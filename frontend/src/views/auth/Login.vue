@@ -132,29 +132,35 @@ const handleLogin = async () => {
   errorMessage.value = ''
 
   try {
-    // Use auth store login method
     const result = await authStore.login({
       email: form.value.email,
       password: form.value.password,
       remember: form.value.remember
     })
 
-    if (result.success) {
-      // Show success message
-      uiStore.showToast({
-        type: 'success',
-        title: 'Login Successful',
-        message: 'Welcome back!'
-      })
+    if (result && result.success) {
+      // Try toast but don't crash if it fails
+      try {
+        if (uiStore && uiStore.showToast) {
+          uiStore.showToast({
+            type: 'success',
+            title: 'Login Successful',
+            message: 'Welcome back!'
+          })
+        }
+      } catch (e) {
+        console.warn('Toast failed:', e)
+      }
 
-      // Redirect to admin or intended page
+      // Redirect
       const redirect = route.query.redirect || '/admin'
-      router.push(redirect)
+      await router.push(redirect)
     } else {
-      errorMessage.value = result.error || 'Invalid email or password.'
+      errorMessage.value = result?.error || 'Invalid email or password.'
     }
   } catch (error) {
-    errorMessage.value = 'An error occurred during login. Please try again.'
+    console.error('Login error:', error)
+    errorMessage.value = error.message || 'Login failed'
   } finally {
     isLoading.value = false
   }

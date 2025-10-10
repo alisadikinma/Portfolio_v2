@@ -10,6 +10,12 @@ return Application::configure(basePath: dirname(__DIR__))
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
+        then: function () {
+            // Register Livewire routes
+            \Livewire\Livewire::setUpdateRoute(function ($handle) {
+                return \Illuminate\Support\Facades\Route::post('livewire/update', $handle);
+            });
+        },
     )
     ->withMiddleware(function (Middleware $middleware): void {
         // Add CORS middleware for API

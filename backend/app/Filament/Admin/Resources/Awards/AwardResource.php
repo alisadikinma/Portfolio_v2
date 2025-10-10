@@ -19,6 +19,12 @@ class AwardResource extends Resource
     protected static ?string $model = Award::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    
+    protected static ?string $navigationLabel = 'Awards';
+    
+    protected static ?string $pluralModelLabel = 'Awards';
+    
+    protected static ?int $navigationSort = 40;
 
     public static function form(Schema $schema): Schema
     {

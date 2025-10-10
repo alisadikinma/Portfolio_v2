@@ -21,6 +21,12 @@ class PostResource extends Resource
     protected static ?string $model = Post::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    
+    protected static ?string $navigationLabel = 'Posts';
+    
+    protected static ?string $pluralModelLabel = 'Posts';
+    
+    protected static ?int $navigationSort = 20;
 
     public static function form(Schema $schema): Schema
     {
