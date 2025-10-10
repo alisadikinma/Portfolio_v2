@@ -2,11 +2,35 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AwardController;
+use App\Http\Controllers\Api\ProjectController;
+use App\Http\Controllers\Api\PostController;
+use App\Http\Controllers\Api\CategoryController;
+use App\Http\Controllers\Api\GalleryController;
+use App\Http\Controllers\Api\ContactController;
+
+// ============================================
+// Authentication Routes
+// ============================================
+
+// Public Authentication Routes
+Route::post('/auth/login', [AuthController::class, 'login']);
+Route::post('/auth/register', [AuthController::class, 'register']);
+
+// Protected Authentication Routes
+Route::middleware(['auth:sanctum'])->group(function () {
+    Route::post('/auth/logout', [AuthController::class, 'logout']);
+    Route::get('/auth/me', [AuthController::class, 'me']);
+});
 
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
+
+// ============================================
+// Public API Routes
+// ============================================
 
 // Public Awards Routes
 Route::prefix('awards')->group(function () {
@@ -15,9 +39,71 @@ Route::prefix('awards')->group(function () {
     Route::get('/{id}/galleries', [AwardController::class, 'getGalleries']);
 });
 
-// Admin Awards Routes (Protected)
+// Public Projects Routes
+Route::prefix('projects')->group(function () {
+    Route::get('/', [ProjectController::class, 'index']);
+    Route::get('/{slug}', [ProjectController::class, 'show']);
+});
+
+// Public Posts Routes
+Route::prefix('posts')->group(function () {
+    Route::get('/', [PostController::class, 'index']);
+    Route::get('/{slug}', [PostController::class, 'show']);
+});
+
+// Public Categories Routes
+Route::prefix('categories')->group(function () {
+    Route::get('/', [CategoryController::class, 'index']);
+    Route::get('/{slug}', [CategoryController::class, 'show']);
+});
+
+// Public Gallery Routes
+Route::prefix('gallery')->group(function () {
+    Route::get('/', [GalleryController::class, 'index']);
+    Route::get('/{id}', [GalleryController::class, 'show']);
+});
+
+// Public Contact Route
+Route::post('/contact', [ContactController::class, 'store']);
+
+// ============================================
+// Admin API Routes (Protected)
+// ============================================
+
+// Admin Awards Routes
 Route::middleware(['auth:sanctum'])->prefix('admin/awards')->group(function () {
     Route::post('/{id}/galleries', [AwardController::class, 'linkGallery']);
     Route::delete('/{id}/galleries/{galleryId}', [AwardController::class, 'unlinkGallery']);
     Route::put('/{id}/galleries/reorder', [AwardController::class, 'reorderGalleries']);
+});
+
+// Admin Projects Routes
+Route::middleware(['auth:sanctum'])->prefix('admin/projects')->group(function () {
+    Route::post('/', [ProjectController::class, 'store']);
+    Route::put('/{id}', [ProjectController::class, 'update']);
+    Route::delete('/{id}', [ProjectController::class, 'destroy']);
+});
+
+// Admin Posts Routes
+Route::middleware(['auth:sanctum'])->prefix('admin/posts')->group(function () {
+    Route::post('/', [PostController::class, 'store']);
+    Route::put('/{id}', [PostController::class, 'update']);
+    Route::delete('/{id}', [PostController::class, 'destroy']);
+});
+
+// Admin Gallery Routes
+Route::middleware(['auth:sanctum'])->prefix('admin/gallery')->group(function () {
+    Route::post('/', [GalleryController::class, 'store']);
+    Route::post('/bulk-upload', [GalleryController::class, 'bulkUpload']);
+    Route::put('/{id}', [GalleryController::class, 'update']);
+    Route::delete('/{id}', [GalleryController::class, 'destroy']);
+    Route::post('/bulk-delete', [GalleryController::class, 'bulkDelete']);
+});
+
+// Admin Contact Routes
+Route::middleware(['auth:sanctum'])->prefix('admin/contacts')->group(function () {
+    Route::get('/', [ContactController::class, 'index']);
+    Route::get('/{id}', [ContactController::class, 'show']);
+    Route::patch('/{id}/mark-as-read', [ContactController::class, 'markAsRead']);
+    Route::delete('/{id}', [ContactController::class, 'destroy']);
 });

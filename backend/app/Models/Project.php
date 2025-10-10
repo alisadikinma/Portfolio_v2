@@ -78,4 +78,20 @@ class Project extends Model
     {
         return $query->where('category', $category);
     }
+
+    /**
+     * Get the translations for the project.
+     */
+    public function translations()
+    {
+        return $this->hasMany(ProjectTranslation::class);
+    }
+
+    /**
+     * Get translation for specific language
+     */
+    public function translation($language = 'en')
+    {
+        return $this->translations()->where('language', $language)->first();
+    }
 }
