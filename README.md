@@ -5,20 +5,24 @@ Modern full-stack portfolio website built with Laravel and Vue.js, featuring a r
 ## 🌟 Features
 
 - **Responsive Design**: Mobile-first approach with seamless experience across all devices
-- **Modern UI/UX**: Clean, professional interface with smooth animations  
+- **Modern UI/UX**: Clean, professional interface with smooth animations
 - **Project Showcase**: Dynamic project gallery with filtering and detailed case studies
 - **Blog System**: Full-featured blog with categories, tags, and rich content
+- **Awards & Recognition**: Showcase achievements with featured awards section
+- **Client Testimonials**: Auto-rotating carousel with star ratings and client feedback
+- **Dynamic Settings**: Flexible settings system for site-wide configuration
 - **Contact Form**: Integrated contact system with email notifications
-- **Admin Panel**: Laravel Jetstream admin dashboard for content management
+- **Admin Panel**: FilamentPHP admin dashboard for content management
 - **API-First**: RESTful API with Laravel Sanctum authentication
 - **SEO Optimized**: Proper meta tags, semantic HTML, and sitemap generation
 - **Performance**: Optimized images, lazy loading, and efficient caching
+- **Dark Mode**: Full dark mode support across all sections
 
 ## 🚀 Tech Stack
 
 ### Backend
 - **Laravel 10.x** - PHP framework
-- **Laravel Jetstream** - Authentication scaffolding
+- **FilamentPHP 4.x** - Modern admin panel framework
 - **Laravel Sanctum** - API authentication
 - **Livewire 3.x** - Dynamic components
 - **MySQL** - Database (via XAMPP)
@@ -269,14 +273,35 @@ PUT    /api/projects/{id}      # Update project (auth required)
 DELETE /api/projects/{id}      # Delete project (auth required)
 ```
 
-For complete API documentation, see `backend/README.md`
+### Awards
+```
+GET    /api/awards             # Get all awards
+GET    /api/awards/{id}        # Get single award
+GET    /api/awards/{id}/galleries  # Get award galleries
+```
+
+### Testimonials
+```
+GET    /api/testimonials       # Get all testimonials
+GET    /api/testimonials/{id}  # Get single testimonial
+```
+
+### Settings
+```
+GET    /api/settings           # Get all settings
+GET    /api/settings/{group}   # Get settings by group (profile, general, about, hero)
+```
+
+For complete API documentation, see `backend/README.md` or `API_TESTING_GUIDE.md`
 
 ## 📖 Documentation
 
-- [Backend Documentation](./backend/README.md) - Laravel API guide
-- [Frontend Documentation](./frontend/README.md) - Vue.js development guide
-- [Deployment Guide](./docs/DEPLOYMENT.md) - Production deployment
-- [API Reference](./backend/docs/API.md) - Complete API documentation
+- **[Backend Documentation](./backend/README.md)** - Laravel API guide
+- **[Frontend Documentation](./frontend/README.md)** - Vue.js development guide
+- **[Implementation Summary](./IMPLEMENTATION_SUMMARY.md)** - Recent features and changes
+- **[Quick Start Guide](./QUICK_START.md)** - Get up and running quickly
+- **[API Testing Guide](./API_TESTING_GUIDE.md)** - Test API endpoints
+- **[Verification Checklist](./frontend/VERIFICATION_CHECKLIST.md)** - QA testing checklist
 
 ## 🤝 Contributing
 

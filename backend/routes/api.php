@@ -9,6 +9,8 @@ use App\Http\Controllers\Api\PostController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\GalleryController;
 use App\Http\Controllers\Api\ContactController;
+use App\Http\Controllers\API\TestimonialController;
+use App\Http\Controllers\API\SettingController;
 
 // ============================================
 // Authentication Routes
@@ -65,6 +67,18 @@ Route::prefix('gallery')->group(function () {
 
 // Public Contact Route
 Route::post('/contact', [ContactController::class, 'store']);
+
+// Public Testimonials Routes
+Route::prefix('testimonials')->group(function () {
+    Route::get('/', [TestimonialController::class, 'index']);
+    Route::get('/{id}', [TestimonialController::class, 'show']);
+});
+
+// Public Settings Routes
+Route::prefix('settings')->group(function () {
+    Route::get('/', [SettingController::class, 'index']);
+    Route::get('/{group}', [SettingController::class, 'getByGroup']);
+});
 
 // ============================================
 // Admin API Routes (Protected)

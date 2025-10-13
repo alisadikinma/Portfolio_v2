@@ -33,15 +33,16 @@ class AdminPanelProvider extends PanelProvider
                 'primary' => Color::Amber,
             ])
             ->resources([
-                // Temporarily disabled to debug
-                // \App\Filament\Admin\Resources\Projects\ProjectResource::class,
-                // \App\Filament\Admin\Resources\Posts\PostResource::class,
-                // \App\Filament\Admin\Resources\Categories\CategoryResource::class,
-                // \App\Filament\Admin\Resources\Awards\AwardResource::class,
-                // \App\Filament\Admin\Resources\Services\ServiceResource::class,
-                // \App\Filament\Admin\Resources\Galleries\GalleryResource::class,
-                // \App\Filament\Admin\Resources\Contacts\ContactResource::class,
-                // \App\Filament\Admin\Resources\Newsletters\NewsletterResource::class,
+                \App\Filament\Admin\Resources\Projects\ProjectResource::class,
+                \App\Filament\Admin\Resources\Posts\PostResource::class,
+                \App\Filament\Admin\Resources\Categories\CategoryResource::class,
+                \App\Filament\Admin\Resources\Awards\AwardResource::class,
+                \App\Filament\Admin\Resources\Services\ServiceResource::class,
+                \App\Filament\Admin\Resources\Galleries\GalleryResource::class,
+                \App\Filament\Admin\Resources\Contacts\ContactResource::class,
+                \App\Filament\Admin\Resources\Newsletters\NewsletterResource::class,
+                \App\Filament\Resources\Testimonials\TestimonialResource::class,
+                \App\Filament\Resources\Settings\SettingResource::class,
             ])
             ->pages([
                 Dashboard::class,

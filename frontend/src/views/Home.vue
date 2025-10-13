@@ -93,6 +93,69 @@
       </div>
     </section>
 
+    <!-- Awards & Recognition Section -->
+    <section class="py-20 bg-gray-50 dark:bg-gray-900">
+      <div class="container-custom">
+        <!-- Section Header -->
+        <div class="max-w-2xl mb-16">
+          <p class="text-accent-600 dark:text-accent-400 font-semibold mb-2 uppercase tracking-wider text-sm">
+            Recognition & Achievements
+          </p>
+          <h2 class="text-4xl md:text-5xl font-display font-bold text-gray-900 dark:text-white mb-4">
+            Awards & Honors
+          </h2>
+          <p class="text-xl text-gray-600 dark:text-gray-400">
+            Celebrating milestones and industry recognition
+          </p>
+        </div>
+
+        <BaseLoader v-if="awardsLoading" text="Loading awards..." />
+
+        <!-- Awards Grid -->
+        <div v-else-if="awards.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div
+            v-for="award in awards"
+            :key="award.id"
+            class="card-elevated p-6 hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+          >
+            <!-- Award Icon/Image -->
+            <div class="flex items-start gap-4 mb-4">
+              <div class="flex-shrink-0 w-16 h-16 bg-gradient-to-br from-accent-500 to-secondary-500 rounded-xl flex items-center justify-center">
+                <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
+                </svg>
+              </div>
+              <div class="flex-1">
+                <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-1">
+                  {{ award.award_title }}
+                </h3>
+                <p class="text-sm text-accent-600 dark:text-accent-400 font-semibold">
+                  {{ award.issuing_organization }}
+                </p>
+              </div>
+            </div>
+
+            <!-- Award Details -->
+            <p v-if="award.description" class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              {{ award.description }}
+            </p>
+
+            <!-- Date -->
+            <div class="flex items-center text-xs text-gray-500 dark:text-gray-500">
+              <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+              </svg>
+              {{ formatDate(award.award_date) }}
+            </div>
+          </div>
+        </div>
+
+        <div v-else class="text-center py-12">
+          <p class="text-gray-500 dark:text-gray-400">No awards to display yet.</p>
+        </div>
+      </div>
+    </section>
+
     <!-- Featured Projects - Modern Grid -->
     <section class="py-20 bg-gray-50 dark:bg-gray-900">
       <div class="container-custom">
@@ -247,6 +310,125 @@
       </div>
     </section>
 
+    <!-- Testimonials Section -->
+    <section class="py-20 bg-gray-50 dark:bg-gray-900">
+      <div class="container-custom">
+        <!-- Section Header -->
+        <div class="max-w-2xl mb-16 text-center mx-auto">
+          <p class="text-accent-600 dark:text-accent-400 font-semibold mb-2 uppercase tracking-wider text-sm">
+            Client Feedback
+          </p>
+          <h2 class="text-4xl md:text-5xl font-display font-bold text-gray-900 dark:text-white mb-4">
+            What People Say
+          </h2>
+          <p class="text-xl text-gray-600 dark:text-gray-400">
+            Trusted by amazing clients worldwide
+          </p>
+        </div>
+
+        <BaseLoader v-if="testimonialsLoading" text="Loading testimonials..." />
+
+        <!-- Testimonials Carousel -->
+        <div v-else-if="testimonials.length > 0" class="max-w-4xl mx-auto">
+          <div class="relative">
+            <!-- Testimonial Card -->
+            <div class="card-elevated p-8 md:p-12 text-center">
+              <!-- Quote Icon -->
+              <div class="flex justify-center mb-6">
+                <div class="w-16 h-16 bg-gradient-to-br from-accent-500 to-secondary-500 rounded-full flex items-center justify-center">
+                  <svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z"/>
+                  </svg>
+                </div>
+              </div>
+
+              <!-- Stars -->
+              <div class="flex justify-center gap-1 mb-6">
+                <svg
+                  v-for="star in 5"
+                  :key="star"
+                  :class="star <= testimonials[currentTestimonialIndex].star_rating ? 'text-yellow-400' : 'text-gray-300 dark:text-gray-600'"
+                  class="w-6 h-6"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                </svg>
+              </div>
+
+              <!-- Testimonial Text -->
+              <p class="text-xl md:text-2xl text-gray-700 dark:text-gray-300 mb-8 leading-relaxed italic">
+                "{{ testimonials[currentTestimonialIndex].testimonial_text }}"
+              </p>
+
+              <!-- Client Info -->
+              <div class="flex items-center justify-center gap-4">
+                <img
+                  v-if="testimonials[currentTestimonialIndex].client_photo"
+                  :src="testimonials[currentTestimonialIndex].client_photo"
+                  :alt="testimonials[currentTestimonialIndex].client_name"
+                  class="w-16 h-16 rounded-full object-cover border-4 border-white dark:border-gray-700"
+                />
+                <div class="flex-shrink-0 w-16 h-16 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-full flex items-center justify-center border-4 border-white dark:border-gray-700" v-else>
+                  <span class="text-2xl font-bold text-white">
+                    {{ testimonials[currentTestimonialIndex].client_name.charAt(0) }}
+                  </span>
+                </div>
+                <div class="text-left">
+                  <p class="font-bold text-gray-900 dark:text-white text-lg">
+                    {{ testimonials[currentTestimonialIndex].client_name }}
+                  </p>
+                  <p class="text-gray-600 dark:text-gray-400 text-sm">
+                    {{ testimonials[currentTestimonialIndex].client_company }}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Navigation Dots -->
+            <div class="flex justify-center gap-2 mt-8">
+              <button
+                v-for="(testimonial, index) in testimonials"
+                :key="testimonial.id"
+                @click="currentTestimonialIndex = index"
+                :class="[
+                  'w-3 h-3 rounded-full transition-all duration-300',
+                  index === currentTestimonialIndex
+                    ? 'bg-accent-600 w-8'
+                    : 'bg-gray-300 dark:bg-gray-600 hover:bg-accent-400'
+                ]"
+                :aria-label="`View testimonial ${index + 1}`"
+              ></button>
+            </div>
+
+            <!-- Navigation Arrows -->
+            <button
+              @click="currentTestimonialIndex = currentTestimonialIndex > 0 ? currentTestimonialIndex - 1 : testimonials.length - 1"
+              class="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-12 w-12 h-12 bg-white dark:bg-gray-800 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center text-gray-700 dark:text-gray-300 hover:text-accent-600 dark:hover:text-accent-400"
+              aria-label="Previous testimonial"
+            >
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+              </svg>
+            </button>
+            <button
+              @click="currentTestimonialIndex = (currentTestimonialIndex + 1) % testimonials.length"
+              class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-12 w-12 h-12 bg-white dark:bg-gray-800 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center text-gray-700 dark:text-gray-300 hover:text-accent-600 dark:hover:text-accent-400"
+              aria-label="Next testimonial"
+            >
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div v-else class="text-center py-12">
+          <p class="text-gray-500 dark:text-gray-400">No testimonials to display yet.</p>
+        </div>
+      </div>
+    </section>
+
     <!-- CTA Section - Clean & Direct -->
     <section class="relative py-20 bg-gradient-to-br from-primary-600 via-secondary-600 to-accent-600 overflow-hidden">
       <!-- Subtle Pattern -->
@@ -276,10 +458,15 @@
 import { ref, onMounted } from 'vue'
 import { useProjects } from '@/composables/useProjects'
 import { usePosts } from '@/composables/usePosts'
+import { useAwards } from '@/composables/useAwards'
+import { useTestimonials } from '@/composables/useTestimonials'
 import { BaseLoader } from '@/components/base'
 
 const { projects: featuredProjects, isLoading: projectsLoading, fetchProjects } = useProjects()
 const { posts: latestPosts, isLoading: postsLoading, fetchPosts } = usePosts()
+const { awards, isLoading: awardsLoading, fetchAwards } = useAwards()
+const { testimonials, isLoading: testimonialsLoading, fetchTestimonials } = useTestimonials()
+const currentTestimonialIndex = ref(0)
 
 const stats = [
   { value: '50+', label: 'Projects' },
@@ -301,9 +488,31 @@ const formatDate = (date) => {
   })
 }
 
+// Auto-rotate testimonials
+const rotateTestimonials = () => {
+  if (testimonials.value.length > 0) {
+    currentTestimonialIndex.value = (currentTestimonialIndex.value + 1) % testimonials.value.length
+  }
+}
+
+let testimonialInterval
+
 onMounted(async () => {
   await fetchProjects({ featured: true, limit: 4 })
   await fetchPosts({ limit: 3 })
+  await fetchAwards({ featured: true, limit: 6 })
+  await fetchTestimonials({ featured: true, limit: 5 })
+  
+  // Start testimonial rotation
+  testimonialInterval = setInterval(rotateTestimonials, 5000)
+})
+
+// Cleanup on unmount
+import { onUnmounted } from 'vue'
+onUnmounted(() => {
+  if (testimonialInterval) {
+    clearInterval(testimonialInterval)
+  }
 })
 </script>
 
