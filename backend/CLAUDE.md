@@ -1,632 +1,532 @@
-# CLAUDE.md - Backend (Laravel)
+# CLAUDE.md - Backend API
 
-**IMPORTANT**: This is the backend-specific CLAUDE.md. Always read the root `/CLAUDE.md` first for general project context.
+This file provides guidance to Claude Code when working with the Laravel backend API.
 
-## Laravel Backend Specific Guidelines
+**Context:** Read root `/CLAUDE.md` first for general project architecture.
 
-### Laravel Version & Stack
-- Laravel 10.x
-- PHP 8.2
-- MySQL (via XAMPP)
-- Laravel Jetstream (authentication)
-- Laravel Sanctum (API authentication)
-- Livewire 3.x (dynamic components)
+## Quick Reference
 
----
+**Framework:** Laravel 10 | **PHP:** 8.2 | **Database:** MySQL 8 (portfolio_v2)
+**Server:** XAMPP Apache (Port 80) - **DO NOT** use `php artisan serve`
+**API Base:** `http://localhost/Portfolio_v2/backend/public/api`
 
-## Code Quality Standards
+## Architecture Overview
 
-### PSR-12 Compliance
-- Follow PSR-12 coding standards
-- Use 4 spaces for indentation (not tabs)
-- Opening braces on same line for classes/methods
-- Use strict types: `declare(strict_types=1);`
+### Core Pattern: RESTful API with i18n Support
 
-### Type Hints
-**ALWAYS** use type hints for parameters and return types:
+This backend implements full internationalization (EN/ID) with:
+
+1. **Slug-based routing** - Public endpoints use slugs (`/posts/{slug}`), not IDs
+2. **Trait-based models** - Models use `HasSeoFields`, `HasSlug`, `SoftDeletes`
+3. **Translation system** - Separate translation tables (`post_translations`)
+4. **Eager loading** - Always load relationships to avoid N+1 queries
+5. **Resource transformation** - All responses via API Resources
+6. **Validation layer** - Form Requests for all input validation
+
+### Request Flow
+```
+Request → Route → Controller → FormRequest (validate)
+→ Model (with traits) → Resource (transform) → JSON Response
+```
+
+## Model Trait System
+
+### 1. HasSeoFields (`app/Traits/HasSeoFields.php`)
+
+Provides comprehensive SEO/GEO functionality:
 
 ```php
-public function store(StoreUserRequest $request): JsonResponse
-{
-    $user = User::create($request->validated());
-    return response()->json(new UserResource($user), 201);
+use App\Traits\HasSeoFields;
+
+class Post extends Model {
+    use HasSeoFields;
+}
+
+// Available methods:
+$post->getSeoMetaAttribute()       // ['title', 'description', 'keywords', 'canonical', 'robots']
+$post->getOgMetaAttribute()        // ['title', 'description', 'image', 'type', 'url']
+$post->getSchemaMarkupAttribute()  // JSON-LD structured data
+$post->calculateSeoScore()         // Returns 0-100 score
+$post->generateAiSummary()         // GEO-optimized summary
+
+// Auto-calculated on save:
+$post->save(); // seo_score automatically updated
+```
+
+**SEO Fields Available:**
+- `meta_title`, `meta_description`, `meta_keywords`
+- `og_title`, `og_description`, `og_image`
+- `schema_markup` (JSON), `canonical_url`
+- `ai_summary` (GEO), `faq_schema` (JSON)
+- `seo_score` (auto-calculated), `index_follow` (boolean)
+
+### 2. HasSlug (Spatie\Sluggable)
+
+Auto-generates slugs from titles:
+
+```php
+use Spatie\Sluggable\HasSlug;
+
+public function getSlugOptions(): SlugOptions {
+    return SlugOptions::create()
+        ->generateSlugsFrom('title')
+        ->saveSlugsTo('slug');
+}
+
+// Slug-based routing
+public function getRouteKeyName() {
+    return 'slug';
 }
 ```
 
----
+### 3. SoftDeletes (for Post/Project)
 
-## Laravel Patterns & Conventions
+Trash/restore functionality:
 
-### Controllers
-
-**Resource Controllers** are preferred:
 ```php
-php artisan make:controller PostController --resource
+use Illuminate\Database\Eloquent\SoftDeletes;
+
+$post->delete();       // Soft delete
+$post->restore();      // Restore
+$post->forceDelete();  // Permanent delete
+Post::withTrashed()->get(); // Include trashed
 ```
 
-**API Controllers** should:
-- Return `JsonResponse` with proper HTTP status codes
-- Use API Resources for transformation
-- Use Form Requests for validation
-- Handle exceptions gracefully
+### 4. Model Scopes
 
-**Example:**
+Common query scopes for filtering:
+
 ```php
+// Post.php
+public function scopePublished($query) {
+    return $query->where('published', true)
+                 ->whereNotNull('published_at')
+                 ->where('published_at', '<=', now());
+}
+
+// Usage:
+$posts = Post::published()->with('category')->paginate(15);
+$posts = Post::published()->free()->latest()->get();
+```
+
+## Translation System
+
+Posts and Projects support i18n via `post_translations` / `project_translations`:
+
+```php
+// Relationships
+public function translations() {
+    return $this->hasMany(PostTranslation::class);
+}
+
+public function translation($language = 'en') {
+    return $this->translations()->where('language', $language)->first();
+}
+
+// Always eager load:
+$posts = Post::with(['category', 'translations'])->get();
+
+// In controller:
+$language = $request->query('lang',
+    $request->header('Accept-Language', 'en'));
+```
+
+## Controller Patterns
+
+### Standard Structure (PostController Example)
+
+```php
+use App\Http\Resources\PostResource;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+
 class PostController extends Controller
 {
-    public function index(): JsonResponse
+    // PUBLIC: List posts
+    public function index(Request $request): JsonResponse
     {
-        $posts = Post::with('author', 'category')
-            ->latest()
-            ->paginate(15);
-            
-        return response()->json([
-            'success' => true,
-            'data' => PostResource::collection($posts)
-        ]);
-    }
-    
-    public function store(StorePostRequest $request): JsonResponse
-    {
-        $post = Post::create($request->validated());
-        
-        return response()->json([
-            'success' => true,
-            'data' => new PostResource($post),
-            'message' => 'Post created successfully'
-        ], 201);
-    }
-    
-    public function update(UpdatePostRequest $request, Post $post): JsonResponse
-    {
-        $post->update($request->validated());
-        
-        return response()->json([
-            'success' => true,
-            'data' => new PostResource($post),
-            'message' => 'Post updated successfully'
-        ]);
-    }
-    
-    public function destroy(Post $post): JsonResponse
-    {
-        $post->delete();
-        
-        return response()->json([
-            'success' => true,
-            'message' => 'Post deleted successfully'
-        ]);
-    }
-}
-```
-
-### Models
-
-**Eloquent Best Practices:**
-
-```php
-<?php
-
-namespace App\Models;
-
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-
-class Post extends Model
-{
-    use HasFactory;
-    
-    // Mass assignment protection
-    protected $fillable = [
-        'title',
-        'slug',
-        'content',
-        'excerpt',
-        'published_at',
-        'user_id',
-        'category_id',
-    ];
-    
-    // Attributes hidden from JSON
-    protected $hidden = [
-        'created_at',
-        'updated_at',
-    ];
-    
-    // Attribute casting
-    protected $casts = [
-        'published_at' => 'datetime',
-        'is_featured' => 'boolean',
-    ];
-    
-    // Relationships
-    public function author(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'user_id');
-    }
-    
-    public function category(): BelongsTo
-    {
-        return $this->belongsTo(Category::class);
-    }
-    
-    public function comments(): HasMany
-    {
-        return $this->hasMany(Comment::class);
-    }
-    
-    // Scopes
-    public function scopePublished($query)
-    {
-        return $query->whereNotNull('published_at')
-                    ->where('published_at', '<=', now());
-    }
-    
-    public function scopeFeatured($query)
-    {
-        return $query->where('is_featured', true);
-    }
-}
-```
-
-### Form Requests
-
-**ALWAYS** use Form Requests for validation:
-
-```php
-<?php
-
-namespace App\Http\Requests;
-
-use Illuminate\Foundation\Http\FormRequest;
-
-class StorePostRequest extends FormRequest
-{
-    public function authorize(): bool
-    {
-        return true; // or implement authorization logic
-    }
-    
-    public function rules(): array
-    {
-        return [
-            'title' => 'required|string|max:255',
-            'slug' => 'required|string|unique:posts,slug',
-            'content' => 'required|string',
-            'excerpt' => 'nullable|string|max:500',
-            'category_id' => 'required|exists:categories,id',
-            'published_at' => 'nullable|date',
-            'is_featured' => 'boolean',
-        ];
-    }
-    
-    public function messages(): array
-    {
-        return [
-            'title.required' => 'Post title is required',
-            'slug.unique' => 'This slug is already taken',
-        ];
-    }
-}
-```
-
-### API Resources
-
-**Transform Eloquent models** with API Resources:
-
-```php
-<?php
-
-namespace App\Http\Resources;
-
-use Illuminate\Http\Request;
-use Illuminate\Http\Resources\Json\JsonResource;
-
-class PostResource extends JsonResource
-{
-    public function toArray(Request $request): array
-    {
-        return [
-            'id' => $this->id,
-            'title' => $this->title,
-            'slug' => $this->slug,
-            'excerpt' => $this->excerpt,
-            'content' => $this->content,
-            'published_at' => $this->published_at?->format('Y-m-d H:i:s'),
-            'is_featured' => $this->is_featured,
-            
-            // Relationships (only when loaded)
-            'author' => new UserResource($this->whenLoaded('author')),
-            'category' => new CategoryResource($this->whenLoaded('category')),
-            'comments_count' => $this->when(
-                $this->relationLoaded('comments'), 
-                fn() => $this->comments->count()
-            ),
-        ];
-    }
-}
-```
-
----
-
-## Database & Migrations
-
-### Migration Best Practices
-
-```php
-<?php
-
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration
-{
-    public function up(): void
-    {
-        Schema::create('posts', function (Blueprint $table) {
-            $table->id();
-            $table->string('title');
-            $table->string('slug')->unique();
-            $table->text('content');
-            $table->text('excerpt')->nullable();
-            $table->timestamp('published_at')->nullable();
-            $table->boolean('is_featured')->default(false);
-            
-            // Foreign keys
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('category_id')->constrained()->cascadeOnDelete();
-            
-            // Indexes
-            $table->index('published_at');
-            $table->index('is_featured');
-            
-            $table->timestamps();
-        });
-    }
-    
-    public function down(): void
-    {
-        Schema::dropIfExists('posts');
-    }
-};
-```
-
-### Factories
-
-**Use factories for testing data:**
-
-```php
-<?php
-
-namespace Database\Factories;
-
-use App\Models\Category;
-use App\Models\User;
-use Illuminate\Database\Eloquent\Factories\Factory;
-use Illuminate\Support\Str;
-
-class PostFactory extends Factory
-{
-    public function definition(): array
-    {
-        $title = fake()->sentence();
-        
-        return [
-            'title' => $title,
-            'slug' => Str::slug($title),
-            'content' => fake()->paragraphs(5, true),
-            'excerpt' => fake()->sentence(),
-            'published_at' => fake()->dateTimeBetween('-1 year', '+1 month'),
-            'is_featured' => fake()->boolean(20), // 20% chance
-            'user_id' => User::factory(),
-            'category_id' => Category::factory(),
-        ];
-    }
-    
-    public function unpublished(): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'published_at' => null,
-        ]);
-    }
-    
-    public function featured(): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'is_featured' => true,
-        ]);
-    }
-}
-```
-
----
-
-## Testing
-
-### Feature Tests
-
-```php
-<?php
-
-namespace Tests\Feature;
-
-use App\Models\Post;
-use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
-
-class PostControllerTest extends TestCase
-{
-    use RefreshDatabase;
-    
-    public function test_can_list_posts(): void
-    {
-        Post::factory()->count(5)->create();
-        
-        $response = $this->getJson('/api/posts');
-        
-        $response->assertStatus(200)
-                 ->assertJsonStructure([
-                     'success',
-                     'data' => [
-                         '*' => ['id', 'title', 'slug', 'excerpt']
-                     ]
-                 ]);
-    }
-    
-    public function test_can_create_post(): void
-    {
-        $user = User::factory()->create();
-        
-        $data = [
-            'title' => 'Test Post',
-            'slug' => 'test-post',
-            'content' => 'Test content',
-            'category_id' => Category::factory()->create()->id,
-        ];
-        
-        $response = $this->actingAs($user)
-                         ->postJson('/api/posts', $data);
-        
-        $response->assertStatus(201)
-                 ->assertJson([
-                     'success' => true,
-                     'data' => ['title' => 'Test Post']
-                 ]);
-        
-        $this->assertDatabaseHas('posts', [
-            'title' => 'Test Post',
-            'slug' => 'test-post',
-        ]);
-    }
-    
-    public function test_cannot_create_post_without_authentication(): void
-    {
-        $response = $this->postJson('/api/posts', []);
-        
-        $response->assertStatus(401);
-    }
-}
-```
-
----
-
-## Performance Optimization
-
-### Eager Loading (N+1 Prevention)
-
-**ALWAYS** eager load relationships:
-
-```php
-// ❌ BAD - N+1 query problem
-$posts = Post::all();
-foreach ($posts as $post) {
-    echo $post->author->name; // Extra query for EACH post
-}
-
-// ✅ GOOD - Only 2 queries
-$posts = Post::with('author')->get();
-foreach ($posts as $post) {
-    echo $post->author->name; // No extra queries
-}
-
-// ✅ BEST - Multiple relationships
-$posts = Post::with(['author', 'category', 'comments'])
-    ->latest()
-    ->paginate(15);
-```
-
-### Query Optimization
-
-```php
-// Use select to fetch only needed columns
-$users = User::select('id', 'name', 'email')->get();
-
-// Use pagination for large datasets
-$posts = Post::latest()->paginate(20);
-
-// Use cursor pagination for large tables
-$posts = Post::latest()->cursorPaginate(20);
-
-// Use chunk for processing large datasets
-Post::chunk(100, function ($posts) {
-    foreach ($posts as $post) {
-        // Process post
-    }
-});
-```
-
-### Caching
-
-```php
-use Illuminate\Support\Facades\Cache;
-
-// Cache for 1 hour
-$posts = Cache::remember('posts.all', 3600, function () {
-    return Post::with('author')->latest()->get();
-});
-
-// Cache forever (until manually cleared)
-$categories = Cache::rememberForever('categories.all', function () {
-    return Category::all();
-});
-
-// Clear cache
-Cache::forget('posts.all');
-Cache::flush(); // Clear all cache
-```
-
----
-
-## Security
-
-### Authentication & Authorization
-
-```php
-// Use Laravel Sanctum for API authentication
-// routes/api.php
-Route::middleware('auth:sanctum')->group(function () {
-    Route::apiResource('posts', PostController::class);
-});
-
-// Check authorization in controller
-public function update(UpdatePostRequest $request, Post $post): JsonResponse
-{
-    $this->authorize('update', $post);
-    
-    $post->update($request->validated());
-    
-    return response()->json(['success' => true]);
-}
-
-// Or use Policy
-// app/Policies/PostPolicy.php
-public function update(User $user, Post $post): bool
-{
-    return $user->id === $post->user_id;
-}
-```
-
-### Input Validation
-
-**NEVER** trust user input:
-
-```php
-// ❌ BAD - Direct input without validation
-$post = Post::create($request->all());
-
-// ✅ GOOD - Use Form Request
-public function store(StorePostRequest $request): JsonResponse
-{
-    $post = Post::create($request->validated());
-    return response()->json(new PostResource($post), 201);
-}
-```
-
----
-
-## Error Handling
-
-### Global Exception Handler
-
-```php
-// app/Exceptions/Handler.php
-public function render($request, Throwable $e)
-{
-    if ($request->is('api/*')) {
-        if ($e instanceof ValidationException) {
-            return response()->json([
-                'success' => false,
-                'error' => [
-                    'code' => 'VALIDATION_ERROR',
-                    'message' => 'The given data was invalid.',
-                    'details' => $e->errors()
-                ]
-            ], 422);
+        // 1. Get language preference
+        $language = $request->query('lang',
+            $request->header('Accept-Language', 'en'));
+        $language = strtolower(substr($language, 0, 2));
+
+        // 2. Build query with eager loading
+        $query = Post::with(['category', 'translations'])
+            ->where('published', true)
+            ->whereNotNull('published_at')
+            ->where('published_at', '<=', now());
+
+        // 3. Apply filters
+        if ($request->has('category')) {
+            $query->whereHas('category', function($q) use ($request) {
+                $q->where('slug', $request->query('category'));
+            });
         }
-        
-        if ($e instanceof ModelNotFoundException) {
+
+        if ($request->has('search')) {
+            $search = $request->query('search');
+            $query->where(function($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                  ->orWhere('content', 'like', "%{$search}%");
+            });
+        }
+
+        // 4. Sort and paginate
+        $query->orderBy('published_at', 'desc');
+        $perPage = min($request->query('per_page', 15), 50);
+        $posts = $query->paginate($perPage);
+
+        // 5. Return with pagination meta
+        return response()->json([
+            'data' => PostResource::collection($posts)
+                ->additional(['lang' => $language]),
+            'meta' => [
+                'current_page' => $posts->currentPage(),
+                'last_page' => $posts->lastPage(),
+                'per_page' => $posts->perPage(),
+                'total' => $posts->total(),
+            ],
+            'links' => [
+                'first' => $posts->url(1),
+                'last' => $posts->url($posts->lastPage()),
+                'prev' => $posts->previousPageUrl(),
+                'next' => $posts->nextPageUrl(),
+            ],
+        ]);
+    }
+
+    // PUBLIC: Show single post by slug
+    public function show(Request $request, string $slug): JsonResponse
+    {
+        $language = $request->query('lang',
+            $request->header('Accept-Language', 'en'));
+
+        $post = Post::with(['category', 'translations'])
+            ->where('slug', $slug)
+            ->where('published', true)
+            ->first();
+
+        if (!$post) {
             return response()->json([
-                'success' => false,
-                'error' => [
-                    'code' => 'NOT_FOUND',
-                    'message' => 'Resource not found.'
-                ]
+                'message' => 'Post not found',
+                'error' => 'The requested post does not exist.'
             ], 404);
         }
-        
-        // Generic error
+
+        // Track views
+        $post->incrementViews();
+
         return response()->json([
-            'success' => false,
-            'error' => [
-                'code' => 'SERVER_ERROR',
-                'message' => 'An error occurred while processing your request.'
-            ]
-        ], 500);
+            'data' => (new PostResource($post))
+                ->additional(['lang' => $language])
+        ]);
     }
-    
-    return parent::render($request, $e);
+
+    // PROTECTED: Create post (auth:sanctum)
+    public function store(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'category_id' => ['required', 'integer', 'exists:categories,id'],
+            'title' => ['required', 'string', 'max:255'],
+            'content' => ['required', 'string'],
+            'translations' => ['required', 'array', 'min:1'],
+            'translations.*.language' => ['required', Rule::in(['en', 'id'])],
+            'translations.*.title' => ['required', 'string'],
+            'translations.*.content' => ['required', 'string'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $post = Post::create($request->only([
+                'category_id', 'title', 'slug', 'content',
+                'excerpt', 'featured_image', 'tags',
+                'is_premium', 'published', 'published_at'
+            ]));
+
+            foreach ($request->input('translations', []) as $translation) {
+                $post->translations()->create($translation);
+            }
+
+            DB::commit();
+            $post->load(['category', 'translations']);
+
+            return response()->json([
+                'message' => 'Post created successfully',
+                'data' => new PostResource($post)
+            ], 201);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Failed to create post',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }
 ```
 
----
+### Response Format Standards
 
-## API Routes Structure
+**Success:**
+```json
+{
+  "data": {...},
+  "message": "Operation successful"
+}
+```
+
+**Error:**
+```json
+{
+  "message": "Error description",
+  "error": "Detailed error message"
+}
+```
+
+**Validation Error:**
+```json
+{
+  "message": "Validation failed",
+  "errors": {
+    "field_name": ["Error message"]
+  }
+}
+```
+
+## Database Patterns
+
+### Eager Loading (Critical!)
+
+**Always use `with()` to avoid N+1 queries:**
 
 ```php
-// routes/api.php
-use App\Http\Controllers\Api\{
-    AuthController,
-    PostController,
-    CategoryController,
-    CommentController
-};
+// ❌ Bad - N+1 queries (1 + N additional queries)
+$posts = Post::all();
+foreach ($posts as $post) {
+    echo $post->category->name; // N queries
+}
 
-// Public routes
-Route::post('/login', [AuthController::class, 'login']);
-Route::post('/register', [AuthController::class, 'register']);
+// ✅ Good - Only 2 queries total
+$posts = Post::with('category')->get();
 
-// Public resource routes
-Route::get('/posts', [PostController::class, 'index']);
-Route::get('/posts/{post:slug}', [PostController::class, 'show']);
-Route::get('/categories', [CategoryController::class, 'index']);
+// ✅ Best - Multiple relationships
+$posts = Post::with(['category', 'translations', 'author'])->get();
 
-// Protected routes
-Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/logout', [AuthController::class, 'logout']);
-    Route::get('/user', [AuthController::class, 'user']);
-    
-    Route::apiResource('posts', PostController::class)->except(['index', 'show']);
-    Route::apiResource('categories', CategoryController::class);
-    Route::apiResource('posts.comments', CommentController::class);
+// ✅ Nested relationships
+$posts = Post::with('category.parent')->get();
+
+// ✅ Conditional eager loading
+$posts = Post::with(['translations' => function($q) use ($lang) {
+    $q->where('language', $lang);
+}])->get();
+```
+
+### Migration Conventions
+
+```php
+Schema::create('posts', function (Blueprint $table) {
+    $table->id();
+    $table->string('title');
+    $table->string('slug')->unique();
+    $table->text('content');
+
+    // Foreign keys with cascade
+    $table->foreignId('category_id')
+          ->constrained()
+          ->cascadeOnDelete();
+
+    // Indexes for frequently queried fields
+    $table->index('slug');
+    $table->index('published_at');
+    $table->index(['category_id', 'published']);
+
+    $table->timestamps();
+    $table->softDeletes(); // For trash functionality
 });
 ```
 
+## Essential Commands
+
+```bash
+# Database
+php artisan migrate                    # Run migrations
+php artisan migrate:fresh --seed       # Nuclear reset with data
+php artisan db:seed                    # Seed only
+
+# Code Generation
+php artisan make:model Post -mcr       # Model + Migration + Controller
+php artisan make:request StorePostRequest
+php artisan make:resource PostResource
+php artisan make:resource PostCollection
+
+# Development
+php artisan route:list                 # All routes
+php artisan route:list --path=api      # API routes only
+php artisan tinker                     # Interactive console
+composer dump-autoload                 # Reload autoloader
+
+# Testing
+php artisan test                       # All tests
+php artisan test --filter=PostTest     # Single test
+php artisan test --coverage            # With coverage
+
+# Cache Management
+php artisan cache:clear                # Clear app cache
+php artisan config:clear               # Clear config cache
+php artisan route:clear                # Clear route cache
+php artisan optimize:clear             # Clear all caches
+```
+
+## Testing Patterns
+
+```php
+// tests/Feature/PostControllerTest.php
+use App\Models\{User, Post};
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+test('can list published posts', function () {
+    Post::factory()->published()->count(3)->create();
+
+    $response = $this->getJson('/api/posts');
+
+    $response->assertStatus(200)
+             ->assertJsonStructure([
+                 'data' => ['*' => ['id', 'title', 'slug']],
+                 'meta',
+                 'links'
+             ]);
+});
+
+test('can create post with translations', function () {
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user, 'sanctum')
+        ->postJson('/api/admin/posts', [
+            'title' => 'Test Post',
+            'content' => 'Content here',
+            'category_id' => 1,
+            'translations' => [
+                ['language' => 'en', 'title' => 'Test', 'content' => 'English'],
+                ['language' => 'id', 'title' => 'Tes', 'content' => 'Indonesian']
+            ]
+        ]);
+
+    $response->assertStatus(201);
+    $this->assertDatabaseHas('posts', ['title' => 'Test Post']);
+    $this->assertDatabaseHas('post_translations', ['language' => 'en']);
+});
+
+test('increments views on post show', function () {
+    $post = Post::factory()->published()->create(['views' => 0]);
+
+    $this->getJson("/api/posts/{$post->slug}");
+
+    expect($post->fresh()->views)->toBe(1);
+});
+```
+
+## Common Issues & Solutions
+
+### "Class not found" after creating file
+```bash
+composer dump-autoload
+```
+
+### Migration fails
+```bash
+# Check migration order - parent tables first
+# Or nuclear option:
+php artisan migrate:fresh --seed
+```
+
+### Route not found
+```bash
+php artisan route:clear
+php artisan optimize:clear
+```
+
+### Authentication not working
+```php
+// Ensure auth:sanctum middleware
+// Check Authorization header
+Authorization: Bearer {token}
+```
+
+### N+1 query detection
+```bash
+# Install Laravel Debugbar (dev only)
+composer require barryvdh/laravel-debugbar --dev
+
+# Check queries in browser toolbar
+```
+
+## File Organization
+
+```
+app/
+├── Http/
+│   ├── Controllers/
+│   │   └── Api/                  # All API controllers
+│   ├── Resources/                # API transformers
+│   └── Requests/                 # Form validation
+├── Models/                       # Eloquent models
+└── Traits/
+    └── HasSeoFields.php          # SEO trait
+
+database/
+├── migrations/                   # Schema definitions
+├── seeders/                      # Sample data
+└── factories/                    # Test data
+
+routes/
+└── api.php                       # API routes
+
+tests/
+├── Feature/                      # Integration tests
+└── Unit/                         # Unit tests
+```
+
+## Best Practices Checklist
+
+**Models:**
+- [ ] Use appropriate traits (HasSeoFields, HasSlug, SoftDeletes)
+- [ ] Define relationships with proper type hints
+- [ ] Add query scopes for common filters
+- [ ] Set proper `$fillable` or `$guarded`
+- [ ] Define `$casts` for special types
+- [ ] Use `getRouteKeyName()` for slug routing
+
+**Controllers:**
+- [ ] Eager load all relationships
+- [ ] Support language parameter (`lang` query or `Accept-Language` header)
+- [ ] Use `Validator::make()` or FormRequest
+- [ ] Wrap multi-table ops in `DB::transaction()`
+- [ ] Return via API Resources
+- [ ] Use proper HTTP status codes (200, 201, 404, 422, 500)
+
+**Database:**
+- [ ] Add indexes to foreign keys
+- [ ] Add indexes to frequently queried fields
+- [ ] Use `softDeletes()` for trash functionality
+- [ ] Use `foreignId()->constrained()->cascadeOnDelete()`
+
+**Testing:**
+- [ ] Test all CRUD operations
+- [ ] Test authentication/authorization
+- [ ] Test validation rules
+- [ ] Test eager loading (no N+1)
+- [ ] Test translations if applicable
+
 ---
 
-## Important Reminders
-
-### DO
-✅ Use Form Requests for validation
-✅ Use API Resources for responses
-✅ Eager load relationships
-✅ Use type hints everywhere
-✅ Write tests for all features
-✅ Follow PSR-12 standards
-✅ Use Laravel conventions
-
-### DON'T
-❌ Use raw SQL queries (use Eloquent)
-❌ Skip validation
-❌ Return raw models (use Resources)
-❌ Create N+1 queries
-❌ Skip error handling
-❌ Hardcode values
-❌ Skip type hints
-
----
-
-**This CLAUDE.md is specific to Laravel backend. For frontend guidelines, see `frontend/CLAUDE.md`.**
+**Last Updated:** October 13, 2025
+**See also:** `/CLAUDE.md` (root), `frontend/CLAUDE.md`

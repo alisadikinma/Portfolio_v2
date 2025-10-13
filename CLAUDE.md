@@ -1,626 +1,379 @@
-# CLAUDE.md - Portfolio_v2
+# CLAUDE.md
 
-This file provides guidance to Claude Code when working with the Portfolio_v2 project.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
 
-Portfolio_v2 is a modern full-stack application built with **Laravel 10** (backend) and **Vue 3** (frontend). This is a Windows 11 development environment using XAMPP for local server.
+Portfolio_v2 is a full-stack portfolio and blog platform using Laravel 10 (backend API) and Vue 3 (frontend SPA). Development on Windows 11 with XAMPP.
 
-**IMPORTANT**: Always read `README.md` in root, `backend/README.md`, and `frontend/README.md` at the start of EVERY new conversation for complete context.
+**Critical Context Files:**
+- Read `README.md`, `backend/README.md`, `frontend/README.md` at start of every conversation
+- Check `PROJECT_STATUS.md` for current development state and progress tracking
 
----
+## Environment Architecture
 
-## 🚨 CRITICAL RULES
+### Tech Stack
+**Backend:** Laravel 10 + MySQL 8 + Laravel Sanctum (JWT auth)
+**Frontend:** Vue 3.5 + Vite 7 (Rolldown) + Pinia 3 + Vue Router 4.5 + Tailwind CSS 4
+**Server:** XAMPP (Apache port 80, MySQL port 3306)
 
-### BEFORE Making ANY Changes:
-1. **READ** all three README.md files (root, backend, frontend)
-2. **UNDERSTAND** the existing code patterns by checking sibling files
-3. **VERIFY** your changes won't break existing conventions
-
-### AFTER Making ANY Changes:
-1. **UPDATE** relevant README.md files with new features/changes
-2. **UPDATE** this CLAUDE.md with architectural decisions/patterns
-3. **DOCUMENT** breaking changes or new dependencies
-4. **RUN TESTS** to ensure nothing broke
-
----
-
-## Environment Setup
-
-### Development Environment
-- **OS**: Windows 11
-- **Web Server**: XAMPP (Apache on port 80, MySQL on port 3306)
-- **PHP**: 8.2
-- **Node.js**: v18+
-- **Database**: MySQL (via phpMyAdmin)
-
-### File Paths (Windows)
+### Critical URLs
 ```
-Root: C:\xampp\htdocs\Portfolio_v2
-Backend: C:\xampp\htdocs\Portfolio_v2\backend
-Frontend: C:\xampp\htdocs\Portfolio_v2\frontend
+Backend API:   http://localhost/Portfolio_v2/backend/public/api
+Frontend Dev:  http://localhost:5173 (Vite)
+Database:      localhost:3306 (user: ali, db: portfolio_v2)
+phpMyAdmin:    http://localhost/phpmyadmin
 ```
 
-**IMPORTANT**: Use Windows-style paths with backslashes when working with files.
+### Key Constraints
+- **DO NOT** use `php artisan serve` - XAMPP Apache already handles backend on port 80
+- Use Windows-style paths: `C:\xampp\htdocs\Portfolio_v2\`
+- Backend runs on XAMPP Apache, frontend on Vite dev server
 
----
+## Architecture & Patterns
 
-## Commands & Workflows
+### Backend Architecture (Laravel)
 
-### Laravel (Backend)
-
-**CRITICAL**: DO NOT use `php artisan serve` - XAMPP Apache already runs on port 80!
-
-```bash
-# Navigate to backend
-cd C:\xampp\htdocs\Portfolio_v2\backend
-
-# Composer commands
-composer install
-composer update
-composer dump-autoload
-
-# Artisan commands
-php artisan migrate
-php artisan migrate:fresh --seed
-php artisan db:seed
-php artisan make:model ModelName -mcr
-php artisan make:controller ControllerName
-php artisan make:request RequestName
-php artisan make:resource ResourceName
-php artisan route:list
-php artisan tinker
-
-# Testing
-php artisan test
-./vendor/bin/pest
-
-# Clear caches
-php artisan cache:clear
-php artisan config:clear
-php artisan route:clear
-php artisan view:clear
-
-# Storage link
-php artisan storage:link
+**API Structure:**
+```
+app/
+├── Models/           # Eloquent models with relationships
+│   ├── Post.php     # HasSeoFields trait, SoftDeletes, HasSlug
+│   ├── Project.php  # HasSeoFields trait, SoftDeletes, HasSlug
+│   └── Category.php # HasSeoFields trait, HasSlug
+├── Http/
+│   ├── Controllers/Api/  # RESTful controllers
+│   ├── Requests/         # Form validation (StorePostRequest, etc.)
+│   └── Resources/        # JSON transformers (PostResource, etc.)
+└── Traits/
+    └── HasSeoFields.php  # SEO/GEO functionality (meta tags, schema, etc.)
 ```
 
-### Vue (Frontend)
+**Important Patterns:**
+1. **Models use Traits:**
+   - `HasSeoFields` - SEO meta tags, structured data, Open Graph
+   - `SoftDeletes` - For Post/Project (trash functionality)
+   - `HasSlug` (Spatie) - Auto-generate slugs from titles
+   - Route key name: `slug` (not `id`)
 
-```bash
-# Navigate to frontend
-cd C:\xampp\htdocs\Portfolio_v2\frontend
-
-# Install dependencies
-npm install
-
-# Development server (runs on port 5173)
-npm run dev
-
-# Production build
-npm run build
-
-# Testing
-npm test
-npm run test:e2e
-
-# Linting
-npm run lint
-npm run lint:fix
-```
-
-### Access URLs
-
-```
-Backend API: http://localhost/Portfolio_v2/backend/public/api
-Admin Dashboard: http://localhost/Portfolio_v2/backend/public/admin
-Frontend Dev: http://localhost:5173
-phpMyAdmin: http://localhost/phpmyadmin
-```
-
----
-
-## Code Style & Conventions
-
-### Laravel Backend
-
-#### File Naming
-- **Controllers**: Singular PascalCase - `UserController.php`
-- **Models**: Singular PascalCase - `User.php`
-- **Migrations**: snake_case with timestamp - `2024_01_01_000000_create_users_table.php`
-- **Requests**: PascalCase + Request - `StoreUserRequest.php`
-- **Resources**: PascalCase + Resource - `UserResource.php`
-
-#### Route Naming
-- Use **plural kebab-case** for resource routes: `/api/blog-posts`
-- Group related routes with `Route::prefix()` and `Route::group()`
-
-#### Controllers
-- Use **Resource Controllers** for CRUD operations
-- Return `JsonResponse` with appropriate HTTP status codes
-- Use **Form Request** classes for validation
-- Use **API Resources** for response transformation
-
-**Example:**
+2. **API Response Format:**
 ```php
-public function index()
-{
-    $users = User::paginate(15);
-    return UserResource::collection($users);
-}
+// Success
+return response()->json([
+    'success' => true,
+    'data' => $resource,
+    'message' => 'Operation successful'
+], 200);
 
-public function store(StoreUserRequest $request)
-{
-    $user = User::create($request->validated());
-    return new UserResource($user);
-}
+// Error
+return response()->json([
+    'success' => false,
+    'error' => ['code' => 'ERROR_CODE', 'message' => 'Error description']
+], 400);
 ```
 
-#### Models
-- Use `$fillable` or `$guarded` for mass assignment
-- Define `$casts` for attribute casting
-- Use **Eloquent relationships** (hasMany, belongsTo, etc.)
-- Use **Accessors & Mutators** for attribute manipulation
+3. **Controller Pattern:**
+   - Use Form Requests for validation
+   - Use API Resources for response transformation
+   - Return appropriate HTTP status codes (200, 201, 404, 422, etc.)
+   - Eager load relationships to avoid N+1 queries
 
-**Example:**
-```php
-class User extends Model
-{
-    protected $fillable = ['name', 'email', 'password'];
-    
-    protected $casts = [
-        'email_verified_at' => 'datetime',
-        'is_active' => 'boolean',
-    ];
-    
-    public function posts()
-    {
-        return $this->hasMany(Post::class);
-    }
-}
+4. **SEO Implementation:**
+   - All content models (Post, Project, Category) have extensive SEO fields
+   - See `backend/SEO_IMPLEMENTATION.md` for complete guide
+   - Fields: meta_title, meta_description, og_image, schema_markup, canonical_url, etc.
+
+### Frontend Architecture (Vue 3)
+
+**Structure:**
+```
+src/
+├── views/          # Page components (Home.vue, Blog.vue, etc.)
+├── layouts/        # Layout wrappers (DefaultLayout, AdminLayout, AuthLayout)
+├── components/
+│   ├── base/      # Reusable UI (BaseButton, BaseCard, BaseInput, etc.)
+│   └── [feature]/ # Feature-specific components
+├── composables/    # Reusable logic (usePosts, useProjects, useAuth, etc.)
+├── stores/         # Pinia stores (auth.js, ui.js, theme.js)
+├── services/       # API layer (api.js with axios)
+└── router/         # Vue Router config
 ```
 
-#### Database
-- Use **migrations** for all schema changes
-- Use **seeders** for sample data
-- Use **factories** for testing data
-- Always add indexes for foreign keys and frequently queried columns
-
-### Vue Frontend
-
-#### File Naming
-- **Components**: PascalCase - `UserCard.vue`, `BlogPost.vue`
-- **Views/Pages**: PascalCase - `HomePage.vue`, `AboutPage.vue`
-- **Composables**: camelCase with `use` prefix - `useAuth.js`, `useApi.js`
-- **Stores**: camelCase - `userStore.js`, `blogStore.js`
-
-#### Component Structure
+**Important Patterns:**
+1. **Component Structure (Composition API):**
 ```vue
 <script setup>
-// Imports first
+// Imports
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 
 // Props & Emits
-const props = defineProps({
-  title: String,
-  data: Object
-})
-
-const emit = defineEmits(['update', 'delete'])
+const props = defineProps({ ... })
+const emit = defineEmits(['update'])
 
 // Composables
-const router = useRouter()
+const { data, loading, error, fetch } = usePosts()
 
 // Reactive state
-const loading = ref(false)
+const localState = ref(null)
 
-// Computed properties
-const formattedTitle = computed(() => props.title.toUpperCase())
+// Computed
+const computed = computed(() => ...)
 
 // Methods
-const handleSubmit = () => {
-  emit('update', data)
-}
+function handleAction() { ... }
 
 // Lifecycle
-onMounted(() => {
-  // Initialization
-})
+onMounted(() => { ... })
 </script>
 
 <template>
-  <!-- Template here -->
+  <!-- Tailwind utility classes only -->
 </template>
 
 <style scoped>
-/* Prefer Tailwind classes, minimal custom CSS */
+/* Minimal custom CSS, prefer Tailwind */
 </style>
 ```
 
-#### Pinia Stores
-- Use **setup syntax** for stores
-- Define clear `state`, `getters`, `actions`
-- Use `$reset()` for state cleanup
+2. **API Integration:**
+   - Axios instance in `services/api.js` with baseURL
+   - Composables handle API calls (`usePosts`, `useProjects`, etc.)
+   - Pinia stores for global state
+   - Interceptors for auth tokens and error handling
 
-**Example:**
-```javascript
-export const useUserStore = defineStore('user', () => {
-  const user = ref(null)
-  const token = ref(localStorage.getItem('token'))
-  
-  const isAuthenticated = computed(() => !!token.value)
-  
-  async function login(credentials) {
-    const response = await api.post('/login', credentials)
-    token.value = response.data.token
-    user.value = response.data.user
-  }
-  
-  function logout() {
-    user.value = null
-    token.value = null
-    localStorage.removeItem('token')
-  }
-  
-  return { user, token, isAuthenticated, login, logout }
-})
+3. **Routing:**
+   - Slug-based routes: `/blog/:slug`, `/projects/:slug`
+   - Layout wrappers for different page types
+   - Protected routes use `auth:sanctum` middleware check
+
+4. **State Management:**
+   - Pinia stores use setup syntax
+   - `auth.js` - User authentication & token management
+   - `ui.js` - Loading states, modals, toasts
+   - `theme.js` - Dark mode toggle
+
+## Essential Commands
+
+### Backend (Laravel)
+```bash
+cd C:\xampp\htdocs\Portfolio_v2\backend
+
+# Database
+php artisan migrate                    # Run migrations
+php artisan migrate:fresh --seed       # Fresh install with data
+php artisan db:seed                    # Seed only
+
+# Code generation
+php artisan make:model Post -mcr       # Model + Migration + Controller (resource)
+php artisan make:request StorePostRequest
+php artisan make:resource PostResource
+
+# Development
+php artisan route:list                 # View all routes
+php artisan tinker                     # Interactive console
+composer dump-autoload                 # Reload classes
+
+# Testing
+php artisan test                       # Run tests
+php artisan test --filter=PostTest     # Single test
+
+# Cache (clear when config changes)
+php artisan cache:clear
+php artisan config:clear
+php artisan route:clear
 ```
 
-#### Tailwind CSS
-- Use **utility-first** approach
-- Prefer Tailwind classes over custom CSS
-- Use `@apply` sparingly for repeated patterns
-- Mobile-first responsive design: `sm:`, `md:`, `lg:`, `xl:`
+### Frontend (Vue)
+```bash
+cd C:\xampp\htdocs\Portfolio_v2\frontend
 
----
+npm run dev           # Start Vite dev server (port 5173)
+npm run build         # Production build
+npm run preview       # Preview production build
+
+# Force refresh (if HMR not working)
+npm run dev -- --force
+```
+
+## Code Style Conventions
+
+### Laravel
+- **Controllers:** `PostController.php` (singular, PascalCase)
+- **Models:** `Post.php` (singular, PascalCase)
+- **Requests:** `StorePostRequest.php`, `UpdatePostRequest.php`
+- **Resources:** `PostResource.php`, `PostCollection.php`
+- **Routes:** `/api/posts` (plural, kebab-case)
+- **Route Parameters:** Use `{slug}` not `{id}` for public routes
+
+### Vue
+- **Components:** `BlogCard.vue`, `ProjectList.vue` (PascalCase)
+- **Pages/Views:** `Home.vue`, `BlogDetail.vue` (PascalCase)
+- **Composables:** `usePosts.js`, `useAuth.js` (camelCase with `use` prefix)
+- **Stores:** `auth.js`, `ui.js` (camelCase)
+- Use `<script setup>` syntax (not Options API)
+- Props in template: kebab-case `<BaseButton button-type="primary" />`
+
+### Database
+- **Tables:** plural snake_case (`posts`, `blog_categories`)
+- **Foreign keys:** `category_id`, `user_id` (singular + _id)
+- **Timestamps:** Always include `created_at`, `updated_at`
+- **Indexes:** Add for foreign keys and frequently queried fields
 
 ## Testing Requirements
 
-### Test-Driven Development (TDD)
+### TDD Workflow (Mandatory)
+1. **Write test FIRST** - Create failing test
+2. **Run test** - Confirm it fails
+3. **Implement** - Write minimal code to pass
+4. **Refactor** - Clean up while keeping tests green
 
-**YOU MUST** follow TDD workflow for ALL features:
-
-1. **Write tests FIRST** before implementation
-2. **Run tests** to confirm they fail
-3. **Implement feature** to make tests pass
-4. **Refactor** while keeping tests green
-
-### Backend Testing (Laravel)
-
-```bash
-# Run all tests
-php artisan test
-
-# Run specific test file
-php artisan test --filter=UserControllerTest
-
-# Run with coverage
-php artisan test --coverage
-```
-
-**Test Structure:**
+### Backend Tests
 ```php
-// tests/Feature/UserControllerTest.php
-public function test_user_can_be_created()
-{
-    $data = [
-        'name' => 'John Doe',
-        'email' => 'john@example.com',
-        'password' => 'password123'
-    ];
-    
-    $response = $this->postJson('/api/users', $data);
-    
+// tests/Feature/PostTest.php
+test('can create post', function () {
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user, 'sanctum')
+        ->postJson('/api/admin/posts', [
+            'title' => 'Test Post',
+            'content' => 'Content here',
+            'category_id' => 1,
+        ]);
+
     $response->assertStatus(201)
-             ->assertJson(['name' => 'John Doe']);
-             
-    $this->assertDatabaseHas('users', [
-        'email' => 'john@example.com'
-    ]);
-}
+             ->assertJsonStructure(['success', 'data', 'message']);
+
+    $this->assertDatabaseHas('posts', ['title' => 'Test Post']);
+});
 ```
 
-### Frontend Testing (Vue + Playwright)
+### Frontend Tests (Playwright)
+- Use Playwright MCP for browser automation
+- Test CRUD operations, forms, navigation
+- Verify responsive design
+- Check for console errors
 
-```bash
-# Unit tests
-npm test
+## Critical Patterns to Follow
 
-# E2E tests
-npm run test:e2e
-```
-
----
-
-## QA Verification Protocol
-
-**MANDATORY**: Every development task MUST conclude with QA verification.
-
-### QA Checklist:
-- [ ] All CRUD operations tested in browser
-- [ ] Form validation works correctly
-- [ ] Error handling displays properly
-- [ ] Responsive design on mobile/tablet/desktop
-- [ ] API responses are correct
-- [ ] Database changes verified
-- [ ] No console errors
-
-### QA Testing with Playwright
-
-Use Playwright MCP browser testing for automated QA:
-
-```javascript
-// Example Playwright test
-test('user can create a post', async ({ page }) => {
-  await page.goto('http://localhost:5173/posts/create')
-  
-  await page.fill('[name="title"]', 'Test Post')
-  await page.fill('[name="content"]', 'Test content')
-  await page.click('button[type="submit"]')
-  
-  await expect(page.locator('.success-message')).toBeVisible()
-})
-```
-
-**Screenshot evidence required** for complex features.
-
----
-
-## Git Workflow
-
-### Commit Messages
-
-Use **Conventional Commits**:
-
-```
-feat: add user authentication
-fix: resolve login validation bug
-docs: update API documentation
-style: format code with prettier
-refactor: simplify user controller
-test: add user creation tests
-chore: update dependencies
-```
-
-### Branch Strategy
-
-```
-main          → production-ready code
-develop       → development branch
-feature/*     → new features
-bugfix/*      → bug fixes
-hotfix/*      → urgent production fixes
-```
-
----
-
-## Security & Best Practices
-
-### Security Checklist
-- [ ] Use **prepared statements** (Eloquent does this automatically)
-- [ ] Validate ALL user inputs with **Form Requests**
-- [ ] Sanitize output to prevent XSS
-- [ ] Use **CSRF protection** (Laravel default)
-- [ ] Use **Laravel Sanctum** for API authentication
-- [ ] Never commit `.env` files
-- [ ] Use **bcrypt** for password hashing (Laravel default)
-
-### Performance Optimization
-- [ ] Use **eager loading** to avoid N+1 queries
-- [ ] Add **database indexes** for foreign keys
-- [ ] Use **pagination** for large datasets
-- [ ] Implement **caching** for frequently accessed data
-- [ ] Optimize images (lazy loading, compression)
-- [ ] Use **CDN** for static assets in production
-
----
-
-## Common Patterns & Examples
-
-### API Response Format
-
-**Success:**
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "name": "John Doe"
-  },
-  "message": "User created successfully"
-}
-```
-
-**Error:**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "The given data was invalid.",
-    "details": {
-      "email": ["The email field is required."]
-    }
-  }
-}
-```
-
-### Eager Loading (Avoid N+1)
-
-**❌ Bad (N+1 Query):**
+### 1. Eager Loading (Avoid N+1)
 ```php
-$posts = Post::all(); // 1 query
+// ❌ Bad (N+1 query)
+$posts = Post::all();
 foreach ($posts as $post) {
-    echo $post->author->name; // N queries
+    echo $post->category->name; // N queries
 }
+
+// ✅ Good
+$posts = Post::with('category')->get(); // 2 queries
 ```
 
-**✅ Good:**
+### 2. Form Validation
 ```php
-$posts = Post::with('author')->get(); // 2 queries total
-foreach ($posts as $post) {
-    echo $post->author->name;
+// ❌ Bad (validation in controller)
+public function store(Request $request) {
+    $request->validate([...]);
+}
+
+// ✅ Good (use Form Request)
+public function store(StorePostRequest $request) {
+    $validated = $request->validated();
 }
 ```
 
-### Vue Composables Pattern
+### 3. API Resources
+```php
+// ❌ Bad (return model directly)
+return $post;
 
-```javascript
-// composables/useApi.js
-export function useApi() {
-  const loading = ref(false)
-  const error = ref(null)
-  
-  const get = async (url) => {
-    loading.value = true
-    error.value = null
-    try {
-      const response = await axios.get(url)
-      return response.data
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-  
-  return { loading, error, get }
-}
+// ✅ Good (use API Resource)
+return new PostResource($post);
 ```
 
----
+### 4. SEO Fields Usage
+```php
+// All content models have HasSeoFields trait
+$post->meta_title          // SEO title
+$post->meta_description    // SEO description
+$post->og_image            // Open Graph image
+$post->schema_markup       // JSON-LD structured data
+$post->canonical_url       // Canonical URL
+$post->seo_score          // Auto-calculated score (0-100)
+```
 
-## Troubleshooting
+## Common Issues & Solutions
 
-### Common Issues
-
-**"Class not found" error:**
+### "Class not found" error
 ```bash
 composer dump-autoload
 ```
 
-**Migration fails:**
+### Frontend not updating (HMR broken)
 ```bash
-php artisan migrate:fresh --seed
-```
-
-**Frontend not updating:**
-```bash
-# Clear Vite cache
 npm run dev -- --force
 ```
 
-**CORS errors:**
-Check `backend/config/cors.php` and ensure frontend URL is allowed.
+### CORS errors
+Check `backend/config/cors.php`:
+```php
+'paths' => ['api/*'],
+'allowed_origins' => ['http://localhost:5173'],
+```
 
----
+### Migration fails
+```bash
+php artisan migrate:fresh --seed  # Nuclear option
+```
 
 ## Documentation Standards
 
-### When to Update Documentation
-
-**ALWAYS update documentation when:**
-- Adding new API endpoints
-- Changing existing API behavior
-- Adding new components or features
-- Modifying environment variables
-- Changing deployment process
+**Update documentation when:**
+- Adding/changing API endpoints
+- Adding new models or major features
+- Changing environment variables
+- Modifying architectural patterns
 - Adding new dependencies
 
-### Documentation Files
-- `README.md` → General project overview
-- `backend/README.md` → Laravel API documentation
-- `frontend/README.md` → Vue component documentation
-- `CLAUDE.md` → This file (for Claude Code context)
-- `API.md` → Detailed API endpoint documentation
+**Files to update:**
+- `PROJECT_STATUS.md` - Track completion status
+- `README.md` - User-facing changes
+- `backend/README.md` or `frontend/README.md` - Technical changes
+- This `CLAUDE.md` - Architectural decisions
+
+## Multi-Agent System
+
+This project uses Claude Code's subagent system located in `.claude/agents/`:
+- `orchestrator.md` - Multi-agent coordinator
+- `laravel-specialist.md` - Backend expert
+- `vue-expert.md` - Frontend expert
+- `database-administrator.md` - Database expert
+- `qa-expert.md` - Testing & QA
+- `documentation-engineer.md` - Documentation
+
+Development prompts in `.claude/prompts/` for phased implementation.
+
+## Working with This Codebase
+
+### Before Starting Work:
+1. Read all three README files (root, backend, frontend)
+2. Check `PROJECT_STATUS.md` for current state
+3. Review sibling files for existing patterns
+4. Verify changes won't break conventions
+
+### After Making Changes:
+1. **Run tests** - Ensure nothing broke
+2. **Update documentation** - Keep READMEs current
+3. **Update PROJECT_STATUS.md** - Track progress
+4. **Commit with conventional commits** - `feat:`, `fix:`, `docs:`, etc.
+
+### Development Philosophy:
+- **Quality over speed** - You're working with an experienced developer (16+ years)
+- **No hand-holding** - Execute tasks efficiently, assume architectural knowledge
+- **Follow established patterns** - Check existing code before creating new patterns
+- **TDD always** - Tests first, implementation second
+- **QA verification mandatory** - Every task must conclude with verification
 
 ---
 
-## Important Notes
-
-### What NOT to Do
-
-❌ **NEVER** use `php artisan serve` (XAMPP Apache already running!)
-❌ **NEVER** commit `.env` files to version control
-❌ **NEVER** skip writing tests for new features
-❌ **NEVER** use raw SQL queries (use Eloquent)
-❌ **NEVER** store passwords in plain text
-❌ **NEVER** trust user input without validation
-❌ **NEVER** make breaking changes without updating docs
-
-### What to ALWAYS Do
-
-✅ **ALWAYS** read README.md files before starting
-✅ **ALWAYS** write tests BEFORE implementation (TDD)
-✅ **ALWAYS** run tests after changes
-✅ **ALWAYS** use Form Requests for validation
-✅ **ALWAYS** use API Resources for responses
-✅ **ALWAYS** eager load relationships to avoid N+1
-✅ **ALWAYS** update documentation after changes
-✅ **ALWAYS** follow existing code conventions
-✅ **ALWAYS** commit with meaningful messages
-
----
-
-## Quick Reference
-
-### Laravel Artisan Shortcuts
-```bash
-# Make everything for a model at once
-php artisan make:model Post -mcr
-# -m: migration, -c: controller, -r: resource controller
-
-# Make form request
-php artisan make:request StorePostRequest
-
-# Make API resource
-php artisan make:resource PostResource
-```
-
-### Vue Component Quick Start
-```bash
-# Component in components/
-touch src/components/BlogCard.vue
-
-# Page in views/
-touch src/views/BlogPage.vue
-
-# Composable in composables/
-touch src/composables/useBlog.js
-
-# Store in stores/
-touch src/stores/blogStore.js
-```
-
----
-
-## Additional Resources
-
-- Laravel Documentation: https://laravel.com/docs/10.x
-- Vue 3 Documentation: https://vuejs.org/guide/
-- Tailwind CSS: https://tailwindcss.com/docs
-- Pinia: https://pinia.vuejs.org/
-- Laravel Sanctum: https://laravel.com/docs/10.x/sanctum
-
----
-
-**Last Updated**: October 11, 2025  
-**Project Owner**: Ali Sadikin (ali.sadikincom85@gmail.com)
-
----
-
-## For Claude Code
-
-When working on this project:
-1. Start by reading all README files
-2. Check sibling files for patterns before creating new code
-3. Follow TDD: write tests first, then implement
-4. Use the command reference above
-5. Update documentation after every feature
-6. Ask for clarification if requirements are unclear
-7. Verify all changes work before considering task complete
-8. Run QA verification with Playwright when applicable
-
-**REMEMBER**: You are working with an experienced developer (16+ years). Focus on implementation quality, not explaining basics. Ali knows the architecture - just execute the tasks efficiently and follow the established patterns.
+**Last Updated:** October 13, 2025
+**Maintainer:** Ali Sadikin (ali.sadikincom85@gmail.com)
+**Status:** In Development (28% Complete - see PROJECT_STATUS.md)
