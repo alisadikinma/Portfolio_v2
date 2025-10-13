@@ -21,6 +21,12 @@ class NewsletterResource extends Resource
     protected static ?string $model = Newsletter::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    
+    protected static ?string $navigationLabel = 'Newsletters';
+    
+    protected static ?string $pluralModelLabel = 'Newsletters';
+    
+    protected static ?int $navigationSort = 90;
 
     public static function form(Schema $schema): Schema
     {

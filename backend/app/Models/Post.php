@@ -95,6 +95,22 @@ class Post extends Model
     }
 
     /**
+     * Get the translations for the post.
+     */
+    public function translations()
+    {
+        return $this->hasMany(PostTranslation::class);
+    }
+
+    /**
+     * Get translation for specific language
+     */
+    public function translation($language = 'en')
+    {
+        return $this->translations()->where('language', $language)->first();
+    }
+
+    /**
      * Calculate reading time based on content.
      */
     public static function boot()

@@ -4,6 +4,9 @@
     </IfModule>
 
     RewriteEngine On
+    
+    # Set base for subdirectory
+    RewriteBase /Portfolio_v2/backend/public/
 
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .

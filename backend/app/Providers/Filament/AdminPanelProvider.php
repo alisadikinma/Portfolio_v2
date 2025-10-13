@@ -26,15 +26,27 @@ class AdminPanelProvider extends PanelProvider
         return $panel
             ->id('admin')
             ->path('admin')
+            ->login()
+            ->authGuard('web')
+            ->brandName('Ali Sadikin Portfolio')
             ->colors([
                 'primary' => Color::Amber,
             ])
-            ->discoverResources(in: app_path('Filament/Admin/Resources'), for: 'App\Filament\Admin\Resources')
-            ->discoverPages(in: app_path('Filament/Admin/Pages'), for: 'App\Filament\Admin\Pages')
+            ->resources([
+                \App\Filament\Admin\Resources\Projects\ProjectResource::class,
+                \App\Filament\Admin\Resources\Posts\PostResource::class,
+                \App\Filament\Admin\Resources\Categories\CategoryResource::class,
+                \App\Filament\Admin\Resources\Awards\AwardResource::class,
+                \App\Filament\Admin\Resources\Services\ServiceResource::class,
+                \App\Filament\Admin\Resources\Galleries\GalleryResource::class,
+                \App\Filament\Admin\Resources\Contacts\ContactResource::class,
+                \App\Filament\Admin\Resources\Newsletters\NewsletterResource::class,
+                \App\Filament\Resources\Testimonials\TestimonialResource::class,
+                \App\Filament\Resources\Settings\SettingResource::class,
+            ])
             ->pages([
                 Dashboard::class,
             ])
-            ->discoverWidgets(in: app_path('Filament/Admin/Widgets'), for: 'App\Filament\Admin\Widgets')
             ->widgets([
                 AccountWidget::class,
                 FilamentInfoWidget::class,

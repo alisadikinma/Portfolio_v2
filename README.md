@@ -256,6 +256,20 @@ Portfolio_v2/
 │   ├── public/                 # Public Static Files
 │   └── .env                    # Frontend Configuration
 │
+├── .claude/                    # Claude Code Configuration
+│   ├── agents/                 # Subagent System
+│   │   ├── orchestrator.md     # Multi-agent coordinator
+│   │   ├── laravel-specialist.md
+│   │   ├── vue-expert.md
+│   │   ├── database-administrator.md
+│   │   ├── qa-expert.md
+│   │   └── documentation-engineer.md
+│   └── prompts/                # Development Prompts
+│       ├── phase-1_frontend-init_20251013-1244.md
+│       ├── phase-2_backend-controllers_20251013-1244.md
+│       ├── phase-3_blog-system_20251013-1244.md
+│       └── phase-4_qa-testing_20251013-1244.md
+│
 ├── PROJECT_STATUS.md           # Current Development Status
 ├── PROJECT_INSTRUCTIONS.md     # Development Guidelines
 ├── README.md                   # This File
@@ -580,6 +594,10 @@ For detailed deployment guide, see: [DEPLOYMENT.md](./DEPLOYMENT.md) *(coming so
 - [frontend/README.md](./frontend/README.md) - Frontend-specific documentation
 - [backend/SEO_IMPLEMENTATION.md](./backend/SEO_IMPLEMENTATION.md) - SEO features guide
 
+### Claude Code System
+- [.claude/agents/README.md](./.claude/agents/README.md) - Subagent system overview
+- [.claude/prompts/README.md](./.claude/prompts/README.md) - Development prompts guide
+
 ### External Documentation
 - [Laravel Documentation](https://laravel.com/docs/10.x)
 - [Vue 3 Documentation](https://vuejs.org)
@@ -644,8 +662,8 @@ All rights reserved. Unauthorized copying, distribution, or modification of this
 
 **Ali Sadikin**
 - Email: ali.sadikincom85@gmail.com
-- GitHub: [Your GitHub Profile]
-- Website: [Your Portfolio URL]
+- GitHub: [@alisadikinma](https://github.com/alisadikinma)
+- Location: Batam, Indonesia
 
 ---
 
@@ -660,6 +678,6 @@ All rights reserved. Unauthorized copying, distribution, or modification of this
 
 **Last Updated:** October 13, 2025  
 **Version:** 2.0.0  
-**Status:** In Development
+**Status:** In Development (28% Complete)
 
 For questions or issues, please open an issue on GitHub or contact the maintainer.

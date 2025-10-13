@@ -1,61 +1,649 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Backend API - Laravel
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Laravel-based RESTful API backend for Portfolio Website, providing authentication, content management, and data delivery with Laravel Jetstream admin panel.
 
-## About Laravel
+## 🏗️ Architecture
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+This backend follows Laravel best practices with:
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- **MVC Pattern**: Models, Controllers, and Views (Blade + Livewire)
+- **API Resources**: Clean JSON transformations
+- **Service Layer**: Business logic abstraction (when needed)
+- **Repository Pattern**: Can be implemented for complex queries
+- **Middleware**: Authentication, CORS, rate limiting
+- **RESTful Design**: Standard HTTP methods and status codes
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## 🚀 Tech Stack
 
-## Learning Laravel
+- **Runtime**: PHP 8.1+
+- **Framework**: Laravel 10.x
+- **Authentication**: Laravel Jetstream + Sanctum
+- **Admin UI**: Livewire 3.x (reactive components)
+- **Database**: MySQL 8.0 (via XAMPP)
+- **ORM**: Eloquent (Laravel's built-in ORM)
+- **Validation**: Laravel Form Requests
+- **File Upload**: Laravel Storage + Intervention Image
+- **Email**: Laravel Mail + Mailtrap/SMTP
+- **Testing**: Pest PHP / PHPUnit
+- **API Documentation**: Laravel API Resources
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## 📋 Prerequisites
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+- PHP 8.1 or higher
+- Composer
+- MySQL (via XAMPP port 3306)
+- Apache (via XAMPP port 80)
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## 🛠️ Installation
 
-## Laravel Sponsors
+### 1. Install Dependencies
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+```bash
+composer install
+```
 
-### Premium Partners
+### 2. Environment Configuration
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+Copy the example environment file:
 
-## Contributing
+```bash
+copy .env.example .env
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Edit `.env` with your configuration:
 
-## Code of Conduct
+```env
+APP_NAME="Portfolio V2"
+APP_ENV=local
+APP_KEY=
+APP_DEBUG=true
+APP_URL=http://localhost/Portfolio_v2/backend/public
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=portfolio_v2
+DB_USERNAME=root
+DB_PASSWORD=
 
-## Security Vulnerabilities
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.mailtrap.io
+MAIL_PORT=2525
+MAIL_USERNAME=your_mailtrap_username
+MAIL_PASSWORD=your_mailtrap_password
+MAIL_ENCRYPTION=tls
+MAIL_FROM_ADDRESS=noreply@portfolio.com
+MAIL_FROM_NAME="${APP_NAME}"
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+### 3. Generate Application Key
 
-## License
+```bash
+php artisan key:generate
+```
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+### 4. Database Setup
+
+Create database in phpMyAdmin (http://localhost/phpmyadmin):
+
+```sql
+CREATE DATABASE portfolio_v2 CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+Run migrations:
+
+```bash
+php artisan migrate
+```
+
+Seed database with sample data (optional):
+
+```bash
+php artisan db:seed
+```
+
+### 5. Storage Link
+
+Create symbolic link for storage:
+
+```bash
+php artisan storage:link
+```
+
+### 6. Create Admin User
+
+```bash
+php artisan make:filament-user
+# Or via tinker:
+php artisan tinker
+>>> \App\Models\User::create(['name' => 'Admin', 'email' => 'admin@portfolio.com', 'password' => bcrypt('admin123')]);
+```
+
+## 🚦 Running the Server
+
+### Development Mode (via XAMPP)
+
+1. Start XAMPP Apache and MySQL
+2. Access via browser:
+   - **API**: http://localhost/Portfolio_v2/backend/public/api
+   - **Admin Panel**: http://localhost/Portfolio_v2/backend/public/admin
+   - **Web Interface**: http://localhost/Portfolio_v2/backend/public
+
+### Using Laravel Serve (Alternative)
+
+```bash
+php artisan serve
+```
+
+Server will start at `http://127.0.0.1:8000`
+
+## 📁 Project Structure
+
+```
+backend/
+├── app/
+│   ├── Http/
+│   │   ├── Controllers/
+│   │   │   ├── API/            # API controllers
+│   │   │   └── Web/            # Web controllers
+│   │   ├── Middleware/         # Custom middleware
+│   │   ├── Requests/           # Form request validation
+│   │   └── Resources/          # API resources (JSON transformers)
+│   ├── Models/                 # Eloquent models
+│   ├── Helpers/                # Helper functions
+│   │   └── ImageHelper.php    # Image processing utilities
+│   └── Livewire/               # Livewire components
+├── config/                     # Configuration files
+├── database/
+│   ├── factories/              # Model factories (testing)
+│   ├── migrations/             # Database migrations
+│   └── seeders/                # Database seeders
+├── public/                     # Public entry point
+│   ├── index.php              # Main entry
+│   ├── uploads/               # Uploaded files
+│   └── .htaccess              # Apache rewrite rules
+├── resources/
+│   ├── views/                 # Blade templates
+│   │   ├── layouts/           # Layout templates
+│   │   ├── components/        # Blade components
+│   │   └── livewire/          # Livewire views
+│   └── js/                    # Frontend assets (if any)
+├── routes/
+│   ├── api.php                # API routes
+│   ├── web.php                # Web routes
+│   └── channels.php           # Broadcast channels
+├── storage/
+│   ├── app/                   # App-specific storage
+│   ├── logs/                  # Application logs
+│   └── framework/             # Framework files
+├── tests/
+│   ├── Feature/               # Feature tests
+│   └── Unit/                  # Unit tests
+├── .env                       # Environment config (not in git)
+├── composer.json              # PHP dependencies
+├── artisan                    # CLI tool
+└── README.md                  # This file
+```
+
+## 🔐 Environment Variables
+
+### Required Variables
+
+```env
+# Application
+APP_NAME=Portfolio_V2
+APP_ENV=local|production
+APP_KEY=base64:...              # Generated by php artisan key:generate
+APP_DEBUG=true|false
+APP_URL=http://localhost/Portfolio_v2/backend/public
+
+# Database (MySQL via XAMPP)
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=portfolio_v2
+DB_USERNAME=root
+DB_PASSWORD=                    # Leave empty for XAMPP default
+
+# Session & Cache
+SESSION_DRIVER=file
+CACHE_DRIVER=file
+QUEUE_CONNECTION=sync
+
+# Mail (for contact form)
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.mailtrap.io      # Or your SMTP server
+MAIL_PORT=2525
+MAIL_USERNAME=null
+MAIL_PASSWORD=null
+MAIL_ENCRYPTION=tls
+MAIL_FROM_ADDRESS=noreply@example.com
+MAIL_FROM_NAME="${APP_NAME}"
+
+# Sanctum (API Authentication)
+SANCTUM_STATEFUL_DOMAINS=localhost,127.0.0.1,localhost:5173
+
+# File Upload
+MAX_UPLOAD_SIZE=10240           # KB (10MB)
+ALLOWED_IMAGE_TYPES=jpg,jpeg,png,gif,webp
+```
+
+### Security Notes
+
+- ✅ Never commit `.env` file
+- ✅ Use strong `APP_KEY` (auto-generated)
+- ✅ Change default database password in production
+- ✅ Use proper MAIL settings for production
+- ✅ Enable HTTPS in production
+- ✅ Set `APP_DEBUG=false` in production
+
+## 📡 API Endpoints
+
+### Authentication
+
+```http
+POST   /api/register           # Register new user
+POST   /api/login              # Login user
+POST   /api/logout             # Logout user (auth required)
+GET    /api/user               # Get authenticated user (auth required)
+```
+
+### Projects
+
+```http
+GET    /api/projects           # Get all projects (paginated)
+GET    /api/projects/{id}      # Get single project
+POST   /api/projects           # Create project (auth required)
+PUT    /api/projects/{id}      # Update project (auth required)
+DELETE /api/projects/{id}      # Delete project (auth required)
+```
+
+### Blog Posts
+
+```http
+GET    /api/posts              # Get all posts (paginated)
+GET    /api/posts/{id}         # Get single post
+GET    /api/posts/category/{slug}  # Get posts by category
+GET    /api/posts/tag/{slug}   # Get posts by tag
+POST   /api/posts              # Create post (auth required)
+PUT    /api/posts/{id}         # Update post (auth required)
+DELETE /api/posts/{id}         # Delete post (auth required)
+```
+
+### Categories
+
+```http
+GET    /api/categories         # Get all categories
+GET    /api/categories/{slug}  # Get category with posts
+```
+
+### Contact
+
+```http
+POST   /api/contact            # Submit contact form
+GET    /api/contacts           # Get all messages (auth required)
+PUT    /api/contacts/{id}/read # Mark as read (auth required)
+DELETE /api/contacts/{id}      # Delete message (auth required)
+```
+
+### API Response Format
+
+**Success Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "title": "Project Title",
+    "slug": "project-title",
+    "description": "Description here...",
+    "created_at": "2025-10-10T10:00:00.000000Z"
+  },
+  "message": "Project retrieved successfully"
+}
+```
+
+**Error Response:**
+```json
+{
+  "success": false,
+  "message": "Validation error",
+  "errors": {
+    "email": ["The email field is required."]
+  }
+}
+```
+
+## 🧪 Testing
+
+```bash
+# Run all tests
+php artisan test
+
+# Run specific test file
+php artisan test tests/Feature/ProjectTest.php
+
+# Run with coverage
+php artisan test --coverage
+
+# Using Pest (if installed)
+./vendor/bin/pest
+
+# With coverage
+./vendor/bin/pest --coverage
+```
+
+### Test Structure
+
+```php
+// tests/Feature/ProjectTest.php
+test('can create project', function () {
+    $user = User::factory()->create();
+    
+    $response = $this->actingAs($user)
+        ->postJson('/api/projects', [
+            'title' => 'Test Project',
+            'description' => 'Test Description',
+        ]);
+    
+    $response->assertStatus(201)
+             ->assertJsonStructure([
+                 'success',
+                 'data' => ['id', 'title', 'slug'],
+                 'message'
+             ]);
+             
+    $this->assertDatabaseHas('projects', [
+        'title' => 'Test Project'
+    ]);
+});
+```
+
+## 🔒 Security
+
+### Implemented Security Features
+
+- ✅ **CSRF Protection**: Laravel's built-in CSRF middleware
+- ✅ **XSS Protection**: Blade escaping by default
+- ✅ **SQL Injection**: Eloquent ORM with parameter binding
+- ✅ **Authentication**: Laravel Sanctum for API
+- ✅ **Authorization**: Laravel Gates & Policies
+- ✅ **Rate Limiting**: Throttle middleware
+- ✅ **Input Validation**: Form Request validation
+- ✅ **Password Hashing**: Bcrypt (auto by Laravel)
+- ✅ **CORS**: Laravel CORS middleware
+
+### Security Checklist
+
+- [ ] Change default database credentials
+- [ ] Use environment variables for secrets
+- [ ] Enable HTTPS in production
+- [ ] Set proper file permissions (755 for dirs, 644 for files)
+- [ ] Configure CSP headers
+- [ ] Regular dependency updates: `composer update`
+- [ ] Security audit: `composer audit`
+- [ ] Disable debug mode in production
+- [ ] Configure proper CORS origins
+
+## 📊 Database
+
+### Migrations
+
+```bash
+# Create new migration
+php artisan make:migration create_projects_table
+
+# Run migrations
+php artisan migrate
+
+# Rollback last migration
+php artisan migrate:rollback
+
+# Rollback all migrations
+php artisan migrate:reset
+
+# Refresh database (rollback all & re-run)
+php artisan migrate:refresh
+
+# Refresh with seed
+php artisan migrate:refresh --seed
+```
+
+### Seeders
+
+```bash
+# Create seeder
+php artisan make:seeder ProjectSeeder
+
+# Run all seeders
+php artisan db:seed
+
+# Run specific seeder
+php artisan db:seed --class=ProjectSeeder
+```
+
+### Database Schema
+
+Main tables:
+- `users` - User accounts
+- `projects` - Portfolio projects
+- `posts` - Blog posts
+- `categories` - Post categories
+- `tags` - Post tags  
+- `contacts` - Contact form submissions
+- `services` - Services offered
+- `awards` - Awards & achievements
+- `galleries` - Image galleries
+
+## 🐛 Debugging
+
+### Laravel Telescope (Optional)
+
+```bash
+# Install Telescope
+composer require laravel/telescope --dev
+php artisan telescope:install
+php artisan migrate
+
+# Access Telescope
+http://localhost/Portfolio_v2/backend/public/telescope
+```
+
+### Logging
+
+Logs are stored in `storage/logs/`:
+- `laravel.log` - General application logs
+
+```php
+// Using the logger
+use Illuminate\Support\Facades\Log;
+
+Log::info('User logged in', ['user_id' => $user->id]);
+Log::error('Failed to process payment', ['error' => $e->getMessage()]);
+Log::debug('Debug information', ['data' => $data]);
+```
+
+### Common Artisan Commands
+
+```bash
+# Clear caches
+php artisan cache:clear
+php artisan config:clear
+php artisan route:clear
+php artisan view:clear
+
+# Optimize for production
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+php artisan optimize
+
+# Database
+php artisan db:show              # Show database info
+php artisan db:table users       # Show table structure
+php artisan db:monitor           # Monitor connections
+
+# Queue (if using)
+php artisan queue:work
+php artisan queue:listen
+php artisan queue:retry all
+```
+
+## 🚀 Deployment
+
+### Preparation
+
+```bash
+# 1. Optimize for production
+composer install --optimize-autoloader --no-dev
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+
+# 2. Set permissions
+chmod -R 755 storage bootstrap/cache
+chown -R www-data:www-data storage bootstrap/cache
+
+# 3. Update .env
+APP_ENV=production
+APP_DEBUG=false
+```
+
+### Apache Configuration
+
+**`.htaccess` in public folder:**
+
+```apache
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+```
+
+### Production Environment
+
+```env
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://yourdomain.com
+
+DB_CONNECTION=mysql
+DB_HOST=your_production_host
+DB_PORT=3306
+DB_DATABASE=production_db
+DB_USERNAME=production_user
+DB_PASSWORD=strong_password_here
+
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.sendgrid.net
+# ... production mail settings
+```
+
+## 📈 Performance
+
+### Optimization Tips
+
+```bash
+# 1. Enable OPcache in php.ini
+opcache.enable=1
+opcache.memory_consumption=128
+opcache.max_accelerated_files=10000
+
+# 2. Use Redis for cache (optional)
+composer require predis/predis
+# Update .env: CACHE_DRIVER=redis
+
+# 3. Queue jobs for heavy tasks
+php artisan queue:table
+php artisan migrate
+# Update .env: QUEUE_CONNECTION=database
+```
+
+### Database Optimization
+
+- Add indexes to frequently queried columns
+- Use eager loading to prevent N+1 queries
+- Implement database query caching
+- Use pagination for large datasets
+
+## 🔧 Artisan Commands
+
+```bash
+# Development
+php artisan serve                      # Start dev server
+php artisan tinker                     # Interactive shell
+php artisan make:controller ProjectController  # Create controller
+php artisan make:model Project -m      # Create model + migration
+php artisan make:request ProjectRequest  # Create form request
+
+# Database
+php artisan migrate                    # Run migrations
+php artisan db:seed                    # Seed database
+php artisan migrate:fresh --seed       # Fresh database with seed
+
+# Cache
+php artisan cache:clear                # Clear application cache
+php artisan config:cache               # Cache configuration
+
+# Routes
+php artisan route:list                 # List all routes
+```
+
+## 📝 Common Issues
+
+### Storage Permission Denied
+
+```bash
+# Fix storage permissions
+sudo chmod -R 775 storage bootstrap/cache
+sudo chown -R www-data:www-data storage bootstrap/cache
+```
+
+### Database Connection Failed
+
+- Check MySQL is running in XAMPP
+- Verify database credentials in `.env`
+- Ensure database exists in phpMyAdmin
+- Check port 3306 is not blocked
+
+### 404 on All Routes
+
+- Ensure Apache `mod_rewrite` is enabled
+- Check `.htaccess` exists in public folder
+- Verify `DocumentRoot` points to `public` folder
+
+### Token Mismatch Error
+
+```bash
+# Clear session and cache
+php artisan cache:clear
+php artisan config:clear
+php artisan session:table
+php artisan migrate
+```
+
+## 📚 Additional Resources
+
+- [Laravel Documentation](https://laravel.com/docs/10.x)
+- [Laravel Jetstream](https://jetstream.laravel.com/)
+- [Laravel Sanctum](https://laravel.com/docs/10.x/sanctum)
+- [Livewire Documentation](https://livewire.laravel.com/)
+- [Eloquent ORM](https://laravel.com/docs/10.x/eloquent)
+- [Laravel Best Practices](https://github.com/alexeymezenin/laravel-best-practices)
+
+## 📞 Support
+
+For backend-specific issues:
+
+1. Check logs in `storage/logs/laravel.log`
+2. Review error messages and stack traces
+3. Consult Laravel documentation
+4. Check database connections
+5. Verify environment variables
+
+---
+
+**Framework**: Laravel 10.x  
+**PHP Version**: 8.1+  
+**Database**: MySQL 8.0  
+**Last Updated**: October 2025
