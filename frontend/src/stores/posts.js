@@ -40,12 +40,25 @@ export const usePostsStore = defineStore('posts', () => {
     error.value = null
 
     try {
-      // TODO: Implement API call when backend is ready
-      // const response = await postsApi.getAll(params)
-      // posts.value = response.data.data
+      const { useApi } = await import('../composables/useApi')
+      const api = useApi()
 
-      // Mock data for now
-      posts.value = []
+      const queryParams = {
+        page: pagination.value.currentPage,
+        per_page: pagination.value.perPage,
+        ...filters.value,
+        ...params,
+      }
+
+      const response = await api.get('/posts', { params: queryParams })
+
+      posts.value = response.data.data
+      pagination.value = {
+        currentPage: response.data.meta.current_page,
+        perPage: response.data.meta.per_page,
+        total: response.data.meta.total,
+        lastPage: response.data.meta.last_page,
+      }
 
       return posts.value
     } catch (err) {
@@ -65,11 +78,102 @@ export const usePostsStore = defineStore('posts', () => {
     error.value = null
 
     try {
-      // TODO: Implement API call
-      currentPost.value = null
+      const { useApi } = await import('../composables/useApi')
+      const api = useApi()
+
+      const response = await api.get(`/posts/${slug}`)
+      currentPost.value = response.data.data
+
       return currentPost.value
     } catch (err) {
       error.value = err.response?.data?.message || 'Failed to fetch post'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
+   * Create a new post
+   * @param {Object} postData - Post data
+   */
+  async function createPost(postData) {
+    loading.value = true
+    error.value = null
+
+    try {
+      const { useApi } = await import('../composables/useApi')
+      const api = useApi()
+
+      const response = await api.post('/admin/posts', postData)
+
+      return response.data.data
+    } catch (err) {
+      error.value = err.response?.data?.message || 'Failed to create post'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
+   * Update an existing post
+   * @param {number} id - Post ID
+   * @param {Object} postData - Post data
+   */
+  async function updatePost(id, postData) {
+    loading.value = true
+    error.value = null
+
+    try {
+      const { useApi } = await import('../composables/useApi')
+      const api = useApi()
+
+      const response = await api.put(`/admin/posts/${id}`, postData)
+
+      // Update in local state if exists
+      const index = posts.value.findIndex(p => p.id === id)
+      if (index !== -1) {
+        posts.value[index] = response.data.data
+      }
+
+      if (currentPost.value?.id === id) {
+        currentPost.value = response.data.data
+      }
+
+      return response.data.data
+    } catch (err) {
+      error.value = err.response?.data?.message || 'Failed to update post'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
+   * Delete a post
+   * @param {number} id - Post ID
+   */
+  async function deletePost(id) {
+    loading.value = true
+    error.value = null
+
+    try {
+      const { useApi } = await import('../composables/useApi')
+      const api = useApi()
+
+      await api.delete(`/admin/posts/${id}`)
+
+      // Remove from local state
+      posts.value = posts.value.filter(p => p.id !== id)
+
+      if (currentPost.value?.id === id) {
+        currentPost.value = null
+      }
+
+      return true
+    } catch (err) {
+      error.value = err.response?.data?.message || 'Failed to delete post'
       throw err
     } finally {
       loading.value = false
@@ -132,6 +236,9 @@ export const usePostsStore = defineStore('posts', () => {
     // Actions
     fetchPosts,
     fetchPost,
+    createPost,
+    updatePost,
+    deletePost,
     setFilters,
     clearFilters,
     reset,
