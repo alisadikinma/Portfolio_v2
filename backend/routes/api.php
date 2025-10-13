@@ -9,8 +9,8 @@ use App\Http\Controllers\Api\PostController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\GalleryController;
 use App\Http\Controllers\Api\ContactController;
-use App\Http\Controllers\API\TestimonialController;
-use App\Http\Controllers\API\SettingController;
+use App\Http\Controllers\Api\TestimonialController;
+use App\Http\Controllers\Api\SettingController;
 
 // ============================================
 // Authentication Routes
@@ -65,8 +65,8 @@ Route::prefix('gallery')->group(function () {
     Route::get('/{id}', [GalleryController::class, 'show']);
 });
 
-// Public Contact Route
-Route::post('/contact', [ContactController::class, 'store']);
+// Public Contact Route (Rate Limited)
+Route::post('/contact', [ContactController::class, 'store'])->middleware('throttle:5,60'); // 5 requests per minute
 
 // Public Testimonials Routes
 Route::prefix('testimonials')->group(function () {

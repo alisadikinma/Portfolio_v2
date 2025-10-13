@@ -3,10 +3,14 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreGalleryRequest;
+use App\Http\Requests\UpdateGalleryRequest;
 use App\Http\Resources\GalleryResource;
 use App\Models\Gallery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -75,25 +79,12 @@ class GalleryController extends Controller
     /**
      * Store a newly created gallery item.
      */
-    public function store(Request $request): JsonResponse
+    public function store(StoreGalleryRequest $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
-            'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'image' => 'required|image|mimes:jpeg,jpg,png,gif,webp|max:5120', // 5MB max
-            'category' => 'required|string|max:100',
-            'order' => 'nullable|integer|min:0',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'message' => 'Validation failed',
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
         try {
-            $data = $validator->validated();
+            DB::beginTransaction();
+
+            $data = $request->validated();
 
             // Handle image upload
             if ($request->hasFile('image')) {
@@ -111,14 +102,28 @@ class GalleryController extends Controller
 
             $gallery = Gallery::create($data);
 
+            DB::commit();
+
             return response()->json([
                 'message' => 'Gallery item created successfully',
                 'data' => new GalleryResource($gallery),
             ], 201);
         } catch (\Exception $e) {
+            DB::rollBack();
+
+            // Clean up uploaded file if it exists
+            if (isset($path) && Storage::disk('public')->exists($path)) {
+                Storage::disk('public')->delete($path);
+            }
+
+            Log::error('Failed to create gallery item', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
             return response()->json([
                 'message' => 'Failed to create gallery item',
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred',
             ], 500);
         }
     }
@@ -126,34 +131,20 @@ class GalleryController extends Controller
     /**
      * Update the specified gallery item.
      */
-    public function update(Request $request, string $id): JsonResponse
+    public function update(UpdateGalleryRequest $request, string $id): JsonResponse
     {
         $gallery = Gallery::findOrFail($id);
 
-        $validator = Validator::make($request->all(), [
-            'title' => 'sometimes|required|string|max:255',
-            'description' => 'nullable|string',
-            'image' => 'nullable|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-            'category' => 'sometimes|required|string|max:100',
-            'order' => 'nullable|integer|min:0',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'message' => 'Validation failed',
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
         try {
-            $data = $validator->validated();
+            DB::beginTransaction();
+
+            $data = $request->validated();
+            $oldImagePath = null;
 
             // Handle image upload if new image provided
             if ($request->hasFile('image')) {
-                // Delete old image
-                if ($gallery->image && Storage::disk('public')->exists($gallery->image)) {
-                    Storage::disk('public')->delete($gallery->image);
-                }
+                // Store old path for cleanup after successful update
+                $oldImagePath = $gallery->image;
 
                 $image = $request->file('image');
                 $filename = time() . '_' . Str::slug($request->input('title', $gallery->title)) . '.' . $image->getClientOriginalExtension();
@@ -163,14 +154,34 @@ class GalleryController extends Controller
 
             $gallery->update($data);
 
+            // Delete old image after successful update
+            if ($oldImagePath && Storage::disk('public')->exists($oldImagePath)) {
+                Storage::disk('public')->delete($oldImagePath);
+            }
+
+            DB::commit();
+
             return response()->json([
                 'message' => 'Gallery item updated successfully',
                 'data' => new GalleryResource($gallery),
             ]);
         } catch (\Exception $e) {
+            DB::rollBack();
+
+            // Clean up new uploaded file if it exists
+            if (isset($path) && Storage::disk('public')->exists($path)) {
+                Storage::disk('public')->delete($path);
+            }
+
+            Log::error('Failed to update gallery item', [
+                'id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
             return response()->json([
                 'message' => 'Failed to update gallery item',
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred',
             ], 500);
         }
     }
@@ -224,6 +235,8 @@ class GalleryController extends Controller
         }
 
         try {
+            DB::beginTransaction();
+
             $images = $request->file('images');
             $category = $request->input('category');
             $titles = $request->input('titles', []);
@@ -231,6 +244,7 @@ class GalleryController extends Controller
 
             $maxOrder = Gallery::where('category', $category)->max('order') ?? 0;
             $uploaded = [];
+            $uploadedPaths = [];
 
             foreach ($images as $index => $image) {
                 $title = $titles[$index] ?? 'Image ' . ($index + 1);
@@ -238,6 +252,7 @@ class GalleryController extends Controller
 
                 $filename = time() . '_' . $index . '_' . Str::slug($title) . '.' . $image->getClientOriginalExtension();
                 $path = $image->storeAs('gallery', $filename, 'public');
+                $uploadedPaths[] = $path;
 
                 $gallery = Gallery::create([
                     'title' => $title,
@@ -250,14 +265,30 @@ class GalleryController extends Controller
                 $uploaded[] = new GalleryResource($gallery);
             }
 
+            DB::commit();
+
             return response()->json([
                 'message' => count($uploaded) . ' gallery items uploaded successfully',
                 'data' => $uploaded,
             ], 201);
         } catch (\Exception $e) {
+            DB::rollBack();
+
+            // Clean up uploaded files on failure
+            foreach ($uploadedPaths ?? [] as $path) {
+                if (Storage::disk('public')->exists($path)) {
+                    Storage::disk('public')->delete($path);
+                }
+            }
+
+            Log::error('Failed to bulk upload gallery items', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
             return response()->json([
                 'message' => 'Failed to upload gallery items',
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred',
             ], 500);
         }
     }
@@ -280,24 +311,41 @@ class GalleryController extends Controller
         }
 
         try {
+            DB::beginTransaction();
+
             $ids = $request->input('ids');
             $galleries = Gallery::whereIn('id', $ids)->get();
 
-            foreach ($galleries as $gallery) {
-                // Delete image file
-                if ($gallery->image && Storage::disk('public')->exists($gallery->image)) {
-                    Storage::disk('public')->delete($gallery->image);
+            // Collect image paths for cleanup
+            $imagePaths = $galleries->pluck('image')->filter()->toArray();
+
+            // Delete all galleries
+            Gallery::whereIn('id', $ids)->delete();
+
+            DB::commit();
+
+            // Delete image files after successful database deletion
+            foreach ($imagePaths as $path) {
+                if (Storage::disk('public')->exists($path)) {
+                    Storage::disk('public')->delete($path);
                 }
-                $gallery->delete();
             }
 
             return response()->json([
                 'message' => count($galleries) . ' gallery items deleted successfully',
             ]);
         } catch (\Exception $e) {
+            DB::rollBack();
+
+            Log::error('Failed to bulk delete gallery items', [
+                'ids' => $request->input('ids'),
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
             return response()->json([
                 'message' => 'Failed to delete gallery items',
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred',
             ], 500);
         }
     }

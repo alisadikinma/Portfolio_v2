@@ -3,7 +3,11 @@
     "allow": [
       "Bash(dir:*)",
       "Bash(cat:*)",
-      "Bash(npm run dev)"
+      "Bash(npm run dev)",
+      "Bash(php artisan route:list:*)",
+      "Bash(php artisan make:request:*)",
+      "Bash(php artisan make:resource:*)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []

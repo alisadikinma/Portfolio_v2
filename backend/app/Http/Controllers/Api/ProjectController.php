@@ -3,13 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreProjectRequest;
+use App\Http\Requests\UpdateProjectRequest;
 use App\Http\Resources\ProjectResource;
 use App\Models\Project;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\Rule;
 
 /**
  * ProjectController
@@ -112,49 +112,11 @@ class ProjectController extends Controller
     /**
      * Store a newly created project.
      *
-     * @param  \Illuminate\Http\Request  $request
+     * @param  \App\Http\Requests\StoreProjectRequest  $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function store(Request $request): JsonResponse
+    public function store(StoreProjectRequest $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
-            'title' => ['required', 'string', 'max:255'],
-            'slug' => ['required', 'string', 'max:255', 'unique:projects,slug'],
-            'description' => ['required', 'string'],
-            'content' => ['nullable', 'string'],
-            'image' => ['nullable', 'string', 'max:255'],
-            'images' => ['nullable', 'array'],
-            'category' => ['required', 'string', Rule::in(['web', 'mobile', 'ai', 'iot', 'automation'])],
-            'technologies' => ['nullable', 'array'],
-            'client' => ['nullable', 'string', 'max:255'],
-            'url' => ['nullable', 'url', 'max:255'],
-            'completed_at' => ['nullable', 'date'],
-            'featured' => ['nullable', 'boolean'],
-            'published' => ['nullable', 'boolean'],
-            'order' => ['nullable', 'integer', 'min:0'],
-
-            // Translations
-            'translations' => ['required', 'array', 'min:1'],
-            'translations.*.language' => ['required', 'string', Rule::in(['en', 'id'])],
-            'translations.*.title' => ['required', 'string', 'max:255'],
-            'translations.*.slug' => ['required', 'string', 'max:255'],
-            'translations.*.description' => ['nullable', 'string'],
-            'translations.*.content' => ['nullable', 'string'],
-            'translations.*.meta_title' => ['nullable', 'string', 'max:255'],
-            'translations.*.meta_description' => ['nullable', 'string', 'max:500'],
-            'translations.*.og_title' => ['nullable', 'string', 'max:255'],
-            'translations.*.og_description' => ['nullable', 'string', 'max:500'],
-            'translations.*.canonical_url' => ['nullable', 'url', 'max:255'],
-            'translations.*.ai_summary' => ['nullable', 'string'],
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'message' => 'Validation failed',
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
         try {
             DB::beginTransaction();
 
@@ -200,11 +162,11 @@ class ProjectController extends Controller
     /**
      * Update the specified project.
      *
-     * @param  \Illuminate\Http\Request  $request
+     * @param  \App\Http\Requests\UpdateProjectRequest  $request
      * @param  int  $id
      * @return \Illuminate\Http\JsonResponse
      */
-    public function update(Request $request, int $id): JsonResponse
+    public function update(UpdateProjectRequest $request, int $id): JsonResponse
     {
         $project = Project::find($id);
 
@@ -213,45 +175,6 @@ class ProjectController extends Controller
                 'message' => 'Project not found',
                 'error' => 'The requested project does not exist.',
             ], 404);
-        }
-
-        $validator = Validator::make($request->all(), [
-            'title' => ['nullable', 'string', 'max:255'],
-            'slug' => ['nullable', 'string', 'max:255', Rule::unique('projects', 'slug')->ignore($id)],
-            'description' => ['nullable', 'string'],
-            'content' => ['nullable', 'string'],
-            'image' => ['nullable', 'string', 'max:255'],
-            'images' => ['nullable', 'array'],
-            'category' => ['nullable', 'string', Rule::in(['web', 'mobile', 'ai', 'iot', 'automation'])],
-            'technologies' => ['nullable', 'array'],
-            'client' => ['nullable', 'string', 'max:255'],
-            'url' => ['nullable', 'url', 'max:255'],
-            'completed_at' => ['nullable', 'date'],
-            'featured' => ['nullable', 'boolean'],
-            'published' => ['nullable', 'boolean'],
-            'order' => ['nullable', 'integer', 'min:0'],
-
-            // Translations
-            'translations' => ['nullable', 'array'],
-            'translations.*.id' => ['nullable', 'integer', 'exists:project_translations,id'],
-            'translations.*.language' => ['required', 'string', Rule::in(['en', 'id'])],
-            'translations.*.title' => ['required', 'string', 'max:255'],
-            'translations.*.slug' => ['required', 'string', 'max:255'],
-            'translations.*.description' => ['nullable', 'string'],
-            'translations.*.content' => ['nullable', 'string'],
-            'translations.*.meta_title' => ['nullable', 'string', 'max:255'],
-            'translations.*.meta_description' => ['nullable', 'string', 'max:500'],
-            'translations.*.og_title' => ['nullable', 'string', 'max:255'],
-            'translations.*.og_description' => ['nullable', 'string', 'max:500'],
-            'translations.*.canonical_url' => ['nullable', 'url', 'max:255'],
-            'translations.*.ai_summary' => ['nullable', 'string'],
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'message' => 'Validation failed',
-                'errors' => $validator->errors(),
-            ], 422);
         }
 
         try {

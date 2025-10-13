@@ -3,13 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StorePostRequest;
+use App\Http\Requests\UpdatePostRequest;
 use App\Http\Resources\PostResource;
 use App\Models\Post;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\Rule;
 
 /**
  * PostController
@@ -119,42 +119,8 @@ class PostController extends Controller
     /**
      * Store a newly created post.
      */
-    public function store(Request $request): JsonResponse
+    public function store(StorePostRequest $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
-            'category_id' => ['required', 'integer', 'exists:categories,id'],
-            'title' => ['required', 'string', 'max:255'],
-            'slug' => ['required', 'string', 'max:255', 'unique:posts,slug'],
-            'excerpt' => ['nullable', 'string'],
-            'content' => ['required', 'string'],
-            'featured_image' => ['nullable', 'string', 'max:255'],
-            'tags' => ['nullable', 'array'],
-            'is_premium' => ['nullable', 'boolean'],
-            'published' => ['nullable', 'boolean'],
-            'published_at' => ['nullable', 'date'],
-
-            // Translations
-            'translations' => ['required', 'array', 'min:1'],
-            'translations.*.language' => ['required', 'string', Rule::in(['en', 'id'])],
-            'translations.*.title' => ['required', 'string', 'max:255'],
-            'translations.*.slug' => ['required', 'string', 'max:255'],
-            'translations.*.excerpt' => ['nullable', 'string'],
-            'translations.*.content' => ['required', 'string'],
-            'translations.*.meta_title' => ['nullable', 'string', 'max:255'],
-            'translations.*.meta_description' => ['nullable', 'string', 'max:500'],
-            'translations.*.og_title' => ['nullable', 'string', 'max:255'],
-            'translations.*.og_description' => ['nullable', 'string', 'max:500'],
-            'translations.*.canonical_url' => ['nullable', 'url', 'max:255'],
-            'translations.*.ai_summary' => ['nullable', 'string'],
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'message' => 'Validation failed',
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
         try {
             DB::beginTransaction();
 
@@ -197,7 +163,7 @@ class PostController extends Controller
     /**
      * Update the specified post.
      */
-    public function update(Request $request, int $id): JsonResponse
+    public function update(UpdatePostRequest $request, int $id): JsonResponse
     {
         $post = Post::find($id);
 
@@ -206,41 +172,6 @@ class PostController extends Controller
                 'message' => 'Post not found',
                 'error' => 'The requested post does not exist.',
             ], 404);
-        }
-
-        $validator = Validator::make($request->all(), [
-            'category_id' => ['nullable', 'integer', 'exists:categories,id'],
-            'title' => ['nullable', 'string', 'max:255'],
-            'slug' => ['nullable', 'string', 'max:255', Rule::unique('posts', 'slug')->ignore($id)],
-            'excerpt' => ['nullable', 'string'],
-            'content' => ['nullable', 'string'],
-            'featured_image' => ['nullable', 'string', 'max:255'],
-            'tags' => ['nullable', 'array'],
-            'is_premium' => ['nullable', 'boolean'],
-            'published' => ['nullable', 'boolean'],
-            'published_at' => ['nullable', 'date'],
-
-            // Translations
-            'translations' => ['nullable', 'array'],
-            'translations.*.id' => ['nullable', 'integer', 'exists:post_translations,id'],
-            'translations.*.language' => ['required', 'string', Rule::in(['en', 'id'])],
-            'translations.*.title' => ['required', 'string', 'max:255'],
-            'translations.*.slug' => ['required', 'string', 'max:255'],
-            'translations.*.excerpt' => ['nullable', 'string'],
-            'translations.*.content' => ['required', 'string'],
-            'translations.*.meta_title' => ['nullable', 'string', 'max:255'],
-            'translations.*.meta_description' => ['nullable', 'string', 'max:500'],
-            'translations.*.og_title' => ['nullable', 'string', 'max:255'],
-            'translations.*.og_description' => ['nullable', 'string', 'max:500'],
-            'translations.*.canonical_url' => ['nullable', 'url', 'max:255'],
-            'translations.*.ai_summary' => ['nullable', 'string'],
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'message' => 'Validation failed',
-                'errors' => $validator->errors(),
-            ], 422);
         }
 
         try {

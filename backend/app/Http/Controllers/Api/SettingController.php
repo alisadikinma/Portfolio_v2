@@ -1,30 +1,45 @@
 <?php
 
-namespace App\Http\Controllers\API;
+namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\SettingResource;
 use App\Models\Setting;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 
+/**
+ * SettingController
+ *
+ * Handles retrieval of site settings
+ */
 class SettingController extends Controller
 {
-    public function index()
+    /**
+     * Display a listing of all settings grouped by group.
+     */
+    public function index(): JsonResponse
     {
         $settings = Setting::all()->groupBy('group');
 
+        $transformed = $settings->map(function ($group) {
+            return SettingResource::collection($group);
+        });
+
         return response()->json([
-            'success' => true,
-            'data' => $settings
+            'data' => $transformed,
         ]);
     }
 
-    public function getByGroup($group)
+    /**
+     * Display settings by group.
+     */
+    public function getByGroup(string $group): JsonResponse
     {
         $settings = Setting::byGroup($group)->get();
 
         return response()->json([
-            'success' => true,
-            'data' => $settings
+            'data' => SettingResource::collection($settings),
         ]);
     }
 }

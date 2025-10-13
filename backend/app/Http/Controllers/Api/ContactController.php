@@ -3,42 +3,28 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreContactRequest;
+use App\Http\Resources\ContactResource;
 use App\Models\Contact;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 
 class ContactController extends Controller
 {
     /**
      * Store a new contact message and send email notification.
      */
-    public function store(Request $request): JsonResponse
+    public function store(StoreContactRequest $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|max:255',
-            'subject' => 'required|string|max:255',
-            'message' => 'required|string|max:5000',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'message' => 'Validation failed',
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
         try {
-            $data = $validator->validated();
-
             // Create contact record
             $contact = Contact::create([
-                'name' => $data['name'],
-                'email' => $data['email'],
-                'subject' => $data['subject'],
-                'message' => $data['message'],
+                'name' => $request->input('name'),
+                'email' => $request->input('email'),
+                'subject' => $request->input('subject'),
+                'message' => $request->input('message'),
                 'is_read' => false,
             ]);
 
@@ -47,15 +33,14 @@ class ContactController extends Controller
 
             return response()->json([
                 'message' => 'Thank you for your message! We will get back to you soon.',
-                'data' => [
-                    'id' => $contact->id,
-                    'name' => $contact->name,
-                    'email' => $contact->email,
-                    'subject' => $contact->subject,
-                    'created_at' => $contact->created_at->toIso8601String(),
-                ],
+                'data' => new ContactResource($contact),
             ], 201);
         } catch (\Exception $e) {
+            Log::error('Failed to create contact message', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
             return response()->json([
                 'message' => 'Failed to send message. Please try again later.',
                 'error' => config('app.debug') ? $e->getMessage() : 'An error occurred',
@@ -93,7 +78,7 @@ class ContactController extends Controller
         $contacts = $query->paginate(20);
 
         return response()->json([
-            'data' => $contacts->items(),
+            'data' => ContactResource::collection($contacts),
             'links' => [
                 'first' => $contacts->url(1),
                 'last' => $contacts->url($contacts->lastPage()),
@@ -124,7 +109,7 @@ class ContactController extends Controller
         }
 
         return response()->json([
-            'data' => $contact,
+            'data' => new ContactResource($contact),
         ]);
     }
 
@@ -138,7 +123,7 @@ class ContactController extends Controller
 
         return response()->json([
             'message' => 'Contact marked as read',
-            'data' => $contact,
+            'data' => new ContactResource($contact),
         ]);
     }
 
@@ -179,7 +164,7 @@ class ContactController extends Controller
             });
         } catch (\Exception $e) {
             // Log error but don't throw - contact should still be saved
-            \Log::error('Failed to send contact notification email: ' . $e->getMessage());
+            Log::error('Failed to send contact notification email: ' . $e->getMessage());
         }
     }
 }
