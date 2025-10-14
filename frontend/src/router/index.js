@@ -94,6 +94,36 @@ const routes = [
     }
   },
   {
+    path: '/admin/posts',
+    name: 'admin-posts',
+    component: () => import('@/views/admin/Dashboard.vue'), // TODO: Create PostsList view
+    meta: {
+      title: 'Manage Posts - Admin',
+      requiresAuth: true,
+      layout: 'admin'
+    }
+  },
+  {
+    path: '/admin/posts/create',
+    name: 'admin-posts-create',
+    component: () => import('@/views/admin/PostCreate.vue'),
+    meta: {
+      title: 'Create Post - Admin',
+      requiresAuth: true,
+      layout: 'admin'
+    }
+  },
+  {
+    path: '/admin/posts/:id/edit',
+    name: 'admin-posts-edit',
+    component: () => import('@/views/admin/PostEdit.vue'),
+    meta: {
+      title: 'Edit Post - Admin',
+      requiresAuth: true,
+      layout: 'admin'
+    }
+  },
+  {
     path: '/login',
     name: 'login',
     component: () => import('@/views/auth/Login.vue'),

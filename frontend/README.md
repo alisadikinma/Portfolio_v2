@@ -779,7 +779,131 @@ For frontend issues:
 
 ---
 
-**Framework**: Vue 3 + Vite  
-**Node Version**: v18+  
-**Port**: 5173 (dev), 80 (production via Apache)  
-**Last Updated**: October 2025
+## 📈 Recent Updates
+
+### Phase 3 Sprint 1 - Blog System Components (October 14, 2025)
+
+**Completed Blog Components:**
+
+#### 1. **RichTextEditor.vue** (465 lines)
+CKEditor 5 integration via CDN with comprehensive features:
+- Full formatting toolbar (headings, bold, italic, links, lists, tables)
+- Code block support with 9 languages (JS, TS, PHP, Python, CSS, HTML, SQL, Bash)
+- Media embed support
+- Dark mode styling
+- Loading & error states
+- Auto-save via v-model
+- Exposed methods: `getEditor()`, `setData()`, `getData()`, `focus()`
+
+```vue
+<!-- Usage Example -->
+<RichTextEditor
+  v-model="content"
+  placeholder="Start writing..."
+  min-height="500px"
+  :disabled="false"
+  @ready="onEditorReady"
+  @error="onEditorError"
+/>
+```
+
+#### 2. **ImageUploader.vue** (336 lines)
+Drag & drop image uploader with preview:
+- Drag & drop + click to browse
+- Image preview with aspect ratio support (16:9, 4:3, 1:1)
+- File validation (type: jpeg/png/gif/webp, size: max 5MB)
+- Remove image functionality
+- File size formatting
+- Dark mode support
+- Error handling
+
+```vue
+<!-- Usage Example -->
+<ImageUploader
+  v-model="featuredImage"
+  label="Featured Image"
+  aspect-ratio="16:9"
+  :max-size="5242880"
+  :disabled="false"
+  @error="onUploadError"
+/>
+```
+
+#### 3. **CategorySelect.vue** (272 lines)
+Accessible category selector using Headless UI Listbox:
+- Fetches categories from API via Pinia store
+- Loading & error states
+- Empty state with helpful message
+- Selected indicator (checkmark)
+- Post count badges
+- Accessible keyboard navigation (WAI-ARIA compliant)
+- Dark mode support
+
+```vue
+<!-- Usage Example -->
+<CategorySelect
+  v-model="categoryId"
+  label="Category"
+  :required="true"
+  :disabled="false"
+  @change="onCategoryChange"
+/>
+```
+
+#### 4. **BlogPostForm.vue** (628 lines)
+Complete integrated blog post form:
+- Integrates RichTextEditor, ImageUploader, CategorySelect
+- Complete validation (title, slug, content, category, etc.)
+- Auto-slug generation from title with manual override
+- Character counters with color warnings (75% yellow, 90% red)
+- Collapsible advanced SEO section:
+  - Meta title (60 chars)
+  - Meta description (160 chars)
+  - Focus keyword
+  - Canonical URL
+- Draft & Publish actions
+- Loading states during submission
+- Scroll to first error on validation fail
+- Dark mode support
+
+```vue
+<!-- Usage Example -->
+<BlogPostForm
+  :post="existingPost"
+  submit-label="Publish Post"
+  :is-submitting="loading"
+  @submit="handleSubmit"
+  @cancel="handleCancel"
+/>
+```
+
+**Admin Views Created:**
+- ✅ `PostCreate.vue` - Create new blog posts
+- ✅ `PostEdit.vue` - Edit existing posts with loading/error states
+
+**Composables Added:**
+- ✅ `useCategories.js` - Categories API integration
+
+**Routes Added:**
+- `/admin/posts` - Posts list (pending)
+- `/admin/posts/create` - Create post ✅
+- `/admin/posts/:id/edit` - Edit post ✅
+
+**Pinia Stores:**
+- ✅ `posts.js` - Full CRUD operations with pagination
+- ✅ `categories.js` - Category management
+
+**Status:** Blog core components 100% complete (Sprint 1)
+
+**Next Sprint:**
+- Posts list page with data table
+- Search & filter functionality
+- Pagination component
+- Bulk actions (publish, draft, delete)
+
+---
+
+**Framework**: Vue 3.5 + Vite 7 (Rolldown)
+**Node Version**: v18+
+**Port**: 5173 (dev), 80 (production via Apache)
+**Last Updated**: October 14, 2025

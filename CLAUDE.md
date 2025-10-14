@@ -88,15 +88,21 @@ return response()->json([
 **Structure:**
 ```
 src/
-├── views/          # Page components (Home.vue, Blog.vue, etc.)
-├── layouts/        # Layout wrappers (DefaultLayout, AdminLayout, AuthLayout)
+├── views/              # Page components (Home.vue, Blog.vue, etc.)
+│   ├── admin/         # Admin pages (Dashboard.vue, PostCreate.vue, PostEdit.vue)
+│   └── auth/          # Auth pages (Login.vue)
+├── layouts/            # Layout wrappers (DefaultLayout, AdminLayout, AuthLayout)
 ├── components/
-│   ├── base/      # Reusable UI (BaseButton, BaseCard, BaseInput, etc.)
-│   └── [feature]/ # Feature-specific components
-├── composables/    # Reusable logic (usePosts, useProjects, useAuth, etc.)
-├── stores/         # Pinia stores (auth.js, ui.js, theme.js)
-├── services/       # API layer (api.js with axios)
-└── router/         # Vue Router config
+│   ├── base/          # Reusable UI (BaseButton, BaseCard, BaseInput, etc.)
+│   └── blog/          # Blog-specific components
+│       ├── RichTextEditor.vue  # CKEditor 5 integration
+│       ├── ImageUploader.vue   # Drag & drop image upload
+│       ├── CategorySelect.vue  # Headless UI category selector
+│       └── BlogPostForm.vue    # Integrated post form
+├── composables/        # Reusable logic (usePosts, useProjects, useAuth, useCategories)
+├── stores/            # Pinia stores (auth.js, posts.js, categories.js, projects.js, ui.js)
+├── services/          # API layer (api.js with axios)
+└── router/            # Vue Router config
 ```
 
 **Important Patterns:**
@@ -149,8 +155,16 @@ onMounted(() => { ... })
 4. **State Management:**
    - Pinia stores use setup syntax
    - `auth.js` - User authentication & token management
+   - `posts.js` - Blog posts CRUD operations & pagination
+   - `categories.js` - Categories management
+   - `projects.js` - Projects CRUD operations & pagination
    - `ui.js` - Loading states, modals, toasts
-   - `theme.js` - Dark mode toggle
+
+5. **Blog Components (Phase 3 - Completed):**
+   - **RichTextEditor** - CKEditor 5 via CDN with full toolbar, code blocks, dark mode
+   - **ImageUploader** - Drag & drop with preview, validation (5MB max)
+   - **CategorySelect** - Headless UI Listbox with API integration
+   - **BlogPostForm** - Integrated form with validation, auto-slug, SEO fields
 
 ## Essential Commands
 
@@ -374,6 +388,57 @@ Development prompts in `.claude/prompts/` for phased implementation.
 
 ---
 
-**Last Updated:** October 13, 2025
+## Recent Updates
+
+### Phase 3 Sprint 1 - Blog System Core Components (October 14, 2025)
+
+**Completed:**
+- ✅ RichTextEditor component with CKEditor 5 CDN
+- ✅ ImageUploader component with drag & drop
+- ✅ CategorySelect component with Headless UI
+- ✅ BlogPostForm component with full validation
+- ✅ PostCreate admin view
+- ✅ PostEdit admin view
+- ✅ useCategories composable
+- ✅ Admin post routes
+
+**Blog Components Usage:**
+
+```vue
+<!-- Example: Using BlogPostForm -->
+<script setup>
+import BlogPostForm from '@/components/blog/BlogPostForm.vue'
+import { usePosts } from '@/stores/posts'
+
+const postsStore = usePosts()
+
+const handleSubmit = async (postData) => {
+  await postsStore.createPost(postData)
+  // Handle success
+}
+</script>
+
+<template>
+  <BlogPostForm
+    submit-label="Publish Post"
+    :is-submitting="false"
+    @submit="handleSubmit"
+    @cancel="handleCancel"
+  />
+</template>
+```
+
+**Routes Added:**
+- `/admin/posts` - Posts list (pending)
+- `/admin/posts/create` - Create post ✅
+- `/admin/posts/:id/edit` - Edit post ✅
+
+**Next Steps:**
+- Sprint 2: Posts list with pagination, search, filters
+- Sprint 3: Public blog pages
+
+---
+
+**Last Updated:** October 14, 2025
 **Maintainer:** Ali Sadikin (ali.sadikincom85@gmail.com)
-**Status:** In Development (28% Complete - see PROJECT_STATUS.md)
+**Status:** In Development (65% Complete - see PROJECT_STATUS.md)
