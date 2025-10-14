@@ -39,6 +39,15 @@ const routes = [
     }
   },
   {
+    path: '/awards',
+    name: 'awards',
+    component: () => import('@/views/Awards.vue'),
+    meta: {
+      title: 'Awards & Recognition - Portfolio V2',
+      requiresAuth: false
+    }
+  },
+  {
     path: '/blog',
     name: 'blog',
     component: () => import('@/views/Blog.vue'),
@@ -96,7 +105,7 @@ const routes = [
   {
     path: '/admin/posts',
     name: 'admin-posts',
-    component: () => import('@/views/admin/Dashboard.vue'), // TODO: Create PostsList view
+    component: () => import('@/views/admin/PostsList.vue'),
     meta: {
       title: 'Manage Posts - Admin',
       requiresAuth: true,
@@ -119,6 +128,76 @@ const routes = [
     component: () => import('@/views/admin/PostEdit.vue'),
     meta: {
       title: 'Edit Post - Admin',
+      requiresAuth: true,
+      layout: 'admin'
+    }
+  },
+  {
+    path: '/admin/projects',
+    name: 'admin-projects',
+    component: () => import('@/views/admin/ProjectsList.vue'),
+    meta: {
+      title: 'Manage Projects - Admin',
+      requiresAuth: true,
+      layout: 'admin'
+    }
+  },
+  {
+    path: '/admin/awards',
+    name: 'admin-awards',
+    component: () => import('@/views/admin/AwardsList.vue'),
+    meta: {
+      title: 'Manage Awards - Admin',
+      requiresAuth: true,
+      layout: 'admin'
+    }
+  },
+  {
+    path: '/admin/gallery',
+    name: 'admin-gallery',
+    component: () => import('@/views/admin/GalleryList.vue'),
+    meta: {
+      title: 'Manage Gallery - Admin',
+      requiresAuth: true,
+      layout: 'admin'
+    }
+  },
+  {
+    path: '/admin/testimonials',
+    name: 'admin-testimonials',
+    component: () => import('@/views/admin/TestimonialsList.vue'),
+    meta: {
+      title: 'Manage Testimonials - Admin',
+      requiresAuth: true,
+      layout: 'admin'
+    }
+  },
+  {
+    path: '/admin/contact',
+    name: 'admin-contact',
+    component: () => import('@/views/admin/ContactList.vue'),
+    meta: {
+      title: 'Contact Messages - Admin',
+      requiresAuth: true,
+      layout: 'admin'
+    }
+  },
+  {
+    path: '/admin/about',
+    name: 'admin-about',
+    component: () => import('@/views/admin/AboutSettings.vue'),
+    meta: {
+      title: 'About Settings - Admin',
+      requiresAuth: true,
+      layout: 'admin'
+    }
+  },
+  {
+    path: '/admin/settings',
+    name: 'admin-settings',
+    component: () => import('@/views/admin/Settings.vue'),
+    meta: {
+      title: 'Site Settings - Admin',
       requiresAuth: true,
       layout: 'admin'
     }

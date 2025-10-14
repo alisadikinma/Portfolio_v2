@@ -14,22 +14,37 @@ class AwardController extends Controller
      */
     public function index()
     {
-        $awards = Award::with('galleries')
-                       ->orderBy('order')
-                       ->get()
-                       ->map(function($award) {
-                           return [
-                               'id' => $award->id,
-                               'title' => $award->title,
-                               'description' => $award->description,
-                               'organization' => $award->organization,
-                               'image' => $award->image,
-                               'received_at' => $award->received_at,
-                               'order' => $award->order,
-                               'gallery_count' => $award->galleries->count(),
-                               'total_photos' => $award->total_photos
-                           ];
-                       });
+        // Check if order column exists, otherwise order by received_at
+        try {
+            $awards = Award::with('galleries')
+                           ->orderBy('order', 'asc')
+                           ->orderBy('received_at', 'desc')
+                           ->get();
+        } catch (\Exception $e) {
+            // Fallback if order column doesn't exist
+            $awards = Award::with('galleries')
+                           ->orderBy('received_at', 'desc')
+                           ->get();
+        }
+
+        $awards = $awards->map(function($award) {
+            return [
+                'id' => $award->id,
+                'award_title' => $award->title, // Match frontend expectation
+                'title' => $award->title, // Keep for backward compatibility
+                'description' => $award->description,
+                'issuing_organization' => $award->organization, // Match frontend expectation
+                'organization' => $award->organization, // Keep for backward compatibility
+                'credential_id' => $award->credential_id,
+                'credential_url' => $award->credential_url,
+                'image' => $award->image,
+                'award_date' => $award->received_at, // Match frontend expectation
+                'received_at' => $award->received_at, // Keep for backward compatibility
+                'order' => $award->order ?? 0,
+                'gallery_count' => $award->galleries->count(),
+                'total_photos' => $award->total_photos
+            ];
+        });
 
         return response()->json($awards);
     }

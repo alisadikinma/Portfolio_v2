@@ -19,9 +19,10 @@ class DatabaseSeeder extends Seeder
             CategorySeeder::class,
             ProjectSeeder::class,
             PostSeeder::class,
-            AwardSeeder::class,
             ServiceSeeder::class,
             GallerySeeder::class,
+            AwardSeeder::class,
+            AwardGallerySeeder::class,
             NewsletterSeeder::class,
             ContactSeeder::class,
         ]);

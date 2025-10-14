@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(php artisan make:migration:*)",
+      "Bash(php artisan:*)",
+      "Bash(findstr \"add_credential_fields_to_awards_table\")",
+      "Bash(findstr:*)"
     ],
     "deny": [],
     "ask": []

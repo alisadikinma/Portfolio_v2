@@ -1,9 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import axios from 'axios'
-
-// Configure axios base URL
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+import api from '@/services/api'
 
 export const useAuthStore = defineStore('auth', () => {
   // State
@@ -28,8 +25,7 @@ export const useAuthStore = defineStore('auth', () => {
       user.value = JSON.parse(savedUser)
       isAuthenticated.value = true
 
-      // Set default axios header
-      axios.defaults.headers.common['Authorization'] = `Bearer ${savedToken}`
+      // Note: Token is automatically added by api.js interceptor
     }
   }
 
@@ -39,15 +35,9 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
 
     try {
-      const response = await axios.post(`${API_URL}/auth/login`, {
+      const response = await api.post('/auth/login', {
         email: credentials.email,
         password: credentials.password
-      }, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        }
-        // Note: withCredentials removed - we're using token-based auth, not session-based
       })
 
       console.log('Login response:', response.data)
@@ -65,8 +55,7 @@ export const useAuthStore = defineStore('auth', () => {
         localStorage.setItem('auth_token', authToken)
         localStorage.setItem('auth_user', JSON.stringify(userData))
 
-        // Set axios default header
-        axios.defaults.headers.common['Authorization'] = `Bearer ${authToken}`
+        // Note: Token is automatically added by api.js interceptor
 
         return { success: true }
       } else {
@@ -98,12 +87,7 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
 
     try {
-      const response = await axios.post(`${API_URL}/auth/register`, userData, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        }
-      })
+      const response = await api.post('/auth/register', userData)
 
       if (response.data.success && response.data.data) {
         const { token: authToken, user: newUser } = response.data.data
@@ -117,8 +101,7 @@ export const useAuthStore = defineStore('auth', () => {
         localStorage.setItem('auth_token', authToken)
         localStorage.setItem('auth_user', JSON.stringify(newUser))
 
-        // Set axios default header
-        axios.defaults.headers.common['Authorization'] = `Bearer ${authToken}`
+        // Note: Token is automatically added by api.js interceptor
 
         return { success: true }
       } else {
@@ -137,11 +120,7 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       // Call logout endpoint if authenticated
       if (isAuthenticated.value) {
-        await axios.post(`${API_URL}/auth/logout`, {}, {
-          headers: {
-            'Authorization': `Bearer ${token.value}`
-          }
-        })
+        await api.post('/auth/logout')
       }
     } catch (err) {
       console.error('Logout error:', err)
@@ -162,8 +141,7 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('auth_token')
     localStorage.removeItem('auth_user')
 
-    // Remove axios header
-    delete axios.defaults.headers.common['Authorization']
+    // Note: Token is automatically removed by api.js interceptor when not in localStorage
   }
 
   // Fetch current user
@@ -173,11 +151,7 @@ export const useAuthStore = defineStore('auth', () => {
     isLoading.value = true
 
     try {
-      const response = await axios.get(`${API_URL}/auth/me`, {
-        headers: {
-          'Authorization': `Bearer ${token.value}`
-        }
-      })
+      const response = await api.get('/auth/me')
       
       if (response.data.success && response.data.data) {
         user.value = response.data.data.user
@@ -200,7 +174,7 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
 
     try {
-      const response = await axios.put(`${API_URL}/user/profile`, profileData)
+      const response = await api.put('/user/profile', profileData)
       user.value = response.data
       localStorage.setItem('auth_user', JSON.stringify(response.data))
 

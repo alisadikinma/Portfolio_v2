@@ -13,6 +13,8 @@ class Award extends Model
         'title',
         'description',
         'organization',
+        'credential_id',
+        'credential_url',
         'image',
         'received_at',
         'order',
