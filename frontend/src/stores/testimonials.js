@@ -1,211 +1,157 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import axios from 'axios'
+import api from '@/services/api'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost/Portfolio_v2/backend/public/api/v1'
+export const useTestimonialsStore = defineStore('testimonials', {
+  state: () => ({
+    testimonials: [],
+    currentTestimonial: null,
+    pagination: {
+      current_page: 1,
+      last_page: 1,
+      per_page: 10,
+      total: 0
+    },
+    loading: false,
+    error: null
+  }),
 
-export const useTestimonialsStore = defineStore('testimonials', () => {
-  // State
-  const testimonials = ref([])
-  const currentTestimonial = ref(null)
-  const loading = ref(false)
-  const error = ref(null)
-  const pagination = ref({
-    currentPage: 1,
-    perPage: 15,
-    total: 0,
-    lastPage: 1
-  })
+  getters: {
+    getTestimonialById: (state) => (id) => {
+      return state.testimonials.find(testimonial => testimonial.id === id)
+    },
+    hasTestimonials: (state) => state.testimonials.length > 0,
+    averageRating: (state) => {
+      if (state.testimonials.length === 0) return 0
+      const sum = state.testimonials.reduce((acc, t) => acc + (t.star_rating || 0), 0)
+      return (sum / state.testimonials.length).toFixed(1)
+    }
+  },
 
-  // Getters
-  const getTestimonialById = computed(() => {
-    return (id) => testimonials.value.find(testimonial => testimonial.id === id)
-  })
+  actions: {
+    async fetchTestimonials(page = 1, perPage = 10, filters = {}) {
+      this.loading = true
+      this.error = null
 
-  const totalTestimonials = computed(() => pagination.value.total)
-
-  const averageRating = computed(() => {
-    if (testimonials.value.length === 0) return 0
-    const sum = testimonials.value.reduce((acc, t) => acc + (t.rating || 0), 0)
-    return (sum / testimonials.value.length).toFixed(1)
-  })
-
-  // Actions
-  async function fetchTestimonials(params = {}) {
-    loading.value = true
-    error.value = null
-
-    try {
-      const response = await axios.get(`${API_BASE_URL}/testimonials`, {
-        params: {
-          page: params.page || pagination.value.currentPage,
-          per_page: params.perPage || pagination.value.perPage,
-          search: params.search,
-          rating: params.rating,
-          ...params
+      try {
+        const params = {
+          page,
+          per_page: perPage,
+          ...filters
         }
-      })
 
-      testimonials.value = response.data.data.data || response.data.data
+        const response = await api.get('/admin/testimonials', { params })
 
-      if (response.data.data.meta) {
-        pagination.value = {
-          currentPage: response.data.data.meta.current_page,
-          perPage: response.data.data.meta.per_page,
-          total: response.data.data.meta.total,
-          lastPage: response.data.data.meta.last_page
+        this.testimonials = response.data.data
+        this.pagination = {
+          current_page: response.data.meta.current_page,
+          last_page: response.data.meta.last_page,
+          per_page: response.data.meta.per_page,
+          total: response.data.meta.total
         }
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to fetch testimonials'
+        throw error
+      } finally {
+        this.loading = false
       }
+    },
 
-      return testimonials.value
-    } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to fetch testimonials'
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
+    async fetchTestimonial(id) {
+      this.loading = true
+      this.error = null
 
-  async function fetchTestimonial(id) {
-    loading.value = true
-    error.value = null
-
-    try {
-      const response = await axios.get(`${API_BASE_URL}/testimonials/${id}`)
-      currentTestimonial.value = response.data.data
-      return currentTestimonial.value
-    } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to fetch testimonial'
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-
-  async function createTestimonial(testimonialData) {
-    loading.value = true
-    error.value = null
-
-    try {
-      const response = await axios.post(
-        `${API_BASE_URL}/admin/testimonials`,
-        testimonialData,
-        {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      )
-
-      const newTestimonial = response.data.data
-      testimonials.value.unshift(newTestimonial)
-      pagination.value.total++
-
-      return newTestimonial
-    } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to create testimonial'
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-
-  async function updateTestimonial(id, testimonialData) {
-    loading.value = true
-    error.value = null
-
-    try {
-      const response = await axios.put(
-        `${API_BASE_URL}/admin/testimonials/${id}`,
-        testimonialData,
-        {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      )
-
-      const updatedTestimonial = response.data.data
-      const index = testimonials.value.findIndex(t => t.id === id)
-      if (index !== -1) {
-        testimonials.value[index] = updatedTestimonial
+      try {
+        const response = await api.get(`/admin/testimonials/${id}`)
+        this.currentTestimonial = response.data.data
+        return this.currentTestimonial
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to fetch testimonial'
+        throw error
+      } finally {
+        this.loading = false
       }
+    },
 
-      if (currentTestimonial.value?.id === id) {
-        currentTestimonial.value = updatedTestimonial
-      }
+    async createTestimonial(testimonialData) {
+      this.loading = true
+      this.error = null
 
-      return updatedTestimonial
-    } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to update testimonial'
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
+      try {
+        const response = await api.post('/admin/testimonials', testimonialData)
 
-  async function deleteTestimonial(id) {
-    loading.value = true
-    error.value = null
+        const newTestimonial = response.data.data
 
-    try {
-      await axios.delete(`${API_BASE_URL}/admin/testimonials/${id}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        if (this.testimonials.length < this.pagination.per_page) {
+          this.testimonials.unshift(newTestimonial)
         }
-      })
 
-      testimonials.value = testimonials.value.filter(t => t.id !== id)
-      pagination.value.total--
+        return newTestimonial
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to create testimonial'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
 
-      return true
-    } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to delete testimonial'
-      throw err
-    } finally {
-      loading.value = false
+    async updateTestimonial(id, testimonialData) {
+      this.loading = true
+      this.error = null
+
+      try {
+        // Use POST with _method=PUT for FormData compatibility
+        const response = await api.post(`/admin/testimonials/${id}`, testimonialData)
+
+        const updatedTestimonial = response.data.data
+
+        const index = this.testimonials.findIndex(t => t.id === id)
+        if (index !== -1) {
+          this.testimonials[index] = updatedTestimonial
+        }
+
+        if (this.currentTestimonial?.id === id) {
+          this.currentTestimonial = updatedTestimonial
+        }
+
+        return updatedTestimonial
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to update testimonial'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async deleteTestimonial(id) {
+      this.loading = true
+      this.error = null
+
+      try {
+        await api.delete(`/admin/testimonials/${id}`)
+
+        this.testimonials = this.testimonials.filter(t => t.id !== id)
+
+        if (this.currentTestimonial?.id === id) {
+          this.currentTestimonial = null
+        }
+
+        if (this.pagination.total > 0) {
+          this.pagination.total--
+        }
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to delete testimonial'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    clearCurrentTestimonial() {
+      this.currentTestimonial = null
+    },
+
+    clearError() {
+      this.error = null
     }
-  }
-
-  function clearError() {
-    error.value = null
-  }
-
-  function resetStore() {
-    testimonials.value = []
-    currentTestimonial.value = null
-    loading.value = false
-    error.value = null
-    pagination.value = {
-      currentPage: 1,
-      perPage: 15,
-      total: 0,
-      lastPage: 1
-    }
-  }
-
-  return {
-    // State
-    testimonials,
-    currentTestimonial,
-    loading,
-    error,
-    pagination,
-
-    // Getters
-    getTestimonialById,
-    totalTestimonials,
-    averageRating,
-
-    // Actions
-    fetchTestimonials,
-    fetchTestimonial,
-    createTestimonial,
-    updateTestimonial,
-    deleteTestimonial,
-    clearError,
-    resetStore
   }
 })

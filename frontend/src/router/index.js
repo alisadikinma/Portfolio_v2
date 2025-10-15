@@ -237,6 +237,26 @@ const routes = [
       layout: 'admin'
     }
   },
+  {
+    path: '/admin/testimonials/create',
+    name: 'admin-testimonials-create',
+    component: () => import('@/views/admin/TestimonialCreate.vue'),
+    meta: {
+      title: 'Create Testimonial - Admin',
+      requiresAuth: true,
+      layout: 'admin'
+    }
+  },
+  {
+    path: '/admin/testimonials/:id/edit',
+    name: 'admin-testimonials-edit',
+    component: () => import('@/views/admin/TestimonialEdit.vue'),
+    meta: {
+      title: 'Edit Testimonial - Admin',
+      requiresAuth: true,
+      layout: 'admin'
+    }
+  },
   
   // Contacts Management (Read-only)
   {

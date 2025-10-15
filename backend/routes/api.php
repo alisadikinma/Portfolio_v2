@@ -123,6 +123,15 @@ Route::middleware(['auth:sanctum'])->prefix('admin/gallery')->group(function () 
     Route::post('/bulk-delete', [GalleryController::class, 'bulkDelete']);
 });
 
+// Admin Testimonials Routes
+Route::middleware(['auth:sanctum'])->prefix('admin/testimonials')->group(function () {
+    Route::get('/', [TestimonialController::class, 'indexForAdmin']);
+    Route::get('/{id}', [TestimonialController::class, 'show']);
+    Route::post('/', [TestimonialController::class, 'store']);
+    Route::put('/{id}', [TestimonialController::class, 'update']);
+    Route::delete('/{id}', [TestimonialController::class, 'destroy']);
+});
+
 // Admin Contact Routes
 Route::middleware(['auth:sanctum'])->prefix('admin/contacts')->group(function () {
     Route::get('/', [ContactController::class, 'index']);
