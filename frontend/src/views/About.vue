@@ -23,7 +23,7 @@
     <section class="section bg-white dark:bg-neutral-800">
       <div class="container-custom">
         <div class="max-w-4xl mx-auto">
-          <div>&nbsp;</div>
+          <div class="h-10"></div>
           <div class="grid md:grid-cols-2 gap-12 items-center">
             <div class="aspect-square bg-neutral-200 dark:bg-neutral-700 rounded-2xl"></div>
             <div>
@@ -43,11 +43,11 @@
           </div>
         </div>
       </div>
-      <div>&nbsp;</div>
+      <div class="h-10"></div>
     </section>
     <!-- Skills Section -->
     <section class="section bg-neutral-50 dark:bg-neutral-900">
-      <div>&nbsp;</div>
+      <div class="h-10"></div>
       <div class="container-custom">
         <div class="text-center mb-12">
           <h2 class="text-3xl md:text-4xl font-display font-bold mb-4">Skills & Expertise</h2>
@@ -69,7 +69,7 @@
       </div>
     </section>
 
-    <div>&nbsp;</div>
+    <div class="h-10"></div>
 
     <!-- Experience Section -->
     <section class="section bg-white dark:bg-neutral-800">
@@ -93,11 +93,11 @@
         </div>
       </div>
     </section>
-    <div>&nbsp;</div> 
+    <div class="h-10"></div> 
 
     <!-- CTA Section -->
     <section class="section bg-gradient-to-r from-primary-600 to-accent-600 text-white">
-      <div>&nbsp;</div>
+      <div class="h-10"></div>
       <div class="container-custom text-center">
         <h2 class="text-3xl md:text-4xl font-display font-bold mb-4">Let's Work Together</h2>
         <p class="text-lg md:text-xl mb-8 opacity-90 max-w-2xl mx-auto">
@@ -107,15 +107,22 @@
           Contact Me
         </BaseButton>
       </div>
-      <div>&nbsp;</div>
+      <div class="h-10"></div>
     </section>
   </div>
 </template>
 
 <script setup>
+import { ref, onMounted } from 'vue'
 import { BaseButton, BaseCard, BaseBadge } from '@/components/base'
+import api from '@/services/api'
 
-const skills = [
+const about = ref(null)
+const loading = ref(true)
+const error = ref(null)
+
+// Default data as fallback
+const skills = ref([
   {
     category: 'Frontend',
     technologies: ['Vue.js', 'React', 'TypeScript', 'Tailwind CSS', 'HTML5', 'CSS3']
@@ -128,9 +135,9 @@ const skills = [
     category: 'DevOps & Tools',
     technologies: ['Git', 'Docker', 'AWS', 'CI/CD', 'Linux', 'Nginx']
   }
-]
+])
 
-const experiences = [
+const experiences = ref([
   {
     position: 'Senior Full Stack Developer',
     company: 'Tech Company Inc.',
@@ -149,5 +156,38 @@ const experiences = [
     period: '2017 - 2019',
     description: 'Built responsive user interfaces and implemented design systems for SaaS applications.'
   }
-]
+])
+
+onMounted(async () => {
+  await fetchAboutData()
+})
+
+async function fetchAboutData() {
+  loading.value = true
+  error.value = null
+
+  try {
+    const response = await api.get('/settings/about')
+
+    if (response.data.success && response.data.data) {
+      about.value = response.data.data
+
+      // Update skills if provided
+      if (about.value.skills && Array.isArray(about.value.skills)) {
+        skills.value = about.value.skills
+      }
+
+      // Update experiences if provided
+      if (about.value.experiences && Array.isArray(about.value.experiences)) {
+        experiences.value = about.value.experiences
+      }
+    }
+  } catch (err) {
+    console.error('Failed to fetch about data:', err)
+    error.value = err.response?.data?.message || 'Failed to load about information'
+    // Continue with default data on error
+  } finally {
+    loading.value = false
+  }
+}
 </script>

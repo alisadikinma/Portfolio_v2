@@ -110,10 +110,10 @@
         </div>
       </div>
     </section>
-    <div>&nbsp;</div>
+    <div class="h-10"></div>
     <!-- Newsletter Section -->
     <section class="section bg-gradient-to-r from-primary-600 to-accent-600 text-white">
-      <div>&nbsp;</div>
+      <div class="h-10"></div>
       <div class="container-custom text-center mt-8">
         <h2 class="text-3xl md:text-4xl font-display font-bold mb-4">Stay Updated</h2>
         <p class="text-lg md:text-xl mb-8 opacity-90 max-w-2xl mx-auto">
@@ -130,7 +130,7 @@
           </BaseButton>
         </div>
       </div>
-      <div>&nbsp;</div>
+      <div class="h-10"></div>
     </section>
   </div>
 </template>

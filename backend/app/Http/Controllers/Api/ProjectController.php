@@ -29,17 +29,16 @@ class ProjectController extends Controller
         $language = $request->query('lang', $request->header('Accept-Language', 'en'));
         $language = strtolower(substr($language, 0, 2));
 
-        $query = Project::with(['translations'])
-            ->where('published', true);
+        $query = Project::with(['translations']);
 
-        // Filter by category
-        if ($request->has('category')) {
-            $query->where('category', $request->query('category'));
+        // Filter by status
+        if ($request->has('status')) {
+            $query->byStatus($request->query('status'));
         }
 
         // Filter by featured
         if ($request->has('featured')) {
-            $query->where('featured', (bool) $request->query('featured'));
+            $query->where('is_featured', (bool) $request->query('featured'));
         }
 
         // Search
@@ -48,21 +47,73 @@ class ProjectController extends Controller
             $query->where(function ($q) use ($searchTerm) {
                 $q->where('title', 'like', "%{$searchTerm}%")
                   ->orWhere('description', 'like', "%{$searchTerm}%")
-                  ->orWhereHas('translations', function ($tq) use ($searchTerm) {
-                      $tq->where('title', 'like', "%{$searchTerm}%")
-                         ->orWhere('description', 'like', "%{$searchTerm}%");
-                  });
+                  ->orWhere('client_name', 'like', "%{$searchTerm}%")
+                  ->orWhereJsonContains('technologies', $searchTerm);
             });
         }
 
-        $query->orderBy('order', 'asc')
-              ->orderBy('created_at', 'desc');
+        $query->orderBy('created_at', 'desc');
 
         $perPage = min($request->query('per_page', 15), 50);
         $projects = $query->paginate($perPage);
 
         return response()->json([
             'data' => ProjectResource::collection($projects)->additional(['lang' => $language]),
+            'meta' => [
+                'current_page' => $projects->currentPage(),
+                'last_page' => $projects->lastPage(),
+                'per_page' => $projects->perPage(),
+                'total' => $projects->total(),
+                'from' => $projects->firstItem(),
+                'to' => $projects->lastItem(),
+            ],
+            'links' => [
+                'first' => $projects->url(1),
+                'last' => $projects->url($projects->lastPage()),
+                'prev' => $projects->previousPageUrl(),
+                'next' => $projects->nextPageUrl(),
+            ],
+        ]);
+    }
+
+    /**
+     * Display a listing of all projects for admin (including unpublished).
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function indexForAdmin(Request $request): JsonResponse
+    {
+        $query = Project::with(['translations']);
+
+        // Filter by status
+        if ($request->has('status')) {
+            $query->where('status', $request->query('status'));
+        }
+
+        // Filter by featured
+        if ($request->has('featured')) {
+            $query->where('is_featured', (bool) $request->query('featured'));
+        }
+
+        // Search
+        if ($request->has('search')) {
+            $searchTerm = $request->query('search');
+            $query->where(function ($q) use ($searchTerm) {
+                $q->where('title', 'like', "%{$searchTerm}%")
+                  ->orWhere('description', 'like', "%{$searchTerm}%")
+                  ->orWhere('client_name', 'like', "%{$searchTerm}%")
+                  ->orWhereJsonContains('technologies', $searchTerm);
+            });
+        }
+
+        $query->orderBy('created_at', 'desc');
+
+        $perPage = min($request->query('per_page', 10), 50);
+        $projects = $query->paginate($perPage);
+
+        return response()->json([
+            'data' => ProjectResource::collection($projects),
             'meta' => [
                 'current_page' => $projects->currentPage(),
                 'last_page' => $projects->lastPage(),
@@ -94,7 +145,6 @@ class ProjectController extends Controller
 
         $project = Project::with(['translations'])
             ->where('slug', $slug)
-            ->where('published', true)
             ->first();
 
         if (!$project) {
@@ -110,6 +160,29 @@ class ProjectController extends Controller
     }
 
     /**
+     * Display the specified project by ID (for admin).
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function showById(int $id): JsonResponse
+    {
+        $project = Project::with(['translations'])->find($id);
+
+        if (!$project) {
+            return response()->json([
+                'message' => 'Project not found',
+                'error' => 'The requested project does not exist.',
+            ], 404);
+        }
+
+        return response()->json([
+            'message' => 'Project retrieved successfully',
+            'data' => new ProjectResource($project),
+        ]);
+    }
+
+    /**
      * Store a newly created project.
      *
      * @param  \App\Http\Requests\StoreProjectRequest  $request
@@ -120,26 +193,34 @@ class ProjectController extends Controller
         try {
             DB::beginTransaction();
 
-            $project = Project::create([
-                'title' => $request->input('title'),
-                'slug' => $request->input('slug'),
-                'description' => $request->input('description'),
-                'content' => $request->input('content'),
-                'image' => $request->input('image'),
-                'images' => $request->input('images'),
-                'category' => $request->input('category'),
-                'technologies' => $request->input('technologies'),
-                'client' => $request->input('client'),
-                'url' => $request->input('url'),
-                'completed_at' => $request->input('completed_at'),
-                'featured' => $request->input('featured', false),
-                'published' => $request->input('published', true),
-                'order' => $request->input('order', 0),
+            // Prepare data
+            $projectData = $request->only([
+                'title',
+                'slug',
+                'description',
+                'technologies',
+                'client_name',
+                'project_url',
+                'github_url',
+                'status',
+                'start_date',
+                'end_date',
+                'is_featured',
+                'meta_title',
+                'meta_description',
+                'focus_keyword',
+                'canonical_url',
             ]);
 
-            foreach ($request->input('translations', []) as $translation) {
-                $project->translations()->create($translation);
+            // Handle file upload
+            if ($request->hasFile('featured_image')) {
+                $file = $request->file('featured_image');
+                $filename = time() . '_' . $file->getClientOriginalName();
+                $file->move(public_path('uploads/projects'), $filename);
+                $projectData['featured_image'] = '/uploads/projects/' . $filename;
             }
+
+            $project = Project::create($projectData);
 
             DB::commit();
 
@@ -180,32 +261,34 @@ class ProjectController extends Controller
         try {
             DB::beginTransaction();
 
-            $project->update($request->only([
+            // Prepare update data
+            $updateData = $request->only([
                 'title',
                 'slug',
                 'description',
-                'content',
-                'image',
-                'images',
-                'category',
                 'technologies',
-                'client',
-                'url',
-                'completed_at',
-                'featured',
-                'published',
-                'order',
-            ]));
+                'client_name',
+                'project_url',
+                'github_url',
+                'status',
+                'start_date',
+                'end_date',
+                'is_featured',
+                'meta_title',
+                'meta_description',
+                'focus_keyword',
+                'canonical_url',
+            ]);
 
-            if ($request->has('translations')) {
-                foreach ($request->input('translations', []) as $translation) {
-                    if (isset($translation['id'])) {
-                        $project->translations()->where('id', $translation['id'])->update($translation);
-                    } else {
-                        $project->translations()->create($translation);
-                    }
-                }
+            // Handle file upload
+            if ($request->hasFile('featured_image')) {
+                $file = $request->file('featured_image');
+                $filename = time() . '_' . $file->getClientOriginalName();
+                $file->move(public_path('uploads/projects'), $filename);
+                $updateData['featured_image'] = '/uploads/projects/' . $filename;
             }
+
+            $project->update($updateData);
 
             DB::commit();
 

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, shallowRef, onMounted, onBeforeUnmount, watch } from 'vue'
 
 const props = defineProps({
   modelValue: {
@@ -23,7 +23,7 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'ready', 'error'])
 
 const editorElement = ref(null)
-const editorInstance = ref(null)
+const editorInstance = shallowRef(null) // Use shallowRef to avoid Vue reactivity issues
 const isReady = ref(false)
 const error = ref(null)
 
@@ -134,16 +134,15 @@ const initializeEditor = async () => {
 }
 
 // Destroy editor instance
-const destroyEditor = () => {
+const destroyEditor = async () => {
   if (editorInstance.value) {
-    editorInstance.value.destroy()
-      .then(() => {
-        editorInstance.value = null
-        isReady.value = false
-      })
-      .catch(err => {
-        console.error('Error destroying CKEditor:', err)
-      })
+    try {
+      await editorInstance.value.destroy()
+      editorInstance.value = null
+      isReady.value = false
+    } catch (err) {
+      console.error('Error destroying CKEditor:', err)
+    }
   }
 }
 

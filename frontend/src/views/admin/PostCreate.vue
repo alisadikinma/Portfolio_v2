@@ -36,7 +36,7 @@ const handleCancel = () => {
 </script>
 
 <template>
-  <div class="post-create-view">
+  <div class="max-w-5xl mx-auto px-4 py-8">
     <!-- Header -->
     <div class="mb-8">
       <div class="flex items-center justify-between">
@@ -85,9 +85,3 @@ const handleCancel = () => {
     </div>
   </div>
 </template>
-
-<style scoped>
-.post-create-view {
-  @apply max-w-5xl mx-auto px-4 py-8;
-}
-</style>

@@ -16,25 +16,26 @@ class Project extends Model
         'title',
         'slug',
         'description',
-        'content',
-        'image',
-        'images',
-        'category',
+        'featured_image',
         'technologies',
-        'client',
-        'url',
-        'completed_at',
-        'featured',
-        'published',
-        'order',
+        'client_name',
+        'project_url',
+        'github_url',
+        'status',
+        'start_date',
+        'end_date',
+        'is_featured',
+        'meta_title',
+        'meta_description',
+        'focus_keyword',
+        'canonical_url',
     ];
 
     protected $casts = [
-        'images' => 'array',
         'technologies' => 'array',
-        'completed_at' => 'date',
-        'featured' => 'boolean',
-        'published' => 'boolean',
+        'start_date' => 'date',
+        'end_date' => 'date',
+        'is_featured' => 'boolean',
     ];
 
     /**
@@ -56,27 +57,19 @@ class Project extends Model
     }
 
     /**
-     * Scope a query to only include published projects.
-     */
-    public function scopePublished($query)
-    {
-        return $query->where('published', true);
-    }
-
-    /**
      * Scope a query to only include featured projects.
      */
     public function scopeFeatured($query)
     {
-        return $query->where('featured', true);
+        return $query->where('is_featured', true);
     }
 
     /**
-     * Scope a query to filter by category.
+     * Scope a query to filter by status.
      */
-    public function scopeByCategory($query, $category)
+    public function scopeByStatus($query, $status)
     {
-        return $query->where('category', $category);
+        return $query->where('status', $status);
     }
 
     /**

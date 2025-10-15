@@ -63,8 +63,8 @@ DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
 DB_PORT=3306
 DB_DATABASE=portfolio_v2
-DB_USERNAME=root
-DB_PASSWORD=
+DB_USERNAME=ali
+DB_PASSWORD=aL1889900@@@
 
 MAIL_MAILER=smtp
 MAIL_HOST=smtp.mailtrap.io
@@ -121,21 +121,28 @@ php artisan tinker
 
 ## 🚦 Running the Server
 
-### Development Mode (via XAMPP)
+### XAMPP Setup (Required)
 
-1. Start XAMPP Apache and MySQL
-2. Access via browser:
+**IMPORTANT:** This project uses XAMPP Apache (Port 80), **NOT** `php artisan serve`
+
+1. **Start XAMPP Control Panel**
+   - Start Apache (Port 80)
+   - Start MySQL (Port 3306)
+
+2. **Access the application:**
    - **API**: http://localhost/Portfolio_v2/backend/public/api
-   - **Admin Panel**: http://localhost/Portfolio_v2/backend/public/admin
-   - **Web Interface**: http://localhost/Portfolio_v2/backend/public
+   - **Backend Public**: http://localhost/Portfolio_v2/backend/public
 
-### Using Laravel Serve (Alternative)
+3. **Verify setup:**
+   - Open http://localhost/Portfolio_v2/backend/public
+   - You should see Laravel default page or your app
+   - API endpoints accessible at `/api/*`
 
-```bash
-php artisan serve
-```
-
-Server will start at `http://127.0.0.1:8000`
+**Why XAMPP instead of `php artisan serve`?**
+- Matches production Apache environment
+- Supports proper .htaccess URL rewriting
+- Windows 11 development environment compatibility
+- Consistent with frontend development workflow
 
 ## 📁 Project Structure
 
@@ -202,8 +209,8 @@ DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
 DB_PORT=3306
 DB_DATABASE=portfolio_v2
-DB_USERNAME=root
-DB_PASSWORD=                    # Leave empty for XAMPP default
+DB_USERNAME=ali
+DB_PASSWORD=aL1889900@@@
 
 # Session & Cache
 SESSION_DRIVER=file
@@ -670,16 +677,23 @@ For backend-specific issues:
 - ✅ Newsletter (Subscribe/Unsubscribe)
 - ✅ Settings (Site-wide settings)
 
-**Backend Status:** Production-ready (75% complete)
+**Backend Status:** In Development (65% complete - see PROJECT_STATUS.md)
+
+**Completed:**
+- ✅ Database schema (17 migrations)
+- ✅ All 8 models with traits (HasSeoFields, HasSlug, SoftDeletes)
+- ✅ 1/9 controllers complete (AwardController)
+- ✅ Form Requests and API Resources for Posts
+- ✅ Authentication with Laravel Sanctum
 
 **Next Steps:**
+- Complete remaining 8 controllers (Post, Project, Category, etc.)
 - Write comprehensive feature tests
 - Add automated backup system
-- Implement logging dashboard
 
 ---
 
 **Framework**: Laravel 10.x
 **PHP Version**: 8.2+
-**Database**: MySQL 8.0
-**Last Updated**: October 14, 2025
+**Database**: MySQL 8.0 via XAMPP
+**Last Updated**: October 15, 2025

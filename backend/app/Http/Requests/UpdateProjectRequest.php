@@ -28,32 +28,22 @@ class UpdateProjectRequest extends FormRequest
             'title' => ['nullable', 'string', 'max:255'],
             'slug' => ['nullable', 'string', 'max:255', Rule::unique('projects', 'slug')->ignore($projectId)],
             'description' => ['nullable', 'string'],
-            'content' => ['nullable', 'string'],
-            'image' => ['nullable', 'string', 'max:255'],
-            'images' => ['nullable', 'array'],
-            'category' => ['nullable', 'string', 'in:web,mobile,ai,iot,automation'],
+            'featured_image' => ['nullable', 'image', 'max:5120'], // 5MB
             'technologies' => ['nullable', 'array'],
-            'client' => ['nullable', 'string', 'max:255'],
-            'url' => ['nullable', 'url', 'max:255'],
-            'completed_at' => ['nullable', 'date'],
-            'featured' => ['nullable', 'boolean'],
-            'published' => ['nullable', 'boolean'],
-            'order' => ['nullable', 'integer', 'min:0'],
-
-            // Translations
-            'translations' => ['nullable', 'array'],
-            'translations.*.id' => ['nullable', 'integer', 'exists:project_translations,id'],
-            'translations.*.language' => ['required', 'string', 'in:en,id'],
-            'translations.*.title' => ['required', 'string', 'max:255'],
-            'translations.*.slug' => ['required', 'string', 'max:255'],
-            'translations.*.description' => ['nullable', 'string'],
-            'translations.*.content' => ['nullable', 'string'],
-            'translations.*.meta_title' => ['nullable', 'string', 'max:255'],
-            'translations.*.meta_description' => ['nullable', 'string', 'max:500'],
-            'translations.*.og_title' => ['nullable', 'string', 'max:255'],
-            'translations.*.og_description' => ['nullable', 'string', 'max:500'],
-            'translations.*.canonical_url' => ['nullable', 'url', 'max:255'],
-            'translations.*.ai_summary' => ['nullable', 'string'],
+            'technologies.*' => ['string', 'max:100'],
+            'client_name' => ['nullable', 'string', 'max:255'],
+            'project_url' => ['nullable', 'url', 'max:255'],
+            'github_url' => ['nullable', 'url', 'max:255'],
+            'status' => ['nullable', 'string', 'in:planning,in_progress,completed'],
+            'start_date' => ['nullable', 'date'],
+            'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
+            'is_featured' => ['nullable', 'boolean'],
+            
+            // SEO fields
+            'meta_title' => ['nullable', 'string', 'max:60'],
+            'meta_description' => ['nullable', 'string', 'max:160'],
+            'focus_keyword' => ['nullable', 'string', 'max:100'],
+            'canonical_url' => ['nullable', 'url', 'max:255'],
         ];
     }
 
@@ -66,11 +56,15 @@ class UpdateProjectRequest extends FormRequest
     {
         return [
             'slug.unique' => 'This project slug is already taken',
-            'category.in' => 'Invalid project category. Must be one of: web, mobile, ai, iot, automation',
-            'translations.*.language.required' => 'Translation language is required',
-            'translations.*.language.in' => 'Translation language must be either en or id',
-            'translations.*.title.required' => 'Translation title is required',
-            'translations.*.slug.required' => 'Translation slug is required',
+            'featured_image.image' => 'Featured image must be an image file',
+            'featured_image.max' => 'Featured image must not exceed 5MB',
+            'status.in' => 'Invalid project status. Must be one of: planning, in_progress, completed',
+            'project_url.url' => 'Project URL must be a valid URL',
+            'github_url.url' => 'GitHub URL must be a valid URL',
+            'canonical_url.url' => 'Canonical URL must be a valid URL',
+            'end_date.after_or_equal' => 'End date must be after or equal to start date',
+            'meta_title.max' => 'Meta title must not exceed 60 characters',
+            'meta_description.max' => 'Meta description must not exceed 160 characters',
         ];
     }
 }

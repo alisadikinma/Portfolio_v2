@@ -2,7 +2,7 @@
   <div>
     <!-- Hero Section -->
     <section class="relative bg-gradient-to-br from-primary-50 via-white to-accent-50 dark:from-neutral-900 dark:via-neutral-800 dark:to-neutral-900 overflow-hidden">
-      <div class="container-custom relative py-20">
+      <div class="container-custom relative py-18">
         <div class="max-w-4xl mx-auto text-center">
           <h1 class="text-4xl md:text-5xl lg:text-6xl font-display font-bold mb-6 animate-fade-in-up">
             My <span class="text-gradient">Projects</span>
@@ -102,6 +102,7 @@
       </div>
     </section>
   </div>
+  <div class="h-10"></div>
 </template>
 
 <script setup>

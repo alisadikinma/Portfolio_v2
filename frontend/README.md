@@ -69,14 +69,15 @@ VITE_API_URL=http://localhost/Portfolio_v2/backend/public/api
 VITE_API_TIMEOUT=30000
 
 # Application
-VITE_APP_NAME=Ali Sadikin Portfolio
-VITE_APP_TITLE=Portfolio & Blog
+VITE_APP_NAME="Portfolio v2"
+VITE_APP_TITLE="Portfolio & Blog"
+VITE_APP_VERSION=2.0.0
 
 # Features
 VITE_ENABLE_DARK_MODE=true
 VITE_ENABLE_ANALYTICS=false
 
-# Contact Form
+# Contact
 VITE_CONTACT_EMAIL=ali.sadikincom85@gmail.com
 ```
 
@@ -94,14 +95,18 @@ npm run dev
 ```
 
 Application will be available at:
-- **Dev Server**: http://localhost:5173
+- **Dev Server**: http://localhost:5173 (default Vite port)
 - **Network**: http://[your-ip]:5173 (for mobile testing)
+
+**Prerequisites:**
+- Ensure XAMPP Apache is running (backend API must be accessible)
+- Backend API at: http://localhost/Portfolio_v2/backend/public/api
 
 Features enabled in development:
 - **Hot Module Replacement (HMR)**: Instant updates without page reload
-- **Source Maps**: Easy debugging
+- **Source Maps**: Easy debugging with Vue DevTools
 - **Detailed Error Messages**: Stack traces and warnings
-- **Vue DevTools**: Browser extension support
+- **API Proxy**: Configured for XAMPP backend
 
 ### Production Build
 
@@ -893,17 +898,28 @@ Complete integrated blog post form:
 - ✅ `posts.js` - Full CRUD operations with pagination
 - ✅ `categories.js` - Category management
 
-**Status:** Blog core components 100% complete (Sprint 1)
+**Frontend Status:**
+- **Admin Panel**: 40% complete (Blog CRUD ✅, other modules pending)
+- **Public Pages**: 35% complete (5/9 pages working)
+- **Blog Components**: 100% complete (Sprint 1) ✅
 
-**Next Sprint:**
+**Completed in Sprint 1:**
+- ✅ RichTextEditor, ImageUploader, CategorySelect, BlogPostForm
+- ✅ PostCreate and PostEdit admin views
+- ✅ Admin routing and navigation
+
+**Next Sprint 2:**
 - Posts list page with data table
 - Search & filter functionality
 - Pagination component
 - Bulk actions (publish, draft, delete)
 
+**See PROJECT_STATUS.md for overall project progress (45% complete)**
+
 ---
 
 **Framework**: Vue 3.5 + Vite 7 (Rolldown)
 **Node Version**: v18+
-**Port**: 5173 (dev), 80 (production via Apache)
-**Last Updated**: October 14, 2025
+**Dev Server**: http://localhost:5173 (Vite HMR)
+**API Backend**: http://localhost/Portfolio_v2/backend/public/api
+**Last Updated**: October 15, 2025

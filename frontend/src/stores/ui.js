@@ -195,3 +195,6 @@ export const useUIStore = defineStore('ui', () => {
     stopLoading
   }
 })
+
+// Alias export for compatibility
+export const useUiStore = useUIStore

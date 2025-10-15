@@ -89,7 +89,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, useSlots } from 'vue'
 
 const props = defineProps({
   modelValue: {
@@ -165,6 +165,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:modelValue', 'blur', 'focus', 'clear'])
+const slots = useSlots()
 
 const inputId = ref(`input-${Math.random().toString(36).substring(7)}`)
 
@@ -203,10 +204,10 @@ const inputClasses = computed(() => {
   classes.push(sizeClasses[props.size])
 
   // Padding adjustments for icons
-  if (props.$slots.prefix || props.prefixIcon) {
+  if (slots.prefix || props.prefixIcon) {
     classes.push('pl-10')
   }
-  if (props.$slots.suffix || props.suffixIcon || props.clearable) {
+  if (slots.suffix || props.suffixIcon || props.clearable) {
     classes.push('pr-10')
   }
 

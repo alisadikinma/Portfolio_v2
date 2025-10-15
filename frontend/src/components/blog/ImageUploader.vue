@@ -195,7 +195,7 @@ defineExpose({
     <!-- Upload Area -->
     <div
       v-if="!hasImage"
-      class="upload-area"
+      class="border-2 border-dashed rounded-lg transition-all duration-200"
       :class="{
         'border-blue-500 bg-blue-50 dark:bg-blue-900/20': isDragging,
         'border-gray-300 dark:border-gray-600': !isDragging && !error,
@@ -261,7 +261,7 @@ defineExpose({
     <!-- Preview Area -->
     <div
       v-else
-      class="preview-area relative rounded-lg border-2 border-gray-300 dark:border-gray-600 overflow-hidden bg-gray-100 dark:bg-gray-800"
+      class="relative rounded-lg border-2 border-gray-300 dark:border-gray-600 overflow-hidden bg-gray-100 dark:bg-gray-800 transition-all duration-200"
     >
       <!-- Image Preview -->
       <div class="relative">
@@ -336,26 +336,3 @@ defineExpose({
     </p>
   </div>
 </template>
-
-<style scoped>
-.upload-area {
-  @apply border-2 border-dashed rounded-lg transition-all duration-200;
-}
-
-.preview-area {
-  @apply transition-all duration-200;
-}
-
-/* Aspect ratio utilities for image preview */
-.aspect-\[16\/9\] {
-  aspect-ratio: 16 / 9;
-}
-
-.aspect-\[4\/3\] {
-  aspect-ratio: 4 / 3;
-}
-
-.aspect-\[1\/1\] {
-  aspect-ratio: 1 / 1;
-}
-</style>

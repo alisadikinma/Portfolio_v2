@@ -1,139 +1,148 @@
-/**
- * Projects store
- * @module stores/projects
- */
-
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import api from '@/services/api'
 
-export const useProjectsStore = defineStore('projects', () => {
-  // State
-  const projects = ref([])
-  const currentProject = ref(null)
-  const featuredProjects = ref([])
-  const pagination = ref({
-    currentPage: 1,
-    perPage: 12,
-    total: 0,
-    lastPage: 1,
-  })
-  const filters = ref({
-    category: null,
-    technology: null,
-    featured: null,
-  })
-  const loading = ref(false)
-  const error = ref(null)
+export const useProjectsStore = defineStore('projects', {
+  state: () => ({
+    projects: [],
+    currentProject: null,
+    pagination: {
+      current_page: 1,
+      last_page: 1,
+      per_page: 10,
+      total: 0
+    },
+    loading: false,
+    error: null
+  }),
 
-  // Getters
-  const hasMore = computed(() => pagination.value.currentPage < pagination.value.lastPage)
-  const totalProjects = computed(() => pagination.value.total)
+  getters: {
+    getProjectById: (state) => (id) => {
+      return state.projects.find(project => project.id === id)
+    },
+    hasProjects: (state) => state.projects.length > 0
+  },
 
-  // Actions
+  actions: {
+    async fetchProjects(page = 1, perPage = 10, filters = {}) {
+      this.loading = true
+      this.error = null
 
-  /**
-   * Fetch all projects with pagination
-   * @param {Object} params - Query parameters
-   */
-  async function fetchProjects(params = {}) {
-    loading.value = true
-    error.value = null
+      try {
+        const params = {
+          page,
+          per_page: perPage,
+          ...filters
+        }
 
-    try {
-      // TODO: Implement API call when backend is ready
-      // const response = await projectsApi.getAll(params)
-      // projects.value = response.data.data
+        const response = await api.get('/admin/projects', { params })
 
-      // Mock data for now
-      projects.value = []
+        this.projects = response.data.data
+        this.pagination = {
+          current_page: response.data.meta.current_page,
+          last_page: response.data.meta.last_page,
+          per_page: response.data.meta.per_page,
+          total: response.data.meta.total
+        }
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to fetch projects'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
 
-      return projects.value
-    } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to fetch projects'
-      throw err
-    } finally {
-      loading.value = false
+    async fetchProject(id) {
+      this.loading = true
+      this.error = null
+
+      try {
+        const response = await api.get(`/admin/projects/${id}`)
+        this.currentProject = response.data.data
+        return this.currentProject
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to fetch project'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async createProject(projectData) {
+      this.loading = true
+      this.error = null
+
+      try {
+        const response = await api.post('/admin/projects', projectData)
+
+        if (this.projects.length < this.pagination.per_page) {
+          this.projects.unshift(response.data.data)
+        }
+
+        return response.data.data
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to create project'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async updateProject(id, projectData) {
+      this.loading = true
+      this.error = null
+
+      try {
+        // Use POST with _method=PUT for FormData compatibility
+        const response = await api.post(`/admin/projects/${id}`, projectData)
+
+        const index = this.projects.findIndex(p => p.id === id)
+        if (index !== -1) {
+          this.projects[index] = response.data.data
+        }
+
+        if (this.currentProject?.id === id) {
+          this.currentProject = response.data.data
+        }
+
+        return response.data.data
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to update project'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async deleteProject(id) {
+      this.loading = true
+      this.error = null
+
+      try {
+        await api.delete(`/admin/projects/${id}`)
+
+        this.projects = this.projects.filter(p => p.id !== id)
+
+        if (this.currentProject?.id === id) {
+          this.currentProject = null
+        }
+
+        if (this.pagination.total > 0) {
+          this.pagination.total--
+        }
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to delete project'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    clearCurrentProject() {
+      this.currentProject = null
+    },
+
+    clearError() {
+      this.error = null
     }
-  }
-
-  /**
-   * Fetch single project by slug
-   * @param {string} slug - Project slug
-   */
-  async function fetchProject(slug) {
-    loading.value = true
-    error.value = null
-
-    try {
-      // TODO: Implement API call
-      currentProject.value = null
-      return currentProject.value
-    } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to fetch project'
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-
-  /**
-   * Set filters
-   * @param {Object} newFilters - Filter values
-   */
-  function setFilters(newFilters) {
-    filters.value = { ...filters.value, ...newFilters }
-    pagination.value.currentPage = 1
-  }
-
-  /**
-   * Clear filters
-   */
-  function clearFilters() {
-    filters.value = {
-      category: null,
-      technology: null,
-      featured: null,
-    }
-    pagination.value.currentPage = 1
-  }
-
-  /**
-   * Reset store state
-   */
-  function reset() {
-    projects.value = []
-    currentProject.value = null
-    featuredProjects.value = []
-    pagination.value = {
-      currentPage: 1,
-      perPage: 12,
-      total: 0,
-      lastPage: 1,
-    }
-    clearFilters()
-    loading.value = false
-    error.value = null
-  }
-
-  return {
-    // State
-    projects,
-    currentProject,
-    featuredProjects,
-    pagination,
-    filters,
-    loading,
-    error,
-
-    // Getters
-    hasMore,
-    totalProjects,
-
-    // Actions
-    fetchProjects,
-    fetchProject,
-    setFilters,
-    clearFilters,
-    reset,
   }
 })

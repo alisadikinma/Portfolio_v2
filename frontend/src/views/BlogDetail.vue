@@ -119,7 +119,7 @@
       <!-- Related Posts -->
       <section class="section bg-neutral-50 dark:bg-neutral-900">
         <div class="container-custom">
-          <div class="text-left mb-12">
+          <div class="text-center mb-12">
             <h2 class="text-3xl md:text-4xl font-display font-bold mb-4">Related Posts</h2>
           </div>
           <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
@@ -140,7 +140,7 @@
           </div>
         </div>
       </section>
-      <div>&nbsp;</div>
+      <div class="h-10"></div>
     </article>
   </div>
 </template>

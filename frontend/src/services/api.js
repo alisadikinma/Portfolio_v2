@@ -23,6 +23,11 @@ api.interceptors.request.use(
     const language = localStorage.getItem('language') || 'en'
     config.headers['Accept-Language'] = language
 
+    // Auto-detect FormData and remove Content-Type (let browser set it with boundary)
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type']
+    }
+
     return config
   },
   (error) => {

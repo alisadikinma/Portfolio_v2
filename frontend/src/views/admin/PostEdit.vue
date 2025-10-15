@@ -60,7 +60,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="post-edit-view">
+  <div class="max-w-5xl mx-auto px-4 py-8">
     <!-- Header -->
     <div class="mb-8">
       <div class="flex items-center justify-between">
@@ -189,9 +189,3 @@ onMounted(() => {
     </div>
   </div>
 </template>
-
-<style scoped>
-.post-edit-view {
-  @apply max-w-5xl mx-auto px-4 py-8;
-}
-</style>

@@ -93,6 +93,8 @@ Route::middleware(['auth:sanctum'])->prefix('admin/awards')->group(function () {
 
 // Admin Projects Routes
 Route::middleware(['auth:sanctum'])->prefix('admin/projects')->group(function () {
+    Route::get('/', [ProjectController::class, 'indexForAdmin']);
+    Route::get('/{id}', [ProjectController::class, 'showById']);
     Route::post('/', [ProjectController::class, 'store']);
     Route::put('/{id}', [ProjectController::class, 'update']);
     Route::delete('/{id}', [ProjectController::class, 'destroy']);

@@ -202,8 +202,7 @@
         </div>
       </div>
     </section>
-    <div>&nbsp;</div>
-    <div>&nbsp;</div>
+    <div class="h-10"></div>
     <!-- Map Section (Placeholder) -->
     <!--section class="section bg-neutral-50 dark:bg-neutral-900">
       <div class="container-custom">
@@ -288,24 +287,27 @@ const handleSubmit = async () => {
       message: form.value.message.trim()
     }
 
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500))
+    // Actual API call
+    const api = (await import('@/services/api')).default
+    const response = await api.post('/contact', sanitizedForm)
 
-    // Show success message
-    uiStore.showToast({
-      type: 'success',
-      title: 'Message Sent!',
-      message: 'Thank you for reaching out. I\'ll get back to you soon.'
-    })
+    if (response.data.success) {
+      // Show success message
+      uiStore.showToast({
+        type: 'success',
+        title: 'Message Sent!',
+        message: 'Thank you for reaching out. I\'ll get back to you soon.'
+      })
 
-    // Reset form
-    form.value = {
-      name: '',
-      email: '',
-      subject: '',
-      message: ''
+      // Reset form
+      form.value = {
+        name: '',
+        email: '',
+        subject: '',
+        message: ''
+      }
+      formErrors.value = {}
     }
-    formErrors.value = {}
   } catch (error) {
     uiStore.showToast({
       type: 'error',

@@ -142,9 +142,9 @@ php artisan db:seed
 # Create storage link for images
 php artisan storage:link
 
-# Start development server
-php artisan serve
-# Backend running at: http://localhost:8000
+# Note: Backend runs on XAMPP Apache (Port 80)
+# Do NOT use 'php artisan serve' - XAMPP handles the backend
+# Backend API URL: http://localhost/Portfolio_v2/backend/public/api
 ```
 
 ### 3. Frontend Setup
@@ -160,11 +160,11 @@ npm install
 copy .env.example .env
 
 # Configure API URL in .env file
-# VITE_API_URL=http://localhost:8000/api
+# VITE_API_URL=http://localhost/Portfolio_v2/backend/public/api
 
 # Start development server
 npm run dev
-# Frontend running at: http://localhost:3000
+# Frontend running at: http://localhost:5173 (Vite default port)
 ```
 
 ### 4. Create Admin User
@@ -202,15 +202,15 @@ npm run dev
 
 ### Accessing the Application
 
-- **Frontend (Public):** http://localhost:3000
-- **Frontend (Admin):** http://localhost:3000/admin
+- **Frontend (Public):** http://localhost:5173
+- **Frontend (Admin):** http://localhost:5173/admin
 - **Backend API:** http://localhost/Portfolio_v2/backend/public/api
 
 ### Development URLs
 
 | Service | URL | Purpose |
 |---------|-----|---------|
-| Frontend Dev | `http://localhost:3000` | Vue development server |
+| Frontend Dev | `http://localhost:5173` | Vite development server |
 | Backend API | `http://localhost/Portfolio_v2/backend/public/api` | Laravel API (XAMPP) |
 | Backend Public | `http://localhost/Portfolio_v2/backend/public` | Laravel public folder |
 | Database | `localhost:3306` | MySQL database |
@@ -328,9 +328,14 @@ FILESYSTEM_DISK=public
 # API Configuration
 VITE_API_URL=http://localhost/Portfolio_v2/backend/public/api
 VITE_APP_NAME="Portfolio v2"
+VITE_API_TIMEOUT=30000
 
 # Development
 VITE_APP_ENV=development
+
+# Features
+VITE_ENABLE_DARK_MODE=true
+VITE_ENABLE_ANALYTICS=false
 ```
 
 ---
@@ -339,10 +344,13 @@ VITE_APP_ENV=development
 
 ### Backend Commands
 
-**Note:** Backend runs on XAMPP (Port 80), no need for `php artisan serve`
+**IMPORTANT:** Backend runs on XAMPP Apache (Port 80)
+- **DO NOT** use `php artisan serve`
+- Ensure XAMPP Apache is started before running commands
+- API accessible at: http://localhost/Portfolio_v2/backend/public/api
 
 ```bash
-# Development
+# Database Management
 php artisan migrate              # Run migrations
 php artisan migrate:fresh        # Drop all tables and re-run migrations
 php artisan db:seed              # Seed database
@@ -711,8 +719,8 @@ All rights reserved. Unauthorized copying, distribution, or modification of this
 
 ---
 
-**Last Updated:** October 14, 2025
+**Last Updated:** October 15, 2025
 **Version:** 2.0.0
-**Status:** In Development (65% Complete)
+**Status:** In Development (45% Complete - See PROJECT_STATUS.md)
 
 For questions or issues, please open an issue on GitHub or contact the maintainer.
