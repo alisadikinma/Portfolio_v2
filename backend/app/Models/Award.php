@@ -32,10 +32,10 @@ class Award extends Model
      */
     public function galleries()
     {
-        return $this->belongsToMany(Gallery::class, 'awards_galleries')
-                    ->withPivot('display_order')
+        return $this->belongsToMany(Gallery::class, 'award_gallery')
+                    ->withPivot('sort_order')
                     ->withTimestamps()
-                    ->orderBy('display_order');
+                    ->orderBy('sort_order');
     }
 
     /**
@@ -48,11 +48,10 @@ class Award extends Model
 
     /**
      * Get total photo count from all linked galleries
+     * Each gallery has one image
      */
     public function getTotalPhotosAttribute()
     {
-        return $this->galleries->sum(function($gallery) {
-            return $gallery->images->count();
-        });
+        return $this->galleries->count();
     }
 }

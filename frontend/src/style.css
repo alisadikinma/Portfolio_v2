@@ -2,6 +2,9 @@
 
 /* Tailwind CSS v4 Theme Configuration */
 @theme {
+  /* Dark Mode Configuration - CRITICAL FIX */
+  --dark-mode: class;
+
   /* Custom Colors - MASTER_DESIGN_SYSTEM */
   --color-primary-50: #eef2ff;
   --color-primary-100: #e0e7ff;
@@ -132,6 +135,11 @@
 @layer base {
   body {
     @apply font-sans text-gray-900 dark:text-gray-50 bg-white dark:bg-gray-950;
+  }
+
+  /* Ensure dark mode class works on HTML element */
+  html.dark {
+    color-scheme: dark;
   }
 }
 

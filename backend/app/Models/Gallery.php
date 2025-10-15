@@ -14,15 +14,21 @@ class Gallery extends Model
         'description',
         'image',
         'category',
-        'order',
+        'is_active',
+        'sort_order',
+    ];
+
+    protected $casts = [
+        'is_active' => 'boolean',
     ];
 
     /**
-     * Gallery has many images (assuming you have GalleryImage model)
+     * Get gallery image as a collection for compatibility
+     * (Gallery has only one image stored in 'image' column)
      */
-    public function images()
+    public function getImagesAttribute()
     {
-        return $this->hasMany(GalleryImage::class)->orderBy('order');
+        return collect([$this->image]);
     }
 
     /**
@@ -30,9 +36,9 @@ class Gallery extends Model
      */
     public function awards()
     {
-        return $this->belongsToMany(Award::class, 'awards_galleries')
-                    ->withPivot('display_order')
+        return $this->belongsToMany(Award::class, 'award_gallery')
+                    ->withPivot('sort_order')
                     ->withTimestamps()
-                    ->orderBy('display_order');
+                    ->orderBy('sort_order');
     }
 }

@@ -116,37 +116,72 @@
           <div
             v-for="award in awards"
             :key="award.id"
-            class="card-elevated p-6 hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+            class="award-card group relative bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 hover:border-primary-500 dark:hover:border-primary-500 hover:shadow-xl transition-all duration-300"
           >
             <!-- Award Icon/Image -->
-            <div class="flex items-start gap-4 mb-4">
-              <div class="flex-shrink-0 w-16 h-16 bg-gradient-to-br from-accent-500 to-secondary-500 rounded-xl flex items-center justify-center">
+            <div class="relative mb-6">
+              <div v-if="award.image" class="relative w-16 h-16 rounded-xl overflow-hidden bg-gradient-to-br from-primary-400 to-secondary-400">
+                <img :src="award.image" :alt="award.award_title" class="w-full h-full object-cover" />
+                <!-- Award Label -->
+                <div class="absolute top-1 left-1 right-1 bg-purple-600/90 backdrop-blur-sm rounded-md px-2 py-0.5">
+                  <span class="text-[10px] text-white font-semibold leading-tight line-clamp-2">
+                    {{ award.award_title.split(' ').slice(0, 3).join(' ') }}
+                  </span>
+                </div>
+              </div>
+              <div v-else class="relative w-16 h-16 bg-gradient-to-br from-primary-400 to-secondary-400 rounded-xl flex items-center justify-center">
                 <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
                 </svg>
-              </div>
-              <div class="flex-1">
-                <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-1">
-                  {{ award.award_title }}
-                </h3>
-                <p class="text-sm text-accent-600 dark:text-accent-400 font-semibold">
-                  {{ award.issuing_organization }}
-                </p>
+                <!-- Award Label -->
+                <div class="absolute top-1 left-1 right-1 bg-purple-600/90 backdrop-blur-sm rounded-md px-2 py-0.5">
+                  <span class="text-[10px] text-white font-semibold leading-tight line-clamp-2">
+                    {{ award.award_title.split(' ').slice(0, 3).join(' ') }}
+                  </span>
+                </div>
               </div>
             </div>
 
-            <!-- Award Details -->
-            <p v-if="award.description" class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              {{ award.description }}
-            </p>
+            <!-- Award Info -->
+            <div class="mb-6">
+              <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
+                {{ award.award_title }}
+              </h3>
+              <p class="text-sm text-purple-600 dark:text-purple-400 font-semibold mb-3 uppercase tracking-wide">
+                {{ award.issuing_organization }} • {{ formatYear(award.award_date) }}
+              </p>
+              <p v-if="award.description" class="text-sm text-gray-600 dark:text-gray-400 line-clamp-3 mb-4">
+                {{ award.description }}
+              </p>
 
-            <!-- Date -->
-            <div class="flex items-center text-xs text-gray-500 dark:text-gray-500">
-              <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+              <!-- Credential Info -->
+              <div class="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-500 mb-4">
+                <div v-if="award.credential_id" class="flex items-center">
+                  <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+                  </svg>
+                  ID: {{ award.credential_id }}
+                </div>
+                <div v-if="award.total_photos > 0" class="flex items-center">
+                  <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                  </svg>
+                  {{ award.total_photos }} {{ award.total_photos === 1 ? 'Photo' : 'Photos' }}
+                </div>
+              </div>
+            </div>
+
+            <!-- Action Button -->
+            <button
+              v-if="award.total_photos > 0"
+              @click="openGalleryModal(award)"
+              class="w-full px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors duration-300 flex items-center justify-center gap-2"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
               </svg>
-              {{ formatDate(award.award_date) }}
-            </div>
+              VIEW GALLERY
+            </button>
           </div>
         </div>
 
@@ -429,6 +464,69 @@
       </div>
     </section>
 
+    <!-- Gallery Modal -->
+    <Teleport to="body">
+      <Transition name="modal">
+        <div
+          v-if="showGalleryModal && selectedAward"
+          class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          @click.self="closeGalleryModal"
+        >
+          <div class="relative w-full max-w-6xl bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800">
+              <div>
+                <h3 class="text-2xl font-bold text-gray-900 dark:text-white">
+                  {{ selectedAward.award_title }}
+                </h3>
+                <p class="text-sm text-purple-600 dark:text-purple-400 mt-1">
+                  {{ selectedAward.issuing_organization }} • {{ formatYear(selectedAward.award_date) }}
+                </p>
+              </div>
+              <button
+                @click="closeGalleryModal"
+                class="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+              >
+                <svg class="w-6 h-6 text-gray-400 hover:text-gray-900 dark:hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
+            </div>
+
+            <!-- Modal Body - Gallery Grid -->
+            <div class="p-6 max-h-[70vh] overflow-y-auto">
+              <BaseLoader v-if="loadingGallery" text="Loading gallery..." class="py-20" />
+
+              <div v-else-if="galleryPhotos.length > 0" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                <div
+                  v-for="photo in galleryPhotos"
+                  :key="photo.id"
+                  class="relative group cursor-pointer aspect-square rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800"
+                >
+                  <img
+                    :src="photo.image"
+                    :alt="photo.title"
+                    class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                  />
+                  <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div class="absolute bottom-0 left-0 right-0 p-3">
+                      <p class="text-white text-sm font-semibold truncate">
+                        {{ photo.title }}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div v-else class="text-center py-20">
+                <p class="text-gray-400">No photos available in this gallery.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
     <!-- CTA Section - Clean & Direct -->
     <section class="relative py-20 bg-gradient-to-br from-primary-600 via-secondary-600 to-accent-600 overflow-hidden">
       <!-- Subtle Pattern -->
@@ -461,6 +559,7 @@ import { usePosts } from '@/composables/usePosts'
 import { useAwards } from '@/composables/useAwards'
 import { useTestimonials } from '@/composables/useTestimonials'
 import { BaseLoader } from '@/components/base'
+import api from '@/services/api'
 
 const { projects: featuredProjects, isLoading: projectsLoading, fetchProjects } = useProjects()
 const { posts: latestPosts, isLoading: postsLoading, fetchPosts } = usePosts()
@@ -486,6 +585,41 @@ const formatDate = (date) => {
     month: 'short',
     day: 'numeric'
   })
+}
+
+const formatYear = (date) => {
+  if (!date) return ''
+  return new Date(date).getFullYear()
+}
+
+// Gallery modal state
+const showGalleryModal = ref(false)
+const selectedAward = ref(null)
+const galleryPhotos = ref([])
+const loadingGallery = ref(false)
+
+const openGalleryModal = async (award) => {
+  selectedAward.value = award
+  showGalleryModal.value = true
+  loadingGallery.value = true
+  galleryPhotos.value = []
+
+  try {
+    const response = await api.get(`/awards/${award.id}/galleries`)
+    if (response.data.success && response.data.data.galleries) {
+      galleryPhotos.value = response.data.data.galleries
+    }
+  } catch (err) {
+    console.error('Failed to load gallery:', err)
+  } finally {
+    loadingGallery.value = false
+  }
+}
+
+const closeGalleryModal = () => {
+  showGalleryModal.value = false
+  selectedAward.value = null
+  galleryPhotos.value = []
 }
 
 // Auto-rotate testimonials
@@ -529,5 +663,24 @@ onUnmounted(() => {
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.award-card {
+  transition: all 0.3s ease;
+}
+
+.award-card:hover {
+  transform: translateY(-4px);
+}
+
+/* Modal transitions */
+.modal-enter-active,
+.modal-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
 }
 </style>

@@ -93,6 +93,16 @@ const routes = [
     }
   },
   {
+    path: '/login',
+    name: 'login',
+    component: () => import('@/views/auth/Login.vue'),
+    meta: {
+      title: 'Login - Portfolio V2',
+      requiresAuth: false,
+      layout: 'auth'
+    }
+  },
+  {
     path: '/admin',
     name: 'admin',
     component: () => import('@/views/admin/Dashboard.vue'),
@@ -102,16 +112,19 @@ const routes = [
       layout: 'admin'
     }
   },
-  {
-    path: '/admin/posts',
-    name: 'admin-posts',
-    component: () => import('@/views/admin/PostsList.vue'),
-    meta: {
-      title: 'Manage Posts - Admin',
-      requiresAuth: true,
-      layout: 'admin'
-    }
-  },
+  // ============================================
+  // BLOG POSTS ROUTES (Partially Implemented)
+  // ============================================
+  // {
+  //   path: '/admin/posts',
+  //   name: 'admin-posts',
+  //   component: () => import('@/views/admin/PostsList.vue'),
+  //   meta: {
+  //     title: 'Manage Posts - Admin',
+  //     requiresAuth: true,
+  //     layout: 'admin'
+  //   }
+  // },
   {
     path: '/admin/posts/create',
     name: 'admin-posts-create',
@@ -132,86 +145,164 @@ const routes = [
       layout: 'admin'
     }
   },
-  {
-    path: '/admin/projects',
-    name: 'admin-projects',
-    component: () => import('@/views/admin/ProjectsList.vue'),
-    meta: {
-      title: 'Manage Projects - Admin',
-      requiresAuth: true,
-      layout: 'admin'
-    }
-  },
-  {
-    path: '/admin/awards',
-    name: 'admin-awards',
-    component: () => import('@/views/admin/AwardsList.vue'),
-    meta: {
-      title: 'Manage Awards - Admin',
-      requiresAuth: true,
-      layout: 'admin'
-    }
-  },
-  {
-    path: '/admin/gallery',
-    name: 'admin-gallery',
-    component: () => import('@/views/admin/GalleryList.vue'),
-    meta: {
-      title: 'Manage Gallery - Admin',
-      requiresAuth: true,
-      layout: 'admin'
-    }
-  },
-  {
-    path: '/admin/testimonials',
-    name: 'admin-testimonials',
-    component: () => import('@/views/admin/TestimonialsList.vue'),
-    meta: {
-      title: 'Manage Testimonials - Admin',
-      requiresAuth: true,
-      layout: 'admin'
-    }
-  },
-  {
-    path: '/admin/contact',
-    name: 'admin-contact',
-    component: () => import('@/views/admin/ContactList.vue'),
-    meta: {
-      title: 'Contact Messages - Admin',
-      requiresAuth: true,
-      layout: 'admin'
-    }
-  },
-  {
-    path: '/admin/about',
-    name: 'admin-about',
-    component: () => import('@/views/admin/AboutSettings.vue'),
-    meta: {
-      title: 'About Settings - Admin',
-      requiresAuth: true,
-      layout: 'admin'
-    }
-  },
-  {
-    path: '/admin/settings',
-    name: 'admin-settings',
-    component: () => import('@/views/admin/Settings.vue'),
-    meta: {
-      title: 'Site Settings - Admin',
-      requiresAuth: true,
-      layout: 'admin'
-    }
-  },
-  {
-    path: '/login',
-    name: 'login',
-    component: () => import('@/views/auth/Login.vue'),
-    meta: {
-      title: 'Login - Portfolio V2',
-      requiresAuth: false,
-      layout: 'auth'
-    }
-  },
+  
+  // ============================================
+  // PHASE 5 ROUTES - Commented out until files are created
+  // Uncomment these after Phase 5 execution
+  // ============================================
+  
+  // Projects Management
+  // {
+  //   path: '/admin/projects',
+  //   name: 'admin-projects',
+  //   component: () => import('@/views/admin/ProjectsList.vue'),
+  //   meta: {
+  //     title: 'Manage Projects - Admin',
+  //     requiresAuth: true,
+  //     layout: 'admin'
+  //   }
+  // },
+  // {
+  //   path: '/admin/projects/create',
+  //   name: 'admin-projects-create',
+  //   component: () => import('@/views/admin/ProjectCreate.vue'),
+  //   meta: {
+  //     title: 'Create Project - Admin',
+  //     requiresAuth: true,
+  //     layout: 'admin'
+  //   }
+  // },
+  // {
+  //   path: '/admin/projects/:id/edit',
+  //   name: 'admin-projects-edit',
+  //   component: () => import('@/views/admin/ProjectEdit.vue'),
+  //   meta: {
+  //     title: 'Edit Project - Admin',
+  //     requiresAuth: true,
+  //     layout: 'admin'
+  //   }
+  // },
+  
+  // Awards Management
+  // {
+  //   path: '/admin/awards',
+  //   name: 'admin-awards',
+  //   component: () => import('@/views/admin/AwardsList.vue'),
+  //   meta: {
+  //     title: 'Manage Awards - Admin',
+  //     requiresAuth: true,
+  //     layout: 'admin'
+  //   }
+  // },
+  // {
+  //   path: '/admin/awards/create',
+  //   name: 'admin-awards-create',
+  //   component: () => import('@/views/admin/AwardCreate.vue'),
+  //   meta: {
+  //     title: 'Create Award - Admin',
+  //     requiresAuth: true,
+  //     layout: 'admin'
+  //   }
+  // },
+  // {
+  //   path: '/admin/awards/:id/edit',
+  //   name: 'admin-awards-edit',
+  //   component: () => import('@/views/admin/AwardEdit.vue'),
+  //   meta: {
+  //     title: 'Edit Award - Admin',
+  //     requiresAuth: true,
+  //     layout: 'admin'
+  //   }
+  // },
+  
+  // Galleries Management
+  // {
+  //   path: '/admin/galleries',
+  //   name: 'admin-galleries',
+  //   component: () => import('@/views/admin/GalleriesList.vue'),
+  //   meta: {
+  //     title: 'Manage Galleries - Admin',
+  //     requiresAuth: true,
+  //     layout: 'admin'
+  //   }
+  // },
+  // {
+  //   path: '/admin/galleries/create',
+  //   name: 'admin-galleries-create',
+  //   component: () => import('@/views/admin/GalleryCreate.vue'),
+  //   meta: {
+  //     title: 'Create Gallery - Admin',
+  //     requiresAuth: true,
+  //     layout: 'admin'
+  //   }
+  // },
+  // {
+  //   path: '/admin/galleries/:id/edit',
+  //   name: 'admin-galleries-edit',
+  //   component: () => import('@/views/admin/GalleryEdit.vue'),
+  //   meta: {
+  //     title: 'Edit Gallery - Admin',
+  //     requiresAuth: true,
+  //     layout: 'admin'
+  //   }
+  // },
+  
+  // Testimonials Management
+  // {
+  //   path: '/admin/testimonials',
+  //   name: 'admin-testimonials',
+  //   component: () => import('@/views/admin/TestimonialsList.vue'),
+  //   meta: {
+  //     title: 'Manage Testimonials - Admin',
+  //     requiresAuth: true,
+  //     layout: 'admin'
+  //   }
+  // },
+  // {
+  //   path: '/admin/testimonials/create',
+  //   name: 'admin-testimonials-create',
+  //   component: () => import('@/views/admin/TestimonialCreate.vue'),
+  //   meta: {
+  //     title: 'Create Testimonial - Admin',
+  //     requiresAuth: true,
+  //     layout: 'admin'
+  //   }
+  // },
+  // {
+  //   path: '/admin/testimonials/:id/edit',
+  //   name: 'admin-testimonials-edit',
+  //   component: () => import('@/views/admin/TestimonialEdit.vue'),
+  //   meta: {
+  //     title: 'Edit Testimonial - Admin',
+  //     requiresAuth: true,
+  //     layout: 'admin'
+  //   }
+  // },
+  
+  // Contacts Management (Read-only)
+  // {
+  //   path: '/admin/contacts',
+  //   name: 'admin-contacts',
+  //   component: () => import('@/views/admin/ContactsList.vue'),
+  //   meta: {
+  //     title: 'Contact Messages - Admin',
+  //     requiresAuth: true,
+  //     layout: 'admin'
+  //   }
+  // },
+  
+  // Settings
+  // {
+  //   path: '/admin/settings',
+  //   name: 'admin-settings',
+  //   component: () => import('@/views/admin/SettingsForm.vue'),
+  //   meta: {
+  //     title: 'Site Settings - Admin',
+  //     requiresAuth: true,
+  //     layout: 'admin'
+  //   }
+  // },
+  
   {
     path: '/:pathMatch(.*)*',
     name: 'not-found',

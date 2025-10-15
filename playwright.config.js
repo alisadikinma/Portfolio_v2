@@ -105,10 +105,11 @@ export default defineConfig({
   ],
 
   // Run local dev server before tests (optional)
-  webServer: {
-    command: 'cd frontend && npm run dev',
-    url: 'http://localhost:5173',
-    reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000,
-  },
+  // DISABLED: Start frontend manually with 'npm run dev' in frontend directory
+  // webServer: {
+  //   command: 'cd frontend && npm run dev',
+  //   url: 'http://localhost:5173',
+  //   reuseExistingServer: !process.env.CI,
+  //   timeout: 120 * 1000,
+  // },
 });

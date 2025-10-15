@@ -194,9 +194,6 @@ const handleLogout = async () => {
 }
 
 onMounted(() => {
-  themeStore.initTheme()
-  themeStore.listenToSystemTheme()
-
   if (toastRef.value) {
     uiStore.toastRef = toastRef.value
   }
