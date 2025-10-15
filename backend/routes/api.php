@@ -108,9 +108,20 @@ Route::middleware(['auth:sanctum'])->prefix('admin/projects')->group(function ()
 
 // Admin Posts Routes
 Route::middleware(['auth:sanctum'])->prefix('admin/posts')->group(function () {
+    Route::get('/', [PostController::class, 'indexForAdmin']);
+    Route::get('/{id}', [PostController::class, 'showById']);
     Route::post('/', [PostController::class, 'store']);
     Route::put('/{id}', [PostController::class, 'update']);
     Route::delete('/{id}', [PostController::class, 'destroy']);
+});
+
+// Admin Categories Routes
+Route::middleware(['auth:sanctum'])->prefix('admin/categories')->group(function () {
+    Route::get('/', [CategoryController::class, 'indexForAdmin']);
+    Route::get('/{id}', [CategoryController::class, 'showById']);
+    Route::post('/', [CategoryController::class, 'store']);
+    Route::put('/{id}', [CategoryController::class, 'update']);
+    Route::delete('/{id}', [CategoryController::class, 'destroy']);
 });
 
 // Admin Gallery Routes

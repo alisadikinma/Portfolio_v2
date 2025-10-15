@@ -41,13 +41,16 @@ const emit = defineEmits(['update:modelValue', 'change'])
 // Use categories composable
 const { categories, loading, error: categoriesError, fetchCategories } = useCategories()
 
+// Ensure categories is always an array
+const categoriesList = computed(() => categories.value || [])
+
 // Selected category ID
 const selectedId = ref(props.modelValue)
 
 // Find selected category object
 const selectedCategory = computed(() => {
   if (!selectedId.value) return null
-  return categories.value.find(cat => cat.id === selectedId.value) || null
+  return categoriesList.value.find(cat => cat.id === selectedId.value) || null
 })
 
 // Handle selection change
@@ -55,7 +58,7 @@ const handleChange = (categoryId) => {
   selectedId.value = categoryId
   emit('update:modelValue', categoryId)
 
-  const category = categories.value.find(cat => cat.id === categoryId)
+  const category = categoriesList.value.find(cat => cat.id === categoryId)
   emit('change', category)
 }
 
@@ -66,7 +69,7 @@ watch(() => props.modelValue, (newVal) => {
 
 // Fetch categories on mount
 onMounted(() => {
-  if (categories.value.length === 0) {
+  if (categoriesList.value.length === 0) {
     fetchCategories()
   }
 })
@@ -182,7 +185,7 @@ const errorMessage = computed(() => {
           >
             <!-- Empty State -->
             <div
-              v-if="categories.length === 0 && !loading"
+              v-if="categoriesList.length === 0 && !loading"
               class="px-4 py-6 text-center text-gray-500 dark:text-gray-400"
             >
               <svg
@@ -204,7 +207,7 @@ const errorMessage = computed(() => {
 
             <!-- Category Options -->
             <ListboxOption
-              v-for="category in categories"
+              v-for="category in categoriesList"
               :key="category.id"
               v-slot="{ active, selected }"
               :value="category.id"

@@ -28,7 +28,7 @@ class StorePostRequest extends FormRequest
             'slug' => ['required', 'string', 'max:255', 'unique:posts,slug'],
             'excerpt' => ['nullable', 'string'],
             'content' => ['required', 'string'],
-            'featured_image' => ['nullable', 'string', 'max:255'],
+            'featured_image' => ['nullable', 'string'],
             'tags' => ['nullable', 'array'],
             'is_premium' => ['nullable', 'boolean'],
             'published' => ['nullable', 'boolean'],

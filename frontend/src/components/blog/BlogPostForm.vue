@@ -48,6 +48,7 @@ const errors = ref({})
 // Other state
 const isAutoSlug = ref(true)
 const showAdvancedSeo = ref(false)
+const uploadedImageFile = ref(null) // Store the File object separately
 
 // Validation rules
 const validationRules = {
@@ -81,6 +82,25 @@ watch(() => formData.value.title, (newTitle) => {
     formData.value.slug = generateSlug(newTitle)
   }
 })
+
+// Convert File to base64 when image changes
+const handleImageChange = (file) => {
+  uploadedImageFile.value = file
+  
+  if (file instanceof File) {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      formData.value.featured_image = e.target.result
+    }
+    reader.readAsDataURL(file)
+  } else if (typeof file === 'string') {
+    // Already a URL or base64
+    formData.value.featured_image = file
+  } else {
+    // Null or undefined
+    formData.value.featured_image = null
+  }
+}
 
 // Validate field
 const validateField = (field, value) => {
@@ -166,8 +186,40 @@ const handleSubmit = async (status = 'draft') => {
     return
   }
 
+  // Transform data to match backend structure
+  const submitData = {
+    category_id: formData.value.category_id,
+    title: formData.value.title,
+    slug: formData.value.slug,
+    excerpt: formData.value.excerpt || null,
+    content: formData.value.content,
+    featured_image: formData.value.featured_image || null,
+    tags: [],
+    is_premium: false,
+    published: status === 'published',
+    published_at: status === 'published' ? (formData.value.published_at || new Date().toISOString()) : null,
+    translations: [
+      {
+        language: 'en',
+        title: formData.value.title,
+        slug: formData.value.slug,
+        excerpt: formData.value.excerpt || null,
+        content: formData.value.content,
+        meta_title: formData.value.meta_title || null,
+        meta_description: formData.value.meta_description || null,
+        og_title: formData.value.meta_title || formData.value.title,
+        og_description: formData.value.meta_description || formData.value.excerpt || null,
+        canonical_url: formData.value.canonical_url || null,
+        ai_summary: null
+      }
+    ]
+  }
+
+  console.log('BlogPostForm submitting data:', submitData)
+  console.log('Featured image length:', submitData.featured_image?.length || 0)
+
   // Emit submit event
-  emit('submit', { ...formData.value })
+  emit('submit', submitData)
 }
 
 // Handle cancel
@@ -197,6 +249,11 @@ const loadPostData = (post) => {
     meta_description: post.meta_description || '',
     focus_keyword: post.focus_keyword || '',
     canonical_url: post.canonical_url || ''
+  }
+
+  // Set uploaded image for preview (existing images are URLs)
+  if (post.featured_image && typeof post.featured_image === 'string') {
+    uploadedImageFile.value = post.featured_image
   }
 
   isAutoSlug.value = false // Disable auto-slug for existing posts
@@ -290,11 +347,12 @@ onMounted(() => {
 
     <!-- Featured Image -->
     <ImageUploader
-      v-model="formData.featured_image"
+      :model-value="uploadedImageFile"
       label="Featured Image"
       description="PNG, JPG, GIF or WEBP (max 5MB)"
       aspect-ratio="16:9"
       :disabled="isSubmitting"
+      @update:model-value="handleImageChange"
     />
 
     <!-- Excerpt -->

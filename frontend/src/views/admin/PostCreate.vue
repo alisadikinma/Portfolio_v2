@@ -2,10 +2,10 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import BlogPostForm from '@/components/blog/BlogPostForm.vue'
-import { usePosts } from '@/stores/posts'
+import { usePostsStore } from '@/stores/posts'
 
 const router = useRouter()
-const postsStore = usePosts()
+const postsStore = usePostsStore()
 
 const isSubmitting = ref(false)
 
@@ -13,16 +13,32 @@ const handleSubmit = async (postData) => {
   isSubmitting.value = true
 
   try {
-    const createdPost = await postsStore.createPost(postData)
+    console.log('Submitting post data:', postData)
+    const response = await postsStore.createPost(postData)
+    console.log('Create post response:', response)
+
+    // Handle response (might be undefined if API returns different structure)
+    const createdPost = response || postData
 
     // Show success message
-    alert(`Post "${createdPost.title}" ${postData.status === 'published' ? 'published' : 'saved as draft'} successfully!`)
+    alert(`Post "${createdPost.title || 'Untitled'}" ${postData.published ? 'published' : 'saved as draft'} successfully!`)
 
     // Redirect to posts list or edit page
     router.push({ name: 'admin-posts' })
   } catch (error) {
     console.error('Error creating post:', error)
-    alert('Failed to create post. Please try again.')
+    console.error('Error response:', error.response?.data)
+    
+    // Show detailed validation errors
+    if (error.response?.data?.errors) {
+      const errors = error.response.data.errors
+      const errorMessages = Object.entries(errors)
+        .map(([field, messages]) => `${field}: ${messages.join(', ')}`)
+        .join('\n')
+      alert(`Validation errors:\n${errorMessages}`)
+    } else {
+      alert(error.response?.data?.message || 'Failed to create post. Please try again.')
+    }
   } finally {
     isSubmitting.value = false
   }

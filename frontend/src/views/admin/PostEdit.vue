@@ -2,11 +2,11 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import BlogPostForm from '@/components/blog/BlogPostForm.vue'
-import { usePosts } from '@/stores/posts'
+import { usePostsStore } from '@/stores/posts'
 
 const router = useRouter()
 const route = useRoute()
-const postsStore = usePosts()
+const postsStore = usePostsStore()
 
 const isSubmitting = ref(false)
 const isLoading = ref(true)

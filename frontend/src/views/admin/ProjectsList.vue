@@ -282,14 +282,14 @@
           </p>
           <div class="flex items-center justify-end gap-3">
             <BaseButton
-              button-type="secondary"
+              variant="secondary"
               @click="projectToDelete = null"
               :disabled="isDeleting"
             >
               Cancel
             </BaseButton>
             <BaseButton
-              button-type="danger"
+              variant="danger"
               @click="handleDelete"
               :loading="isDeleting"
               :disabled="isDeleting"

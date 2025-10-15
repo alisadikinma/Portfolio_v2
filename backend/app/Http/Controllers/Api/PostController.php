@@ -89,6 +89,83 @@ class PostController extends Controller
     }
 
     /**
+     * Display a listing of all posts for admin (including unpublished).
+     */
+    public function indexForAdmin(Request $request): JsonResponse
+    {
+        $query = Post::with(['category', 'translations']);
+
+        // Filter by published status
+        if ($request->has('published')) {
+            $published = $request->query('published');
+            if ($published === 'true' || $published === '1') {
+                $query->where('published', true);
+            } elseif ($published === 'false' || $published === '0') {
+                $query->where('published', false);
+            }
+        }
+
+        // Filter by category
+        if ($request->has('category_id')) {
+            $query->where('category_id', $request->query('category_id'));
+        }
+
+        // Filter by premium status
+        if ($request->has('is_premium')) {
+            $query->where('is_premium', (bool) $request->query('is_premium'));
+        }
+
+        // Filter by date range
+        if ($request->has('date_from')) {
+            $query->whereDate('created_at', '>=', $request->query('date_from'));
+        }
+        if ($request->has('date_to')) {
+            $query->whereDate('created_at', '<=', $request->query('date_to'));
+        }
+
+        // Search
+        if ($request->has('search')) {
+            $searchTerm = $request->query('search');
+            $query->where(function ($q) use ($searchTerm) {
+                $q->where('title', 'like', "%{$searchTerm}%")
+                  ->orWhere('excerpt', 'like', "%{$searchTerm}%")
+                  ->orWhere('content', 'like', "%{$searchTerm}%");
+            });
+        }
+
+        // Sort
+        $sortBy = $request->query('sort_by', 'created_at');
+        $sortOrder = $request->query('sort_order', 'desc');
+        $query->orderBy($sortBy, $sortOrder);
+
+        $perPage = min($request->query('per_page', 10), 50);
+        $posts = $query->paginate($perPage);
+
+        \Log::info('[PostController] indexForAdmin called');
+        \Log::info('[PostController] Total posts found: ' . $posts->total());
+        \Log::info('[PostController] Posts items count: ' . $posts->count());
+        \Log::info('[PostController] First post: ' . ($posts->first() ? $posts->first()->title : 'none'));
+
+        return response()->json([
+            'data' => PostResource::collection($posts),
+            'meta' => [
+                'current_page' => $posts->currentPage(),
+                'last_page' => $posts->lastPage(),
+                'per_page' => $posts->perPage(),
+                'total' => $posts->total(),
+                'from' => $posts->firstItem(),
+                'to' => $posts->lastItem(),
+            ],
+            'links' => [
+                'first' => $posts->url(1),
+                'last' => $posts->url($posts->lastPage()),
+                'prev' => $posts->previousPageUrl(),
+                'next' => $posts->nextPageUrl(),
+            ],
+        ]);
+    }
+
+    /**
      * Display the specified post by slug.
      */
     public function show(Request $request, string $slug): JsonResponse
@@ -117,6 +194,26 @@ class PostController extends Controller
     }
 
     /**
+     * Display the specified post by ID (for admin).
+     */
+    public function showById(int $id): JsonResponse
+    {
+        $post = Post::with(['category', 'translations'])->find($id);
+
+        if (!$post) {
+            return response()->json([
+                'message' => 'Post not found',
+                'error' => 'The requested post does not exist.',
+            ], 404);
+        }
+
+        return response()->json([
+            'message' => 'Post retrieved successfully',
+            'data' => new PostResource($post),
+        ]);
+    }
+
+    /**
      * Store a newly created post.
      */
     public function store(StorePostRequest $request): JsonResponse
@@ -124,20 +221,54 @@ class PostController extends Controller
         try {
             DB::beginTransaction();
 
-            $post = Post::create([
-                'category_id' => $request->input('category_id'),
-                'title' => $request->input('title'),
-                'slug' => $request->input('slug'),
-                'excerpt' => $request->input('excerpt'),
-                'content' => $request->input('content'),
-                'featured_image' => $request->input('featured_image'),
-                'tags' => $request->input('tags'),
-                'is_premium' => $request->input('is_premium', false),
-                'published' => $request->input('published', false),
-                'published_at' => $request->input('published_at'),
-                'views' => 0,
+            // Prepare data (only Post model fields)
+            $postData = $request->only([
+                'category_id',
+                'title',
+                'slug',
+                'excerpt',
+                'content',
+                'tags',
+                'is_premium',
+                'published',
+                'published_at',
             ]);
 
+            // Handle featured image (base64 or file)
+            if ($request->filled('featured_image')) {
+                $image = $request->input('featured_image');
+                
+                // Check if it's base64 data
+                if (preg_match('/^data:image\/(\w+);base64,/', $image, $matches)) {
+                    $imageData = substr($image, strpos($image, ',') + 1);
+                    $imageData = base64_decode($imageData);
+                    $extension = $matches[1];
+                    $filename = time() . '_' . uniqid() . '.' . $extension;
+                    
+                    $uploadDir = public_path('uploads/posts');
+                    if (!file_exists($uploadDir)) {
+                        mkdir($uploadDir, 0755, true);
+                    }
+                    
+                    file_put_contents($uploadDir . '/' . $filename, $imageData);
+                    $postData['featured_image'] = '/uploads/posts/' . $filename;
+                } else {
+                    // It's already a URL/path
+                    $postData['featured_image'] = $image;
+                }
+            } elseif ($request->hasFile('featured_image')) {
+                // Handle traditional file upload
+                $file = $request->file('featured_image');
+                $filename = time() . '_' . $file->getClientOriginalName();
+                $file->move(public_path('uploads/posts'), $filename);
+                $postData['featured_image'] = '/uploads/posts/' . $filename;
+            }
+
+            $postData['views'] = 0;
+
+            $post = Post::create($postData);
+
+            // Handle translations if provided
             foreach ($request->input('translations', []) as $translation) {
                 $post->translations()->create($translation);
             }
@@ -177,19 +308,52 @@ class PostController extends Controller
         try {
             DB::beginTransaction();
 
-            $post->update($request->only([
+            // Prepare update data (only Post model fields)
+            $updateData = $request->only([
                 'category_id',
                 'title',
                 'slug',
                 'excerpt',
                 'content',
-                'featured_image',
                 'tags',
                 'is_premium',
                 'published',
                 'published_at',
-            ]));
+            ]);
 
+            // Handle featured image (base64 or file)
+            if ($request->filled('featured_image')) {
+                $image = $request->input('featured_image');
+                
+                // Check if it's base64 data
+                if (preg_match('/^data:image\/(\w+);base64,/', $image, $matches)) {
+                    $imageData = substr($image, strpos($image, ',') + 1);
+                    $imageData = base64_decode($imageData);
+                    $extension = $matches[1];
+                    $filename = time() . '_' . uniqid() . '.' . $extension;
+                    
+                    $uploadDir = public_path('uploads/posts');
+                    if (!file_exists($uploadDir)) {
+                        mkdir($uploadDir, 0755, true);
+                    }
+                    
+                    file_put_contents($uploadDir . '/' . $filename, $imageData);
+                    $updateData['featured_image'] = '/uploads/posts/' . $filename;
+                } else {
+                    // It's already a URL/path
+                    $updateData['featured_image'] = $image;
+                }
+            } elseif ($request->hasFile('featured_image')) {
+                // Handle traditional file upload
+                $file = $request->file('featured_image');
+                $filename = time() . '_' . $file->getClientOriginalName();
+                $file->move(public_path('uploads/posts'), $filename);
+                $updateData['featured_image'] = '/uploads/posts/' . $filename;
+            }
+
+            $post->update($updateData);
+
+            // Handle translations if provided
             if ($request->has('translations')) {
                 foreach ($request->input('translations', []) as $translation) {
                     if (isset($translation['id'])) {

@@ -30,7 +30,7 @@ class UpdatePostRequest extends FormRequest
             'slug' => ['nullable', 'string', 'max:255', Rule::unique('posts', 'slug')->ignore($postId)],
             'excerpt' => ['nullable', 'string'],
             'content' => ['nullable', 'string'],
-            'featured_image' => ['nullable', 'string', 'max:255'],
+            'featured_image' => ['nullable', 'string'],
             'tags' => ['nullable', 'array'],
             'is_premium' => ['nullable', 'boolean'],
             'published' => ['nullable', 'boolean'],

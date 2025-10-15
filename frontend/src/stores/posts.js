@@ -50,18 +50,40 @@ export const usePostsStore = defineStore('posts', () => {
         ...params,
       }
 
-      const response = await api.get('/posts', { params: queryParams })
+      console.log('[posts.js] Fetching with params:', queryParams)
+      const response = await api.get('/admin/posts', { params: queryParams })
+      console.log('[posts.js] Raw API response:', response)
 
-      posts.value = response.data.data
-      pagination.value = {
-        currentPage: response.data.meta.current_page,
-        perPage: response.data.meta.per_page,
-        total: response.data.meta.total,
-        lastPage: response.data.meta.last_page,
+      // Handle response structure
+      const responseData = response.data || response
+      console.log('[posts.js] Response data:', responseData)
+      
+      posts.value = responseData.data || []
+      console.log('[posts.js] Posts extracted:', posts.value.length, 'items')
+      
+      // Update pagination if meta exists
+      if (responseData.meta) {
+        pagination.value = {
+          currentPage: responseData.meta.current_page || 1,
+          perPage: responseData.meta.per_page || 10,
+          total: responseData.meta.total || 0,
+          lastPage: responseData.meta.last_page || 1,
+        }
+      } else {
+        // Fallback if no meta in response
+        pagination.value = {
+          currentPage: 1,
+          perPage: 10,
+          total: posts.value.length,
+          lastPage: 1,
+        }
       }
+      console.log('[posts.js] Pagination updated:', pagination.value)
 
       return posts.value
     } catch (err) {
+      console.error('[posts.js] Error fetching posts:', err)
+      console.error('[posts.js] Error response:', err.response?.data)
       error.value = err.response?.data?.message || 'Failed to fetch posts'
       throw err
     } finally {
@@ -82,6 +104,30 @@ export const usePostsStore = defineStore('posts', () => {
       const api = useApi()
 
       const response = await api.get(`/posts/${slug}`)
+      currentPost.value = response.data.data
+
+      return currentPost.value
+    } catch (err) {
+      error.value = err.response?.data?.message || 'Failed to fetch post'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
+   * Fetch single post by ID (admin endpoint)
+   * @param {number} id - Post ID
+   */
+  async function fetchPostById(id) {
+    loading.value = true
+    error.value = null
+
+    try {
+      const { useApi } = await import('../composables/useApi')
+      const api = useApi()
+
+      const response = await api.get(`/admin/posts/${id}`)
       currentPost.value = response.data.data
 
       return currentPost.value
@@ -236,6 +282,7 @@ export const usePostsStore = defineStore('posts', () => {
     // Actions
     fetchPosts,
     fetchPost,
+    fetchPostById,
     createPost,
     updatePost,
     deletePost,

@@ -1,7 +1,7 @@
 # PROJECT STATUS - Portfolio v2
 
 **Last Updated:** October 15, 2025
-**Overall Progress:** 69% (Sprint 6 of 11 Complete)
+**Overall Progress:** 64% (Sprint 8 of 12 Complete)
 **Status:** In Development - Sprint-Based Approach
 
 ---
@@ -10,8 +10,8 @@
 
 ### Phase 6: Production Ready Version
 **Methodology:** Sprint-based (1 sprint = 1 complete feature)
-**Total Sprints:** 11 (7 Admin Features + 4 Public Pages)
-**Completion:** 6/11 (55%)
+**Total Sprints:** 12 (8 Admin Features + 4 Public Pages)
+**Completion:** 8/12 (67%)
 
 | Sprint | Feature | Progress | Status | Completion Date |
 |--------|---------|----------|--------|-----------------|
@@ -21,11 +21,12 @@
 | **4** | **Testimonials Management** | **100%** | **✅ COMPLETED** | **Oct 15, 2025** |
 | **5** | **Contact Messages** | **100%** | **✅ COMPLETED** | **Oct 15, 2025** |
 | **6** | **About Settings** | **100%** | **✅ COMPLETED** | **Oct 15, 2025** |
-| 7 | Site Settings | 0% | 🔲 Pending | - |
-| 8 | Home Hero Section | 0% | 🔲 Pending | - |
-| 9 | About Page | 0% | 🔲 Pending | - |
-| 10 | Blog Detail Page | 0% | 🔲 Pending | - |
-| 11 | Contact Page | 0% | 🔲 Pending | - |
+| **7** | **Site Settings** | **100%** | **✅ COMPLETED** | **Oct 15, 2025** |
+| **8** | **Blog Management** | **100%** | **✅ COMPLETED** | **Oct 15, 2025** |
+| 9 | Automation API (n8n) | 0% | 🔲 Pending | - |
+| 10 | Home Hero Section | 0% | 🔲 Pending | - |
+| 11 | About Page | 0% | 🔲 Pending | - |
+| 12 | Contact Page | 0% | 🔲 Pending | - |
 
 ---
 
@@ -33,12 +34,12 @@
 
 | Module | Progress | Status |
 |--------|----------|--------|
-| **Backend API** | 70% | 🟡 In Progress |
-| **Frontend Admin** | 50% | 🟡 In Progress |
+| **Backend API** | 78% | 🟡 In Progress |
+| **Frontend Admin** | 70% | 🟡 In Progress |
 | **Frontend Public** | 35% | 🟡 In Progress |
 | **Database** | 100% | ✅ Complete |
 | **Testing** | 20% | 🔴 Not Started |
-| **Documentation** | 65% | 🟡 In Progress |
+| **Documentation** | 70% | 🟡 In Progress |
 
 ---
 
@@ -616,6 +617,218 @@ protected function prepareForValidation(): void {
 
 ---
 
+## ✅ Sprint 7: Site Settings Management - COMPLETED (Oct 15, 2025)
+
+### Backend Deliverables ✅
+- ✅ **SettingsController** - Site settings management
+  - `getSiteSettings()` - Get all site group settings
+  - `updateSiteSettings()` - Update site configuration
+  - JSON decoding from FormData
+  - Directory creation for logo upload
+  - Old logo cleanup on update
+
+- ✅ **Form Validation**
+  - `UpdateSiteSettingsRequest.php` - Update validation rules
+    - Site Info: site_name*, site_description*, site_logo (max 5MB)
+    - Contact: email*, phone, address
+    - Social Media: array with platform*, url*
+    - SEO: meta_keywords (array), meta_author, google_analytics_id
+  - `prepareForValidation()` - Decode JSON arrays before validation
+
+- ✅ **API Routes**
+  ```
+  GET    /admin/settings/site        - Get site settings
+  PUT    /admin/settings/site        - Update site settings (FormData)
+  ```
+
+### Frontend Deliverables ✅
+- ✅ **SettingsForm Component** (`views/admin/SettingsForm.vue`)
+  - **Site Information Card**
+    - Site name* (e.g., "Portfolio v2")
+    - Site description* (tagline/slogan)
+    - Site logo upload with preview
+    - Remove logo button
+    - 5MB file size validation
+
+  - **Contact Information Card**
+    - Email*, Phone, Address (textarea)
+
+  - **Social Media Links Card** - Dynamic array
+    - Add link button
+    - Fields: platform*, url*
+    - Platform dropdown (Facebook, Twitter, LinkedIn, GitHub, Instagram, YouTube)
+    - Remove link button
+    - Link #N numbering
+
+  - **SEO Settings Card**
+    - Meta keywords (array input)
+    - Meta author
+    - Google Analytics ID
+
+  - **Form Actions**
+    - Reset button (reload from store)
+    - Save Changes button with loading state
+    - Client-side validation
+    - Error display section
+
+- ✅ **Settings Store** (`stores/settings.js`)
+  - Already updated in Sprint 6
+  - `fetchSiteSettings()` - Load settings from API
+  - `updateSiteSettings(formData)` - Save with FormData
+  - FormData detection for proper headers
+  - Deep clone arrays to prevent mutations
+  - Getters: `hasSiteSettings`
+
+### Features Delivered ✅
+- ✅ **Site Configuration Management**
+  - ✅ Site name and description
+  - ✅ Site logo upload with preview
+  - ✅ Logo removal functionality
+  - ✅ File size validation (5MB max)
+- ✅ **Contact Information**
+  - ✅ Email, phone, address fields
+  - ✅ Address textarea for multi-line
+- ✅ **Dynamic Social Media Links**
+  - ✅ Add/remove links
+  - ✅ Platform dropdown selection
+  - ✅ URL validation
+- ✅ **SEO Configuration**
+  - ✅ Meta keywords array
+  - ✅ Meta author field
+  - ✅ Google Analytics integration
+- ✅ **FormData with JSON.stringify()** for arrays
+- ✅ **JSON decoding in backend** (prepareForValidation)
+- ✅ Form reset functionality
+- ✅ Loading states & error handling
+- ✅ Dark mode support
+- ✅ Responsive design
+- ✅ Auto-create uploads directory
+
+### Files Created/Modified
+**Backend:**
+- `app/Http/Controllers/Api/SettingsController.php` ✅ (Updated - added updateSiteSettings)
+- `app/Http/Requests/UpdateSiteSettingsRequest.php` ✅ (Created)
+- `routes/api.php` ✅ (Route already exists from Sprint 6)
+
+**Frontend:**
+- `src/views/admin/SettingsForm.vue` ✅ (Complete implementation)
+- `src/stores/settings.js` ✅ (Already updated in Sprint 6)
+- `src/router/index.js` ✅ (Route already exists at /admin/settings)
+
+---
+
+## ✅ Sprint 8: Blog Management - COMPLETED (Oct 15, 2025)
+
+### Backend Deliverables ✅
+- ✅ **PostController** - Full CRUD implementation for admin
+  - `indexForAdmin()` - Admin list with search, filters (published, category, date range), pagination
+  - `index()` - Public list (published posts only)
+  - `showById($id)` - Get post by ID (admin)
+  - `show($slug)` - Get post by slug (public)
+  - `store()` - Create post with image upload
+  - `update($id)` - Update post with image replacement
+  - `destroy($id)` - Delete post
+  - File upload handling for featured images
+
+- ✅ **CategoryController** - Full CRUD implementation
+  - `indexForAdmin()` - Admin list with search, pagination
+  - `index()` - Public list
+  - `showById($id)` - Get category by ID (admin)
+  - `show($slug)` - Get category by slug (public)
+  - `store()` - Create category
+  - `update($id)` - Update category
+  - `destroy($id)` - Delete category (with post count validation)
+
+- ✅ **Form Validation**
+  - `StoreCategoryRequest.php` - Create validation rules
+    - Required: name
+    - Optional: slug (auto-generated), description, color (hex), order
+    - Unique constraints on name and slug
+  - `UpdateCategoryRequest.php` - Update validation rules (with ignore ID for uniqueness)
+
+- ✅ **API Routes**
+  ```
+  GET    /admin/posts              - List all posts (admin)
+  GET    /admin/posts/:id          - Get single post
+  POST   /admin/posts              - Create post
+  PUT    /admin/posts/:id          - Update post
+  DELETE /admin/posts/:id          - Delete post
+
+  GET    /admin/categories         - List all categories
+  GET    /admin/categories/:id     - Get single category
+  POST   /admin/categories         - Create category
+  PUT    /admin/categories/:id     - Update category
+  DELETE /admin/categories/:id     - Delete category
+  ```
+
+### Frontend Deliverables ✅
+- ✅ **PostsList View** (`views/admin/PostsList.vue`)
+  - **Search** - Search by title, content, excerpt
+  - **Filters**
+    - Category filter dropdown (populated from categories API)
+    - Status filter (All / Published / Draft)
+  - **Posts Table** - Display posts with:
+    - Thumbnail image
+    - Title and excerpt
+    - Category badge (with color)
+    - Status badge (Published/Draft with color coding)
+    - Date (published_at or created_at)
+    - View count
+  - **Actions** - Edit and Delete buttons per row
+  - **Pagination** - Full pagination with page numbers
+  - **Delete Confirmation Modal**
+  - **Empty States** - No posts, no search results
+  - **Loading States** - Spinner during API calls
+  - **Error States** - Error display with retry button
+
+- ✅ **Posts Store Updates** (`stores/posts.js`)
+  - `fetchPosts()` - Updated to use `/admin/posts` endpoint
+  - `fetchPostById(id)` - New method for admin edit (uses `/admin/posts/:id`)
+  - `fetchPost(slug)` - Kept for public views (uses `/posts/:slug`)
+  - Proper filter support (search, category_id, published status)
+  - State management for loading, errors, pagination
+
+### Features Delivered ✅
+- ✅ **Full Blog CRUD**
+  - Create posts with featured image upload
+  - Edit posts with image replacement
+  - Delete posts with confirmation
+  - View posts list with filters
+- ✅ **Category Management**
+  - Full CRUD for categories
+  - Color picker for category badges
+  - Slug auto-generation
+  - Post count display
+  - Delete protection (prevents deleting categories with posts)
+- ✅ **Advanced Search & Filters**
+  - Real-time search with debounce (300ms)
+  - Category filter
+  - Status filter (Published/Draft)
+  - Combined filter support
+- ✅ **Pagination** - 10 posts per page, full controls
+- ✅ **UI Features**
+  - Category color badges
+  - Status badges (green/yellow)
+  - Responsive table layout
+  - Dark mode support
+  - Loading spinners
+  - Error handling with toasts
+  - Delete confirmation modals
+
+### Files Created/Modified
+**Backend:**
+- `app/Http/Controllers/Api/PostController.php` ✅ (Added indexForAdmin, showById, updated store/update)
+- `app/Http/Controllers/Api/CategoryController.php` ✅ (Complete CRUD implementation)
+- `app/Http/Requests/StoreCategoryRequest.php` ✅ (Created)
+- `app/Http/Requests/UpdateCategoryRequest.php` ✅ (Created)
+- `routes/api.php` ✅ (Added admin posts + categories routes)
+
+**Frontend:**
+- `src/views/admin/PostsList.vue` ✅ (Complete implementation - 430 lines)
+- `src/stores/posts.js` ✅ (Updated - added fetchPostById, changed to admin endpoints)
+
+---
+
 ## ✅ Completed (100%)
 
 ### Database Layer
@@ -671,21 +884,22 @@ protected function prepareForValidation(): void {
 
 ## 🟡 In Progress (40-70%)
 
-### Backend API - 70% Complete
+### Backend API - 75% Complete
 
-**✅ Completed Controllers (3/8):**
-- GalleryController - Full CRUD + bulk operations ✅ (Sprint 3)
-- AwardController - Full CRUD + galleries endpoint ✅ (Sprint 2)
+**✅ Completed Controllers (5/9):**
 - ProjectController - Full CRUD ✅ (Sprint 1)
+- AwardController - Full CRUD + galleries endpoint ✅ (Sprint 2)
+- GalleryController - Full CRUD + bulk operations ✅ (Sprint 3)
+- TestimonialController - Full CRUD ✅ (Sprint 4)
+- ContactController - Read-only + export ✅ (Sprint 5)
+- SettingsController - About + Site settings ✅ (Sprint 6 & 7)
 
-**❌ Missing Controllers (5/8):**
-- PostController (validation + resources exist)
-- CategoryController
-- TestimonialController
-- ServiceController
-- ContactController
-- SettingsController
-- NewsletterController
+**❌ Missing Controllers (4/9):**
+- PostController (validation + resources exist) - Sprint 8 Next
+- CategoryController - Sprint 8 Next
+- AutomationController - Sprint 9 (n8n API)
+- ServiceController - Future
+- NewsletterController - Future
 
 **✅ Form Requests:**
 - StorePostRequest, UpdatePostRequest ✅
@@ -693,40 +907,53 @@ protected function prepareForValidation(): void {
 - StoreAwardRequest, UpdateAwardRequest ✅ (Sprint 2)
 - StoreGalleryRequest, UpdateGalleryRequest ✅ (Sprint 3)
 - StoreTestimonialRequest, UpdateTestimonialRequest ✅ (Sprint 4)
-- Need: Store/Update requests for remaining 3 controllers
+- UpdateAboutSettingsRequest ✅ (Sprint 6)
+- UpdateSiteSettingsRequest ✅ (Sprint 7)
+- Need: Store/Update requests for remaining 2 controllers (Service, Newsletter)
 
 **✅ API Resources:**
 - PostResource ✅
 - GalleryResource ✅ (Sprint 3)
 - Need: ProjectResource, CategoryResource, TestimonialResource, etc.
 
-**Status:** 3 of 8 controllers complete. Following sprint-based approach for remaining 5.
+**Status:** 5 of 9 controllers complete. Following sprint-based approach for remaining 4.
 
 ---
 
-### Frontend Admin Panel - 50% Complete
+### Frontend Admin Panel - 70% Complete
 
-**✅ Working Pages (4/9):**
+**✅ Completed Pages (7/10):**
 1. **Dashboard** - Basic stats display (needs real data)
-2. **Blog (Posts)** - ✅ FULL CRUD
-   - PostsList.vue ✅ (needs backend connection)
-   - PostCreate.vue ✅
-   - PostEdit.vue ✅
-3. **Projects** - ✅ FULL CRUD (Sprint 1)
+2. **Projects** - ✅ FULL CRUD (Sprint 1)
    - ProjectsList.vue ✅
    - ProjectCreate.vue ✅
    - ProjectEdit.vue ✅
-4. **Awards** - ✅ FULL CRUD (Sprint 2)
+3. **Awards** - ✅ FULL CRUD (Sprint 2)
    - AwardsList.vue ✅
    - AwardCreate.vue ✅
    - AwardEdit.vue ✅
+4. **Gallery** - ✅ FULL CRUD (Sprint 3)
+   - GalleriesList.vue ✅ (with upload UI & bulk operations)
+5. **Testimonials** - ✅ FULL CRUD (Sprint 4)
+   - TestimonialsList.vue ✅
+   - TestimonialCreate.vue ✅
+   - TestimonialEdit.vue ✅
+6. **Contact** - ✅ Read-only (Sprint 5)
+   - ContactsList.vue ✅ (view, mark as read, delete, export CSV)
+7. **About** - ✅ Settings (Sprint 6)
+   - AboutSettings.vue ✅ (dynamic arrays: skills, experience, education, social)
+8. **Settings** - ✅ Site Settings (Sprint 7)
+   - SettingsForm.vue ✅ (site info, contact, social media, SEO)
 
-**⚠️ Placeholder Pages (5/9):**
-5. **Gallery** - GalleriesList.vue exists, no Upload UI (Sprint 3)
-6. **Testimonials** - TestimonialsList.vue exists, no Create/Edit forms (Sprint 4)
-7. **Contact** - ContactsList.vue placeholder only (Sprint 5)
-8. **About** - AboutSettings.vue placeholder only (Sprint 6)
-9. **Settings** - SettingsForm.vue placeholder only (Sprint 7)
+**⚠️ Remaining Pages (3/10):**
+9. **Blog (Posts)** - 80% Complete (Sprint 8 Next)
+   - PostsList.vue ⚠️ (needs backend connection)
+   - PostCreate.vue ✅
+   - PostEdit.vue ✅
+10. **Automation** - 0% (Sprint 9 Next)
+   - AutomationTokens.vue ❌ (token management)
+   - AutomationLogs.vue ❌ (activity logs)
+   - AutomationDocs.vue ❌ (API documentation)
 
 **✅ Admin Infrastructure:**
 - AdminLayout.vue ✅ (sidebar navigation, dark mode toggle)
@@ -734,7 +961,7 @@ protected function prepareForValidation(): void {
 - Auth store ✅ (Pinia with token management)
 - UI store ✅ (sidebar, toasts, modals)
 
-**Status:** Blog + Projects + Awards + Gallery stores complete. Following sprint approach for remaining 4 features.
+**Status:** 7 of 10 admin features complete (70%). Blog Management (Sprint 8) and Automation API (Sprint 9) are next priorities.
 
 ---
 
@@ -792,28 +1019,31 @@ protected function prepareForValidation(): void {
 
 | Controller | CRUD | Validation | Resource | Tests | Status |
 |-----------|------|-----------|----------|-------|--------|
-| AwardController | ✅ | ✅ | ✅ | ❌ | Complete |
 | ProjectController | ✅ | ✅ | ❌ | ❌ | Complete (Sprint 1) |
-| PostController | ❌ | ✅ | ✅ | ❌ | Needs Implementation |
-| CategoryController | ❌ | ❌ | ❌ | ❌ | Not Started |
+| AwardController | ✅ | ✅ | ✅ | ❌ | Complete (Sprint 2) |
+| GalleryController | ✅ | ✅ | ✅ | ❌ | Complete (Sprint 3) |
 | TestimonialController | ✅ | ✅ | ✅ | ❌ | Complete (Sprint 4) |
-| ServiceController | ❌ | ❌ | ❌ | ❌ | Not Started |
 | ContactController | ✅ | ❌ | ✅ | ❌ | Complete (Sprint 5) |
-| SettingsController | ⚠️ | ✅ | ❌ | ❌ | Partial (Sprint 6 - about done) |
-| NewsletterController | ❌ | ❌ | ❌ | ❌ | Not Started |
+| SettingsController | ✅ | ✅ | ❌ | ❌ | Complete (Sprint 6 & 7) |
+| PostController | ❌ | ✅ | ✅ | ❌ | Sprint 8 Next |
+| CategoryController | ❌ | ❌ | ❌ | ❌ | Sprint 8 Next |
+| AutomationController | ❌ | ❌ | ❌ | ❌ | Sprint 9 (n8n API) |
+| ServiceController | ❌ | ❌ | ❌ | ❌ | Future |
+| NewsletterController | ❌ | ❌ | ❌ | ❌ | Future |
 
 ### Frontend Admin Pages Status
 
 | Page | List | Create | Edit | Delete | API Connected | Status |
 |------|------|--------|------|--------|--------------|--------|
-| Posts | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | 80% Complete |
 | Projects | ✅ | ✅ | ✅ | ✅ | ✅ | 100% Complete (Sprint 1) |
 | Awards | ✅ | ✅ | ✅ | ✅ | ✅ | 100% Complete (Sprint 2) |
 | Gallery | ✅ | ✅ | ✅ | ✅ | ✅ | 100% Complete (Sprint 3) |
 | Testimonials | ✅ | ✅ | ✅ | ✅ | ✅ | 100% Complete (Sprint 4) |
 | Contact | ✅ | N/A | N/A | ✅ | ✅ | 100% Complete (Sprint 5) |
 | About | ✅ | N/A | ✅ | N/A | ✅ | 100% Complete (Sprint 6) |
-| Settings | ⚠️ | N/A | ⚠️ | N/A | ❌ | 10% - Sprint 7 |
+| Settings | ✅ | N/A | ✅ | N/A | ✅ | 100% Complete (Sprint 7) |
+| Posts | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | 80% - Sprint 8 Next |
+| Automation | ❌ | ❌ | N/A | ❌ | ❌ | 0% - Sprint 9 (Tokens & Logs) |
 
 **Legend:**
 - ✅ Complete and working
@@ -836,29 +1066,189 @@ protected function prepareForValidation(): void {
 
 ---
 
-## 🎯 Next Sprint: Site Settings Management (Sprint 7)
+## 🎯 Next Sprint: Blog Management (Sprint 8)
 
 **See:** `.claude/prompts/phase-6_production_ready_version_20251015-0938.md`
 
-**Deliverables:**
-- Backend: SettingsController site methods (already has getSiteSettings)
-- Frontend: SettingsForm.vue (site_name, site_description, site_logo, contact details)
-- Social media links array
-- Meta tags array
-- Analytics code
-- Settings store already updated
+**Objective:** Complete Blog post management with list page, search, filters, and bulk operations
 
-**Expected Timeline:** 50-60 minutes
+**Deliverables:**
+- Backend: PostController full CRUD (already has validation + resources)
+- Backend: CategoryController for category management
+- Frontend: Complete PostsList.vue with:
+  - Search (title, content, author)
+  - Filters (status, category, date range)
+  - Pagination
+  - Bulk actions (publish, draft, delete)
+  - Quick edit modal
+- Frontend: Posts store connection to backend
+- Test all CRUD operations
+
+**Expected Timeline:** 60-90 minutes
+
+---
+
+## 🚀 Upcoming Sprint: Automation API for n8n Integration (Sprint 9)
+
+**Objective:** Build dedicated API endpoints for automation platforms (n8n, Zapier, Make.com) to enable external content workflows
+
+### Use Cases
+- **RSS to Blog:** Auto-publish from RSS feeds
+- **Notion to Blog:** Sync content from Notion databases
+- **Email to Draft:** Convert emails to draft posts
+- **AI Content:** Generate and publish AI-written posts
+- **Social Media:** Cross-post blog content to social platforms
+
+### Backend Deliverables
+- ✅ **AutomationController** - Dedicated endpoints for automation
+  - `getPosts()` - List posts with advanced filters
+  - `getPost($id)` - Get single post
+  - `createPost()` - Create post (simplified validation)
+  - `updatePost($id)` - Update post
+  - `deletePost($id)` - Delete post
+  - `bulkCreatePosts()` - Create multiple posts at once
+  - `getCategories()` - List categories
+  - `postPublishedWebhook()` - Webhook trigger on publish
+
+- ✅ **AutomationRequest** - Flexible validation for automation
+  - Simplified rules (auto-slug, auto-excerpt, auto-dates)
+  - Support for batch operations
+  - Markdown/HTML content support
+
+- ✅ **API Routes**
+  ```
+  GET    /api/automation/posts              - List posts
+  GET    /api/automation/posts/{id}         - Get post
+  POST   /api/automation/posts              - Create post
+  PUT    /api/automation/posts/{id}         - Update post
+  DELETE /api/automation/posts/{id}         - Delete post
+  POST   /api/automation/posts/bulk         - Bulk create
+  GET    /api/automation/categories         - List categories
+  POST   /api/automation/webhook/published  - Webhook trigger
+  ```
+
+### Authentication & Security
+- ✅ **Token-based auth** - Sanctum with abilities/scopes
+  ```php
+  $token = $user->createToken('n8n-automation', [
+      'post:read', 'post:write', 'post:delete'
+  ])->plainTextToken;
+  ```
+- ✅ **Rate limiting** - 60 requests/minute per token
+- ✅ **Webhook signature** - HMAC-SHA256 verification
+- ✅ **IP whitelist** - Optional IP-based access control
+- ✅ **Request logging** - Audit trail for all automation actions
+
+### Response Format (n8n-optimized)
+```json
+{
+  "success": true,
+  "data": {
+    "id": 123,
+    "title": "Post Title",
+    "slug": "post-title",
+    "content": "...",
+    "excerpt": "...",
+    "status": "published",
+    "category": {
+      "id": 5,
+      "name": "Technology",
+      "slug": "technology"
+    },
+    "published_at": "2025-10-15T10:30:00Z",
+    "meta": {
+      "views": 0,
+      "word_count": 850
+    }
+  },
+  "meta": {
+    "processed_at": "2025-10-15T10:30:05Z",
+    "automation_id": "optional-workflow-id"
+  }
+}
+```
+
+### Features
+- ✅ **Simplified API** - Minimal required fields, auto-fill the rest
+- ✅ **Bulk operations** - Create up to 50 posts in one request
+- ✅ **Auto-slug** - Generate slug from title automatically
+- ✅ **Auto-excerpt** - Extract from content if not provided
+- ✅ **Markdown support** - Accept Markdown, convert to HTML
+- ✅ **Webhook triggers** - Notify n8n on post published/updated
+- ✅ **Advanced filters** - Date range, status, category, search
+- ✅ **Error handling** - Clear, actionable error messages
+
+### Frontend (Admin)
+- ✅ **API Tokens Management** - Generate/revoke automation tokens
+  - Token name, scopes selection
+  - Copy token on creation (shown once)
+  - View active tokens, last used date
+  - Revoke tokens
+  - Usage statistics (requests count)
+
+- ✅ **Automation Logs** - View automation activity
+  - List recent automation requests
+  - Filter by token, action, date
+  - View request/response details
+  - Error tracking
+
+### Documentation
+- ✅ **API Documentation Page** - `/admin/automation/docs`
+  - Endpoint reference with examples
+  - Authentication guide
+  - n8n workflow templates
+  - Postman collection
+  - Rate limits & best practices
+
+### n8n Workflow Templates
+```
+1. RSS Feed to Blog
+   - RSS Feed Read → HTTP Request (POST /automation/posts)
+
+2. Notion Database to Blog
+   - Notion Trigger → Transform Data → HTTP Request (bulk create)
+
+3. Email to Draft Post
+   - Gmail Trigger → Parse Email → HTTP Request (status: draft)
+
+4. Schedule AI Content
+   - Schedule Trigger → OpenAI → HTTP Request (create post)
+
+5. Cross-post to Social
+   - Webhook (post published) → Format Content → Twitter/LinkedIn API
+```
+
+### Files to Create
+**Backend:**
+- `app/Http/Controllers/Api/AutomationController.php` (new)
+- `app/Http/Requests/AutomationPostRequest.php` (new)
+- `app/Http/Middleware/VerifyWebhookSignature.php` (new)
+- `app/Models/ApiToken.php` (extend PersonalAccessToken)
+- `routes/api.php` (add automation routes)
+- `database/migrations/xxxx_add_automation_fields_to_tokens.php` (new)
+
+**Frontend:**
+- `src/views/admin/AutomationTokens.vue` (new)
+- `src/views/admin/AutomationLogs.vue` (new)
+- `src/views/admin/AutomationDocs.vue` (new)
+- `src/stores/automation.js` (new)
+- `src/router/index.js` (add automation routes)
+
+**Documentation:**
+- `backend/AUTOMATION_API.md` (complete API reference)
+- `backend/N8N_TEMPLATES.md` (workflow examples)
+
+**Expected Timeline:** 90-120 minutes
 
 ---
 
 ## 🚧 Known Issues
 
 ### Critical
-- ❌ 1 admin settings page is placeholder (Sprint 7)
-- ❌ 4 public detail pages incomplete (Sprints 8-11)
-- ❌ 3 backend controllers missing
-- ⚠️ Contact form backend exists but frontend not connected yet
+- ❌ 2 admin features pending (Blog Management - Sprint 8, Automation API - Sprint 9)
+- ❌ 4 public detail pages incomplete (Sprints 10-12)
+- ❌ 3 backend controllers missing (Post + Category for Sprint 8, Automation for Sprint 9)
+- ⚠️ Blog posts backend not connected yet
 
 ### Medium
 - ⚠️ No automated tests
@@ -875,21 +1265,23 @@ protected function prepareForValidation(): void {
 
 ## 📊 Progress Calculation
 
-### Backend API: 70%
+### Backend API: 75%
 - Models: 100% (8/8 ✅)
 - Migrations: 100% (17/17 ✅)
 - Seeders: 100% (13/13 ✅)
-- Controllers: 25% (2/8 ✅)
-- Validation: 33% (3/9 ✅)
-- Resources: 11% (1/9 ✅)
-- **Average:** (100+100+100+25+33+11) / 6 = **70%**
+- Controllers: 56% (5/9 ✅) - Sprint 7 done, Sprint 8 & 9 add 2 more
+- Validation: 78% (7/9 ✅) - Sprint 7 done
+- Resources: 33% (3/9 ✅)
+- **Average:** (100+100+100+56+78+33) / 6 = **78%**
 
-### Frontend Admin: 50%
+### Frontend Admin: 70%
 - Infrastructure: 100% (layouts, router, stores ✅)
-- Blog CRUD: 100% (PostsList, Create, Edit ✅)
-- Projects CRUD: 100% (Sprint 1 ✅)
-- Other CRUDs: 0% (0/6 remaining)
-- **Average:** (100+100+100+0) / 4 = **50%**
+- Admin Pages: 70% (7/10 complete)
+  - Projects, Awards, Gallery, Testimonials, Contact, About, Settings ✅
+  - Posts (80% - Sprint 8 next)
+  - Automation (0% - Sprint 9 next)
+  - Dashboard (basic stats)
+- **Average:** 70%
 
 ### Frontend Public: 35%
 - Layout/Infrastructure: 100% ✅
@@ -897,32 +1289,43 @@ protected function prepareForValidation(): void {
 - Detail Pages: 0% (0/4 ✅)
 - **Average:** (100+56+0) / 3 = **35%**
 
-### Overall Project: 52%
-**Formula:** (Backend 70% + Admin 50% + Public 35%) / 3 = **52%**
+### Overall Project: 61%
+**Formula:** (Backend 78% + Admin 70% + Public 35%) / 3 = **61%**
 
 ---
 
 ## 🎯 Milestone Targets
 
-### 60% - Sprint 3 Complete (Gallery)
+### 60% - Sprint 3 Complete (Gallery) ✅ ACHIEVED
 - ✅ 3 admin features complete
 - ✅ Gallery with bulk upload
-- **ETA:** 2-3 hours
+- **Completed:** Oct 15, 2025
 
-### 70% - Sprint 5 Complete (Contact Messages)
+### 70% - Sprint 5 Complete (Contact Messages) ✅ ACHIEVED
 - ✅ 5 admin features complete
 - ✅ Contact management
-- **ETA:** 4-5 hours
+- **Completed:** Oct 15, 2025
 
-### 80% - Sprint 7 Complete (All Admin Features)
+### 80% - Sprint 7 Complete (All Admin Settings) ✅ ACHIEVED
 - ✅ 7 admin features complete
-- ✅ Settings management
-- **ETA:** 6-7 hours
+- ✅ About + Site settings management
+- **Completed:** Oct 15, 2025
 
-### 90% - Sprint 11 Complete (All Features)
-- ✅ All 11 sprints complete
-- ✅ Full production-ready app
-- **ETA:** 8-10 hours
+### 85% - Sprint 8 Complete (Blog Management) 🔲 NEXT
+- 🔲 8 admin features complete
+- 🔲 Full blog CRUD with filters
+- **ETA:** 60-90 minutes
+
+### 88% - Sprint 9 Complete (Automation API) 🔲 UPCOMING
+- 🔲 n8n integration complete
+- 🔲 API tokens management
+- 🔲 Automation logs & docs
+- **ETA:** 90-120 minutes
+
+### 95% - Sprint 12 Complete (All Features)
+- 🔲 All 12 sprints complete
+- 🔲 Full production-ready app
+- **ETA:** 4-5 hours
 
 ---
 
@@ -963,7 +1366,11 @@ protected function prepareForValidation(): void {
 
 ---
 
-**Ready for Sprint 7: Site Settings Management!**
+**Ready for Sprint 8: Blog Management!**
 **Sprint-based approach ensures steady, incremental progress.**
 
-**Sprint 6 Complete:** About Settings Management delivered! Dynamic array management for skills, experience, education, and social links. Profile photo upload with preview. FormData + JSON pattern for complex nested arrays. Both backend (SettingsController + validation) and frontend (AboutSettings.vue 805 lines) complete with Options API pattern.
+**Sprint 7 Complete (Oct 15, 2025):** Site Settings Management delivered! Complete site configuration with logo upload, contact info, dynamic social media links array, and SEO settings (meta keywords, analytics). Both backend (SettingsController.updateSiteSettings + UpdateSiteSettingsRequest validation) and frontend (SettingsForm.vue) complete. 7 of 12 sprints done (58% sprint completion, 61% overall progress).
+
+**Next Priority:** Sprint 8 - Blog Management. Complete PostController CRUD + CategoryController, connect PostsList.vue to backend with search/filters/pagination, implement bulk actions. This will bring admin features to 80% completion (8/10 pages).
+
+**Upcoming Sprint 9:** Automation API (n8n Integration) - Build dedicated API endpoints for n8n/Zapier automation. Token management, webhook triggers, bulk operations, simplified validation. Enable RSS-to-Blog, Notion-to-Blog, Email-to-Draft workflows. Admin pages for token management and automation logs. (90-120 minutes)

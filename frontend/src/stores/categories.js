@@ -39,11 +39,19 @@ export const useCategoriesStore = defineStore('categories', () => {
       const { useApi } = await import('../composables/useApi')
       const api = useApi()
 
+      console.log('Fetching categories from /categories...')
       const response = await api.get('/categories')
-      categories.value = response.data.data
+      console.log('Categories API response:', response)
+      
+      // Handle different response structures
+      const responseData = response.data || response
+      categories.value = responseData.data || responseData || []
+      
+      console.log('Categories loaded:', categories.value)
 
       return categories.value
     } catch (err) {
+      console.error('Failed to fetch categories:', err)
       error.value = err.response?.data?.message || 'Failed to fetch categories'
       throw err
     } finally {

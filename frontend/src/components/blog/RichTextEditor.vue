@@ -300,18 +300,32 @@ defineExpose({
   border-color: #374151;
 }
 
+/* Keep toolbar light in dark mode for better visibility */
 .dark .ck.ck-toolbar {
-  background-color: #111827;
-  border-color: #374151;
+  background-color: #f7f7f7 !important;
+  border-color: #c4c4c4 !important;
+}
+
+.dark .ck.ck-toolbar .ck-button,
+.dark .ck.ck-toolbar .ck-dropdown__button,
+.dark .ck.ck-toolbar .ck-button .ck-button__label,
+.dark .ck.ck-toolbar .ck-dropdown__button .ck-dropdown__arrow {
+  color: #333 !important;
 }
 
 .dark .ck.ck-toolbar .ck-button:not(.ck-on):hover {
-  background-color: #374151;
+  background-color: #e6e6e6 !important;
 }
 
 .dark .ck.ck-toolbar .ck-button.ck-on {
-  background-color: #3b82f6;
-  color: #ffffff;
+  background-color: #3b82f6 !important;
+  color: #ffffff !important;
+}
+
+.dark .ck.ck-toolbar .ck-icon,
+.dark .ck.ck-toolbar .ck-icon * {
+  color: #333 !important;
+  fill: #333 !important;
 }
 
 /* Content styles for better readability */
