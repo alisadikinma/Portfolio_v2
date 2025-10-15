@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\GalleryController;
 use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\TestimonialController;
 use App\Http\Controllers\Api\SettingController;
+use App\Http\Controllers\Api\SettingsController;
 
 // ============================================
 // Authentication Routes
@@ -135,7 +136,15 @@ Route::middleware(['auth:sanctum'])->prefix('admin/testimonials')->group(functio
 // Admin Contact Routes
 Route::middleware(['auth:sanctum'])->prefix('admin/contacts')->group(function () {
     Route::get('/', [ContactController::class, 'index']);
+    Route::get('/export', [ContactController::class, 'export']);
     Route::get('/{id}', [ContactController::class, 'show']);
     Route::patch('/{id}/mark-as-read', [ContactController::class, 'markAsRead']);
     Route::delete('/{id}', [ContactController::class, 'destroy']);
+});
+
+// Admin Settings Routes
+Route::middleware(['auth:sanctum'])->prefix('admin/settings')->group(function () {
+    Route::get('/about', [SettingsController::class, 'getAboutSettings']);
+    Route::put('/about', [SettingsController::class, 'updateAboutSettings']);
+    Route::get('/site', [SettingsController::class, 'getSiteSettings']);
 });

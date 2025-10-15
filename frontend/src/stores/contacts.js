@@ -1,250 +1,201 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import axios from 'axios'
+import api from '@/services/api'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost/Portfolio_v2/backend/public/api/v1'
+export const useContactsStore = defineStore('contacts', {
+  state: () => ({
+    contacts: [],
+    currentContact: null,
+    pagination: {
+      current_page: 1,
+      last_page: 1,
+      per_page: 20,
+      total: 0
+    },
+    loading: false,
+    error: null
+  }),
 
-export const useContactsStore = defineStore('contacts', () => {
-  // State
-  const contacts = ref([])
-  const currentContact = ref(null)
-  const loading = ref(false)
-  const error = ref(null)
-  const pagination = ref({
-    currentPage: 1,
-    perPage: 15,
-    total: 0,
-    lastPage: 1
-  })
+  getters: {
+    getContactById: (state) => (id) => {
+      return state.contacts.find(contact => contact.id === id)
+    },
+    hasContacts: (state) => state.contacts.length > 0,
+    unreadCount: (state) => {
+      return state.contacts.filter(c => !c.is_read).length
+    },
+    readCount: (state) => {
+      return state.contacts.filter(c => c.is_read).length
+    }
+  },
 
-  // Getters
-  const getContactById = computed(() => {
-    return (id) => contacts.value.find(contact => contact.id === id)
-  })
+  actions: {
+    async fetchContacts(page = 1, perPage = 20, filters = {}) {
+      this.loading = true
+      this.error = null
 
-  const totalContacts = computed(() => pagination.value.total)
-
-  const unreadCount = computed(() => {
-    return contacts.value.filter(c => !c.is_read).length
-  })
-
-  const readCount = computed(() => {
-    return contacts.value.filter(c => c.is_read).length
-  })
-
-  // Actions
-  async function fetchContacts(params = {}) {
-    loading.value = true
-    error.value = null
-
-    try {
-      const response = await axios.get(`${API_BASE_URL}/admin/contacts`, {
-        params: {
-          page: params.page || pagination.value.currentPage,
-          per_page: params.perPage || pagination.value.perPage,
-          search: params.search,
-          is_read: params.is_read,
-          ...params
-        },
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+      try {
+        const params = {
+          page,
+          per_page: perPage,
+          ...filters
         }
-      })
 
-      contacts.value = response.data.data.data || response.data.data
+        const response = await api.get('/admin/contacts', { params })
 
-      if (response.data.data.meta) {
-        pagination.value = {
-          currentPage: response.data.data.meta.current_page,
-          perPage: response.data.data.meta.per_page,
-          total: response.data.data.meta.total,
-          lastPage: response.data.data.meta.last_page
+        this.contacts = response.data.data
+        this.pagination = {
+          current_page: response.data.meta.current_page,
+          last_page: response.data.meta.last_page,
+          per_page: response.data.meta.per_page,
+          total: response.data.meta.total
         }
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to fetch contacts'
+        throw error
+      } finally {
+        this.loading = false
       }
+    },
 
-      return contacts.value
-    } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to fetch contacts'
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
+    async fetchContact(id) {
+      this.loading = true
+      this.error = null
 
-  async function fetchContact(id) {
-    loading.value = true
-    error.value = null
+      try {
+        const response = await api.get(`/admin/contacts/${id}`)
+        this.currentContact = response.data.data
 
-    try {
-      const response = await axios.get(`${API_BASE_URL}/admin/contacts/${id}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        // Update in contacts list if present
+        const index = this.contacts.findIndex(c => c.id === id)
+        if (index !== -1) {
+          this.contacts[index] = response.data.data
         }
-      })
-      currentContact.value = response.data.data
-      return currentContact.value
-    } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to fetch contact'
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
 
-  async function markAsRead(id) {
-    loading.value = true
-    error.value = null
+        return this.currentContact
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to fetch contact'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
 
-    try {
-      const response = await axios.put(
-        `${API_BASE_URL}/admin/contacts/${id}/read`,
-        {},
-        {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+    async markAsRead(id) {
+      this.loading = true
+      this.error = null
+
+      try {
+        const response = await api.patch(`/admin/contacts/${id}/mark-as-read`)
+
+        const updatedContact = response.data.data
+
+        // Update in contacts list
+        const index = this.contacts.findIndex(c => c.id === id)
+        if (index !== -1) {
+          this.contacts[index] = updatedContact
+        }
+
+        // Update current contact if viewing it
+        if (this.currentContact?.id === id) {
+          this.currentContact = updatedContact
+        }
+
+        return updatedContact
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to mark as read'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async deleteContact(id) {
+      this.loading = true
+      this.error = null
+
+      try {
+        await api.delete(`/admin/contacts/${id}`)
+
+        this.contacts = this.contacts.filter(c => c.id !== id)
+
+        if (this.currentContact?.id === id) {
+          this.currentContact = null
+        }
+
+        if (this.pagination.total > 0) {
+          this.pagination.total--
+        }
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to delete contact'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async exportContacts(filters = {}) {
+      this.loading = true
+      this.error = null
+
+      try {
+        const params = { ...filters }
+
+        const response = await api.get('/admin/contacts/export', {
+          params,
+          responseType: 'blob'
+        })
+
+        // Create download link
+        const url = window.URL.createObjectURL(new Blob([response.data]))
+        const link = document.createElement('a')
+        link.href = url
+
+        // Extract filename from content-disposition header or use default
+        const contentDisposition = response.headers['content-disposition']
+        let filename = 'contacts_export.csv'
+        if (contentDisposition) {
+          const filenameMatch = contentDisposition.match(/filename="?(.+)"?/)
+          if (filenameMatch) {
+            filename = filenameMatch[1]
           }
         }
-      )
 
-      const updatedContact = response.data.data
-      const index = contacts.value.findIndex(c => c.id === id)
-      if (index !== -1) {
-        contacts.value[index] = { ...contacts.value[index], is_read: true }
+        link.setAttribute('download', filename)
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        window.URL.revokeObjectURL(url)
+
+        return true
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to export contacts'
+        throw error
+      } finally {
+        this.loading = false
       }
+    },
 
-      if (currentContact.value?.id === id) {
-        currentContact.value = { ...currentContact.value, is_read: true }
+    async submitContactForm(formData) {
+      this.loading = true
+      this.error = null
+
+      try {
+        const response = await api.post('/contact', formData)
+        return response.data.data
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to submit contact form'
+        throw error
+      } finally {
+        this.loading = false
       }
+    },
 
-      return updatedContact
-    } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to mark as read'
-      throw err
-    } finally {
-      loading.value = false
+    clearCurrentContact() {
+      this.currentContact = null
+    },
+
+    clearError() {
+      this.error = null
     }
-  }
-
-  async function markAsUnread(id) {
-    loading.value = true
-    error.value = null
-
-    try {
-      const response = await axios.put(
-        `${API_BASE_URL}/admin/contacts/${id}/unread`,
-        {},
-        {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        }
-      )
-
-      const updatedContact = response.data.data
-      const index = contacts.value.findIndex(c => c.id === id)
-      if (index !== -1) {
-        contacts.value[index] = { ...contacts.value[index], is_read: false }
-      }
-
-      if (currentContact.value?.id === id) {
-        currentContact.value = { ...currentContact.value, is_read: false }
-      }
-
-      return updatedContact
-    } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to mark as unread'
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-
-  async function deleteContact(id) {
-    loading.value = true
-    error.value = null
-
-    try {
-      await axios.delete(`${API_BASE_URL}/admin/contacts/${id}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      })
-
-      contacts.value = contacts.value.filter(c => c.id !== id)
-      pagination.value.total--
-
-      return true
-    } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to delete contact'
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-
-  async function submitContactForm(formData) {
-    loading.value = true
-    error.value = null
-
-    try {
-      const response = await axios.post(
-        `${API_BASE_URL}/contact`,
-        formData,
-        {
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        }
-      )
-
-      return response.data.data
-    } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to submit contact form'
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-
-  function clearError() {
-    error.value = null
-  }
-
-  function resetStore() {
-    contacts.value = []
-    currentContact.value = null
-    loading.value = false
-    error.value = null
-    pagination.value = {
-      currentPage: 1,
-      perPage: 15,
-      total: 0,
-      lastPage: 1
-    }
-  }
-
-  return {
-    // State
-    contacts,
-    currentContact,
-    loading,
-    error,
-    pagination,
-
-    // Getters
-    getContactById,
-    totalContacts,
-    unreadCount,
-    readCount,
-
-    // Actions
-    fetchContacts,
-    fetchContact,
-    markAsRead,
-    markAsUnread,
-    deleteContact,
-    submitContactForm,
-    clearError,
-    resetStore
   }
 })

@@ -1,7 +1,7 @@
 # PROJECT STATUS - Portfolio v2
 
 **Last Updated:** October 15, 2025
-**Overall Progress:** 61% (Sprint 4 of 11 Complete)
+**Overall Progress:** 69% (Sprint 6 of 11 Complete)
 **Status:** In Development - Sprint-Based Approach
 
 ---
@@ -11,7 +11,7 @@
 ### Phase 6: Production Ready Version
 **Methodology:** Sprint-based (1 sprint = 1 complete feature)
 **Total Sprints:** 11 (7 Admin Features + 4 Public Pages)
-**Completion:** 4/11 (36%)
+**Completion:** 6/11 (55%)
 
 | Sprint | Feature | Progress | Status | Completion Date |
 |--------|---------|----------|--------|-----------------|
@@ -19,8 +19,8 @@
 | **2** | **Awards Management** | **100%** | **✅ COMPLETED** | **Oct 15, 2025** |
 | **3** | **Gallery Management** | **100%** | **✅ COMPLETED** | **Oct 15, 2025** |
 | **4** | **Testimonials Management** | **100%** | **✅ COMPLETED** | **Oct 15, 2025** |
-| 5 | Contact Messages | 0% | 🔲 Pending | - |
-| 6 | About Settings | 0% | 🔲 Pending | - |
+| **5** | **Contact Messages** | **100%** | **✅ COMPLETED** | **Oct 15, 2025** |
+| **6** | **About Settings** | **100%** | **✅ COMPLETED** | **Oct 15, 2025** |
 | 7 | Site Settings | 0% | 🔲 Pending | - |
 | 8 | Home Hero Section | 0% | 🔲 Pending | - |
 | 9 | About Page | 0% | 🔲 Pending | - |
@@ -394,6 +394,228 @@
 
 ---
 
+## ✅ Sprint 5: Contact Messages Management - COMPLETED (Oct 15, 2025)
+
+**Note:** Read-only contact management (no create/edit - contacts come from public form)
+
+### Backend Deliverables ✅
+- ✅ **ContactController** - Read-only CRUD + Export
+  - `index()` - Admin list with search (name, email, subject, message), read/unread filter
+  - `show($id)` - Get contact by ID (auto-marks as read)
+  - `markAsRead($id)` - Manually mark as read
+  - `destroy($id)` - Delete contact message
+  - `export()` - Export contacts to CSV with filters
+  - `store()` - Public form submission (rate limited: 5/minute)
+
+- ✅ **Contact Model** (`app/Models/Contact.php`)
+  - Fields: name, email, subject, message, is_read, read_at
+  - Scope: `unread()` - Filter unread messages
+  - Method: `markAsRead()` - Mark message as read
+
+- ✅ **ContactResource** (`app/Http/Resources/ContactResource.php`)
+  - JSON transformation with timestamps
+
+- ✅ **API Routes**
+  ```
+  GET    /admin/contacts              - List all contacts
+  GET    /admin/contacts/export       - Export to CSV
+  GET    /admin/contacts/:id          - Get single contact
+  PATCH  /admin/contacts/:id/mark-as-read - Mark as read
+  DELETE /admin/contacts/:id          - Delete contact
+  POST   /contact (public, rate limited) - Submit contact form
+  ```
+
+### Frontend Deliverables ✅
+- ✅ **ContactsList View** (`views/admin/ContactsList.vue`)
+  - List with read/unread status badges
+  - Search (name, email, subject, message)
+  - Read status filter (All / Unread Only / Read Only)
+  - Pagination (20 per page)
+  - **View Detail Modal** - Full message display with reply button
+  - Mark as read button
+  - Delete with confirmation modal
+  - **Export to CSV button** - Respects current filters
+  - Unread count display in header
+  - Click row to view message (auto-marks as read)
+
+- ✅ **Contacts Store** (`stores/contacts.js`)
+  - Converted to Options API pattern
+  - Integrated with centralized API service
+  - `fetchContacts()` - With pagination, filters (search, is_read)
+  - `fetchContact(id)` - Single contact (auto-marks as read)
+  - `markAsRead(id)` - Mark message as read
+  - `deleteContact(id)` - Delete contact
+  - `exportContacts(filters)` - Download CSV with blob handling
+  - `submitContactForm(data)` - Public form submission
+  - Getters: `unreadCount`, `readCount`
+
+### Features Delivered ✅
+- ✅ **Read-Only Management** (no create/edit - public form only)
+- ✅ View contact messages list with status badges
+- ✅ **View Detail Modal** - Full message with sender info, reply button
+- ✅ Mark as read (auto on view, manual button)
+- ✅ Delete with confirmation
+- ✅ **Export to CSV** - Downloads with filtered results
+- ✅ Search (multi-field: name, email, subject, message)
+- ✅ Read status filter dropdown
+- ✅ Unread count display
+- ✅ Click row to view (auto-marks as read)
+- ✅ Email reply link (mailto: with pre-filled subject)
+- ✅ Pagination (20 per page)
+- ✅ Loading states & error handling
+- ✅ Dark mode support
+- ✅ Responsive design
+
+### Files Created/Modified
+**Backend:**
+- `app/Http/Controllers/Api/ContactController.php` ✅ (Added export method)
+- `app/Models/Contact.php` ✅ (Verified - has markAsRead method)
+- `app/Http/Resources/ContactResource.php` ✅ (Verified)
+- `routes/api.php` ✅ (Added export route)
+
+**Frontend:**
+- `src/views/admin/ContactsList.vue` ✅ (Complete with modal & export)
+- `src/stores/contacts.js` ✅ (Updated to Options API + export)
+
+---
+
+## ✅ Sprint 6: About Settings Management - COMPLETED (Oct 15, 2025)
+
+**Note:** Settings stored as key-value pairs with dynamic arrays
+
+### Backend Deliverables ✅
+- ✅ **SettingsController** - About settings management
+  - `getAboutSettings()` - Get all about group settings
+  - `updateAboutSettings()` - Update with complex nested arrays
+  - `getSiteSettings()` - Get site group settings (for Sprint 7)
+  - JSON decoding from FormData
+  - Directory creation for uploads
+  - Old photo cleanup on update
+
+- ✅ **Form Validation**
+  - `UpdateAboutSettingsRequest.php` - Update validation rules
+    - Basic: name, title, bio, profile_photo (max 5MB)
+    - Skills: array of strings
+    - Experience: array with title*, company*, location, start_date*, end_date, description, current
+    - Education: array with degree*, institution*, location, start_year*, end_year, description
+    - Social Links: array with platform*, url*, icon
+  - `prepareForValidation()` - Decode JSON strings before validation
+
+- ✅ **Setting Model** (Pre-existing)
+  - Key-value storage with group field
+  - `byGroup()` scope for filtering
+  - `getByKey()` helper method
+
+- ✅ **API Routes**
+  ```
+  GET    /admin/settings/about       - Get about settings
+  PUT    /admin/settings/about       - Update about settings (FormData)
+  GET    /admin/settings/site        - Get site settings
+  ```
+
+### Frontend Deliverables ✅
+- ✅ **AboutSettings Component** (`views/admin/AboutSettings.vue`)
+  - **Basic Info Card**
+    - Name, Title, Bio (textarea)
+    - Profile photo upload with preview
+    - Remove photo button
+    - 5MB file size validation
+
+  - **Skills Card** - Dynamic array
+    - Add skill button
+    - Remove individual skill
+    - Empty state message
+
+  - **Experience Card** - Dynamic array with full forms
+    - Add experience button
+    - Fields: title*, company*, location, start_date*, end_date, description
+    - "I currently work here" checkbox (clears end_date)
+    - Remove experience button
+    - Experience #N numbering
+
+  - **Education Card** - Dynamic array with full forms
+    - Add education button
+    - Fields: degree*, institution*, location, start_year*, end_year, description
+    - Remove education button
+    - Education #N numbering
+
+  - **Social Links Card** - Dynamic array
+    - Add link button
+    - Fields: platform*, url*, icon (e.g., "fab fa-github")
+    - Remove link button
+    - Link #N numbering
+
+  - **Form Actions**
+    - Reset button (reload from store)
+    - Save Changes button with loading state
+    - Client-side validation
+    - Error display section
+
+- ✅ **Settings Store** (`stores/settings.js`)
+  - Converted to Options API pattern
+  - Integrated with centralized API service
+  - `fetchAboutSettings()` - Load settings from API
+  - `updateAboutSettings(formData)` - Save with FormData
+  - `fetchSiteSettings()` - For Sprint 7
+  - FormData detection for proper headers
+  - Deep clone arrays to prevent mutations
+  - Getters: `hasAboutSettings`, `hasSiteSettings`
+
+### Features Delivered ✅
+- ✅ **Dynamic Array Management**
+  - ✅ Add/remove skills (simple strings)
+  - ✅ Add/remove experience (complex objects with 7 fields)
+  - ✅ Add/remove education (complex objects with 6 fields)
+  - ✅ Add/remove social links (objects with 3 fields)
+- ✅ Profile photo upload with preview
+- ✅ Photo removal functionality
+- ✅ File size validation (5MB max)
+- ✅ **FormData with JSON.stringify()** for arrays
+- ✅ **JSON decoding in backend** (prepareForValidation)
+- ✅ Nested array validation (experience.*.title, etc.)
+- ✅ Current position checkbox (auto-clear end_date)
+- ✅ Empty state messages for arrays
+- ✅ Form reset functionality
+- ✅ Loading states & error handling
+- ✅ Dark mode support
+- ✅ Responsive design
+- ✅ Auto-create uploads directory
+
+### Technical Implementation
+**FormData + JSON Arrays Pattern:**
+```javascript
+// Frontend: Stringify arrays for FormData
+const data = new FormData()
+data.append('name', formData.name)
+data.append('profile_photo', photoFile) // File
+data.append('skills', JSON.stringify(skills)) // Array as JSON
+data.append('experience', JSON.stringify(experience)) // Complex array as JSON
+```
+
+```php
+// Backend: Decode before validation
+protected function prepareForValidation(): void {
+    foreach (['skills', 'experience', 'education', 'social_links'] as $field) {
+        if ($this->has($field) && is_string($this->input($field))) {
+            $this->merge([$field => json_decode($this->input($field), true)]);
+        }
+    }
+}
+```
+
+### Files Created/Modified
+**Backend:**
+- `app/Http/Controllers/Api/SettingsController.php` ✅ (Created - 200 lines)
+- `app/Http/Requests/UpdateAboutSettingsRequest.php` ✅ (Created - 90 lines)
+- `routes/api.php` ✅ (Added settings routes)
+
+**Frontend:**
+- `src/views/admin/AboutSettings.vue` ✅ (Created - 805 lines)
+- `src/stores/settings.js` ✅ (Updated to Options API + FormData)
+- `src/router/index.js` ✅ (Route already exists at /admin/about)
+
+---
+
 ## ✅ Completed (100%)
 
 ### Database Layer
@@ -576,8 +798,8 @@
 | CategoryController | ❌ | ❌ | ❌ | ❌ | Not Started |
 | TestimonialController | ✅ | ✅ | ✅ | ❌ | Complete (Sprint 4) |
 | ServiceController | ❌ | ❌ | ❌ | ❌ | Not Started |
-| ContactController | ❌ | ❌ | ❌ | ❌ | Not Started (Sprint 5) |
-| SettingsController | ❌ | ❌ | ❌ | ❌ | Not Started (Sprints 6-7) |
+| ContactController | ✅ | ❌ | ✅ | ❌ | Complete (Sprint 5) |
+| SettingsController | ⚠️ | ✅ | ❌ | ❌ | Partial (Sprint 6 - about done) |
 | NewsletterController | ❌ | ❌ | ❌ | ❌ | Not Started |
 
 ### Frontend Admin Pages Status
@@ -589,8 +811,8 @@
 | Awards | ✅ | ✅ | ✅ | ✅ | ✅ | 100% Complete (Sprint 2) |
 | Gallery | ✅ | ✅ | ✅ | ✅ | ✅ | 100% Complete (Sprint 3) |
 | Testimonials | ✅ | ✅ | ✅ | ✅ | ✅ | 100% Complete (Sprint 4) |
-| Contact | ⚠️ | N/A | N/A | ⚠️ | ❌ | 10% - Sprint 5 |
-| About | ⚠️ | N/A | ⚠️ | N/A | ❌ | 10% - Sprint 6 |
+| Contact | ✅ | N/A | N/A | ✅ | ✅ | 100% Complete (Sprint 5) |
+| About | ✅ | N/A | ✅ | N/A | ✅ | 100% Complete (Sprint 6) |
 | Settings | ⚠️ | N/A | ⚠️ | N/A | ❌ | 10% - Sprint 7 |
 
 **Legend:**
@@ -614,28 +836,29 @@
 
 ---
 
-## 🎯 Next Sprint: Contact Messages Management (Sprint 5)
+## 🎯 Next Sprint: Site Settings Management (Sprint 7)
 
 **See:** `.claude/prompts/phase-6_production_ready_version_20251015-0938.md`
 
 **Deliverables:**
-- Backend: ContactController with read-only operations (list, show, mark as read, delete)
-- Frontend: ContactsList.vue with filters (read/unread, date range)
-- Contacts store (contacts.js)
-- No create/edit (contacts come from public form submissions)
-- Email notification integration (optional)
+- Backend: SettingsController site methods (already has getSiteSettings)
+- Frontend: SettingsForm.vue (site_name, site_description, site_logo, contact details)
+- Social media links array
+- Meta tags array
+- Analytics code
+- Settings store already updated
 
-**Expected Timeline:** 30-45 minutes
+**Expected Timeline:** 50-60 minutes
 
 ---
 
 ## 🚧 Known Issues
 
 ### Critical
-- ❌ 3 admin CRUD pages are placeholders (Sprints 5-7)
+- ❌ 1 admin settings page is placeholder (Sprint 7)
 - ❌ 4 public detail pages incomplete (Sprints 8-11)
-- ❌ 4 backend controllers missing
-- ❌ Contact form not connected to API
+- ❌ 3 backend controllers missing
+- ⚠️ Contact form backend exists but frontend not connected yet
 
 ### Medium
 - ⚠️ No automated tests
@@ -740,7 +963,7 @@
 
 ---
 
-**Ready for Sprint 5: Contact Messages Management!**
+**Ready for Sprint 7: Site Settings Management!**
 **Sprint-based approach ensures steady, incremental progress.**
 
-**Sprint 4 Complete:** Testimonials Management delivered! Full CRUD with 5-star rating system, search filters, and status management. Both backend and frontend complete with Options API pattern.
+**Sprint 6 Complete:** About Settings Management delivered! Dynamic array management for skills, experience, education, and social links. Profile photo upload with preview. FormData + JSON pattern for complex nested arrays. Both backend (SettingsController + validation) and frontend (AboutSettings.vue 805 lines) complete with Options API pattern.

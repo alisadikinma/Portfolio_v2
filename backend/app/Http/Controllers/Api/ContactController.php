@@ -148,6 +148,64 @@ class ContactController extends Controller
     }
 
     /**
+     * Export contacts to CSV (Admin only).
+     */
+    public function export(Request $request)
+    {
+        $query = Contact::query();
+
+        // Apply same filters as index
+        if ($request->has('is_read')) {
+            $isRead = filter_var($request->query('is_read'), FILTER_VALIDATE_BOOLEAN);
+            $query->where('is_read', $isRead);
+        }
+
+        if ($request->has('search')) {
+            $search = $request->query('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('subject', 'like', "%{$search}%")
+                  ->orWhere('message', 'like', "%{$search}%");
+            });
+        }
+
+        $contacts = $query->orderBy('created_at', 'desc')->get();
+
+        $filename = 'contacts_export_' . date('Y-m-d_H-i-s') . '.csv';
+
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ];
+
+        $callback = function () use ($contacts) {
+            $file = fopen('php://output', 'w');
+
+            // Add CSV headers
+            fputcsv($file, ['ID', 'Name', 'Email', 'Subject', 'Message', 'Status', 'Read At', 'Submitted At']);
+
+            // Add data rows
+            foreach ($contacts as $contact) {
+                fputcsv($file, [
+                    $contact->id,
+                    $contact->name,
+                    $contact->email,
+                    $contact->subject,
+                    $contact->message,
+                    $contact->is_read ? 'Read' : 'Unread',
+                    $contact->read_at ? $contact->read_at->format('Y-m-d H:i:s') : '-',
+                    $contact->created_at->format('Y-m-d H:i:s'),
+                ]);
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    /**
      * Send email notification for new contact.
      */
     private function sendEmailNotification(Contact $contact): void
