@@ -1,203 +1,187 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import axios from 'axios'
+import api from '@/services/api'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost/Portfolio_v2/backend/public/api/v1'
+export const useGalleriesStore = defineStore('galleries', {
+  state: () => ({
+    galleries: [],
+    currentGallery: null,
+    pagination: {
+      current_page: 1,
+      last_page: 1,
+      per_page: 12,
+      total: 0
+    },
+    loading: false,
+    error: null
+  }),
 
-export const useGalleriesStore = defineStore('galleries', () => {
-  // State
-  const galleries = ref([])
-  const currentGallery = ref(null)
-  const loading = ref(false)
-  const error = ref(null)
-  const pagination = ref({
-    currentPage: 1,
-    perPage: 15,
-    total: 0,
-    lastPage: 1
-  })
+  getters: {
+    getGalleryById: (state) => (id) => {
+      return state.galleries.find(gallery => gallery.id === id)
+    },
+    hasGalleries: (state) => state.galleries.length > 0
+  },
 
-  // Getters
-  const getGalleryById = computed(() => {
-    return (id) => galleries.value.find(gallery => gallery.id === id)
-  })
+  actions: {
+    async fetchGalleries(page = 1, perPage = 12, filters = {}) {
+      this.loading = true
+      this.error = null
 
-  const totalGalleries = computed(() => pagination.value.total)
-
-  // Actions
-  async function fetchGalleries(params = {}) {
-    loading.value = true
-    error.value = null
-
-    try {
-      const response = await axios.get(`${API_BASE_URL}/galleries`, {
-        params: {
-          page: params.page || pagination.value.currentPage,
-          per_page: params.perPage || pagination.value.perPage,
-          search: params.search,
-          ...params
+      try {
+        const params = {
+          page,
+          per_page: perPage,
+          ...filters
         }
-      })
 
-      galleries.value = response.data.data.data || response.data.data
+        const response = await api.get('/admin/gallery', { params })
 
-      if (response.data.data.meta) {
-        pagination.value = {
-          currentPage: response.data.data.meta.current_page,
-          perPage: response.data.data.meta.per_page,
-          total: response.data.data.meta.total,
-          lastPage: response.data.data.meta.last_page
+        this.galleries = response.data.data
+        this.pagination = {
+          current_page: response.data.meta.current_page,
+          last_page: response.data.meta.last_page,
+          per_page: response.data.meta.per_page,
+          total: response.data.meta.total
         }
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to fetch galleries'
+        throw error
+      } finally {
+        this.loading = false
       }
+    },
 
-      return galleries.value
-    } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to fetch galleries'
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
+    async fetchGallery(id) {
+      this.loading = true
+      this.error = null
 
-  async function fetchGallery(id) {
-    loading.value = true
-    error.value = null
-
-    try {
-      const response = await axios.get(`${API_BASE_URL}/galleries/${id}`)
-      currentGallery.value = response.data.data
-      return currentGallery.value
-    } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to fetch gallery'
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-
-  async function createGallery(galleryData) {
-    loading.value = true
-    error.value = null
-
-    try {
-      const response = await axios.post(
-        `${API_BASE_URL}/admin/galleries`,
-        galleryData,
-        {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      )
-
-      const newGallery = response.data.data
-      galleries.value.unshift(newGallery)
-      pagination.value.total++
-
-      return newGallery
-    } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to create gallery'
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-
-  async function updateGallery(id, galleryData) {
-    loading.value = true
-    error.value = null
-
-    try {
-      const response = await axios.put(
-        `${API_BASE_URL}/admin/galleries/${id}`,
-        galleryData,
-        {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      )
-
-      const updatedGallery = response.data.data
-      const index = galleries.value.findIndex(g => g.id === id)
-      if (index !== -1) {
-        galleries.value[index] = updatedGallery
+      try {
+        const response = await api.get(`/admin/gallery/${id}`)
+        this.currentGallery = response.data.data
+        return this.currentGallery
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to fetch gallery'
+        throw error
+      } finally {
+        this.loading = false
       }
+    },
 
-      if (currentGallery.value?.id === id) {
-        currentGallery.value = updatedGallery
-      }
+    async createGallery(galleryData) {
+      this.loading = true
+      this.error = null
 
-      return updatedGallery
-    } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to update gallery'
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
+      try {
+        const response = await api.post('/admin/gallery', galleryData)
 
-  async function deleteGallery(id) {
-    loading.value = true
-    error.value = null
+        const newGallery = response.data.data
 
-    try {
-      await axios.delete(`${API_BASE_URL}/admin/galleries/${id}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        if (this.galleries.length < this.pagination.per_page) {
+          this.galleries.unshift(newGallery)
         }
-      })
 
-      galleries.value = galleries.value.filter(g => g.id !== id)
-      pagination.value.total--
+        return newGallery
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to create gallery'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
 
-      return true
-    } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to delete gallery'
-      throw err
-    } finally {
-      loading.value = false
+    async updateGallery(id, galleryData) {
+      this.loading = true
+      this.error = null
+
+      try {
+        const response = await api.put(`/admin/gallery/${id}`, galleryData)
+
+        const updatedGallery = response.data.data
+
+        const index = this.galleries.findIndex(g => g.id === id)
+        if (index !== -1) {
+          this.galleries[index] = updatedGallery
+        }
+
+        if (this.currentGallery?.id === id) {
+          this.currentGallery = updatedGallery
+        }
+
+        return updatedGallery
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to update gallery'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async deleteGallery(id) {
+      this.loading = true
+      this.error = null
+
+      try {
+        await api.delete(`/admin/gallery/${id}`)
+
+        this.galleries = this.galleries.filter(g => g.id !== id)
+
+        if (this.currentGallery?.id === id) {
+          this.currentGallery = null
+        }
+
+        if (this.pagination.total > 0) {
+          this.pagination.total--
+        }
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to delete gallery'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async bulkUpload(uploadData) {
+      this.loading = true
+      this.error = null
+
+      try {
+        const response = await api.post('/admin/gallery/bulk-upload', uploadData)
+
+        return response.data.data
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to upload galleries'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async bulkDelete(ids) {
+      this.loading = true
+      this.error = null
+
+      try {
+        await api.post('/admin/gallery/bulk-delete', { ids })
+
+        this.galleries = this.galleries.filter(g => !ids.includes(g.id))
+
+        if (this.pagination.total > 0) {
+          this.pagination.total -= ids.length
+        }
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to delete galleries'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    clearCurrentGallery() {
+      this.currentGallery = null
+    },
+
+    clearError() {
+      this.error = null
     }
-  }
-
-  function clearError() {
-    error.value = null
-  }
-
-  function resetStore() {
-    galleries.value = []
-    currentGallery.value = null
-    loading.value = false
-    error.value = null
-    pagination.value = {
-      currentPage: 1,
-      perPage: 15,
-      total: 0,
-      lastPage: 1
-    }
-  }
-
-  return {
-    // State
-    galleries,
-    currentGallery,
-    loading,
-    error,
-    pagination,
-
-    // Getters
-    getGalleryById,
-    totalGalleries,
-
-    // Actions
-    fetchGalleries,
-    fetchGallery,
-    createGallery,
-    updateGallery,
-    deleteGallery,
-    clearError,
-    resetStore
   }
 })

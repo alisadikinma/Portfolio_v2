@@ -1,280 +1,213 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import axios from 'axios'
+import api from '@/services/api'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost/Portfolio_v2/backend/public/api/v1'
+export const useAwardsStore = defineStore('awards', {
+  state: () => ({
+    awards: [],
+    currentAward: null,
+    pagination: {
+      current_page: 1,
+      last_page: 1,
+      per_page: 10,
+      total: 0
+    },
+    loading: false,
+    error: null
+  }),
 
-export const useAwardsStore = defineStore('awards', () => {
-  // State
-  const awards = ref([])
-  const currentAward = ref(null)
-  const loading = ref(false)
-  const error = ref(null)
-  const pagination = ref({
-    currentPage: 1,
-    perPage: 15,
-    total: 0,
-    lastPage: 1
-  })
+  getters: {
+    getAwardById: (state) => (id) => {
+      return state.awards.find(award => award.id === id)
+    },
+    hasAwards: (state) => state.awards.length > 0
+  },
 
-  // Getters
-  const getAwardById = computed(() => {
-    return (id) => awards.value.find(award => award.id === id)
-  })
+  actions: {
+    async fetchAwards(page = 1, perPage = 10, filters = {}) {
+      this.loading = true
+      this.error = null
 
-  const totalAwards = computed(() => pagination.value.total)
-
-  // Actions
-  async function fetchAwards(params = {}) {
-    loading.value = true
-    error.value = null
-
-    try {
-      const response = await axios.get(`${API_BASE_URL}/awards`, {
-        params: {
-          page: params.page || pagination.value.currentPage,
-          per_page: params.perPage || pagination.value.perPage,
-          search: params.search,
-          year: params.year,
-          ...params
+      try {
+        const params = {
+          page,
+          per_page: perPage,
+          ...filters
         }
-      })
 
-      awards.value = response.data.data.data || response.data.data
+        const response = await api.get('/admin/awards', { params })
 
-      if (response.data.data.meta) {
-        pagination.value = {
-          currentPage: response.data.data.meta.current_page,
-          perPage: response.data.data.meta.per_page,
-          total: response.data.data.meta.total,
-          lastPage: response.data.data.meta.last_page
+        this.awards = response.data.data
+        this.pagination = {
+          current_page: response.data.meta.current_page,
+          last_page: response.data.meta.last_page,
+          per_page: response.data.meta.per_page,
+          total: response.data.meta.total
         }
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to fetch awards'
+        throw error
+      } finally {
+        this.loading = false
       }
+    },
 
-      return awards.value
-    } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to fetch awards'
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
+    async fetchAward(id) {
+      this.loading = true
+      this.error = null
 
-  async function fetchAward(id) {
-    loading.value = true
-    error.value = null
+      try {
+        const response = await api.get(`/admin/awards/${id}`)
 
-    try {
-      const response = await axios.get(`${API_BASE_URL}/awards/${id}`)
-      currentAward.value = response.data.data
-      return currentAward.value
-    } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to fetch award'
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-
-  async function createAward(awardData) {
-    loading.value = true
-    error.value = null
-
-    try {
-      const response = await axios.post(
-        `${API_BASE_URL}/admin/awards`,
-        awardData,
-        {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
+        // Extract award data from nested response structure
+        if (response.data.success && response.data.data.award) {
+          this.currentAward = {
+            ...response.data.data.award,
+            galleries: response.data.data.galleries || []
           }
+        } else {
+          this.currentAward = response.data.data
         }
-      )
 
-      const newAward = response.data.data
-      awards.value.unshift(newAward)
-      pagination.value.total++
-
-      return newAward
-    } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to create award'
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-
-  async function updateAward(id, awardData) {
-    loading.value = true
-    error.value = null
-
-    try {
-      const response = await axios.put(
-        `${API_BASE_URL}/admin/awards/${id}`,
-        awardData,
-        {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      )
-
-      const updatedAward = response.data.data
-      const index = awards.value.findIndex(a => a.id === id)
-      if (index !== -1) {
-        awards.value[index] = updatedAward
+        return this.currentAward
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to fetch award'
+        throw error
+      } finally {
+        this.loading = false
       }
+    },
 
-      if (currentAward.value?.id === id) {
-        currentAward.value = updatedAward
+    async createAward(awardData) {
+      this.loading = true
+      this.error = null
+
+      try {
+        const response = await api.post('/admin/awards', awardData)
+
+        const newAward = response.data.success ? response.data.data : response.data.data
+
+        if (this.awards.length < this.pagination.per_page) {
+          this.awards.unshift(newAward)
+        }
+
+        return newAward
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to create award'
+        throw error
+      } finally {
+        this.loading = false
       }
+    },
 
-      return updatedAward
-    } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to update award'
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
+    async updateAward(id, awardData) {
+      this.loading = true
+      this.error = null
 
-  async function deleteAward(id) {
-    loading.value = true
-    error.value = null
+      try {
+        // Use POST with _method=PUT for FormData compatibility
+        const response = await api.post(`/admin/awards/${id}`, awardData)
 
-    try {
-      await axios.delete(`${API_BASE_URL}/admin/awards/${id}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        const updatedAward = response.data.success ? response.data.data : response.data.data
+
+        const index = this.awards.findIndex(a => a.id === id)
+        if (index !== -1) {
+          this.awards[index] = updatedAward
         }
-      })
 
-      awards.value = awards.value.filter(a => a.id !== id)
-      pagination.value.total--
-
-      return true
-    } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to delete award'
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-
-  async function linkGallery(awardId, galleryId, sortOrder = 0) {
-    loading.value = true
-    error.value = null
-
-    try {
-      const response = await axios.post(
-        `${API_BASE_URL}/admin/awards/${awardId}/galleries`,
-        { gallery_id: galleryId, sort_order: sortOrder },
-        {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-          }
+        if (this.currentAward?.id === id) {
+          this.currentAward = updatedAward
         }
-      )
 
-      return response.data.data
-    } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to link gallery'
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
+        return updatedAward
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to update award'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
 
-  async function unlinkGallery(awardId, galleryId) {
-    loading.value = true
-    error.value = null
+    async deleteAward(id) {
+      this.loading = true
+      this.error = null
 
-    try {
-      await axios.delete(
-        `${API_BASE_URL}/admin/awards/${awardId}/galleries/${galleryId}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
+      try {
+        await api.delete(`/admin/awards/${id}`)
+
+        this.awards = this.awards.filter(a => a.id !== id)
+
+        if (this.currentAward?.id === id) {
+          this.currentAward = null
         }
-      )
 
-      return true
-    } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to unlink gallery'
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-
-  async function reorderGalleries(awardId, galleries) {
-    loading.value = true
-    error.value = null
-
-    try {
-      const response = await axios.put(
-        `${API_BASE_URL}/admin/awards/${awardId}/galleries/reorder`,
-        { galleries },
-        {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-          }
+        if (this.pagination.total > 0) {
+          this.pagination.total--
         }
-      )
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to delete award'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
 
-      return response.data.data
-    } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to reorder galleries'
-      throw err
-    } finally {
-      loading.value = false
+    async linkGallery(awardId, galleryId, sortOrder = 0) {
+      this.loading = true
+      this.error = null
+
+      try {
+        const response = await api.post(`/admin/awards/${awardId}/galleries`, {
+          gallery_id: galleryId,
+          sort_order: sortOrder
+        })
+
+        return response.data.data
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to link gallery'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async unlinkGallery(awardId, galleryId) {
+      this.loading = true
+      this.error = null
+
+      try {
+        await api.delete(`/admin/awards/${awardId}/galleries/${galleryId}`)
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to unlink gallery'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async reorderGalleries(awardId, galleries) {
+      this.loading = true
+      this.error = null
+
+      try {
+        const response = await api.put(`/admin/awards/${awardId}/galleries/reorder`, {
+          galleries
+        })
+
+        return response.data.data
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to reorder galleries'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    clearCurrentAward() {
+      this.currentAward = null
+    },
+
+    clearError() {
+      this.error = null
     }
-  }
-
-  function clearError() {
-    error.value = null
-  }
-
-  function resetStore() {
-    awards.value = []
-    currentAward.value = null
-    loading.value = false
-    error.value = null
-    pagination.value = {
-      currentPage: 1,
-      perPage: 15,
-      total: 0,
-      lastPage: 1
-    }
-  }
-
-  return {
-    // State
-    awards,
-    currentAward,
-    loading,
-    error,
-    pagination,
-
-    // Getters
-    getAwardById,
-    totalAwards,
-
-    // Actions
-    fetchAwards,
-    fetchAward,
-    createAward,
-    updateAward,
-    deleteAward,
-    linkGallery,
-    unlinkGallery,
-    reorderGalleries,
-    clearError,
-    resetStore
   }
 })

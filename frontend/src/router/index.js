@@ -193,6 +193,26 @@ const routes = [
       layout: 'admin'
     }
   },
+  {
+    path: '/admin/awards/create',
+    name: 'admin-awards-create',
+    component: () => import('@/views/admin/AwardCreate.vue'),
+    meta: {
+      title: 'Create Award - Admin',
+      requiresAuth: true,
+      layout: 'admin'
+    }
+  },
+  {
+    path: '/admin/awards/:id/edit',
+    name: 'admin-awards-edit',
+    component: () => import('@/views/admin/AwardEdit.vue'),
+    meta: {
+      title: 'Edit Award - Admin',
+      requiresAuth: true,
+      layout: 'admin'
+    }
+  },
   
   // Galleries Management
   {

@@ -86,6 +86,11 @@ Route::prefix('settings')->group(function () {
 
 // Admin Awards Routes
 Route::middleware(['auth:sanctum'])->prefix('admin/awards')->group(function () {
+    Route::get('/', [AwardController::class, 'indexForAdmin']);
+    Route::get('/{id}', [AwardController::class, 'show']);
+    Route::post('/', [AwardController::class, 'store']);
+    Route::put('/{id}', [AwardController::class, 'update']);
+    Route::delete('/{id}', [AwardController::class, 'destroy']);
     Route::post('/{id}/galleries', [AwardController::class, 'linkGallery']);
     Route::delete('/{id}/galleries/{galleryId}', [AwardController::class, 'unlinkGallery']);
     Route::put('/{id}/galleries/reorder', [AwardController::class, 'reorderGalleries']);
@@ -109,6 +114,8 @@ Route::middleware(['auth:sanctum'])->prefix('admin/posts')->group(function () {
 
 // Admin Gallery Routes
 Route::middleware(['auth:sanctum'])->prefix('admin/gallery')->group(function () {
+    Route::get('/', [GalleryController::class, 'index']);
+    Route::get('/{id}', [GalleryController::class, 'show']);
     Route::post('/', [GalleryController::class, 'store']);
     Route::post('/bulk-upload', [GalleryController::class, 'bulkUpload']);
     Route::put('/{id}', [GalleryController::class, 'update']);
