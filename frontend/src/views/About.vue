@@ -23,6 +23,7 @@
     <section class="section bg-white dark:bg-neutral-800">
       <div class="container-custom">
         <div class="max-w-4xl mx-auto">
+          <div>&nbsp;</div>
           <div class="grid md:grid-cols-2 gap-12 items-center">
             <div class="aspect-square bg-neutral-200 dark:bg-neutral-700 rounded-2xl"></div>
             <div>
@@ -42,10 +43,11 @@
           </div>
         </div>
       </div>
+      <div>&nbsp;</div>
     </section>
-
     <!-- Skills Section -->
     <section class="section bg-neutral-50 dark:bg-neutral-900">
+      <div>&nbsp;</div>
       <div class="container-custom">
         <div class="text-center mb-12">
           <h2 class="text-3xl md:text-4xl font-display font-bold mb-4">Skills & Expertise</h2>
@@ -66,6 +68,8 @@
         </div>
       </div>
     </section>
+
+    <div>&nbsp;</div>
 
     <!-- Experience Section -->
     <section class="section bg-white dark:bg-neutral-800">
@@ -89,9 +93,11 @@
         </div>
       </div>
     </section>
+    <div>&nbsp;</div> 
 
     <!-- CTA Section -->
     <section class="section bg-gradient-to-r from-primary-600 to-accent-600 text-white">
+      <div>&nbsp;</div>
       <div class="container-custom text-center">
         <h2 class="text-3xl md:text-4xl font-display font-bold mb-4">Let's Work Together</h2>
         <p class="text-lg md:text-xl mb-8 opacity-90 max-w-2xl mx-auto">
@@ -101,6 +107,7 @@
           Contact Me
         </BaseButton>
       </div>
+      <div>&nbsp;</div>
     </section>
   </div>
 </template>

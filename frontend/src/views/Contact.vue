@@ -202,15 +202,17 @@
         </div>
       </div>
     </section>
-
+    <div>&nbsp;</div>
+    <div>&nbsp;</div>
     <!-- Map Section (Placeholder) -->
-    <section class="section bg-neutral-50 dark:bg-neutral-900">
+    <!--section class="section bg-neutral-50 dark:bg-neutral-900">
       <div class="container-custom">
         <div class="h-96 bg-neutral-200 dark:bg-neutral-700 rounded-2xl flex items-center justify-center">
           <p class="text-neutral-500 dark:text-neutral-400">Map Placeholder</p>
         </div>
       </div>
-    </section>
+    </section-->
+    
   </div>
 </template>
 

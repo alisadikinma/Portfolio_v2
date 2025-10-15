@@ -24,7 +24,7 @@ class ProjectSeeder extends Seeder
                 'completed_at' => '2024-06-30',
                 'featured' => true,
                 'published' => true,
-                'order' => 1,
+                'sort_order' => 1,
                 'translations' => [
                     'en' => [
                         'title' => 'E-commerce Platform',
@@ -62,7 +62,7 @@ class ProjectSeeder extends Seeder
                 'completed_at' => null,
                 'featured' => false,
                 'published' => true,
-                'order' => 2,
+                'sort_order' => 2,
                 'translations' => [
                     'en' => [
                         'title' => 'Task Management Application',

@@ -17,7 +17,7 @@ class PostSeeder extends Seeder
                 'name' => 'Web Development',
                 'description' => 'Articles about web development, frameworks, and best practices',
                 'color' => '#3B82F6',
-                'order' => 1,
+                'sort_order' => 1,
             ]
         );
 
@@ -27,7 +27,7 @@ class PostSeeder extends Seeder
                 'name' => 'Tutorials',
                 'description' => 'Step-by-step guides and tutorials',
                 'color' => '#10B981',
-                'order' => 2,
+                'sort_order' => 2,
             ]
         );
 

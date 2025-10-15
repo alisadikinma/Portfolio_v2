@@ -1,7 +1,7 @@
 <template>
   <div class="min-h-screen">
     <!-- Hero Section - Clean & Professional -->
-    <section class="relative pt-32 pb-20 md:pt-40 md:pb-32 bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-950">
+    <section class="relative pt-32 pb-8 md:pt-40 md:pb-12 bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-950">
       <!-- Subtle Background Pattern -->
       <div class="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]">
         <div class="absolute inset-0" style="background-image: radial-gradient(circle, #6366f1 1px, transparent 1px); background-size: 30px 30px;"></div>
@@ -73,7 +73,7 @@
     </section>
 
     <!-- Stats Section - Clean Cards -->
-    <section class="py-20 bg-white dark:bg-gray-950">
+    <section class="py-12 bg-white dark:bg-gray-950">
       <div class="container-custom">
         <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
           <div

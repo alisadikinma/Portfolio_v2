@@ -28,7 +28,7 @@
             <h1 class="text-4xl md:text-5xl lg:text-6xl font-display font-bold mb-6">
               {{ post.title }}
             </h1>
-            <div class="flex items-center gap-4 text-neutral-600 dark:text-neutral-400">
+            <div class="flex items-center gap-2 text-neutral-600 dark:text-neutral-400">
               <span>{{ formatDate(post.published_at) }}</span>
               <span>•</span>
               <span>{{ post.read_time }} min read</span>
@@ -40,13 +40,13 @@
       </section>
 
       <!-- Featured Image -->
-      <section class="section bg-neutral-50 dark:bg-neutral-900">
+      <!--section class="section bg-neutral-50 dark:bg-neutral-900">
         <div class="container-custom">
           <div class="max-w-5xl mx-auto">
             <div class="aspect-video bg-neutral-200 dark:bg-neutral-700 rounded-2xl"></div>
           </div>
         </div>
-      </section>
+      </section-->
 
       <!-- Post Content -->
       <section class="section bg-white dark:bg-neutral-800">
@@ -119,7 +119,7 @@
       <!-- Related Posts -->
       <section class="section bg-neutral-50 dark:bg-neutral-900">
         <div class="container-custom">
-          <div class="text-center mb-12">
+          <div class="text-left mb-12">
             <h2 class="text-3xl md:text-4xl font-display font-bold mb-4">Related Posts</h2>
           </div>
           <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
@@ -140,6 +140,7 @@
           </div>
         </div>
       </section>
+      <div>&nbsp;</div>
     </article>
   </div>
 </template>
