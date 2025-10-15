@@ -113,6 +113,36 @@ export const useSettingsStore = defineStore('settings', {
       }
     },
 
+    async updateSiteSettings(settingsData) {
+      this.loading = true
+      this.error = null
+
+      try {
+        // If settingsData is FormData, set proper headers
+        const config = settingsData instanceof FormData ? {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        } : {}
+
+        const response = await api.put('/admin/settings/site', settingsData, config)
+
+        if (response.data.success) {
+          this.siteSettings = {
+            ...this.siteSettings,
+            ...response.data.data
+          }
+        }
+
+        return this.siteSettings
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to update site settings'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
     clearError() {
       this.error = null
     }

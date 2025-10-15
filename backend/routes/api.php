@@ -147,4 +147,5 @@ Route::middleware(['auth:sanctum'])->prefix('admin/settings')->group(function ()
     Route::get('/about', [SettingsController::class, 'getAboutSettings']);
     Route::put('/about', [SettingsController::class, 'updateAboutSettings']);
     Route::get('/site', [SettingsController::class, 'getSiteSettings']);
+    Route::put('/site', [SettingsController::class, 'updateSiteSettings']);
 });
