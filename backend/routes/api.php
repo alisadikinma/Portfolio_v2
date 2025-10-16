@@ -81,6 +81,9 @@ Route::prefix('settings')->group(function () {
     Route::get('/{group}', [SettingController::class, 'getByGroup']);
 });
 
+// Health check
+Route::get('/health', fn() => response()->json(['status' => 'ok', 'timestamp' => now()]));
+
 // ============================================
 // Admin API Routes (Protected)
 // ============================================
