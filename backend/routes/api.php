@@ -12,6 +12,9 @@ use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\TestimonialController;
 use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\SettingsController;
+use App\Http\Controllers\Api\AutomationController;
+use App\Http\Controllers\Api\TokenController;
+use App\Http\Controllers\Api\SitemapController;
 
 // ============================================
 // Authentication Routes
@@ -80,6 +83,12 @@ Route::prefix('settings')->group(function () {
     Route::get('/', [SettingController::class, 'index']);
     Route::get('/{group}', [SettingController::class, 'getByGroup']);
 });
+
+// SEO Sitemap Routes
+Route::get('/sitemap.xml', [SitemapController::class, 'index'])->name('sitemap');
+Route::get('/sitemap-index.xml', [SitemapController::class, 'sitemapIndex'])->name('sitemap.index');
+Route::get('/sitemap-posts.xml', [SitemapController::class, 'posts'])->name('sitemap.posts');
+Route::get('/sitemap-projects.xml', [SitemapController::class, 'projects'])->name('sitemap.projects');
 
 // Health check
 Route::get('/health', fn() => response()->json(['status' => 'ok', 'timestamp' => now()]));
@@ -162,4 +171,35 @@ Route::middleware(['auth:sanctum'])->prefix('admin/settings')->group(function ()
     Route::put('/about', [SettingsController::class, 'updateAboutSettings']);
     Route::get('/site', [SettingsController::class, 'getSiteSettings']);
     Route::put('/site', [SettingsController::class, 'updateSiteSettings']);
+});
+
+// ============================================
+// Automation API Routes (n8n, Zapier, Make.com)
+// ============================================
+Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->group(function () {
+    // Posts endpoints
+    Route::get('/posts', [AutomationController::class, 'getPosts']);
+    Route::get('/posts/{id}', [AutomationController::class, 'getPost']);
+    Route::post('/posts', [AutomationController::class, 'createPost']);
+    Route::put('/posts/{id}', [AutomationController::class, 'updatePost']);
+    Route::delete('/posts/{id}', [AutomationController::class, 'deletePost']);
+    Route::post('/posts/bulk', [AutomationController::class, 'bulkCreatePosts']);
+
+    // Categories endpoint
+    Route::get('/categories', [AutomationController::class, 'getCategories']);
+
+    // Webhook endpoint
+    Route::post('/webhook/published', [AutomationController::class, 'postPublishedWebhook']);
+});
+
+// Admin Automation Management Routes
+Route::middleware(['auth:sanctum'])->prefix('admin/automation')->group(function () {
+    // Token management
+    Route::get('/tokens', [TokenController::class, 'index']);
+    Route::post('/tokens', [TokenController::class, 'store']);
+    Route::delete('/tokens/{id}', [TokenController::class, 'destroy']);
+
+    // Logs management
+    Route::get('/logs', [TokenController::class, 'logs']);
+    Route::delete('/logs', [TokenController::class, 'clearLogs']);
 });

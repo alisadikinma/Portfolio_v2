@@ -1,2 +1,71 @@
+# SEO Robots Configuration for Portfolio_v2
+# Last Updated: October 16, 2025
+
+# Allow all bots to crawl the site
 User-agent: *
-Disallow:
+Allow: /
+
+# Specific rules for Google
+User-agent: Googlebot
+Allow: /
+Crawl-delay: 0
+
+# Specific rules for Bing
+User-agent: Bingbot
+Allow: /
+Crawl-delay: 1
+
+# Disallow admin and sensitive areas
+User-agent: *
+Disallow: /admin/
+Disallow: /_debug/
+Disallow: /config/
+Disallow: /.env
+Disallow: /storage/
+Disallow: /vendor/
+Disallow: /bootstrap/
+
+# Disallow common spam/junk patterns
+Disallow: /*?*sort=
+Disallow: /*?*filter=
+Disallow: /*?*page=*&sort=
+Disallow: /search?
+Disallow: /login
+Disallow: /register
+
+# Block bad bots
+User-agent: MJ12bot
+Disallow: /
+
+User-agent: AhrefsBot
+Disallow: /
+
+User-agent: SemrushBot
+Disallow: /
+
+User-agent: DotBot
+Disallow: /
+
+# Sitemaps
+Sitemap: https://example.com/api/sitemap.xml
+Sitemap: https://example.com/api/sitemap-index.xml
+Sitemap: https://example.com/api/sitemap-posts.xml
+Sitemap: https://example.com/api/sitemap-projects.xml
+
+# Crawl delay for other bots (in seconds)
+Crawl-delay: 1
+Request-rate: 30/60
+
+# User agents allowed for search engines
+User-agent: Slurp
+Allow: /
+
+User-agent: msnbot
+Allow: /
+
+User-agent: DuckDuckBot
+Allow: /
+
+# Cache directive for CDNs
+User-agent: *
+Cache-Control: public, max-age=2592000

@@ -1,0 +1,10 @@
+# Frontend robots.txt
+# Redirect all crawler requests to backend
+
+User-agent: *
+Allow: /
+Disallow: /admin
+
+# Sitemaps (served from backend)
+Sitemap: http://localhost/Portfolio_v2/backend/public/sitemap.xml
+Sitemap: http://localhost/Portfolio_v2/backend/public/sitemap-index.xml

@@ -293,7 +293,39 @@ const routes = [
       layout: 'admin'
     }
   },
-  
+
+  // Automation (n8n Integration)
+  {
+    path: '/admin/automation/tokens',
+    name: 'admin-automation-tokens',
+    component: () => import('@/views/admin/AutomationTokens.vue'),
+    meta: {
+      title: 'API Tokens - Admin',
+      requiresAuth: true,
+      layout: 'admin'
+    }
+  },
+  {
+    path: '/admin/automation/logs',
+    name: 'admin-automation-logs',
+    component: () => import('@/views/admin/AutomationLogs.vue'),
+    meta: {
+      title: 'Automation Logs - Admin',
+      requiresAuth: true,
+      layout: 'admin'
+    }
+  },
+  {
+    path: '/admin/automation/docs',
+    name: 'admin-automation-docs',
+    component: () => import('@/views/admin/AutomationDocs.vue'),
+    meta: {
+      title: 'API Documentation - Admin',
+      requiresAuth: true,
+      layout: 'admin'
+    }
+  },
+
   {
     path: '/:pathMatch(.*)*',
     name: 'not-found',

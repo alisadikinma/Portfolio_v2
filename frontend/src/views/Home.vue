@@ -22,14 +22,13 @@
 
           <!-- Main Heading -->
           <h1 class="text-5xl md:text-6xl lg:text-7xl font-display font-bold text-gray-900 dark:text-white mb-6 leading-tight animate-fade-in-up">
-            Creative Developer & <br />
-            <span class="text-gradient">Digital Designer</span>
+            {{ heroName }} <br v-if="heroTitle" />
+            <span v-if="heroTitle" class="text-gradient">{{ heroTitle }}</span>
           </h1>
 
           <!-- Subtitle -->
           <p class="text-xl md:text-2xl text-gray-600 dark:text-gray-400 mb-10 max-w-2xl mx-auto leading-relaxed animate-fade-in-up animate-delay-100">
-            I craft exceptional digital experiences through modern design
-            and innovative solutions that drive real results.
+            {{ heroBio }}
           </p>
 
           <!-- CTA Buttons -->
@@ -53,18 +52,18 @@
             </button>
           </div>
 
-          <!-- Tech Stack -->
-          <div class="animate-fade-in-up animate-delay-300">
+          <!-- Tech Stack / Skills -->
+          <div v-if="heroSkills.length > 0" class="animate-fade-in-up animate-delay-300">
             <p class="text-sm text-gray-500 dark:text-gray-500 mb-4 uppercase tracking-wider">
-              Tech Stack
+              {{ aboutSettings?.skills ? 'Skills' : 'Tech Stack' }}
             </p>
             <div class="flex flex-wrap justify-center gap-3">
               <span
-                v-for="tech in techStack"
-                :key="tech"
+                v-for="skill in heroSkills.slice(0, 8)"
+                :key="skill"
                 class="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:border-primary-500 hover:text-primary-600 dark:hover:text-primary-400 transition-all"
               >
-                {{ tech }}
+                {{ skill }}
               </span>
             </div>
           </div>
@@ -553,7 +552,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useProjects } from '@/composables/useProjects'
 import { usePosts } from '@/composables/usePosts'
 import { useAwards } from '@/composables/useAwards'
@@ -567,16 +566,42 @@ const { awards, isLoading: awardsLoading, fetchAwards } = useAwards()
 const { testimonials, isLoading: testimonialsLoading, fetchTestimonials } = useTestimonials()
 const currentTestimonialIndex = ref(0)
 
-const stats = [
+// About settings state
+const aboutSettings = ref(null)
+const loadingAbout = ref(false)
+
+// Computed properties for hero section
+const heroName = computed(() => aboutSettings.value?.name || 'Creative Developer')
+const heroTitle = computed(() => aboutSettings.value?.title || 'Digital Designer')
+const heroBio = computed(() => aboutSettings.value?.bio || 'I craft exceptional digital experiences through modern design and innovative solutions that drive real results.')
+const heroAvatar = computed(() => aboutSettings.value?.profile_photo || null)
+const heroSkills = computed(() => aboutSettings.value?.skills || [
+  'Vue.js', 'React', 'Laravel', 'Node.js', 'TypeScript', 'TailwindCSS', 'MySQL', 'Docker'
+])
+
+const stats = ref([
   { value: '50+', label: 'Projects' },
   { value: '100+', label: 'Articles' },
   { value: '200+', label: 'Clients' },
   { value: '5+', label: 'Years' }
-]
+])
 
-const techStack = [
-  'Vue.js', 'React', 'Laravel', 'Node.js', 'TypeScript', 'TailwindCSS', 'MySQL', 'Docker'
-]
+// Fetch About settings
+const fetchAboutSettings = async () => {
+  loadingAbout.value = true
+  try {
+    // Try public endpoint first
+    const response = await api.get('/settings/about')
+    if (response.data.success) {
+      aboutSettings.value = response.data.data
+    }
+  } catch (error) {
+    console.error('Failed to load about settings:', error)
+    // Use defaults if API fails
+  } finally {
+    loadingAbout.value = false
+  }
+}
 
 const formatDate = (date) => {
   if (!date) return ''
@@ -632,11 +657,14 @@ const rotateTestimonials = () => {
 let testimonialInterval
 
 onMounted(async () => {
+  // Fetch about settings for hero section
+  await fetchAboutSettings()
+
   await fetchProjects({ featured: true, limit: 4 })
   await fetchPosts({ limit: 3 })
   await fetchAwards({ featured: true, limit: 6 })
   await fetchTestimonials({ featured: true, limit: 5 })
-  
+
   // Start testimonial rotation
   testimonialInterval = setInterval(rotateTestimonials, 5000)
 })
