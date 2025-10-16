@@ -1,6 +1,10 @@
 import { defineStore } from 'pinia'
 import api from '@/services/api'
 
+export const useProjects = () => {
+  return useProjectsStore()
+}
+
 export const useProjectsStore = defineStore('projects', {
   state: () => ({
     projects: [],
@@ -51,12 +55,22 @@ export const useProjectsStore = defineStore('projects', {
       }
     },
 
-    async fetchProject(id) {
+    async fetchProject(idOrSlug) {
       this.loading = true
       this.error = null
 
       try {
-        const response = await api.get(`/admin/projects/${id}`)
+        // Check if it's a slug (string) or ID (number)
+        let endpoint
+        if (typeof idOrSlug === 'string') {
+          // It's a slug, use public API
+          endpoint = `/projects/${idOrSlug}`
+        } else {
+          // It's an ID, use admin API
+          endpoint = `/admin/projects/${idOrSlug}`
+        }
+
+        const response = await api.get(endpoint)
         this.currentProject = response.data.data
         return this.currentProject
       } catch (error) {

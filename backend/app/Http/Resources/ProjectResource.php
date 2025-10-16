@@ -69,6 +69,25 @@ class ProjectResource extends JsonResource
             'available_translations' => $this->translations->pluck('language')->toArray(),
             'current_language' => $language,
 
+            // CTA Section
+            'cta' => [
+                'title' => $this->cta_title,
+                'description' => $this->cta_description,
+                'button_text' => $this->cta_button_text,
+                'phone_number' => $this->cta_phone_number,
+                'has_cta' => $this->hasCta(),
+            ],
+
+            // Related Projects
+            'related_projects' => $this->related_project_ids ? 
+                collect($this->getRelatedProjects())->map(fn($p) => [
+                    'id' => $p->id,
+                    'title' => $p->title,
+                    'slug' => $p->slug,
+                    'featured_image' => $p->featured_image ? asset('storage/' . $p->featured_image) : null,
+                    'description' => $p->description,
+                ])->toArray() : [],
+
             // Timestamps
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),

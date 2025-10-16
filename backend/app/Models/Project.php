@@ -33,14 +33,31 @@ class Project extends Model
         'cta_description',
         'cta_button_text',
         'cta_phone_number',
+        'related_project_ids',
     ];
 
     protected $casts = [
         'technologies' => 'array',
+        'related_project_ids' => 'array',
         'start_date' => 'date',
         'end_date' => 'date',
         'is_featured' => 'boolean',
     ];
+
+    /**
+     * Get related projects
+     */
+    public function getRelatedProjects($limit = 3)
+    {
+        if (!$this->related_project_ids || count($this->related_project_ids) === 0) {
+            return collect();
+        }
+
+        return self::whereIn('id', $this->related_project_ids)
+            ->where('id', '!=', $this->id)
+            ->limit($limit)
+            ->get();
+    }
 
     /**
      * Check if project has CTA

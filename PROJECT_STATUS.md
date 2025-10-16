@@ -1,8 +1,8 @@
 # PROJECT STATUS - Portfolio v2
 
 **Last Updated:** October 16, 2025
-**Overall Progress:** 100% (Sprint 12 of 12 Complete) 🎉
-**Status:** Production Ready - All Sprints Complete ✅
+**Overall Progress:** Phase 6: 100% Complete ✅ | Phase 7: 0% (Starting) 🚀
+**Status:** Phase 6 Production Ready | Phase 7 Initiated
 
 ---
 
@@ -1326,6 +1326,195 @@ protected function prepareForValidation(): void {
   
 - ✅ **Posts Store** (`stores/posts.js`)
 - ✅ **Categories Store** (`stores/categories.js`)
+
+---
+
+---
+
+## 🚀 Phase 7: Menu & Section Management + Project CTA
+**Status:** 🔴 NOT STARTED (Starting October 16, 2025)
+**Complexity:** High (Database + Backend + Frontend Integration)
+**Duration:** 2 Sprints (35-40 hours)
+**Type:** Feature Enhancement
+
+### Phase 7 Sprint Overview
+
+| Sprint | Feature | Progress | Status | Complexity |
+|--------|---------|----------|--------|------------|
+| **13** | **Menu Items Management** | **0%** | **🔴 NOT STARTED** | **High** |
+| **14** | **Homepage Sections Manager + Project CTA** | **0%** | **🔴 NOT STARTED** | **High** |
+
+---
+
+### 🎯 Phase 7 Objective
+
+Enable admin to:
+1. **Control Navigation Menu** - Activate/deactivate menu items, reorder in navbar
+2. **Control Homepage Sections** - Activate/deactivate sections, drag-n-drop reorder with live preview
+3. **Add Project CTAs** - Each project detail shows contextual call-to-action for contact/inquiry
+
+### 📋 Phase 7 Requirements
+
+**Menu Management:**
+- [ ] Admin view all menu items (Home, About, Projects, Awards, Blog, Gallery, Contact)
+- [ ] Toggle active/inactive per item
+- [ ] Drag-n-drop reorder menu sequence
+- [ ] Edit title, url, icon per menu item
+- [ ] Support custom external URLs
+- [ ] Changes reflect immediately in navbar
+
+**Homepage Sections Management:**
+- [ ] Seed initial sections (Hero, Featured Projects, Latest Blog, Testimonials, CTA)
+- [ ] Admin toggle active/inactive
+- [ ] Drag-n-drop reorder sections
+- [ ] **Preview Modal** - show homepage preview with active sections only
+- [ ] Save reorder changes to database
+- [ ] Homepage renders dynamically based on `is_active` & `sequence`
+
+**Project CTA:**
+- [ ] Add CTA fields: `cta_title`, `cta_description`, `cta_button_text`, `cta_phone_number` to projects table
+- [ ] Admin edit CTA during create/edit project
+- [ ] Project detail page displays CTA section
+- [ ] Professional, clear call-to-action design
+
+### 🏗️ Phase 7 Architecture
+
+**Backend Deliverables:**
+- ✅ **Models** (planned)
+  - MenuItem.php - Active/sequence management
+  - PageSection.php - Section type + sequence
+  - Project.php updates - CTA fields
+
+- ✅ **Controllers** (planned)
+  - MenuItemController - CRUD + reorder
+  - PageSectionController - Toggle + reorder
+  - ProjectController update - CTA fields
+
+- ✅ **Database** (planned)
+  - menu_items table (id, title, slug, url, icon, is_active, sequence)
+  - page_sections table (id, page_type, section_type, is_active, sequence)
+  - projects table - add CTA columns
+
+- ✅ **API Endpoints** (planned)
+  - GET /api/menu-items (public, active only)
+  - GET/POST/PUT/DELETE /api/admin/menu-items (admin CRUD)
+  - PUT /api/admin/menu-items/reorder (bulk reorder)
+  - GET /api/page-sections?page=homepage (public, active only)
+  - GET/PUT /api/admin/page-sections (admin)
+  - PUT /api/admin/page-sections/reorder (bulk reorder)
+
+**Frontend Deliverables:**
+- ✅ **Admin Pages** (planned)
+  - MenuItemsList.vue - Menu management with drag-drop
+  - PageSectionsManager.vue - Sections manager with live preview
+
+- ✅ **Components** (planned)
+  - DragDropList.vue - Reusable drag-drop component
+  - SectionPreview.vue - Preview modal
+  - ProjectCTA.vue - CTA display on project detail
+
+- ✅ **Integration** (planned)
+  - DefaultLayout.vue updates - Fetch/render active menu items
+  - Home.vue updates - Fetch/render active sections dynamically
+  - ProjectDetail.vue updates - Show CTA section
+  - Router updates - Menu & Sections admin routes
+
+### 👥 Phase 7 Specialist Breakdown
+
+**@laravel-specialist.md** - Backend API (8-10 hours)
+- Models: MenuItem, PageSection, Project updates
+- Controllers: CRUD + reorder endpoints
+- Form Requests: Validation rules
+- API Resources: Response formatting
+- Routes: API endpoint configuration
+- Tests: TDD workflow
+
+**@vue-expert.md** - Frontend Admin Pages (13-16 hours)
+- Reusable components (DragDropList, SectionPreview, ProjectCTA)
+- Admin pages (MenuItemsList, PageSectionsManager)
+- Composables (useMenuItems, usePageSections)
+- Layout integration (navbar, homepage, project detail)
+- Router configuration
+- Tests: Playwright browser automation
+
+**@qa-expert.md** - Testing & QA (6-8 hours)
+- Backend feature tests (TDD)
+- Frontend browser tests (Playwright)
+- Integration tests (end-to-end)
+- Performance testing
+- Accessibility testing
+- Error handling testing
+
+**@documentation-engineer.md** - Documentation (5 hours)
+- API endpoint documentation
+- Component documentation
+- Integration guides
+- README updates
+- Developer guide
+
+### 🔌 Phase 7 API Endpoints
+
+```
+# Menu Items
+GET    /api/menu-items                    # Public: Active items only
+GET    /api/admin/menu-items              # List all
+POST   /api/admin/menu-items              # Create
+PUT    /api/admin/menu-items/{id}         # Update
+DELETE /api/admin/menu-items/{id}         # Delete
+PUT    /api/admin/menu-items/reorder      # Bulk reorder
+
+# Page Sections
+GET    /api/page-sections?page=homepage   # Public: Active sections
+GET    /api/admin/page-sections           # Admin: List all
+PUT    /api/admin/page-sections/{id}      # Toggle active/sequence
+PUT    /api/admin/page-sections/reorder   # Bulk reorder
+
+# Projects (updated)
+GET    /api/projects/{slug}               # Include cta_* fields
+PUT    /api/admin/projects/{id}           # Can update cta_* fields
+```
+
+### ✅ Phase 7 Success Criteria
+
+**Functionality:**
+- [ ] Admin manage menu items (CRUD + reorder)
+- [ ] Admin manage sections (toggle + reorder)
+- [ ] Preview modal shows homepage real-time
+- [ ] Menu navbar reflects active items only
+- [ ] Homepage renders sections dynamically
+- [ ] Project detail shows CTA section
+- [ ] All changes persist to database
+
+**Quality:**
+- [ ] 80%+ test coverage
+- [ ] All tests green
+- [ ] No console errors
+- [ ] Responsive design (mobile/tablet/desktop)
+- [ ] Smooth drag-drop UX
+- [ ] Proper error handling
+
+**Performance:**
+- [ ] Menu items load < 200ms
+- [ ] Sections reorder without page refresh
+- [ ] Preview modal renders < 500ms
+
+### 📅 Phase 7 Timeline
+
+**Sprint 13 (Backend API):** ~12-14 hours
+- @laravel-specialist.md: Models + Controllers + Routes + Tests
+- @qa-expert.md: TDD coordination + Backend tests
+- Database schema seeding
+
+**Sprint 14 (Frontend + Integration):** ~21-24 hours
+- @vue-expert.md: Admin pages + Components + Integration
+- @qa-expert.md: Frontend tests + Integration tests
+- @documentation-engineer.md: API & component docs
+
+**Total: ~35-40 hours**
+
+### 🔗 Phase 7 Reference Files
+- `.claude/prompts/phase-7_menu-section-management_20251016-1245.md` - Complete sprint details
+- `backend/database/sql/phase-7-menu-sections-cta-schema.sql` - SQL schema (to be executed)
 
 ---
 

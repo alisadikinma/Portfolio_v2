@@ -44,6 +44,14 @@ class UpdateProjectRequest extends FormRequest
             'meta_description' => ['nullable', 'string', 'max:160'],
             'focus_keyword' => ['nullable', 'string', 'max:100'],
             'canonical_url' => ['nullable', 'url', 'max:255'],
+
+            // CTA fields
+            'cta_title' => ['nullable', 'string', 'max:255'],
+            'cta_description' => ['nullable', 'string', 'max:1000'],
+            'cta_button_text' => ['nullable', 'string', 'max:100'],
+            'cta_phone_number' => ['nullable', 'string', 'max:20'],
+            'related_project_ids' => ['nullable', 'array'],
+            'related_project_ids.*' => ['integer', 'exists:projects,id'],
         ];
     }
 
@@ -65,6 +73,12 @@ class UpdateProjectRequest extends FormRequest
             'end_date.after_or_equal' => 'End date must be after or equal to start date',
             'meta_title.max' => 'Meta title must not exceed 60 characters',
             'meta_description.max' => 'Meta description must not exceed 160 characters',
+            'cta_title.max' => 'CTA title must not exceed 255 characters',
+            'cta_description.max' => 'CTA description must not exceed 1000 characters',
+            'cta_button_text.max' => 'CTA button text must not exceed 100 characters',
+            'cta_phone_number.max' => 'CTA phone number must not exceed 20 characters',
+            'related_project_ids.array' => 'Related project IDs must be an array',
+            'related_project_ids.*.exists' => 'One or more selected projects do not exist',
         ];
     }
 }

@@ -302,6 +302,155 @@
       </div>
     </div>
 
+    <!-- CTA Section (Collapsible) -->
+    <div class="border border-neutral-200 dark:border-neutral-700 rounded-lg overflow-hidden">
+      <button
+        type="button"
+        @click="showCtaSection = !showCtaSection"
+        class="w-full px-4 py-3 bg-neutral-50 dark:bg-neutral-800 flex items-center justify-between hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
+      >
+        <div class="flex items-center gap-2">
+          <svg class="w-5 h-5 text-neutral-600 dark:text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5-4a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
+          <span class="font-medium text-neutral-900 dark:text-neutral-100">Call-to-Action (CTA)</span>
+          <span class="text-sm text-neutral-500 dark:text-neutral-400">(Optional)</span>
+        </div>
+        <svg
+          class="w-5 h-5 text-neutral-600 dark:text-neutral-400 transition-transform"
+          :class="{ 'rotate-180': showCtaSection }"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      <div v-show="showCtaSection" class="p-4 space-y-4 bg-white dark:bg-neutral-900">
+        <!-- CTA Title -->
+        <div>
+          <BaseInput
+            v-model="formData.cta_title"
+            label="CTA Title"
+            type="text"
+            placeholder="e.g., 'Transform Your Business' or 'Ready for the next level?'"
+            :error="errors.cta_title"
+            @blur="validateField('cta_title')"
+          >
+            <template #help>
+              Catchy headline to grab attention
+            </template>
+          </BaseInput>
+        </div>
+
+        <!-- CTA Description -->
+        <div>
+          <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+            CTA Description
+          </label>
+          <textarea
+            v-model="formData.cta_description"
+            rows="3"
+            placeholder="Describe how this solution can help the user. Be specific about benefits."
+            class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+            :class="{ 'border-red-500': errors.cta_description }"
+            @blur="validateField('cta_description')"
+          ></textarea>
+          <p v-if="errors.cta_description" class="mt-1 text-sm text-red-600 dark:text-red-400">
+            {{ errors.cta_description }}
+          </p>
+        </div>
+
+        <!-- CTA Button Text and Phone -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <BaseInput
+              v-model="formData.cta_button_text"
+              label="Button Text"
+              type="text"
+              placeholder="e.g., 'Get Started', 'Contact Us', 'Schedule a Call'"
+              :error="errors.cta_button_text"
+              @blur="validateField('cta_button_text')"
+            />
+          </div>
+
+          <div>
+            <BaseInput
+              v-model="formData.cta_phone_number"
+              label="Phone/Email"
+              type="text"
+              placeholder="+62-812-xxxx-xxxx or email@example.com"
+              :error="errors.cta_phone_number"
+              @blur="validateField('cta_phone_number')"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Related Projects Section (Collapsible) -->
+    <div class="border border-neutral-200 dark:border-neutral-700 rounded-lg overflow-hidden">
+      <button
+        type="button"
+        @click="showRelatedProjectsSection = !showRelatedProjectsSection"
+        class="w-full px-4 py-3 bg-neutral-50 dark:bg-neutral-800 flex items-center justify-between hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
+      >
+        <div class="flex items-center gap-2">
+          <svg class="w-5 h-5 text-neutral-600 dark:text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          <span class="font-medium text-neutral-900 dark:text-neutral-100">Related Projects</span>
+          <span class="text-sm text-neutral-500 dark:text-neutral-400">(Optional)</span>
+        </div>
+        <svg
+          class="w-5 h-5 text-neutral-600 dark:text-neutral-400 transition-transform"
+          :class="{ 'rotate-180': showRelatedProjectsSection }"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      <div v-show="showRelatedProjectsSection" class="p-4 space-y-4 bg-white dark:bg-neutral-900">
+        <!-- Related Projects List -->
+        <div>
+          <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-3">
+            Select Related Projects
+          </label>
+          <div class="space-y-2 max-h-64 overflow-y-auto border border-neutral-200 dark:border-neutral-700 rounded-lg p-3 bg-neutral-50 dark:bg-neutral-800">
+            <div v-if="availableProjects.length === 0" class="text-sm text-neutral-500 dark:text-neutral-400 py-4 text-center">
+              No other projects available
+            </div>
+            <div
+              v-for="project in availableProjects"
+              :key="project.id"
+              class="flex items-center gap-2"
+            >
+              <input
+                :id="`project-${project.id}`"
+                type="checkbox"
+                :checked="formData.related_project_ids.includes(project.id)"
+                @change="toggleRelatedProject(project.id)"
+                class="w-4 h-4 text-primary-600 bg-white dark:bg-neutral-700 border-neutral-300 dark:border-neutral-600 rounded focus:ring-primary-500 focus:ring-2 cursor-pointer"
+              />
+              <label
+                :for="`project-${project.id}`"
+                class="text-sm text-neutral-700 dark:text-neutral-300 cursor-pointer flex-1 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+              >
+                {{ project.title }}
+              </label>
+            </div>
+          </div>
+          <p class="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
+            {{ formData.related_project_ids.length }} project(s) selected (Max 5 recommended)
+          </p>
+        </div>
+      </div>
+    </div>
+
     <!-- Form Actions -->
     <div class="flex items-center justify-end gap-4 pt-6 border-t border-neutral-200 dark:border-neutral-700">
       <BaseButton
@@ -326,7 +475,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import RichTextEditor from '@/components/blog/RichTextEditor.vue'
@@ -371,7 +520,8 @@ const formData = ref({
   cta_title: '',
   cta_description: '',
   cta_button_text: '',
-  cta_phone_number: ''
+  cta_phone_number: '',
+  related_project_ids: []
 })
 
 // Form errors
@@ -380,7 +530,9 @@ const errors = ref({})
 // UI state
 const showSeoSection = ref(false)
 const showCtaSection = ref(false)
+const showRelatedProjectsSection = ref(false)
 const newTechnology = ref('')
+const allProjects = ref([])
 
 // Initialize form with project data if editing
 if (props.project) {
@@ -405,7 +557,8 @@ if (props.project) {
     cta_title: props.project.cta_title || '',
     cta_description: props.project.cta_description || '',
     cta_button_text: props.project.cta_button_text || '',
-    cta_phone_number: props.project.cta_phone_number || ''
+    cta_phone_number: props.project.cta_phone_number || '',
+    related_project_ids: props.project.related_project_ids || []
   }
 }
 
@@ -444,6 +597,11 @@ const metaDescriptionClass = computed(() => {
   return 'text-red-600 dark:text-red-400'
 })
 
+// Available projects (excluding current project)
+const availableProjects = computed(() => {
+  return allProjects.value.filter(p => !props.project || p.id !== props.project.id)
+})
+
 // Add technology
 function addTechnology() {
   const tech = newTechnology.value.trim()
@@ -457,6 +615,32 @@ function addTechnology() {
 // Remove technology
 function removeTechnology(index) {
   formData.value.technologies.splice(index, 1)
+}
+
+// Toggle related project
+function toggleRelatedProject(projectId) {
+  const index = formData.value.related_project_ids.indexOf(projectId)
+  if (index > -1) {
+    formData.value.related_project_ids.splice(index, 1)
+  } else {
+    // Limit to 5 related projects
+    if (formData.value.related_project_ids.length < 5) {
+      formData.value.related_project_ids.push(projectId)
+    }
+  }
+}
+
+// Load all projects for selection
+const loadProjects = async () => {
+  try {
+    const response = await fetch('/api/projects')
+    const data = await response.json()
+    if (data.success) {
+      allProjects.value = data.data || []
+    }
+  } catch (error) {
+    console.error('Failed to load projects:', error)
+  }
 }
 
 // Validate single field
@@ -618,6 +802,13 @@ function handleSubmit() {
     submissionData.append('cta_phone_number', formData.value.cta_phone_number.trim())
   }
 
+  // Add related project IDs
+  if (formData.value.related_project_ids.length > 0) {
+    formData.value.related_project_ids.forEach((id, index) => {
+      submissionData.append(`related_project_ids[${index}]`, id)
+    })
+  }
+
   // Add featured image if changed
   if (formData.value.featured_image) {
     submissionData.append('featured_image', formData.value.featured_image)
@@ -635,6 +826,11 @@ function handleSubmit() {
 function handleCancel() {
   emit('cancel')
 }
+
+// Fetch projects on mount
+onMounted(() => {
+  loadProjects()
+})
 </script>
 
 <style scoped>
