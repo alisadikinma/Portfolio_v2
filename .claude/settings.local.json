@@ -10,7 +10,8 @@
       "Bash(timeout:*)",
       "Bash(curl:*)",
       "Bash(env)",
-      "Bash(del \"database\\migrations\\2025_10_15_100000_update_projects_table_for_new_fields.php\")"
+      "Bash(del \"database\\migrations\\2025_10_15_100000_update_projects_table_for_new_fields.php\")",
+      "Bash(npm install:*)"
     ],
     "deny": [],
     "ask": []

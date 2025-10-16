@@ -25,6 +25,8 @@ class DatabaseSeeder extends Seeder
             AwardGallerySeeder::class,
             NewsletterSeeder::class,
             ContactSeeder::class,
+            MenuItemSeeder::class,
+            PageSectionSeeder::class,
         ]);
 
         $this->command->info('✅ Database seeding completed successfully!');

@@ -15,6 +15,8 @@ use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\AutomationController;
 use App\Http\Controllers\Api\TokenController;
 use App\Http\Controllers\Api\SitemapController;
+use App\Http\Controllers\Api\MenuItemController;
+use App\Http\Controllers\Api\PageSectionController;
 
 // ============================================
 // Authentication Routes
@@ -92,6 +94,12 @@ Route::get('/sitemap-projects.xml', [SitemapController::class, 'projects'])->nam
 
 // Health check
 Route::get('/health', fn() => response()->json(['status' => 'ok', 'timestamp' => now()]));
+
+// Public Menu Items Routes (for navbar)
+Route::get('/menu-items', [MenuItemController::class, 'publicMenuItems']);
+
+// Public Page Sections Routes (for page rendering)
+Route::get('/page-sections', [PageSectionController::class, 'publicSections']);
 
 // ============================================
 // Admin API Routes (Protected)
@@ -171,6 +179,24 @@ Route::middleware(['auth:sanctum'])->prefix('admin/settings')->group(function ()
     Route::put('/about', [SettingsController::class, 'updateAboutSettings']);
     Route::get('/site', [SettingsController::class, 'getSiteSettings']);
     Route::put('/site', [SettingsController::class, 'updateSiteSettings']);
+});
+
+// Admin Menu Items Routes
+Route::middleware(['auth:sanctum'])->prefix('admin/menu-items')->group(function () {
+    Route::get('/', [MenuItemController::class, 'index']);
+    Route::post('/', [MenuItemController::class, 'store']);
+    // IMPORTANT: Specific routes must come BEFORE generic {id} routes
+    Route::put('/reorder', [MenuItemController::class, 'reorder']);
+    Route::put('/{id}', [MenuItemController::class, 'update']);
+    Route::delete('/{id}', [MenuItemController::class, 'destroy']);
+});
+
+// Admin Page Sections Routes
+Route::middleware(['auth:sanctum'])->prefix('admin/page-sections')->group(function () {
+    Route::get('/', [PageSectionController::class, 'index']);
+    // IMPORTANT: Specific routes must come BEFORE generic {id} routes
+    Route::put('/reorder', [PageSectionController::class, 'reorder']);
+    Route::put('/{id}', [PageSectionController::class, 'update']);
 });
 
 // ============================================

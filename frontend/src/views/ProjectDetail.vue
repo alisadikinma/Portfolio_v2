@@ -121,23 +121,8 @@
         </div>
       </section>
 
-      <!-- Related Projects -->
-      <section class="section bg-neutral-50 dark:bg-neutral-900">
-        <div class="container-custom">
-          <div class="text-center mb-12">
-            <h2 class="text-3xl md:text-4xl font-display font-bold mb-4">Related Projects</h2>
-          </div>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            <BaseCard v-for="i in 3" :key="i" hover class="cursor-pointer">
-              <div class="aspect-video bg-neutral-200 dark:bg-neutral-700 rounded-lg mb-4"></div>
-              <h3 class="text-lg font-semibold mb-2">Related Project {{ i }}</h3>
-              <p class="text-neutral-600 dark:text-neutral-400 text-sm">
-                Another great project worth checking out
-              </p>
-            </BaseCard>
-          </div>
-        </div>
-      </section>
+      <!-- Project CTA Section -->
+      <ProjectCTA :project="project" />
     </div>
   </div>
 </template>
@@ -147,6 +132,7 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useProjects } from '@/composables/useProjects'
 import { BaseButton, BaseCard, BaseBadge, BaseLoader } from '@/components/base'
+import ProjectCTA from '@/components/projects/ProjectCTA.vue'
 
 const route = useRoute()
 const router = useRouter()

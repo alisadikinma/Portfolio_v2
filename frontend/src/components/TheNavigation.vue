@@ -116,24 +116,25 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useThemeStore } from '@/stores/theme'
 import { useUIStore } from '@/stores/ui'
+import { useMenuItems } from '@/composables/useMenuItems'
 
 const themeStore = useThemeStore()
 const uiStore = useUIStore()
+const { menuItems, isLoading, fetchActiveMenuItems } = useMenuItems()
 
 const isScrolled = ref(false)
 
-const navItems = [
-  { name: 'Home', path: '/' },
-  { name: 'About', path: '/about' },
-  { name: 'Projects', path: '/projects' },
-  { name: 'Awards', path: '/awards' },
-  { name: 'Blog', path: '/blog' },
-  { name: 'Gallery', path: '/gallery' },
-  { name: 'Contact', path: '/contact' }
-]
+// Computed property to transform menu items to navigation format
+const navItems = computed(() => {
+  return menuItems.value.map(item => ({
+    name: item.title,
+    path: item.url,
+    icon: item.icon
+  }))
+})
 
 const handleScroll = () => {
   isScrolled.value = window.scrollY > 20
@@ -146,8 +147,11 @@ const handleThemeToggle = () => {
   console.log('After toggle isDark:', themeStore.isDark)
 }
 
-onMounted(() => {
+onMounted(async () => {
   window.addEventListener('scroll', handleScroll)
+
+  // Fetch active menu items from API
+  await fetchActiveMenuItems()
 })
 
 onUnmounted(() => {

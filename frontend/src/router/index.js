@@ -294,6 +294,30 @@ const routes = [
     }
   },
 
+  // Menu Items Management
+  {
+    path: '/admin/menu-items',
+    name: 'admin-menu-items',
+    component: () => import('@/views/admin/MenuItemsList.vue'),
+    meta: {
+      title: 'Menu Items - Admin',
+      requiresAuth: true,
+      layout: 'admin'
+    }
+  },
+
+  // Page Sections Management
+  {
+    path: '/admin/page-sections',
+    name: 'admin-page-sections',
+    component: () => import('@/views/admin/PageSectionsManager.vue'),
+    meta: {
+      title: 'Page Sections - Admin',
+      requiresAuth: true,
+      layout: 'admin'
+    }
+  },
+
   // Automation (n8n Integration)
   {
     path: '/admin/automation/tokens',

@@ -367,7 +367,11 @@ const formData = ref({
   meta_title: '',
   meta_description: '',
   focus_keyword: '',
-  canonical_url: ''
+  canonical_url: '',
+  cta_title: '',
+  cta_description: '',
+  cta_button_text: '',
+  cta_phone_number: ''
 })
 
 // Form errors
@@ -375,6 +379,7 @@ const errors = ref({})
 
 // UI state
 const showSeoSection = ref(false)
+const showCtaSection = ref(false)
 const newTechnology = ref('')
 
 // Initialize form with project data if editing
@@ -396,7 +401,11 @@ if (props.project) {
     meta_title: props.project.meta_title || '',
     meta_description: props.project.meta_description || '',
     focus_keyword: props.project.focus_keyword || '',
-    canonical_url: props.project.canonical_url || ''
+    canonical_url: props.project.canonical_url || '',
+    cta_title: props.project.cta_title || '',
+    cta_description: props.project.cta_description || '',
+    cta_button_text: props.project.cta_button_text || '',
+    cta_phone_number: props.project.cta_phone_number || ''
   }
 }
 
@@ -593,6 +602,20 @@ function handleSubmit() {
   }
   if (formData.value.canonical_url) {
     submissionData.append('canonical_url', formData.value.canonical_url.trim())
+  }
+
+  // Add CTA fields
+  if (formData.value.cta_title) {
+    submissionData.append('cta_title', formData.value.cta_title.trim())
+  }
+  if (formData.value.cta_description) {
+    submissionData.append('cta_description', formData.value.cta_description.trim())
+  }
+  if (formData.value.cta_button_text) {
+    submissionData.append('cta_button_text', formData.value.cta_button_text.trim())
+  }
+  if (formData.value.cta_phone_number) {
+    submissionData.append('cta_phone_number', formData.value.cta_phone_number.trim())
   }
 
   // Add featured image if changed

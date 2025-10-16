@@ -29,6 +29,10 @@ class Project extends Model
         'meta_description',
         'focus_keyword',
         'canonical_url',
+        'cta_title',
+        'cta_description',
+        'cta_button_text',
+        'cta_phone_number',
     ];
 
     protected $casts = [
@@ -37,6 +41,14 @@ class Project extends Model
         'end_date' => 'date',
         'is_featured' => 'boolean',
     ];
+
+    /**
+     * Check if project has CTA
+     */
+    public function hasCta()
+    {
+        return $this->cta_title || $this->cta_description || $this->cta_button_text;
+    }
 
     /**
      * Get the options for generating the slug.

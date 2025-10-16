@@ -1,7 +1,10 @@
 <template>
   <div class="min-h-screen">
     <!-- Hero Section - Clean & Professional -->
-    <section class="relative pt-32 pb-8 md:pt-40 md:pb-12 bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-950">
+    <section
+      v-if="showHeroSection"
+      class="relative pt-32 pb-8 md:pt-40 md:pb-12 bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-950"
+    >
       <!-- Subtle Background Pattern -->
       <div class="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]">
         <div class="absolute inset-0" style="background-image: radial-gradient(circle, #6366f1 1px, transparent 1px); background-size: 30px 30px;"></div>
@@ -191,7 +194,10 @@
     </section>
 
     <!-- Featured Projects - Modern Grid -->
-    <section class="py-20 bg-gray-50 dark:bg-gray-900">
+    <section
+      v-if="showFeaturedProjectsSection"
+      class="py-20 bg-gray-50 dark:bg-gray-900"
+    >
       <div class="container-custom">
         <!-- Section Header -->
         <div class="max-w-2xl mb-16">
@@ -271,7 +277,10 @@
     </section>
 
     <!-- Latest Blog -->
-    <section class="py-20 bg-white dark:bg-gray-950">
+    <section
+      v-if="showLatestBlogSection"
+      class="py-20 bg-white dark:bg-gray-950"
+    >
       <div class="container-custom">
         <!-- Section Header -->
         <div class="max-w-2xl mb-16">
@@ -345,7 +354,10 @@
     </section>
 
     <!-- Testimonials Section -->
-    <section class="py-20 bg-gray-50 dark:bg-gray-900">
+    <section
+      v-if="showTestimonialsSection"
+      class="py-20 bg-gray-50 dark:bg-gray-900"
+    >
       <div class="container-custom">
         <!-- Section Header -->
         <div class="max-w-2xl mb-16 text-center mx-auto">
@@ -527,7 +539,10 @@
     </Teleport>
 
     <!-- CTA Section - Clean & Direct -->
-    <section class="relative py-20 bg-gradient-to-br from-primary-600 via-secondary-600 to-accent-600 overflow-hidden">
+    <section
+      v-if="showCTASection"
+      class="relative py-20 bg-gradient-to-br from-primary-600 via-secondary-600 to-accent-600 overflow-hidden"
+    >
       <!-- Subtle Pattern -->
       <div class="absolute inset-0 opacity-10">
         <div class="absolute inset-0" style="background-image: radial-gradient(circle, white 1px, transparent 1px); background-size: 30px 30px;"></div>
@@ -557,6 +572,7 @@ import { useProjects } from '@/composables/useProjects'
 import { usePosts } from '@/composables/usePosts'
 import { useAwards } from '@/composables/useAwards'
 import { useTestimonials } from '@/composables/useTestimonials'
+import { usePageSections } from '@/composables/usePageSections'
 import { BaseLoader } from '@/components/base'
 import api from '@/services/api'
 
@@ -564,7 +580,33 @@ const { projects: featuredProjects, isLoading: projectsLoading, fetchProjects } 
 const { posts: latestPosts, isLoading: postsLoading, fetchPosts } = usePosts()
 const { awards, isLoading: awardsLoading, fetchAwards } = useAwards()
 const { testimonials, isLoading: testimonialsLoading, fetchTestimonials } = useTestimonials()
+const { sections, fetchActiveSections } = usePageSections()
 const currentTestimonialIndex = ref(0)
+
+// Section visibility computed properties
+const showHeroSection = computed(() =>
+  sections.value.some(s => s.section_type === 'hero' && s.is_active && s.page_type === 'homepage')
+)
+const showFeaturedProjectsSection = computed(() =>
+  sections.value.some(s => s.section_type === 'featured_projects' && s.is_active && s.page_type === 'homepage')
+)
+const showLatestBlogSection = computed(() =>
+  sections.value.some(s => s.section_type === 'latest_blog' && s.is_active && s.page_type === 'homepage')
+)
+const showTestimonialsSection = computed(() =>
+  sections.value.some(s => s.section_type === 'testimonials' && s.is_active && s.page_type === 'homepage')
+)
+const showCTASection = computed(() =>
+  sections.value.some(s => s.section_type === 'cta' && s.is_active && s.page_type === 'homepage')
+)
+
+// Section order (sorted by sequence)
+const orderedSections = computed(() => {
+  return [...sections.value]
+    .filter(s => s.page_type === 'homepage' && s.is_active)
+    .sort((a, b) => a.sequence - b.sequence)
+    .map(s => s.section_type)
+})
 
 // About settings state
 const aboutSettings = ref(null)
@@ -657,6 +699,9 @@ const rotateTestimonials = () => {
 let testimonialInterval
 
 onMounted(async () => {
+  // Fetch page sections configuration
+  await fetchActiveSections('homepage')
+
   // Fetch about settings for hero section
   await fetchAboutSettings()
 
