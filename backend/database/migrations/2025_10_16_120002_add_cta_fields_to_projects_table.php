@@ -12,10 +12,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('projects', function (Blueprint $table) {
-            $table->string('cta_title', 255)->nullable()->after('github_url');        // "Transform Your Business"
-            $table->text('cta_description')->nullable()->after('cta_title');          // "See how this solution can..."
-            $table->string('cta_button_text', 100)->nullable()->after('cta_description'); // "Get Started", "Contact Us"
-            $table->string('cta_phone_number', 20)->nullable()->after('cta_button_text'); // "+62-812-xxxx" atau email
+            $table->string('cta_title', 255)->nullable();        // "Transform Your Business"
+            $table->text('cta_description')->nullable();          // "See how this solution can..."
+            $table->string('cta_button_text', 100)->nullable(); // "Get Started", "Contact Us"
+            $table->string('cta_phone_number', 20)->nullable(); // "+62-812-xxxx" atau email
         });
     }
 

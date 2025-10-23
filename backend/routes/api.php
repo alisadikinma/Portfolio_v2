@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\TokenController;
 use App\Http\Controllers\Api\SitemapController;
 use App\Http\Controllers\Api\MenuItemController;
 use App\Http\Controllers\Api\PageSectionController;
+use App\Http\Controllers\Api\Admin\DashboardController;
 
 // ============================================
 // Authentication Routes
@@ -104,6 +105,11 @@ Route::get('/page-sections', [PageSectionController::class, 'publicSections']);
 // ============================================
 // Admin API Routes (Protected)
 // ============================================
+
+// Admin Dashboard Routes
+Route::middleware(['auth:sanctum'])->prefix('admin/dashboard')->group(function () {
+    Route::get('/stats', [DashboardController::class, 'stats']);
+});
 
 // Admin Awards Routes
 Route::middleware(['auth:sanctum'])->prefix('admin/awards')->group(function () {

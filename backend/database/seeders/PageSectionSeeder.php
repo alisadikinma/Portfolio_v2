@@ -13,6 +13,7 @@ class PageSectionSeeder extends Seeder
     public function run(): void
     {
         $sections = [
+            // Homepage sections (all active)
             [
                 'page_type' => 'homepage',
                 'section_type' => 'hero',
@@ -42,6 +43,54 @@ class PageSectionSeeder extends Seeder
                 'section_type' => 'cta',
                 'is_active' => true,
                 'sequence' => 4,
+            ],
+
+            // About Page sections (all inactive by default)
+            [
+                'page_type' => 'about',
+                'section_type' => 'featured_projects',
+                'is_active' => false,
+                'sequence' => 0,
+            ],
+            [
+                'page_type' => 'about',
+                'section_type' => 'latest_blog',
+                'is_active' => false,
+                'sequence' => 1,
+            ],
+            [
+                'page_type' => 'about',
+                'section_type' => 'cta',
+                'is_active' => false,
+                'sequence' => 2,
+            ],
+
+            // Projects Page sections (all inactive by default)
+            [
+                'page_type' => 'projects',
+                'section_type' => 'latest_blog',
+                'is_active' => false,
+                'sequence' => 0,
+            ],
+            [
+                'page_type' => 'projects',
+                'section_type' => 'cta',
+                'is_active' => false,
+                'sequence' => 1,
+            ],
+
+            // Blog Page sections (all inactive by default)
+            [
+                'page_type' => 'blog',
+                'section_type' => 'featured_projects',
+                'is_active' => false,
+                'sequence' => 0,
+            ],
+            [
+                'page_type' => 'blog',
+                'section_type' => 'cta',
+                'is_active' => false,
+                'sequence' => 1,
             ],
         ];
 

@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('projects', function (Blueprint $table) {
-            $table->json('related_project_ids')->nullable()->after('github_url');
+            $table->json('related_project_ids')->nullable();
         });
     }
 
