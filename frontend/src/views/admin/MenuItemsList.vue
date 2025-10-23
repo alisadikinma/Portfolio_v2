@@ -6,9 +6,11 @@ import BaseCard from '@/components/base/BaseCard.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
 import DragDropList from '@/components/admin/DragDropList.vue'
+import IconPicker from '@/components/admin/IconPicker.vue'
+import IconDisplay from '@/components/admin/IconDisplay.vue'
 
 const { menuItems, isLoading, error, fetchMenuItems, updateMenuItem, deleteMenuItem, reorderMenuItems, createMenuItem } = useMenuItems()
-const { showSuccess, showError } = useToast()
+const toast = useToast()
 
 const showCreateModal = ref(false)
 const showEditModal = ref(false)
@@ -33,7 +35,7 @@ onMounted(async () => {
 async function loadMenuItems() {
   const result = await fetchMenuItems()
   if (!result.success) {
-    showError(error.value || 'Failed to load menu items')
+    toast.error(error.value || 'Failed to load menu items')
   }
 }
 
@@ -75,11 +77,11 @@ async function handleCreate() {
   const result = await createMenuItem(formData.value)
 
   if (result.success) {
-    showSuccess('Menu item created successfully')
+    toast.success('Menu item created successfully')
     closeModals()
     await loadMenuItems()
   } else {
-    showError(result.error || 'Failed to create menu item')
+    toast.error(result.error || 'Failed to create menu item')
   }
 
   isSaving.value = false
@@ -93,11 +95,11 @@ async function handleUpdate() {
   const result = await updateMenuItem(editingItem.value.id, formData.value)
 
   if (result.success) {
-    showSuccess('Menu item updated successfully')
+    toast.success('Menu item updated successfully')
     closeModals()
     await loadMenuItems()
   } else {
-    showError(result.error || 'Failed to update menu item')
+    toast.error(result.error || 'Failed to update menu item')
   }
 
   isSaving.value = false
@@ -110,10 +112,10 @@ async function toggleActive(item) {
   })
 
   if (result.success) {
-    showSuccess(`Menu item ${result.data.is_active ? 'activated' : 'deactivated'}`)
+    toast.success(`Menu item ${result.data.is_active ? 'activated' : 'deactivated'}`)
     await loadMenuItems()
   } else {
-    showError('Failed to update menu item status')
+    toast.error('Failed to update menu item status')
   }
 }
 
@@ -129,11 +131,11 @@ async function handleDelete() {
   const result = await deleteMenuItem(itemToDelete.value.id)
 
   if (result.success) {
-    showSuccess('Menu item deleted successfully')
+    toast.success('Menu item deleted successfully')
     itemToDelete.value = null
     await loadMenuItems()
   } else {
-    showError(result.error || 'Failed to delete menu item')
+    toast.error(result.error || 'Failed to delete menu item')
   }
 
   isDeleting.value = false
@@ -143,9 +145,9 @@ async function handleReorder(reorderedItems) {
   const result = await reorderMenuItems(reorderedItems)
 
   if (result.success) {
-    showSuccess('Menu items reordered successfully')
+    toast.success('Menu items reordered successfully')
   } else {
-    showError('Failed to reorder menu items')
+    toast.error('Failed to reorder menu items')
     await loadMenuItems()
   }
 }
@@ -259,9 +261,11 @@ function generateSlug() {
 
               <!-- Icon -->
               <td class="px-6 py-4 whitespace-nowrap">
-                <div class="text-sm text-neutral-600 dark:text-neutral-400">
-                  {{ item.icon || '-' }}
+                <div v-if="item.icon" class="flex items-center gap-2">
+                  <IconDisplay :name="item.icon" class="w-5 h-5 text-neutral-600 dark:text-neutral-400" />
+                  <span class="text-xs text-neutral-500 dark:text-neutral-400">{{ item.icon }}</span>
                 </div>
+                <span v-else class="text-sm text-neutral-400 dark:text-neutral-600">-</span>
               </td>
 
               <!-- Status -->
@@ -378,11 +382,7 @@ function generateSlug() {
               <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
                 Icon (optional)
               </label>
-              <BaseInput
-                v-model="formData.icon"
-                type="text"
-                placeholder="home"
-              />
+              <IconPicker v-model="formData.icon" />
             </div>
 
             <div class="flex items-center">

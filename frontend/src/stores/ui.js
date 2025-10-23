@@ -198,3 +198,17 @@ export const useUIStore = defineStore('ui', () => {
 
 // Alias export for compatibility
 export const useUiStore = useUIStore
+
+// Toast composable for convenience
+export const useToast = () => {
+  const store = useUIStore()
+  return {
+    success: store.showSuccess,
+    error: store.showError,
+    warning: store.showWarning,
+    info: store.showInfo,
+    add: store.addToast,
+    remove: store.removeToast,
+    clear: store.clearToasts
+  }
+}

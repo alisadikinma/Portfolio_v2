@@ -14,6 +14,10 @@ const props = defineProps({
   disabled: {
     type: Boolean,
     default: false
+  },
+  tag: {
+    type: String,
+    default: 'div'
   }
 })
 
@@ -72,9 +76,9 @@ watch(() => props.items, () => {
 </script>
 
 <template>
-  <div ref="listRef" class="space-y-2">
+  <component :is="tag" ref="listRef" :class="tag !== 'tbody' ? 'space-y-2' : ''">
     <slot />
-  </div>
+  </component>
 </template>
 
 <style scoped>

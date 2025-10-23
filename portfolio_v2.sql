@@ -3,9 +3,9 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Oct 15, 2025 at 12:08 PM
--- Server version: 10.4.28-MariaDB
--- PHP Version: 8.2.4
+-- Generation Time: Oct 23, 2025 at 02:00 AM
+-- Server version: 10.4.32-MariaDB
+-- PHP Version: 8.2.12
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -29,8 +29,44 @@ SET time_zone = "+00:00";
 
 CREATE TABLE `about` (
   `id` bigint(20) UNSIGNED NOT NULL,
-  `created_at` timestamp NULL DEFAULT NULL,
-  `updated_at` timestamp NULL DEFAULT NULL
+  `name` varchar(255) DEFAULT NULL,
+  `title` varchar(255) DEFAULT NULL,
+  `bio` longtext DEFAULT NULL,
+  `profile_photo` varchar(500) DEFAULT NULL,
+  `email` varchar(255) DEFAULT NULL,
+  `phone` varchar(50) DEFAULT NULL,
+  `location` varchar(255) DEFAULT NULL,
+  `website` varchar(500) DEFAULT NULL,
+  `skills` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`skills`)),
+  `experience` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`experience`)),
+  `education` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`education`)),
+  `social_links` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`social_links`)),
+  `created_at` timestamp NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `about`
+--
+
+INSERT INTO `about` (`id`, `name`, `title`, `bio`, `profile_photo`, `email`, `phone`, `location`, `website`, `skills`, `experience`, `education`, `social_links`, `created_at`, `updated_at`) VALUES
+(1, 'Ali Sadikin', 'AI Automation Engineer', 'Building AI automation to democratize viral content creation in Asia. Seefluencer alumni. Believe every creator deserves the tools to succeed. Currently connecting 500M+ aspiring creators with our viral intelligence platform. Let\'s engineer virality, not chase it.', NULL, NULL, NULL, NULL, NULL, '[{\"name\": \"Artificial Intelligence (AI)\", \"level\": \"Expert\"}, {\"name\": \"Content Creation\", \"level\": \"Advanced\"}, {\"name\": \"Product Management\", \"level\": \"Advanced\"}, {\"name\": \"Community Building\", \"level\": \"Expert\"}, {\"name\": \"Go-to-Market Strategy\", \"level\": \"Intermediate\"}]', NULL, NULL, '[{\"platform\": \"LinkedIn\", \"url\": \"https://linkedin.com/in/alisadikin\", \"icon\": \"linkedin\"}, {\"platform\": \"Twitter\", \"url\": \"https://twitter.com/alisadikin\", \"icon\": \"twitter\"}, {\"platform\": \"GitHub\", \"url\": \"https://github.com/alisadikin\", \"icon\": \"github\"}]', '2025-10-22 23:54:11', '2025-10-22 23:54:11');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `automation_logs`
+--
+
+CREATE TABLE `automation_logs` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `user_id` bigint(20) UNSIGNED DEFAULT NULL,
+  `token_id` bigint(20) UNSIGNED DEFAULT NULL,
+  `action` varchar(255) NOT NULL,
+  `ip_address` varchar(45) DEFAULT NULL,
+  `user_agent` text DEFAULT NULL,
+  `metadata` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`metadata`)),
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -278,6 +314,36 @@ CREATE TABLE `job_batches` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `menu_items`
+--
+
+CREATE TABLE `menu_items` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `title` varchar(100) NOT NULL,
+  `slug` varchar(100) NOT NULL,
+  `url` varchar(255) NOT NULL,
+  `icon` varchar(100) DEFAULT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `sequence` int(11) NOT NULL DEFAULT 0,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `menu_items`
+--
+
+INSERT INTO `menu_items` (`id`, `title`, `slug`, `url`, `icon`, `is_active`, `sequence`, `created_at`, `updated_at`) VALUES
+(1, 'Home', 'home', '/', 'home', 1, 0, '2025-10-22 13:41:30', '2025-10-22 13:54:14'),
+(2, 'About', 'about', '/about', 'user', 1, 1, '2025-10-22 13:42:48', '2025-10-22 14:02:11'),
+(3, 'Projects', 'projects', '/projects', 'chart-bar', 1, 3, '2025-10-22 13:47:21', '2025-10-22 14:08:21'),
+(4, 'Awards', 'awards', '/awards', 'trophy', 1, 2, '2025-10-22 13:54:08', '2025-10-22 14:02:24'),
+(5, 'Services', 'services', '/services', 'briefcase', 1, 4, '2025-10-22 13:54:38', '2025-10-22 14:03:22'),
+(6, 'Contact', 'contact', '/contact', 'phone', 1, 5, '2025-10-22 13:55:16', '2025-10-22 14:03:30');
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `migrations`
 --
 
@@ -319,7 +385,12 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES
 (25, '2025_10_11_070937_add_is_active_and_rename_order_to_projects_table', 4),
 (26, '2025_10_11_070939_add_is_active_and_rename_order_to_categories_table', 4),
 (27, '2025_10_11_070941_create_award_gallery_pivot_table', 4),
-(28, '2025_10_14_130026_add_credential_fields_to_awards_table', 4);
+(28, '2025_10_14_130026_add_credential_fields_to_awards_table', 4),
+(29, '2025_10_16_051922_create_automation_logs_table', 5),
+(30, '2025_10_16_120000_create_menu_items_table', 5),
+(31, '2025_10_16_120001_create_page_sections_table', 5),
+(32, '2025_10_16_120002_add_cta_fields_to_projects_table', 5),
+(33, '2025_10_16_150000_add_related_projects_to_projects_table', 5);
 
 -- --------------------------------------------------------
 
@@ -336,6 +407,33 @@ CREATE TABLE `newsletters` (
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `page_sections`
+--
+
+CREATE TABLE `page_sections` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `page_type` varchar(50) NOT NULL,
+  `section_type` varchar(100) NOT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `sequence` int(11) NOT NULL DEFAULT 0,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `page_sections`
+--
+
+INSERT INTO `page_sections` (`id`, `page_type`, `section_type`, `is_active`, `sequence`, `created_at`, `updated_at`) VALUES
+(1, 'homepage', 'hero', 1, 0, '2025-10-22 14:11:22', '2025-10-22 14:11:22'),
+(2, 'homepage', 'featured_projects', 1, 1, '2025-10-22 14:11:22', '2025-10-22 14:11:22'),
+(3, 'homepage', 'latest_blog', 1, 2, '2025-10-22 14:11:22', '2025-10-22 14:11:22'),
+(4, 'homepage', 'testimonials', 0, 3, '2025-10-22 14:11:22', '2025-10-22 14:11:52'),
+(5, 'homepage', 'cta', 1, 4, '2025-10-22 14:11:22', '2025-10-22 14:11:22');
 
 -- --------------------------------------------------------
 
@@ -395,7 +493,28 @@ INSERT INTO `personal_access_tokens` (`id`, `tokenable_type`, `tokenable_id`, `n
 (20, 'App\\Models\\User', 9, 'auth-token', '10c1ddb0d4dd2245f0a785bb153d49924254fbca9afe9fa7db31a406b79b53cc', '[\"*\"]', '2025-10-15 01:58:42', NULL, '2025-10-15 01:47:05', '2025-10-15 01:58:42'),
 (21, 'App\\Models\\User', 9, 'auth-token', '7d323deb2c4574c390329f5ef7479a9d91aca261411f38f6b7fef5eab9268657', '[\"*\"]', '2025-10-15 02:09:11', NULL, '2025-10-15 01:59:31', '2025-10-15 02:09:11'),
 (22, 'App\\Models\\User', 9, 'auth-token', '9096ca75f0b259144a004477a1490fb490131db044ef9d2d995d798d8f86c9a0', '[\"*\"]', '2025-10-15 02:14:21', NULL, '2025-10-15 02:09:29', '2025-10-15 02:14:21'),
-(23, 'App\\Models\\User', 9, 'auth-token', 'e2fb604a92700f262f9e2967ff817aa3e4c1a3f56828130bbc48d90ea247c00a', '[\"*\"]', '2025-10-15 02:58:19', NULL, '2025-10-15 02:29:38', '2025-10-15 02:58:19');
+(23, 'App\\Models\\User', 9, 'auth-token', 'e2fb604a92700f262f9e2967ff817aa3e4c1a3f56828130bbc48d90ea247c00a', '[\"*\"]', '2025-10-15 02:58:19', NULL, '2025-10-15 02:29:38', '2025-10-15 02:58:19'),
+(24, 'App\\Models\\User', 9, 'auth-token', 'be8b4790245fe940ea7fe6f75086f2aa5510703cb3f08b6da99bc5af80b03eed', '[\"*\"]', '2025-10-22 13:33:50', NULL, '2025-10-22 13:24:00', '2025-10-22 13:33:50'),
+(25, 'App\\Models\\User', 9, 'auth-token', 'e9744bc0f46ae36fd689254a4df7e7a13d7b9b9dbeb238a81081810b7e74cf5c', '[\"*\"]', '2025-10-22 13:41:29', NULL, '2025-10-22 13:35:28', '2025-10-22 13:41:29'),
+(26, 'App\\Models\\User', 9, 'auth-token', 'ca47f7af13eb57a4d00d48ed195e82675bc63b1fac2382ad336327aa3cc2d411', '[\"*\"]', '2025-10-22 13:42:48', NULL, '2025-10-22 13:42:12', '2025-10-22 13:42:48'),
+(27, 'App\\Models\\User', 9, 'auth-token', '592799c747fff1b5cd96908f22afc2161bae91c5667d3beb73c049371ac083e2', '[\"*\"]', '2025-10-22 13:53:08', NULL, '2025-10-22 13:47:02', '2025-10-22 13:53:08'),
+(28, 'App\\Models\\User', 9, 'auth-token', 'd9d291fe9e74264c3f4f2d056fcdb83ec662ed2896ab6d56deece435b4668e42', '[\"*\"]', '2025-10-22 14:00:35', NULL, '2025-10-22 13:53:41', '2025-10-22 14:00:35'),
+(29, 'App\\Models\\User', 9, 'auth-token', '62cd0cd38ac4eaa4dbd608d378583f94b54a337d3c80613b5cc935c769fb6c09', '[\"*\"]', '2025-10-22 14:09:46', NULL, '2025-10-22 14:01:37', '2025-10-22 14:09:46'),
+(30, 'App\\Models\\User', 9, 'auth-token', '033cdbb3c807ff13449ca5046620c72a920f2323b77bcb3efd7bc4364eb70719', '[\"*\"]', '2025-10-22 14:36:15', NULL, '2025-10-22 14:11:35', '2025-10-22 14:36:15'),
+(31, 'App\\Models\\User', 9, 'auth-token', '49f4de7c74e1ecc79a69173256ec6fda0cf643487640c768814e0ff76bbc885f', '[\"*\"]', '2025-10-22 15:49:01', NULL, '2025-10-22 15:47:15', '2025-10-22 15:49:01'),
+(32, 'App\\Models\\User', 9, 'auth-token', '8d56f30254bd1b34b94d12f3bbe70bed96648d5ce8c001fc862d5f5d6ce6a9bf', '[\"*\"]', '2025-10-22 15:49:20', NULL, '2025-10-22 15:49:19', '2025-10-22 15:49:20'),
+(33, 'App\\Models\\User', 9, 'auth-token', '382636d2ad699c70e821cc12f2edbdc0eee8909a59b69d5bc4ad247dee0e37ae', '[\"*\"]', '2025-10-22 15:59:31', NULL, '2025-10-22 15:52:46', '2025-10-22 15:59:31'),
+(34, 'App\\Models\\User', 9, 'auth-token', '3a187de544d1c06715c7423e5afb3385c85d6e2c6b693514d0285dc618e10a79', '[\"*\"]', '2025-10-22 16:02:51', NULL, '2025-10-22 16:02:22', '2025-10-22 16:02:51'),
+(35, 'App\\Models\\User', 9, 'auth-token', 'e6730a865654dc52497fdeabca9ff48792a7c2d757daa43aa328d1fd8937adfe', '[\"*\"]', '2025-10-22 16:08:43', NULL, '2025-10-22 16:06:18', '2025-10-22 16:08:43'),
+(36, 'App\\Models\\User', 9, 'auth-token', 'd4c1a24b8aa129c0fc191e902eeb2b8d10125284b1ffcd18265e62a2c24c9de8', '[\"*\"]', '2025-10-22 16:26:05', NULL, '2025-10-22 16:10:04', '2025-10-22 16:26:05'),
+(37, 'App\\Models\\User', 9, 'auth-token', 'de54f8f6ca39642a56431c3d32710769c12fc87fcc0c2b34ecc2a97c8f3b60ff', '[\"*\"]', '2025-10-22 16:26:37', NULL, '2025-10-22 16:26:36', '2025-10-22 16:26:37'),
+(38, 'App\\Models\\User', 9, 'auth-token', '82a1b0984df7002b2458b022ad41f479b2861e661ec17129cc9b03b807cb8314', '[\"*\"]', '2025-10-22 16:29:14', NULL, '2025-10-22 16:27:15', '2025-10-22 16:29:14'),
+(39, 'App\\Models\\User', 9, 'auth-token', 'db50af0f20daa94cad4dcf310fd4e9b02fb9381d96af0c1fd79995d76beb8d5a', '[\"*\"]', '2025-10-22 16:44:54', NULL, '2025-10-22 16:30:05', '2025-10-22 16:44:54'),
+(40, 'App\\Models\\User', 9, 'auth-token', '259c0e85bc6ea28e66bae115b0afa46fd09426a1ce7df43c2822078674306985', '[\"*\"]', '2025-10-22 16:48:02', NULL, '2025-10-22 16:45:34', '2025-10-22 16:48:02'),
+(41, 'App\\Models\\User', 9, 'auth-token', 'aa7d6366b074c527d01076795f6949dd2d8822122720fed639d2a3acb52e024d', '[\"*\"]', '2025-10-22 16:48:35', NULL, '2025-10-22 16:48:28', '2025-10-22 16:48:35'),
+(42, 'App\\Models\\User', 9, 'auth-token', '5ebba9ceca779f4871f7655fe001238a7d3c35813b1c47e98b8ad44df31677c8', '[\"*\"]', '2025-10-22 16:54:31', NULL, '2025-10-22 16:54:30', '2025-10-22 16:54:31'),
+(43, 'App\\Models\\User', 9, 'auth-token', '072a58ac26f363589500d707c26d6bff8dd4c3e6368681b8508576f9a40bf82b', '[\"*\"]', '2025-10-22 16:55:10', NULL, '2025-10-22 16:55:09', '2025-10-22 16:55:10'),
+(44, 'App\\Models\\User', 9, 'auth-token', 'aa2dbe5d5a40ed376391344e00dddb8ff00e16b8a454c1f0a6a8d551f37b7804', '[\"*\"]', '2025-10-22 16:56:04', NULL, '2025-10-22 16:56:03', '2025-10-22 16:56:04');
 
 -- --------------------------------------------------------
 
@@ -493,6 +612,11 @@ CREATE TABLE `projects` (
   `client_name` varchar(255) DEFAULT NULL,
   `project_url` varchar(255) DEFAULT NULL,
   `github_url` varchar(255) DEFAULT NULL,
+  `related_project_ids` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`related_project_ids`)),
+  `cta_title` varchar(255) DEFAULT NULL,
+  `cta_description` text DEFAULT NULL,
+  `cta_button_text` varchar(100) DEFAULT NULL,
+  `cta_phone_number` varchar(20) DEFAULT NULL,
   `featured_image` varchar(255) DEFAULT NULL,
   `is_featured` tinyint(1) DEFAULT 0,
   `technologies` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`technologies`)),
@@ -512,8 +636,8 @@ CREATE TABLE `projects` (
 -- Dumping data for table `projects`
 --
 
-INSERT INTO `projects` (`id`, `title`, `slug`, `description`, `client_name`, `project_url`, `github_url`, `featured_image`, `is_featured`, `technologies`, `status`, `start_date`, `end_date`, `meta_title`, `meta_description`, `focus_keyword`, `canonical_url`, `created_at`, `updated_at`, `deleted_at`) VALUES
-(1, 'Mysatnusa Platform 2', 'mysatnusa-platform-2', '<p>Mysatnusa Platform Mysatnusa Platform Mysatnusa Platform</p>', 'SATNUSA', NULL, NULL, NULL, 0, '[\"Django\",\"PostgreSQL\",\"VUE JS\"]', 'planning', NULL, NULL, NULL, NULL, NULL, NULL, '2025-10-15 00:38:04', '2025-10-15 00:39:03', NULL);
+INSERT INTO `projects` (`id`, `title`, `slug`, `description`, `client_name`, `project_url`, `github_url`, `related_project_ids`, `cta_title`, `cta_description`, `cta_button_text`, `cta_phone_number`, `featured_image`, `is_featured`, `technologies`, `status`, `start_date`, `end_date`, `meta_title`, `meta_description`, `focus_keyword`, `canonical_url`, `created_at`, `updated_at`, `deleted_at`) VALUES
+(1, 'Mysatnusa Platform 2', 'mysatnusa-platform-2', '<p>Mysatnusa Platform Mysatnusa Platform Mysatnusa Platform</p>', 'SATNUSA', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, '[\"Django\",\"PostgreSQL\",\"VUE JS\"]', 'planning', NULL, NULL, NULL, NULL, NULL, NULL, '2025-10-15 00:38:04', '2025-10-15 00:39:03', NULL);
 
 -- --------------------------------------------------------
 
@@ -637,6 +761,17 @@ CREATE TABLE `settings` (
   `updated_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+--
+-- Dumping data for table `settings`
+--
+
+INSERT INTO `settings` (`id`, `key`, `value`, `group`, `type`, `created_at`, `updated_at`) VALUES
+(1, 'name', 'Ali Sadikin', 'about', 'text', '2025-10-22 16:10:45', '2025-10-22 16:10:45'),
+(2, 'title', 'AI Generalist Expert', 'about', 'text', '2025-10-22 16:10:45', '2025-10-22 16:10:45'),
+(3, 'bio', 'Building AI automation untuk democratize viral content creation di Asia. Ex-community builder Seefluencer. Percaya setiap creator berhak punya tools untuk succeed. Currently: menghubungkan 500M+ aspiring creators dengan viral intelligence platform. Let\'s engineer virality, not chase it.', 'about', 'text', '2025-10-22 16:10:45', '2025-10-22 16:10:45'),
+(4, 'profile_photo', '/uploads/about/1761175821_creator_face.png', 'about', 'image', '2025-10-22 16:10:45', '2025-10-22 16:30:21'),
+(7, 'social_links', '[{\"platform\":\"Youtube\",\"url\":\"https:\\/\\/www.youtube.com\\/@alisadikinma\",\"icon\":\"\"},{\"platform\":\"Tik-Tok\",\"url\":\"https:\\/\\/www.tiktok.com\\/@alisadikinma\",\"icon\":\"\"},{\"platform\":\"Instagram\",\"url\":\"https:\\/\\/www.instagram.com\\/alisadikinma\\/\",\"icon\":\"\"}]', 'about', 'json', '2025-10-22 16:23:08', '2025-10-22 16:26:05');
+
 -- --------------------------------------------------------
 
 --
@@ -690,6 +825,14 @@ INSERT INTO `users` (`id`, `name`, `email`, `email_verified_at`, `password`, `re
 --
 ALTER TABLE `about`
   ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `automation_logs`
+--
+ALTER TABLE `automation_logs`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `automation_logs_user_id_created_at_index` (`user_id`,`created_at`),
+  ADD KEY `automation_logs_action_created_at_index` (`action`,`created_at`);
 
 --
 -- Indexes for table `awards`
@@ -776,6 +919,15 @@ ALTER TABLE `job_batches`
   ADD PRIMARY KEY (`id`);
 
 --
+-- Indexes for table `menu_items`
+--
+ALTER TABLE `menu_items`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `menu_items_slug_unique` (`slug`),
+  ADD KEY `menu_items_is_active_index` (`is_active`),
+  ADD KEY `menu_items_sequence_index` (`sequence`);
+
+--
 -- Indexes for table `migrations`
 --
 ALTER TABLE `migrations`
@@ -787,6 +939,16 @@ ALTER TABLE `migrations`
 ALTER TABLE `newsletters`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `newsletters_email_unique` (`email`);
+
+--
+-- Indexes for table `page_sections`
+--
+ALTER TABLE `page_sections`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `page_sections_page_type_section_type_unique` (`page_type`,`section_type`),
+  ADD KEY `page_sections_page_type_index` (`page_type`),
+  ADD KEY `page_sections_is_active_index` (`is_active`),
+  ADD KEY `page_sections_sequence_index` (`sequence`);
 
 --
 -- Indexes for table `password_reset_tokens`
@@ -894,6 +1056,12 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `about`
 --
 ALTER TABLE `about`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- AUTO_INCREMENT for table `automation_logs`
+--
+ALTER TABLE `automation_logs`
   MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
@@ -945,10 +1113,16 @@ ALTER TABLE `jobs`
   MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT for table `menu_items`
+--
+ALTER TABLE `menu_items`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+
+--
 -- AUTO_INCREMENT for table `migrations`
 --
 ALTER TABLE `migrations`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=29;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=34;
 
 --
 -- AUTO_INCREMENT for table `newsletters`
@@ -957,10 +1131,16 @@ ALTER TABLE `newsletters`
   MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT for table `page_sections`
+--
+ALTER TABLE `page_sections`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+
+--
 -- AUTO_INCREMENT for table `personal_access_tokens`
 --
 ALTER TABLE `personal_access_tokens`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=24;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=45;
 
 --
 -- AUTO_INCREMENT for table `posts`
@@ -996,7 +1176,7 @@ ALTER TABLE `services`
 -- AUTO_INCREMENT for table `settings`
 --
 ALTER TABLE `settings`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
 
 --
 -- AUTO_INCREMENT for table `testimonials`
@@ -1013,6 +1193,12 @@ ALTER TABLE `users`
 --
 -- Constraints for dumped tables
 --
+
+--
+-- Constraints for table `automation_logs`
+--
+ALTER TABLE `automation_logs`
+  ADD CONSTRAINT `automation_logs_user_id_foreign` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `awards_galleries`

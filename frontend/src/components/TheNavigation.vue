@@ -28,9 +28,10 @@
             v-for="item in navItems"
             :key="item.name"
             :to="item.path"
-            class="relative px-4 py-2 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors group"
+            class="relative px-4 py-2 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors group flex items-center gap-2"
             active-class="text-primary-600 dark:text-primary-400"
           >
+            <IconDisplay v-if="item.icon" :name="item.icon" class="w-4 h-4" />
             {{ item.name }}
             <!-- Active Indicator -->
             <span
@@ -87,9 +88,10 @@
           :key="item.name"
           :to="item.path"
           @click="uiStore.closeMobileMenu"
-          class="block px-4 py-3 rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 font-medium transition-colors"
+          class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 font-medium transition-colors"
           active-class="bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400"
         >
+          <IconDisplay v-if="item.icon" :name="item.icon" class="w-5 h-5" />
           {{ item.name }}
         </router-link>
 
@@ -120,6 +122,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useThemeStore } from '@/stores/theme'
 import { useUIStore } from '@/stores/ui'
 import { useMenuItems } from '@/composables/useMenuItems'
+import IconDisplay from '@/components/admin/IconDisplay.vue'
 
 const themeStore = useThemeStore()
 const uiStore = useUIStore()

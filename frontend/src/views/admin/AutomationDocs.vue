@@ -273,4 +273,3 @@ Response:
   ]
 }`
 </script>
-</template>

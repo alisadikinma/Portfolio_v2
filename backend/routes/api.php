@@ -177,8 +177,10 @@ Route::middleware(['auth:sanctum'])->prefix('admin/contacts')->group(function ()
 Route::middleware(['auth:sanctum'])->prefix('admin/settings')->group(function () {
     Route::get('/about', [SettingsController::class, 'getAboutSettings']);
     Route::put('/about', [SettingsController::class, 'updateAboutSettings']);
+    Route::post('/about', [SettingsController::class, 'updateAboutSettings']); // POST with _method=PUT for FormData
     Route::get('/site', [SettingsController::class, 'getSiteSettings']);
     Route::put('/site', [SettingsController::class, 'updateSiteSettings']);
+    Route::post('/site', [SettingsController::class, 'updateSiteSettings']); // POST with _method=PUT for FormData
 });
 
 // Admin Menu Items Routes

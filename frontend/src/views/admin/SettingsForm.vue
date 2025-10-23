@@ -380,6 +380,7 @@ const logoInput = ref(null)
 const isSubmitting = ref(false)
 const loading = ref(false)
 const error = ref(null)
+const isLoadingSettings = ref(false) // Guard untuk prevent double load
 
 // Form data
 const formData = ref({
@@ -456,6 +457,16 @@ async function handleSubmit() {
   isSubmitting.value = true
   error.value = null
 
+  console.log('🔵 Site settings form submitted - Starting validation...')
+  console.log('📋 Current formData:', {
+    site_name: formData.value.site_name,
+    site_description: formData.value.site_description?.substring(0, 50) + '...',
+    contact_email: formData.value.contact_email,
+    contact_phone: formData.value.contact_phone,
+    social_media: formData.value.social_media,
+    meta_tags: formData.value.meta_tags
+  })
+
   try {
     // Validate required fields
     const hasInvalidSocialMedia = formData.value.social_media.some(
@@ -495,8 +506,21 @@ async function handleSubmit() {
       data.append('meta_tags', JSON.stringify(formData.value.meta_tags))
     }
 
+    console.log('🔵 Sending request to API...', {
+      hasLogo: !!logoFile.value,
+      socialMediaCount: formData.value.social_media.length,
+      metaTagsCount: formData.value.meta_tags.length
+    })
+    
+    // Log FormData contents
+    console.log('📦 FormData contents:')
+    for (let [key, value] of data.entries()) {
+      console.log(`  ${key}:`, typeof value === 'string' ? value.substring(0, 100) : value)
+    }
+
     await settingsStore.updateSiteSettings(data)
 
+    console.log('✅ Settings updated successfully')
     uiStore.showSuccess('Site settings updated successfully', 'Settings Saved')
 
     // Reset logo upload state
@@ -506,7 +530,12 @@ async function handleSubmit() {
       logoInput.value.value = ''
     }
   } catch (err) {
-    console.error('Failed to update site settings:', err)
+    console.error('❌ Failed to update site settings:', err)
+    console.error('Error details:', {
+      message: err.message,
+      response: err.response?.data,
+      status: err.response?.status
+    })
     error.value = err.message || err.response?.data?.message || 'Failed to update settings. Please try again.'
     uiStore.showError(error.value, 'Update Failed', 0)
   } finally {
@@ -527,11 +556,21 @@ function resetForm() {
 
 // Load settings
 async function loadSettings() {
+  if (isLoadingSettings.value) {
+    console.log('⚠️ Already loading settings, skipping...')
+    return
+  }
+  
+  isLoadingSettings.value = true
   loading.value = true
   error.value = null
+  
+  console.log('🔄 Loading site settings from API...')
 
   try {
     await settingsStore.fetchSiteSettings()
+    
+    console.log('📥 Settings fetched from store:', settingsStore.siteSettings)
 
     // Populate form data
     formData.value = {
@@ -544,12 +583,20 @@ async function loadSettings() {
       meta_tags: JSON.parse(JSON.stringify(settingsStore.siteSettings.meta_tags || [])),
       analytics_code: settingsStore.siteSettings.analytics_code || ''
     }
+    
+    console.log('✅ Form data populated:', {
+      site_name: formData.value.site_name,
+      contact_email: formData.value.contact_email,
+      socialMediaCount: formData.value.social_media.length,
+      metaTagsCount: formData.value.meta_tags.length
+    })
   } catch (err) {
-    console.error('Failed to load settings:', err)
+    console.error('❌ Failed to load settings:', err)
     error.value = 'Failed to load settings. Please refresh the page.'
     uiStore.showError(error.value, 'Load Failed')
   } finally {
     loading.value = false
+    isLoadingSettings.value = false
   }
 }
 

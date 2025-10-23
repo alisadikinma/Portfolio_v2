@@ -76,8 +76,24 @@
 
           <div class="flex items-center gap-4">
             <!-- Current Photo Preview -->
-            <div v-if="currentPhotoUrl" class="relative w-24 h-24 rounded-lg overflow-hidden bg-neutral-100 dark:bg-neutral-800">
-              <img :src="currentPhotoUrl" alt="Profile" class="w-full h-full object-cover" />
+            <div class="relative w-24 h-24 rounded-lg overflow-hidden bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center">
+              <img 
+                v-if="currentPhotoUrl" 
+                :src="currentPhotoUrl" 
+                alt="Profile" 
+                class="w-full h-full object-cover"
+                @error="handleImageError"
+              />
+              <!-- Fallback Icon -->
+              <svg 
+                v-else
+                class="w-12 h-12 text-neutral-400 dark:text-neutral-500" 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
             </div>
 
             <!-- Upload Input -->
@@ -578,6 +594,7 @@ const fileInput = ref(null)
 const isSubmitting = ref(false)
 const loading = ref(false)
 const error = ref(null)
+const isLoadingSettings = ref(false) // Guard untuk prevent double load
 
 // Form data
 const formData = ref({
@@ -679,10 +696,26 @@ function removePhoto() {
   }
 }
 
+function handleImageError() {
+  console.warn('Failed to load profile image')
+  photoRemoved.value = true
+}
+
 // Form submission
 async function handleSubmit() {
   isSubmitting.value = true
   error.value = null
+
+  console.log('🔵 Form submitted - Starting validation...')
+  console.log('📋 Current formData:', {
+    name: formData.value.name,
+    title: formData.value.title,
+    bio: formData.value.bio?.substring(0, 50) + '...',
+    skills: formData.value.skills,
+    experience: formData.value.experience,
+    education: formData.value.education,
+    social_links: formData.value.social_links
+  })
 
   try {
     // Validate required fields
@@ -711,6 +744,9 @@ async function handleSubmit() {
 
     // Prepare FormData
     const data = new FormData()
+    
+    // Laravel method spoofing for FormData
+    data.append('_method', 'PUT')
 
     // Basic fields
     if (formData.value.name) data.append('name', formData.value.name)
@@ -736,8 +772,23 @@ async function handleSubmit() {
       data.append('social_links', JSON.stringify(formData.value.social_links))
     }
 
+    console.log('🔵 Sending request to API...', {
+      hasPhoto: !!photoFile.value,
+      skillsCount: cleanedSkills.length,
+      experienceCount: formData.value.experience.length,
+      educationCount: formData.value.education.length,
+      socialLinksCount: formData.value.social_links.length
+    })
+    
+    // Log FormData contents
+    console.log('📦 FormData contents:')
+    for (let [key, value] of data.entries()) {
+      console.log(`  ${key}:`, typeof value === 'string' ? value.substring(0, 100) : value)
+    }
+
     await settingsStore.updateAboutSettings(data)
 
+    console.log('✅ Settings updated successfully')
     uiStore.showSuccess('About settings updated successfully', 'Settings Saved')
 
     // Reset photo upload state
@@ -747,7 +798,12 @@ async function handleSubmit() {
       fileInput.value.value = ''
     }
   } catch (err) {
-    console.error('Failed to update about settings:', err)
+    console.error('❌ Failed to update about settings:', err)
+    console.error('Error details:', {
+      message: err.message,
+      response: err.response?.data,
+      status: err.response?.status
+    })
     error.value = err.message || err.response?.data?.message || 'Failed to update settings. Please try again.'
     uiStore.showError(error.value, 'Update Failed', 0)
   } finally {
@@ -768,11 +824,21 @@ function resetForm() {
 
 // Load settings
 async function loadSettings() {
+  if (isLoadingSettings.value) {
+    console.log('⚠️ Already loading settings, skipping...')
+    return
+  }
+  
+  isLoadingSettings.value = true
   loading.value = true
   error.value = null
+  
+  console.log('🔄 Loading settings from API...')
 
   try {
     await settingsStore.fetchAboutSettings()
+    
+    console.log('📥 Settings fetched from store:', settingsStore.aboutSettings)
 
     // Populate form data
     formData.value = {
@@ -785,12 +851,22 @@ async function loadSettings() {
       education: JSON.parse(JSON.stringify(settingsStore.aboutSettings.education || [])),
       social_links: JSON.parse(JSON.stringify(settingsStore.aboutSettings.social_links || []))
     }
+    
+    console.log('✅ Form data populated:', {
+      name: formData.value.name,
+      title: formData.value.title,
+      skillsCount: formData.value.skills.length,
+      experienceCount: formData.value.experience.length,
+      educationCount: formData.value.education.length,
+      socialLinksCount: formData.value.social_links.length
+    })
   } catch (err) {
-    console.error('Failed to load settings:', err)
+    console.error('❌ Failed to load settings:', err)
     error.value = 'Failed to load settings. Please refresh the page.'
     uiStore.showError(error.value, 'Load Failed')
   } finally {
     loading.value = false
+    isLoadingSettings.value = false
   }
 }
 

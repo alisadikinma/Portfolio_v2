@@ -71,7 +71,19 @@ class SettingsController extends Controller
         DB::beginTransaction();
 
         try {
+            Log::info('🔵 updateAboutSettings - Request method:', [
+                'method' => $request->method(),
+                'content_type' => $request->header('Content-Type'),
+                'has_files' => $request->hasFile('profile_photo'),
+                'all_keys' => array_keys($request->all())
+            ]);
+            
             $validated = $request->validated();
+            
+            Log::info('📝 About settings update started', [
+                'validated_keys' => array_keys($validated),
+                'has_photo' => $request->hasFile('profile_photo')
+            ]);
 
             // Handle profile photo upload
             if ($request->hasFile('profile_photo')) {
@@ -116,7 +128,13 @@ class SettingsController extends Controller
                     $type = 'image';
                 }
 
-                Setting::updateOrCreate(
+                Log::info('💾 Saving setting', [
+                    'key' => $key,
+                    'type' => $type,
+                    'value_length' => strlen($value)
+                ]);
+
+                $setting = Setting::updateOrCreate(
                     [
                         'key' => $key,
                         'group' => 'about'
@@ -126,9 +144,17 @@ class SettingsController extends Controller
                         'type' => $type
                     ]
                 );
+                
+                Log::info('✅ Setting saved', [
+                    'id' => $setting->id,
+                    'key' => $setting->key,
+                    'updated' => $setting->wasRecentlyCreated ? 'created' : 'updated'
+                ]);
             }
 
             DB::commit();
+            
+            Log::info('✅ About settings update completed successfully');
 
             // Fetch updated settings
             $settings = Setting::byGroup('about')->get();
@@ -170,7 +196,14 @@ class SettingsController extends Controller
     public function getSiteSettings(): JsonResponse
     {
         try {
+            Log::info('🔍 getSiteSettings - Fetching settings from database');
+            
             $settings = Setting::byGroup('site')->get();
+            
+            Log::info('📥 Found settings:', [
+                'count' => $settings->count(),
+                'keys' => $settings->pluck('key')->toArray()
+            ]);
 
             $siteData = [];
             foreach ($settings as $setting) {
@@ -195,14 +228,19 @@ class SettingsController extends Controller
                 'meta_tags' => [],
                 'analytics_code' => ''
             ], $siteData);
+            
+            Log::info('✅ Site settings fetched successfully', [
+                'keys' => array_keys($siteData)
+            ]);
 
             return response()->json([
                 'success' => true,
                 'data' => $siteData
             ]);
         } catch (\Exception $e) {
-            Log::error('Failed to fetch site settings', [
-                'error' => $e->getMessage()
+            Log::error('❌ Failed to fetch site settings', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
 
             return response()->json([
@@ -220,7 +258,19 @@ class SettingsController extends Controller
         DB::beginTransaction();
 
         try {
+            Log::info('🔵 updateSiteSettings - Request method:', [
+                'method' => $request->method(),
+                'content_type' => $request->header('Content-Type'),
+                'has_files' => $request->hasFile('site_logo'),
+                'all_keys' => array_keys($request->all())
+            ]);
+            
             $validated = $request->validated();
+            
+            Log::info('📝 Site settings update started', [
+                'validated_keys' => array_keys($validated),
+                'has_logo' => $request->hasFile('site_logo')
+            ]);
 
             // Handle site logo upload
             if ($request->hasFile('site_logo')) {
@@ -267,7 +317,13 @@ class SettingsController extends Controller
                     $type = 'textarea';
                 }
 
-                Setting::updateOrCreate(
+                Log::info('💾 Saving setting', [
+                    'key' => $key,
+                    'type' => $type,
+                    'value_length' => strlen($value)
+                ]);
+
+                $setting = Setting::updateOrCreate(
                     [
                         'key' => $key,
                         'group' => 'site'
@@ -277,9 +333,17 @@ class SettingsController extends Controller
                         'type' => $type
                     ]
                 );
+                
+                Log::info('✅ Setting saved', [
+                    'id' => $setting->id,
+                    'key' => $setting->key,
+                    'updated' => $setting->wasRecentlyCreated ? 'created' : 'updated'
+                ]);
             }
 
             DB::commit();
+            
+            Log::info('✅ Site settings update completed successfully');
 
             // Fetch updated settings
             $settings = Setting::byGroup('site')->get();

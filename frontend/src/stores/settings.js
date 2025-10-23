@@ -40,15 +40,21 @@ export const useSettingsStore = defineStore('settings', {
     async fetchAboutSettings() {
       this.loading = true
       this.error = null
+      
+      console.log('🔍 Fetching about settings from API...')
 
       try {
         const response = await api.get('/admin/settings/about')
+        
+        console.log('📥 API Response:', response.data)
 
         if (response.data.success) {
           this.aboutSettings = {
             ...this.aboutSettings,
             ...response.data.data
           }
+          
+          console.log('✅ Store updated:', this.aboutSettings)
         }
 
         return this.aboutSettings
@@ -65,14 +71,15 @@ export const useSettingsStore = defineStore('settings', {
       this.error = null
 
       try {
-        // If settingsData is FormData, set proper headers
+        // If settingsData is FormData, use POST with _method spoofing (Laravel requirement)
         const config = settingsData instanceof FormData ? {
           headers: {
             'Content-Type': 'multipart/form-data'
           }
         } : {}
 
-        const response = await api.put('/admin/settings/about', settingsData, config)
+        // Use POST for FormData (Laravel doesn't support PUT with FormData)
+        const response = await api.post('/admin/settings/about', settingsData, config)
 
         if (response.data.success) {
           this.aboutSettings = {
@@ -93,19 +100,26 @@ export const useSettingsStore = defineStore('settings', {
     async fetchSiteSettings() {
       this.loading = true
       this.error = null
+      
+      console.log('🔍 Fetching site settings from API...')
 
       try {
         const response = await api.get('/admin/settings/site')
+        
+        console.log('📥 API Response:', response.data)
 
         if (response.data.success) {
           this.siteSettings = {
             ...this.siteSettings,
             ...response.data.data
           }
+          
+          console.log('✅ Store updated:', this.siteSettings)
         }
 
         return this.siteSettings
       } catch (error) {
+        console.error('❌ Failed to fetch site settings:', error)
         this.error = error.response?.data?.message || 'Failed to fetch site settings'
         throw error
       } finally {
@@ -117,25 +131,39 @@ export const useSettingsStore = defineStore('settings', {
       this.loading = true
       this.error = null
 
+      console.log('🔵 updateSiteSettings - Starting update...', {
+        isFormData: settingsData instanceof FormData
+      })
+
       try {
-        // If settingsData is FormData, set proper headers
+        // If settingsData is FormData, use POST with _method spoofing (Laravel requirement)
         const config = settingsData instanceof FormData ? {
           headers: {
             'Content-Type': 'multipart/form-data'
           }
         } : {}
 
-        const response = await api.put('/admin/settings/site', settingsData, config)
+        // Add _method for Laravel if using FormData
+        if (settingsData instanceof FormData && !settingsData.has('_method')) {
+          settingsData.append('_method', 'PUT')
+        }
+
+        // Use POST for FormData (Laravel doesn't support PUT with FormData)
+        const response = await api.post('/admin/settings/site', settingsData, config)
+
+        console.log('📥 Response received:', response.data)
 
         if (response.data.success) {
           this.siteSettings = {
             ...this.siteSettings,
             ...response.data.data
           }
+          console.log('✅ Store updated successfully:', this.siteSettings)
         }
 
         return this.siteSettings
       } catch (error) {
+        console.error('❌ Store update failed:', error)
         this.error = error.response?.data?.message || 'Failed to update site settings'
         throw error
       } finally {

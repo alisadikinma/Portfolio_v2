@@ -63,14 +63,48 @@ class UpdateAboutSettingsRequest extends FormRequest
      */
     protected function prepareForValidation(): void
     {
+        \Log::info('📥 prepareForValidation - Raw request data:', [
+            'all_keys' => array_keys($this->all()),
+            'has_name' => $this->has('name'),
+            'has_title' => $this->has('title'),
+            'has_bio' => $this->has('bio'),
+            'name_value' => $this->input('name'),
+            'title_value' => $this->input('title')
+        ]);
+        
+        $data = [];
+        
+        // Handle basic text fields
+        if ($this->has('name')) $data['name'] = $this->input('name');
+        if ($this->has('title')) $data['title'] = $this->input('title');
+        if ($this->has('bio')) $data['bio'] = $this->input('bio');
+        
         // Decode JSON strings from FormData
         foreach (['skills', 'experience', 'education', 'social_links'] as $field) {
-            if ($this->has($field) && is_string($this->input($field))) {
-                $decoded = json_decode($this->input($field), true);
-                if (json_last_error() === JSON_ERROR_NONE) {
-                    $this->merge([$field => $decoded]);
+            if ($this->has($field)) {
+                $value = $this->input($field);
+                
+                // If it's a string, try to decode it
+                if (is_string($value) && !empty($value)) {
+                    $decoded = json_decode($value, true);
+                    if (json_last_error() === JSON_ERROR_NONE) {
+                        $data[$field] = $decoded;
+                    } else {
+                        // If decode fails, keep as string
+                        $data[$field] = $value;
+                    }
+                } else {
+                    // If it's already an array or empty, use as is
+                    $data[$field] = $value;
                 }
             }
+        }
+        
+        if (!empty($data)) {
+            \Log::info('🔄 Merging prepared data:', array_keys($data));
+            $this->merge($data);
+        } else {
+            \Log::warning('⚠️ No data to merge in prepareForValidation');
         }
     }
 

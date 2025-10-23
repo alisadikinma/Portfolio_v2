@@ -18,7 +18,7 @@ export function useToast() {
    * @param {number} duration - Duration in ms
    */
   const success = (message, duration = 3000) => {
-    return uiStore.success(message, duration)
+    return uiStore.showSuccess(message, null, duration)
   }
 
   /**
@@ -27,7 +27,7 @@ export function useToast() {
    * @param {number} duration - Duration in ms
    */
   const error = (message, duration = 5000) => {
-    return uiStore.error(message, duration)
+    return uiStore.showError(message, null, duration)
   }
 
   /**
@@ -36,7 +36,7 @@ export function useToast() {
    * @param {number} duration - Duration in ms
    */
   const warning = (message, duration = 4000) => {
-    return uiStore.warning(message, duration)
+    return uiStore.showWarning(message, null, duration)
   }
 
   /**
@@ -45,7 +45,7 @@ export function useToast() {
    * @param {number} duration - Duration in ms
    */
   const info = (message, duration = 3000) => {
-    return uiStore.info(message, duration)
+    return uiStore.showInfo(message, null, duration)
   }
 
   /**
@@ -53,7 +53,7 @@ export function useToast() {
    * @param {Object} options - Toast configuration
    */
   const show = (options) => {
-    return uiStore.showToast(options)
+    return uiStore.addToast(options)
   }
 
   /**
