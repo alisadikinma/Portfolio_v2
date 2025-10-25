@@ -18,7 +18,6 @@ class Award extends Model
         'image',
         'received_at',
         'order',
-        'featured_gallery_id'
     ];
 
     protected $casts = [
@@ -28,30 +27,21 @@ class Award extends Model
     protected $appends = ['total_photos'];
 
     /**
-     * Award has many galleries (many-to-many)
+     * Award has many galleries
      */
     public function galleries()
     {
-        return $this->belongsToMany(Gallery::class, 'award_gallery')
-                    ->withPivot('sort_order')
-                    ->withTimestamps()
-                    ->orderBy('sort_order');
+        return $this->hasMany(Gallery::class)->orderBy('sort_order');
     }
 
     /**
-     * Featured gallery for award
-     */
-    public function featuredGallery()
-    {
-        return $this->belongsTo(Gallery::class, 'featured_gallery_id');
-    }
-
-    /**
-     * Get total photo count from all linked galleries
-     * Each gallery has one image
+     * Get total photo count from all gallery items
      */
     public function getTotalPhotosAttribute()
     {
-        return $this->galleries->count();
+        return $this->galleries()
+            ->withCount('items')
+            ->get()
+            ->sum('items_count');
     }
 }

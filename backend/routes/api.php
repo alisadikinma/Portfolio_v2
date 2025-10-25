@@ -18,6 +18,8 @@ use App\Http\Controllers\Api\SitemapController;
 use App\Http\Controllers\Api\MenuItemController;
 use App\Http\Controllers\Api\PageSectionController;
 use App\Http\Controllers\Api\Admin\DashboardController;
+use App\Http\Controllers\Api\GalleryItemController;
+use App\Http\Controllers\Api\ServiceController;
 
 // ============================================
 // Authentication Routes
@@ -67,9 +69,10 @@ Route::prefix('categories')->group(function () {
 });
 
 // Public Gallery Routes
-Route::prefix('gallery')->group(function () {
+Route::prefix('galleries')->group(function () {
     Route::get('/', [GalleryController::class, 'index']);
     Route::get('/{id}', [GalleryController::class, 'show']);
+    Route::get('/{galleryId}/items', [GalleryItemController::class, 'index']);
 });
 
 // Public Contact Route (Rate Limited)
@@ -79,6 +82,12 @@ Route::post('/contact', [ContactController::class, 'store'])->middleware('thrott
 Route::prefix('testimonials')->group(function () {
     Route::get('/', [TestimonialController::class, 'index']);
     Route::get('/{id}', [TestimonialController::class, 'show']);
+});
+
+// Public Services Routes
+Route::prefix('services')->group(function () {
+    Route::get('/', [ServiceController::class, 'index']);
+    Route::get('/{slug}', [ServiceController::class, 'show']);
 });
 
 // Public Settings Routes
@@ -151,14 +160,20 @@ Route::middleware(['auth:sanctum'])->prefix('admin/categories')->group(function 
 });
 
 // Admin Gallery Routes
-Route::middleware(['auth:sanctum'])->prefix('admin/gallery')->group(function () {
+Route::middleware(['auth:sanctum'])->prefix('admin/galleries')->group(function () {
     Route::get('/', [GalleryController::class, 'index']);
     Route::get('/{id}', [GalleryController::class, 'show']);
     Route::post('/', [GalleryController::class, 'store']);
-    Route::post('/bulk-upload', [GalleryController::class, 'bulkUpload']);
     Route::put('/{id}', [GalleryController::class, 'update']);
     Route::delete('/{id}', [GalleryController::class, 'destroy']);
-    Route::post('/bulk-delete', [GalleryController::class, 'bulkDelete']);
+
+    // Gallery Items Routes (nested resource)
+    Route::get('/{galleryId}/items', [GalleryItemController::class, 'index']);
+    Route::post('/{galleryId}/items', [GalleryItemController::class, 'store']);
+    Route::post('/{galleryId}/items/bulk-upload', [GalleryItemController::class, 'bulkUpload']);
+    Route::get('/{galleryId}/items/{id}', [GalleryItemController::class, 'show']);
+    Route::put('/{galleryId}/items/{id}', [GalleryItemController::class, 'update']);
+    Route::delete('/{galleryId}/items/{id}', [GalleryItemController::class, 'destroy']);
 });
 
 // Admin Testimonials Routes
@@ -168,6 +183,15 @@ Route::middleware(['auth:sanctum'])->prefix('admin/testimonials')->group(functio
     Route::post('/', [TestimonialController::class, 'store']);
     Route::put('/{id}', [TestimonialController::class, 'update']);
     Route::delete('/{id}', [TestimonialController::class, 'destroy']);
+});
+
+// Admin Services Routes
+Route::middleware(['auth:sanctum'])->prefix('admin/services')->group(function () {
+    Route::get('/', [ServiceController::class, 'index']);
+    Route::get('/{slug}', [ServiceController::class, 'show']);
+    Route::post('/', [ServiceController::class, 'store']);
+    Route::put('/{slug}', [ServiceController::class, 'update']);
+    Route::delete('/{slug}', [ServiceController::class, 'destroy']);
 });
 
 // Admin Contact Routes
