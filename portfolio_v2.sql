@@ -3,9 +3,9 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Oct 30, 2025 at 01:41 AM
--- Server version: 10.4.32-MariaDB
--- PHP Version: 8.2.12
+-- Generation Time: Oct 30, 2025 at 11:03 AM
+-- Server version: 10.4.28-MariaDB
+-- PHP Version: 8.2.4
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -64,7 +64,7 @@ CREATE TABLE `awards` (
   `credential_id` varchar(255) DEFAULT NULL,
   `credential_url` varchar(255) DEFAULT NULL,
   `image` varchar(255) DEFAULT NULL,
-  `received_at` date NOT NULL,
+  `received_at` varchar(100) NOT NULL,
   `is_active` tinyint(1) NOT NULL DEFAULT 1,
   `sort_order` int(11) NOT NULL DEFAULT 0,
   `created_at` timestamp NULL DEFAULT NULL,
@@ -76,12 +76,8 @@ CREATE TABLE `awards` (
 --
 
 INSERT INTO `awards` (`id`, `title`, `description`, `organization`, `credential_id`, `credential_url`, `image`, `received_at`, `is_active`, `sort_order`, `created_at`, `updated_at`) VALUES
-(1, 'Best Web Developer Award 2024', 'Recognized for outstanding achievement in modern web development, creating innovative and user-centric solutions using cutting-edge technologies.', 'International Web Development Association', 'IWDA-2024-001', 'https://example.com/credentials/iwda-2024-001', 'awards/web-developer-2024.jpg', '2024-06-15', 1, 1, '2025-10-29 16:26:35', '2025-10-29 16:26:35'),
-(2, 'Excellence in Full-Stack Development', 'Awarded for demonstrating exceptional skills in both frontend and backend technologies, with a focus on scalable architecture and clean code practices.', 'Tech Excellence Foundation', 'TEF-FULLSTACK-2023', 'https://example.com/credentials/tef-fullstack-2023', 'awards/fullstack-excellence.jpg', '2023-11-20', 1, 2, '2025-10-29 16:26:35', '2025-10-29 16:26:35'),
-(3, 'Innovation in Laravel Development', 'Honored for creating robust and maintainable Laravel applications with advanced features and best practices implementation.', 'Laravel Community Excellence Awards', 'LCEA-2023-042', 'https://example.com/credentials/lcea-2023-042', 'awards/laravel-innovation.jpg', '2023-09-10', 1, 3, '2025-10-29 16:26:35', '2025-10-29 16:26:35'),
-(4, 'Outstanding Vue.js Implementation', 'Recognized for building performant and elegant single-page applications using Vue 3 with modern composition API patterns.', 'Frontend Developers Guild', 'FDG-VUE-2023', 'https://example.com/credentials/fdg-vue-2023', 'awards/vue-outstanding.jpg', '2023-07-05', 1, 4, '2025-10-29 16:26:35', '2025-10-29 16:26:35'),
-(5, 'Best UI/UX Design Implementation', 'Awarded for exceptional attention to user experience design, accessibility standards, and creating intuitive interfaces that delight users.', 'Design & Development Summit', 'DDS-UIUX-2022', 'https://example.com/credentials/dds-uiux-2022', 'awards/uiux-best.jpg', '2022-12-18', 1, 5, '2025-10-29 16:26:35', '2025-10-29 16:26:35'),
-(6, 'Database Architecture Excellence', 'Recognized for designing and implementing efficient database schemas with optimal query performance and data integrity.', 'Database Professionals Association', 'DPA-ARCH-2022', 'https://example.com/credentials/dpa-arch-2022', 'awards/database-excellence.jpg', '2022-08-22', 1, 6, '2025-10-29 16:26:35', '2025-10-29 16:26:35');
+(7, '1st Place Winner Nextdev Startup Competition', '<p>Achieved first place in prestigious Nextdev Startup Competition, demonstrating innovative digital solutions and entrepreneurial excellence.</p>', 'TELKOMSEL', 'AWARD-1761800275656-D53KZV', 'https://credentials.portfolio.com/verify/AWARD-1761800275656-D53KZV', '/uploads/awards/1761800305_award-nextdev.jpg', '2018', 1, 0, '2025-10-29 21:58:25', '2025-10-29 21:58:25'),
+(8, '1st Place Winner Wild Card Fenox Startup World Cup Competition', '<p>Won first place in Wild Card category of Fenox Startup World Cup Competition, showcasing global-level innovation and business excellence.</p>', 'FENOX - BEKRAF', 'AWARD-1761804295613-J5Q14Z', 'https://credentials.portfolio.com/verify/AWARD-1761804295613-J5Q14Z', '/uploads/awards/1761804321_award-fenox.jpg', '2017', 1, 2, '2025-10-29 23:05:21', '2025-10-29 23:05:21');
 
 -- --------------------------------------------------------
 
@@ -221,7 +217,8 @@ CREATE TABLE `galleries` (
 --
 
 INSERT INTO `galleries` (`id`, `title`, `description`, `company`, `period`, `thumbnail`, `award_id`, `is_active`, `sort_order`, `created_at`, `updated_at`) VALUES
-(9, 'Nextdev Telkomsel Winner', 'Nextdev Telkomsel Winner', NULL, NULL, 'gallery/items/1761784324_9_0.jpg', NULL, 1, 8, '2025-10-29 17:32:04', '2025-10-29 17:32:04');
+(11, '1st Place Winner Nextdev Startup Competition', 'Recognized as Telkomsel’s flagship startup program, NextDev empowers young innovators to create impactful digital solutions. Winning 1st place highlights innovation, vision, and execution in driving Indonesia’s digital transformation and shaping future global leaders.', NULL, NULL, '/storage/gallery/thumbnails/1761792762_thumb_1st-place-winner-nextdev-startup-competition.png', 7, 1, 0, '2025-10-29 19:52:42', '2025-10-29 21:58:28'),
+(12, '1st Wild Card Winner – Startup World Cup', 'Organized by Fenox Venture Capital in collaboration with Indonesia’s Creative Economy Agency (BEKRAF), the Startup World Cup is a prestigious global competition connecting startups with top investors and tech leaders. Winning the Wild Card Round in Indonesia highlighted innovation, resilience, and global potential—granting the opportunity to join the regional finals and gain exposure to Silicon Valley’s ecosystem.', NULL, NULL, '/storage/gallery/thumbnails/1761793546_thumb_1st-wild-card-winner-startup-world-cup.png', 8, 1, 0, '2025-10-29 20:05:46', '2025-10-29 23:05:23');
 
 -- --------------------------------------------------------
 
@@ -246,11 +243,15 @@ CREATE TABLE `gallery_items` (
 --
 
 INSERT INTO `gallery_items` (`id`, `gallery_id`, `type`, `file_path`, `title`, `description`, `sequence`, `created_at`, `updated_at`) VALUES
-(18, 9, 'image', 'gallery/items/1761784324_9_0.jpg', 'Nextdev Telkomsel Winner - Image 1', NULL, 0, '2025-10-29 17:32:04', '2025-10-29 17:32:04'),
-(19, 9, 'image', 'gallery/items/1761784324_9_1.jpg', 'Nextdev Telkomsel Winner - Image 2', NULL, 1, '2025-10-29 17:32:04', '2025-10-29 17:32:04'),
-(20, 9, 'image', 'gallery/items/1761784324_9_2.jpg', 'Nextdev Telkomsel Winner - Image 3', NULL, 2, '2025-10-29 17:32:04', '2025-10-29 17:32:04'),
-(21, 9, 'image', 'gallery/items/1761784324_9_3.jpg', 'Nextdev Telkomsel Winner - Image 4', NULL, 3, '2025-10-29 17:32:04', '2025-10-29 17:32:04'),
-(22, 9, 'image', 'gallery/items/1761784324_9_4.jpg', 'Nextdev Telkomsel Winner - Image 5', NULL, 4, '2025-10-29 17:32:04', '2025-10-29 17:32:04');
+(28, 11, 'image', 'gallery/items/1761792762_item_11_0.jpg', '1st Place Winner Nextdev Startup Competition - Image 1', NULL, 0, '2025-10-29 19:52:42', '2025-10-29 19:52:42'),
+(29, 11, 'image', 'gallery/items/1761792762_item_11_1.jpg', '1st Place Winner Nextdev Startup Competition - Image 2', NULL, 1, '2025-10-29 19:52:42', '2025-10-29 19:52:42'),
+(30, 11, 'image', 'gallery/items/1761792762_item_11_2.jpg', '1st Place Winner Nextdev Startup Competition - Image 3', NULL, 2, '2025-10-29 19:52:42', '2025-10-29 19:52:42'),
+(31, 11, 'image', 'gallery/items/1761792762_item_11_3.jpg', '1st Place Winner Nextdev Startup Competition - Image 4', NULL, 3, '2025-10-29 19:52:42', '2025-10-29 19:52:42'),
+(32, 11, 'image', 'gallery/items/1761792762_item_11_4.jpg', '1st Place Winner Nextdev Startup Competition - Image 5', NULL, 4, '2025-10-29 19:52:42', '2025-10-29 19:52:42'),
+(33, 12, 'image', 'gallery/items/1761793546_item_12_0.jpg', '1st Wild Card Winner – Startup World Cup - Image 1', NULL, 0, '2025-10-29 20:05:46', '2025-10-29 20:05:46'),
+(34, 12, 'image', 'gallery/items/1761793546_item_12_1.jpg', '1st Wild Card Winner – Startup World Cup - Image 2', NULL, 1, '2025-10-29 20:05:46', '2025-10-29 20:05:46'),
+(35, 12, 'image', 'gallery/items/1761793546_item_12_2.jpg', '1st Wild Card Winner – Startup World Cup - Image 3', NULL, 2, '2025-10-29 20:05:46', '2025-10-29 20:05:46'),
+(36, 12, 'image', 'gallery/items/1761793546_item_12_3.jpg', '1st Wild Card Winner – Startup World Cup - Image 4', NULL, 3, '2025-10-29 20:05:46', '2025-10-29 20:05:46');
 
 -- --------------------------------------------------------
 
@@ -368,7 +369,8 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES
 (31, '2025_10_16_120001_create_page_sections_table', 1),
 (32, '2025_10_16_120002_add_cta_fields_to_projects_table', 1),
 (33, '2025_10_16_150000_add_related_projects_to_projects_table', 1),
-(34, '2025_10_25_083505_restructure_galleries_system', 1);
+(34, '2025_10_25_083505_restructure_galleries_system', 1),
+(35, '2025_10_30_000001_change_received_at_to_string_in_awards_table', 2);
 
 -- --------------------------------------------------------
 
@@ -464,7 +466,24 @@ INSERT INTO `personal_access_tokens` (`id`, `tokenable_type`, `tokenable_id`, `n
 (6, 'App\\Models\\User', 1, 'auth-token', '003058269f713c258833e45d9b3e6be25a6b1c338def0f87086f9778f9b9eb75', '[\"*\"]', '2025-10-29 17:21:07', NULL, '2025-10-29 17:21:01', '2025-10-29 17:21:07'),
 (7, 'App\\Models\\User', 1, 'auth-token', '520cae5ce819be685d7429e9dc145ae9787097345cfdfd6359f19318310a2671', '[\"*\"]', '2025-10-29 17:24:58', NULL, '2025-10-29 17:24:45', '2025-10-29 17:24:58'),
 (8, 'App\\Models\\User', 1, 'auth-token', '824aa87b4cff87457773a0fba3a36947d7db17faf511ef4f37dafd3dfdba33dc', '[\"*\"]', '2025-10-29 17:32:29', NULL, '2025-10-29 17:29:14', '2025-10-29 17:32:29'),
-(9, 'App\\Models\\User', 1, 'auth-token', 'ed3160ae30e8597f290eda01246d4fcc2219738aa8b7c337a1894c06331899c6', '[\"*\"]', NULL, NULL, '2025-10-29 17:40:46', '2025-10-29 17:40:46');
+(9, 'App\\Models\\User', 1, 'auth-token', 'ed3160ae30e8597f290eda01246d4fcc2219738aa8b7c337a1894c06331899c6', '[\"*\"]', NULL, NULL, '2025-10-29 17:40:46', '2025-10-29 17:40:46'),
+(10, 'App\\Models\\User', 1, 'auth-token', '2093a5f7bf982929f90326825ac9ceb1e4567fd1d09d99542accbac670fcf83a', '[\"*\"]', '2025-10-29 18:52:07', NULL, '2025-10-29 18:51:47', '2025-10-29 18:52:07'),
+(11, 'App\\Models\\User', 1, 'auth-token', 'ca5eaed1ea6c7f16d63e5e24cd19934cdb91279eec2e99a9563cc7c70c915188', '[\"*\"]', '2025-10-29 18:58:18', NULL, '2025-10-29 18:58:15', '2025-10-29 18:58:18'),
+(12, 'App\\Models\\User', 3, 'auth-token', 'd0df102c7847a440320ef5473722555932850062df80ee8e5d6c6766f6143526', '[\"*\"]', NULL, NULL, '2025-10-29 19:34:19', '2025-10-29 19:34:19'),
+(13, 'App\\Models\\User', 3, 'auth-token', '01e63c71b290d26b022c5b69ea8bfcdd5514eba8ad48d7960c4b9144f90adba1', '[\"*\"]', '2025-10-29 19:35:20', NULL, '2025-10-29 19:35:18', '2025-10-29 19:35:20'),
+(14, 'App\\Models\\User', 3, 'auth-token', 'dfb0be9f7a1e7711e8062698a2f759806eb7cf6314b8e66e3bc9a936441518ec', '[\"*\"]', '2025-10-29 19:38:00', NULL, '2025-10-29 19:36:32', '2025-10-29 19:38:00'),
+(15, 'App\\Models\\User', 3, 'auth-token', '935fec5c904d3d45e3511514b101b632c2ebfc19be1adf8f17869c33a5561042', '[\"*\"]', NULL, NULL, '2025-10-29 19:43:11', '2025-10-29 19:43:11'),
+(16, 'App\\Models\\User', 3, 'auth-token', '9741f8ada8163bc11ae2e6ade6568019e07cfe530cd65b3839ca2b9d9fd748cd', '[\"*\"]', '2025-10-29 21:12:11', NULL, '2025-10-29 19:49:45', '2025-10-29 21:12:11'),
+(17, 'App\\Models\\User', 3, 'auth-token', 'ae7906eb2b001bc2749c024d285473260a671c17eaeb73abc7b2c6c29a751a1a', '[\"*\"]', '2025-10-29 21:13:04', NULL, '2025-10-29 21:12:54', '2025-10-29 21:13:04'),
+(19, 'App\\Models\\User', 3, 'auth-token', '09e93c7b86b8717298a0f19db4464c840c4720d0f790143780f3c43260097e4b', '[\"*\"]', '2025-10-29 21:39:40', NULL, '2025-10-29 21:33:14', '2025-10-29 21:39:40'),
+(20, 'App\\Models\\User', 3, 'auth-token', '29f7cbd1a66a3d0b03de28edf361d91f056229734bc82e16a85df312ab014559', '[\"*\"]', '2025-10-29 21:51:58', NULL, '2025-10-29 21:43:04', '2025-10-29 21:51:58'),
+(21, 'App\\Models\\User', 3, 'auth-token', 'e3850d27a5c97f77a206eb54dc768fbd7ce683a254bd29cc3d88afc3b5d7400d', '[\"*\"]', '2025-10-29 22:25:31', NULL, '2025-10-29 21:54:43', '2025-10-29 22:25:31'),
+(22, 'App\\Models\\User', 3, 'auth-token', 'b3129caf1b512ab8b924e22b2697fc265ce407a0fbf1265d57fb1159e75b591a', '[\"*\"]', '2025-10-29 22:27:20', NULL, '2025-10-29 22:27:18', '2025-10-29 22:27:20'),
+(23, 'App\\Models\\User', 3, 'auth-token', 'bf01b240f8349fdf15ecfd0673daac4089e6e60e4c75cd55a5fad5489f400130', '[\"*\"]', '2025-10-29 22:28:07', NULL, '2025-10-29 22:27:44', '2025-10-29 22:28:07'),
+(24, 'App\\Models\\User', 3, 'auth-token', 'c9e3f16825911d361c6a248c9384d9414d0ebbbdcd92c5325a4b4eefd1fbffb9', '[\"*\"]', '2025-10-29 22:33:36', NULL, '2025-10-29 22:30:38', '2025-10-29 22:33:36'),
+(25, 'App\\Models\\User', 3, 'auth-token', '06b2da25f59d3c1ac736cb271a999a81b787fa28827877622311763cc0fc7f0f', '[\"*\"]', '2025-10-29 22:34:21', NULL, '2025-10-29 22:33:58', '2025-10-29 22:34:21'),
+(26, 'App\\Models\\User', 3, 'auth-token', '610914f4c78fb6c62479c46546d2dda3e788a3f8a8879776d3725472363b55a7', '[\"*\"]', '2025-10-29 22:35:58', NULL, '2025-10-29 22:35:56', '2025-10-29 22:35:58'),
+(27, 'App\\Models\\User', 3, 'auth-token', 'de101d4d588e7aa68a3909d12925d36be3a82b5f26fe81e5ee1028f43ddb4bf7', '[\"*\"]', '2025-10-29 23:05:26', NULL, '2025-10-29 22:36:52', '2025-10-29 23:05:26');
 
 -- --------------------------------------------------------
 
@@ -686,6 +705,20 @@ CREATE TABLE `settings` (
   `updated_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+--
+-- Dumping data for table `settings`
+--
+
+INSERT INTO `settings` (`id`, `key`, `value`, `group`, `type`, `created_at`, `updated_at`) VALUES
+(1, 'name', 'Ali Sadikin', 'about', 'text', '2025-10-30 03:01:58', '2025-10-30 03:01:58'),
+(2, 'title', 'Full-Stack Developer & Digital Solutions Architect', 'about', 'text', '2025-10-30 03:01:58', '2025-10-30 03:01:58'),
+(3, 'bio', '<p>I\'m a passionate full-stack developer with over 16 years of experience building innovative web applications and digital solutions. I specialize in modern JavaScript frameworks like Vue.js and React, backend development with Laravel and Node.js, and creating seamless user experiences.</p><p>My journey in software development has been driven by a constant desire to solve complex problems with elegant solutions. I believe in writing clean, maintainable code and staying at the forefront of technological advancements.</p>', 'about', 'textarea', '2025-10-30 03:01:58', '2025-10-30 03:01:58'),
+(4, 'profile_photo', NULL, 'about', 'image', '2025-10-30 03:01:58', '2025-10-30 03:01:58'),
+(5, 'skills', '[\"Vue.js\",\"React\",\"Laravel\",\"PHP\",\"Node.js\",\"TypeScript\",\"MySQL\",\"MongoDB\",\"Tailwind CSS\",\"Docker\",\"AWS\",\"Git\",\"REST API\",\"GraphQL\"]', 'about', 'json', '2025-10-30 03:01:58', '2025-10-30 03:01:58'),
+(6, 'experience', '[{\"position\":\"Senior Full-Stack Developer\",\"company\":\"Tech Innovations Inc.\",\"period\":\"2020 - Present\",\"description\":\"Leading development of enterprise web applications using Vue.js and Laravel. Mentoring junior developers and architecting scalable solutions.\"},{\"position\":\"Full-Stack Developer\",\"company\":\"Digital Solutions Co.\",\"period\":\"2017 - 2020\",\"description\":\"Developed and maintained multiple client projects using modern web technologies. Implemented CI\\/CD pipelines and improved deployment processes.\"},{\"position\":\"Frontend Developer\",\"company\":\"Creative Web Agency\",\"period\":\"2015 - 2017\",\"description\":\"Created responsive and interactive user interfaces using Vue.js and React. Collaborated with designers to implement pixel-perfect designs.\"}]', 'about', 'json', '2025-10-30 03:01:58', '2025-10-30 03:01:58'),
+(7, 'education', '[{\"degree\":\"Bachelor of Computer Science\",\"institution\":\"University of Technology\",\"period\":\"2011 - 2015\",\"description\":\"Specialized in Software Engineering and Web Technologies\"},{\"degree\":\"Certified AWS Solutions Architect\",\"institution\":\"Amazon Web Services\",\"period\":\"2021\",\"description\":\"Professional certification for cloud architecture and deployment\"}]', 'about', 'json', '2025-10-30 03:01:58', '2025-10-30 03:01:58'),
+(8, 'social_links', '[{\"platform\":\"github\",\"url\":\"https:\\/\\/github.com\\/alisadikinma\"},{\"platform\":\"linkedin\",\"url\":\"https:\\/\\/linkedin.com\\/in\\/alisadikin\"},{\"platform\":\"twitter\",\"url\":\"https:\\/\\/twitter.com\\/alisadikin\"}]', 'about', 'json', '2025-10-30 03:01:58', '2025-10-30 03:01:58');
+
 -- --------------------------------------------------------
 
 --
@@ -728,7 +761,8 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `name`, `email`, `email_verified_at`, `password`, `remember_token`, `created_at`, `updated_at`) VALUES
-(1, 'Ali Sadikin', 'admin@alisadikinma.com', '2025-10-29 16:26:35', '$2y$12$2dxq8so7MmfFtJ7mZ7rDMuE3Ijp7ngYD.xGbeoM9F6NoAaD8ULnZW', NULL, '2025-10-29 16:26:35', '2025-10-29 16:26:35');
+(3, 'Ali Sadikin', 'admin@alisadikinma.com', '2025-10-29 19:08:06', '$2y$12$X2NcYoE6T9UZ9/pr7Ij83.m1BIRd2zQCEYSdyTpuOCfFurk1oXFTe', NULL, '2025-10-29 19:08:06', '2025-10-29 19:08:06'),
+(4, 'Admin', 'admin@portfolio.com', '2025-10-29 19:08:06', '$2y$12$uD.a3Vj36yv7eOWeq3dW4Oo0Wh9Vr8vqqqwtXgOR/0HALzGRIdPk6', NULL, '2025-10-29 19:08:06', '2025-10-29 19:08:06');
 
 --
 -- Indexes for dumped tables
@@ -982,7 +1016,7 @@ ALTER TABLE `automation_logs`
 -- AUTO_INCREMENT for table `awards`
 --
 ALTER TABLE `awards`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- AUTO_INCREMENT for table `award_gallery`
@@ -1012,13 +1046,13 @@ ALTER TABLE `failed_jobs`
 -- AUTO_INCREMENT for table `galleries`
 --
 ALTER TABLE `galleries`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
 
 --
 -- AUTO_INCREMENT for table `gallery_items`
 --
 ALTER TABLE `gallery_items`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=23;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=37;
 
 --
 -- AUTO_INCREMENT for table `jobs`
@@ -1036,7 +1070,7 @@ ALTER TABLE `menu_items`
 -- AUTO_INCREMENT for table `migrations`
 --
 ALTER TABLE `migrations`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=35;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=36;
 
 --
 -- AUTO_INCREMENT for table `newsletters`
@@ -1054,7 +1088,7 @@ ALTER TABLE `page_sections`
 -- AUTO_INCREMENT for table `personal_access_tokens`
 --
 ALTER TABLE `personal_access_tokens`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=28;
 
 --
 -- AUTO_INCREMENT for table `posts`
@@ -1090,7 +1124,7 @@ ALTER TABLE `services`
 -- AUTO_INCREMENT for table `settings`
 --
 ALTER TABLE `settings`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- AUTO_INCREMENT for table `testimonials`
@@ -1102,7 +1136,7 @@ ALTER TABLE `testimonials`
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- Constraints for dumped tables
