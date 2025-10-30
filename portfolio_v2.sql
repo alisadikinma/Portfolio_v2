@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Oct 27, 2025 at 12:33 AM
+-- Generation Time: Oct 30, 2025 at 01:41 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -71,6 +71,33 @@ CREATE TABLE `awards` (
   `updated_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+--
+-- Dumping data for table `awards`
+--
+
+INSERT INTO `awards` (`id`, `title`, `description`, `organization`, `credential_id`, `credential_url`, `image`, `received_at`, `is_active`, `sort_order`, `created_at`, `updated_at`) VALUES
+(1, 'Best Web Developer Award 2024', 'Recognized for outstanding achievement in modern web development, creating innovative and user-centric solutions using cutting-edge technologies.', 'International Web Development Association', 'IWDA-2024-001', 'https://example.com/credentials/iwda-2024-001', 'awards/web-developer-2024.jpg', '2024-06-15', 1, 1, '2025-10-29 16:26:35', '2025-10-29 16:26:35'),
+(2, 'Excellence in Full-Stack Development', 'Awarded for demonstrating exceptional skills in both frontend and backend technologies, with a focus on scalable architecture and clean code practices.', 'Tech Excellence Foundation', 'TEF-FULLSTACK-2023', 'https://example.com/credentials/tef-fullstack-2023', 'awards/fullstack-excellence.jpg', '2023-11-20', 1, 2, '2025-10-29 16:26:35', '2025-10-29 16:26:35'),
+(3, 'Innovation in Laravel Development', 'Honored for creating robust and maintainable Laravel applications with advanced features and best practices implementation.', 'Laravel Community Excellence Awards', 'LCEA-2023-042', 'https://example.com/credentials/lcea-2023-042', 'awards/laravel-innovation.jpg', '2023-09-10', 1, 3, '2025-10-29 16:26:35', '2025-10-29 16:26:35'),
+(4, 'Outstanding Vue.js Implementation', 'Recognized for building performant and elegant single-page applications using Vue 3 with modern composition API patterns.', 'Frontend Developers Guild', 'FDG-VUE-2023', 'https://example.com/credentials/fdg-vue-2023', 'awards/vue-outstanding.jpg', '2023-07-05', 1, 4, '2025-10-29 16:26:35', '2025-10-29 16:26:35'),
+(5, 'Best UI/UX Design Implementation', 'Awarded for exceptional attention to user experience design, accessibility standards, and creating intuitive interfaces that delight users.', 'Design & Development Summit', 'DDS-UIUX-2022', 'https://example.com/credentials/dds-uiux-2022', 'awards/uiux-best.jpg', '2022-12-18', 1, 5, '2025-10-29 16:26:35', '2025-10-29 16:26:35'),
+(6, 'Database Architecture Excellence', 'Recognized for designing and implementing efficient database schemas with optimal query performance and data integrity.', 'Database Professionals Association', 'DPA-ARCH-2022', 'https://example.com/credentials/dpa-arch-2022', 'awards/database-excellence.jpg', '2022-08-22', 1, 6, '2025-10-29 16:26:35', '2025-10-29 16:26:35');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `award_gallery`
+--
+
+CREATE TABLE `award_gallery` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `award_id` bigint(20) UNSIGNED NOT NULL,
+  `gallery_id` bigint(20) UNSIGNED NOT NULL,
+  `sort_order` int(11) NOT NULL DEFAULT 0,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- --------------------------------------------------------
 
 --
@@ -127,12 +154,13 @@ CREATE TABLE `categories` (
 --
 
 INSERT INTO `categories` (`id`, `name`, `meta_title`, `meta_description`, `meta_keywords`, `og_title`, `og_description`, `og_image`, `canonical_url`, `schema_markup`, `index_follow`, `slug`, `description`, `color`, `is_active`, `sort_order`, `created_at`, `updated_at`) VALUES
-(1, 'Web Development', 'Web Development Articles', 'Read the latest articles about web development, programming languages, frameworks, and best practices.', NULL, NULL, NULL, NULL, NULL, NULL, 1, 'web-development', 'Articles about web development, programming, and coding', '#3b82f6', 1, 0, '2025-10-24 23:12:33', '2025-10-24 23:12:33'),
-(2, 'Design', 'Design Articles', 'Explore articles about UI/UX design, graphic design, and creative processes.', NULL, NULL, NULL, NULL, NULL, NULL, 1, 'design', 'UI/UX design, graphic design, and creative inspiration', '#ec4899', 1, 0, '2025-10-24 23:12:33', '2025-10-24 23:12:33'),
-(3, 'Technology', 'Technology News', 'Stay updated with the latest technology news, trends, and innovations.', NULL, NULL, NULL, NULL, NULL, NULL, 1, 'technology', 'Latest tech news, trends, and innovations', '#10b981', 1, 0, '2025-10-24 23:12:33', '2025-10-24 23:12:33'),
-(4, 'Tutorial', 'Tutorials and Guides', 'Learn with our comprehensive tutorials and step-by-step guides.', NULL, NULL, NULL, NULL, NULL, NULL, 1, 'tutorial', 'Step-by-step guides and tutorials', '#f59e0b', 1, 0, '2025-10-24 23:12:33', '2025-10-24 23:12:33'),
-(5, 'Career', 'Career Development', 'Get career advice, tips, and insights for professional growth.', NULL, NULL, NULL, NULL, NULL, NULL, 1, 'career', 'Career advice, tips, and professional development', '#8b5cf6', 1, 0, '2025-10-24 23:12:33', '2025-10-24 23:12:33'),
-(6, 'Personal', 'Personal Blog', 'Read personal thoughts, experiences, and stories.', NULL, NULL, NULL, NULL, NULL, NULL, 1, 'personal', 'Personal thoughts, experiences, and stories', '#ef4444', 1, 0, '2025-10-24 23:12:33', '2025-10-24 23:12:33');
+(1, 'Web Development', 'Web Development Articles', 'Read the latest articles about web development, programming languages, frameworks, and best practices.', NULL, NULL, NULL, NULL, NULL, NULL, 1, 'web-development', 'Articles about web development, programming, and coding', '#3b82f6', 1, 0, '2025-10-29 16:26:35', '2025-10-29 16:26:35'),
+(2, 'Design', 'Design Articles', 'Explore articles about UI/UX design, graphic design, and creative processes.', NULL, NULL, NULL, NULL, NULL, NULL, 1, 'design', 'UI/UX design, graphic design, and creative inspiration', '#ec4899', 1, 0, '2025-10-29 16:26:35', '2025-10-29 16:26:35'),
+(3, 'Technology', 'Technology News', 'Stay updated with the latest technology news, trends, and innovations.', NULL, NULL, NULL, NULL, NULL, NULL, 1, 'technology', 'Latest tech news, trends, and innovations', '#10b981', 1, 0, '2025-10-29 16:26:35', '2025-10-29 16:26:35'),
+(4, 'Tutorial', 'Tutorials and Guides', 'Learn with our comprehensive tutorials and step-by-step guides.', NULL, NULL, NULL, NULL, NULL, NULL, 1, 'tutorial', 'Step-by-step guides and tutorials', '#f59e0b', 1, 0, '2025-10-29 16:26:35', '2025-10-29 16:26:35'),
+(5, 'Career', 'Career Development', 'Get career advice, tips, and insights for professional growth.', NULL, NULL, NULL, NULL, NULL, NULL, 1, 'career', 'Career advice, tips, and professional development', '#8b5cf6', 1, 0, '2025-10-29 16:26:35', '2025-10-29 16:26:35'),
+(6, 'Personal', 'Personal Blog', 'Read personal thoughts, experiences, and stories.', NULL, NULL, NULL, NULL, NULL, NULL, 1, 'personal', 'Personal thoughts, experiences, and stories', '#ef4444', 1, 0, '2025-10-29 16:26:35', '2025-10-29 16:26:35'),
+(7, 'Tutorials', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, 'tutorials', 'Step-by-step guides and tutorials', '#10B981', 1, 2, '2025-10-29 16:26:35', '2025-10-29 16:26:35');
 
 -- --------------------------------------------------------
 
@@ -188,6 +216,13 @@ CREATE TABLE `galleries` (
   `updated_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+--
+-- Dumping data for table `galleries`
+--
+
+INSERT INTO `galleries` (`id`, `title`, `description`, `company`, `period`, `thumbnail`, `award_id`, `is_active`, `sort_order`, `created_at`, `updated_at`) VALUES
+(9, 'Nextdev Telkomsel Winner', 'Nextdev Telkomsel Winner', NULL, NULL, 'gallery/items/1761784324_9_0.jpg', NULL, 1, 8, '2025-10-29 17:32:04', '2025-10-29 17:32:04');
+
 -- --------------------------------------------------------
 
 --
@@ -205,6 +240,17 @@ CREATE TABLE `gallery_items` (
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `gallery_items`
+--
+
+INSERT INTO `gallery_items` (`id`, `gallery_id`, `type`, `file_path`, `title`, `description`, `sequence`, `created_at`, `updated_at`) VALUES
+(18, 9, 'image', 'gallery/items/1761784324_9_0.jpg', 'Nextdev Telkomsel Winner - Image 1', NULL, 0, '2025-10-29 17:32:04', '2025-10-29 17:32:04'),
+(19, 9, 'image', 'gallery/items/1761784324_9_1.jpg', 'Nextdev Telkomsel Winner - Image 2', NULL, 1, '2025-10-29 17:32:04', '2025-10-29 17:32:04'),
+(20, 9, 'image', 'gallery/items/1761784324_9_2.jpg', 'Nextdev Telkomsel Winner - Image 3', NULL, 2, '2025-10-29 17:32:04', '2025-10-29 17:32:04'),
+(21, 9, 'image', 'gallery/items/1761784324_9_3.jpg', 'Nextdev Telkomsel Winner - Image 4', NULL, 3, '2025-10-29 17:32:04', '2025-10-29 17:32:04'),
+(22, 9, 'image', 'gallery/items/1761784324_9_4.jpg', 'Nextdev Telkomsel Winner - Image 5', NULL, 4, '2025-10-29 17:32:04', '2025-10-29 17:32:04');
 
 -- --------------------------------------------------------
 
@@ -259,6 +305,19 @@ CREATE TABLE `menu_items` (
   `updated_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+--
+-- Dumping data for table `menu_items`
+--
+
+INSERT INTO `menu_items` (`id`, `title`, `slug`, `url`, `icon`, `is_active`, `sequence`, `created_at`, `updated_at`) VALUES
+(1, 'Home', 'home', '/', 'home', 1, 0, '2025-10-29 16:26:35', '2025-10-29 16:26:35'),
+(2, 'About', 'about', '/about', 'information-circle', 1, 1, '2025-10-29 16:26:35', '2025-10-29 16:31:02'),
+(3, 'Projects', 'projects', '/projects', 'briefcase', 1, 2, '2025-10-29 16:26:35', '2025-10-29 16:26:35'),
+(4, 'Awards', 'awards', '/awards', 'trophy', 1, 3, '2025-10-29 16:26:35', '2025-10-29 16:31:14'),
+(5, 'Blog', 'blog', '/blog', 'newspaper', 1, 4, '2025-10-29 16:26:35', '2025-10-29 16:31:37'),
+(6, 'Gallery', 'gallery', '/gallery', 'photograph', 1, 5, '2025-10-29 16:26:35', '2025-10-29 16:31:47'),
+(7, 'Contact', 'contact', '/contact', 'mail', 1, 6, '2025-10-29 16:26:35', '2025-10-29 16:26:35');
+
 -- --------------------------------------------------------
 
 --
@@ -309,8 +368,7 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES
 (31, '2025_10_16_120001_create_page_sections_table', 1),
 (32, '2025_10_16_120002_add_cta_fields_to_projects_table', 1),
 (33, '2025_10_16_150000_add_related_projects_to_projects_table', 1),
-(34, '2025_10_25_000000_refactor_gallery_to_album_architecture', 1),
-(35, '2025_10_25_083505_restructure_galleries_system', 2);
+(34, '2025_10_25_083505_restructure_galleries_system', 1);
 
 -- --------------------------------------------------------
 
@@ -343,6 +401,24 @@ CREATE TABLE `page_sections` (
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `page_sections`
+--
+
+INSERT INTO `page_sections` (`id`, `page_type`, `section_type`, `is_active`, `sequence`, `created_at`, `updated_at`) VALUES
+(1, 'homepage', 'hero', 1, 0, '2025-10-29 16:26:36', '2025-10-29 16:26:36'),
+(2, 'homepage', 'featured_projects', 1, 1, '2025-10-29 16:26:36', '2025-10-29 16:26:36'),
+(3, 'homepage', 'latest_blog', 1, 2, '2025-10-29 16:26:36', '2025-10-29 16:26:36'),
+(4, 'homepage', 'testimonials', 0, 3, '2025-10-29 16:26:36', '2025-10-29 16:32:51'),
+(5, 'homepage', 'cta', 1, 4, '2025-10-29 16:26:36', '2025-10-29 16:26:36'),
+(6, 'about', 'featured_projects', 0, 0, '2025-10-29 16:26:36', '2025-10-29 16:26:36'),
+(7, 'about', 'latest_blog', 0, 1, '2025-10-29 16:26:36', '2025-10-29 16:26:36'),
+(8, 'about', 'cta', 0, 2, '2025-10-29 16:26:36', '2025-10-29 16:26:36'),
+(9, 'projects', 'latest_blog', 0, 0, '2025-10-29 16:26:36', '2025-10-29 16:26:36'),
+(10, 'projects', 'cta', 0, 1, '2025-10-29 16:26:36', '2025-10-29 16:26:36'),
+(11, 'blog', 'featured_projects', 0, 0, '2025-10-29 16:26:36', '2025-10-29 16:26:36'),
+(12, 'blog', 'cta', 0, 1, '2025-10-29 16:26:36', '2025-10-29 16:26:36');
 
 -- --------------------------------------------------------
 
@@ -380,12 +456,15 @@ CREATE TABLE `personal_access_tokens` (
 --
 
 INSERT INTO `personal_access_tokens` (`id`, `tokenable_type`, `tokenable_id`, `name`, `token`, `abilities`, `last_used_at`, `expires_at`, `created_at`, `updated_at`) VALUES
-(1, 'App\\Models\\User', 1, 'auth-token', 'a591a1b5a0f12a145489b8c806cd0936937d7616790803752bcb4a70ba1384e3', '[\"*\"]', '2025-10-24 23:14:17', NULL, '2025-10-24 23:14:11', '2025-10-24 23:14:17'),
-(2, 'App\\Models\\User', 1, 'auth-token', 'ffe5cdc287d217d84cafa79f80f93fe008a3e08b51271f8bca440b868c30ceca', '[\"*\"]', '2025-10-24 23:42:51', NULL, '2025-10-24 23:25:02', '2025-10-24 23:42:51'),
-(3, 'App\\Models\\User', 1, 'auth-token', 'c2d01615b06fed064d385741cfb3df9d6d584dffdf713b80fac0f08d19c74177', '[\"*\"]', '2025-10-25 00:17:11', NULL, '2025-10-25 00:15:22', '2025-10-25 00:17:11'),
-(4, 'App\\Models\\User', 1, 'auth-token', 'b54ef6fd1935c4fb4c45ee44e485337fb1dc16e47a8c8fb61796c4fa728cf9dd', '[\"*\"]', '2025-10-25 00:17:33', NULL, '2025-10-25 00:17:24', '2025-10-25 00:17:33'),
-(5, 'App\\Models\\User', 1, 'auth-token', '68a90aac84163ddc94630c588f1ddb1c86fd56b403b6ccd4e72f7f2e9262529a', '[\"*\"]', '2025-10-25 03:38:47', NULL, '2025-10-25 03:38:46', '2025-10-25 03:38:47'),
-(6, 'App\\Models\\User', 1, 'auth-token', '707207e67008fb4e50b0d1db7b544ce79c32b82768da4a4597c70bb7d0a2aa10', '[\"*\"]', '2025-10-25 03:41:20', NULL, '2025-10-25 03:40:14', '2025-10-25 03:41:20');
+(1, 'App\\Models\\User', 1, 'auth-token', '37b21c234234111d3099a2df4a40f3db273dee03218cf523cfa39775c9696f21', '[\"*\"]', '2025-10-29 16:38:14', NULL, '2025-10-29 16:26:49', '2025-10-29 16:38:14'),
+(2, 'App\\Models\\User', 1, 'auth-token', '1813b085d990bdc4eda03e93e67edc691b583be926d87ff084ef0da7ce121b45', '[\"*\"]', NULL, NULL, '2025-10-29 16:39:01', '2025-10-29 16:39:01'),
+(3, 'App\\Models\\User', 1, 'auth-token', 'b2c00b7074a62bfad16f7ceb2189bee32516f3b60feb2ab0192c5279676f6410', '[\"*\"]', '2025-10-29 16:43:38', NULL, '2025-10-29 16:41:43', '2025-10-29 16:43:38'),
+(4, 'App\\Models\\User', 1, 'auth-token', '05a1ec8e4d434139c1c9cb1e52aa7b80a0fb4a2222fc8638c24ddfbc2e712cca', '[\"*\"]', '2025-10-29 16:44:18', NULL, '2025-10-29 16:44:17', '2025-10-29 16:44:18'),
+(5, 'App\\Models\\User', 1, 'auth-token', 'bc9a2263cb08051da92d745b6f9e32b99243d2fea8408a0659867c766bc5a5a5', '[\"*\"]', '2025-10-29 16:46:38', NULL, '2025-10-29 16:45:30', '2025-10-29 16:46:38'),
+(6, 'App\\Models\\User', 1, 'auth-token', '003058269f713c258833e45d9b3e6be25a6b1c338def0f87086f9778f9b9eb75', '[\"*\"]', '2025-10-29 17:21:07', NULL, '2025-10-29 17:21:01', '2025-10-29 17:21:07'),
+(7, 'App\\Models\\User', 1, 'auth-token', '520cae5ce819be685d7429e9dc145ae9787097345cfdfd6359f19318310a2671', '[\"*\"]', '2025-10-29 17:24:58', NULL, '2025-10-29 17:24:45', '2025-10-29 17:24:58'),
+(8, 'App\\Models\\User', 1, 'auth-token', '824aa87b4cff87457773a0fba3a36947d7db17faf511ef4f37dafd3dfdba33dc', '[\"*\"]', '2025-10-29 17:32:29', NULL, '2025-10-29 17:29:14', '2025-10-29 17:32:29'),
+(9, 'App\\Models\\User', 1, 'auth-token', 'ed3160ae30e8597f290eda01246d4fcc2219738aa8b7c337a1894c06331899c6', '[\"*\"]', NULL, NULL, '2025-10-29 17:40:46', '2025-10-29 17:40:46');
 
 -- --------------------------------------------------------
 
@@ -426,6 +505,14 @@ CREATE TABLE `posts` (
   `deleted_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+--
+-- Dumping data for table `posts`
+--
+
+INSERT INTO `posts` (`id`, `category_id`, `title`, `meta_title`, `meta_description`, `meta_keywords`, `og_title`, `og_description`, `og_image`, `canonical_url`, `schema_markup`, `ai_summary`, `faq_schema`, `seo_score`, `index_follow`, `slug`, `excerpt`, `content`, `featured_image`, `tags`, `is_premium`, `published`, `published_at`, `is_active`, `sort_order`, `views`, `reading_time`, `created_at`, `updated_at`, `deleted_at`) VALUES
+(1, 1, 'Getting Started with Vue 3', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 1, 'getting-started-vue3', 'Learn the basics of Vue 3 and build your first application', '<p>Vue 3 is the latest version of the progressive JavaScript framework. In this comprehensive guide, we will explore the new features including the Composition API, improved performance, and TypeScript support.</p><p>We will build a complete application from scratch, covering components, state management, routing, and deployment strategies. By the end of this tutorial, you will have a solid understanding of Vue 3 fundamentals.</p>', 'posts/vue3-tutorial.jpg', '[\"vue\",\"javascript\",\"frontend\",\"tutorial\"]', 0, 1, '2025-10-24 16:26:35', 1, 0, 150, 1, '2025-10-29 16:26:35', '2025-10-29 16:26:35', NULL),
+(2, 1, 'Laravel 12 New Features', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 1, 'laravel-12-new-features', 'Explore the exciting new features in Laravel 12', '<p>Laravel 12 brings significant improvements to the framework. We will dive deep into the new features including enhanced database query builder, improved testing utilities, and better performance.</p><p>This article covers practical examples and migration guides to help you upgrade your existing Laravel applications to version 12.</p>', 'posts/laravel-12.jpg', '[\"laravel\",\"php\",\"backend\",\"framework\"]', 0, 1, '2025-10-27 16:26:35', 1, 0, 89, 1, '2025-10-29 16:26:35', '2025-10-29 16:26:35', NULL);
+
 -- --------------------------------------------------------
 
 --
@@ -449,6 +536,16 @@ CREATE TABLE `post_translations` (
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `post_translations`
+--
+
+INSERT INTO `post_translations` (`id`, `post_id`, `language`, `title`, `slug`, `excerpt`, `content`, `meta_title`, `meta_description`, `og_title`, `og_description`, `canonical_url`, `ai_summary`, `created_at`, `updated_at`) VALUES
+(1, 1, 'en', 'Getting Started with Vue 3', 'getting-started-vue3', 'Learn the basics of Vue 3 and build your first application', '<p>Vue 3 is the latest version of the progressive JavaScript framework. In this comprehensive guide, we will explore the new features including the Composition API, improved performance, and TypeScript support.</p><p>We will build a complete application from scratch, covering components, state management, routing, and deployment strategies. By the end of this tutorial, you will have a solid understanding of Vue 3 fundamentals.</p>', 'Getting Started with Vue 3 - Complete Guide', 'Learn Vue 3 from scratch with this comprehensive tutorial covering Composition API, components, and more.', NULL, NULL, NULL, NULL, '2025-10-29 16:26:35', '2025-10-29 16:26:35'),
+(2, 1, 'id', 'Memulai dengan Vue 3', 'memulai-dengan-vue3', 'Pelajari dasar-dasar Vue 3 dan bangun aplikasi pertama Anda', '<p>Vue 3 adalah versi terbaru dari framework JavaScript progresif. Dalam panduan komprehensif ini, kita akan menjelajahi fitur-fitur baru termasuk Composition API, peningkatan performa, dan dukungan TypeScript.</p><p>Kita akan membangun aplikasi lengkap dari awal, mencakup komponen, manajemen state, routing, dan strategi deployment. Di akhir tutorial ini, Anda akan memiliki pemahaman yang solid tentang fundamental Vue 3.</p>', 'Memulai dengan Vue 3 - Panduan Lengkap', 'Pelajari Vue 3 dari awal dengan tutorial komprehensif ini yang mencakup Composition API, komponen, dan lainnya.', NULL, NULL, NULL, NULL, '2025-10-29 16:26:35', '2025-10-29 16:26:35'),
+(3, 2, 'en', 'Laravel 12 New Features', 'laravel-12-new-features', 'Explore the exciting new features in Laravel 12', '<p>Laravel 12 brings significant improvements to the framework. We will dive deep into the new features including enhanced database query builder, improved testing utilities, and better performance.</p><p>This article covers practical examples and migration guides to help you upgrade your existing Laravel applications to version 12.</p>', 'Laravel 12 New Features - Complete Overview', 'Discover the new features in Laravel 12 and learn how to upgrade your applications.', NULL, NULL, NULL, NULL, '2025-10-29 16:26:35', '2025-10-29 16:26:35'),
+(4, 2, 'id', 'Fitur Baru Laravel 12', 'fitur-baru-laravel-12', 'Jelajahi fitur-fitur baru yang menarik di Laravel 12', '<p>Laravel 12 membawa peningkatan signifikan ke framework. Kita akan mendalami fitur-fitur baru termasuk query builder database yang ditingkatkan, utilitas testing yang lebih baik, dan performa yang lebih bagus.</p><p>Artikel ini mencakup contoh praktis dan panduan migrasi untuk membantu Anda mengupgrade aplikasi Laravel yang ada ke versi 12.</p>', 'Fitur Baru Laravel 12 - Overview Lengkap', 'Temukan fitur-fitur baru di Laravel 12 dan pelajari cara mengupgrade aplikasi Anda.', NULL, NULL, NULL, NULL, '2025-10-29 16:26:35', '2025-10-29 16:26:35');
 
 -- --------------------------------------------------------
 
@@ -496,6 +593,14 @@ CREATE TABLE `projects` (
   `related_project_ids` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`related_project_ids`))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+--
+-- Dumping data for table `projects`
+--
+
+INSERT INTO `projects` (`id`, `title`, `meta_title`, `meta_description`, `meta_keywords`, `og_title`, `og_description`, `og_image`, `canonical_url`, `schema_markup`, `ai_summary`, `tech_stack_details`, `seo_score`, `index_follow`, `slug`, `description`, `content`, `image`, `images`, `category`, `technologies`, `tags`, `client`, `url`, `completed_at`, `featured`, `published`, `is_active`, `sort_order`, `created_at`, `updated_at`, `deleted_at`, `cta_title`, `cta_description`, `cta_button_text`, `cta_phone_number`, `related_project_ids`) VALUES
+(1, 'E-commerce Platform', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 1, 'ecommerce-platform', 'A modern, scalable e-commerce platform built with Laravel and React', 'A comprehensive e-commerce solution featuring product management, shopping cart, payment integration, and admin dashboard. Built with Laravel 12 backend and React 18 frontend.', 'projects/ecommerce.jpg', '[\"projects\\/ecommerce\\/1.jpg\",\"projects\\/ecommerce\\/2.jpg\",\"projects\\/ecommerce\\/3.jpg\"]', 'web', '[\"Laravel\",\"React\",\"MySQL\",\"Redis\",\"Stripe\"]', NULL, 'ABC Corporation', 'https://example.com', '2024-06-30', 1, 1, 1, 1, '2025-10-29 16:26:35', '2025-10-29 16:26:35', NULL, NULL, NULL, NULL, NULL, NULL),
+(2, 'Task Management App', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 1, 'task-management-app', 'Collaborative task management tool for teams', 'A powerful task management application with real-time collaboration, project tracking, and team communication features.', 'projects/task-app.jpg', '[\"projects\\/task-app\\/1.jpg\",\"projects\\/task-app\\/2.jpg\"]', 'web', '[\"Laravel\",\"Vue.js\",\"WebSockets\",\"PostgreSQL\"]', NULL, 'Internal Project', 'https://tasks.example.com', NULL, 0, 1, 1, 2, '2025-10-29 16:26:35', '2025-10-29 16:26:35', NULL, NULL, NULL, NULL, NULL, NULL);
+
 -- --------------------------------------------------------
 
 --
@@ -519,6 +624,16 @@ CREATE TABLE `project_translations` (
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `project_translations`
+--
+
+INSERT INTO `project_translations` (`id`, `project_id`, `language`, `title`, `slug`, `description`, `content`, `meta_title`, `meta_description`, `og_title`, `og_description`, `canonical_url`, `ai_summary`, `created_at`, `updated_at`) VALUES
+(1, 1, 'en', 'E-commerce Platform', 'ecommerce-platform', 'A modern, scalable e-commerce platform built with Laravel and React', 'A comprehensive e-commerce solution featuring product management, shopping cart, payment integration, and admin dashboard. Built with Laravel 12 backend and React 18 frontend.', 'E-commerce Platform - Modern Shopping Solution', 'A modern, scalable e-commerce platform built with Laravel and React for ABC Corporation', 'E-commerce Platform', 'Modern shopping solution with Laravel and React', NULL, NULL, '2025-10-29 16:26:35', '2025-10-29 16:26:35'),
+(2, 1, 'id', 'Platform E-commerce', 'platform-ecommerce', 'Platform e-commerce modern dan scalable yang dibangun dengan Laravel dan React', 'Solusi e-commerce komprehensif dengan manajemen produk, keranjang belanja, integrasi pembayaran, dan dashboard admin. Dibangun dengan backend Laravel 12 dan frontend React 18.', 'Platform E-commerce - Solusi Belanja Modern', 'Platform e-commerce modern dan scalable yang dibangun dengan Laravel dan React untuk ABC Corporation', 'Platform E-commerce', 'Solusi belanja modern dengan Laravel dan React', NULL, NULL, '2025-10-29 16:26:35', '2025-10-29 16:26:35'),
+(3, 2, 'en', 'Task Management Application', 'task-management-app', 'Collaborative task management tool for teams', 'A powerful task management application with real-time collaboration, project tracking, and team communication features.', 'Task Management App - Team Collaboration Tool', 'Collaborative task management tool for teams with real-time updates', NULL, NULL, NULL, NULL, '2025-10-29 16:26:35', '2025-10-29 16:26:35'),
+(4, 2, 'id', 'Aplikasi Manajemen Tugas', 'aplikasi-manajemen-tugas', 'Tool manajemen tugas kolaboratif untuk tim', 'Aplikasi manajemen tugas yang powerful dengan kolaborasi real-time, pelacakan proyek, dan fitur komunikasi tim.', 'Aplikasi Manajemen Tugas - Tool Kolaborasi Tim', 'Tool manajemen tugas kolaboratif untuk tim dengan pembaruan real-time', NULL, NULL, NULL, NULL, '2025-10-29 16:26:35', '2025-10-29 16:26:35');
 
 -- --------------------------------------------------------
 
@@ -613,7 +728,7 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `name`, `email`, `email_verified_at`, `password`, `remember_token`, `created_at`, `updated_at`) VALUES
-(1, 'Ali Sadikin', 'admin@alisadikinma.com', '2025-10-24 23:12:32', '$2y$12$REp9g6.mbwOiPNwWYunq.u5nEhpyoLBiRfD.B/O7Py0efUinz7YHC', NULL, '2025-10-24 23:12:33', '2025-10-24 23:12:33');
+(1, 'Ali Sadikin', 'admin@alisadikinma.com', '2025-10-29 16:26:35', '$2y$12$2dxq8so7MmfFtJ7mZ7rDMuE3Ijp7ngYD.xGbeoM9F6NoAaD8ULnZW', NULL, '2025-10-29 16:26:35', '2025-10-29 16:26:35');
 
 --
 -- Indexes for dumped tables
@@ -640,6 +755,16 @@ ALTER TABLE `awards`
   ADD PRIMARY KEY (`id`),
   ADD KEY `awards_is_active_index` (`is_active`),
   ADD KEY `awards_sort_order_index` (`sort_order`);
+
+--
+-- Indexes for table `award_gallery`
+--
+ALTER TABLE `award_gallery`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `award_gallery_award_id_gallery_id_unique` (`award_id`,`gallery_id`),
+  ADD KEY `award_gallery_award_id_index` (`award_id`),
+  ADD KEY `award_gallery_gallery_id_index` (`gallery_id`),
+  ADD KEY `award_gallery_sort_order_index` (`sort_order`);
 
 --
 -- Indexes for table `cache`
@@ -857,13 +982,19 @@ ALTER TABLE `automation_logs`
 -- AUTO_INCREMENT for table `awards`
 --
 ALTER TABLE `awards`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+
+--
+-- AUTO_INCREMENT for table `award_gallery`
+--
+ALTER TABLE `award_gallery`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- AUTO_INCREMENT for table `categories`
 --
 ALTER TABLE `categories`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `contacts`
@@ -881,13 +1012,13 @@ ALTER TABLE `failed_jobs`
 -- AUTO_INCREMENT for table `galleries`
 --
 ALTER TABLE `galleries`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- AUTO_INCREMENT for table `gallery_items`
 --
 ALTER TABLE `gallery_items`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=23;
 
 --
 -- AUTO_INCREMENT for table `jobs`
@@ -899,13 +1030,13 @@ ALTER TABLE `jobs`
 -- AUTO_INCREMENT for table `menu_items`
 --
 ALTER TABLE `menu_items`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `migrations`
 --
 ALTER TABLE `migrations`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=36;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=35;
 
 --
 -- AUTO_INCREMENT for table `newsletters`
@@ -917,37 +1048,37 @@ ALTER TABLE `newsletters`
 -- AUTO_INCREMENT for table `page_sections`
 --
 ALTER TABLE `page_sections`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
 
 --
 -- AUTO_INCREMENT for table `personal_access_tokens`
 --
 ALTER TABLE `personal_access_tokens`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- AUTO_INCREMENT for table `posts`
 --
 ALTER TABLE `posts`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `post_translations`
 --
 ALTER TABLE `post_translations`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `projects`
 --
 ALTER TABLE `projects`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `project_translations`
 --
 ALTER TABLE `project_translations`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `services`
@@ -982,6 +1113,13 @@ ALTER TABLE `users`
 --
 ALTER TABLE `automation_logs`
   ADD CONSTRAINT `automation_logs_user_id_foreign` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `award_gallery`
+--
+ALTER TABLE `award_gallery`
+  ADD CONSTRAINT `award_gallery_award_id_foreign` FOREIGN KEY (`award_id`) REFERENCES `awards` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `award_gallery_gallery_id_foreign` FOREIGN KEY (`gallery_id`) REFERENCES `galleries` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `galleries`
