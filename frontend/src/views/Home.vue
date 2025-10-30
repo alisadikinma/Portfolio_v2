@@ -122,25 +122,13 @@
           >
             <!-- Award Icon/Image -->
             <div class="relative mb-6">
-              <div v-if="award.image" class="relative w-16 h-16 rounded-xl overflow-hidden bg-gradient-to-br from-primary-400 to-secondary-400">
+              <div v-if="award.image" class="w-16 h-16 rounded-xl overflow-hidden bg-gradient-to-br from-primary-400 to-secondary-400">
                 <img :src="award.image" :alt="award.award_title" class="w-full h-full object-cover" />
-                <!-- Award Label -->
-                <div class="absolute top-1 left-1 right-1 bg-purple-600/90 backdrop-blur-sm rounded-md px-2 py-0.5">
-                  <span class="text-[10px] text-white font-semibold leading-tight line-clamp-2">
-                    {{ award.award_title.split(' ').slice(0, 3).join(' ') }}
-                  </span>
-                </div>
               </div>
-              <div v-else class="relative w-16 h-16 bg-gradient-to-br from-primary-400 to-secondary-400 rounded-xl flex items-center justify-center">
+              <div v-else class="w-16 h-16 bg-gradient-to-br from-primary-400 to-secondary-400 rounded-xl flex items-center justify-center">
                 <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
                 </svg>
-                <!-- Award Label -->
-                <div class="absolute top-1 left-1 right-1 bg-purple-600/90 backdrop-blur-sm rounded-md px-2 py-0.5">
-                  <span class="text-[10px] text-white font-semibold leading-tight line-clamp-2">
-                    {{ award.award_title.split(' ').slice(0, 3).join(' ') }}
-                  </span>
-                </div>
               </div>
             </div>
 
@@ -153,7 +141,7 @@
                 {{ award.issuing_organization }} • {{ formatYear(award.award_date) }}
               </p>
               <p v-if="award.description" class="text-sm text-gray-600 dark:text-gray-400 line-clamp-3 mb-4">
-                {{ award.description }}
+                {{ stripHtml(award.description) }}
               </p>
 
               <!-- Credential Info -->
@@ -510,14 +498,16 @@
 
               <div v-else-if="galleryPhotos.length > 0" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 <div
-                  v-for="photo in galleryPhotos"
+                  v-for="(photo, index) in galleryPhotos"
                   :key="photo.id"
                   class="relative group cursor-pointer aspect-square rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800"
+                  @click="openLightbox(index)"
                 >
                   <img
                     :src="photo.image"
                     :alt="photo.title"
                     class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                    @error="handleImageError"
                   />
                   <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
                     <div class="absolute bottom-0 left-0 right-0 p-3">
@@ -533,6 +523,61 @@
                 <p class="text-gray-400">No photos available in this gallery.</p>
               </div>
             </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- Lightbox for full image view -->
+    <Teleport to="body">
+      <Transition name="fade">
+        <div
+          v-if="showLightbox"
+          class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black"
+          @click.self="closeLightbox"
+        >
+          <button
+            @click="closeLightbox"
+            class="absolute top-4 right-4 p-3 bg-white/10 hover:bg-white/20 rounded-full transition-colors z-10"
+          >
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+
+          <button
+            v-if="currentPhotoIndex > 0"
+            @click="previousPhoto"
+            class="absolute left-4 p-3 bg-white/10 hover:bg-white/20 rounded-full transition-colors"
+          >
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+            </svg>
+          </button>
+
+          <div class="max-w-6xl max-h-full">
+            <img
+              :src="galleryPhotos[currentPhotoIndex]?.image"
+              :alt="galleryPhotos[currentPhotoIndex]?.title"
+              class="max-w-full max-h-[90vh] object-contain"
+            />
+            <p v-if="galleryPhotos[currentPhotoIndex]?.title" class="text-center text-white mt-4 text-lg">
+              {{ galleryPhotos[currentPhotoIndex].title }}
+            </p>
+          </div>
+
+          <button
+            v-if="currentPhotoIndex < galleryPhotos.length - 1"
+            @click="nextPhoto"
+            class="absolute right-4 p-3 bg-white/10 hover:bg-white/20 rounded-full transition-colors"
+          >
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
+          </button>
+
+          <div class="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-white text-sm">
+            {{ currentPhotoIndex + 1 }} / {{ galleryPhotos.length }}
           </div>
         </div>
       </Transition>
@@ -659,11 +704,22 @@ const formatYear = (date) => {
   return new Date(date).getFullYear()
 }
 
+const stripHtml = (html) => {
+  if (!html) return ''
+  const tmp = document.createElement('div')
+  tmp.innerHTML = html
+  return tmp.textContent || tmp.innerText || ''
+}
+
 // Gallery modal state
 const showGalleryModal = ref(false)
 const selectedAward = ref(null)
 const galleryPhotos = ref([])
 const loadingGallery = ref(false)
+
+// Lightbox state
+const showLightbox = ref(false)
+const currentPhotoIndex = ref(0)
 
 const openGalleryModal = async (award) => {
   selectedAward.value = award
@@ -674,7 +730,14 @@ const openGalleryModal = async (award) => {
   try {
     const response = await api.get(`/awards/${award.id}/galleries`)
     if (response.data.success && response.data.data.galleries) {
-      galleryPhotos.value = response.data.data.galleries
+      // Extract all photos from all galleries
+      const allPhotos = []
+      response.data.data.galleries.forEach(gallery => {
+        if (gallery.items && gallery.items.length > 0) {
+          allPhotos.push(...gallery.items)
+        }
+      })
+      galleryPhotos.value = allPhotos
     }
   } catch (err) {
     console.error('Failed to load gallery:', err)
@@ -687,6 +750,43 @@ const closeGalleryModal = () => {
   showGalleryModal.value = false
   selectedAward.value = null
   galleryPhotos.value = []
+}
+
+const openLightbox = (index) => {
+  currentPhotoIndex.value = index
+  showLightbox.value = true
+}
+
+const closeLightbox = () => {
+  showLightbox.value = false
+}
+
+const nextPhoto = () => {
+  if (currentPhotoIndex.value < galleryPhotos.value.length - 1) {
+    currentPhotoIndex.value++
+  }
+}
+
+const previousPhoto = () => {
+  if (currentPhotoIndex.value > 0) {
+    currentPhotoIndex.value--
+  }
+}
+
+const handleImageError = (event) => {
+  console.error('[Home] Image failed to load:', event.target.src)
+  event.target.src = 'https://via.placeholder.com/400x300/e5e7eb/6b7280?text=Image+Not+Found'
+}
+
+// Keyboard navigation for lightbox
+const handleKeydown = (e) => {
+  if (showLightbox.value) {
+    if (e.key === 'ArrowRight') nextPhoto()
+    if (e.key === 'ArrowLeft') previousPhoto()
+    if (e.key === 'Escape') closeLightbox()
+  } else if (showGalleryModal.value && e.key === 'Escape') {
+    closeGalleryModal()
+  }
 }
 
 // Auto-rotate testimonials
@@ -712,6 +812,9 @@ onMounted(async () => {
 
   // Start testimonial rotation
   testimonialInterval = setInterval(rotateTestimonials, 5000)
+  
+  // Add keyboard event listener
+  window.addEventListener('keydown', handleKeydown)
 })
 
 // Cleanup on unmount
@@ -720,6 +823,7 @@ onUnmounted(() => {
   if (testimonialInterval) {
     clearInterval(testimonialInterval)
   }
+  window.removeEventListener('keydown', handleKeydown)
 })
 </script>
 
@@ -754,6 +858,17 @@ onUnmounted(() => {
 
 .modal-enter-from,
 .modal-leave-to {
+  opacity: 0;
+}
+
+/* Fade transitions */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
   opacity: 0;
 }
 </style>

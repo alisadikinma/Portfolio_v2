@@ -54,7 +54,11 @@ class AwardController extends Controller
                 'organization' => $award->organization,
                 'credential_id' => $award->credential_id,
                 'credential_url' => $award->credential_url,
-                'image' => $award->image,
+                'image' => $award->image 
+                    ? (str_starts_with($award->image, '/') 
+                        ? url($award->image) 
+                        : asset('uploads/awards/' . $award->image)) 
+                    : null,
                 'received_at' => $award->received_at,
                 'sort_order' => $award->sort_order ?? 0,
                 'gallery_count' => $award->galleries->count(),
@@ -108,7 +112,11 @@ class AwardController extends Controller
                 'organization' => $award->organization,
                 'credential_id' => $award->credential_id,
                 'credential_url' => $award->credential_url,
-                'image' => $award->image,
+                'image' => $award->image 
+                    ? (str_starts_with($award->image, '/') 
+                        ? url($award->image) 
+                        : asset('uploads/awards/' . $award->image)) 
+                    : null,
                 'award_date' => $award->received_at,
                 'received_at' => $award->received_at,
                 'sort_order' => $award->sort_order ?? 0,
@@ -141,7 +149,11 @@ class AwardController extends Controller
                 'organization' => $award->organization,
                 'credential_id' => $award->credential_id,
                 'credential_url' => $award->credential_url,
-                'image' => $award->image,
+                'image' => $award->image 
+                    ? (str_starts_with($award->image, '/') 
+                        ? url($award->image) 
+                        : asset('uploads/awards/' . $award->image)) 
+                    : null,
                 'received_at' => $award->received_at,
                 'sort_order' => $award->sort_order,
                 'total_photos' => $award->total_photos,
@@ -206,7 +218,11 @@ class AwardController extends Controller
                     'organization' => $award->organization,
                     'credential_id' => $award->credential_id,
                     'credential_url' => $award->credential_url,
-                    'image' => $award->image,
+                    'image' => $award->image 
+                        ? (str_starts_with($award->image, '/') 
+                            ? url($award->image) 
+                            : asset('uploads/awards/' . $award->image)) 
+                        : null,
                     'received_at' => $award->received_at,
                     'sort_order' => $award->sort_order,
                     'gallery_count' => $award->galleries->count(),
@@ -284,7 +300,11 @@ class AwardController extends Controller
                     'organization' => $award->organization,
                     'credential_id' => $award->credential_id,
                     'credential_url' => $award->credential_url,
-                    'image' => $award->image,
+                    'image' => $award->image 
+                        ? (str_starts_with($award->image, '/') 
+                            ? url($award->image) 
+                            : asset('uploads/awards/' . $award->image)) 
+                        : null,
                     'received_at' => $award->received_at,
                     'sort_order' => $award->sort_order,
                     'gallery_count' => $award->galleries->count(),
@@ -369,10 +389,26 @@ class AwardController extends Controller
                         'description' => $gallery->description,
                         'company' => $gallery->company,
                         'period' => $gallery->period,
-                        'thumbnail' => $gallery->thumbnail,
+                        'thumbnail' => $gallery->thumbnail 
+                            ? (str_starts_with($gallery->thumbnail, '/storage/') 
+                                ? url($gallery->thumbnail) 
+                                : asset('storage/' . $gallery->thumbnail)) 
+                            : null,
                         'sort_order' => $gallery->sort_order,
                         'is_active' => $gallery->is_active,
-                        'items_count' => $gallery->items->count()
+                        'items_count' => $gallery->items->count(),
+                        'items' => $gallery->items->map(function($item) {
+                            return [
+                                'id' => $item->id,
+                                'type' => $item->type,
+                                'title' => $item->title,
+                                'description' => $item->description,
+                                'image' => $item->file_path 
+                                    ? asset('storage/' . $item->file_path) 
+                                    : null,
+                                'sequence' => $item->sequence,
+                            ];
+                        })
                     ];
                 }),
                 'total_photos' => $award->total_photos

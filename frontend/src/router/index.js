@@ -48,6 +48,15 @@ const routes = [
     }
   },
   {
+    path: '/awards-debug',
+    name: 'awards-debug',
+    component: () => import('@/views/Awards-DEBUG.vue'),
+    meta: {
+      title: 'Awards Debug - Portfolio V2',
+      requiresAuth: false
+    }
+  },
+  {
     path: '/blog',
     name: 'blog',
     component: () => import('@/views/Blog.vue'),

@@ -17,7 +17,13 @@
     <!-- Awards Grid -->
     <section class="py-16 pb-32 bg-white dark:bg-gray-950">
       <div class="container-custom">
-        <BaseLoader v-if="isLoading" text="Loading awards..." />
+        <!-- Loading State -->
+        <div v-if="isLoading" class="flex items-center justify-center py-20">
+          <svg class="animate-spin h-12 w-12 text-primary-600" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        </div>
 
         <div v-else-if="awards.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           <div
@@ -46,7 +52,7 @@
                 {{ award.issuing_organization }} • {{ formatYear(award.award_date) }}
               </p>
               <p class="text-sm text-gray-400 line-clamp-3 mb-4">
-                {{ award.description || 'Recognized for outstanding achievement and excellence in the field.' }}
+                {{ stripHtml(award.description) || 'Recognized for outstanding achievement and excellence in the field.' }}
               </p>
 
               <!-- Credential Info -->
@@ -151,8 +157,15 @@
 
             <!-- Modal Body - Gallery Grid -->
             <div class="p-6 max-h-[70vh] overflow-y-auto">
-              <BaseLoader v-if="loadingGallery" text="Loading gallery..." class="py-20" />
+              <!-- Loading State -->
+              <div v-if="loadingGallery" class="flex items-center justify-center py-20">
+                <svg class="animate-spin h-12 w-12 text-primary-600" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              </div>
 
+              <!-- Gallery Grid -->
               <div v-else-if="galleryPhotos.length > 0" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 <div
                   v-for="(photo, index) in galleryPhotos"
@@ -164,6 +177,7 @@
                     :src="photo.image"
                     :alt="photo.title"
                     class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                    @error="handleImageError"
                   />
                   <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
                     <div class="absolute bottom-0 left-0 right-0 p-3">
@@ -175,8 +189,12 @@
                 </div>
               </div>
 
+              <!-- Empty State -->
               <div v-else class="text-center py-20">
-                <p class="text-gray-400">No photos available in this gallery.</p>
+                <svg class="mx-auto h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                </svg>
+                <p class="mt-4 text-gray-500 dark:text-gray-400">No photos available in this gallery.</p>
               </div>
             </div>
           </div>
@@ -245,7 +263,6 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useAwards } from '@/composables/useAwards'
 import api from '@/services/api'
-import { BaseLoader } from '@/components/base'
 
 const { awards, isLoading, error, fetchAwards } = useAwards()
 
@@ -264,21 +281,42 @@ const formatYear = (date) => {
   return new Date(date).getFullYear()
 }
 
+const stripHtml = (html) => {
+  if (!html) return ''
+  const tmp = document.createElement('div')
+  tmp.innerHTML = html
+  return tmp.textContent || tmp.innerText || ''
+}
+
 const openGalleryModal = async (award) => {
+  console.log('[Awards] openGalleryModal called with award:', award)
   selectedAward.value = award
   showGalleryModal.value = true
   loadingGallery.value = true
   galleryPhotos.value = []
 
   try {
+    console.log('[Awards] Fetching galleries for award ID:', award.id)
     const response = await api.get(`/awards/${award.id}/galleries`)
+    console.log('[Awards] API response:', response.data)
+    
     if (response.data.success && response.data.data.galleries) {
-      galleryPhotos.value = response.data.data.galleries
+      // Extract all photos from all galleries
+      const allPhotos = []
+      response.data.data.galleries.forEach(gallery => {
+        console.log('[Awards] Gallery:', gallery.title, '- Items:', gallery.items?.length)
+        if (gallery.items && gallery.items.length > 0) {
+          allPhotos.push(...gallery.items)
+        }
+      })
+      console.log('[Awards] Total photos extracted:', allPhotos.length, allPhotos)
+      galleryPhotos.value = allPhotos
     }
   } catch (err) {
     console.error('Failed to load gallery:', err)
   } finally {
     loadingGallery.value = false
+    console.log('[Awards] Loading complete. galleryPhotos.value:', galleryPhotos.value)
   }
 }
 
@@ -307,6 +345,11 @@ const previousPhoto = () => {
   if (currentPhotoIndex.value > 0) {
     currentPhotoIndex.value--
   }
+}
+
+const handleImageError = (event) => {
+  console.error('[Awards] Image failed to load:', event.target.src)
+  event.target.src = 'https://via.placeholder.com/400x300/e5e7eb/6b7280?text=Image+Not+Found'
 }
 
 // Keyboard navigation for lightbox

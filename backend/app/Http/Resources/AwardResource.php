@@ -24,7 +24,11 @@ class AwardResource extends JsonResource
             'title' => $this->title,
             'description' => $this->description,
             'organization' => $this->organization,
-            'image' => $this->image,
+            'image' => $this->image 
+                ? (str_starts_with($this->image, '/') 
+                    ? url($this->image) 
+                    : asset('uploads/awards/' . $this->image)) 
+                : null,
             'received_at' => $this->received_at?->toISOString(),
             'order' => $this->order,
             'featured_gallery_id' => $this->featured_gallery_id,
