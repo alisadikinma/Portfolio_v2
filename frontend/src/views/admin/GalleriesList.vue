@@ -122,7 +122,7 @@
           <!-- Image -->
           <div class="aspect-square bg-neutral-100 dark:bg-neutral-900 overflow-hidden">
             <img
-              :src="item.image"
+              :src="item.thumbnail"
               :alt="item.title"
               class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
             />
@@ -133,13 +133,26 @@
             <h3 class="font-medium text-neutral-900 dark:text-neutral-100 truncate text-sm">
               {{ item.title }}
             </h3>
-            <p v-if="item.category" class="text-xs text-neutral-600 dark:text-neutral-400 mt-1">
-              {{ item.category }}
+            <p v-if="item.company" class="text-xs text-neutral-600 dark:text-neutral-400 mt-1">
+              {{ item.company }}
+            </p>
+            <p v-if="item.items_count" class="text-xs text-primary-600 dark:text-primary-400 mt-1">
+              {{ item.items_count }} images
             </p>
           </div>
 
           <!-- Actions Overlay -->
           <div class="absolute inset-0 bg-neutral-900/70 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-2">
+            <button
+              @click="handleViewItems(item)"
+              class="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+              title="View Images"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+            </button>
             <button
               @click="handleEdit(item)"
               class="p-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
@@ -283,29 +296,32 @@
           />
         </div>
 
-        <!-- Title (Single only) -->
-        <div v-if="uploadType === 'single'">
+        <!-- Title (for both single and bulk) -->
+        <div>
           <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-            Title *
+            Title {{ uploadType === 'single' ? '*' : '(optional)' }}
           </label>
           <input
             v-model="uploadForm.title"
             type="text"
-            placeholder="Enter image title"
+            :placeholder="uploadType === 'single' ? 'Enter image title' : 'Auto-generated if empty (Category - Date)'"
             class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            required
+            :required="uploadType === 'single'"
           />
+          <p v-if="uploadType === 'bulk'" class="text-xs text-neutral-500 dark:text-neutral-500 mt-1">
+            Leave empty to auto-generate: "{{ uploadForm.category || 'Category' }} - {{ new Date().toLocaleString() }}"
+          </p>
         </div>
 
-        <!-- Description (Single only) -->
-        <div v-if="uploadType === 'single'">
+        <!-- Description -->
+        <div>
           <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
             Description
           </label>
           <textarea
             v-model="uploadForm.description"
             rows="3"
-            placeholder="Enter image description (optional)"
+            placeholder="Enter description (optional)"
             class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
           ></textarea>
         </div>
@@ -332,6 +348,58 @@
           </BaseButton>
         </div>
       </form>
+    </BaseModal>
+
+    <!-- View Items Modal -->
+    <BaseModal v-model="showItemsModal" :title="`${currentGallery?.title} - Images`" size="xl">
+      <div v-if="isLoadingItems" class="flex items-center justify-center py-12">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+      <div v-else-if="currentGalleryItems.length > 0" class="space-y-4">
+        <!-- Gallery Info -->
+        <div class="bg-neutral-50 dark:bg-neutral-900 p-4 rounded-lg">
+          <h3 class="font-semibold text-neutral-900 dark:text-neutral-100 mb-2">{{ currentGallery.title }}</h3>
+          <p v-if="currentGallery.description" class="text-sm text-neutral-600 dark:text-neutral-400 mb-2">{{ currentGallery.description }}</p>
+          <div class="flex items-center gap-4 text-sm text-neutral-600 dark:text-neutral-400">
+            <span v-if="currentGallery.company">📍 {{ currentGallery.company }}</span>
+            <span v-if="currentGallery.period">📅 {{ currentGallery.period }}</span>
+            <span>🖼️ {{ currentGalleryItems.length }} images</span>
+          </div>
+        </div>
+
+        <!-- Items Grid -->
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-4 max-h-[60vh] overflow-y-auto">
+          <div
+            v-for="item in currentGalleryItems"
+            :key="item.id"
+            class="relative group bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden"
+          >
+            <!-- Image -->
+            <div class="aspect-square bg-neutral-100 dark:bg-neutral-900 overflow-hidden">
+              <img
+                :src="item.file_url"
+                :alt="item.title || 'Gallery item'"
+                class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110 cursor-pointer"
+                @click="openLightbox(item.file_url)"
+              />
+            </div>
+            <!-- Info -->
+            <div v-if="item.title" class="p-2">
+              <p class="text-xs text-neutral-600 dark:text-neutral-400 truncate">{{ item.title }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div v-else class="text-center py-12">
+        <p class="text-neutral-500 dark:text-neutral-400">No images found</p>
+      </div>
+    </BaseModal>
+
+    <!-- Lightbox Modal -->
+    <BaseModal v-model="showLightbox" title="" size="xl">
+      <div class="flex items-center justify-center bg-black rounded-lg">
+        <img :src="lightboxImage" alt="Full size" class="max-w-full max-h-[80vh] object-contain" />
+      </div>
     </BaseModal>
 
     <!-- Edit Modal -->
@@ -426,6 +494,7 @@ const {
   isLoading,
   pagination,
   fetchGallery,
+  fetchGalleryItem,
   uploadImage,
   bulkUploadImages,
   updateGalleryItem,
@@ -446,7 +515,13 @@ const filters = ref({
 const selectedItems = ref([])
 const showUploadModal = ref(false)
 const showEditModal = ref(false)
+const showItemsModal = ref(false)
+const showLightbox = ref(false)
 const uploadType = ref('single')
+const isLoadingItems = ref(false)
+const currentGallery = ref(null)
+const currentGalleryItems = ref([])
+const lightboxImage = ref('')
 const isUploading = ref(false)
 const isUpdating = ref(false)
 const isDeleting = ref(false)
@@ -584,10 +659,16 @@ async function handleUpload() {
         formData.append('images[]', file)
       })
       formData.append('category', categoryValue)
+      if (uploadForm.value.title) {
+        formData.append('title', uploadForm.value.title)
+      }
+      if (uploadForm.value.description) {
+        formData.append('description', uploadForm.value.description)
+      }
 
       const result = await bulkUploadImages(formData)
       if (result.success) {
-        uiStore.showSuccess(`${uploadForm.value.images.length} images uploaded successfully`)
+        uiStore.showSuccess(`Gallery created with ${uploadForm.value.images.length} images`)
       } else {
         uiStore.showError(result.error)
       }
@@ -618,13 +699,36 @@ function resetUploadForm() {
   }
 }
 
+async function handleViewItems(item) {
+  currentGallery.value = item
+  showItemsModal.value = true
+  isLoadingItems.value = true
+
+  try {
+    const result = await fetchGalleryItem(item.id)
+    if (result.success && result.data.items) {
+      currentGalleryItems.value = result.data.items
+    }
+  } catch (error) {
+    uiStore.showError('Failed to load gallery items')
+    currentGalleryItems.value = []
+  } finally {
+    isLoadingItems.value = false
+  }
+}
+
+function openLightbox(imageUrl) {
+  lightboxImage.value = imageUrl
+  showLightbox.value = true
+}
+
 function handleEdit(item) {
   editForm.value = {
     id: item.id,
     title: item.title,
     description: item.description || '',
-    category: item.category,
-    image: item.image
+    category: item.company || '', // Use company as category for now
+    image: item.thumbnail
   }
   showEditModal.value = true
 }

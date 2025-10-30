@@ -59,7 +59,7 @@ class AwardController extends Controller
                 'sort_order' => $award->order ?? 0,
                 'gallery_count' => $award->galleries->count(),
                 'total_photos' => $award->total_photos,
-                'featured_gallery_id' => $award->featured_gallery_id
+
             ];
         });
 
@@ -130,7 +130,7 @@ class AwardController extends Controller
      */
     public function show($id)
     {
-        $award = Award::with(['galleries', 'featuredGallery'])->findOrFail($id);
+        $award = Award::with('galleries.items')->findOrFail($id);
 
         return response()->json([
             'success' => true,
@@ -145,7 +145,7 @@ class AwardController extends Controller
                     'image' => $award->image,
                     'received_at' => $award->received_at->format('Y-m-d'),
                     'sort_order' => $award->order,
-                    'featured_gallery_id' => $award->featured_gallery_id,
+
                     'total_photos' => $award->total_photos
                 ],
                 'galleries' => $award->galleries->map(function($gallery) {
@@ -153,10 +153,12 @@ class AwardController extends Controller
                         'id' => $gallery->id,
                         'title' => $gallery->title,
                         'description' => $gallery->description,
-                        'category' => $gallery->category,
-                        'image' => $gallery->image,
-                        'sort_order' => $gallery->pivot->sort_order,
-                        'is_active' => $gallery->is_active
+                        'company' => $gallery->company,
+                        'period' => $gallery->period,
+                        'thumbnail' => $gallery->thumbnail,
+                        'sort_order' => $gallery->sort_order,
+                        'is_active' => $gallery->is_active,
+                        'items_count' => $gallery->items->count()
                     ];
                 })
             ],
@@ -180,8 +182,7 @@ class AwardController extends Controller
                 'credential_id',
                 'credential_url',
                 'received_at',
-                'sort_order',
-                'featured_gallery_id',
+                'sort_order'
             ]);
 
             // Handle file upload
@@ -213,7 +214,7 @@ class AwardController extends Controller
                     'sort_order' => $award->order,
                     'gallery_count' => $award->galleries->count(),
                     'total_photos' => $award->total_photos,
-                    'featured_gallery_id' => $award->featured_gallery_id
+
                 ],
             ], 201);
         } catch (\Exception $e) {
@@ -328,8 +329,7 @@ class AwardController extends Controller
                 unlink(public_path($award->image));
             }
 
-            // Detach all galleries
-            $award->galleries()->detach();
+            // Galleries will be cascade deleted automatically (award_id is nullable or cascaded)
 
             $award->delete();
 
@@ -355,7 +355,7 @@ class AwardController extends Controller
      */
     public function getGalleries($id)
     {
-        $award = Award::with('galleries')->findOrFail($id);
+        $award = Award::with('galleries.items')->findOrFail($id);
         
         return response()->json([
             'success' => true,
@@ -369,11 +369,13 @@ class AwardController extends Controller
                     return [
                         'id' => $gallery->id,
                         'title' => $gallery->title,
-                        'category' => $gallery->category,
-                        'image' => $gallery->image,
                         'description' => $gallery->description,
-                        'sort_order' => $gallery->pivot->sort_order,
-                        'is_active' => $gallery->is_active
+                        'company' => $gallery->company,
+                        'period' => $gallery->period,
+                        'thumbnail' => $gallery->thumbnail,
+                        'sort_order' => $gallery->sort_order,
+                        'is_active' => $gallery->is_active,
+                        'items_count' => $gallery->items->count()
                     ];
                 }),
                 'total_photos' => $award->total_photos
@@ -393,16 +395,19 @@ class AwardController extends Controller
         ]);
 
         $award = Award::findOrFail($id);
+        $gallery = Gallery::findOrFail($validated['gallery_id']);
         
         // Check if already linked
-        if ($award->galleries()->where('gallery_id', $validated['gallery_id'])->exists()) {
+        if ($gallery->award_id === $award->id) {
             return response()->json([
                 'success' => false,
                 'message' => 'Gallery already linked to this award'
             ], 409);
         }
 
-        $award->galleries()->attach($validated['gallery_id'], [
+        // Update gallery to link to this award
+        $gallery->update([
+            'award_id' => $award->id,
             'sort_order' => $validated['sort_order'] ?? 0
         ]);
 
@@ -419,15 +424,17 @@ class AwardController extends Controller
     public function unlinkGallery($id, $galleryId)
     {
         $award = Award::findOrFail($id);
+        $gallery = Gallery::findOrFail($galleryId);
         
-        if (!$award->galleries()->where('gallery_id', $galleryId)->exists()) {
+        if ($gallery->award_id !== $award->id) {
             return response()->json([
                 'success' => false,
                 'message' => 'Gallery not linked to this award'
             ], 404);
         }
 
-        $award->galleries()->detach($galleryId);
+        // Unlink gallery from award
+        $gallery->update(['award_id' => null]);
 
         return response()->json([
             'success' => true,
@@ -448,10 +455,13 @@ class AwardController extends Controller
 
         $award = Award::findOrFail($id);
 
-        foreach ($validated['galleries'] as $gallery) {
-            $award->galleries()->updateExistingPivot($gallery['id'], [
-                'sort_order' => $gallery['sort_order']
-            ]);
+        foreach ($validated['galleries'] as $galleryData) {
+            $gallery = Gallery::find($galleryData['id']);
+            
+            // Only update if gallery belongs to this award
+            if ($gallery && $gallery->award_id === $award->id) {
+                $gallery->update(['sort_order' => $galleryData['sort_order']]);
+            }
         }
 
         return response()->json([

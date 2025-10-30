@@ -18,7 +18,10 @@ class GalleryItemResource extends JsonResource
             'id' => $this->id,
             'gallery_id' => $this->gallery_id,
             'type' => $this->type,
-            'file_path' => $this->file_path ? asset('storage/' . $this->file_path) : null,
+            'file_path' => $this->file_path,
+            'file_url' => $this->file_path 
+                ? asset('storage/' . $this->file_path) 
+                : 'https://via.placeholder.com/800x600/e5e7eb/6b7280?text=' . urlencode($this->title ?? 'Image'),
             'title' => $this->title,
             'description' => $this->description,
             'sequence' => $this->sequence,

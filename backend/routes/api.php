@@ -75,6 +75,13 @@ Route::prefix('galleries')->group(function () {
     Route::get('/{galleryId}/items', [GalleryItemController::class, 'index']);
 });
 
+// Gallery route alias (singular)
+Route::prefix('gallery')->group(function () {
+    Route::get('/', [GalleryController::class, 'index']);
+    Route::get('/{id}', [GalleryController::class, 'show']);
+    Route::get('/{galleryId}/items', [GalleryItemController::class, 'index']);
+});
+
 // Public Contact Route (Rate Limited)
 Route::post('/contact', [ContactController::class, 'store'])->middleware('throttle:5,60'); // 5 requests per minute
 
@@ -162,6 +169,25 @@ Route::middleware(['auth:sanctum'])->prefix('admin/categories')->group(function 
 // Admin Gallery Routes
 Route::middleware(['auth:sanctum'])->prefix('admin/galleries')->group(function () {
     Route::get('/', [GalleryController::class, 'index']);
+    Route::post('/bulk-upload', [GalleryController::class, 'bulkUpload']); // MUST be before /{id}
+    Route::get('/{id}', [GalleryController::class, 'show']);
+    Route::post('/', [GalleryController::class, 'store']);
+    Route::put('/{id}', [GalleryController::class, 'update']);
+    Route::delete('/{id}', [GalleryController::class, 'destroy']);
+
+    // Gallery Items Routes (nested resource)
+    Route::get('/{galleryId}/items', [GalleryItemController::class, 'index']);
+    Route::post('/{galleryId}/items', [GalleryItemController::class, 'store']);
+    Route::post('/{galleryId}/items/bulk-upload', [GalleryItemController::class, 'bulkUpload']);
+    Route::get('/{galleryId}/items/{id}', [GalleryItemController::class, 'show']);
+    Route::put('/{galleryId}/items/{id}', [GalleryItemController::class, 'update']);
+    Route::delete('/{galleryId}/items/{id}', [GalleryItemController::class, 'destroy']);
+});
+
+// Admin Gallery Routes (singular alias)
+Route::middleware(['auth:sanctum'])->prefix('admin/gallery')->group(function () {
+    Route::get('/', [GalleryController::class, 'index']);
+    Route::post('/bulk-upload', [GalleryController::class, 'bulkUpload']); // MUST be before /{id}
     Route::get('/{id}', [GalleryController::class, 'show']);
     Route::post('/', [GalleryController::class, 'store']);
     Route::put('/{id}', [GalleryController::class, 'update']);

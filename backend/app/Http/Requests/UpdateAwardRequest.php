@@ -30,7 +30,6 @@ class UpdateAwardRequest extends FormRequest
             'image' => ['nullable', 'image', 'max:5120'],
             'received_at' => ['required', 'date'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
-            'featured_gallery_id' => ['nullable', 'integer', 'exists:galleries,id'],
         ];
     }
 
@@ -53,7 +52,6 @@ class UpdateAwardRequest extends FormRequest
             'received_at.date' => 'Award date must be a valid date',
             'order.integer' => 'Order must be a number',
             'order.min' => 'Order must be at least 0',
-            'featured_gallery_id.exists' => 'Selected gallery does not exist',
         ];
     }
 }

@@ -57,6 +57,12 @@ class GalleryController extends Controller
 
         // Order by
         $orderBy = $request->query('order_by', 'sort_order');
+        
+        // Map 'order' to 'sort_order' for backward compatibility
+        if ($orderBy === 'order') {
+            $orderBy = 'sort_order';
+        }
+        
         $orderDir = $request->query('order_dir', 'asc');
         $query->orderBy($orderBy, $orderDir);
 
@@ -264,6 +270,101 @@ class GalleryController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to delete gallery',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred',
+            ], 500);
+        }
+    }
+
+    /**
+     * Bulk upload galleries with images
+     * Simplified: Upload multiple images to one gallery
+     */
+    public function bulkUpload(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'images' => 'required|array|min:1|max:20',
+            'images.*' => 'image|mimes:jpg,jpeg,png,webp|max:5120',
+            'title' => 'nullable|string|max:255',
+            'description' => 'nullable|string',
+            'company' => 'nullable|string|max:255',
+            'period' => 'nullable|string|max:100',
+            'category' => 'nullable|string|max:100', // Old field for compatibility
+            'award_id' => 'nullable|exists:awards,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            // Get max order
+            $maxOrder = Gallery::max('sort_order') ?? 0;
+
+            // Auto-generate title if not provided
+            $title = $request->input('title');
+            if (!$title) {
+                $category = $request->input('category', 'Gallery');
+                $title = $category . ' - ' . now()->format('Y-m-d H:i');
+            }
+
+            // Create gallery
+            $gallery = Gallery::create([
+                'title' => $title,
+                'description' => $request->input('description'),
+                'company' => $request->input('company'),
+                'period' => $request->input('period'),
+                'award_id' => $request->input('award_id'),
+                'is_active' => true,
+                'sort_order' => $maxOrder + 1,
+            ]);
+
+            // Upload images as gallery items
+            $uploadedItems = [];
+            if ($request->hasFile('images')) {
+                foreach ($request->file('images') as $index => $image) {
+                    $filename = time() . '_' . $gallery->id . '_' . $index . '.' . $image->getClientOriginalExtension();
+                    $path = $image->storeAs('gallery/items', $filename, 'public');
+
+                    $item = $gallery->items()->create([
+                        'type' => 'image',
+                        'file_path' => $path,
+                        'title' => $gallery->title . ' - Image ' . ($index + 1),
+                        'sequence' => $index,
+                    ]);
+
+                    $uploadedItems[] = $item;
+                }
+
+                // Use first image as thumbnail
+                if (count($uploadedItems) > 0) {
+                    $gallery->update(['thumbnail' => $uploadedItems[0]->file_path]);
+                }
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Gallery created with ' . count($uploadedItems) . ' images',
+                'data' => new GalleryResource($gallery->load(['award', 'items'])),
+            ], 201);
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            Log::error('Failed to bulk upload gallery', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create gallery',
                 'error' => config('app.debug') ? $e->getMessage() : 'An error occurred',
             ], 500);
         }
