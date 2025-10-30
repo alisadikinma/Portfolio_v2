@@ -21,7 +21,9 @@ class GalleryResource extends JsonResource
             'company' => $this->company,
             'period' => $this->period,
             'thumbnail' => $this->thumbnail 
-                ? asset('storage/' . $this->thumbnail) 
+                ? (str_starts_with($this->thumbnail, '/storage/') 
+                    ? url($this->thumbnail) 
+                    : asset('storage/' . $this->thumbnail)) 
                 : 'https://via.placeholder.com/400x300/e5e7eb/6b7280?text=' . urlencode($this->title),
             'award_id' => $this->award_id,
             'award' => $this->whenLoaded('award', function () {
