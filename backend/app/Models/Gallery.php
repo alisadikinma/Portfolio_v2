@@ -12,8 +12,10 @@ class Gallery extends Model
     protected $fillable = [
         'title',
         'description',
-        'image',
-        'category',
+        'company',
+        'period',
+        'thumbnail',
+        'award_id',
         'is_active',
         'sort_order',
     ];
@@ -23,22 +25,26 @@ class Gallery extends Model
     ];
 
     /**
-     * Get gallery image as a collection for compatibility
-     * (Gallery has only one image stored in 'image' column)
+     * Gallery belongs to an award
      */
-    public function getImagesAttribute()
+    public function award()
     {
-        return collect([$this->image]);
+        return $this->belongsTo(Award::class);
     }
 
     /**
-     * Gallery belongs to many awards
+     * Gallery has many items (images/videos)
      */
-    public function awards()
+    public function items()
     {
-        return $this->belongsToMany(Award::class, 'award_gallery')
-                    ->withPivot('sort_order')
-                    ->withTimestamps()
-                    ->orderBy('sort_order');
+        return $this->hasMany(GalleryItem::class)->orderBy('sequence');
+    }
+
+    /**
+     * Get total items count
+     */
+    public function getTotalItemsAttribute()
+    {
+        return $this->items()->count();
     }
 }

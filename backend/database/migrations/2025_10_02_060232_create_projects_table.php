@@ -26,7 +26,7 @@ return new class extends Migration
             $table->date('completed_at')->nullable();
             $table->boolean('featured')->default(false);
             $table->boolean('published')->default(true);
-            $table->integer('order')->default(0);
+            $table->integer('sort_order')->default(0);
             $table->timestamps();
             $table->softDeletes();
         });

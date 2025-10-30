@@ -5,6 +5,7 @@ export const useGalleriesStore = defineStore('galleries', {
   state: () => ({
     galleries: [],
     currentGallery: null,
+    currentGalleryItems: [],
     pagination: {
       current_page: 1,
       last_page: 1,
@@ -34,7 +35,7 @@ export const useGalleriesStore = defineStore('galleries', {
           ...filters
         }
 
-        const response = await api.get('/admin/gallery', { params })
+        const response = await api.get('/admin/galleries', { params })
 
         this.galleries = response.data.data
         this.pagination = {
@@ -56,7 +57,7 @@ export const useGalleriesStore = defineStore('galleries', {
       this.error = null
 
       try {
-        const response = await api.get(`/admin/gallery/${id}`)
+        const response = await api.get(`/admin/galleries/${id}`)
         this.currentGallery = response.data.data
         return this.currentGallery
       } catch (error) {
@@ -72,7 +73,17 @@ export const useGalleriesStore = defineStore('galleries', {
       this.error = null
 
       try {
-        const response = await api.post('/admin/gallery', galleryData)
+        // Create FormData for file upload
+        const formData = new FormData()
+        Object.keys(galleryData).forEach(key => {
+          if (galleryData[key] !== null && galleryData[key] !== undefined) {
+            formData.append(key, galleryData[key])
+          }
+        })
+
+        const response = await api.post('/admin/galleries', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        })
 
         const newGallery = response.data.data
 
@@ -94,7 +105,17 @@ export const useGalleriesStore = defineStore('galleries', {
       this.error = null
 
       try {
-        const response = await api.put(`/admin/gallery/${id}`, galleryData)
+        // Create FormData for file upload
+        const formData = new FormData()
+        Object.keys(galleryData).forEach(key => {
+          if (galleryData[key] !== null && galleryData[key] !== undefined) {
+            formData.append(key, galleryData[key])
+          }
+        })
+
+        const response = await api.put(`/admin/galleries/${id}`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        })
 
         const updatedGallery = response.data.data
 
@@ -121,7 +142,7 @@ export const useGalleriesStore = defineStore('galleries', {
       this.error = null
 
       try {
-        await api.delete(`/admin/gallery/${id}`)
+        await api.delete(`/admin/galleries/${id}`)
 
         this.galleries = this.galleries.filter(g => g.id !== id)
 
@@ -140,36 +161,117 @@ export const useGalleriesStore = defineStore('galleries', {
       }
     },
 
-    async bulkUpload(uploadData) {
+    // Gallery Items Actions
+    async fetchGalleryItems(galleryId) {
       this.loading = true
       this.error = null
 
       try {
-        const response = await api.post('/admin/gallery/bulk-upload', uploadData)
-
-        return response.data.data
+        const response = await api.get(`/admin/galleries/${galleryId}/items`)
+        this.currentGalleryItems = response.data.data
+        return this.currentGalleryItems
       } catch (error) {
-        this.error = error.response?.data?.message || 'Failed to upload galleries'
+        this.error = error.response?.data?.message || 'Failed to fetch gallery items'
         throw error
       } finally {
         this.loading = false
       }
     },
 
-    async bulkDelete(ids) {
+    async addGalleryItem(galleryId, itemData) {
       this.loading = true
       this.error = null
 
       try {
-        await api.post('/admin/gallery/bulk-delete', { ids })
+        const formData = new FormData()
+        Object.keys(itemData).forEach(key => {
+          if (itemData[key] !== null && itemData[key] !== undefined) {
+            formData.append(key, itemData[key])
+          }
+        })
 
-        this.galleries = this.galleries.filter(g => !ids.includes(g.id))
+        const response = await api.post(`/admin/galleries/${galleryId}/items`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        })
 
-        if (this.pagination.total > 0) {
-          this.pagination.total -= ids.length
-        }
+        const newItem = response.data.data
+        this.currentGalleryItems.push(newItem)
+
+        return newItem
       } catch (error) {
-        this.error = error.response?.data?.message || 'Failed to delete galleries'
+        this.error = error.response?.data?.message || 'Failed to add gallery item'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async updateGalleryItem(galleryId, itemId, itemData) {
+      this.loading = true
+      this.error = null
+
+      try {
+        const formData = new FormData()
+        Object.keys(itemData).forEach(key => {
+          if (itemData[key] !== null && itemData[key] !== undefined) {
+            formData.append(key, itemData[key])
+          }
+        })
+
+        const response = await api.put(`/admin/galleries/${galleryId}/items/${itemId}`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        })
+
+        const updatedItem = response.data.data
+        const index = this.currentGalleryItems.findIndex(item => item.id === itemId)
+        if (index !== -1) {
+          this.currentGalleryItems[index] = updatedItem
+        }
+
+        return updatedItem
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to update gallery item'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async deleteGalleryItem(galleryId, itemId) {
+      this.loading = true
+      this.error = null
+
+      try {
+        await api.delete(`/admin/galleries/${galleryId}/items/${itemId}`)
+        this.currentGalleryItems = this.currentGalleryItems.filter(item => item.id !== itemId)
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to delete gallery item'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async bulkUploadGalleryItems(galleryId, files, titles = [], descriptions = []) {
+      this.loading = true
+      this.error = null
+
+      try {
+        const formData = new FormData()
+        files.forEach(file => formData.append('files[]', file))
+        titles.forEach((title, index) => formData.append(`titles[${index}]`, title))
+        descriptions.forEach((desc, index) => formData.append(`descriptions[${index}]`, desc))
+
+        const response = await api.post(`/admin/galleries/${galleryId}/items/bulk-upload`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        })
+
+        const newItems = response.data.data
+        this.currentGalleryItems.push(...newItems)
+
+        return newItems
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to bulk upload gallery items'
         throw error
       } finally {
         this.loading = false

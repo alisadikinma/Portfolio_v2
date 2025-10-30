@@ -24,6 +24,7 @@ class ProjectSeeder extends Seeder
                 'completed_at' => '2024-06-30',
                 'featured' => true,
                 'published' => true,
+                'is_active' => true,
                 'sort_order' => 1,
                 'translations' => [
                     'en' => [
@@ -62,6 +63,7 @@ class ProjectSeeder extends Seeder
                 'completed_at' => null,
                 'featured' => false,
                 'published' => true,
+                'is_active' => true,
                 'sort_order' => 2,
                 'translations' => [
                     'en' => [

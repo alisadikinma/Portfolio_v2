@@ -18,15 +18,30 @@ use Illuminate\Support\Str;
 class GalleryController extends Controller
 {
     /**
-     * Display a listing of gallery items.
+     * Display a listing of galleries.
      */
     public function index(Request $request): JsonResponse
     {
-        $query = Gallery::query();
+        $query = Gallery::with(['award', 'items']);
 
-        // Filter by category
-        if ($request->has('category')) {
-            $query->where('category', $request->query('category'));
+        // Filter by award
+        if ($request->has('award_id')) {
+            $query->where('award_id', $request->query('award_id'));
+        }
+
+        // Filter by company
+        if ($request->has('company')) {
+            $query->where('company', 'like', '%' . $request->query('company') . '%');
+        }
+
+        // Filter by period
+        if ($request->has('period')) {
+            $query->where('period', $request->query('period'));
+        }
+
+        // Filter by active status
+        if ($request->has('is_active')) {
+            $query->where('is_active', $request->query('is_active'));
         }
 
         // Search
@@ -34,18 +49,27 @@ class GalleryController extends Controller
             $search = $request->query('search');
             $query->where(function ($q) use ($search) {
                 $q->where('title', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%");
+                  ->orWhere('description', 'like', "%{$search}%")
+                  ->orWhere('company', 'like', "%{$search}%")
+                  ->orWhere('period', 'like', "%{$search}%");
             });
         }
 
         // Order by
-        $orderBy = $request->query('order_by', 'order');
+        $orderBy = $request->query('order_by', 'sort_order');
+        
+        // Map 'order' to 'sort_order' for backward compatibility
+        if ($orderBy === 'order') {
+            $orderBy = 'sort_order';
+        }
+        
         $orderDir = $request->query('order_dir', 'asc');
         $query->orderBy($orderBy, $orderDir);
 
-        $galleries = $query->paginate(12);
+        $galleries = $query->withCount('items')->paginate(12);
 
         return response()->json([
+            'success' => true,
             'data' => GalleryResource::collection($galleries),
             'links' => [
                 'first' => $galleries->url(1),
@@ -65,19 +89,20 @@ class GalleryController extends Controller
     }
 
     /**
-     * Display the specified gallery item.
+     * Display the specified gallery.
      */
     public function show(string $id): JsonResponse
     {
-        $gallery = Gallery::findOrFail($id);
+        $gallery = Gallery::with(['award', 'items'])->findOrFail($id);
 
         return response()->json([
+            'success' => true,
             'data' => new GalleryResource($gallery),
         ]);
     }
 
     /**
-     * Store a newly created gallery item.
+     * Store a newly created gallery.
      */
     public function store(StoreGalleryRequest $request): JsonResponse
     {
@@ -86,27 +111,31 @@ class GalleryController extends Controller
 
             $data = $request->validated();
 
-            // Handle image upload
-            if ($request->hasFile('image')) {
-                $image = $request->file('image');
-                $filename = time() . '_' . Str::slug($data['title']) . '.' . $image->getClientOriginalExtension();
-                $path = $image->storeAs('gallery', $filename, 'public');
-                $data['image'] = $path;
+            // Handle thumbnail upload
+            if ($request->hasFile('thumbnail')) {
+                $thumbnail = $request->file('thumbnail');
+                $filename = time() . '_' . Str::slug($data['title']) . '.' . $thumbnail->getClientOriginalExtension();
+                $path = $thumbnail->storeAs('gallery/thumbnails', $filename, 'public');
+                $data['thumbnail'] = $path;
             }
 
-            // Set order if not provided
-            if (!isset($data['order'])) {
-                $maxOrder = Gallery::where('category', $data['category'])->max('order') ?? 0;
-                $data['order'] = $maxOrder + 1;
+            // Set sort_order if not provided
+            if (!isset($data['sort_order'])) {
+                $maxOrder = Gallery::max('sort_order') ?? 0;
+                $data['sort_order'] = $maxOrder + 1;
             }
+
+            // Set is_active default
+            $data['is_active'] = $data['is_active'] ?? true;
 
             $gallery = Gallery::create($data);
 
             DB::commit();
 
             return response()->json([
-                'message' => 'Gallery item created successfully',
-                'data' => new GalleryResource($gallery),
+                'success' => true,
+                'message' => 'Gallery created successfully',
+                'data' => new GalleryResource($gallery->load('award')),
             ], 201);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -116,20 +145,21 @@ class GalleryController extends Controller
                 Storage::disk('public')->delete($path);
             }
 
-            Log::error('Failed to create gallery item', [
+            Log::error('Failed to create gallery', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
-                'message' => 'Failed to create gallery item',
+                'success' => false,
+                'message' => 'Failed to create gallery',
                 'error' => config('app.debug') ? $e->getMessage() : 'An error occurred',
             ], 500);
         }
     }
 
     /**
-     * Update the specified gallery item.
+     * Update the specified gallery.
      */
     public function update(UpdateGalleryRequest $request, string $id): JsonResponse
     {
@@ -139,31 +169,32 @@ class GalleryController extends Controller
             DB::beginTransaction();
 
             $data = $request->validated();
-            $oldImagePath = null;
+            $oldThumbnailPath = null;
 
-            // Handle image upload if new image provided
-            if ($request->hasFile('image')) {
+            // Handle thumbnail upload if new thumbnail provided
+            if ($request->hasFile('thumbnail')) {
                 // Store old path for cleanup after successful update
-                $oldImagePath = $gallery->image;
+                $oldThumbnailPath = $gallery->thumbnail;
 
-                $image = $request->file('image');
-                $filename = time() . '_' . Str::slug($request->input('title', $gallery->title)) . '.' . $image->getClientOriginalExtension();
-                $path = $image->storeAs('gallery', $filename, 'public');
-                $data['image'] = $path;
+                $thumbnail = $request->file('thumbnail');
+                $filename = time() . '_' . Str::slug($request->input('title', $gallery->title)) . '.' . $thumbnail->getClientOriginalExtension();
+                $path = $thumbnail->storeAs('gallery/thumbnails', $filename, 'public');
+                $data['thumbnail'] = $path;
             }
 
             $gallery->update($data);
 
-            // Delete old image after successful update
-            if ($oldImagePath && Storage::disk('public')->exists($oldImagePath)) {
-                Storage::disk('public')->delete($oldImagePath);
+            // Delete old thumbnail after successful update
+            if ($oldThumbnailPath && Storage::disk('public')->exists($oldThumbnailPath)) {
+                Storage::disk('public')->delete($oldThumbnailPath);
             }
 
             DB::commit();
 
             return response()->json([
-                'message' => 'Gallery item updated successfully',
-                'data' => new GalleryResource($gallery),
+                'success' => true,
+                'message' => 'Gallery updated successfully',
+                'data' => new GalleryResource($gallery->load(['award', 'items'])),
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -173,62 +204,97 @@ class GalleryController extends Controller
                 Storage::disk('public')->delete($path);
             }
 
-            Log::error('Failed to update gallery item', [
+            Log::error('Failed to update gallery', [
                 'id' => $id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
-                'message' => 'Failed to update gallery item',
+                'success' => false,
+                'message' => 'Failed to update gallery',
                 'error' => config('app.debug') ? $e->getMessage() : 'An error occurred',
             ], 500);
         }
     }
 
     /**
-     * Remove the specified gallery item.
+     * Remove the specified gallery.
+     * Note: Gallery items will be cascade deleted due to FK constraint.
      */
     public function destroy(string $id): JsonResponse
     {
         try {
-            $gallery = Gallery::findOrFail($id);
+            $gallery = Gallery::with('items')->findOrFail($id);
 
-            // Delete image file
-            if ($gallery->image && Storage::disk('public')->exists($gallery->image)) {
-                Storage::disk('public')->delete($gallery->image);
+            DB::beginTransaction();
+
+            // Collect all file paths for cleanup (thumbnail + all item files)
+            $filesToDelete = [];
+
+            if ($gallery->thumbnail) {
+                $filesToDelete[] = $gallery->thumbnail;
             }
 
+            foreach ($gallery->items as $item) {
+                if ($item->file_path) {
+                    $filesToDelete[] = $item->file_path;
+                }
+            }
+
+            // Delete gallery (items will cascade delete)
             $gallery->delete();
 
+            DB::commit();
+
+            // Clean up files after successful database deletion
+            foreach ($filesToDelete as $filePath) {
+                if (Storage::disk('public')->exists($filePath)) {
+                    Storage::disk('public')->delete($filePath);
+                }
+            }
+
             return response()->json([
-                'message' => 'Gallery item deleted successfully',
+                'success' => true,
+                'message' => 'Gallery and all items deleted successfully',
             ]);
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to delete gallery item',
+            DB::rollBack();
+
+            Log::error('Failed to delete gallery', [
+                'id' => $id,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete gallery',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred',
             ], 500);
         }
     }
 
     /**
-     * Bulk upload gallery items.
+     * Bulk upload galleries with images
+     * Simplified: Upload multiple images to one gallery
      */
     public function bulkUpload(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
             'images' => 'required|array|min:1|max:20',
-            'images.*' => 'required|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-            'category' => 'required|string|max:100',
-            'titles' => 'nullable|array',
-            'titles.*' => 'nullable|string|max:255',
-            'descriptions' => 'nullable|array',
-            'descriptions.*' => 'nullable|string',
+            'images.*' => 'image|mimes:jpg,jpeg,png,webp|max:5120',
+            'title' => 'nullable|string|max:255',
+            'description' => 'nullable|string',
+            'company' => 'nullable|string|max:255',
+            'period' => 'nullable|string|max:100',
+            'category' => 'nullable|string|max:100', // Old field for compatibility
+            'award_id' => 'nullable|exists:awards,id',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
+                'success' => false,
                 'message' => 'Validation failed',
                 'errors' => $validator->errors(),
             ], 422);
@@ -237,114 +303,68 @@ class GalleryController extends Controller
         try {
             DB::beginTransaction();
 
-            $images = $request->file('images');
-            $category = $request->input('category');
-            $titles = $request->input('titles', []);
-            $descriptions = $request->input('descriptions', []);
+            // Get max order
+            $maxOrder = Gallery::max('sort_order') ?? 0;
 
-            $maxOrder = Gallery::where('category', $category)->max('order') ?? 0;
-            $uploaded = [];
-            $uploadedPaths = [];
+            // Auto-generate title if not provided
+            $title = $request->input('title');
+            if (!$title) {
+                $category = $request->input('category', 'Gallery');
+                $title = $category . ' - ' . now()->format('Y-m-d H:i');
+            }
 
-            foreach ($images as $index => $image) {
-                $title = $titles[$index] ?? 'Image ' . ($index + 1);
-                $description = $descriptions[$index] ?? null;
+            // Create gallery
+            $gallery = Gallery::create([
+                'title' => $title,
+                'description' => $request->input('description'),
+                'company' => $request->input('company'),
+                'period' => $request->input('period'),
+                'award_id' => $request->input('award_id'),
+                'is_active' => true,
+                'sort_order' => $maxOrder + 1,
+            ]);
 
-                $filename = time() . '_' . $index . '_' . Str::slug($title) . '.' . $image->getClientOriginalExtension();
-                $path = $image->storeAs('gallery', $filename, 'public');
-                $uploadedPaths[] = $path;
+            // Upload images as gallery items
+            $uploadedItems = [];
+            if ($request->hasFile('images')) {
+                foreach ($request->file('images') as $index => $image) {
+                    $filename = time() . '_' . $gallery->id . '_' . $index . '.' . $image->getClientOriginalExtension();
+                    $path = $image->storeAs('gallery/items', $filename, 'public');
 
-                $gallery = Gallery::create([
-                    'title' => $title,
-                    'description' => $description,
-                    'image' => $path,
-                    'category' => $category,
-                    'order' => $maxOrder + $index + 1,
-                ]);
+                    $item = $gallery->items()->create([
+                        'type' => 'image',
+                        'file_path' => $path,
+                        'title' => $gallery->title . ' - Image ' . ($index + 1),
+                        'sequence' => $index,
+                    ]);
 
-                $uploaded[] = new GalleryResource($gallery);
+                    $uploadedItems[] = $item;
+                }
+
+                // Use first image as thumbnail
+                if (count($uploadedItems) > 0) {
+                    $gallery->update(['thumbnail' => $uploadedItems[0]->file_path]);
+                }
             }
 
             DB::commit();
 
             return response()->json([
-                'message' => count($uploaded) . ' gallery items uploaded successfully',
-                'data' => $uploaded,
+                'success' => true,
+                'message' => 'Gallery created with ' . count($uploadedItems) . ' images',
+                'data' => new GalleryResource($gallery->load(['award', 'items'])),
             ], 201);
         } catch (\Exception $e) {
             DB::rollBack();
 
-            // Clean up uploaded files on failure
-            foreach ($uploadedPaths ?? [] as $path) {
-                if (Storage::disk('public')->exists($path)) {
-                    Storage::disk('public')->delete($path);
-                }
-            }
-
-            Log::error('Failed to bulk upload gallery items', [
+            Log::error('Failed to bulk upload gallery', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
-                'message' => 'Failed to upload gallery items',
-                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred',
-            ], 500);
-        }
-    }
-
-    /**
-     * Bulk delete gallery items.
-     */
-    public function bulkDelete(Request $request): JsonResponse
-    {
-        $validator = Validator::make($request->all(), [
-            'ids' => 'required|array|min:1',
-            'ids.*' => 'required|integer|exists:galleries,id',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'message' => 'Validation failed',
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
-        try {
-            DB::beginTransaction();
-
-            $ids = $request->input('ids');
-            $galleries = Gallery::whereIn('id', $ids)->get();
-
-            // Collect image paths for cleanup
-            $imagePaths = $galleries->pluck('image')->filter()->toArray();
-
-            // Delete all galleries
-            Gallery::whereIn('id', $ids)->delete();
-
-            DB::commit();
-
-            // Delete image files after successful database deletion
-            foreach ($imagePaths as $path) {
-                if (Storage::disk('public')->exists($path)) {
-                    Storage::disk('public')->delete($path);
-                }
-            }
-
-            return response()->json([
-                'message' => count($galleries) . ' gallery items deleted successfully',
-            ]);
-        } catch (\Exception $e) {
-            DB::rollBack();
-
-            Log::error('Failed to bulk delete gallery items', [
-                'ids' => $request->input('ids'),
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return response()->json([
-                'message' => 'Failed to delete gallery items',
+                'success' => false,
+                'message' => 'Failed to create gallery',
                 'error' => config('app.debug') ? $e->getMessage() : 'An error occurred',
             ], 500);
         }
