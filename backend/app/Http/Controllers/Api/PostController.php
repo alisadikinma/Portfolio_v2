@@ -66,6 +66,17 @@ class PostController extends Controller
 
         $query->orderBy('published_at', 'desc');
 
+        // Support simple limit for fast queries (homepage, etc)
+        if ($request->has('limit')) {
+            $limit = min($request->query('limit', 15), 50);
+            $posts = $query->limit($limit)->get();
+
+            return response()->json([
+                'data' => PostResource::collection($posts)->additional(['lang' => $language]),
+            ]);
+        }
+
+        // Default: Pagination for admin/listing pages
         $perPage = min($request->query('per_page', 15), 50);
         $posts = $query->paginate($perPage);
 

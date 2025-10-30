@@ -1,164 +1,171 @@
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import api from '@/services/api'
 
-export function useGallery() {
-  const gallery = ref([])
-  const galleryItem = ref(null)
-  const isLoading = ref(false)
-  const error = ref(null)
-  const pagination = ref({
-    currentPage: 1,
-    perPage: 12,
-    total: 0,
-    lastPage: 1
+export function useGallery(initialParams = {}) {
+  const queryClient = useQueryClient()
+  const queryParams = ref(initialParams)
+
+  // Fetch gallery items with caching (1hr stale / 1hr cache)
+  const {
+    data: galleryData,
+    isLoading,
+    error: queryError,
+    refetch
+  } = useQuery({
+    queryKey: ['gallery', queryParams],
+    queryFn: async () => {
+      const response = await api.get('/gallery', { params: queryParams.value })
+      return response.data
+    },
+    staleTime: 60 * 60 * 1000, // 1 hour
+    gcTime: 60 * 60 * 1000 // 1 hour
   })
 
-  // Fetch gallery items
+  // Computed values for backward compatibility
+  const gallery = computed(() => {
+    // Handle both success: true format and direct data format
+    const data = galleryData.value?.data || galleryData.value || []
+    return data
+  })
+
+  const pagination = computed(() => {
+    const meta = galleryData.value?.meta
+    return meta ? {
+      currentPage: meta.current_page,
+      perPage: meta.per_page,
+      total: meta.total,
+      lastPage: meta.last_page
+    } : {
+      currentPage: 1,
+      perPage: 12,
+      total: 0,
+      lastPage: 1
+    }
+  })
+
+  const error = computed(() => queryError.value?.response?.data?.message || queryError.value?.message || null)
+
+  // Fetch gallery with params
   const fetchGallery = async (params = {}) => {
-    isLoading.value = true
-    error.value = null
-
-    try {
-      const response = await api.get('/gallery', { params })
-      gallery.value = response.data.data
-
-      if (response.data.meta) {
-        pagination.value = {
-          currentPage: response.data.meta.current_page,
-          perPage: response.data.meta.per_page,
-          total: response.data.meta.total,
-          lastPage: response.data.meta.last_page
-        }
-      }
-
-      return { success: true, data: response.data }
-    } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to fetch gallery'
-      return { success: false, error: error.value }
-    } finally {
-      isLoading.value = false
+    queryParams.value = params
+    const result = await refetch()
+    return {
+      success: !result.isError,
+      data: result.data,
+      error: result.error?.response?.data?.message
     }
   }
 
   // Fetch single gallery item
   const fetchGalleryItem = async (id) => {
-    isLoading.value = true
-    error.value = null
-
     try {
       const response = await api.get(`/gallery/${id}`)
-      galleryItem.value = response.data.data
-
       return { success: true, data: response.data.data }
     } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to fetch gallery item'
-      return { success: false, error: error.value }
-    } finally {
-      isLoading.value = false
+      return {
+        success: false,
+        error: err.response?.data?.message || 'Failed to fetch gallery item'
+      }
     }
   }
 
   // Upload single image (admin)
   const uploadImage = async (formData) => {
-    isLoading.value = true
-    error.value = null
-
     try {
       const response = await api.post('/admin/gallery', formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }
       })
+      // Invalidate cache after mutation
+      queryClient.invalidateQueries({ queryKey: ['gallery'] })
       return { success: true, data: response.data }
     } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to upload image'
-      return { success: false, error: error.value }
-    } finally {
-      isLoading.value = false
+      return {
+        success: false,
+        error: err.response?.data?.message || 'Failed to upload image'
+      }
     }
   }
 
   // Bulk upload images (admin)
   const bulkUploadImages = async (formData) => {
-    isLoading.value = true
-    error.value = null
-
     try {
       const response = await api.post('/admin/gallery/bulk-upload', formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }
       })
+      // Invalidate cache after mutation
+      queryClient.invalidateQueries({ queryKey: ['gallery'] })
       return { success: true, data: response.data }
     } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to upload images'
-      return { success: false, error: error.value }
-    } finally {
-      isLoading.value = false
+      return {
+        success: false,
+        error: err.response?.data?.message || 'Failed to upload images'
+      }
     }
   }
 
   // Update gallery item (admin)
   const updateGalleryItem = async (id, formData) => {
-    isLoading.value = true
-    error.value = null
-
     try {
       const response = await api.put(`/admin/gallery/${id}`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }
       })
+      // Invalidate cache after mutation
+      queryClient.invalidateQueries({ queryKey: ['gallery'] })
       return { success: true, data: response.data }
     } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to update gallery item'
-      return { success: false, error: error.value }
-    } finally {
-      isLoading.value = false
+      return {
+        success: false,
+        error: err.response?.data?.message || 'Failed to update gallery item'
+      }
     }
   }
 
   // Delete gallery item (admin)
   const deleteGalleryItem = async (id) => {
-    isLoading.value = true
-    error.value = null
-
     try {
       await api.delete(`/admin/gallery/${id}`)
+      // Invalidate cache after mutation
+      queryClient.invalidateQueries({ queryKey: ['gallery'] })
       return { success: true }
     } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to delete gallery item'
-      return { success: false, error: error.value }
-    } finally {
-      isLoading.value = false
+      return {
+        success: false,
+        error: err.response?.data?.message || 'Failed to delete gallery item'
+      }
     }
   }
 
   // Bulk delete gallery items (admin)
   const bulkDeleteGalleryItems = async (ids) => {
-    isLoading.value = true
-    error.value = null
-
     try {
       await api.post('/admin/gallery/bulk-delete', { ids })
+      // Invalidate cache after mutation
+      queryClient.invalidateQueries({ queryKey: ['gallery'] })
       return { success: true }
     } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to delete gallery items'
-      return { success: false, error: error.value }
-    } finally {
-      isLoading.value = false
+      return {
+        success: false,
+        error: err.response?.data?.message || 'Failed to delete gallery items'
+      }
     }
   }
 
   return {
-    // State
+    // State - computed for reactivity
     gallery,
-    galleryItem,
+    galleryItem: ref(null),
     isLoading,
     error,
     pagination,
 
-    // Methods
+    // Methods - backward compatible
     fetchGallery,
     fetchGalleryItem,
     uploadImage,

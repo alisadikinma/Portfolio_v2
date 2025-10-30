@@ -89,18 +89,54 @@ class AwardController extends Controller
     /**
      * Get all awards
      */
-    public function index()
+    public function index(Request $request)
     {
+        $query = Award::with('galleries');
+
         try {
-            $awards = Award::with('galleries')
-                           ->orderBy('sort_order', 'asc')
-                           ->orderBy('received_at', 'desc')
-                           ->get();
+            $query->orderBy('sort_order', 'asc')
+                  ->orderBy('received_at', 'desc');
         } catch (\Exception $e) {
-            $awards = Award::with('galleries')
-                           ->orderBy('received_at', 'desc')
-                           ->get();
+            $query->orderBy('received_at', 'desc');
         }
+
+        // Support simple limit for fast queries (homepage, etc)
+        if ($request->has('limit')) {
+            $limit = min($request->query('limit', 15), 50);
+            $awards = $query->limit($limit)->get();
+
+            $formattedAwards = $awards->map(function($award) {
+                return [
+                    'id' => $award->id,
+                    'award_title' => $award->title,
+                    'title' => $award->title,
+                    'description' => $award->description,
+                    'issuing_organization' => $award->organization,
+                    'organization' => $award->organization,
+                    'credential_id' => $award->credential_id,
+                    'credential_url' => $award->credential_url,
+                    'image' => $award->image
+                        ? (str_starts_with($award->image, '/')
+                            ? url($award->image)
+                            : asset('uploads/awards/' . $award->image))
+                        : null,
+                    'award_date' => $award->received_at,
+                    'received_at' => $award->received_at,
+                    'sort_order' => $award->sort_order ?? 0,
+                    'gallery_count' => $award->galleries->count(),
+                    'total_photos' => $award->total_photos
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'data' => $formattedAwards,
+                'message' => 'Awards retrieved successfully'
+            ]);
+        }
+
+        // Default: Get all awards
+        $awards = $query->get();
 
         $formattedAwards = $awards->map(function($award) {
             return [
@@ -112,10 +148,10 @@ class AwardController extends Controller
                 'organization' => $award->organization,
                 'credential_id' => $award->credential_id,
                 'credential_url' => $award->credential_url,
-                'image' => $award->image 
-                    ? (str_starts_with($award->image, '/') 
-                        ? url($award->image) 
-                        : asset('uploads/awards/' . $award->image)) 
+                'image' => $award->image
+                    ? (str_starts_with($award->image, '/')
+                        ? url($award->image)
+                        : asset('uploads/awards/' . $award->image))
                     : null,
                 'award_date' => $award->received_at,
                 'received_at' => $award->received_at,

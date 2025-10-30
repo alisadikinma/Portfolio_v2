@@ -25,6 +25,17 @@ class TestimonialController extends Controller
     {
         $query = Testimonial::active()->ordered();
 
+        // Support simple limit for fast queries (homepage, etc)
+        if ($request->has('limit')) {
+            $limit = min($request->query('limit', 15), 50);
+            $testimonials = $query->limit($limit)->get();
+
+            return response()->json([
+                'data' => TestimonialResource::collection($testimonials),
+            ]);
+        }
+
+        // Default: Pagination for admin/listing pages
         $perPage = min($request->query('per_page', 15), 50);
         $testimonials = $query->paginate($perPage);
 

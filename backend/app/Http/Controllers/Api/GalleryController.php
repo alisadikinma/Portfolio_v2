@@ -57,15 +57,27 @@ class GalleryController extends Controller
 
         // Order by
         $orderBy = $request->query('order_by', 'sort_order');
-        
+
         // Map 'order' to 'sort_order' for backward compatibility
         if ($orderBy === 'order') {
             $orderBy = 'sort_order';
         }
-        
+
         $orderDir = $request->query('order_dir', 'asc');
         $query->orderBy($orderBy, $orderDir);
 
+        // Support simple limit for fast queries (homepage, etc)
+        if ($request->has('limit')) {
+            $limit = min($request->query('limit', 12), 50);
+            $galleries = $query->withCount('items')->limit($limit)->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => GalleryResource::collection($galleries),
+            ]);
+        }
+
+        // Default: Pagination for admin/listing pages
         $galleries = $query->withCount('items')->paginate(12);
 
         return response()->json([
