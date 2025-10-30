@@ -100,6 +100,7 @@ Route::prefix('services')->group(function () {
 // Public Settings Routes
 Route::prefix('settings')->group(function () {
     Route::get('/', [SettingController::class, 'index']);
+    Route::get('/about', [SettingsController::class, 'getAboutSettings']); // NEW: Public about page data
     Route::get('/{group}', [SettingController::class, 'getByGroup']);
 });
 
