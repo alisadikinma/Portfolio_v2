@@ -33,7 +33,7 @@
 
     <!-- Filters -->
     <BaseCard class="mb-6">
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <!-- Search -->
         <div>
           <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
@@ -46,23 +46,6 @@
             class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             @input="debouncedSearch"
           />
-        </div>
-
-        <!-- Category Filter -->
-        <div>
-          <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-            Category
-          </label>
-          <select
-            v-model="filters.category"
-            class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            @change="fetchGalleries"
-          >
-            <option value="">All Categories</option>
-            <option v-for="cat in categories" :key="cat" :value="cat">
-              {{ cat }}
-            </option>
-          </select>
         </div>
 
         <!-- Sort -->
@@ -208,7 +191,7 @@
           No Gallery Items Found
         </h3>
         <p class="text-neutral-600 dark:text-neutral-400 mb-6">
-          {{ filters.search || filters.category ? 'Try adjusting your filters' : 'Get started by uploading your first images' }}
+          {{ filters.search ? 'Try adjusting your filters' : 'Get started by uploading your first images' }}
         </p>
         <BaseButton @click="showUploadModal = true">
           <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -222,38 +205,89 @@
     <!-- Upload Modal -->
     <BaseModal v-model="showUploadModal" title="Upload Images" size="lg">
       <form @submit.prevent="handleUpload" class="space-y-4">
-        <!-- Upload Type -->
-        <div class="flex gap-4 p-4 bg-neutral-50 dark:bg-neutral-900 rounded-lg">
-          <label class="flex items-center gap-2 cursor-pointer">
-            <input
-              v-model="uploadType"
-              type="radio"
-              value="single"
-              class="text-primary-600 focus:ring-primary-500"
-            />
-            <span class="text-sm font-medium text-neutral-700 dark:text-neutral-300">Single Image</span>
-          </label>
-          <label class="flex items-center gap-2 cursor-pointer">
-            <input
-              v-model="uploadType"
-              type="radio"
-              value="bulk"
-              class="text-primary-600 focus:ring-primary-500"
-            />
-            <span class="text-sm font-medium text-neutral-700 dark:text-neutral-300">Bulk Upload (Max 20)</span>
-          </label>
-        </div>
-
-        <!-- Image Upload -->
+        <!-- Title -->
         <div>
           <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-            {{ uploadType === 'single' ? 'Image' : 'Images' }} *
+            Title *
+          </label>
+          <input
+            v-model="uploadForm.title"
+            type="text"
+            placeholder="Enter gallery title"
+            class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            required
+          />
+        </div>
+
+        <!-- Description -->
+        <div>
+          <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+            Description *
+          </label>
+          <textarea
+            v-model="uploadForm.description"
+            rows="3"
+            placeholder="Enter gallery description"
+            class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            required
+          ></textarea>
+        </div>
+
+        <!-- Sort Order -->
+        <div>
+          <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+            Sort Order
+          </label>
+          <input
+            v-model.number="uploadForm.sort_order"
+            type="number"
+            min="0"
+            placeholder="Display order (lower number appears first)"
+            class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          />
+          <p class="text-xs text-neutral-500 dark:text-neutral-500 mt-1">
+            Leave empty to add at the end
+          </p>
+        </div>
+
+        <!-- Thumbnail Image -->
+        <div>
+          <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+            Thumbnail Image *
+          </label>
+          <div class="flex gap-4 items-start">
+            <div class="flex-1">
+              <input
+                ref="thumbnailInput"
+                type="file"
+                accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                @change="handleThumbnailChange"
+                class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                required
+              />
+              <p class="text-xs text-neutral-500 dark:text-neutral-500 mt-1">
+                This will be displayed as the gallery cover image
+              </p>
+            </div>
+            <!-- Thumbnail Preview -->
+            <div v-if="thumbnailPreview" class="flex-shrink-0">
+              <div class="w-32 h-32 rounded-lg overflow-hidden bg-neutral-100 dark:bg-neutral-900 border-2 border-neutral-200 dark:border-neutral-700">
+                <img :src="thumbnailPreview" alt="Thumbnail preview" class="w-full h-full object-cover" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Gallery Images -->
+        <div>
+          <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+            Gallery Images * (Bulk Upload - Max 20)
           </label>
           <input
             ref="fileInput"
             type="file"
             accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-            :multiple="uploadType === 'bulk'"
+            multiple
             @change="handleFileChange"
             class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             required
@@ -264,66 +298,10 @@
         </div>
 
         <!-- Preview -->
-        <div v-if="previewUrls.length > 0" class="grid grid-cols-3 gap-2">
+        <div v-if="previewUrls.length > 0" class="grid grid-cols-4 gap-2">
           <div v-for="(url, index) in previewUrls" :key="index" class="aspect-square rounded-lg overflow-hidden bg-neutral-100 dark:bg-neutral-900">
             <img :src="url" alt="Preview" class="w-full h-full object-cover" />
           </div>
-        </div>
-
-        <!-- Category -->
-        <div>
-          <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-            Category *
-          </label>
-          <div class="flex gap-2">
-            <select
-              v-model="uploadForm.category"
-              class="flex-1 px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              required
-            >
-              <option value="">Select category...</option>
-              <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
-              <option value="__new__">+ Add New Category</option>
-            </select>
-          </div>
-          <input
-            v-if="uploadForm.category === '__new__'"
-            v-model="newCategory"
-            type="text"
-            placeholder="Enter new category name"
-            class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent mt-2"
-            required
-          />
-        </div>
-
-        <!-- Title (for both single and bulk) -->
-        <div>
-          <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-            Title {{ uploadType === 'single' ? '*' : '(optional)' }}
-          </label>
-          <input
-            v-model="uploadForm.title"
-            type="text"
-            :placeholder="uploadType === 'single' ? 'Enter image title' : 'Auto-generated if empty (Category - Date)'"
-            class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            :required="uploadType === 'single'"
-          />
-          <p v-if="uploadType === 'bulk'" class="text-xs text-neutral-500 dark:text-neutral-500 mt-1">
-            Leave empty to auto-generate: "{{ uploadForm.category || 'Category' }} - {{ new Date().toLocaleString() }}"
-          </p>
-        </div>
-
-        <!-- Description -->
-        <div>
-          <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-            Description
-          </label>
-          <textarea
-            v-model="uploadForm.description"
-            rows="3"
-            placeholder="Enter description (optional)"
-            class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-          ></textarea>
         </div>
 
         <!-- Actions -->
@@ -405,12 +383,12 @@
     <!-- Edit Modal -->
     <BaseModal v-model="showEditModal" title="Edit Gallery Item" size="md">
       <form @submit.prevent="handleUpdate" class="space-y-4">
-        <!-- Current Image -->
+        <!-- Current Thumbnail -->
         <div>
           <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-            Current Image
+            Current Thumbnail
           </label>
-          <div class="aspect-video rounded-lg overflow-hidden bg-neutral-100 dark:bg-neutral-900">
+          <div class="w-32 h-32 rounded-lg overflow-hidden bg-neutral-100 dark:bg-neutral-900">
             <img :src="editForm.image" :alt="editForm.title" class="w-full h-full object-cover" />
           </div>
         </div>
@@ -431,28 +409,31 @@
         <!-- Description -->
         <div>
           <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-            Description
+            Description *
           </label>
           <textarea
             v-model="editForm.description"
             rows="3"
             class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            required
           ></textarea>
         </div>
 
-        <!-- Category -->
+        <!-- Sort Order -->
         <div>
           <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-            Category *
+            Sort Order
           </label>
-          <select
-            v-model="editForm.category"
+          <input
+            v-model.number="editForm.sort_order"
+            type="number"
+            min="0"
+            placeholder="Display order"
             class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            required
-          >
-            <option value="">Select category...</option>
-            <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
-          </select>
+          />
+          <p class="text-xs text-neutral-500 dark:text-neutral-500 mt-1">
+            Lower number appears first
+          </p>
         </div>
 
         <!-- Actions -->
@@ -507,7 +488,6 @@ const uiStore = useUiStore()
 // State
 const filters = ref({
   search: '',
-  category: '',
   order_by: 'order',
   order_dir: 'asc'
 })
@@ -517,7 +497,8 @@ const showUploadModal = ref(false)
 const showEditModal = ref(false)
 const showItemsModal = ref(false)
 const showLightbox = ref(false)
-const uploadType = ref('single')
+const thumbnailInput = ref(null)
+const thumbnailPreview = ref('')
 const isLoadingItems = ref(false)
 const currentGallery = ref(null)
 const currentGalleryItems = ref([])
@@ -527,31 +508,20 @@ const isUpdating = ref(false)
 const isDeleting = ref(false)
 const fileInput = ref(null)
 const previewUrls = ref([])
-const newCategory = ref('')
-
-// Categories (hardcoded for now, could be dynamic)
-const categories = ref([
-  'Award Ceremonies',
-  'Projects',
-  'Events',
-  'Behind The Scenes',
-  'Team',
-  'Office',
-  'Other'
-])
 
 const uploadForm = ref({
+  thumbnail: null,
   images: null,
   title: '',
   description: '',
-  category: ''
+  sort_order: null
 })
 
 const editForm = ref({
   id: null,
   title: '',
   description: '',
-  category: '',
+  sort_order: null,
   image: ''
 })
 
@@ -610,8 +580,28 @@ function toggleSelectAll() {
   }
 }
 
+function handleThumbnailChange(event) {
+  const file = event.target.files[0]
+  if (file) {
+    uploadForm.value.thumbnail = file
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      thumbnailPreview.value = e.target.result
+    }
+    reader.readAsDataURL(file)
+  }
+}
+
 function handleFileChange(event) {
   const files = Array.from(event.target.files)
+  
+  // Validate max 20 files
+  if (files.length > 20) {
+    uiStore.showError('Maximum 20 images allowed')
+    event.target.value = ''
+    return
+  }
+  
   uploadForm.value.images = files
 
   // Generate previews
@@ -626,13 +616,23 @@ function handleFileChange(event) {
 }
 
 async function handleUpload() {
-  if (!uploadForm.value.images) return
-
-  // Use new category if selected
-  const categoryValue = uploadForm.value.category === '__new__' ? newCategory.value : uploadForm.value.category
-
-  if (!categoryValue) {
-    uiStore.showError('Please select or enter a category')
+  if (!uploadForm.value.title || !uploadForm.value.title.trim()) {
+    uiStore.showError('Title is required')
+    return
+  }
+  
+  if (!uploadForm.value.description || !uploadForm.value.description.trim()) {
+    uiStore.showError('Description is required')
+    return
+  }
+  
+  if (!uploadForm.value.thumbnail) {
+    uiStore.showError('Please select a thumbnail image')
+    return
+  }
+  
+  if (!uploadForm.value.images || uploadForm.value.images.length === 0) {
+    uiStore.showError('Please select at least one gallery image')
     return
   }
 
@@ -641,43 +641,31 @@ async function handleUpload() {
   try {
     const formData = new FormData()
 
-    if (uploadType.value === 'single') {
-      formData.append('image', uploadForm.value.images[0])
-      formData.append('title', uploadForm.value.title)
-      formData.append('description', uploadForm.value.description || '')
-      formData.append('category', categoryValue)
-
-      const result = await uploadImage(formData)
-      if (result.success) {
-        uiStore.showSuccess('Image uploaded successfully')
-      } else {
-        uiStore.showError(result.error)
-      }
-    } else {
-      // Bulk upload
-      uploadForm.value.images.forEach((file, index) => {
-        formData.append('images[]', file)
-      })
-      formData.append('category', categoryValue)
-      if (uploadForm.value.title) {
-        formData.append('title', uploadForm.value.title)
-      }
-      if (uploadForm.value.description) {
-        formData.append('description', uploadForm.value.description)
-      }
-
-      const result = await bulkUploadImages(formData)
-      if (result.success) {
-        uiStore.showSuccess(`Gallery created with ${uploadForm.value.images.length} images`)
-      } else {
-        uiStore.showError(result.error)
-      }
+    // Add required fields
+    formData.append('title', uploadForm.value.title.trim())
+    formData.append('description', uploadForm.value.description.trim())
+    formData.append('thumbnail', uploadForm.value.thumbnail)
+    
+    // Add optional sort_order
+    if (uploadForm.value.sort_order !== null && uploadForm.value.sort_order !== '') {
+      formData.append('sort_order', uploadForm.value.sort_order)
     }
+    
+    // Add gallery images
+    uploadForm.value.images.forEach((file) => {
+      formData.append('images[]', file)
+    })
 
-    // Reset and close
-    showUploadModal.value = false
-    resetUploadForm()
-    await fetchGalleries()
+    const result = await bulkUploadImages(formData)
+    if (result.success) {
+      uiStore.showSuccess(`Gallery created with ${uploadForm.value.images.length} images`)
+      // Reset and close
+      showUploadModal.value = false
+      resetUploadForm()
+      await fetchGalleries()
+    } else {
+      uiStore.showError(result.error)
+    }
   } catch (error) {
     uiStore.showError('Upload failed. Please try again.')
   } finally {
@@ -687,15 +675,19 @@ async function handleUpload() {
 
 function resetUploadForm() {
   uploadForm.value = {
+    thumbnail: null,
     images: null,
     title: '',
     description: '',
-    category: ''
+    sort_order: null
   }
   previewUrls.value = []
-  newCategory.value = ''
+  thumbnailPreview.value = ''
   if (fileInput.value) {
     fileInput.value.value = ''
+  }
+  if (thumbnailInput.value) {
+    thumbnailInput.value.value = ''
   }
 }
 
@@ -727,20 +719,34 @@ function handleEdit(item) {
     id: item.id,
     title: item.title,
     description: item.description || '',
-    category: item.company || '', // Use company as category for now
+    sort_order: item.sort_order || null,
     image: item.thumbnail
   }
   showEditModal.value = true
 }
 
 async function handleUpdate() {
+  if (!editForm.value.title || !editForm.value.title.trim()) {
+    uiStore.showError('Title is required')
+    return
+  }
+  
+  if (!editForm.value.description || !editForm.value.description.trim()) {
+    uiStore.showError('Description is required')
+    return
+  }
+  
   isUpdating.value = true
 
   try {
     const formData = new FormData()
-    formData.append('title', editForm.value.title)
-    formData.append('description', editForm.value.description)
-    formData.append('category', editForm.value.category)
+    formData.append('title', editForm.value.title.trim())
+    formData.append('description', editForm.value.description.trim())
+    
+    // Add sort_order if provided
+    if (editForm.value.sort_order !== null && editForm.value.sort_order !== '') {
+      formData.append('sort_order', editForm.value.sort_order)
+    }
 
     const result = await updateGalleryItem(editForm.value.id, formData)
     if (result.success) {

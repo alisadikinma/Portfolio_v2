@@ -21,8 +21,16 @@ class UserSeeder extends Seeder
             'password' => Hash::make('Passw0rd'),
         ]);
 
-        $this->command->info('✅ Admin user created successfully!');
-        $this->command->info('   Email: admin@alisadikinma.com');
-        $this->command->info('   Password: Passw0rd');
+        // Create Second Admin
+        User::create([
+            'name' => 'Admin',
+            'email' => 'admin@portfolio.com',
+            'email_verified_at' => now(),
+            'password' => Hash::make('password123'),
+        ]);
+
+        $this->command->info('✅ Admin users created successfully!');
+        $this->command->info('   1) Email: admin@alisadikinma.com | Password: Passw0rd');
+        $this->command->info('   2) Email: admin@portfolio.com | Password: password123');
     }
 }

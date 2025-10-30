@@ -34,17 +34,51 @@ export const useGalleriesStore = defineStore('galleries', {
           per_page: perPage,
           ...filters
         }
+        
+        console.log('[GalleriesStore] Fetching with params:', params)
 
         const response = await api.get('/admin/galleries', { params })
-
-        this.galleries = response.data.data
+        
+        console.log('[GalleriesStore] API Response Status:', response.status)
+        console.log('[GalleriesStore] API Response Full:', response)
+        console.log('[GalleriesStore] API Response data:', response.data)
+        console.log('[GalleriesStore] API Response data.data:', response.data.data)
+        console.log('[GalleriesStore] API Response data.data type:', typeof response.data.data)
+        console.log('[GalleriesStore] API Response data.data is array?', Array.isArray(response.data.data))
+        
+        // CRITICAL: Log the actual structure
+        console.log('[GalleriesStore] Response keys:', Object.keys(response.data))
+        console.log('[GalleriesStore] Has success field?', response.data.success)
+        console.log('[GalleriesStore] Data field value:', response.data.data)
+        
+        // Check if data.data is array of resources or collection
+        if (response.data.data && response.data.data.data) {
+          console.warn('[GalleriesStore] WARNING: Nested data.data.data detected! Using nested path.')
+          this.galleries = response.data.data.data
+        } else if (Array.isArray(response.data.data)) {
+          console.log('[GalleriesStore] Using response.data.data (array)')
+          this.galleries = response.data.data
+        } else if (response.data.data) {
+          console.warn('[GalleriesStore] WARNING: data.data is not array, converting to array')
+          this.galleries = [response.data.data]
+        } else {
+          console.error('[GalleriesStore] ERROR: No valid data found in response')
+          this.galleries = []
+        }
         this.pagination = {
           current_page: response.data.meta.current_page,
           last_page: response.data.meta.last_page,
           per_page: response.data.meta.per_page,
           total: response.data.meta.total
         }
+        
+        console.log('[GalleriesStore] Stored galleries:', this.galleries)
+        console.log('[GalleriesStore] Stored galleries length:', this.galleries.length)
       } catch (error) {
+        console.error('[GalleriesStore] Fetch error:', error)
+        console.error('[GalleriesStore] Error response:', error.response)
+        console.error('[GalleriesStore] Error response data:', error.response?.data)
+        console.error('[GalleriesStore] Error message:', error.message)
         this.error = error.response?.data?.message || 'Failed to fetch galleries'
         throw error
       } finally {

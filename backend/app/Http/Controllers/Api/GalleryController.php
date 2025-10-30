@@ -113,6 +113,9 @@ class GalleryController extends Controller
 
             // Handle thumbnail upload
             if ($request->hasFile('thumbnail')) {
+                // Ensure directory exists
+                Storage::disk('public')->makeDirectory('gallery/thumbnails');
+                
                 $thumbnail = $request->file('thumbnail');
                 $filename = time() . '_' . Str::slug($data['title']) . '.' . $thumbnail->getClientOriginalExtension();
                 $path = $thumbnail->storeAs('gallery/thumbnails', $filename, 'public');
@@ -176,6 +179,9 @@ class GalleryController extends Controller
                 // Store old path for cleanup after successful update
                 $oldThumbnailPath = $gallery->thumbnail;
 
+                // Ensure directory exists
+                Storage::disk('public')->makeDirectory('gallery/thumbnails');
+                
                 $thumbnail = $request->file('thumbnail');
                 $filename = time() . '_' . Str::slug($request->input('title', $gallery->title)) . '.' . $thumbnail->getClientOriginalExtension();
                 $path = $thumbnail->storeAs('gallery/thumbnails', $filename, 'public');
@@ -282,10 +288,11 @@ class GalleryController extends Controller
     public function bulkUpload(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
+            'thumbnail' => 'required|image|mimes:jpg,jpeg,png,webp|max:5120',
             'images' => 'required|array|min:1|max:20',
             'images.*' => 'image|mimes:jpg,jpeg,png,webp|max:5120',
-            'title' => 'nullable|string|max:255',
-            'description' => 'nullable|string',
+            'title' => 'required|string|max:255',
+            'description' => 'required|string',
             'company' => 'nullable|string|max:255',
             'period' => 'nullable|string|max:100',
             'category' => 'nullable|string|max:100', // Old field for compatibility
@@ -306,17 +313,23 @@ class GalleryController extends Controller
             // Get max order
             $maxOrder = Gallery::max('sort_order') ?? 0;
 
-            // Auto-generate title if not provided
-            $title = $request->input('title');
-            if (!$title) {
-                $category = $request->input('category', 'Gallery');
-                $title = $category . ' - ' . now()->format('Y-m-d H:i');
+            // Handle thumbnail upload
+            $thumbnailPath = null;
+            if ($request->hasFile('thumbnail')) {
+                // Ensure directories exist
+                Storage::disk('public')->makeDirectory('gallery/thumbnails');
+                Storage::disk('public')->makeDirectory('gallery/items');
+                
+                $thumbnail = $request->file('thumbnail');
+                $filename = time() . '_thumb_' . Str::slug($request->input('title')) . '.' . $thumbnail->getClientOriginalExtension();
+                $thumbnailPath = $thumbnail->storeAs('gallery/thumbnails', $filename, 'public');
             }
 
             // Create gallery
             $gallery = Gallery::create([
-                'title' => $title,
+                'title' => $request->input('title'),
                 'description' => $request->input('description'),
+                'thumbnail' => $thumbnailPath,
                 'company' => $request->input('company'),
                 'period' => $request->input('period'),
                 'award_id' => $request->input('award_id'),
@@ -328,7 +341,7 @@ class GalleryController extends Controller
             $uploadedItems = [];
             if ($request->hasFile('images')) {
                 foreach ($request->file('images') as $index => $image) {
-                    $filename = time() . '_' . $gallery->id . '_' . $index . '.' . $image->getClientOriginalExtension();
+                    $filename = time() . '_item_' . $gallery->id . '_' . $index . '.' . $image->getClientOriginalExtension();
                     $path = $image->storeAs('gallery/items', $filename, 'public');
 
                     $item = $gallery->items()->create([
@@ -339,11 +352,6 @@ class GalleryController extends Controller
                     ]);
 
                     $uploadedItems[] = $item;
-                }
-
-                // Use first image as thumbnail
-                if (count($uploadedItems) > 0) {
-                    $gallery->update(['thumbnail' => $uploadedItems[0]->file_path]);
                 }
             }
 

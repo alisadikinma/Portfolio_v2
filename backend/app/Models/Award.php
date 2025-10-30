@@ -17,11 +17,12 @@ class Award extends Model
         'credential_url',
         'image',
         'received_at',
-        'order',
+        'sort_order',
     ];
 
     protected $casts = [
-        'received_at' => 'date',
+        // received_at is stored as string to support flexible formats
+        // like "January 2025", "Q1 2025", etc.
     ];
 
     protected $appends = ['total_photos'];

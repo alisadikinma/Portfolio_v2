@@ -37,8 +37,8 @@
         <!-- Image -->
         <div class="aspect-video bg-neutral-100 dark:bg-neutral-900 overflow-hidden">
           <img
-            v-if="gallery.image"
-            :src="gallery.image"
+            v-if="gallery.thumbnail"
+            :src="getImageUrl(gallery.thumbnail)"
             :alt="gallery.title"
             class="w-full h-full object-cover"
           />
@@ -116,8 +116,8 @@
             <!-- Thumbnail -->
             <div class="w-20 h-20 bg-neutral-100 dark:bg-neutral-900 rounded-lg overflow-hidden flex-shrink-0">
               <img
-                v-if="gallery.image"
-                :src="gallery.image"
+                v-if="gallery.thumbnail"
+                :src="getImageUrl(gallery.thumbnail)"
                 :alt="gallery.title"
                 class="w-full h-full object-cover"
               />
@@ -193,6 +193,18 @@ const loadingAvailable = ref(false)
 const showLinkModal = ref(false)
 const linking = ref(null)
 const unlinking = ref(null)
+
+// Helper to get full image URL
+const getImageUrl = (imagePath) => {
+  if (!imagePath) return null
+  if (imagePath.startsWith('http')) return imagePath
+  
+  const backendUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost/Portfolio_v2/backend/public'
+  
+  // Ensure single slash between URL and path
+  const cleanPath = imagePath.startsWith('/') ? imagePath : `/${imagePath}`
+  return `${backendUrl}${cleanPath}`
+}
 
 // Compute available galleries (not yet linked)
 const availableGalleries = computed(() => {

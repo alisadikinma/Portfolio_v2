@@ -59,8 +59,8 @@
         />
       </BaseCard>
 
-      <!-- Gallery Management -->
-      <BaseCard>
+      <!-- Gallery Management - Only render once award.id is available -->
+      <BaseCard v-if="award.id">
         <GalleryManager
           :award-id="award.id"
           @updated="handleGalleryUpdate"

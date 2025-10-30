@@ -28,7 +28,7 @@ class StoreAwardRequest extends FormRequest
             'credential_id' => ['nullable', 'string', 'max:255'],
             'credential_url' => ['nullable', 'url', 'max:255'],
             'image' => ['nullable', 'image', 'max:5120'],
-            'received_at' => ['required', 'date'],
+            'received_at' => ['required', 'string', 'max:100'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
         ];
     }
@@ -49,7 +49,8 @@ class StoreAwardRequest extends FormRequest
             'image.image' => 'Award image must be an image file',
             'image.max' => 'Award image must not exceed 5MB',
             'received_at.required' => 'Award date is required',
-            'received_at.date' => 'Award date must be a valid date',
+            'received_at.string' => 'Award date must be a text value',
+            'received_at.max' => 'Award date must not exceed 100 characters',
             'order.integer' => 'Order must be a number',
             'order.min' => 'Order must be at least 0',
         ];

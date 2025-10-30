@@ -55,8 +55,8 @@ class AwardController extends Controller
                 'credential_id' => $award->credential_id,
                 'credential_url' => $award->credential_url,
                 'image' => $award->image,
-                'received_at' => $award->received_at->format('Y-m-d'),
-                'sort_order' => $award->order ?? 0,
+                'received_at' => $award->received_at,
+                'sort_order' => $award->sort_order ?? 0,
                 'gallery_count' => $award->galleries->count(),
                 'total_photos' => $award->total_photos,
 
@@ -111,7 +111,7 @@ class AwardController extends Controller
                 'image' => $award->image,
                 'award_date' => $award->received_at,
                 'received_at' => $award->received_at,
-                'sort_order' => $award->order ?? 0,
+                'sort_order' => $award->sort_order ?? 0,
                 'gallery_count' => $award->galleries->count(),
                 'total_photos' => $award->total_photos
             ];
@@ -135,19 +135,16 @@ class AwardController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'award' => [
-                    'id' => $award->id,
-                    'title' => $award->title,
-                    'description' => $award->description,
-                    'organization' => $award->organization,
-                    'credential_id' => $award->credential_id,
-                    'credential_url' => $award->credential_url,
-                    'image' => $award->image,
-                    'received_at' => $award->received_at->format('Y-m-d'),
-                    'sort_order' => $award->order,
-
-                    'total_photos' => $award->total_photos
-                ],
+                'id' => $award->id,
+                'title' => $award->title,
+                'description' => $award->description,
+                'organization' => $award->organization,
+                'credential_id' => $award->credential_id,
+                'credential_url' => $award->credential_url,
+                'image' => $award->image,
+                'received_at' => $award->received_at,
+                'sort_order' => $award->sort_order,
+                'total_photos' => $award->total_photos,
                 'galleries' => $award->galleries->map(function($gallery) {
                     return [
                         'id' => $gallery->id,
@@ -210,8 +207,8 @@ class AwardController extends Controller
                     'credential_id' => $award->credential_id,
                     'credential_url' => $award->credential_url,
                     'image' => $award->image,
-                    'received_at' => $award->received_at->format('Y-m-d'),
-                    'sort_order' => $award->order,
+                    'received_at' => $award->received_at,
+                    'sort_order' => $award->sort_order,
                     'gallery_count' => $award->galleries->count(),
                     'total_photos' => $award->total_photos,
 
@@ -288,8 +285,8 @@ class AwardController extends Controller
                     'credential_id' => $award->credential_id,
                     'credential_url' => $award->credential_url,
                     'image' => $award->image,
-                    'received_at' => $award->received_at->format('Y-m-d'),
-                    'sort_order' => $award->order,
+                    'received_at' => $award->received_at,
+                    'sort_order' => $award->sort_order,
                     'gallery_count' => $award->galleries->count(),
                     'total_photos' => $award->total_photos,
                     'featured_gallery_id' => $award->featured_gallery_id

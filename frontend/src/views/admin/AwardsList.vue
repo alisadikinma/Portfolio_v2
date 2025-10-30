@@ -102,14 +102,14 @@
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="flex items-center">
                   <div v-if="award.image" class="flex-shrink-0 h-10 w-10">
-                    <img :src="award.image" :alt="award.title" class="h-10 w-10 rounded-lg object-cover">
+                    <img :src="getImageUrl(award.image)" :alt="award.title" class="h-10 w-10 rounded-lg object-cover">
                   </div>
                   <div :class="award.image ? 'ml-4' : ''">
                     <div class="text-sm font-medium text-neutral-900 dark:text-neutral-100">
                       {{ award.title }}
                     </div>
-                    <div v-if="award.order !== null" class="text-sm text-neutral-500 dark:text-neutral-400">
-                      Order: {{ award.order }}
+                    <div v-if="award.sort_order !== null && award.sort_order !== undefined" class="text-sm text-neutral-500 dark:text-neutral-400">
+                      Order: {{ award.sort_order }}
                     </div>
                   </div>
                 </div>
@@ -288,6 +288,15 @@ const awards = computed(() => awardsStore.awards)
 const pagination = computed(() => awardsStore.pagination)
 const loading = computed(() => awardsStore.loading)
 const error = computed(() => awardsStore.error)
+
+// Helper to get full image URL
+const getImageUrl = (imagePath) => {
+  if (!imagePath) return null
+  if (imagePath.startsWith('http')) return imagePath
+  const backendUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost/Portfolio_v2/backend/public'
+  const cleanPath = imagePath.startsWith('/') ? imagePath : `/${imagePath}`
+  return `${backendUrl}${cleanPath}`
+}
 
 // Visible page numbers for pagination
 const visiblePages = computed(() => {

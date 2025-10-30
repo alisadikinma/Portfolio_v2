@@ -68,14 +68,56 @@ async function handleSubmit(awardData) {
   isSubmitting.value = true
 
   try {
+    // Extract gallery data before submitting award
+    const galleryIds = []
+    const createNewGallery = awardData.get('create_new_gallery') === 'true'
+    
+    // Get gallery IDs from FormData
+    for (const [key, value] of awardData.entries()) {
+      if (key === 'gallery_ids[]') {
+        galleryIds.push(parseInt(value))
+      }
+    }
+
+    // Remove gallery data from award submission
+    awardData.delete('gallery_ids[]')
+    awardData.delete('create_new_gallery')
+
+    // Create award
     const createdAward = await awardsStore.createAward(awardData)
 
-    uiStore.showSuccess(
-      `"${createdAward.title}" has been created successfully.`,
-      'Award Created'
-    )
+    // Link galleries if any were selected
+    if (galleryIds.length > 0 && createdAward.id) {
+      try {
+        // Link gallery to the award
+        await awardsStore.linkGallery(createdAward.id, galleryIds[0])
+        
+        uiStore.showSuccess(
+          `"${createdAward.title}" has been created and linked to gallery successfully.`,
+          'Award Created'
+        )
+      } catch (linkError) {
+        console.error('Failed to link gallery:', linkError)
+        uiStore.showWarning(
+          `Award created, but failed to link gallery. You can link it manually from the award details page.`,
+          'Partial Success'
+        )
+      }
+    } else {
+      uiStore.showSuccess(
+        `"${createdAward.title}" has been created successfully.`,
+        'Award Created'
+      )
+    }
 
-    router.push('/admin/awards')
+    // Redirect based on user choice
+    if (createNewGallery && createdAward.id) {
+      // Redirect to gallery creation with award_id pre-filled
+      router.push(`/admin/galleries/create?award_id=${createdAward.id}`)
+    } else {
+      // Redirect to awards list
+      router.push('/admin/awards')
+    }
   } catch (error) {
     console.error('Failed to create award:', error)
 

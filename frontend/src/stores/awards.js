@@ -58,15 +58,8 @@ export const useAwardsStore = defineStore('awards', {
       try {
         const response = await api.get(`/admin/awards/${id}`)
 
-        // Extract award data from nested response structure
-        if (response.data.success && response.data.data.award) {
-          this.currentAward = {
-            ...response.data.data.award,
-            galleries: response.data.data.galleries || []
-          }
-        } else {
-          this.currentAward = response.data.data
-        }
+        // Response structure: { success: true, data: { id, title, ..., galleries: [] } }
+        this.currentAward = response.data.data
 
         return this.currentAward
       } catch (error) {
