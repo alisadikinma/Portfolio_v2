@@ -1,162 +1,175 @@
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import api from '@/services/api'
 
-export function usePosts() {
-  const posts = ref([])
-  const post = ref(null)
-  const categories = ref([])
-  const category = ref(null)
-  const isLoading = ref(false)
-  const error = ref(null)
-  const pagination = ref({
-    currentPage: 1,
-    perPage: 15,
-    total: 0,
-    lastPage: 1
+export function usePosts(initialParams = {}) {
+  const queryClient = useQueryClient()
+  const queryParams = ref(initialParams)
+
+  // Fetch all posts with caching (5min stale / 30min cache)
+  const {
+    data: postsData,
+    isLoading,
+    error: queryError,
+    refetch
+  } = useQuery({
+    queryKey: ['posts', queryParams],
+    queryFn: async () => {
+      const response = await api.get('/posts', { params: queryParams.value })
+      return response.data
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 30 * 60 * 1000 // 30 minutes
   })
 
-  // Fetch all posts
+  // Computed values for backward compatibility
+  const posts = computed(() => postsData.value?.data || [])
+  const pagination = computed(() => {
+    const meta = postsData.value?.meta
+    return meta ? {
+      currentPage: meta.current_page,
+      perPage: meta.per_page,
+      total: meta.total,
+      lastPage: meta.last_page
+    } : {
+      currentPage: 1,
+      perPage: 15,
+      total: 0,
+      lastPage: 1
+    }
+  })
+  const error = computed(() => queryError.value?.response?.data?.message || queryError.value?.message || null)
+
+  // Fetch posts with params
   const fetchPosts = async (params = {}) => {
-    isLoading.value = true
-    error.value = null
-
-    try {
-      const response = await api.get('/posts', { params })
-      posts.value = response.data.data
-
-      if (response.data.meta) {
-        pagination.value = {
-          currentPage: response.data.meta.current_page,
-          perPage: response.data.meta.per_page,
-          total: response.data.meta.total,
-          lastPage: response.data.meta.last_page
-        }
-      }
-
-      return { success: true, data: response.data }
-    } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to fetch posts'
-      return { success: false, error: error.value }
-    } finally {
-      isLoading.value = false
+    queryParams.value = params
+    const result = await refetch()
+    return {
+      success: !result.isError,
+      data: result.data,
+      error: result.error?.response?.data?.message
     }
   }
 
-  // Fetch single post by slug
+  // Fetch single post
   const fetchPost = async (slug, lang = 'en') => {
-    isLoading.value = true
-    error.value = null
-
     try {
-      const response = await api.get(`/posts/${slug}`, {
-        params: { lang }
-      })
-      post.value = response.data.data
-
+      const response = await api.get(`/posts/${slug}`, { params: { lang } })
       return { success: true, data: response.data.data }
     } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to fetch post'
-      return { success: false, error: error.value }
-    } finally {
-      isLoading.value = false
+      return {
+        success: false,
+        error: err.response?.data?.message || 'Failed to fetch post'
+      }
     }
   }
 
-  // Fetch all categories
+  // Fetch categories
   const fetchCategories = async () => {
-    isLoading.value = true
-    error.value = null
-
     try {
       const response = await api.get('/categories')
-      categories.value = response.data.data
-
       return { success: true, data: response.data.data }
     } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to fetch categories'
-      return { success: false, error: error.value }
-    } finally {
-      isLoading.value = false
+      return {
+        success: false,
+        error: err.response?.data?.message || 'Failed to fetch categories'
+      }
     }
   }
 
-  // Fetch category with posts
+  // Fetch category
   const fetchCategory = async (slug, params = {}) => {
-    isLoading.value = true
-    error.value = null
-
     try {
       const response = await api.get(`/categories/${slug}`, { params })
-      category.value = response.data.data
-
       return { success: true, data: response.data.data }
     } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to fetch category'
-      return { success: false, error: error.value }
-    } finally {
-      isLoading.value = false
+      return {
+        success: false,
+        error: err.response?.data?.message || 'Failed to fetch category'
+      }
     }
   }
 
-  // Create post (admin)
-  const createPost = async (postData) => {
-    isLoading.value = true
-    error.value = null
-
-    try {
+  // Create post mutation
+  const createPostMutation = useMutation({
+    mutationFn: async (postData) => {
       const response = await api.post('/admin/posts', postData)
-      return { success: true, data: response.data }
-    } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to create post'
-      return { success: false, error: error.value }
-    } finally {
-      isLoading.value = false
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['posts'] })
     }
-  }
+  })
 
-  // Update post (admin)
-  const updatePost = async (id, postData) => {
-    isLoading.value = true
-    error.value = null
-
-    try {
-      const response = await api.put(`/admin/posts/${id}`, postData)
-      return { success: true, data: response.data }
-    } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to update post'
-      return { success: false, error: error.value }
-    } finally {
-      isLoading.value = false
+  // Update post mutation
+  const updatePostMutation = useMutation({
+    mutationFn: async ({ id, data }) => {
+      const response = await api.put(`/admin/posts/${id}`, data)
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['posts'] })
     }
-  }
+  })
 
-  // Delete post (admin)
-  const deletePost = async (id) => {
-    isLoading.value = true
-    error.value = null
-
-    try {
+  // Delete post mutation
+  const deletePostMutation = useMutation({
+    mutationFn: async (id) => {
       await api.delete(`/admin/posts/${id}`)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['posts'] })
+    }
+  })
+
+  // Backward compatible mutation wrappers
+  const createPost = async (postData) => {
+    try {
+      const data = await createPostMutation.mutateAsync(postData)
+      return { success: true, data }
+    } catch (err) {
+      return {
+        success: false,
+        error: err.response?.data?.message || 'Failed to create post'
+      }
+    }
+  }
+
+  const updatePost = async (id, postData) => {
+    try {
+      const data = await updatePostMutation.mutateAsync({ id, data: postData })
+      return { success: true, data }
+    } catch (err) {
+      return {
+        success: false,
+        error: err.response?.data?.message || 'Failed to update post'
+      }
+    }
+  }
+
+  const deletePost = async (id) => {
+    try {
+      await deletePostMutation.mutateAsync(id)
       return { success: true }
     } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to delete post'
-      return { success: false, error: error.value }
-    } finally {
-      isLoading.value = false
+      return {
+        success: false,
+        error: err.response?.data?.message || 'Failed to delete post'
+      }
     }
   }
 
   return {
-    // State
+    // State - computed for reactivity
     posts,
-    post,
-    categories,
-    category,
+    post: ref(null),
+    categories: ref([]),
+    category: ref(null),
     isLoading,
     error,
     pagination,
 
-    // Methods
+    // Methods - backward compatible
     fetchPosts,
     fetchPost,
     fetchCategories,

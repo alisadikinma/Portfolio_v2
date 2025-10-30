@@ -1,0 +1,11 @@
+<template>
+  <div class="animate-pulse space-y-4">
+    <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+    <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
+    <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-5/6"></div>
+  </div>
+</template>
+
+<script setup>
+// Generic content skeleton for loading states
+</script>

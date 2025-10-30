@@ -29,7 +29,7 @@ class ProjectController extends Controller
         $language = $request->query('lang', $request->header('Accept-Language', 'en'));
         $language = strtolower(substr($language, 0, 2));
 
-        $query = Project::with(['translations']);
+        $query = Project::query(); // Removed translations eager load for performance
 
         // Filter by status
         if ($request->has('status')) {
@@ -38,7 +38,7 @@ class ProjectController extends Controller
 
         // Filter by featured
         if ($request->has('featured')) {
-            $query->where('is_featured', (bool) $request->query('featured'));
+            $query->where('featured', (bool) $request->query('featured'));
         }
 
         // Search
@@ -54,6 +54,17 @@ class ProjectController extends Controller
 
         $query->orderBy('created_at', 'desc');
 
+        // Support simple limit for fast queries (homepage, etc)
+        if ($request->has('limit')) {
+            $limit = min($request->query('limit', 15), 50);
+            $projects = $query->limit($limit)->get();
+            
+            return response()->json([
+                'data' => ProjectResource::collection($projects)->additional(['lang' => $language]),
+            ]);
+        }
+
+        // Default: Pagination for admin/listing pages
         $perPage = min($request->query('per_page', 15), 50);
         $projects = $query->paginate($perPage);
 
@@ -93,7 +104,7 @@ class ProjectController extends Controller
 
         // Filter by featured
         if ($request->has('featured')) {
-            $query->where('is_featured', (bool) $request->query('featured'));
+            $query->where('featured', (bool) $request->query('featured'));
         }
 
         // Search

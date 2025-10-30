@@ -11,6 +11,7 @@
   "dependencies": {
     "@headlessui/vue": "^1.7.23",
     "@heroicons/vue": "^2.2.0",
+    "@tanstack/vue-query": "^5.90.5",
     "axios": "^1.12.2",
     "pinia": "^3.0.3",
     "sortablejs": "^1.15.6",

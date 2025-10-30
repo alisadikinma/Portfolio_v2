@@ -629,21 +629,11 @@ const { sections, fetchActiveSections } = usePageSections()
 const currentTestimonialIndex = ref(0)
 
 // Section visibility computed properties
-const showHeroSection = computed(() =>
-  sections.value.some(s => s.section_type === 'hero' && s.is_active && s.page_type === 'homepage')
-)
-const showFeaturedProjectsSection = computed(() =>
-  sections.value.some(s => s.section_type === 'featured_projects' && s.is_active && s.page_type === 'homepage')
-)
-const showLatestBlogSection = computed(() =>
-  sections.value.some(s => s.section_type === 'latest_blog' && s.is_active && s.page_type === 'homepage')
-)
-const showTestimonialsSection = computed(() =>
-  sections.value.some(s => s.section_type === 'testimonials' && s.is_active && s.page_type === 'homepage')
-)
-const showCTASection = computed(() =>
-  sections.value.some(s => s.section_type === 'cta' && s.is_active && s.page_type === 'homepage')
-)
+const showHeroSection = computed(() => true) // Always show
+const showFeaturedProjectsSection = computed(() => true) // Always show
+const showLatestBlogSection = computed(() => true) // Always show
+const showTestimonialsSection = computed(() => true) // Always show
+const showCTASection = computed(() => true) // Always show
 
 // Section order (sorted by sequence)
 const orderedSections = computed(() => {
@@ -799,16 +789,55 @@ const rotateTestimonials = () => {
 let testimonialInterval
 
 onMounted(async () => {
+  // Performance tracking START
+  const startTime = performance.now()
+  
   // Fetch page sections configuration
-  await fetchActiveSections('homepage')
+  // await fetchActiveSections('homepage') // DISABLED FOR TEST
 
   // Fetch about settings for hero section
-  await fetchAboutSettings()
+  // await fetchAboutSettings() // DISABLED FOR TEST - CHECK IF THIS IS THE SLOW ONE
 
-  await fetchProjects({ featured: true, limit: 4 })
-  await fetchPosts({ limit: 3 })
-  await fetchAwards({ featured: true, limit: 6 })
-  await fetchTestimonials({ featured: true, limit: 5 })
+  console.log('⏱️ Starting PARALLEL data fetch...')
+  
+  const fetchStart = performance.now()
+  
+  // PARALLEL fetch instead of sequential (FASTEST!)
+  await Promise.all([
+    fetchProjects({ featured: true, limit: 4 }),
+    fetchPosts({ limit: 3 }),
+    fetchAwards({ featured: true, limit: 6 }),
+    fetchTestimonials({ featured: true, limit: 5 })
+  ])
+  
+  const fetchTime = Math.round(performance.now() - fetchStart)
+  console.log('✅ All data fetched in:', fetchTime + 'ms (parallel)')
+
+  // Performance tracking END
+  const endTime = performance.now()
+  const loadTime = Math.round(endTime - startTime)
+  
+  console.group('📊 Homepage Performance')
+  console.log('⏱️ Data Fetch Time:', loadTime + 'ms')
+  console.log('✅ Projects:', projectsLoading.value ? 'Loading...' : 'Cached')
+  console.log('✅ Posts:', postsLoading.value ? 'Loading...' : 'Cached')
+  console.log('✅ Awards:', awardsLoading.value ? 'Loading...' : 'Cached')
+  console.log('✅ Testimonials:', testimonialsLoading.value ? 'Loading...' : 'Cached')
+  console.groupEnd()
+  
+  // Image performance on window load
+  window.addEventListener('load', () => {
+    const resources = performance.getEntriesByType('resource')
+    const images = resources.filter(r => r.initiatorType === 'img')
+    const cached = images.filter(r => r.transferSize === 0)
+    
+    console.group('🖼️ Image Loading')
+    console.log('Total Images:', images.length)
+    console.log('Cached Images:', cached.length)
+    console.log('Downloaded:', images.length - cached.length)
+    console.log('Avg Time:', Math.round(images.reduce((sum, img) => sum + img.duration, 0) / images.length) + 'ms')
+    console.groupEnd()
+  })
 
   // Start testimonial rotation
   testimonialInterval = setInterval(rotateTestimonials, 5000)
