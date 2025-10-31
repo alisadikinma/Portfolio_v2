@@ -20,7 +20,7 @@ class PageSectionController extends Controller
 
         // Filter by page type if provided
         if ($request->has('page')) {
-            $query->forPage($request->query('page'));
+            $query->where('page_type', $request->query('page'));
         }
 
         $sections = $query->ordered()->get();
@@ -33,15 +33,16 @@ class PageSectionController extends Controller
     }
 
     /**
-     * Get active page sections (public endpoint for page rendering).
+     * Get all page sections for specific page (public endpoint).
+     * Returns ALL sections (active + inactive) so frontend can control visibility
      */
     public function publicSections(Request $request)
     {
-        $query = PageSection::active();
+        $query = PageSection::query();
 
         // Filter by page type if provided
         if ($request->has('page')) {
-            $query->forPage($request->query('page'));
+            $query->where('page_type', $request->query('page'));
         }
 
         $sections = $query->ordered()->get();
@@ -49,7 +50,7 @@ class PageSectionController extends Controller
         return response()->json([
             'success' => true,
             'data' => $sections,
-            'message' => 'Active page sections retrieved successfully'
+            'message' => 'Page sections retrieved successfully'
         ]);
     }
 

@@ -34,15 +34,27 @@ class PageSectionSeeder extends Seeder
             ],
             [
                 'page_type' => 'homepage',
-                'section_type' => 'testimonials',
+                'section_type' => 'awards',
                 'is_active' => true,
                 'sequence' => 3,
             ],
             [
                 'page_type' => 'homepage',
-                'section_type' => 'cta',
+                'section_type' => 'gallery',
                 'is_active' => true,
                 'sequence' => 4,
+            ],
+            [
+                'page_type' => 'homepage',
+                'section_type' => 'testimonials',
+                'is_active' => true,
+                'sequence' => 5,
+            ],
+            [
+                'page_type' => 'homepage',
+                'section_type' => 'cta',
+                'is_active' => true,
+                'sequence' => 6,
             ],
 
             // About Page sections (all inactive by default)

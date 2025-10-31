@@ -5,6 +5,8 @@ import api from '@/services/api'
 export function usePosts(initialParams = {}) {
   const queryClient = useQueryClient()
   const queryParams = ref(initialParams)
+  const selectedPostSlug = ref(null)
+  const selectedLang = ref('en')
 
   // Fetch all posts with caching (5min stale / 30min cache)
   const {
@@ -16,14 +18,43 @@ export function usePosts(initialParams = {}) {
     queryKey: ['posts', queryParams],
     queryFn: async () => {
       const response = await api.get('/posts', { params: queryParams.value })
+      console.log('[usePosts] TanStack Query - Fetching posts list')
       return response.data
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 30 * 60 * 1000 // 30 minutes
   })
 
+  // Fetch single post with TanStack Query (enabled only when slug is set)
+  const {
+    data: postData,
+    isLoading: isLoadingPost,
+    error: postError,
+    refetch: refetchPost
+  } = useQuery({
+    queryKey: ['post', selectedPostSlug, selectedLang],
+    queryFn: async () => {
+      if (!selectedPostSlug.value) return null
+      
+      console.log('[usePosts] TanStack Query - Fetching post:', selectedPostSlug.value)
+      const response = await api.get(`/posts/${selectedPostSlug.value}`, {
+        params: { lang: selectedLang.value }
+      })
+      
+      if (response.data.success) {
+        console.log('[usePosts] Post loaded & cached:', selectedPostSlug.value)
+        return response.data.data
+      }
+      return null
+    },
+    enabled: computed(() => !!selectedPostSlug.value),
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    gcTime: 60 * 60 * 1000 // 1 hour
+  })
+
   // Computed values for backward compatibility
   const posts = computed(() => postsData.value?.data || [])
+  const post = computed(() => postData.value || null)
   const pagination = computed(() => {
     const meta = postsData.value?.meta
     return meta ? {
@@ -51,16 +82,25 @@ export function usePosts(initialParams = {}) {
     }
   }
 
-  // Fetch single post
+  // Fetch single post (TanStack Query managed)
   const fetchPost = async (slug, lang = 'en') => {
-    try {
-      const response = await api.get(`/posts/${slug}`, { params: { lang } })
-      return { success: true, data: response.data.data }
-    } catch (err) {
-      return {
-        success: false,
-        error: err.response?.data?.message || 'Failed to fetch post'
-      }
+    // Check if already cached
+    const cached = queryClient.getQueryData(['post', slug, lang])
+    if (cached) {
+      console.log('[usePosts] ⚡ Cache HIT for post:', slug, '(INSTANT)')
+      return { success: true, data: cached }
+    }
+
+    console.log('[usePosts] ⏳ Cache MISS for post:', slug, '- fetching via TanStack Query...')
+    selectedPostSlug.value = slug
+    selectedLang.value = lang
+    
+    await refetchPost()
+    
+    return {
+      success: !!post.value,
+      data: post.value,
+      error: postError.value?.response?.data?.message
     }
   }
 
@@ -109,6 +149,7 @@ export function usePosts(initialParams = {}) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['posts'] })
+      queryClient.invalidateQueries({ queryKey: ['post'] })
     }
   })
 
@@ -162,10 +203,11 @@ export function usePosts(initialParams = {}) {
   return {
     // State - computed for reactivity
     posts,
-    post: ref(null),
+    post,
     categories: ref([]),
     category: ref(null),
     isLoading,
+    isLoadingPost,
     error,
     pagination,
 

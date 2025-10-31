@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useAboutSettings } from '@/composables/useAboutSettings'
 
 const routes = [
   {
@@ -388,8 +389,16 @@ const router = createRouter({
 })
 
 // Navigation guards
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
+
+  // Prefetch critical data for homepage BEFORE navigation
+  if (to.name === 'home') {
+    console.log('[Router] 🚀 Prefetching homepage data...')
+    const { prefetchAboutSettings } = useAboutSettings()
+    await prefetchAboutSettings()
+    console.log('[Router] ✅ Homepage data prefetched - instant render!')
+  }
 
   // Set page title
   document.title = to.meta.title || 'Portfolio V2'

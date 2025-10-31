@@ -4,6 +4,7 @@ import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 import router from './router'
 import './style.css'
 import App from './App.vue'
+import api from './services/api'
 
 const app = createApp(App)
 const pinia = createPinia()
@@ -22,6 +23,24 @@ const queryClient = new QueryClient({
     }
   }
 })
+
+// Prefetch critical homepage data on app load for instant first render
+;(async () => {
+  try {
+    console.log('[App] 🚀 Prefetching critical data for instant homepage...')
+    await queryClient.prefetchQuery({
+      queryKey: ['about-settings'],
+      queryFn: async () => {
+        const response = await api.get('/settings/about')
+        return response.data.success ? response.data.data : null
+      },
+      staleTime: 15 * 60 * 1000
+    })
+    console.log('[App] ✅ About settings prefetched - homepage will render instantly!')
+  } catch (error) {
+    console.log('[App] ⚠️ Prefetch failed (non-critical):', error.message)
+  }
+})()
 
 app.use(pinia)
 app.use(router)

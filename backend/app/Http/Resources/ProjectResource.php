@@ -39,16 +39,31 @@ class ProjectResource extends JsonResource
         return [
             'id' => $this->id,
             'slug' => $this->slug,
+            
+            // Images (with alias for frontend compatibility)
             'image' => $this->image ? asset('storage/' . $this->image) : null,
+            'featured_image' => $this->image ? asset('storage/' . $this->image) : null, // Frontend expects this
             'images' => $this->images ? collect($this->images)->map(fn($img) => asset('storage/' . $img))->toArray() : [],
+            
             'category' => $this->category,
             'technologies' => $this->technologies ?? [],
+            
+            // Client & URLs (with aliases for frontend compatibility)
             'client' => $this->client,
+            'client_name' => $this->client, // Frontend expects this
             'url' => $this->url,
+            'project_url' => $this->url, // Frontend expects this
+            'github_url' => null, // Field doesn't exist yet
+            
+            // Dates (with aliases for frontend compatibility)
             'completed_at' => $this->completed_at?->format('Y-m-d'),
+            'start_date' => $this->completed_at?->format('Y-m-d'), // Use completed_at as fallback
+            'end_date' => null, // Field doesn't exist yet
+            
             'featured' => (bool) $this->featured,
             'published' => (bool) $this->published,
-            'order' => $this->order,
+            'status' => 'completed', // Default status
+            'order' => $this->sort_order ?? 0,
 
             // Translated content (prioritize translation, fallback to main fields)
             'title' => $translation?->title ?? $this->title,

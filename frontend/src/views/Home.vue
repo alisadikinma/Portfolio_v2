@@ -96,7 +96,10 @@
     </section>
 
     <!-- Awards & Recognition Section -->
-    <section class="py-20 bg-gray-50 dark:bg-gray-900">
+    <section
+      v-if="showAwardsSection"
+      class="py-20 bg-gray-50 dark:bg-gray-900"
+    >
       <div class="container-custom">
         <!-- Section Header -->
         <div class="max-w-2xl mb-16">
@@ -177,6 +180,101 @@
 
         <div v-else class="text-center py-12">
           <p class="text-gray-500 dark:text-gray-400">No awards to display yet.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Gallery Section -->
+    <section
+      v-if="showGallerySection"
+      class="py-20 bg-white dark:bg-gray-950"
+    >
+      <div class="container-custom">
+        <!-- Section Header -->
+        <div class="max-w-2xl mb-16">
+          <p class="text-primary-600 dark:text-primary-400 font-semibold mb-2 uppercase tracking-wider text-sm">
+            Visual Stories
+          </p>
+          <h2 class="text-4xl md:text-5xl font-display font-bold text-gray-900 dark:text-white mb-4">
+            Gallery
+          </h2>
+          <p class="text-xl text-gray-600 dark:text-gray-400">
+            Capturing moments and showcasing creative work
+          </p>
+        </div>
+
+        <!-- Loading State -->
+        <BaseLoader v-if="galleriesLoading" text="Loading gallery..." />
+
+        <!-- Gallery Grid -->
+        <div v-else-if="galleries.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div
+            v-for="gallery in galleries.slice(0, 6)"
+            :key="gallery.id"
+            class="group cursor-pointer card-elevated overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+            @click="openGalleryItemsModal(gallery)"
+          >
+            <!-- Gallery Thumbnail -->
+            <div class="relative aspect-video bg-gradient-to-br from-primary-100 to-secondary-100 dark:from-primary-900/20 dark:to-secondary-900/20 overflow-hidden">
+              <img
+                v-if="gallery.thumbnail"
+                :src="gallery.thumbnail"
+                :alt="gallery.title"
+                class="w-full h-full object-contain"
+                loading="lazy"
+              />
+              <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+
+              <!-- View Button Overlay -->
+              <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <span class="px-6 py-3 glass text-white font-semibold rounded-xl flex items-center gap-2">
+                  View Gallery
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                  </svg>
+                </span>
+              </div>
+
+              <!-- Items Count Badge -->
+              <div class="absolute top-4 right-4 px-3 py-1 bg-black/70 backdrop-blur-sm text-white text-xs font-semibold rounded-lg">
+                {{ gallery.items_count || 0 }} Photos
+              </div>
+            </div>
+
+            <!-- Content -->
+            <div class="p-6">
+              <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
+                {{ gallery.title }}
+              </h3>
+              <p v-if="gallery.description" class="text-gray-600 dark:text-gray-400 text-sm line-clamp-2 mb-3">
+                {{ stripHtml(gallery.description) }}
+              </p>
+              <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-500">
+                <span v-if="gallery.company">{{ gallery.company }}</span>
+                <span v-if="gallery.company && gallery.period">•</span>
+                <span v-if="gallery.period">{{ gallery.period }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Empty State -->
+        <div v-else class="text-center py-12">
+          <svg class="w-16 h-16 mx-auto text-gray-300 dark:text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+          </svg>
+          <p class="text-gray-500 dark:text-gray-400 mb-2">No galleries to display</p>
+          <p class="text-xs text-gray-400">Check console for API response debug info</p>
+        </div>
+
+        <!-- View All Button -->
+        <div v-if="galleries.length > 6" class="text-center mt-12">
+          <button
+            @click="$router.push('/gallery')"
+            class="px-8 py-4 glass text-gray-700 dark:text-gray-300 font-semibold rounded-xl hover:shadow-lg transition-all duration-300"
+          >
+            View All Galleries
+          </button>
         </div>
       </div>
     </section>
@@ -463,6 +561,139 @@
       </div>
     </section>
 
+    <!-- Gallery Items Modal (for galleries section) -->
+    <Teleport to="body">
+      <Transition name="modal">
+        <div
+          v-if="showGalleryItemsModal && selectedGallery"
+          class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          @click.self="closeGalleryItemsModal"
+        >
+          <div class="relative w-full max-w-6xl bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800">
+              <div>
+                <h3 class="text-2xl font-bold text-gray-900 dark:text-white">
+                  {{ selectedGallery.title }}
+                </h3>
+                <p class="text-sm text-primary-600 dark:text-primary-400 mt-1">
+                  <span v-if="selectedGallery.company">{{ selectedGallery.company }}</span>
+                  <span v-if="selectedGallery.company && selectedGallery.period"> • </span>
+                  <span v-if="selectedGallery.period">{{ selectedGallery.period }}</span>
+                </p>
+              </div>
+              <button
+                @click="closeGalleryItemsModal"
+                class="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+              >
+                <svg class="w-6 h-6 text-gray-400 hover:text-gray-900 dark:hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
+            </div>
+
+            <!-- Modal Body - Gallery Grid -->
+            <div class="p-6 max-h-[70vh] overflow-y-auto">
+              <!-- Loading State -->
+              <div v-if="loadingGalleryItems" class="flex items-center justify-center py-20">
+                <svg class="animate-spin h-12 w-12 text-primary-600" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              </div>
+
+              <!-- Gallery Grid -->
+              <div v-else-if="galleryItems.length > 0" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                <div
+                  v-for="(item, index) in galleryItems"
+                  :key="item.id"
+                  class="relative group cursor-pointer aspect-square rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800"
+                  @click="openGalleryLightbox(index)"
+                >
+                  <img
+                    :src="item.file_url || getImageUrl(item.file_path)"
+                    :alt="item.title"
+                    class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                    @error="handleImageError"
+                  />
+                  <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div class="absolute bottom-0 left-0 right-0 p-3">
+                      <p class="text-white text-sm font-semibold truncate">
+                        {{ item.title }}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Empty State -->
+              <div v-else class="text-center py-20">
+                <svg class="mx-auto h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                </svg>
+                <p class="mt-4 text-gray-500 dark:text-gray-400">No photos available in this gallery.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- Lightbox for gallery items -->
+    <Teleport to="body">
+      <Transition name="fade">
+        <div
+          v-if="showGalleryLightbox"
+          class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black"
+          @click.self="closeGalleryLightbox"
+        >
+          <button
+            @click="closeGalleryLightbox"
+            class="absolute top-4 right-4 p-3 bg-white/10 hover:bg-white/20 rounded-full transition-colors z-10"
+          >
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+
+          <button
+            v-if="currentGalleryPhotoIndex > 0"
+            @click="previousGalleryPhoto"
+            class="absolute left-4 p-3 bg-white/10 hover:bg-white/20 rounded-full transition-colors"
+          >
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+            </svg>
+          </button>
+
+          <div class="max-w-6xl max-h-full">
+            <img
+              :src="galleryItems[currentGalleryPhotoIndex]?.file_url || getImageUrl(galleryItems[currentGalleryPhotoIndex]?.file_path)"
+              :alt="galleryItems[currentGalleryPhotoIndex]?.title"
+              class="max-w-full max-h-[90vh] object-contain"
+            />
+            <p v-if="galleryItems[currentGalleryPhotoIndex]?.title" class="text-center text-white mt-4 text-lg">
+              {{ galleryItems[currentGalleryPhotoIndex].title }}
+            </p>
+          </div>
+
+          <button
+            v-if="currentGalleryPhotoIndex < galleryItems.length - 1"
+            @click="nextGalleryPhoto"
+            class="absolute right-4 p-3 bg-white/10 hover:bg-white/20 rounded-full transition-colors"
+          >
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
+          </button>
+
+          <div class="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-white text-sm">
+            {{ currentGalleryPhotoIndex + 1 }} / {{ galleryItems.length }}
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
     <!-- Gallery Modal -->
     <Teleport to="body">
       <Transition name="modal">
@@ -617,6 +848,8 @@ import { useProjects } from '@/composables/useProjects'
 import { usePosts } from '@/composables/usePosts'
 import { useAwards } from '@/composables/useAwards'
 import { useTestimonials } from '@/composables/useTestimonials'
+import { useGallery } from '@/composables/useGallery'
+import { useAboutSettings } from '@/composables/useAboutSettings'
 import { usePageSections } from '@/composables/usePageSections'
 import { BaseLoader } from '@/components/base'
 import api from '@/services/api'
@@ -625,15 +858,46 @@ const { projects: featuredProjects, isLoading: projectsLoading, fetchProjects } 
 const { posts: latestPosts, isLoading: postsLoading, fetchPosts } = usePosts()
 const { awards, isLoading: awardsLoading, fetchAwards } = useAwards()
 const { testimonials, isLoading: testimonialsLoading, fetchTestimonials } = useTestimonials()
+const { galleries, loading: galleriesLoading, fetchGalleries, fetchGalleryItems } = useGallery()
+const { aboutSettings, loading: loadingAbout, heroName, heroTitle, heroBio, heroAvatar, heroSkills } = useAboutSettings()
 const { sections, fetchActiveSections } = usePageSections()
 const currentTestimonialIndex = ref(0)
 
 // Section visibility computed properties
-const showHeroSection = computed(() => true) // Always show
-const showFeaturedProjectsSection = computed(() => true) // Always show
-const showLatestBlogSection = computed(() => true) // Always show
-const showTestimonialsSection = computed(() => true) // Always show
-const showCTASection = computed(() => true) // Always show
+const showHeroSection = computed(() => {
+  const section = sections.value.find(s => s.section_type === 'hero')
+  return section ? section.is_active : false // Default false - hide if not configured
+})
+
+const showFeaturedProjectsSection = computed(() => {
+  const section = sections.value.find(s => s.section_type === 'featured_projects')
+  return section ? section.is_active : false
+})
+
+const showLatestBlogSection = computed(() => {
+  const section = sections.value.find(s => s.section_type === 'latest_blog')
+  return section ? section.is_active : false
+})
+
+const showTestimonialsSection = computed(() => {
+  const section = sections.value.find(s => s.section_type === 'testimonials')
+  return section ? section.is_active : false
+})
+
+const showAwardsSection = computed(() => {
+  const section = sections.value.find(s => s.section_type === 'awards')
+  return section ? section.is_active : false // Default false
+})
+
+const showGallerySection = computed(() => {
+  const section = sections.value.find(s => s.section_type === 'gallery')
+  return section ? section.is_active : false // Default false
+})
+
+const showCTASection = computed(() => {
+  const section = sections.value.find(s => s.section_type === 'cta')
+  return section ? section.is_active : false
+})
 
 // Section order (sorted by sequence)
 const orderedSections = computed(() => {
@@ -643,18 +907,7 @@ const orderedSections = computed(() => {
     .map(s => s.section_type)
 })
 
-// About settings state
-const aboutSettings = ref(null)
-const loadingAbout = ref(false)
-
-// Computed properties for hero section
-const heroName = computed(() => aboutSettings.value?.name || 'Creative Developer')
-const heroTitle = computed(() => aboutSettings.value?.title || 'Digital Designer')
-const heroBio = computed(() => aboutSettings.value?.bio || 'I craft exceptional digital experiences through modern design and innovative solutions that drive real results.')
-const heroAvatar = computed(() => aboutSettings.value?.profile_photo || null)
-const heroSkills = computed(() => aboutSettings.value?.skills || [
-  'Vue.js', 'React', 'Laravel', 'Node.js', 'TypeScript', 'TailwindCSS', 'MySQL', 'Docker'
-])
+// About settings now managed by useAboutSettings composable
 
 const stats = ref([
   { value: '50+', label: 'Projects' },
@@ -663,22 +916,7 @@ const stats = ref([
   { value: '5+', label: 'Years' }
 ])
 
-// Fetch About settings
-const fetchAboutSettings = async () => {
-  loadingAbout.value = true
-  try {
-    // Try public endpoint first
-    const response = await api.get('/settings/about')
-    if (response.data.success) {
-      aboutSettings.value = response.data.data
-    }
-  } catch (error) {
-    console.error('Failed to load about settings:', error)
-    // Use defaults if API fails
-  } finally {
-    loadingAbout.value = false
-  }
-}
+// fetchAboutSettings now managed by useAboutSettings composable
 
 const formatDate = (date) => {
   if (!date) return ''
@@ -701,15 +939,25 @@ const stripHtml = (html) => {
   return tmp.textContent || tmp.innerText || ''
 }
 
-// Gallery modal state
+// Gallery modal state (for awards)
 const showGalleryModal = ref(false)
 const selectedAward = ref(null)
 const galleryPhotos = ref([])
 const loadingGallery = ref(false)
 
-// Lightbox state
+// Gallery items modal state (for galleries section)
+const showGalleryItemsModal = ref(false)
+const selectedGallery = ref(null)
+const galleryItems = ref([])
+const loadingGalleryItems = ref(false)
+
+// Lightbox state (for awards)
 const showLightbox = ref(false)
 const currentPhotoIndex = ref(0)
+
+// Lightbox state (for galleries section)
+const showGalleryLightbox = ref(false)
+const currentGalleryPhotoIndex = ref(0)
 
 const openGalleryModal = async (award) => {
   selectedAward.value = award
@@ -742,6 +990,58 @@ const closeGalleryModal = () => {
   galleryPhotos.value = []
 }
 
+const openGalleryItemsModal = async (gallery) => {
+  selectedGallery.value = gallery
+  showGalleryItemsModal.value = true
+  loadingGalleryItems.value = true
+  galleryItems.value = []
+
+  try {
+    const items = await fetchGalleryItems(gallery.id)
+    if (items && items.length > 0) {
+      galleryItems.value = items
+    }
+  } catch (err) {
+    console.error('Failed to load gallery items:', err)
+  } finally {
+    loadingGalleryItems.value = false
+  }
+}
+
+const closeGalleryItemsModal = () => {
+  showGalleryItemsModal.value = false
+  selectedGallery.value = null
+  galleryItems.value = []
+}
+
+const openGalleryLightbox = (index) => {
+  currentGalleryPhotoIndex.value = index
+  showGalleryLightbox.value = true
+}
+
+const closeGalleryLightbox = () => {
+  showGalleryLightbox.value = false
+}
+
+const nextGalleryPhoto = () => {
+  if (currentGalleryPhotoIndex.value < galleryItems.value.length - 1) {
+    currentGalleryPhotoIndex.value++
+  }
+}
+
+const previousGalleryPhoto = () => {
+  if (currentGalleryPhotoIndex.value > 0) {
+    currentGalleryPhotoIndex.value--
+  }
+}
+
+const getImageUrl = (path) => {
+  if (!path) return ''
+  if (path.startsWith('http')) return path
+  if (path.startsWith('/storage/')) return import.meta.env.VITE_API_URL.replace('/api', '') + path
+  return import.meta.env.VITE_API_URL.replace('/api', '') + '/storage/' + path
+}
+
 const openLightbox = (index) => {
   currentPhotoIndex.value = index
   showLightbox.value = true
@@ -770,10 +1070,16 @@ const handleImageError = (event) => {
 
 // Keyboard navigation for lightbox
 const handleKeydown = (e) => {
-  if (showLightbox.value) {
+  if (showGalleryLightbox.value) {
+    if (e.key === 'ArrowRight') nextGalleryPhoto()
+    if (e.key === 'ArrowLeft') previousGalleryPhoto()
+    if (e.key === 'Escape') closeGalleryLightbox()
+  } else if (showLightbox.value) {
     if (e.key === 'ArrowRight') nextPhoto()
     if (e.key === 'ArrowLeft') previousPhoto()
     if (e.key === 'Escape') closeLightbox()
+  } else if (showGalleryItemsModal.value && e.key === 'Escape') {
+    closeGalleryItemsModal()
   } else if (showGalleryModal.value && e.key === 'Escape') {
     closeGalleryModal()
   }
@@ -793,10 +1099,12 @@ onMounted(async () => {
   const startTime = performance.now()
   
   // Fetch page sections configuration
-  // await fetchActiveSections('homepage') // DISABLED FOR TEST
+  console.log('🔄 Fetching page sections...')
+  await fetchActiveSections('homepage')
+  console.log('📋 Sections loaded:', sections.value)
 
-  // Fetch about settings for hero section
-  // await fetchAboutSettings() // DISABLED FOR TEST - CHECK IF THIS IS THE SLOW ONE
+  // About settings auto-loads via TanStack Query (instant with placeholderData)
+  // No need to await - composable handles loading state automatically
 
   console.log('⏱️ Starting PARALLEL data fetch...')
   
@@ -807,6 +1115,9 @@ onMounted(async () => {
     fetchProjects({ featured: true, limit: 4 }),
     fetchPosts({ limit: 3 }),
     fetchAwards({ featured: true, limit: 6 }),
+    fetchGalleries({ is_active: true, limit: 6 }).then(() => {
+      console.log('🖼️ Galleries fetched:', galleries.value.length, 'items')
+    }),
     fetchTestimonials({ featured: true, limit: 5 })
   ])
   
@@ -822,7 +1133,16 @@ onMounted(async () => {
   console.log('✅ Projects:', projectsLoading.value ? 'Loading...' : 'Cached')
   console.log('✅ Posts:', postsLoading.value ? 'Loading...' : 'Cached')
   console.log('✅ Awards:', awardsLoading.value ? 'Loading...' : 'Cached')
+  console.log('✅ Galleries:', galleriesLoading.value ? 'Loading...' : galleries.value.length + ' loaded')
   console.log('✅ Testimonials:', testimonialsLoading.value ? 'Loading...' : 'Cached')
+  console.log('\n🎛️ Page Sections:')
+  console.log('   Hero:', showHeroSection.value)
+  console.log('   Featured Projects:', showFeaturedProjectsSection.value)
+  console.log('   Latest Blog:', showLatestBlogSection.value)
+  console.log('   Awards:', showAwardsSection.value)
+  console.log('   Gallery:', showGallerySection.value)
+  console.log('   Testimonials:', showTestimonialsSection.value)
+  console.log('   CTA:', showCTASection.value)
   console.groupEnd()
   
   // Image performance on window load

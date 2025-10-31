@@ -28,11 +28,19 @@ class Project extends Model
         'published',
         'is_active',
         'sort_order',
+        // CTA fields
+        'cta_title',
+        'cta_description',
+        'cta_button_text',
+        'cta_phone_number',
+        // Related projects
+        'related_project_ids',
     ];
 
     protected $casts = [
         'images' => 'array',
         'technologies' => 'array',
+        'related_project_ids' => 'array',
         'completed_at' => 'date',
         'featured' => 'boolean',
         'published' => 'boolean',

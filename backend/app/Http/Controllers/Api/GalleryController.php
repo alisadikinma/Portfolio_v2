@@ -41,7 +41,12 @@ class GalleryController extends Controller
 
         // Filter by active status
         if ($request->has('is_active')) {
-            $query->where('is_active', $request->query('is_active'));
+            $isActive = $request->query('is_active');
+            // Convert string boolean to integer (0/1)
+            if (is_string($isActive)) {
+                $isActive = filter_var($isActive, FILTER_VALIDATE_BOOLEAN) ? 1 : 0;
+            }
+            $query->where('is_active', $isActive);
         }
 
         // Search

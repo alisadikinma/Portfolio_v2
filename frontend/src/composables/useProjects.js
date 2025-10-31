@@ -5,6 +5,7 @@ import api from '@/services/api'
 export function useProjects(initialParams = {}) {
   const queryClient = useQueryClient()
   const queryParams = ref(initialParams)
+  const selectedProjectSlug = ref(null)
 
   // Fetch all projects with caching (10min stale / 1hr cache)
   const {
@@ -16,14 +17,41 @@ export function useProjects(initialParams = {}) {
     queryKey: ['projects', queryParams],
     queryFn: async () => {
       const response = await api.get('/projects', { params: queryParams.value })
+      console.log('[useProjects] TanStack Query - Fetching projects list')
       return response.data
     },
     staleTime: 10 * 60 * 1000, // 10 minutes
     gcTime: 60 * 60 * 1000 // 1 hour
   })
 
+  // Fetch single project with TanStack Query (enabled only when slug is set)
+  const {
+    data: projectData,
+    isLoading: isLoadingProject,
+    error: projectError,
+    refetch: refetchProject
+  } = useQuery({
+    queryKey: ['project', selectedProjectSlug],
+    queryFn: async () => {
+      if (!selectedProjectSlug.value) return null
+      
+      console.log('[useProjects] TanStack Query - Fetching project:', selectedProjectSlug.value)
+      const response = await api.get(`/projects/${selectedProjectSlug.value}`)
+      
+      if (response.data.success) {
+        console.log('[useProjects] Project loaded & cached:', selectedProjectSlug.value)
+        return response.data.data
+      }
+      return null
+    },
+    enabled: computed(() => !!selectedProjectSlug.value),
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    gcTime: 60 * 60 * 1000 // 1 hour
+  })
+
   // Computed values for backward compatibility
   const projects = computed(() => projectsData.value?.data || [])
+  const project = computed(() => projectData.value || null)
   const pagination = computed(() => {
     const meta = projectsData.value?.meta
     return meta ? {
@@ -51,16 +79,24 @@ export function useProjects(initialParams = {}) {
     }
   }
 
-  // Fetch single project
+  // Fetch single project (TanStack Query managed)
   const fetchProject = async (slug) => {
-    try {
-      const response = await api.get(`/projects/${slug}`)
-      return { success: true, data: response.data.data }
-    } catch (err) {
-      return {
-        success: false,
-        error: err.response?.data?.message || 'Failed to fetch project'
-      }
+    // Check if already cached
+    const cached = queryClient.getQueryData(['project', slug])
+    if (cached) {
+      console.log('[useProjects] ⚡ Cache HIT for project:', slug, '(INSTANT)')
+      return { success: true, data: cached }
+    }
+
+    console.log('[useProjects] ⏳ Cache MISS for project:', slug, '- fetching via TanStack Query...')
+    selectedProjectSlug.value = slug
+    
+    await refetchProject()
+    
+    return {
+      success: !!project.value,
+      data: project.value,
+      error: projectError.value?.response?.data?.message
     }
   }
 
@@ -87,6 +123,7 @@ export function useProjects(initialParams = {}) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] })
+      queryClient.invalidateQueries({ queryKey: ['project'] })
     }
   })
 
@@ -140,8 +177,9 @@ export function useProjects(initialParams = {}) {
   return {
     // State
     projects,
-    project: ref(null),
+    project,
     isLoading,
+    isLoadingProject,
     error,
     pagination,
 

@@ -14,23 +14,19 @@
       </div>
     </section>
 
-    <!-- Filters Section -->
+    <!-- Gallery Grid Section -->
     <section class="section bg-white dark:bg-neutral-800">
       <div class="container-custom">
-        <div class="flex flex-wrap gap-4 justify-center mb-8">
-          <BaseButton
-            v-for="filter in filters"
-            :key="filter.value"
-            :variant="activeFilter === filter.value ? 'primary' : 'outline'"
-            @click="activeFilter = filter.value"
-          >
-            {{ filter.label }}
+        <BaseLoader v-if="loading" text="Loading gallery..." />
+
+        <div v-else-if="error" class="text-center py-12">
+          <p class="text-red-600 dark:text-red-400">{{ error }}</p>
+          <BaseButton variant="outline" @click="loadGalleries" class="mt-4">
+            Retry
           </BaseButton>
         </div>
 
-        <BaseLoader v-if="isLoading" text="Loading gallery..." />
-
-        <div v-else-if="filteredItems.length === 0" class="text-center py-12">
+        <div v-else-if="galleries.length === 0" class="text-center py-12">
           <p class="text-neutral-600 dark:text-neutral-400">No gallery items found.</p>
         </div>
 
@@ -38,170 +34,297 @@
           <!-- Masonry Grid -->
           <div class="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
             <div
-              v-for="item in paginatedItems"
+              v-for="item in galleries"
               :key="item.id"
               class="break-inside-avoid"
             >
               <BaseCard
                 hover
                 class="cursor-pointer overflow-hidden"
-                @click="openLightbox(item)"
+                @click="openGalleryModal(item)"
               >
-                <div
-                  class="bg-neutral-200 dark:bg-neutral-700 rounded-lg"
-                  :style="{ aspectRatio: item.aspectRatio || '1/1' }"
-                ></div>
+                <div class="relative bg-neutral-200 dark:bg-neutral-700 rounded-lg overflow-hidden" style="aspect-ratio: 16/9;">
+                  <img
+                    v-if="item.thumbnail"
+                    :src="item.thumbnail"
+                    :alt="item.title"
+                    class="w-full h-full object-contain"
+                    loading="lazy"
+                  />
+                  <div v-else class="w-full h-full flex items-center justify-center text-neutral-400">
+                    <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div v-if="item.items_count" class="absolute top-2 right-2 bg-black/70 text-white px-2 py-1 rounded-lg text-sm">
+                    {{ item.items_count }} items
+                  </div>
+                </div>
                 <div class="p-4">
                   <div class="flex items-center gap-2 mb-2">
-                    <BaseBadge :variant="getCategoryVariant(item.category)" size="sm">
-                      {{ item.category }}
+                    <BaseBadge v-if="item.company" :variant="getCategoryVariant(item.company)" size="sm">
+                      {{ item.company }}
                     </BaseBadge>
-                    <span class="text-sm text-neutral-500">{{ formatDate(item.created_at) }}</span>
+                    <span v-if="item.period" class="text-sm text-neutral-500">{{ item.period }}</span>
                   </div>
                   <h3 class="font-semibold mb-1">{{ item.title }}</h3>
-                  <p class="text-neutral-600 dark:text-neutral-400 text-sm">
+                  <p class="text-neutral-600 dark:text-neutral-400 text-sm line-clamp-2">
                     {{ item.description }}
                   </p>
                 </div>
               </BaseCard>
             </div>
           </div>
-
-          <!-- Load More -->
-          <div v-if="hasMore" class="text-center mt-12">
-            <BaseButton variant="outline" @click="loadMore">
-              Load More
-            </BaseButton>
-          </div>
         </div>
       </div>
     </section>
 
-    <!-- Lightbox Modal -->
-    <Transition name="fade">
-      <div
-        v-if="lightboxItem"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
-        @click="closeLightbox"
-      >
-        <div class="relative max-w-6xl w-full">
-          <button
-            class="absolute -top-12 right-0 text-white hover:text-neutral-300 transition-colors"
-            @click="closeLightbox"
-          >
-            <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-          <div
-            class="bg-white dark:bg-neutral-800 rounded-2xl overflow-hidden"
-            @click.stop
-          >
-            <div class="aspect-video bg-neutral-200 dark:bg-neutral-700"></div>
-            <div class="p-6">
-              <div class="flex items-center gap-2 mb-4">
-                <BaseBadge :variant="getCategoryVariant(lightboxItem.category)" size="sm">
-                  {{ lightboxItem.category }}
-                </BaseBadge>
-                <span class="text-sm text-neutral-500">{{ formatDate(lightboxItem.created_at) }}</span>
+    <!-- Gallery Items Modal -->
+    <Teleport to="body">
+      <Transition name="modal">
+        <div
+          v-if="showGalleryModal && selectedGallery"
+          class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          @click.self="closeGalleryModal"
+        >
+          <div class="relative w-full max-w-6xl bg-white dark:bg-neutral-900 rounded-2xl shadow-2xl overflow-hidden">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between p-6 border-b border-neutral-200 dark:border-neutral-800">
+              <div>
+                <h3 class="text-2xl font-bold text-neutral-900 dark:text-white">
+                  {{ selectedGallery.title }}
+                </h3>
+                <p class="text-sm text-primary-600 dark:text-primary-400 mt-1">
+                  <span v-if="selectedGallery.company">{{ selectedGallery.company }}</span>
+                  <span v-if="selectedGallery.company && selectedGallery.period"> • </span>
+                  <span v-if="selectedGallery.period">{{ selectedGallery.period }}</span>
+                </p>
               </div>
-              <h2 class="text-2xl font-bold mb-2">{{ lightboxItem.title }}</h2>
-              <p class="text-neutral-600 dark:text-neutral-400">{{ lightboxItem.description }}</p>
+              <button
+                @click="closeGalleryModal"
+                class="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg transition-colors"
+              >
+                <svg class="w-6 h-6 text-neutral-400 hover:text-neutral-900 dark:hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
+            </div>
+
+            <!-- Modal Body - Gallery Grid -->
+            <div class="p-6 max-h-[70vh] overflow-y-auto">
+              <!-- Loading State -->
+              <div v-if="loadingItems" class="flex items-center justify-center py-20">
+                <svg class="animate-spin h-12 w-12 text-primary-600" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              </div>
+
+              <!-- Gallery Grid -->
+              <div v-else-if="galleryItems.length > 0" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                <div
+                  v-for="(item, index) in galleryItems"
+                  :key="item.id"
+                  class="relative group cursor-pointer aspect-square rounded-lg overflow-hidden bg-neutral-100 dark:bg-neutral-800"
+                  @click="openLightbox(index)"
+                >
+                  <img
+                    :src="item.file_url || getImageUrl(item.file_path)"
+                    :alt="item.title"
+                    class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                    @error="handleImageError"
+                  />
+                  <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div class="absolute bottom-0 left-0 right-0 p-3">
+                      <p class="text-white text-sm font-semibold truncate">
+                        {{ item.title }}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Empty State -->
+              <div v-else class="text-center py-20">
+                <svg class="mx-auto h-16 w-16 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                </svg>
+                <p class="mt-4 text-neutral-500 dark:text-neutral-400">No photos available in this gallery.</p>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </Transition>
+      </Transition>
+    </Teleport>
+
+    <!-- Lightbox for full image view -->
+    <Teleport to="body">
+      <Transition name="fade">
+        <div
+          v-if="showLightbox"
+          class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black"
+          @click.self="closeLightbox"
+        >
+          <button
+            @click="closeLightbox"
+            class="absolute top-4 right-4 p-3 bg-white/10 hover:bg-white/20 rounded-full transition-colors z-10"
+          >
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+
+          <button
+            v-if="currentPhotoIndex > 0"
+            @click="previousPhoto"
+            class="absolute left-4 p-3 bg-white/10 hover:bg-white/20 rounded-full transition-colors"
+          >
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+            </svg>
+          </button>
+
+          <div class="max-w-6xl max-h-full">
+            <img
+              :src="galleryItems[currentPhotoIndex]?.file_url || getImageUrl(galleryItems[currentPhotoIndex]?.file_path)"
+              :alt="galleryItems[currentPhotoIndex]?.title"
+              class="max-w-full max-h-[90vh] object-contain"
+            />
+            <p v-if="galleryItems[currentPhotoIndex]?.title" class="text-center text-white mt-4 text-lg">
+              {{ galleryItems[currentPhotoIndex].title }}
+            </p>
+          </div>
+
+          <button
+            v-if="currentPhotoIndex < galleryItems.length - 1"
+            @click="nextPhoto"
+            class="absolute right-4 p-3 bg-white/10 hover:bg-white/20 rounded-full transition-colors"
+          >
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
+          </button>
+
+          <div class="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-white text-sm">
+            {{ currentPhotoIndex + 1 }} / {{ galleryItems.length }}
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { BaseButton, BaseCard, BaseBadge, BaseLoader } from '@/components/base'
+import { useGallery } from '@/composables/useGallery'
 
-const isLoading = ref(false)
-const activeFilter = ref('all')
-const lightboxItem = ref(null)
-const currentPage = ref(1)
-const perPage = 12
+const { galleries, loading, error, fetchGalleries, fetchGalleryItems } = useGallery()
 
-const filters = [
-  { label: 'All', value: 'all' },
-  { label: 'Design', value: 'design' },
-  { label: 'Photography', value: 'photography' },
-  { label: 'Illustrations', value: 'illustrations' },
-  { label: 'UI/UX', value: 'ui-ux' }
-]
+// Modal state
+const showGalleryModal = ref(false)
+const selectedGallery = ref(null)
+const galleryItems = ref([])
+const loadingItems = ref(false)
 
-// Mock gallery items
-const galleryItems = ref([
-  { id: 1, title: 'Modern Dashboard', description: 'Clean and intuitive dashboard design', category: 'UI/UX', created_at: '2024-01-15', aspectRatio: '16/9' },
-  { id: 2, title: 'Sunset Landscape', description: 'Beautiful sunset photography', category: 'Photography', created_at: '2024-01-14', aspectRatio: '4/3' },
-  { id: 3, title: 'Character Sketch', description: 'Digital character illustration', category: 'Illustrations', created_at: '2024-01-13', aspectRatio: '3/4' },
-  { id: 4, title: 'Brand Identity', description: 'Complete brand identity design', category: 'Design', created_at: '2024-01-12', aspectRatio: '1/1' },
-  { id: 5, title: 'Mobile App UI', description: 'Mobile application interface', category: 'UI/UX', created_at: '2024-01-11', aspectRatio: '9/16' },
-  { id: 6, title: 'Urban Architecture', description: 'Modern building photography', category: 'Photography', created_at: '2024-01-10', aspectRatio: '16/9' },
-  { id: 7, title: 'Vector Art', description: 'Geometric vector illustration', category: 'Illustrations', created_at: '2024-01-09', aspectRatio: '1/1' },
-  { id: 8, title: 'Logo Collection', description: 'Various logo designs', category: 'Design', created_at: '2024-01-08', aspectRatio: '4/3' },
-  { id: 9, title: 'Web Interface', description: 'Responsive web design', category: 'UI/UX', created_at: '2024-01-07', aspectRatio: '16/9' },
-  { id: 10, title: 'Nature Scene', description: 'Forest landscape photo', category: 'Photography', created_at: '2024-01-06', aspectRatio: '3/2' },
-  { id: 11, title: 'Portrait Art', description: 'Digital portrait illustration', category: 'Illustrations', created_at: '2024-01-05', aspectRatio: '3/4' },
-  { id: 12, title: 'Poster Design', description: 'Event poster design', category: 'Design', created_at: '2024-01-04', aspectRatio: '2/3' }
-])
+// Lightbox state
+const showLightbox = ref(false)
+const currentPhotoIndex = ref(0)
 
-const filteredItems = computed(() => {
-  if (activeFilter.value === 'all') {
-    return galleryItems.value
-  }
-  return galleryItems.value.filter(item =>
-    item.category.toLowerCase().replace(/\//g, '-') === activeFilter.value
-  )
-})
-
-const paginatedItems = computed(() => {
-  return filteredItems.value.slice(0, currentPage.value * perPage)
-})
-
-const hasMore = computed(() => {
-  return paginatedItems.value.length < filteredItems.value.length
-})
-
-const getCategoryVariant = (category) => {
-  const variants = {
-    'Design': 'primary',
-    'Photography': 'success',
-    'Illustrations': 'warning',
-    'UI/UX': 'info'
-  }
-  return variants[category] || 'outline'
+const getCategoryVariant = (company) => {
+  if (!company) return 'outline'
+  // Simple hash-based color assignment
+  const hash = company.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
+  const variants = ['primary', 'success', 'warning', 'info']
+  return variants[hash % variants.length]
 }
 
-const formatDate = (date) => {
-  if (!date) return ''
-  return new Date(date).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  })
+const getImageUrl = (path) => {
+  if (!path) return ''
+  // If path already starts with http/https, return as is
+  if (path.startsWith('http')) return path
+  // If path starts with /storage/, return as is (already public URL)
+  if (path.startsWith('/storage/')) return import.meta.env.VITE_API_URL.replace('/api', '') + path
+  // Otherwise, prepend storage path
+  return import.meta.env.VITE_API_URL.replace('/api', '') + '/storage/' + path
 }
 
-const openLightbox = (item) => {
-  lightboxItem.value = item
+const openGalleryModal = async (gallery) => {
+  selectedGallery.value = gallery
+  showGalleryModal.value = true
+  loadingItems.value = true
+  galleryItems.value = []
+
+  try {
+    const items = await fetchGalleryItems(gallery.id)
+    if (items && items.length > 0) {
+      galleryItems.value = items
+    }
+  } catch (err) {
+    console.error('Failed to load gallery items:', err)
+  } finally {
+    loadingItems.value = false
+  }
+}
+
+const closeGalleryModal = () => {
+  showGalleryModal.value = false
+  selectedGallery.value = null
+  galleryItems.value = []
+}
+
+const openLightbox = (index) => {
+  currentPhotoIndex.value = index
+  showLightbox.value = true
 }
 
 const closeLightbox = () => {
-  lightboxItem.value = null
+  showLightbox.value = false
 }
 
-const loadMore = () => {
-  currentPage.value++
+const nextPhoto = () => {
+  if (currentPhotoIndex.value < galleryItems.value.length - 1) {
+    currentPhotoIndex.value++
+  }
 }
 
-onMounted(async () => {
-  isLoading.value = true
-  // Simulate API call
-  await new Promise(resolve => setTimeout(resolve, 500))
-  isLoading.value = false
+const previousPhoto = () => {
+  if (currentPhotoIndex.value > 0) {
+    currentPhotoIndex.value--
+  }
+}
+
+const handleImageError = (event) => {
+  console.error('Image failed to load:', event.target.src)
+  event.target.src = 'https://via.placeholder.com/400x300/e5e7eb/6b7280?text=Image+Not+Found'
+}
+
+const loadGalleries = async () => {
+  await fetchGalleries({
+    is_active: 1,
+    order_by: 'sort_order',
+    order_dir: 'asc'
+  })
+}
+
+// Keyboard navigation for lightbox
+const handleKeydown = (e) => {
+  if (showLightbox.value) {
+    if (e.key === 'ArrowRight') nextPhoto()
+    if (e.key === 'ArrowLeft') previousPhoto()
+    if (e.key === 'Escape') closeLightbox()
+  } else if (showGalleryModal.value && e.key === 'Escape') {
+    closeGalleryModal()
+  }
+}
+
+onMounted(() => {
+  loadGalleries()
+  window.addEventListener('keydown', handleKeydown)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleKeydown)
 })
 </script>
 
@@ -214,5 +337,23 @@ onMounted(async () => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+/* Modal transitions */
+.modal-enter-active,
+.modal-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 </style>

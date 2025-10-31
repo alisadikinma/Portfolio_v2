@@ -23,6 +23,11 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Http\Middleware\HandleCors::class,
         ]);
         
+        // Add cache headers for static assets (images, CSS, JS, fonts)
+        $middleware->web(append: [
+            \App\Http\Middleware\SetCacheHeaders::class,
+        ]);
+        
         // Note: statefulApi() removed - we're using token-based auth, not cookie-based
         // This prevents CSRF 419 errors on API routes
     })
