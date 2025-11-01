@@ -90,7 +90,7 @@ async function fetchProject() {
   error.value = null
 
   try {
-    const projectId = route.params.id
+    const projectId = parseInt(route.params.id, 10)
     project.value = await projectsStore.fetchProject(projectId)
   } catch (err) {
     console.error('Failed to fetch project:', err)
@@ -104,7 +104,7 @@ async function handleSubmit(projectData) {
   isSubmitting.value = true
 
   try {
-    const projectId = route.params.id
+    const projectId = parseInt(route.params.id, 10)
     const updatedProject = await projectsStore.updateProject(projectId, projectData)
 
     uiStore.showSuccess(

@@ -99,7 +99,7 @@ async function fetchAward() {
   error.value = null
 
   try {
-    const awardId = route.params.id
+    const awardId = parseInt(route.params.id, 10)
     const fetchedAward = await awardsStore.fetchAward(awardId)
 
     // Handle both nested and flat response structures
@@ -120,7 +120,7 @@ async function handleSubmit(awardData) {
   isSubmitting.value = true
 
   try {
-    const awardId = route.params.id
+    const awardId = parseInt(route.params.id, 10)
     const updatedAward = await awardsStore.updateAward(awardId, awardData)
 
     uiStore.showSuccess(

@@ -42,7 +42,14 @@
             class="cursor-pointer"
             @click="$router.push(`/projects/${project.slug}`)"
           >
-            <div class="aspect-video bg-neutral-200 dark:bg-neutral-700 rounded-lg mb-4"></div>
+            <div class="aspect-video bg-neutral-200 dark:bg-neutral-700 rounded-lg mb-4 overflow-hidden">
+              <img
+                v-if="project.image"
+                :src="project.image"
+                :alt="project.title"
+                class="w-full h-full object-cover"
+              />
+            </div>
             <div class="flex items-center gap-2 mb-3">
               <BaseBadge variant="success" size="sm">{{ project.status }}</BaseBadge>
               <span class="text-sm text-neutral-500">{{ formatDate(project.created_at) }}</span>

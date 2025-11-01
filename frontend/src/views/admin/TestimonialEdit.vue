@@ -90,7 +90,7 @@ async function fetchTestimonial() {
   error.value = null
 
   try {
-    const testimonialId = route.params.id
+    const testimonialId = parseInt(route.params.id, 10)
     const fetchedTestimonial = await testimonialsStore.fetchTestimonial(testimonialId)
 
     if (fetchedTestimonial && fetchedTestimonial.client_name) {
@@ -110,7 +110,7 @@ async function handleSubmit(testimonialData) {
   isSubmitting.value = true
 
   try {
-    const testimonialId = route.params.id
+    const testimonialId = parseInt(route.params.id, 10)
     const updatedTestimonial = await testimonialsStore.updateTestimonial(testimonialId, testimonialData)
 
     uiStore.showSuccess(
