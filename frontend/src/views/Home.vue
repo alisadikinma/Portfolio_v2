@@ -158,91 +158,240 @@
       </div>
     </section>
 
-    <!-- Awards & Recognition Section -->
+    <!-- Awards & Recognition Section - 3D COVERFLOW + MAGNETIC -->
     <section
       v-if="showAwardsSection"
-      class="py-20 bg-gray-50 dark:bg-gray-900"
+      class="py-20 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden"
     >
-      <div class="container-custom">
+      <!-- Animated background particles -->
+      <div class="absolute inset-0 overflow-hidden">
+        <div class="absolute w-96 h-96 bg-purple-500/20 rounded-full blur-3xl top-0 -left-20 animate-blob"></div>
+        <div class="absolute w-96 h-96 bg-pink-500/20 rounded-full blur-3xl top-0 -right-20 animate-blob animation-delay-2000"></div>
+        <div class="absolute w-96 h-96 bg-blue-500/20 rounded-full blur-3xl -bottom-20 left-1/2 animate-blob animation-delay-4000"></div>
+      </div>
+
+      <div class="container-custom relative z-10">
         <!-- Section Header -->
-        <div class="max-w-2xl mb-16">
-          <p class="text-accent-600 dark:text-accent-400 font-semibold mb-2 uppercase tracking-wider text-sm">
+        <div class="text-center mb-16">
+          <p class="text-purple-400 font-semibold mb-3 uppercase tracking-wider text-sm flex items-center justify-center gap-2">
+            <svg class="w-5 h-5 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+            </svg>
             Recognition & Achievements
           </p>
-          <h2 class="text-4xl md:text-5xl font-display font-bold text-gray-900 dark:text-white mb-4">
-            Awards & Honors
+          <h2 class="text-5xl md:text-6xl font-display font-bold text-white mb-4">
+            Awards & <span class="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 animate-gradient">Honors</span>
           </h2>
-          <p class="text-xl text-gray-600 dark:text-gray-400">
+          <p class="text-xl text-gray-300 max-w-2xl mx-auto">
             Celebrating milestones and industry recognition
           </p>
         </div>
 
         <BaseLoader v-if="awardsLoading" text="Loading awards..." />
 
-        <!-- Awards Grid -->
-        <div v-else-if="awards.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div
-            v-for="award in awards"
-            :key="award.id"
-            class="award-card group relative bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 hover:border-primary-500 dark:hover:border-primary-500 hover:shadow-xl transition-all duration-300"
+        <!-- 3D Coverflow Carousel -->
+        <div v-else-if="awards.length > 0" class="relative">
+          <!-- Carousel container with perspective -->
+          <div 
+            ref="carouselContainer"
+            class="relative h-[600px] md:h-[650px]"
+            style="perspective: 2000px"
+            @mousemove="handleMouseMove"
+            @mouseleave="handleMouseLeave"
+            @touchstart="handleTouchStart"
+            @touchmove="handleTouchMove"
+            @touchend="handleTouchEnd"
           >
-            <!-- Award Icon/Image -->
-            <div class="relative mb-6">
-              <div v-if="award.image" class="w-16 h-16 rounded-xl overflow-hidden bg-gradient-to-br from-primary-400 to-secondary-400">
-                <img :src="award.image" :alt="award.award_title" class="w-full h-full object-cover" />
-              </div>
-              <div v-else class="w-16 h-16 bg-gradient-to-br from-primary-400 to-secondary-400 rounded-xl flex items-center justify-center">
-                <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
-                </svg>
+            <div class="absolute inset-0 flex items-center justify-center">
+              <!-- Award Cards in 3D -->
+              <div
+                v-for="(award, index) in awards"
+                :key="award.id"
+                class="award-3d-card absolute transition-all duration-700 ease-out"
+                :class="{
+                  'award-active': index === activeAwardIndex,
+                  'award-prev': index < activeAwardIndex,
+                  'award-next': index > activeAwardIndex
+                }"
+                :style="getCardStyle(index)"
+              >
+                <!-- Card with glass morphism -->
+                <div 
+                  class="relative w-[320px] md:w-[380px] h-[500px] md:h-[550px] rounded-2xl overflow-hidden backdrop-blur-xl border shadow-2xl group"
+                  :class="[
+                    index === activeAwardIndex 
+                      ? 'bg-white/60 border-white/50' 
+                      : 'bg-white/20 border-white/25'
+                  ]"
+                >
+                  <!-- Gradient overlay -->
+                  <div class="absolute inset-0 bg-gradient-to-br from-purple-500/20 via-transparent to-pink-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                  
+                  <!-- Content -->
+                  <div class="relative z-10 p-8 h-full flex flex-col">
+                    <!-- Top section -->
+                    <div class="flex items-start justify-between mb-6">
+                      <!-- Award Icon with glow -->
+                      <div class="relative">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-2xl blur-xl opacity-60 group-hover:opacity-100 transition-opacity animate-pulse"></div>
+                        <div v-if="award.image" class="relative w-20 h-20 rounded-2xl overflow-hidden shadow-2xl transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
+                          <img :src="award.image" :alt="award.award_title" class="w-full h-full object-cover" />
+                        </div>
+                        <div v-else class="relative w-20 h-20 bg-gradient-to-br from-yellow-400 via-orange-500 to-red-500 rounded-2xl flex items-center justify-center shadow-2xl transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
+                          <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
+                          </svg>
+                        </div>
+                      </div>
+
+                      <!-- Year badge -->
+                      <div class="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full shadow-lg">
+                        <span class="text-white font-bold text-sm">{{ formatYear(award.award_date) }}</span>
+                      </div>
+                    </div>
+
+                    <!-- Award title -->
+                    <h3 
+                      class="text-2xl font-bold mb-3 line-clamp-2 transition-colors"
+                      :class="[
+                        index === activeAwardIndex
+                          ? 'text-gray-900 hover:text-purple-600'
+                          : 'text-white hover:text-purple-300'
+                      ]"
+                    >
+                      {{ award.award_title }}
+                    </h3>
+
+                    <!-- Organization -->
+                    <div class="flex items-center gap-2 mb-4 pb-4 border-b border-white/10">
+                      <svg 
+                        class="w-5 h-5" 
+                        :class="index === activeAwardIndex ? 'text-purple-600' : 'text-purple-400'"
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24"
+                      >
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                      </svg>
+                      <p 
+                        class="font-semibold text-sm uppercase tracking-wide"
+                        :class="index === activeAwardIndex ? 'text-purple-700' : 'text-purple-300'"
+                      >
+                        {{ award.issuing_organization }}
+                      </p>
+                    </div>
+
+                    <!-- Description -->
+                    <p 
+                      v-if="award.description" 
+                      class="text-sm leading-relaxed line-clamp-3 mb-6 flex-1"
+                      :class="index === activeAwardIndex ? 'text-gray-700' : 'text-gray-300'"
+                    >
+                      {{ stripHtml(award.description) }}
+                    </p>
+
+                    <!-- Bottom badges -->
+                    <div class="flex items-center gap-3 mb-4">
+                      <div v-if="award.credential_id" class="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 rounded-lg backdrop-blur-sm">
+                        <svg 
+                          class="w-4 h-4" 
+                          :class="index === activeAwardIndex ? 'text-purple-600' : 'text-purple-400'"
+                          fill="none" 
+                          stroke="currentColor" 
+                          viewBox="0 0 24 24"
+                        >
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+                        </svg>
+                        <span 
+                          class="text-xs font-medium"
+                          :class="index === activeAwardIndex ? 'text-gray-900' : 'text-white'"
+                        >
+                          {{ award.credential_id }}
+                        </span>
+                      </div>
+                      <div v-if="award.total_photos > 0" class="flex items-center gap-1.5 px-3 py-1.5 bg-purple-500/30 rounded-lg backdrop-blur-sm">
+                        <svg 
+                          class="w-4 h-4" 
+                          :class="index === activeAwardIndex ? 'text-purple-600' : 'text-purple-300'"
+                          fill="none" 
+                          stroke="currentColor" 
+                          viewBox="0 0 24 24"
+                        >
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                        <span 
+                          class="text-xs font-semibold"
+                          :class="index === activeAwardIndex ? 'text-gray-900' : 'text-white'"
+                        >
+                          {{ award.total_photos }} Photos
+                        </span>
+                      </div>
+                    </div>
+
+                    <!-- View button -->
+                    <button
+                      v-if="award.total_photos > 0"
+                      @click="openGalleryModal(award)"
+                      class="w-full relative overflow-hidden px-6 py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-xl font-bold text-white shadow-xl shadow-purple-500/50 hover:shadow-2xl hover:shadow-purple-500/70 transition-all duration-300 transform hover:scale-105 flex items-center justify-center gap-2 group"
+                    >
+                      <span class="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></span>
+                      <svg class="w-5 h-5 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                      </svg>
+                      <span class="relative z-10">VIEW GALLERY</span>
+                    </button>
+                  </div>
+
+                  <!-- Reflection effect -->
+                  <div class="absolute inset-0 bg-gradient-to-t from-white/5 to-transparent pointer-events-none"></div>
+                </div>
               </div>
             </div>
+          </div>
 
-            <!-- Award Info -->
-            <div class="mb-6">
-              <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
-                {{ award.award_title }}
-              </h3>
-              <p class="text-sm text-purple-600 dark:text-purple-400 font-semibold mb-3 uppercase tracking-wide">
-                {{ award.issuing_organization }} • {{ formatYear(award.award_date) }}
-              </p>
-              <p v-if="award.description" class="text-sm text-gray-600 dark:text-gray-400 line-clamp-3 mb-4">
-                {{ stripHtml(award.description) }}
-              </p>
+          <!-- Navigation arrows -->
+          <button
+            v-if="awards.length > 1"
+            @click="previousAward"
+            class="absolute left-4 top-1/2 -translate-y-1/2 z-20 w-14 h-14 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-all hover:scale-110 shadow-xl"
+          >
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M15 19l-7-7 7-7"></path>
+            </svg>
+          </button>
+          <button
+            v-if="awards.length > 1"
+            @click="nextAward"
+            class="absolute right-4 top-1/2 -translate-y-1/2 z-20 w-14 h-14 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-all hover:scale-110 shadow-xl"
+          >
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9 5l7 7-7 7"></path>
+            </svg>
+          </button>
 
-              <!-- Credential Info -->
-              <div class="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-500 mb-4">
-                <div v-if="award.credential_id" class="flex items-center">
-                  <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
-                  </svg>
-                  ID: {{ award.credential_id }}
-                </div>
-                <div v-if="award.total_photos > 0" class="flex items-center">
-                  <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                  </svg>
-                  {{ award.total_photos }} {{ award.total_photos === 1 ? 'Photo' : 'Photos' }}
-                </div>
-              </div>
-            </div>
-
-            <!-- Action Button -->
+          <!-- Dots indicator -->
+          <div class="flex justify-center gap-2 mt-8">
             <button
-              v-if="award.total_photos > 0"
-              @click="openGalleryModal(award)"
-              class="w-full px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors duration-300 flex items-center justify-center gap-2"
-            >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-              </svg>
-              VIEW GALLERY
-            </button>
+              v-for="(award, index) in awards"
+              :key="`dot-${award.id}`"
+              @click="activeAwardIndex = index"
+              class="transition-all duration-300"
+              :class="[
+                index === activeAwardIndex 
+                  ? 'w-8 h-3 bg-gradient-to-r from-purple-500 to-pink-500' 
+                  : 'w-3 h-3 bg-white/30 hover:bg-white/50'
+              ]"
+              style="border-radius: 9999px"
+            ></button>
           </div>
         </div>
 
-        <div v-else class="text-center py-12">
-          <p class="text-gray-500 dark:text-gray-400">No awards to display yet.</p>
+        <div v-else class="text-center py-20">
+          <svg class="w-20 h-20 mx-auto text-white/20 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
+          </svg>
+          <p class="text-white/60 text-lg">No awards to display yet.</p>
         </div>
       </div>
     </section>
@@ -1159,6 +1308,27 @@ const stripHtml = (html) => {
   return tmp.textContent || tmp.innerText || ''
 }
 
+// Awards 3D Coverflow state
+const activeAwardIndex = ref(0)
+const carouselContainer = ref(null)
+const mouseX = ref(0)
+const mouseY = ref(0)
+const isHoveringCarousel = ref(false)
+const screenSize = ref('desktop') // 'mobile' | 'tablet' | 'desktop'
+const windowWidth = ref(window.innerWidth)
+
+// Screen breakpoints
+const isMobile = computed(() => windowWidth.value < 768)
+const isTablet = computed(() => windowWidth.value >= 768 && windowWidth.value < 1024)
+const isDesktop = computed(() => windowWidth.value >= 1024)
+
+// Cards to show based on screen size
+const visibleCardsCount = computed(() => {
+  if (isMobile.value) return 1 // Mobile: 1 card (active only)
+  if (isTablet.value) return 2 // Tablet: 2 cards (active + 1 side)
+  return 3 // Desktop: 3 cards (active + 2 sides)
+})
+
 // Gallery modal state (for awards)
 const showGalleryModal = ref(false)
 const selectedAward = ref(null)
@@ -1301,7 +1471,179 @@ const handleAvatarError = (event) => {
   event.target.style.display = 'none'
 }
 
-// Keyboard navigation for lightbox
+// 3D Coverflow + Magnetic Hover Functions
+const getCardStyle = (index) => {
+  const diff = index - activeAwardIndex.value
+  const isCurrent = diff === 0
+  const isPrev = diff < 0
+  const isNext = diff > 0
+  const absDiff = Math.abs(diff)
+  
+  // Visibility based on screen size
+  let maxVisible = 1 // Default: show center + 1 on each side (3 total)
+  if (isMobile.value) {
+    maxVisible = 0 // Mobile: only center (1 total)
+  } else if (isTablet.value) {
+    maxVisible = 1 // Tablet: center + 1 per side (up to 3 total, but we'll limit to 2)
+  } else {
+    maxVisible = 1 // Desktop: center + 1 per side (3 total)
+  }
+  
+  // Hide cards too far outside visible range
+  if (absDiff > maxVisible) {
+    return {
+      transform: `translateX(${diff > 0 ? '150%' : '-150%'}) scale(0.3)`,
+      opacity: 0,
+      zIndex: 0,
+      pointerEvents: 'none',
+      visibility: 'hidden'
+    }
+  }
+  
+  let translateX = diff * 100
+  let translateZ = isCurrent ? 0 : -300
+  let rotateY = 0
+  let scale = isCurrent ? 1 : 0.75
+  let opacity = isCurrent ? 1 : 0.85 // Increased from 0.5 to 0.85
+  let zIndex = isCurrent ? 30 : (20 - absDiff)
+  
+  // Responsive positioning adjustments
+  if (isMobile.value) {
+    // Mobile: Only show active card, hide all others
+    if (!isCurrent) {
+      return {
+        transform: `translateX(${diff > 0 ? '150%' : '-150%'}) scale(0.5)`,
+        opacity: 0,
+        zIndex: 0,
+        pointerEvents: 'none',
+        visibility: 'hidden'
+      }
+    }
+  } else if (isTablet.value) {
+    // Tablet: Show 2 cards (active + 1 side peek on right only for cleaner look)
+    if (absDiff > 1 || isPrev) {
+      // Hide cards on left and far right
+      return {
+        transform: `translateX(${diff > 0 ? '180%' : '-180%'}) scale(0.6)`,
+        opacity: 0,
+        zIndex: 0,
+        pointerEvents: 'none',
+        visibility: 'hidden'
+      }
+    }
+    // Show only next card (right side) as peek
+    if (isNext && absDiff === 1) {
+      rotateY = -35
+      translateX = 50
+      translateZ = -200
+      scale = 0.75
+      opacity = 0.8 // Increased from 0.6 to 0.8
+    }
+  } else {
+    // Desktop: Show 3 cards (active + 2 sides)
+    // Adjust spacing to keep cards in viewport
+    if (absDiff === 1) {
+      // Immediate neighbors (±1)
+      if (isPrev) {
+        rotateY = 45
+        translateX = -45 // Closer positioning
+        translateZ = -250
+        scale = 0.8
+      } else if (isNext) {
+        rotateY = -45
+        translateX = 45 // Closer positioning
+        translateZ = -250
+        scale = 0.8
+      }
+    } else if (absDiff > 1) {
+      // Cards beyond immediate neighbors - fade out more gently
+      opacity = 0.4 // Increased from 0.2 to 0.4
+      scale = 0.6
+      if (isPrev) {
+        rotateY = 60
+        translateX = -80
+        translateZ = -400
+      } else if (isNext) {
+        rotateY = -60
+        translateX = 80
+        translateZ = -400
+      }
+    }
+  }
+  
+  // Magnetic hover effect (only on active card and desktop)
+  if (isCurrent && isHoveringCarousel.value && carouselContainer.value && isDesktop.value) {
+    const rect = carouselContainer.value.getBoundingClientRect()
+    const centerX = rect.width / 2
+    const centerY = rect.height / 2
+    const deltaX = (mouseX.value - centerX) / 20
+    const deltaY = (mouseY.value - centerY) / 20
+    
+    translateX += deltaX
+    rotateY = -deltaX / 5
+  }
+  
+  return {
+    transform: `translateX(${translateX}%) translateZ(${translateZ}px) rotateY(${rotateY}deg) scale(${scale})`,
+    opacity,
+    zIndex,
+    pointerEvents: isCurrent ? 'auto' : 'none',
+    visibility: 'visible'
+  }
+}
+
+const nextAward = () => {
+  if (activeAwardIndex.value < awards.value.length - 1) {
+    activeAwardIndex.value++
+  }
+}
+
+const previousAward = () => {
+  if (activeAwardIndex.value > 0) {
+    activeAwardIndex.value--
+  }
+}
+
+const handleMouseMove = (event) => {
+  if (!carouselContainer.value) return
+  const rect = carouselContainer.value.getBoundingClientRect()
+  mouseX.value = event.clientX - rect.left
+  mouseY.value = event.clientY - rect.top
+  isHoveringCarousel.value = true
+}
+
+const handleMouseLeave = () => {
+  isHoveringCarousel.value = false
+}
+
+// Touch/Swipe support for mobile
+let touchStartX = 0
+let touchEndX = 0
+
+const handleTouchStart = (event) => {
+  touchStartX = event.touches[0].clientX
+}
+
+const handleTouchMove = (event) => {
+  touchEndX = event.touches[0].clientX
+}
+
+const handleTouchEnd = () => {
+  const swipeThreshold = 50
+  const diff = touchStartX - touchEndX
+  
+  if (Math.abs(diff) > swipeThreshold) {
+    if (diff > 0) {
+      // Swipe left - next
+      nextAward()
+    } else {
+      // Swipe right - previous
+      previousAward()
+    }
+  }
+}
+
+// Keyboard navigation for lightbox and carousel
 const handleKeydown = (e) => {
   if (showGalleryLightbox.value) {
     if (e.key === 'ArrowRight') nextGalleryPhoto()
@@ -1315,6 +1657,10 @@ const handleKeydown = (e) => {
     closeGalleryItemsModal()
   } else if (showGalleryModal.value && e.key === 'Escape') {
     closeGalleryModal()
+  } else if (showAwardsSection.value && awards.value.length > 1) {
+    // Awards carousel keyboard navigation (when no modal is open)
+    if (e.key === 'ArrowRight') nextAward()
+    if (e.key === 'ArrowLeft') previousAward()
   }
 }
 
@@ -1325,11 +1671,25 @@ const rotateTestimonials = () => {
   }
 }
 
+// Auto-rotate awards carousel
+const rotateAwards = () => {
+  if (awards.value.length > 1) {
+    activeAwardIndex.value = (activeAwardIndex.value + 1) % awards.value.length
+  }
+}
+
 let testimonialInterval
+let awardsInterval
 
 onMounted(async () => {
   // Performance tracking START
   const startTime = performance.now()
+  
+  // Window resize listener for responsive carousel
+  const handleResize = () => {
+    windowWidth.value = window.innerWidth
+  }
+  window.addEventListener('resize', handleResize)
   
   // Fetch page sections configuration
   console.log('🔄 Fetching page sections...')
@@ -1395,8 +1755,16 @@ onMounted(async () => {
   // Start testimonial rotation
   testimonialInterval = setInterval(rotateTestimonials, 5000)
   
+  // Start awards carousel rotation
+  if (showAwardsSection.value && awards.value.length > 1) {
+    awardsInterval = setInterval(rotateAwards, 6000) // 6s interval (slower than testimonials)
+  }
+  
   // Add keyboard event listener
   window.addEventListener('keydown', handleKeydown)
+  
+  // Store resize handler for cleanup
+  window._resizeHandler = handleResize
 })
 
 // Cleanup on unmount
@@ -1404,6 +1772,9 @@ import { onUnmounted } from 'vue'
 onUnmounted(() => {
   if (testimonialInterval) {
     clearInterval(testimonialInterval)
+  }
+  if (awardsInterval) {
+    clearInterval(awardsInterval)
   }
   window.removeEventListener('keydown', handleKeydown)
 })
@@ -1422,6 +1793,108 @@ onUnmounted(() => {
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* Premium Award Card Animations */
+.award-premium-card {
+  animation: fadeInUp 0.6s ease-out forwards;
+  opacity: 0;
+  transform: translateY(30px);
+}
+
+@keyframes fadeInUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Shine animation */
+@keyframes shine {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shine {
+  animation: shine 2s ease-in-out infinite;
+}
+
+/* 3D Coverflow Styles */
+.award-3d-card {
+  position: absolute;
+  transform-style: preserve-3d;
+  will-change: transform, opacity;
+  transition: all 0.7s cubic-bezier(0.165, 0.84, 0.44, 1);
+}
+
+/* Active card (center) */
+.award-active {
+  transform: translateX(0) translateZ(0) rotateY(0deg) scale(1) !important;
+  opacity: 1 !important;
+  z-index: 30 !important;
+}
+
+/* Previous cards (left side) */
+.award-prev {
+  /* Removed excessive darkening - let opacity handle visibility */
+}
+
+/* Next cards (right side) */
+.award-next {
+  /* Removed excessive darkening - let opacity handle visibility */
+}
+
+/* Hover 3D tilt effect */
+.award-premium-card:hover {
+  transform: translateY(-8px) scale(1.02);
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Blob animations for background */
+@keyframes blob {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  25% {
+    transform: translate(20px, -50px) scale(1.1);
+  }
+  50% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
+  75% {
+    transform: translate(50px, 50px) scale(1.05);
+  }
+}
+
+.animate-blob {
+  animation: blob 7s infinite;
+}
+
+.animation-delay-2000 {
+  animation-delay: 2s;
+}
+
+.animation-delay-4000 {
+  animation-delay: 4s;
+}
+
+/* Gradient animation */
+@keyframes gradient {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradient 3s ease infinite;
 }
 
 .award-card {
