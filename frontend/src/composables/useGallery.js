@@ -116,6 +116,96 @@ export function useGallery(initialParams = {}) {
     return galleryItems.value
   }
 
+  // Pagination state
+  const pagination = ref({
+    currentPage: 1,
+    lastPage: 1,
+    perPage: 20,
+    total: 0
+  })
+
+  // Fetch gallery item (alias for fetchGallery)
+  const fetchGalleryItem = fetchGallery
+
+  // Upload single image
+  const uploadImage = async (formData) => {
+    try {
+      const response = await api.post('/admin/galleries', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+      await refetch() // Invalidate cache
+      return { success: true, data: response.data.data }
+    } catch (err) {
+      return {
+        success: false,
+        error: err.response?.data?.message || 'Upload failed'
+      }
+    }
+  }
+
+  // Bulk upload images
+  const bulkUploadImages = async (formData) => {
+    try {
+      const response = await api.post('/admin/galleries/bulk-upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+      await refetch() // Invalidate cache
+      return { success: true, data: response.data.data }
+    } catch (err) {
+      return {
+        success: false,
+        error: err.response?.data?.message || 'Bulk upload failed'
+      }
+    }
+  }
+
+  // Update gallery item
+  const updateGalleryItem = async (id, formData) => {
+    try {
+      const response = await api.post(`/admin/galleries/${id}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+      queryClient.invalidateQueries(['gallery', id])
+      await refetch()
+      return { success: true, data: response.data.data }
+    } catch (err) {
+      return {
+        success: false,
+        error: err.response?.data?.message || 'Update failed'
+      }
+    }
+  }
+
+  // Delete gallery item
+  const deleteGalleryItem = async (id) => {
+    try {
+      await api.delete(`/admin/galleries/${id}`)
+      queryClient.invalidateQueries(['gallery', id])
+      await refetch()
+      return { success: true }
+    } catch (err) {
+      return {
+        success: false,
+        error: err.response?.data?.message || 'Delete failed'
+      }
+    }
+  }
+
+  // Bulk delete gallery items
+  const bulkDeleteGalleryItems = async (ids) => {
+    try {
+      await Promise.all(ids.map(id => api.delete(`/admin/galleries/${id}`)))
+      ids.forEach(id => queryClient.invalidateQueries(['gallery', id]))
+      await refetch()
+      return { success: true }
+    } catch (err) {
+      return {
+        success: false,
+        error: err.response?.data?.message || 'Bulk delete failed'
+      }
+    }
+  }
+
   return {
     // State
     galleries,
@@ -124,10 +214,17 @@ export function useGallery(initialParams = {}) {
     error,
     galleryItems,
     loadingItems,
+    pagination,
 
     // Methods
     fetchGalleries,
     fetchGallery,
-    fetchGalleryItems
+    fetchGalleryItem,
+    fetchGalleryItems,
+    uploadImage,
+    bulkUploadImages,
+    updateGalleryItem,
+    deleteGalleryItem,
+    bulkDeleteGalleryItems
   }
 }

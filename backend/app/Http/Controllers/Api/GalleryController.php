@@ -136,8 +136,8 @@ class GalleryController extends Controller
                 $thumbnail = $request->file('thumbnail');
                 $filename = time() . '_' . Str::slug($data['title']) . '.' . $thumbnail->getClientOriginalExtension();
                 $path = $thumbnail->storeAs('gallery/thumbnails', $filename, 'public');
-                // Add /storage/ prefix for public access
-                $data['thumbnail'] = '/storage/' . $path;
+                // Store path without /storage/ prefix - Resource will add it
+                $data['thumbnail'] = $path;
             }
 
             // Set sort_order if not provided

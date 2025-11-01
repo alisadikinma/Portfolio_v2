@@ -101,6 +101,7 @@ Route::prefix('services')->group(function () {
 Route::prefix('settings')->group(function () {
     Route::get('/', [SettingController::class, 'index']);
     Route::get('/about', [SettingsController::class, 'getAboutSettings']); // NEW: Public about page data
+    Route::get('/site', [SettingsController::class, 'getSiteSettings']); // NEW: Public site settings
     Route::get('/{group}', [SettingController::class, 'getByGroup']);
 });
 

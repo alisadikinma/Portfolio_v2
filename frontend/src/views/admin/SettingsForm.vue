@@ -403,7 +403,15 @@ const currentLogoUrl = computed(() => {
   if (logoFile.value) {
     return URL.createObjectURL(logoFile.value)
   }
-  return formData.value.site_logo
+  
+  // Transform site_logo path to full URL
+  const logo = formData.value.site_logo
+  if (!logo) return null
+  if (logo.startsWith('http')) return logo
+  
+  // Add base URL for relative paths
+  const baseUrl = import.meta.env.VITE_API_URL.replace('/api', '')
+  return `${baseUrl}${logo}`
 })
 
 // Social media methods
@@ -522,6 +530,12 @@ async function handleSubmit() {
 
     console.log('✅ Settings updated successfully')
     uiStore.showSuccess('Site settings updated successfully', 'Settings Saved')
+
+    // Reload settings to update preview
+    await settingsStore.fetchSiteSettings()
+    
+    // Repopulate form with updated data
+    formData.value.site_logo = settingsStore.siteSettings.site_logo || null
 
     // Reset logo upload state
     logoFile.value = null

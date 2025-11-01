@@ -3,7 +3,7 @@
     <!-- Hero Section - Clean & Professional -->
     <section
       v-if="showHeroSection"
-      class="relative pt-32 pb-8 md:pt-40 md:pb-12 bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-950"
+      class="relative pt-20 pb-8 md:pt-24 md:pb-12 bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-950"
     >
       <!-- Subtle Background Pattern -->
       <div class="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]">
@@ -11,63 +11,126 @@
       </div>
 
       <div class="container-custom relative z-10">
-        <div class="max-w-4xl mx-auto text-center">
-          <!-- Badge -->
-          <div class="inline-flex items-center gap-2 px-4 py-2 glass rounded-full mb-6 animate-fade-in-down">
-            <span class="relative flex h-2 w-2">
-              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-400 opacity-75"></span>
-              <span class="relative inline-flex rounded-full h-2 w-2 bg-accent-500"></span>
-            </span>
-            <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">
-              Available for Freelance Work
-            </span>
-          </div>
+        <div class="max-w-6xl mx-auto">
+          <!-- Grid Layout: Photo + Content -->
+          <div class="grid md:grid-cols-2 gap-8 items-center">
+            <!-- Left: Profile Photo -->
+            <div class="order-2 md:order-1">
+              <div class="relative">
+                <!-- Photo Container -->
+                <div class="relative w-full max-w-md mx-auto aspect-square rounded-2xl overflow-hidden bg-gradient-to-br from-primary-100 to-secondary-100 dark:from-primary-900/20 dark:to-secondary-900/20 shadow-2xl">
+                  <img 
+                    v-if="heroAvatar" 
+                    :src="getProfilePhotoUrl(heroAvatar)" 
+                    :alt="heroName" 
+                    class="w-full h-full object-cover"
+                    @error="handleAvatarError"
+                  />
+                  <div v-else class="w-full h-full flex items-center justify-center">
+                    <svg class="w-32 h-32 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </div>
+                </div>
+                
+                <!-- Decorative Elements -->
+                <div class="absolute -top-4 -right-4 w-24 h-24 bg-accent-500/10 rounded-full blur-3xl"></div>
+                <div class="absolute -bottom-6 -left-6 w-32 h-32 bg-primary-500/10 rounded-full blur-3xl"></div>
+              </div>
+            </div>
 
-          <!-- Main Heading -->
-          <h1 class="text-5xl md:text-6xl lg:text-7xl font-display font-bold text-gray-900 dark:text-white mb-6 leading-tight animate-fade-in-up">
-            {{ heroName }} <br v-if="heroTitle" />
-            <span v-if="heroTitle" class="text-gradient">{{ heroTitle }}</span>
-          </h1>
+            <!-- Right: Content -->
+            <div class="order-1 md:order-2 text-center md:text-left">
+              <!-- Badge -->
+              <div class="inline-flex items-center gap-2 px-4 py-2 glass rounded-full mb-6 animate-fade-in-down">
+                <span class="relative flex h-2 w-2">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-400 opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-2 w-2 bg-accent-500"></span>
+                </span>
+                <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                  Available for Freelance Work
+                </span>
+              </div>
 
-          <!-- Subtitle -->
-          <p class="text-xl md:text-2xl text-gray-600 dark:text-gray-400 mb-10 max-w-2xl mx-auto leading-relaxed animate-fade-in-up animate-delay-100">
-            {{ heroBio }}
-          </p>
+              <!-- Main Heading -->
+              <h1 class="text-4xl md:text-5xl lg:text-6xl font-display font-bold text-gray-900 dark:text-white mb-4 leading-tight animate-fade-in-up">
+                {{ heroName }}
+              </h1>
+              
+              <h2 v-if="heroTitle" class="text-2xl md:text-3xl font-display font-bold text-gradient mb-6 animate-fade-in-up animate-delay-100">
+                {{ heroTitle }}
+              </h2>
 
-          <!-- CTA Buttons -->
-          <div class="flex flex-wrap justify-center gap-4 mb-16 animate-fade-in-up animate-delay-200">
-            <button
-              @click="$router.push('/projects')"
-              class="group px-8 py-4 bg-gradient-to-r from-primary-600 to-secondary-600 text-white font-semibold rounded-xl hover:shadow-xl hover:scale-105 transition-all duration-300"
-            >
-              <span class="flex items-center gap-2">
-                View My Work
-                <svg class="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-                </svg>
-              </span>
-            </button>
-            <button
-              @click="$router.push('/contact')"
-              class="px-8 py-4 glass text-gray-700 dark:text-gray-300 font-semibold rounded-xl hover:shadow-lg transition-all duration-300"
-            >
-              Let's Talk
-            </button>
-          </div>
+              <!-- Subtitle -->
+              <p class="text-base md:text-lg text-gray-600 dark:text-gray-400 mb-6 leading-relaxed animate-fade-in-up animate-delay-200">
+                {{ heroBio }}
+              </p>
 
-          <!-- Tech Stack / Skills -->
-          <div v-if="heroSkills.length > 0" class="animate-fade-in-up animate-delay-300">
-            <p class="text-sm text-gray-500 dark:text-gray-500 mb-4 uppercase tracking-wider">
-              {{ aboutSettings?.skills ? 'Skills' : 'Tech Stack' }}
-            </p>
-            <div class="flex flex-wrap justify-center gap-3">
-              <span
-                v-for="skill in heroSkills.slice(0, 8)"
-                :key="skill"
-                class="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:border-primary-500 hover:text-primary-600 dark:hover:text-primary-400 transition-all"
-              >
-                {{ skill }}
-              </span>
+              <!-- CTA Buttons -->
+              <div class="flex flex-wrap gap-3 mb-6 animate-fade-in-up animate-delay-300 justify-center md:justify-start">
+                <button
+                  @click="$router.push('/projects')"
+                  class="group px-8 py-4 bg-gradient-to-r from-primary-600 to-secondary-600 text-white font-semibold rounded-xl hover:shadow-xl hover:scale-105 transition-all duration-300"
+                >
+                  <span class="flex items-center gap-2">
+                    View My Work
+                    <svg class="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                    </svg>
+                  </span>
+                </button>
+                <button
+                  @click="$router.push('/contact')"
+                  class="px-8 py-4 glass text-gray-700 dark:text-gray-300 font-semibold rounded-xl hover:shadow-lg transition-all duration-300"
+                >
+                  Let's Talk
+                </button>
+              </div>
+
+              <!-- Tech Stack / Skills - RESPONSIVE (MAX 2 LINES) -->
+              <div v-if="heroSkills.length > 0" class="animate-fade-in-up animate-delay-400">
+                <p class="text-xs text-gray-500 dark:text-gray-500 mb-2 uppercase tracking-wider font-semibold">
+                  SKILLS
+                </p>
+                <!-- Mobile: Max 3 skills + See More -->
+                <div class="md:hidden">
+                  <div class="flex flex-wrap gap-1.5 justify-center">
+                    <span
+                      v-for="skill in (showAllSkills ? heroSkills : heroSkills.slice(0, 3))"
+                      :key="skill"
+                      class="px-2.5 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-xs font-medium text-gray-700 dark:text-gray-300 hover:border-primary-500 hover:text-primary-600 dark:hover:text-primary-400 transition-all"
+                    >
+                      {{ skill }}
+                    </span>
+                  </div>
+                  <button
+                    v-if="heroSkills.length > 3 && !showAllSkills"
+                    @click="showAllSkills = true"
+                    class="mt-2 text-xs text-primary-600 dark:text-primary-400 hover:underline font-semibold"
+                  >
+                    See More ({{ heroSkills.length - 3 }}+)
+                  </button>
+                </div>
+                <!-- Desktop: Max 6 skills (2 lines max) + See More -->
+                <div class="hidden md:block">
+                  <div class="flex flex-wrap gap-1.5 justify-start max-h-[52px] overflow-hidden">
+                    <span
+                      v-for="skill in (showAllSkills ? heroSkills : heroSkills.slice(0, 6))"
+                      :key="skill"
+                      class="px-2.5 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-xs font-medium text-gray-700 dark:text-gray-300 hover:border-primary-500 hover:text-primary-600 dark:hover:text-primary-400 transition-all"
+                    >
+                      {{ skill }}
+                    </span>
+                  </div>
+                  <button
+                    v-if="heroSkills.length > 6 && !showAllSkills"
+                    @click="showAllSkills = true"
+                    class="mt-2 text-xs text-primary-600 dark:text-primary-400 hover:underline font-semibold"
+                  >
+                    See More ({{ heroSkills.length - 6 }}+)
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -75,9 +138,9 @@
     </section>
 
     <!-- Stats Section - Clean Cards -->
-    <section class="py-12 bg-white dark:bg-gray-950">
+    <section v-if="stats.length > 0" class="py-8 bg-white dark:bg-gray-950">
       <div class="container-custom">
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
           <div
             v-for="(stat, index) in stats"
             :key="stat.label"
@@ -206,8 +269,53 @@
         <!-- Loading State -->
         <BaseLoader v-if="galleriesLoading" text="Loading gallery..." />
 
-        <!-- Gallery Grid -->
-        <div v-else-if="galleries.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div v-else-if="galleries.length > 0">
+          <!-- Gallery Carousel (Mobile) -->
+          <div class="md:hidden">
+            <MobileCarousel :items="galleries.slice(0, 6)" :show-arrows="true" :show-dots="true">
+              <template #default="{ item }">
+              <div
+                class="group cursor-pointer card-elevated overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 mx-1"
+                @click="openGalleryItemsModal(item)"
+              >
+                <!-- Gallery Thumbnail -->
+                <div class="relative aspect-video bg-gradient-to-br from-primary-100 to-secondary-100 dark:from-primary-900/20 dark:to-secondary-900/20 overflow-hidden">
+                  <img
+                    v-if="item.thumbnail"
+                    :src="item.thumbnail"
+                    :alt="item.title"
+                    class="w-full h-full object-contain"
+                    loading="lazy"
+                  />
+                  <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+
+                  <!-- Items Count Badge -->
+                  <div class="absolute top-4 right-4 px-3 py-1 bg-black/70 backdrop-blur-sm text-white text-xs font-semibold rounded-lg">
+                    {{ item.items_count || 0 }} Photos
+                  </div>
+                </div>
+
+                <!-- Content -->
+                <div class="p-6">
+                  <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
+                    {{ item.title }}
+                  </h3>
+                  <p v-if="item.description" class="text-gray-600 dark:text-gray-400 text-sm line-clamp-2 mb-3">
+                    {{ stripHtml(item.description) }}
+                  </p>
+                  <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-500">
+                    <span v-if="item.company">{{ item.company }}</span>
+                    <span v-if="item.company && item.period">•</span>
+                    <span v-if="item.period">{{ item.period }}</span>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </MobileCarousel>
+        </div>
+
+          <!-- Gallery Grid (Desktop) -->
+          <div class="hidden md:grid grid-cols-2 lg:grid-cols-3 gap-6">
           <div
             v-for="gallery in galleries.slice(0, 6)"
             :key="gallery.id"
@@ -257,6 +365,7 @@
             </div>
           </div>
         </div>
+        </div>
 
         <!-- Empty State -->
         <div v-else class="text-center py-12">
@@ -300,8 +409,51 @@
 
         <BaseLoader v-if="projectsLoading" text="Loading projects..." />
 
-        <!-- Projects Grid -->
-        <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div v-else>
+          <!-- Projects Carousel (Mobile) -->
+          <div class="md:hidden">
+            <MobileCarousel :items="featuredProjects" :show-arrows="true" :show-dots="true">
+              <template #default="{ item }">
+              <div
+                @click="$router.push(`/projects/${item.slug}`)"
+                class="group cursor-pointer card-elevated overflow-hidden hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 mx-1"
+              >
+                <!-- Project Image -->
+                <div class="relative aspect-video bg-gradient-to-br from-primary-100 to-secondary-100 dark:from-primary-900/20 dark:to-secondary-900/20 overflow-hidden">
+                  <img
+                    v-if="item.featured_image"
+                    :src="item.featured_image"
+                    :alt="item.title"
+                    class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                  />
+                  <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                </div>
+
+                <!-- Content -->
+                <div class="p-6">
+                  <h3 class="text-2xl font-bold text-gray-900 dark:text-white mb-3 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
+                    {{ item.title }}
+                  </h3>
+                  <p class="text-gray-600 dark:text-gray-400 mb-4 line-clamp-2">
+                    {{ item.description }}
+                  </p>
+                  <div class="flex flex-wrap gap-2">
+                    <span
+                      v-for="tech in item.technologies?.slice(0, 4)"
+                      :key="tech"
+                      class="px-3 py-1 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 rounded-lg text-xs font-semibold"
+                    >
+                      {{ tech }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </MobileCarousel>
+        </div>
+
+          <!-- Projects Grid (Desktop) -->
+          <div class="hidden md:grid grid-cols-2 gap-8">
           <div
             v-for="(project, index) in featuredProjects"
             :key="project.id"
@@ -349,6 +501,7 @@
             </div>
           </div>
         </div>
+        </div>
 
         <!-- View All Button -->
         <div class="text-center mt-12">
@@ -380,8 +533,58 @@
 
         <BaseLoader v-if="postsLoading" text="Loading posts..." />
 
-        <!-- Posts Grid -->
-        <div v-else class="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div v-else>
+          <!-- Posts Carousel (Mobile) -->
+          <div class="md:hidden">
+            <MobileCarousel :items="latestPosts" :show-arrows="true" :show-dots="true">
+              <template #default="{ item }">
+              <div
+                @click="$router.push(`/blog/${item.slug}`)"
+                class="group cursor-pointer card-elevated overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col mx-1"
+              >
+                <!-- Image -->
+                <div class="relative aspect-video bg-gradient-to-br from-secondary-100 to-accent-100 dark:from-secondary-900/20 dark:to-accent-900/20">
+                  <img
+                    v-if="item.featured_image"
+                    :src="item.featured_image"
+                    :alt="item.title"
+                    class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                  />
+                </div>
+
+                <!-- Content -->
+                <div class="p-6 flex-1 flex flex-col">
+                  <div class="flex items-center gap-3 mb-4">
+                    <span class="px-3 py-1 bg-secondary-50 dark:bg-secondary-900/20 text-secondary-700 dark:text-secondary-300 rounded-lg text-xs font-semibold uppercase">
+                      {{ item.category?.name }}
+                    </span>
+                    <span class="text-xs text-gray-500 dark:text-gray-500">
+                      {{ formatDate(item.published_at) }}
+                    </span>
+                  </div>
+
+                  <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-3 group-hover:text-secondary-600 dark:group-hover:text-secondary-400 transition-colors line-clamp-2">
+                    {{ item.title }}
+                  </h3>
+
+                  <p class="text-gray-600 dark:text-gray-400 text-sm line-clamp-3 flex-1 mb-4">
+                    {{ item.excerpt }}
+                  </p>
+
+                  <div class="flex items-center text-secondary-600 dark:text-secondary-400 font-semibold text-sm">
+                    <span>Read Article</span>
+                    <svg class="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </MobileCarousel>
+        </div>
+
+          <!-- Posts Grid (Desktop) -->
+          <div class="hidden md:grid grid-cols-3 gap-8">
           <div
             v-for="post in latestPosts"
             :key="post.id"
@@ -425,6 +628,7 @@
               </div>
             </div>
           </div>
+        </div>
         </div>
 
         <!-- View All Button -->
@@ -851,7 +1055,7 @@ import { useTestimonials } from '@/composables/useTestimonials'
 import { useGallery } from '@/composables/useGallery'
 import { useAboutSettings } from '@/composables/useAboutSettings'
 import { usePageSections } from '@/composables/usePageSections'
-import { BaseLoader } from '@/components/base'
+import { BaseLoader, MobileCarousel } from '@/components/base'
 import api from '@/services/api'
 
 const { projects: featuredProjects, isLoading: projectsLoading, fetchProjects } = useProjects()
@@ -862,6 +1066,7 @@ const { galleries, loading: galleriesLoading, fetchGalleries, fetchGalleryItems 
 const { aboutSettings, loading: loadingAbout, heroName, heroTitle, heroBio, heroAvatar, heroSkills } = useAboutSettings()
 const { sections, fetchActiveSections } = usePageSections()
 const currentTestimonialIndex = ref(0)
+const showAllSkills = ref(false)
 
 // Section visibility computed properties
 const showHeroSection = computed(() => {
@@ -909,12 +1114,27 @@ const orderedSections = computed(() => {
 
 // About settings now managed by useAboutSettings composable
 
-const stats = ref([
-  { value: '50+', label: 'Projects' },
-  { value: '100+', label: 'Articles' },
-  { value: '200+', label: 'Clients' },
-  { value: '5+', label: 'Years' }
-])
+// Stats computed from aboutSettings
+const stats = computed(() => {
+  if (!aboutSettings.value?.statistics) {
+    return [
+      { value: '16+', label: 'Years Experience' },
+      { value: '1K', label: 'Followers' },
+      { value: '50+', label: 'Projects Delivered' },
+      { value: '$2M+', label: 'Cost Savings' },
+      { value: '95%', label: 'Success Rate' }
+    ]
+  }
+  
+  const s = aboutSettings.value.statistics
+  return [
+    { value: s.years_experience || '16+', label: 'Years Experience' },
+    { value: s.followers || '1K', label: 'Followers' },
+    { value: s.projects_delivered || '50+', label: 'Projects Delivered' },
+    { value: s.cost_savings || '$2M+', label: 'Cost Savings' },
+    { value: s.success_rate || '95%', label: 'Success Rate' }
+  ].filter(stat => stat.value) // Only show stats with values
+})
 
 // fetchAboutSettings now managed by useAboutSettings composable
 
@@ -1066,6 +1286,19 @@ const previousPhoto = () => {
 const handleImageError = (event) => {
   console.error('[Home] Image failed to load:', event.target.src)
   event.target.src = 'https://via.placeholder.com/400x300/e5e7eb/6b7280?text=Image+Not+Found'
+}
+
+const getProfilePhotoUrl = (path) => {
+  if (!path) return ''
+  if (path.startsWith('http')) return path
+  if (path.startsWith('/uploads/')) return import.meta.env.VITE_API_URL.replace('/api', '') + path
+  if (path.startsWith('/storage/')) return import.meta.env.VITE_API_URL.replace('/api', '') + path
+  return import.meta.env.VITE_API_URL.replace('/api', '') + '/uploads/' + path
+}
+
+const handleAvatarError = (event) => {
+  console.warn('[Home] Failed to load avatar:', event.target.src)
+  event.target.style.display = 'none'
 }
 
 // Keyboard navigation for lightbox

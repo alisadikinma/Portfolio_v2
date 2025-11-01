@@ -28,7 +28,7 @@ return [
         'http://127.0.0.1:5173',
     ],
 
-    'allowed_origins_patterns' => [],
+    'allowed_origins' => ['http://localhost:5173'],
 
     'allowed_headers' => ['*'],
 

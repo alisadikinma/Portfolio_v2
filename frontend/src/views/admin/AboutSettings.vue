@@ -253,6 +253,38 @@
                 />
               </div>
 
+              <!-- Company Logo -->
+              <div>
+                <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                  Company Logo URL
+                </label>
+                <input
+                  v-model="exp.company_logo"
+                  type="url"
+                  class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="https://example.com/logo.png"
+                />
+                <p class="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                  Optional: Enter company logo URL
+                </p>
+              </div>
+
+              <!-- Company Website URL -->
+              <div>
+                <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                  Company Website
+                </label>
+                <input
+                  v-model="exp.company_url"
+                  type="url"
+                  class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="https://company.com"
+                />
+                <p class="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                  Optional: Company website will be linked from company name
+                </p>
+              </div>
+
               <!-- Location -->
               <div>
                 <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
@@ -320,6 +352,40 @@
                 class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Describe your role and achievements..."
               ></textarea>
+            </div>
+
+            <!-- Gallery Selection -->
+            <div class="mt-4">
+              <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                Work Gallery Photos
+              </label>
+              <p class="text-xs text-neutral-500 dark:text-neutral-400 mb-3">
+                Select galleries to showcase photos from this work experience
+              </p>
+              
+              <div v-if="loadingGalleries" class="text-sm text-neutral-500 dark:text-neutral-400">
+                Loading galleries...
+              </div>
+              
+              <div v-else-if="availableGalleries.length > 0" class="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-60 overflow-y-auto p-2 border border-neutral-200 dark:border-neutral-700 rounded-lg bg-neutral-50 dark:bg-neutral-900">
+                <label
+                  v-for="gallery in availableGalleries"
+                  :key="gallery.id"
+                  class="flex items-start gap-2 p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    :value="gallery.id"
+                    v-model="exp.gallery_ids"
+                    class="mt-0.5 w-4 h-4 text-blue-600 border-neutral-300 rounded focus:ring-blue-500"
+                  />
+                  <span class="text-sm text-neutral-700 dark:text-neutral-300">{{ gallery.title }}</span>
+                </label>
+              </div>
+              
+              <div v-else class="text-sm text-neutral-500 dark:text-neutral-400">
+                No galleries available. Create galleries first to link them here.
+              </div>
             </div>
           </div>
         </div>
@@ -547,6 +613,88 @@
         </div>
       </BaseCard>
 
+      <!-- Statistics Card -->
+      <BaseCard>
+        <h2 class="text-xl font-display font-semibold text-neutral-900 dark:text-neutral-100 mb-6">
+          Homepage Statistics
+        </h2>
+        <p class="text-sm text-neutral-600 dark:text-neutral-400 mb-6">
+          These numbers will be displayed on your homepage hero section.
+        </p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <!-- Years Experience -->
+          <div>
+            <label for="stat-years" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+              Years Experience
+            </label>
+            <input
+              id="stat-years"
+              v-model="formData.statistics.years_experience"
+              type="text"
+              class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="16+"
+            />
+          </div>
+
+          <!-- Followers -->
+          <div>
+            <label for="stat-followers" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+              Followers
+            </label>
+            <input
+              id="stat-followers"
+              v-model="formData.statistics.followers"
+              type="text"
+              class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="1K"
+            />
+          </div>
+
+          <!-- Projects Delivered -->
+          <div>
+            <label for="stat-projects" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+              Projects Delivered
+            </label>
+            <input
+              id="stat-projects"
+              v-model="formData.statistics.projects_delivered"
+              type="text"
+              class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="50+"
+            />
+          </div>
+
+          <!-- Cost Savings -->
+          <div>
+            <label for="stat-cost" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+              Cost Savings
+            </label>
+            <input
+              id="stat-cost"
+              v-model="formData.statistics.cost_savings"
+              type="text"
+              class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="$2M+"
+            />
+          </div>
+
+          <!-- Success Rate -->
+          <div>
+            <label for="stat-success" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+              Success Rate
+            </label>
+            <input
+              id="stat-success"
+              v-model="formData.statistics.success_rate"
+              type="text"
+              class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="95%"
+            />
+          </div>
+        </div>
+      </BaseCard>
+
       <!-- Form Actions -->
       <div class="flex items-center justify-end gap-4">
         <BaseButton
@@ -586,6 +734,7 @@ import { useSettingsStore } from '@/stores/settings'
 import { useUiStore } from '@/stores/ui'
 import BaseCard from '@/components/base/BaseCard.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
+import api from '@/services/api'
 
 const settingsStore = useSettingsStore()
 const uiStore = useUiStore()
@@ -595,6 +744,8 @@ const isSubmitting = ref(false)
 const loading = ref(false)
 const error = ref(null)
 const isLoadingSettings = ref(false) // Guard untuk prevent double load
+const availableGalleries = ref([])
+const loadingGalleries = ref(false)
 
 // Form data
 const formData = ref({
@@ -605,7 +756,14 @@ const formData = ref({
   skills: [],
   experience: [],
   education: [],
-  social_links: []
+  social_links: [],
+  statistics: {
+    years_experience: '16+',
+    followers: '1K',
+    projects_delivered: '50+',
+    cost_savings: '$2M+',
+    success_rate: '95%'
+  }
 })
 
 const photoFile = ref(null)
@@ -617,7 +775,24 @@ const currentPhotoUrl = computed(() => {
   if (photoFile.value) {
     return URL.createObjectURL(photoFile.value)
   }
-  return formData.value.profile_photo
+  // Fix: Handle different photo URL formats
+  if (formData.value.profile_photo) {
+    const photo = formData.value.profile_photo
+    // If already full URL
+    if (photo.startsWith('http://') || photo.startsWith('https://')) {
+      return photo
+    }
+    // If relative path from backend
+    if (photo.startsWith('/uploads/')) {
+      return import.meta.env.VITE_API_URL.replace('/api', '') + photo
+    }
+    // If no leading slash
+    if (!photo.startsWith('/')) {
+      return import.meta.env.VITE_API_URL.replace('/api', '') + '/uploads/' + photo
+    }
+    return import.meta.env.VITE_API_URL.replace('/api', '') + photo
+  }
+  return null
 })
 
 // Skills methods
@@ -634,11 +809,14 @@ function addExperience() {
   formData.value.experience.push({
     title: '',
     company: '',
+    company_logo: null,
+    company_url: '',
     location: '',
     start_date: '',
     end_date: '',
     description: '',
-    current: false
+    current: false,
+    gallery_ids: []
   })
 }
 
@@ -696,8 +874,11 @@ function removePhoto() {
   }
 }
 
-function handleImageError() {
-  console.warn('Failed to load profile image')
+function handleImageError(event) {
+  console.warn('Failed to load profile image:', {
+    src: event.target.src,
+    rawValue: formData.value.profile_photo
+  })
   photoRemoved.value = true
 }
 
@@ -714,7 +895,9 @@ async function handleSubmit() {
     skills: formData.value.skills,
     experience: formData.value.experience,
     education: formData.value.education,
-    social_links: formData.value.social_links
+    social_links: formData.value.social_links,
+    hasPhotoFile: !!photoFile.value,
+    photoFileName: photoFile.value?.name
   })
 
   try {
@@ -755,7 +938,14 @@ async function handleSubmit() {
 
     // Profile photo
     if (photoFile.value) {
+      console.log('📸 Appending photo file:', {
+        name: photoFile.value.name,
+        size: photoFile.value.size,
+        type: photoFile.value.type
+      })
       data.append('profile_photo', photoFile.value)
+    } else {
+      console.log('⚠️ No photo file to upload')
     }
 
     // Arrays as JSON strings
@@ -771,9 +961,13 @@ async function handleSubmit() {
     if (formData.value.social_links.length > 0) {
       data.append('social_links', JSON.stringify(formData.value.social_links))
     }
+    if (formData.value.statistics) {
+      data.append('statistics', JSON.stringify(formData.value.statistics))
+    }
 
     console.log('🔵 Sending request to API...', {
       hasPhoto: !!photoFile.value,
+      photoFileName: photoFile.value?.name,
       skillsCount: cleanedSkills.length,
       experienceCount: formData.value.experience.length,
       educationCount: formData.value.education.length,
@@ -841,15 +1035,29 @@ async function loadSettings() {
     console.log('📥 Settings fetched from store:', settingsStore.aboutSettings)
 
     // Populate form data
+    const experiences = JSON.parse(JSON.stringify(settingsStore.aboutSettings.experience || []))
+    // Ensure each experience has gallery_ids array and company_url
+    experiences.forEach(exp => {
+      if (!exp.gallery_ids) exp.gallery_ids = []
+      if (!exp.company_url) exp.company_url = ''
+    })
+
     formData.value = {
       name: settingsStore.aboutSettings.name || '',
       title: settingsStore.aboutSettings.title || '',
       bio: settingsStore.aboutSettings.bio || '',
       profile_photo: settingsStore.aboutSettings.profile_photo || null,
       skills: [...(settingsStore.aboutSettings.skills || [])],
-      experience: JSON.parse(JSON.stringify(settingsStore.aboutSettings.experience || [])),
+      experience: experiences,
       education: JSON.parse(JSON.stringify(settingsStore.aboutSettings.education || [])),
-      social_links: JSON.parse(JSON.stringify(settingsStore.aboutSettings.social_links || []))
+      social_links: JSON.parse(JSON.stringify(settingsStore.aboutSettings.social_links || [])),
+      statistics: {
+        years_experience: settingsStore.aboutSettings.statistics?.years_experience || '16+',
+        followers: settingsStore.aboutSettings.statistics?.followers || '1K',
+        projects_delivered: settingsStore.aboutSettings.statistics?.projects_delivered || '50+',
+        cost_savings: settingsStore.aboutSettings.statistics?.cost_savings || '$2M+',
+        success_rate: settingsStore.aboutSettings.statistics?.success_rate || '95%'
+      }
     }
     
     console.log('✅ Form data populated:', {
@@ -870,9 +1078,30 @@ async function loadSettings() {
   }
 }
 
+// Fetch galleries for selection
+async function fetchGalleries() {
+  loadingGalleries.value = true
+  try {
+    const response = await api.get('/galleries', {
+      params: {
+        per_page: 100, // Get all galleries
+        is_active: 1
+      }
+    })
+    if (response.data.success && response.data.data) {
+      availableGalleries.value = response.data.data
+    }
+  } catch (err) {
+    console.error('Failed to fetch galleries:', err)
+  } finally {
+    loadingGalleries.value = false
+  }
+}
+
 // Load on mount
 onMounted(() => {
   loadSettings()
+  fetchGalleries()
 })
 </script>
 

@@ -42,7 +42,14 @@ class SettingsController extends Controller
                 'skills' => [],
                 'experience' => [],
                 'education' => [],
-                'social_links' => []
+                'social_links' => [],
+                'statistics' => [
+                    'years_experience' => '16+',
+                    'followers' => '1K',
+                    'projects_delivered' => '50+',
+                    'cost_savings' => '$2M+',
+                    'success_rate' => '95%'
+                ]
             ], $aboutData);
 
             return response()->json([
@@ -110,7 +117,7 @@ class SettingsController extends Controller
             }
 
             // Decode JSON strings from FormData
-            foreach (['skills', 'experience', 'education', 'social_links'] as $jsonField) {
+            foreach (['skills', 'experience', 'education', 'social_links', 'statistics'] as $jsonField) {
                 if (isset($validated[$jsonField]) && is_string($validated[$jsonField])) {
                     $validated[$jsonField] = json_decode($validated[$jsonField], true);
                 }
@@ -121,7 +128,7 @@ class SettingsController extends Controller
                 $type = 'text';
 
                 // Determine type
-                if (in_array($key, ['skills', 'experience', 'education', 'social_links'])) {
+                if (in_array($key, ['skills', 'experience', 'education', 'social_links', 'statistics'])) {
                     $type = 'json';
                     $value = json_encode($value);
                 } elseif ($key === 'profile_photo') {

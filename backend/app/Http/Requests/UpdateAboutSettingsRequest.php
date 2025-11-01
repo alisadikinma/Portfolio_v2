@@ -35,6 +35,7 @@ class UpdateAboutSettingsRequest extends FormRequest
             'experience' => ['nullable'],
             'experience.*.title' => ['required', 'string', 'max:255'],
             'experience.*.company' => ['required', 'string', 'max:255'],
+            'experience.*.company_logo' => ['nullable', 'string'], // Will be URL after upload
             'experience.*.location' => ['nullable', 'string', 'max:255'],
             'experience.*.start_date' => ['required', 'string', 'max:50'],
             'experience.*.end_date' => ['nullable', 'string', 'max:50'],
@@ -55,6 +56,14 @@ class UpdateAboutSettingsRequest extends FormRequest
             'social_links.*.platform' => ['required', 'string', 'max:100'],
             'social_links.*.url' => ['required', 'url', 'max:500'],
             'social_links.*.icon' => ['nullable', 'string', 'max:100'],
+
+            // Statistics
+            'statistics' => ['nullable'],
+            'statistics.years_experience' => ['nullable', 'string', 'max:50'],
+            'statistics.followers' => ['nullable', 'string', 'max:50'],
+            'statistics.projects_delivered' => ['nullable', 'string', 'max:50'],
+            'statistics.cost_savings' => ['nullable', 'string', 'max:50'],
+            'statistics.success_rate' => ['nullable', 'string', 'max:50'],
         ];
     }
 
@@ -80,7 +89,7 @@ class UpdateAboutSettingsRequest extends FormRequest
         if ($this->has('bio')) $data['bio'] = $this->input('bio');
         
         // Decode JSON strings from FormData
-        foreach (['skills', 'experience', 'education', 'social_links'] as $field) {
+        foreach (['skills', 'experience', 'education', 'social_links', 'statistics'] as $field) {
             if ($this->has($field)) {
                 $value = $this->input($field);
                 
