@@ -23,6 +23,7 @@ class ContactController extends Controller
             $contact = Contact::create([
                 'name' => $request->input('name'),
                 'email' => $request->input('email'),
+                'whatsapp_number' => $request->input('whatsapp_number'),
                 'subject' => $request->input('subject'),
                 'message' => $request->input('message'),
                 'is_read' => false,
@@ -183,7 +184,7 @@ class ContactController extends Controller
             $file = fopen('php://output', 'w');
 
             // Add CSV headers
-            fputcsv($file, ['ID', 'Name', 'Email', 'Subject', 'Message', 'Status', 'Read At', 'Submitted At']);
+            fputcsv($file, ['ID', 'Name', 'Email', 'WhatsApp', 'Subject', 'Message', 'Status', 'Read At', 'Submitted At']);
 
             // Add data rows
             foreach ($contacts as $contact) {
@@ -191,6 +192,7 @@ class ContactController extends Controller
                     $contact->id,
                     $contact->name,
                     $contact->email,
+                    $contact->whatsapp_number,
                     $contact->subject,
                     $contact->message,
                     $contact->is_read ? 'Read' : 'Unread',

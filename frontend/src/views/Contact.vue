@@ -66,6 +66,38 @@
                 </p>
               </div>
 
+              <!-- WhatsApp Number -->
+              <div>
+                <label for="whatsapp" class="block text-sm font-medium mb-2">
+                  WhatsApp Number <span class="text-red-500">*</span>
+                </label>
+                <div class="relative">
+                  <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <svg class="h-5 w-5 text-green-500" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+                    </svg>
+                  </div>
+                  <input
+                    id="whatsapp"
+                    v-model="form.whatsapp_number"
+                    @input="clearError('whatsapp_number')"
+                    type="tel"
+                    required
+                    :class="[
+                      'w-full pl-12 pr-4 py-3 rounded-lg border bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2',
+                      formErrors.whatsapp_number ? 'border-red-500 focus:ring-red-500' : 'border-neutral-300 dark:border-neutral-600 focus:ring-primary-500'
+                    ]"
+                    placeholder="+62812345678 or 08123456789"
+                  />
+                </div>
+                <p v-if="formErrors.whatsapp_number" class="mt-1 text-sm text-red-600 dark:text-red-400">
+                  {{ formErrors.whatsapp_number }}
+                </p>
+                <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                  We'll contact you via WhatsApp for faster response
+                </p>
+              </div>
+
               <!-- Subject -->
               <div>
                 <label for="subject" class="block text-sm font-medium mb-2">
@@ -110,6 +142,14 @@
                 </p>
               </div>
 
+              <!-- hCaptcha -->
+              <div>
+                <div ref="captchaContainer" class="flex justify-center"></div>
+                <p v-if="formErrors.captcha" class="mt-2 text-sm text-red-600 dark:text-red-400 text-center">
+                  {{ formErrors.captcha }}
+                </p>
+              </div>
+
               <!-- Submit Button -->
               <BaseButton
                 type="submit"
@@ -127,6 +167,28 @@
           <div>
             <h2 class="text-3xl font-display font-bold mb-6">Contact Information</h2>
             <div class="space-y-6 mb-8">
+              <div v-if="siteSettings?.contact_phone" class="flex items-start gap-4">
+                <div class="p-3 rounded-lg bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400">
+                  <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+                  </svg>
+                </div>
+                <div>
+                  <h3 class="font-semibold mb-1">WhatsApp</h3>
+                  <a 
+                    :href="whatsappLink" 
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-neutral-600 dark:text-neutral-400 hover:text-green-600 dark:hover:text-green-400 transition-colors flex items-center gap-2"
+                  >
+                    {{ siteSettings.contact_phone }}
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                    </svg>
+                  </a>
+                </div>
+              </div>
+
               <div v-if="siteSettings?.contact_email" class="flex items-start gap-4">
                 <div class="p-3 rounded-lg bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400">
                   <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -227,7 +289,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useUIStore } from '@/stores/ui'
 import { BaseButton } from '@/components/base'
 import api from '@/services/api'
@@ -237,6 +299,7 @@ const uiStore = useUIStore()
 const form = ref({
   name: '',
   email: '',
+  whatsapp_number: '',
   subject: '',
   message: ''
 })
@@ -245,6 +308,20 @@ const formErrors = ref({})
 const isSubmitting = ref(false)
 const siteSettings = ref(null)
 const loadingSettings = ref(false)
+const captchaContainer = ref(null)
+const captchaToken = ref(null)
+let hcaptchaWidgetId = null
+
+// hCaptcha Site Key (Test Key - ganti dengan site key production nanti)
+const HCAPTCHA_SITE_KEY = '10000000-ffff-ffff-ffff-000000000001' // Test key dari hCaptcha
+
+// WhatsApp link computed
+const whatsappLink = computed(() => {
+  if (!siteSettings.value?.contact_phone) return '#'
+  const phone = siteSettings.value.contact_phone.replace(/[^0-9]/g, '')
+  const message = encodeURIComponent('Hi! I found your portfolio and would like to discuss a project.')
+  return `https://wa.me/${phone}?text=${message}`
+})
 
 // Validation rules
 const validateForm = () => {
@@ -255,22 +332,59 @@ const validateForm = () => {
     errors.name = 'Name must be at least 2 characters'
   }
 
-  // Email validation
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  // Email validation (RFC 5322 compliant)
+  const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/
   if (!form.value.email) {
     errors.email = 'Email is required'
   } else if (!emailRegex.test(form.value.email)) {
-    errors.email = 'Please enter a valid email address'
+    errors.email = 'Please enter a valid email address (e.g., name@example.com)'
+  } else if (form.value.email.length > 254) {
+    errors.email = 'Email address is too long'
+  }
+
+  // WhatsApp Number validation
+  if (!form.value.whatsapp_number) {
+    errors.whatsapp_number = 'WhatsApp number is required'
+  } else {
+    // Remove all non-digit characters for validation
+    const cleaned = form.value.whatsapp_number.replace(/\D/g, '')
+    
+    // Check if it's a valid phone number (8-15 digits)
+    if (cleaned.length < 8) {
+      errors.whatsapp_number = 'Phone number is too short (min 8 digits)'
+    } else if (cleaned.length > 15) {
+      errors.whatsapp_number = 'Phone number is too long (max 15 digits)'
+    }
+    
+    // Check for Indonesian format if starts with 0 or 62
+    if (cleaned.startsWith('0')) {
+      if (cleaned.length < 10 || cleaned.length > 13) {
+        errors.whatsapp_number = 'Invalid Indonesian phone format (e.g., 08123456789)'
+      }
+    } else if (cleaned.startsWith('62')) {
+      if (cleaned.length < 11 || cleaned.length > 14) {
+        errors.whatsapp_number = 'Invalid Indonesian phone format (e.g., +628123456789)'
+      }
+    }
   }
 
   // Subject validation
   if (!form.value.subject || form.value.subject.trim().length < 3) {
     errors.subject = 'Subject must be at least 3 characters'
+  } else if (form.value.subject.trim().length > 255) {
+    errors.subject = 'Subject is too long (max 255 characters)'
   }
 
   // Message validation
   if (!form.value.message || form.value.message.trim().length < 10) {
     errors.message = 'Message must be at least 10 characters'
+  } else if (form.value.message.trim().length > 5000) {
+    errors.message = 'Message is too long (max 5000 characters)'
+  }
+
+  // Captcha validation
+  if (!captchaToken.value) {
+    errors.captcha = 'Please complete the captcha verification'
   }
 
   return errors
@@ -282,11 +396,10 @@ const handleSubmit = async () => {
 
   // Stop if there are errors
   if (Object.keys(formErrors.value).length > 0) {
-    uiStore.showToast({
-      type: 'error',
-      title: 'Validation Error',
-      message: 'Please fix the errors in the form'
-    })
+    uiStore.showError(
+      'Please fix the errors in the form',
+      'Validation Error'
+    )
     return
   }
 
@@ -297,38 +410,93 @@ const handleSubmit = async () => {
     const sanitizedForm = {
       name: form.value.name.trim(),
       email: form.value.email.trim().toLowerCase(),
+      whatsapp_number: form.value.whatsapp_number.trim(),
       subject: form.value.subject.trim(),
-      message: form.value.message.trim()
+      message: form.value.message.trim(),
+      captcha_token: captchaToken.value // Send captcha token
     }
 
     // Actual API call
     const response = await api.post('/contact', sanitizedForm)
 
     if (response.data.message || response.data.data) {
-      // Show success message
-      uiStore.showToast({
-        type: 'success',
-        title: 'Message Sent!',
-        message: response.data.message || 'Thank you for reaching out. I\'ll get back to you soon.'
-      })
+      // Show success message with better visibility
+      uiStore.showSuccess(
+        'Thank you for reaching out! We\'ll contact you via WhatsApp within 24 hours.',
+        '✅ Message Sent Successfully!',
+        6000 // Show for 6 seconds
+      )
 
       // Reset form
       form.value = {
         name: '',
         email: '',
+        whatsapp_number: '',
         subject: '',
         message: ''
       }
       formErrors.value = {}
+      
+      // Reset captcha
+      captchaToken.value = null
+      if (window.hcaptcha && hcaptchaWidgetId !== null) {
+        window.hcaptcha.reset(hcaptchaWidgetId)
+      }
     }
   } catch (error) {
-    uiStore.showToast({
-      type: 'error',
-      title: 'Error',
-      message: 'Failed to send message. Please try again.'
-    })
+    // Reset captcha on error
+    captchaToken.value = null
+    if (window.hcaptcha && hcaptchaWidgetId !== null) {
+      window.hcaptcha.reset(hcaptchaWidgetId)
+    }
+    
+    uiStore.showError(
+      error.response?.data?.message || 'Failed to send message. Please try again.',
+      'Error'
+    )
   } finally {
     isSubmitting.value = false
+  }
+}
+
+// Load hCaptcha script
+const loadHCaptcha = () => {
+  return new Promise((resolve, reject) => {
+    if (window.hcaptcha) {
+      resolve()
+      return
+    }
+
+    const script = document.createElement('script')
+    script.src = 'https://js.hcaptcha.com/1/api.js'
+    script.async = true
+    script.defer = true
+    script.onload = () => resolve()
+    script.onerror = () => reject(new Error('Failed to load hCaptcha'))
+    document.head.appendChild(script)
+  })
+}
+
+// Initialize hCaptcha widget
+const initHCaptcha = () => {
+  if (!captchaContainer.value || !window.hcaptcha) return
+
+  try {
+    hcaptchaWidgetId = window.hcaptcha.render(captchaContainer.value, {
+      sitekey: HCAPTCHA_SITE_KEY,
+      callback: (token) => {
+        captchaToken.value = token
+        clearError('captcha')
+      },
+      'expired-callback': () => {
+        captchaToken.value = null
+      },
+      'error-callback': () => {
+        captchaToken.value = null
+      }
+    })
+  } catch (error) {
+    console.error('Failed to initialize hCaptcha:', error)
   }
 }
 
@@ -355,7 +523,30 @@ const fetchSiteSettings = async () => {
 }
 
 // Load settings on mount
-onMounted(() => {
-  fetchSiteSettings()
+onMounted(async () => {
+  await fetchSiteSettings()
+  
+  // Load and initialize hCaptcha
+  try {
+    await loadHCaptcha()
+    // Wait a bit for DOM to be ready
+    setTimeout(() => {
+      initHCaptcha()
+    }, 100)
+  } catch (error) {
+    console.error('Failed to load hCaptcha:', error)
+  }
+})
+
+// Cleanup on unmount
+onUnmounted(() => {
+  // Remove hCaptcha widget if exists
+  if (window.hcaptcha && hcaptchaWidgetId !== null) {
+    try {
+      window.hcaptcha.remove(hcaptchaWidgetId)
+    } catch (error) {
+      // Ignore errors
+    }
+  }
 })
 </script>

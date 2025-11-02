@@ -3,7 +3,7 @@
     <!-- Hero Section - Clean & Professional -->
     <section
       v-if="showHeroSection"
-      class="relative pt-20 pb-8 md:pt-24 md:pb-12 bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-950"
+      class="relative pt-16 pb-6 md:pt-24 md:pb-12 bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-950"
     >
       <!-- Subtle Background Pattern -->
       <div class="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]">
@@ -13,12 +13,12 @@
       <div class="container-custom relative z-10">
         <div class="max-w-6xl mx-auto">
           <!-- Grid Layout: Photo + Content -->
-          <div class="grid md:grid-cols-2 gap-8 items-center">
+          <div class="grid sm:grid-cols-2 gap-6 md:gap-8 lg:gap-10 items-center">
             <!-- Left: Profile Photo -->
-            <div class="order-2 md:order-1">
+            <div class="order-2 sm:order-1">
               <div class="relative">
-                <!-- Photo Container -->
-                <div class="relative w-full max-w-md mx-auto aspect-square rounded-2xl overflow-hidden bg-gradient-to-br from-primary-100 to-secondary-100 dark:from-primary-900/20 dark:to-secondary-900/20 shadow-2xl">
+                <!-- Photo Container - Responsive Size -->
+                <div class="relative w-48 h-48 sm:w-64 sm:h-64 md:w-80 md:h-80 lg:w-120 lg:h-120 mx-auto rounded-2xl overflow-hidden bg-gradient-to-br from-primary-100 to-secondary-100 dark:from-primary-900/20 dark:to-secondary-900/20 shadow-2xl">
                   <img 
                     v-if="heroAvatar" 
                     :src="getProfilePhotoUrl(heroAvatar)" 
@@ -37,40 +37,74 @@
                 <div class="absolute -top-4 -right-4 w-24 h-24 bg-accent-500/10 rounded-full blur-3xl"></div>
                 <div class="absolute -bottom-6 -left-6 w-32 h-32 bg-primary-500/10 rounded-full blur-3xl"></div>
               </div>
+
+              <!-- Languages Flags -->
+              <div v-if="aboutSettings?.languages?.length > 0" class="mt-4 md:mt-6 flex items-center justify-center gap-2 md:gap-3">
+                <div
+                  v-for="lang in aboutSettings.languages.slice(0, 3)"
+                  :key="lang"
+                  class="flex items-center gap-1.5 md:gap-2 px-2.5 py-1.5 md:px-3 md:py-2 glass rounded-full"
+                >
+                  <img :src="getLangFlag(lang)" :alt="lang" class="w-5 h-5 md:w-6 md:h-6 object-contain rounded" />
+                  <span class="text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ lang }}
+                  </span>
+                </div>
+              </div>
+
+              <!-- Certifications - Moved Here -->
+              <div v-if="aboutSettings?.certifications?.length > 0" class="mt-3 md:mt-4">
+                <p class="text-xs text-gray-500 dark:text-gray-500 mb-2 md:mb-3 uppercase tracking-wider font-semibold text-center">
+                  CERTIFIED BY
+                </p>
+                <div class="flex flex-wrap gap-2 md:gap-3 justify-center">
+                  <a
+                    v-for="cert in aboutSettings.certifications"
+                    :key="cert.name"
+                    :href="cert.url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="group p-2 md:p-3 glass rounded-lg hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5"
+                    :title="cert.name"
+                  >
+                    <img :src="getCertLogo(cert.name)" :alt="cert.name" class="w-6 h-6 md:w-8 md:h-8 object-contain" />
+                  </a>
+                </div>
+              </div>
             </div>
 
             <!-- Right: Content -->
-            <div class="order-1 md:order-2 text-center md:text-left">
+            <div class="order-1 sm:order-2 text-center sm:text-left">
               <!-- Badge -->
-              <div class="inline-flex items-center gap-2 px-4 py-2 glass rounded-full mb-6 animate-fade-in-down">
+              <div class="inline-flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 glass rounded-full mb-4 md:mb-6 animate-fade-in-down">
                 <span class="relative flex h-2 w-2">
                   <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-400 opacity-75"></span>
                   <span class="relative inline-flex rounded-full h-2 w-2 bg-accent-500"></span>
                 </span>
-                <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                <span class="text-xs md:text-sm font-semibold text-gray-700 dark:text-gray-300">
                   Available for Freelance Work
                 </span>
               </div>
 
               <!-- Main Heading -->
-              <h1 class="text-4xl md:text-5xl lg:text-6xl font-display font-bold text-gray-900 dark:text-white mb-4 leading-tight animate-fade-in-up">
+              <h1 class="text-3xl md:text-5xl lg:text-6xl font-display font-bold text-gray-900 dark:text-white mb-3 md:mb-4 leading-tight animate-fade-in-up">
                 {{ heroName }}
               </h1>
               
-              <h2 v-if="heroTitle" class="text-2xl md:text-3xl font-display font-bold text-gradient mb-6 animate-fade-in-up animate-delay-100">
+              <h2 v-if="heroTitle" class="text-xl md:text-3xl font-display font-bold text-gradient mb-4 md:mb-6 animate-fade-in-up animate-delay-100">
                 {{ heroTitle }}
               </h2>
 
               <!-- Subtitle -->
-              <p class="text-base md:text-lg text-gray-600 dark:text-gray-400 mb-6 leading-relaxed animate-fade-in-up animate-delay-200">
+              <p class="text-sm md:text-lg text-gray-600 dark:text-gray-400 mb-4 md:mb-6 leading-relaxed animate-fade-in-up animate-delay-200">
                 {{ heroBio }}
               </p>
 
               <!-- CTA Buttons -->
-              <div class="flex flex-wrap gap-3 mb-6 animate-fade-in-up animate-delay-300 justify-center md:justify-start">
+              <div class="flex flex-wrap gap-2 md:gap-3 mb-4 md:mb-6 animate-fade-in-up animate-delay-300 justify-center sm:justify-start">
                 <button
                   @click="$router.push('/projects')"
-                  class="group px-8 py-4 bg-gradient-to-r from-primary-600 to-secondary-600 text-white font-semibold rounded-xl hover:shadow-xl hover:scale-105 transition-all duration-300"
+                  class="group px-6 py-3 md:px-8 md:py-4 bg-gradient-to-r from-primary-600 to-secondary-600 text-white text-sm md:text-base font-semibold rounded-xl hover:shadow-xl hover:scale-105 transition-all duration-300"
                 >
                   <span class="flex items-center gap-2">
                     View My Work
@@ -81,7 +115,7 @@
                 </button>
                 <button
                   @click="$router.push('/contact')"
-                  class="px-8 py-4 glass text-gray-700 dark:text-gray-300 font-semibold rounded-xl hover:shadow-lg transition-all duration-300"
+                  class="px-6 py-3 md:px-8 md:py-4 glass text-gray-700 dark:text-gray-300 text-sm md:text-base font-semibold rounded-xl hover:shadow-lg transition-all duration-300"
                 >
                   Let's Talk
                 </button>
@@ -89,7 +123,7 @@
 
               <!-- Tech Stack / Skills - RESPONSIVE (MAX 2 LINES) -->
               <div v-if="heroSkills.length > 0" class="animate-fade-in-up animate-delay-400">
-                <p class="text-xs text-gray-500 dark:text-gray-500 mb-2 uppercase tracking-wider font-semibold">
+                <p class="text-xs text-gray-500 dark:text-gray-500 mb-1.5 md:mb-2 uppercase tracking-wider font-semibold">
                   SKILLS
                 </p>
                 <!-- Mobile: Max 3 skills + See More -->
@@ -138,19 +172,19 @@
     </section>
 
     <!-- Stats Section - Clean Cards -->
-    <section v-if="stats.length > 0" class="py-8 bg-white dark:bg-gray-950">
+    <section v-if="stats.length > 0" class="py-6 md:py-8 bg-white dark:bg-gray-950">
       <div class="container-custom">
-        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-6">
           <div
             v-for="(stat, index) in stats"
             :key="stat.label"
-            class="card-elevated p-8 text-center hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+            class="card-elevated p-4 md:p-6 lg:p-8 text-center hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
             :class="`animate-fade-in-up animate-delay-${index * 100}`"
           >
-            <div class="text-4xl md:text-5xl font-bold text-gradient mb-2">
+            <div class="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-gradient mb-1 md:mb-2 break-words">
               {{ stat.value }}
             </div>
-            <div class="text-sm text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+            <div class="text-xs md:text-sm text-gray-600 dark:text-gray-400 uppercase tracking-wider leading-tight">
               {{ stat.label }}
             </div>
           </div>
@@ -1308,6 +1342,16 @@ import { useSettings } from '@/composables/useSettings'
 import { BaseLoader, MobileCarousel } from '@/components/base'
 import api from '@/services/api'
 
+// Import certification logos
+import googleLogo from '@/assets/certifications/google.png'
+import oracleLogo from '@/assets/certifications/oracle.png'
+import outskillLogo from '@/assets/certifications/outskill.png'
+
+// Import language flags
+import idFlag from '@/assets/language/ID.png'
+import gbFlag from '@/assets/language/GB.png'
+import cnFlag from '@/assets/language/CN.png'
+
 const { projects, isLoading: projectsLoading, fetchProjects } = useProjects()
 
 // Featured projects computed (backend already filters, but we create alias for clarity)
@@ -1322,10 +1366,9 @@ const { settings, fetchSettings, getSettingValue } = useSettings()
 const currentTestimonialIndex = ref(0)
 const showAllSkills = ref(false)
 
-// WhatsApp Contact computed - gets phone from settings (profile.phone or contact.phone)
+// WhatsApp Contact computed - uses getSettingValue from composable
 const contactWhatsApp = computed(() => {
-  // Try profile.phone first, then contact.phone, then default
-  const phone = getSettingValue('profile.phone') || getSettingValue('contact.phone') || '+6281234567890'
+  const phone = getSettingValue('contact_phone') || '+6281234567890'
   const message = encodeURIComponent('Hi! I saw your AI-powered website and I\'m interested in discussing AI Automation for my business. Can we schedule a free consultation?')
   return `https://wa.me/${phone.replace(/[^0-9]/g, '')}?text=${message}`
 })
@@ -1582,6 +1625,24 @@ const getProfilePhotoUrl = (path) => {
 const handleAvatarError = (event) => {
   console.warn('[Home] Failed to load avatar:', event.target.src)
   event.target.style.display = 'none'
+}
+
+// Get certification logo based on name
+const getCertLogo = (name) => {
+  const lowerName = name.toLowerCase()
+  if (lowerName.includes('google')) return googleLogo
+  if (lowerName.includes('oracle')) return oracleLogo
+  if (lowerName.includes('outskill')) return outskillLogo
+  return '' // no logo for unknown cert
+}
+
+// Get language flag based on name
+const getLangFlag = (lang) => {
+  const lowerLang = lang.toLowerCase()
+  if (lowerLang.includes('indonesia')) return idFlag
+  if (lowerLang.includes('english')) return gbFlag
+  if (lowerLang.includes('mandarin') || lowerLang.includes('chinese')) return cnFlag
+  return idFlag // default to ID flag
 }
 
 // 3D Coverflow + Magnetic Hover Functions

@@ -130,6 +130,55 @@
         </div>
       </BaseCard>
 
+      <!-- Languages Card -->
+      <BaseCard>
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="text-xl font-display font-semibold text-neutral-900 dark:text-neutral-100">
+            Languages
+          </h2>
+          <BaseButton
+            type="button"
+            button-type="secondary"
+            size="sm"
+            @click="addLanguage"
+          >
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            Add Language
+          </BaseButton>
+        </div>
+
+        <div v-if="formData.languages.length === 0" class="text-center py-8 text-neutral-500 dark:text-neutral-400">
+          No languages added yet. Click "Add Language" to get started.
+        </div>
+
+        <div v-else class="space-y-3">
+          <div
+            v-for="(language, index) in formData.languages"
+            :key="index"
+            class="flex items-center gap-3"
+          >
+            <input
+              v-model="formData.languages[index]"
+              type="text"
+              class="flex-1 px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Enter language (e.g., Indonesia, English, Mandarin)"
+            />
+            <button
+              type="button"
+              @click="removeLanguage(index)"
+              class="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+              aria-label="Remove language"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </BaseCard>
+
       <!-- Skills Card -->
       <BaseCard>
         <div class="flex items-center justify-between mb-6">
@@ -613,6 +662,87 @@
         </div>
       </BaseCard>
 
+      <!-- Certifications Card -->
+      <BaseCard>
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="text-xl font-display font-semibold text-neutral-900 dark:text-neutral-100">
+            Certifications
+          </h2>
+          <BaseButton
+            type="button"
+            button-type="secondary"
+            size="sm"
+            @click="addCertification"
+          >
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            Add Certification
+          </BaseButton>
+        </div>
+
+        <div v-if="formData.certifications.length === 0" class="text-center py-8 text-neutral-500 dark:text-neutral-400">
+          No certifications added yet. Click "Add Certification" to get started.
+        </div>
+
+        <div v-else class="space-y-4">
+          <div
+            v-for="(cert, index) in formData.certifications"
+            :key="index"
+            class="p-4 border border-neutral-200 dark:border-neutral-700 rounded-lg"
+          >
+            <div class="flex items-start justify-between mb-4">
+              <h3 class="font-medium text-neutral-900 dark:text-neutral-100">
+                Certification #{{ index + 1 }}
+              </h3>
+              <button
+                type="button"
+                @click="removeCertification(index)"
+                class="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                aria-label="Remove certification"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <!-- Name -->
+              <div>
+                <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                  Certification Name *
+                </label>
+                <input
+                  v-model="cert.name"
+                  type="text"
+                  class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="e.g., Google Cloud Certified, Oracle Certified"
+                  required
+                />
+              </div>
+
+              <!-- URL -->
+              <div>
+                <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                  Certificate URL *
+                </label>
+                <input
+                  v-model="cert.url"
+                  type="url"
+                  class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="https://..."
+                  required
+                />
+                <p class="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                  Link to certificate or credential page
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </BaseCard>
+
       <!-- Statistics Card -->
       <BaseCard>
         <h2 class="text-xl font-display font-semibold text-neutral-900 dark:text-neutral-100 mb-6">
@@ -743,7 +873,7 @@ const fileInput = ref(null)
 const isSubmitting = ref(false)
 const loading = ref(false)
 const error = ref(null)
-const isLoadingSettings = ref(false) // Guard untuk prevent double load
+const isLoadingSettings = ref(false)
 const availableGalleries = ref([])
 const loadingGalleries = ref(false)
 
@@ -753,10 +883,12 @@ const formData = ref({
   title: '',
   bio: '',
   profile_photo: null,
+  languages: [],
   skills: [],
   experience: [],
   education: [],
   social_links: [],
+  certifications: [],
   statistics: {
     years_experience: '16+',
     followers: '1K',
@@ -775,18 +907,14 @@ const currentPhotoUrl = computed(() => {
   if (photoFile.value) {
     return URL.createObjectURL(photoFile.value)
   }
-  // Fix: Handle different photo URL formats
   if (formData.value.profile_photo) {
     const photo = formData.value.profile_photo
-    // If already full URL
     if (photo.startsWith('http://') || photo.startsWith('https://')) {
       return photo
     }
-    // If relative path from backend
     if (photo.startsWith('/uploads/')) {
       return import.meta.env.VITE_API_URL.replace('/api', '') + photo
     }
-    // If no leading slash
     if (!photo.startsWith('/')) {
       return import.meta.env.VITE_API_URL.replace('/api', '') + '/uploads/' + photo
     }
@@ -794,6 +922,15 @@ const currentPhotoUrl = computed(() => {
   }
   return null
 })
+
+// Languages methods
+function addLanguage() {
+  formData.value.languages.push('')
+}
+
+function removeLanguage(index) {
+  formData.value.languages.splice(index, 1)
+}
 
 // Skills methods
 function addSkill() {
@@ -853,6 +990,18 @@ function removeSocialLink(index) {
   formData.value.social_links.splice(index, 1)
 }
 
+// Certifications methods
+function addCertification() {
+  formData.value.certifications.push({
+    name: '',
+    url: ''
+  })
+}
+
+function removeCertification(index) {
+  formData.value.certifications.splice(index, 1)
+}
+
 // Photo handling
 function handlePhotoChange(event) {
   const file = event.target.files[0]
@@ -887,19 +1036,6 @@ async function handleSubmit() {
   isSubmitting.value = true
   error.value = null
 
-  console.log('🔵 Form submitted - Starting validation...')
-  console.log('📋 Current formData:', {
-    name: formData.value.name,
-    title: formData.value.title,
-    bio: formData.value.bio?.substring(0, 50) + '...',
-    skills: formData.value.skills,
-    experience: formData.value.experience,
-    education: formData.value.education,
-    social_links: formData.value.social_links,
-    hasPhotoFile: !!photoFile.value,
-    photoFileName: photoFile.value?.name
-  })
-
   try {
     // Validate required fields
     const hasInvalidExperience = formData.value.experience.some(
@@ -922,8 +1058,10 @@ async function handleSubmit() {
       throw new Error('Please fill in all required social link fields (platform, URL)')
     }
 
-    // Filter out empty skills
+    // Filter out empty arrays
+    const cleanedLanguages = formData.value.languages.filter(lang => lang.trim() !== '')
     const cleanedSkills = formData.value.skills.filter(skill => skill.trim() !== '')
+    const cleanedCertifications = formData.value.certifications.filter(cert => cert.name.trim() !== '' && cert.url.trim() !== '')
 
     // Prepare FormData
     const data = new FormData()
@@ -938,17 +1076,13 @@ async function handleSubmit() {
 
     // Profile photo
     if (photoFile.value) {
-      console.log('📸 Appending photo file:', {
-        name: photoFile.value.name,
-        size: photoFile.value.size,
-        type: photoFile.value.type
-      })
       data.append('profile_photo', photoFile.value)
-    } else {
-      console.log('⚠️ No photo file to upload')
     }
 
     // Arrays as JSON strings
+    if (cleanedLanguages.length > 0) {
+      data.append('languages', JSON.stringify(cleanedLanguages))
+    }
     if (cleanedSkills.length > 0) {
       data.append('skills', JSON.stringify(cleanedSkills))
     }
@@ -961,28 +1095,14 @@ async function handleSubmit() {
     if (formData.value.social_links.length > 0) {
       data.append('social_links', JSON.stringify(formData.value.social_links))
     }
+    if (cleanedCertifications.length > 0) {
+      data.append('certifications', JSON.stringify(cleanedCertifications))
+    }
     if (formData.value.statistics) {
       data.append('statistics', JSON.stringify(formData.value.statistics))
     }
 
-    console.log('🔵 Sending request to API...', {
-      hasPhoto: !!photoFile.value,
-      photoFileName: photoFile.value?.name,
-      skillsCount: cleanedSkills.length,
-      experienceCount: formData.value.experience.length,
-      educationCount: formData.value.education.length,
-      socialLinksCount: formData.value.social_links.length
-    })
-    
-    // Log FormData contents
-    console.log('📦 FormData contents:')
-    for (let [key, value] of data.entries()) {
-      console.log(`  ${key}:`, typeof value === 'string' ? value.substring(0, 100) : value)
-    }
-
     await settingsStore.updateAboutSettings(data)
-
-    console.log('✅ Settings updated successfully')
     uiStore.showSuccess('About settings updated successfully', 'Settings Saved')
 
     // Reload settings from backend to get fresh data
@@ -996,11 +1116,6 @@ async function handleSubmit() {
     }
   } catch (err) {
     console.error('❌ Failed to update about settings:', err)
-    console.error('Error details:', {
-      message: err.message,
-      response: err.response?.data,
-      status: err.response?.status
-    })
     error.value = err.message || err.response?.data?.message || 'Failed to update settings. Please try again.'
     uiStore.showError(error.value, 'Update Failed', 0)
   } finally {
@@ -1022,24 +1137,18 @@ function resetForm() {
 // Load settings
 async function loadSettings() {
   if (isLoadingSettings.value) {
-    console.log('⚠️ Already loading settings, skipping...')
     return
   }
   
   isLoadingSettings.value = true
   loading.value = true
   error.value = null
-  
-  console.log('🔄 Loading settings from API...')
 
   try {
     await settingsStore.fetchAboutSettings()
-    
-    console.log('📥 Settings fetched from store:', settingsStore.aboutSettings)
 
     // Populate form data
     const experiences = JSON.parse(JSON.stringify(settingsStore.aboutSettings.experience || []))
-    // Ensure each experience has gallery_ids array and company_url
     experiences.forEach(exp => {
       if (!exp.gallery_ids) exp.gallery_ids = []
       if (!exp.company_url) exp.company_url = ''
@@ -1050,10 +1159,12 @@ async function loadSettings() {
       title: settingsStore.aboutSettings.title || '',
       bio: settingsStore.aboutSettings.bio || '',
       profile_photo: settingsStore.aboutSettings.profile_photo || null,
+      languages: [...(settingsStore.aboutSettings.languages || [])],
       skills: [...(settingsStore.aboutSettings.skills || [])],
       experience: experiences,
       education: JSON.parse(JSON.stringify(settingsStore.aboutSettings.education || [])),
       social_links: JSON.parse(JSON.stringify(settingsStore.aboutSettings.social_links || [])),
+      certifications: JSON.parse(JSON.stringify(settingsStore.aboutSettings.certifications || [])),
       statistics: {
         years_experience: settingsStore.aboutSettings.statistics?.years_experience || '16+',
         followers: settingsStore.aboutSettings.statistics?.followers || '1K',
@@ -1062,15 +1173,6 @@ async function loadSettings() {
         success_rate: settingsStore.aboutSettings.statistics?.success_rate || '95%'
       }
     }
-    
-    console.log('✅ Form data populated:', {
-      name: formData.value.name,
-      title: formData.value.title,
-      skillsCount: formData.value.skills.length,
-      experienceCount: formData.value.experience.length,
-      educationCount: formData.value.education.length,
-      socialLinksCount: formData.value.social_links.length
-    })
   } catch (err) {
     console.error('❌ Failed to load settings:', err)
     error.value = 'Failed to load settings. Please refresh the page.'
@@ -1087,7 +1189,7 @@ async function fetchGalleries() {
   try {
     const response = await api.get('/galleries', {
       params: {
-        per_page: 100, // Get all galleries
+        per_page: 100,
         is_active: 1
       }
     })
