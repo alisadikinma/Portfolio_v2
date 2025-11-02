@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\DB;
 class TokenController extends Controller
 {
     /**
-     * Get all tokens for the authenticated user
+     * Get all API tokens for the authenticated user (excludes auth-token)
      */
     public function index(Request $request): JsonResponse
     {
@@ -24,16 +24,22 @@ class TokenController extends Controller
         $tokens = DB::table('personal_access_tokens')
             ->where('tokenable_type', 'App\\Models\\User')
             ->where('tokenable_id', $user->id)
+            ->where('name', 'LIKE', 'api-%') // Only show automation tokens, not auth-token
             ->orderBy('created_at', 'desc')
             ->get()
             ->map(function ($token) {
+                // Count requests from automation_logs
+                $requestCount = DB::table('automation_logs')
+                    ->where('token_id', $token->id)
+                    ->count();
+
                 return [
                     'id' => $token->id,
                     'name' => $token->name,
                     'abilities' => json_decode($token->abilities, true),
                     'last_used_at' => $token->last_used_at,
                     'created_at' => $token->created_at,
-                    'revoked_at' => null, // Sanctum doesn't have revoked_at by default
+                    'requests_count' => $requestCount,
                 ];
             });
 
@@ -44,14 +50,16 @@ class TokenController extends Controller
     }
 
     /**
-     * Create a new API token
+     * Create a new API token (must start with 'api-' prefix)
      */
     public function store(Request $request): JsonResponse
     {
         $request->validate([
-            'name' => 'required|string|max:255',
+            'name' => 'required|string|max:255|regex:/^api-/',
             'abilities' => 'required|array|min:1',
             'abilities.*' => 'string|in:post:read,post:write,post:delete,category:read',
+        ], [
+            'name.regex' => 'Token name must start with "api-" prefix',
         ]);
 
         $user = $request->user();

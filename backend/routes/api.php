@@ -263,6 +263,10 @@ Route::middleware(['auth:sanctum'])->prefix('admin/page-sections')->group(functi
 // Automation API Routes (n8n, Zapier, Make.com)
 // ============================================
 Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->group(function () {
+    // Image uploads for blog content
+    Route::post('/upload-images', [AutomationController::class, 'uploadImages']); // Batch (recommended)
+    Route::post('/upload-image', [AutomationController::class, 'uploadImage']);   // Single (fallback)
+
     // Posts endpoints
     Route::get('/posts', [AutomationController::class, 'getPosts']);
     Route::get('/posts/{id}', [AutomationController::class, 'getPost']);

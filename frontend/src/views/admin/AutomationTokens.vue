@@ -22,7 +22,7 @@
     </div>
 
     <!-- Stats Cards -->
-    <div class="mb-8 grid grid-cols-1 gap-6 sm:grid-cols-3">
+    <div class="mb-8 grid grid-cols-1 gap-6 sm:grid-cols-2">
       <div class="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
         <div class="flex items-center">
           <div class="flex-1">
@@ -42,25 +42,9 @@
       <div class="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
         <div class="flex items-center">
           <div class="flex-1">
-            <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Revoked Tokens</p>
-            <p class="mt-2 text-3xl font-semibold text-gray-900 dark:text-white">
-              {{ automationStore.revokedTokens.length }}
-            </p>
-          </div>
-          <div class="rounded-full bg-red-100 p-3 dark:bg-red-900">
-            <svg class="h-6 w-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
-          </div>
-        </div>
-      </div>
-
-      <div class="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
-        <div class="flex items-center">
-          <div class="flex-1">
             <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Total Requests</p>
             <p class="mt-2 text-3xl font-semibold text-gray-900 dark:text-white">
-              {{ totalRequests }}
+              {{ automationStore.totalRequests }}
             </p>
           </div>
           <div class="rounded-full bg-blue-100 p-3 dark:bg-blue-900">
@@ -104,9 +88,9 @@
             <tr>
               <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Name</th>
               <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Abilities</th>
+              <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Requests</th>
               <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Last Used</th>
               <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Created</th>
-              <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Status</th>
               <th class="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Actions</th>
             </tr>
           </thead>
@@ -127,32 +111,20 @@
                 </div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
+                {{ token.requests_count || 0 }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
                 {{ token.last_used_at ? formatDate(token.last_used_at) : 'Never' }}
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
                 {{ formatDate(token.created_at) }}
               </td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <span
-                  v-if="!token.revoked_at"
-                  class="inline-flex rounded-full bg-green-100 px-2 py-1 text-xs font-semibold leading-5 text-green-800 dark:bg-green-900 dark:text-green-200"
-                >
-                  Active
-                </span>
-                <span
-                  v-else
-                  class="inline-flex rounded-full bg-red-100 px-2 py-1 text-xs font-semibold leading-5 text-red-800 dark:bg-red-900 dark:text-red-200"
-                >
-                  Revoked
-                </span>
-              </td>
               <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                 <button
-                  v-if="!token.revoked_at"
                   @click="confirmRevoke(token)"
                   class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
                 >
-                  Revoke
+                  Delete
                 </button>
               </td>
             </tr>
@@ -176,12 +148,20 @@
           <div class="mt-4 space-y-4">
             <div>
               <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Token Name</label>
-              <input
-                v-model="newToken.name"
-                type="text"
-                placeholder="e.g., n8n Workflow"
-                class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-              />
+              <div class="mt-1 flex rounded-md shadow-sm">
+                <span class="inline-flex items-center rounded-l-md border border-r-0 border-gray-300 bg-gray-50 px-3 text-sm text-gray-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-400">
+                  api-
+                </span>
+                <input
+                  v-model="newToken.name"
+                  type="text"
+                  placeholder="n8n-workflow"
+                  class="block w-full flex-1 rounded-none rounded-r-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                />
+              </div>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Example: api-n8n-workflow, api-zapier-integration
+              </p>
             </div>
 
             <div>
@@ -259,7 +239,7 @@
       </div>
     </div>
 
-    <!-- Revoke Confirmation Modal -->
+    <!-- Delete Confirmation Modal -->
     <div
       v-if="showRevokeModal"
       class="fixed inset-0 z-50 overflow-y-auto"
@@ -269,9 +249,9 @@
         <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
 
         <div class="relative w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800">
-          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Revoke Token</h3>
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Delete Token</h3>
           <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            Are you sure you want to revoke "{{ tokenToRevoke?.name }}"? This action cannot be undone.
+            Are you sure you want to delete "{{ tokenToRevoke?.name }}"? This will permanently revoke access and cannot be undone.
           </p>
 
           <div class="mt-6 flex space-x-3">
@@ -279,7 +259,7 @@
               @click="revokeToken"
               class="flex-1 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
             >
-              Revoke
+              Delete
             </button>
             <button
               @click="showRevokeModal = false"
@@ -316,10 +296,6 @@ const newToken = ref({
 
 const availableAbilities = ['post:read', 'post:write', 'post:delete', 'category:read']
 
-const totalRequests = computed(() => {
-  return automationStore.tokens.reduce((total, token) => total + (token.requests_count || 0), 0)
-})
-
 onMounted(async () => {
   try {
     await automationStore.fetchTokens()
@@ -330,7 +306,16 @@ onMounted(async () => {
 
 const createToken = async () => {
   try {
-    const response = await automationStore.createToken(newToken.value)
+    // Auto-prepend 'api-' if user forgets
+    const tokenName = newToken.value.name.startsWith('api-') 
+      ? newToken.value.name 
+      : `api-${newToken.value.name}`
+
+    const response = await automationStore.createToken({
+      name: tokenName,
+      abilities: newToken.value.abilities
+    })
+    
     createdToken.value = response.token
     showCreateModal.value = false
     showTokenModal.value = true
@@ -339,7 +324,7 @@ const createToken = async () => {
     // Reset form
     newToken.value = { name: '', abilities: [] }
   } catch (error) {
-    toast.error('Failed to create token')
+    toast.error(error.response?.data?.message || 'Failed to create token')
   }
 }
 
@@ -371,9 +356,9 @@ const revokeToken = async () => {
     await automationStore.revokeToken(tokenToRevoke.value.id)
     showRevokeModal.value = false
     tokenToRevoke.value = null
-    toast.success('Token revoked successfully')
+    toast.success('Token deleted successfully')
   } catch (error) {
-    toast.error('Failed to revoke token')
+    toast.error('Failed to delete token')
   }
 }
 
