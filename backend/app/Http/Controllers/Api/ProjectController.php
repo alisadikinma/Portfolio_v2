@@ -41,13 +41,13 @@ class ProjectController extends Controller
             $query->where('featured', (bool) $request->query('featured'));
         }
 
-        // Search
-        if ($request->has('search')) {
-            $searchTerm = $request->query('search');
+        // Search (support both 'search' and 'q' parameters)
+        if ($request->has('search') || $request->has('q')) {
+            $searchTerm = $request->query('search') ?? $request->query('q');
             $query->where(function ($q) use ($searchTerm) {
                 $q->where('title', 'like', "%{$searchTerm}%")
                   ->orWhere('description', 'like', "%{$searchTerm}%")
-                  ->orWhere('client_name', 'like', "%{$searchTerm}%")
+                  ->orWhere('client', 'like', "%{$searchTerm}%")
                   ->orWhereJsonContains('technologies', $searchTerm);
             });
         }
@@ -60,6 +60,7 @@ class ProjectController extends Controller
             $projects = $query->limit($limit)->get();
             
             return response()->json([
+                'success' => true,
                 'data' => ProjectResource::collection($projects)->additional(['lang' => $language]),
             ]);
         }
@@ -69,6 +70,7 @@ class ProjectController extends Controller
         $projects = $query->paginate($perPage);
 
         return response()->json([
+            'success' => true,
             'data' => ProjectResource::collection($projects)->additional(['lang' => $language]),
             'meta' => [
                 'current_page' => $projects->currentPage(),
@@ -107,13 +109,13 @@ class ProjectController extends Controller
             $query->where('featured', (bool) $request->query('featured'));
         }
 
-        // Search
-        if ($request->has('search')) {
-            $searchTerm = $request->query('search');
+        // Search (support both 'search' and 'q' parameters)
+        if ($request->has('search') || $request->has('q')) {
+            $searchTerm = $request->query('search') ?? $request->query('q');
             $query->where(function ($q) use ($searchTerm) {
                 $q->where('title', 'like', "%{$searchTerm}%")
                   ->orWhere('description', 'like', "%{$searchTerm}%")
-                  ->orWhere('client_name', 'like', "%{$searchTerm}%")
+                  ->orWhere('client', 'like', "%{$searchTerm}%")
                   ->orWhereJsonContains('technologies', $searchTerm);
             });
         }
@@ -124,6 +126,7 @@ class ProjectController extends Controller
         $projects = $query->paginate($perPage);
 
         return response()->json([
+            'success' => true,
             'data' => ProjectResource::collection($projects),
             'meta' => [
                 'current_page' => $projects->currentPage(),
@@ -160,12 +163,14 @@ class ProjectController extends Controller
 
         if (!$project) {
             return response()->json([
+                'success' => false,
                 'message' => 'Project not found',
                 'error' => 'The requested project does not exist or is not published.',
             ], 404);
         }
 
         return response()->json([
+            'success' => true,
             'data' => (new ProjectResource($project))->additional(['lang' => $language]),
         ]);
     }
@@ -182,12 +187,14 @@ class ProjectController extends Controller
 
         if (!$project) {
             return response()->json([
+                'success' => false,
                 'message' => 'Project not found',
                 'error' => 'The requested project does not exist.',
             ], 404);
         }
 
         return response()->json([
+            'success' => true,
             'message' => 'Project retrieved successfully',
             'data' => new ProjectResource($project),
         ]);
@@ -209,6 +216,7 @@ class ProjectController extends Controller
                 'title',
                 'slug',
                 'description',
+                'content',
                 'technologies',
                 'client_name',
                 'project_url',
@@ -221,14 +229,38 @@ class ProjectController extends Controller
                 'meta_description',
                 'focus_keyword',
                 'canonical_url',
+                'related_project_ids',
             ]);
+
+            // Handle featured (boolean conversion)
+            if (isset($projectData['is_featured'])) {
+                $projectData['featured'] = (bool) $projectData['is_featured'];
+                unset($projectData['is_featured']);
+            }
+
+            // Handle client_name alias
+            if (isset($projectData['client_name'])) {
+                $projectData['client'] = $projectData['client_name'];
+                unset($projectData['client_name']);
+            }
+
+            // Handle project_url alias
+            if (isset($projectData['project_url'])) {
+                $projectData['url'] = $projectData['project_url'];
+                unset($projectData['project_url']);
+            }
 
             // Handle file upload
             if ($request->hasFile('featured_image')) {
                 $file = $request->file('featured_image');
                 $filename = time() . '_' . $file->getClientOriginalName();
                 $file->move(public_path('uploads/projects'), $filename);
-                $projectData['featured_image'] = '/uploads/projects/' . $filename;
+                $projectData['image'] = '/uploads/projects/' . $filename;
+                
+                // Auto-set og_image if not provided
+                if (empty($projectData['og_image'])) {
+                    $projectData['og_image'] = url('/uploads/projects/' . $filename);
+                }
             }
 
             $project = Project::create($projectData);
@@ -238,6 +270,7 @@ class ProjectController extends Controller
             $project->load(['translations']);
 
             return response()->json([
+                'success' => true,
                 'message' => 'Project created successfully',
                 'data' => new ProjectResource($project),
             ], 201);
@@ -245,6 +278,7 @@ class ProjectController extends Controller
             DB::rollBack();
 
             return response()->json([
+                'success' => false,
                 'message' => 'Failed to create project',
                 'error' => $e->getMessage(),
             ], 500);
@@ -264,6 +298,7 @@ class ProjectController extends Controller
 
         if (!$project) {
             return response()->json([
+                'success' => false,
                 'message' => 'Project not found',
                 'error' => 'The requested project does not exist.',
             ], 404);
@@ -277,6 +312,7 @@ class ProjectController extends Controller
                 'title',
                 'slug',
                 'description',
+                'content',
                 'technologies',
                 'client_name',
                 'project_url',
@@ -289,14 +325,38 @@ class ProjectController extends Controller
                 'meta_description',
                 'focus_keyword',
                 'canonical_url',
+                'related_project_ids',
             ]);
+
+            // Handle featured (boolean conversion)
+            if (isset($updateData['is_featured'])) {
+                $updateData['featured'] = (bool) $updateData['is_featured'];
+                unset($updateData['is_featured']);
+            }
+
+            // Handle client_name alias
+            if (isset($updateData['client_name'])) {
+                $updateData['client'] = $updateData['client_name'];
+                unset($updateData['client_name']);
+            }
+
+            // Handle project_url alias
+            if (isset($updateData['project_url'])) {
+                $updateData['url'] = $updateData['project_url'];
+                unset($updateData['project_url']);
+            }
 
             // Handle file upload
             if ($request->hasFile('featured_image')) {
                 $file = $request->file('featured_image');
                 $filename = time() . '_' . $file->getClientOriginalName();
                 $file->move(public_path('uploads/projects'), $filename);
-                $updateData['featured_image'] = '/uploads/projects/' . $filename;
+                $updateData['image'] = '/uploads/projects/' . $filename;
+                
+                // Auto-update og_image if new image uploaded and og_image is empty
+                if (empty($updateData['og_image']) || $project->og_image === $project->image) {
+                    $updateData['og_image'] = url('/uploads/projects/' . $filename);
+                }
             }
 
             $project->update($updateData);
@@ -306,6 +366,7 @@ class ProjectController extends Controller
             $project->load(['translations']);
 
             return response()->json([
+                'success' => true,
                 'message' => 'Project updated successfully',
                 'data' => new ProjectResource($project),
             ]);
@@ -313,6 +374,7 @@ class ProjectController extends Controller
             DB::rollBack();
 
             return response()->json([
+                'success' => false,
                 'message' => 'Failed to update project',
                 'error' => $e->getMessage(),
             ], 500);
@@ -331,6 +393,7 @@ class ProjectController extends Controller
 
         if (!$project) {
             return response()->json([
+                'success' => false,
                 'message' => 'Project not found',
                 'error' => 'The requested project does not exist.',
             ], 404);
@@ -345,12 +408,14 @@ class ProjectController extends Controller
             DB::commit();
 
             return response()->json([
+                'success' => true,
                 'message' => 'Project deleted successfully',
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
 
             return response()->json([
+                'success' => false,
                 'message' => 'Failed to delete project',
                 'error' => $e->getMessage(),
             ], 500);

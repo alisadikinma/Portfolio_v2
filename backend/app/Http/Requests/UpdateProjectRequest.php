@@ -16,6 +16,21 @@ class UpdateProjectRequest extends FormRequest
     }
 
     /**
+     * Prepare the data for validation.
+     */
+    protected function prepareForValidation(): void
+    {
+        // Convert empty strings to null for optional URL fields
+        $urlFields = ['project_url', 'github_url', 'canonical_url'];
+        
+        foreach ($urlFields as $field) {
+            if ($this->has($field) && trim($this->input($field)) === '') {
+                $this->merge([$field => null]);
+            }
+        }
+    }
+
+    /**
      * Get the validation rules that apply to the request.
      *
      * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
@@ -28,6 +43,7 @@ class UpdateProjectRequest extends FormRequest
             'title' => ['nullable', 'string', 'max:255'],
             'slug' => ['nullable', 'string', 'max:255', Rule::unique('projects', 'slug')->ignore($projectId)],
             'description' => ['nullable', 'string'],
+            'content' => ['nullable', 'string'],
             'featured_image' => ['nullable', 'image', 'max:5120'], // 5MB
             'technologies' => ['nullable', 'array'],
             'technologies.*' => ['string', 'max:100'],
@@ -43,7 +59,7 @@ class UpdateProjectRequest extends FormRequest
             'meta_title' => ['nullable', 'string', 'max:60'],
             'meta_description' => ['nullable', 'string', 'max:160'],
             'focus_keyword' => ['nullable', 'string', 'max:100'],
-            'canonical_url' => ['nullable', 'url', 'max:255'],
+            'canonical_url' => ['nullable', 'string', 'max:255'],
 
             // CTA fields
             'cta_title' => ['nullable', 'string', 'max:255'],
@@ -69,7 +85,7 @@ class UpdateProjectRequest extends FormRequest
             'status.in' => 'Invalid project status. Must be one of: planning, in_progress, completed',
             'project_url.url' => 'Project URL must be a valid URL',
             'github_url.url' => 'GitHub URL must be a valid URL',
-            'canonical_url.url' => 'Canonical URL must be a valid URL',
+            'canonical_url.max' => 'Canonical URL must not exceed 255 characters',
             'end_date.after_or_equal' => 'End date must be after or equal to start date',
             'meta_title.max' => 'Meta title must not exceed 60 characters',
             'meta_description.max' => 'Meta description must not exceed 160 characters',

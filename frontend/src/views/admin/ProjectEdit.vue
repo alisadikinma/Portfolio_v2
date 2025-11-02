@@ -115,9 +115,21 @@ async function handleSubmit(projectData) {
     router.push('/admin/projects')
   } catch (err) {
     console.error('Failed to update project:', err)
+    console.error('Error response:', err.response?.data)
+    console.error('Validation errors:', err.response?.data?.errors)
+
+    // Show detailed validation errors if available
+    let errorMessage = 'Failed to update project. Please try again.'
+    if (err.response?.data?.errors) {
+      const errors = err.response.data.errors
+      const errorList = Object.keys(errors).map(key => `${key}: ${errors[key][0]}`).join('\n')
+      errorMessage = `Validation failed:\n${errorList}`
+    } else if (err.response?.data?.message) {
+      errorMessage = err.response.data.message
+    }
 
     uiStore.showError(
-      err.response?.data?.message || 'Failed to update project. Please try again.',
+      errorMessage,
       'Update Failed',
       0 // Persistent
     )
