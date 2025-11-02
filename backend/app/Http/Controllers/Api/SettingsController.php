@@ -231,6 +231,7 @@ class SettingsController extends Controller
                 'site_logo' => null,
                 'contact_email' => '',
                 'contact_phone' => '',
+                'location' => '',
                 'social_media' => [],
                 'meta_tags' => [],
                 'analytics_code' => ''

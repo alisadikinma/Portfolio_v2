@@ -32,6 +32,18 @@ class AboutSettingsSeeder extends Seeder
                 'type' => 'textarea'
             ],
             [
+                'key' => 'email',
+                'group' => 'about',
+                'value' => 'ali.sadikincom85@gmail.com',
+                'type' => 'text'
+            ],
+            [
+                'key' => 'location',
+                'group' => 'about',
+                'value' => 'Jakarta, Indonesia',
+                'type' => 'text'
+            ],
+            [
                 'key' => 'profile_photo',
                 'group' => 'about',
                 'value' => null,

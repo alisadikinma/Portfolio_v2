@@ -1225,7 +1225,7 @@
       </Transition>
     </Teleport>
 
-    <!-- CTA Section - Clean & Direct -->
+    <!-- CTA Section - AI Automation Expert (100% AI-Built Proof) -->
     <section
       v-if="showCTASection"
       class="relative py-20 bg-gradient-to-br from-primary-600 via-secondary-600 to-accent-600 overflow-hidden"
@@ -1236,18 +1236,60 @@
       </div>
 
       <div class="container-custom text-center relative z-10">
-        <h2 class="text-4xl md:text-5xl font-display font-bold text-white mb-6">
-          Let's Build Something Great
+        <!-- Heading with AI Proof Angle -->
+        <h2 class="text-4xl md:text-5xl font-display font-bold text-white mb-6 leading-tight">
+          Don't Believe AI Can Build A Site This Good?
         </h2>
-        <p class="text-xl text-white/90 mb-10 max-w-2xl mx-auto">
-          Ready to start your next project? Let's create something extraordinary together.
+        
+        <!-- Copy with AI Tech Stack -->
+        <p class="text-xl text-white/90 mb-8 max-w-3xl mx-auto leading-relaxed">
+          This website you're viewing is <strong class="text-white">100% built by AI Automation</strong>. Laravel + Vue.js + n8n + AI Agents. <span class="font-semibold text-white">ZERO manual coding</span>. 300+ hours of work automated to 3 days. If a complex website like this can be fully AI-powered, imagine how easy automating your business will be.
         </p>
-        <button
-          @click="$router.push('/contact')"
-          class="px-10 py-5 bg-white text-primary-600 font-bold text-lg rounded-xl hover:shadow-2xl hover:scale-105 transition-all duration-300"
-        >
-          Start a Project
-        </button>
+
+        <!-- Stats Badge -->
+        <div class="flex flex-wrap items-center justify-center gap-4 mb-10">
+          <div class="flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full border border-white/20">
+            <span class="text-2xl">⚡</span>
+            <span class="text-white font-semibold text-sm">300+ hours saved</span>
+          </div>
+          <div class="flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full border border-white/20">
+            <span class="text-2xl">🤖</span>
+            <span class="text-white font-semibold text-sm">100% AI-built</span>
+          </div>
+          <div class="flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full border border-white/20">
+            <span class="text-2xl">💰</span>
+            <span class="text-white font-semibold text-sm">95% cost reduction</span>
+          </div>
+        </div>
+
+        <!-- CTA Text -->
+        <p class="text-lg text-white/95 mb-8 font-medium">
+          Want to see how? <span class="text-white font-bold">FREE 30-minute consultation!</span>
+        </p>
+
+        <!-- CTA Buttons -->
+        <div class="flex flex-wrap items-center justify-center gap-4">
+          <!-- Primary CTA: WhatsApp -->
+          <a
+            :href="contactWhatsApp"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="group px-10 py-5 bg-white text-primary-600 font-bold text-lg rounded-xl hover:shadow-2xl hover:scale-105 transition-all duration-300 flex items-center gap-3"
+          >
+            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+            </svg>
+            <span>WhatsApp Me Now</span>
+          </a>
+
+          <!-- Secondary CTA: Contact Form -->
+          <button
+            @click="$router.push('/contact')"
+            class="px-10 py-5 bg-white/10 backdrop-blur-sm border-2 border-white text-white font-bold text-lg rounded-xl hover:bg-white hover:text-primary-600 hover:shadow-2xl hover:scale-105 transition-all duration-300"
+          >
+            Schedule Consultation
+          </button>
+        </div>
       </div>
     </section>
   </div>
@@ -1262,6 +1304,7 @@ import { useTestimonials } from '@/composables/useTestimonials'
 import { useGallery } from '@/composables/useGallery'
 import { useAboutSettings } from '@/composables/useAboutSettings'
 import { usePageSections } from '@/composables/usePageSections'
+import { useSettings } from '@/composables/useSettings'
 import { BaseLoader, MobileCarousel } from '@/components/base'
 import api from '@/services/api'
 
@@ -1275,8 +1318,17 @@ const { testimonials, isLoading: testimonialsLoading, fetchTestimonials } = useT
 const { galleries, loading: galleriesLoading, fetchGalleries, fetchGalleryItems } = useGallery()
 const { aboutSettings, loading: loadingAbout, heroName, heroTitle, heroBio, heroAvatar, heroSkills } = useAboutSettings()
 const { sections, fetchActiveSections } = usePageSections()
+const { settings, fetchSettings, getSettingValue } = useSettings()
 const currentTestimonialIndex = ref(0)
 const showAllSkills = ref(false)
+
+// WhatsApp Contact computed - gets phone from settings (profile.phone or contact.phone)
+const contactWhatsApp = computed(() => {
+  // Try profile.phone first, then contact.phone, then default
+  const phone = getSettingValue('profile.phone') || getSettingValue('contact.phone') || '+6281234567890'
+  const message = encodeURIComponent('Hi! I saw your AI-powered website and I\'m interested in discussing AI Automation for my business. Can we schedule a free consultation?')
+  return `https://wa.me/${phone.replace(/[^0-9]/g, '')}?text=${message}`
+})
 
 // Section visibility computed properties
 const showHeroSection = computed(() => {
@@ -1756,6 +1808,11 @@ onMounted(async () => {
   console.log('🔄 Fetching page sections...')
   await fetchActiveSections('homepage')
   console.log('📋 Sections loaded:', sections.value)
+
+  // Fetch settings for WhatsApp number
+  console.log('🔄 Fetching settings...')
+  await fetchSettings()
+  console.log('⚙️ Settings loaded:', settings.value.length, 'items')
 
   // About settings auto-loads via TanStack Query (instant with placeholderData)
   // No need to await - composable handles loading state automatically

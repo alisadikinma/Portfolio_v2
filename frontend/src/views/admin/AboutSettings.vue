@@ -985,6 +985,9 @@ async function handleSubmit() {
     console.log('✅ Settings updated successfully')
     uiStore.showSuccess('About settings updated successfully', 'Settings Saved')
 
+    // Reload settings from backend to get fresh data
+    await loadSettings()
+
     // Reset photo upload state
     photoFile.value = null
     photoRemoved.value = false

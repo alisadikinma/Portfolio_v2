@@ -6,7 +6,7 @@
         Site Settings
       </h1>
       <p class="text-neutral-600 dark:text-neutral-400">
-        Manage your site information, contact details, social media, and SEO settings
+        Manage your site information, contact details, and SEO settings
       </p>
     </div>
 
@@ -138,96 +138,19 @@
               placeholder="+1 (555) 123-4567"
             />
           </div>
-        </div>
-      </BaseCard>
 
-      <!-- Social Media Links Card -->
-      <BaseCard>
-        <div class="flex items-center justify-between mb-6">
-          <h2 class="text-xl font-display font-semibold text-neutral-900 dark:text-neutral-100">
-            Social Media Links
-          </h2>
-          <BaseButton
-            type="button"
-            button-type="secondary"
-            size="sm"
-            @click="addSocialMedia"
-          >
-            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-            </svg>
-            Add Link
-          </BaseButton>
-        </div>
-
-        <div v-if="formData.social_media.length === 0" class="text-center py-8 text-neutral-500 dark:text-neutral-400">
-          No social media links added yet. Click "Add Link" to get started.
-        </div>
-
-        <div v-else class="space-y-4">
-          <div
-            v-for="(link, index) in formData.social_media"
-            :key="index"
-            class="p-4 border border-neutral-200 dark:border-neutral-700 rounded-lg"
-          >
-            <div class="flex items-start justify-between mb-4">
-              <h3 class="font-medium text-neutral-900 dark:text-neutral-100">
-                Link #{{ index + 1 }}
-              </h3>
-              <button
-                type="button"
-                @click="removeSocialMedia(index)"
-                class="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                aria-label="Remove link"
-              >
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <!-- Platform -->
-              <div>
-                <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-                  Platform *
-                </label>
-                <input
-                  v-model="link.platform"
-                  type="text"
-                  class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="e.g., Twitter, LinkedIn"
-                  required
-                />
-              </div>
-
-              <!-- URL -->
-              <div>
-                <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-                  URL *
-                </label>
-                <input
-                  v-model="link.url"
-                  type="url"
-                  class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="https://..."
-                  required
-                />
-              </div>
-
-              <!-- Icon -->
-              <div>
-                <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-                  Icon Class
-                </label>
-                <input
-                  v-model="link.icon"
-                  type="text"
-                  class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="e.g., fab fa-twitter"
-                />
-              </div>
-            </div>
+          <!-- Location -->
+          <div>
+            <label for="location" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+              Location
+            </label>
+            <input
+              id="location"
+              v-model="formData.location"
+              type="text"
+              class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="City, Country"
+            />
           </div>
         </div>
       </BaseCard>
@@ -389,7 +312,7 @@ const formData = ref({
   site_logo: null,
   contact_email: '',
   contact_phone: '',
-  social_media: [],
+  location: '',
   meta_tags: [],
   analytics_code: ''
 })
@@ -413,19 +336,6 @@ const currentLogoUrl = computed(() => {
   const baseUrl = import.meta.env.VITE_API_URL.replace('/api', '')
   return `${baseUrl}${logo}`
 })
-
-// Social media methods
-function addSocialMedia() {
-  formData.value.social_media.push({
-    platform: '',
-    url: '',
-    icon: ''
-  })
-}
-
-function removeSocialMedia(index) {
-  formData.value.social_media.splice(index, 1)
-}
 
 // Meta tags methods
 function addMetaTag() {
@@ -477,16 +387,10 @@ async function handleSubmit() {
 
   try {
     // Validate required fields
-    const hasInvalidSocialMedia = formData.value.social_media.some(
-      link => !link.platform || !link.url
-    )
     const hasInvalidMetaTags = formData.value.meta_tags.some(
       tag => !tag.name || !tag.content
     )
 
-    if (hasInvalidSocialMedia) {
-      throw new Error('Please fill in all required social media fields (platform, URL)')
-    }
     if (hasInvalidMetaTags) {
       throw new Error('Please fill in all required meta tag fields (name, content)')
     }
@@ -499,6 +403,7 @@ async function handleSubmit() {
     if (formData.value.site_description) data.append('site_description', formData.value.site_description)
     if (formData.value.contact_email) data.append('contact_email', formData.value.contact_email)
     if (formData.value.contact_phone) data.append('contact_phone', formData.value.contact_phone)
+    if (formData.value.location) data.append('location', formData.value.location)
     if (formData.value.analytics_code) data.append('analytics_code', formData.value.analytics_code)
 
     // Site logo
@@ -507,16 +412,12 @@ async function handleSubmit() {
     }
 
     // Arrays as JSON strings
-    if (formData.value.social_media.length > 0) {
-      data.append('social_media', JSON.stringify(formData.value.social_media))
-    }
     if (formData.value.meta_tags.length > 0) {
       data.append('meta_tags', JSON.stringify(formData.value.meta_tags))
     }
 
     console.log('🔵 Sending request to API...', {
       hasLogo: !!logoFile.value,
-      socialMediaCount: formData.value.social_media.length,
       metaTagsCount: formData.value.meta_tags.length
     })
     
@@ -593,15 +494,16 @@ async function loadSettings() {
       site_logo: settingsStore.siteSettings.site_logo || null,
       contact_email: settingsStore.siteSettings.contact_email || '',
       contact_phone: settingsStore.siteSettings.contact_phone || '',
-      social_media: JSON.parse(JSON.stringify(settingsStore.siteSettings.social_media || [])),
-      meta_tags: JSON.parse(JSON.stringify(settingsStore.siteSettings.meta_tags || [])),
+      location: settingsStore.siteSettings.location || '',
+      meta_tags: Array.isArray(settingsStore.siteSettings.meta_tags) 
+        ? JSON.parse(JSON.stringify(settingsStore.siteSettings.meta_tags))
+        : [],
       analytics_code: settingsStore.siteSettings.analytics_code || ''
     }
     
     console.log('✅ Form data populated:', {
       site_name: formData.value.site_name,
       contact_email: formData.value.contact_email,
-      socialMediaCount: formData.value.social_media.length,
       metaTagsCount: formData.value.meta_tags.length
     })
   } catch (err) {
