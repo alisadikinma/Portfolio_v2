@@ -56,7 +56,7 @@ class ProjectController extends Controller
 
         // Support simple limit for fast queries (homepage, etc)
         if ($request->has('limit')) {
-            $limit = min($request->query('limit', 15), 50);
+            $limit = min($request->query('limit', 15), 100);
             $projects = $query->limit($limit)->get();
             
             return response()->json([

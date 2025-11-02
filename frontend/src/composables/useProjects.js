@@ -16,7 +16,9 @@ export function useProjects(initialParams = {}) {
   } = useQuery({
     queryKey: ['projects', queryParams],
     queryFn: async () => {
-      const response = await api.get('/projects', { params: queryParams.value })
+      // Use limit parameter to fetch all projects (skip pagination)
+      const params = { ...queryParams.value, limit: 100 }
+      const response = await api.get('/projects', { params })
       console.log('[useProjects] TanStack Query - Fetching projects list')
       return response.data
     },

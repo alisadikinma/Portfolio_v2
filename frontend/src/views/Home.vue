@@ -561,93 +561,151 @@
         <div v-else>
           <!-- Projects Carousel (Mobile) -->
           <div class="md:hidden">
-            <MobileCarousel :items="featuredProjects" :show-arrows="true" :show-dots="true">
+            <MobileCarousel :items="featuredProjects.slice(0, 6)" :show-arrows="true" :show-dots="true">
               <template #default="{ item }">
               <div
                 @click="$router.push(`/projects/${item.slug}`)"
-                class="group cursor-pointer card-elevated overflow-hidden hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 mx-1"
+                class="group relative cursor-pointer bg-white dark:bg-gray-800 rounded-2xl overflow-hidden hover:shadow-2xl transition-all duration-500 mx-1"
               >
-                <!-- Project Image -->
-                <div class="relative aspect-video bg-gradient-to-br from-primary-100 to-secondary-100 dark:from-primary-900/20 dark:to-secondary-900/20 overflow-hidden">
+                <!-- Premium Badge -->
+                <div class="absolute top-4 left-4 z-10 px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold rounded-full shadow-lg flex items-center gap-1.5">
+                  <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                  </svg>
+                  FEATURED
+                </div>
+
+                <!-- Image Section with Parallax Effect -->
+                <div class="relative aspect-[16/10] overflow-hidden bg-gradient-to-br from-primary-50 to-secondary-50 dark:from-gray-900 dark:to-gray-800">
+                  <div class="absolute inset-0 bg-gradient-to-br from-primary-500/10 to-secondary-500/10 group-hover:opacity-0 transition-opacity duration-500"></div>
                   <img
                     v-if="item.featured_image"
                     :src="item.featured_image"
                     :alt="item.title"
-                    class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                    class="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700 ease-out"
                   />
-                  <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  <!-- Gradient Overlay -->
+                  <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-60 group-hover:opacity-90 transition-opacity duration-300"></div>
+                  
+                  <!-- Hover CTA -->
+                  <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 transform group-hover:scale-100 scale-95">
+                    <div class="px-6 py-3 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm rounded-xl shadow-2xl flex items-center gap-2 border border-white/20">
+                      <span class="text-primary-600 dark:text-primary-400 font-bold text-sm">View Case Study</span>
+                      <svg class="w-5 h-5 text-primary-600 dark:text-primary-400 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                      </svg>
+                    </div>
+                  </div>
                 </div>
 
-                <!-- Content -->
-                <div class="p-6">
-                  <h3 class="text-2xl font-bold text-gray-900 dark:text-white mb-3 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
+                <!-- Content Section -->
+                <div class="p-6 space-y-4">
+                  <!-- Title -->
+                  <h3 class="text-xl font-bold text-gray-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors line-clamp-2">
                     {{ item.title }}
                   </h3>
-                  <p class="text-gray-600 dark:text-gray-400 mb-4 line-clamp-2">
+                  
+                  <!-- Description -->
+                  <p class="text-sm text-gray-600 dark:text-gray-400 line-clamp-2 leading-relaxed">
                     {{ item.description }}
                   </p>
-                  <div class="flex flex-wrap gap-2">
+                  
+                  <!-- Tech Stack -->
+                  <div class="flex flex-wrap gap-2 pt-2">
                     <span
-                      v-for="tech in item.technologies?.slice(0, 4)"
+                      v-for="tech in item.technologies?.slice(0, 3)"
                       :key="tech"
-                      class="px-3 py-1 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 rounded-lg text-xs font-semibold"
+                      class="px-3 py-1.5 bg-gradient-to-r from-primary-50 to-secondary-50 dark:from-primary-900/20 dark:to-secondary-900/20 text-primary-700 dark:text-primary-300 rounded-lg text-xs font-semibold border border-primary-100 dark:border-primary-800/50 hover:border-primary-300 dark:hover:border-primary-600 transition-colors"
                     >
                       {{ tech }}
                     </span>
+                    <span
+                      v-if="item.technologies?.length > 3"
+                      class="px-3 py-1.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-xs font-semibold"
+                    >
+                      +{{ item.technologies.length - 3 }}
+                    </span>
                   </div>
                 </div>
+
+                <!-- Bottom Glow Effect -->
+                <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-primary-500 via-secondary-500 to-accent-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left"></div>
               </div>
             </template>
           </MobileCarousel>
         </div>
 
           <!-- Projects Grid (Desktop) -->
-          <div class="hidden md:grid grid-cols-2 gap-8">
+          <div class="hidden md:grid grid-cols-3 gap-6">
           <div
-            v-for="(project, index) in featuredProjects"
+            v-for="(project, index) in featuredProjects.slice(0, 6)"
             :key="project.id"
             @click="$router.push(`/projects/${project.slug}`)"
-            class="group cursor-pointer card-elevated overflow-hidden hover:shadow-2xl hover:-translate-y-2 transition-all duration-300"
+            class="group relative cursor-pointer bg-white dark:bg-gray-800 rounded-xl overflow-hidden hover:shadow-2xl transition-all duration-500 hover:-translate-y-2"
           >
-            <!-- Project Image -->
-            <div class="relative aspect-video bg-gradient-to-br from-primary-100 to-secondary-100 dark:from-primary-900/20 dark:to-secondary-900/20 overflow-hidden">
+            <!-- Premium Badge -->
+            <div class="absolute top-4 left-4 z-10 px-3 py-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold rounded-full shadow-lg flex items-center gap-1.5">
+              <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+              </svg>
+              FEATURED
+            </div>
+
+            <!-- Image Section -->
+            <div class="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-primary-50 to-secondary-50 dark:from-gray-900 dark:to-gray-800">
+              <div class="absolute inset-0 bg-gradient-to-br from-primary-500/10 to-secondary-500/10 group-hover:opacity-0 transition-opacity duration-500"></div>
               <img
                 v-if="project.featured_image"
                 :src="project.featured_image"
                 :alt="project.title"
-                class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                class="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700 ease-out"
               />
-              <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-
-              <!-- View Button Overlay -->
-              <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                <span class="px-6 py-3 glass text-white font-semibold rounded-xl flex items-center gap-2">
-                  View Project
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+              <!-- Gradient Overlay -->
+              <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-60 group-hover:opacity-90 transition-opacity duration-300"></div>
+              
+              <!-- Hover CTA -->
+              <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 transform group-hover:scale-100 scale-95">
+                <div class="px-6 py-3 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm rounded-xl shadow-2xl flex items-center gap-2 border border-white/20">
+                  <span class="text-primary-600 dark:text-primary-400 font-bold text-sm">View Details</span>
+                  <svg class="w-4 h-4 text-primary-600 dark:text-primary-400 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
                   </svg>
-                </span>
+                </div>
               </div>
             </div>
 
-            <!-- Content -->
-            <div class="p-6">
-              <h3 class="text-2xl font-bold text-gray-900 dark:text-white mb-3 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
+            <!-- Content Section -->
+            <div class="p-5 space-y-3">
+              <!-- Title -->
+              <h3 class="text-lg font-bold text-gray-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors line-clamp-2">
                 {{ project.title }}
               </h3>
-              <p class="text-gray-600 dark:text-gray-400 mb-4 line-clamp-2">
+              
+              <!-- Description -->
+              <p class="text-sm text-gray-600 dark:text-gray-400 line-clamp-2 leading-relaxed">
                 {{ project.description }}
               </p>
-              <div class="flex flex-wrap gap-2">
+              
+              <!-- Tech Stack -->
+              <div class="flex flex-wrap gap-1.5 pt-2">
                 <span
-                  v-for="tech in project.technologies?.slice(0, 4)"
+                  v-for="tech in project.technologies?.slice(0, 3)"
                   :key="tech"
-                  class="px-3 py-1 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 rounded-lg text-xs font-semibold"
+                  class="px-2.5 py-1 bg-gradient-to-r from-primary-50 to-secondary-50 dark:from-primary-900/20 dark:to-secondary-900/20 text-primary-700 dark:text-primary-300 rounded-md text-xs font-semibold border border-primary-100 dark:border-primary-800/50 hover:border-primary-300 dark:hover:border-primary-600 transition-colors"
                 >
                   {{ tech }}
                 </span>
+                <span
+                  v-if="project.technologies?.length > 3"
+                  class="px-2.5 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-md text-xs font-semibold"
+                >
+                  +{{ project.technologies.length - 3 }}
+                </span>
               </div>
             </div>
+
+            <!-- Bottom Glow Effect -->
+            <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-primary-500 via-secondary-500 to-accent-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left"></div>
           </div>
         </div>
         </div>
@@ -1207,7 +1265,10 @@ import { usePageSections } from '@/composables/usePageSections'
 import { BaseLoader, MobileCarousel } from '@/components/base'
 import api from '@/services/api'
 
-const { projects: featuredProjects, isLoading: projectsLoading, fetchProjects } = useProjects()
+const { projects, isLoading: projectsLoading, fetchProjects } = useProjects()
+
+// Featured projects computed (backend already filters, but we create alias for clarity)
+const featuredProjects = computed(() => projects.value)
 const { posts: latestPosts, isLoading: postsLoading, fetchPosts } = usePosts()
 const { awards, isLoading: awardsLoading, fetchAwards } = useAwards()
 const { testimonials, isLoading: testimonialsLoading, fetchTestimonials } = useTestimonials()
@@ -1705,7 +1766,10 @@ onMounted(async () => {
   
   // PARALLEL fetch instead of sequential (FASTEST!)
   await Promise.all([
-    fetchProjects({ featured: true, limit: 4 }),
+    fetchProjects({ featured: true, limit: 6 }).then(() => {
+      console.log('🎯 Featured Projects fetched:', projects.value.length, 'items')
+      console.log('📦 Projects data:', projects.value)
+    }),
     fetchPosts({ limit: 3 }),
     fetchAwards({ featured: true, limit: 6 }),
     fetchGalleries({ is_active: true, limit: 6 }).then(() => {

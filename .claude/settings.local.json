@@ -28,7 +28,11 @@
       "Bash(php check_project_48.php:*)",
       "Bash(if exist check_project_48.php del check_project_48.php)",
       "Bash(php populate_descriptions.php:*)",
-      "Bash(awk:*)"
+      "Bash(awk:*)",
+      "Bash(mkdir:*)",
+      "Bash(node process-images.js:*)",
+      "Bash(powershell -Command \"(Get-ChildItem -Path ''frontend/public/storage/projects'' -Filter ''*.webp'' -File).Count\")",
+      "Bash(powershell -Command:*)"
     ],
     "deny": [],
     "ask": []

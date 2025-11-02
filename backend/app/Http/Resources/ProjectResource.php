@@ -70,15 +70,15 @@ class ProjectResource extends JsonResource
             'description' => $translation?->description ?? $this->description,
             'content' => $translation?->content ?? $this->content,
 
-            // SEO meta data
-            'seo' => [
-                'meta_title' => $translation?->meta_title ?? $translation?->title ?? $this->title,
-                'meta_description' => $translation?->meta_description ?? $translation?->description ?? $this->description,
-                'og_title' => $translation?->og_title,
-                'og_description' => $translation?->og_description,
-                'canonical_url' => $translation?->canonical_url,
-                'ai_summary' => $translation?->ai_summary,
-            ],
+            // SEO fields (flat structure for form compatibility)
+            'meta_title' => $this->meta_title ?? '',
+            'meta_description' => $this->meta_description ?? '',
+            'focus_keyword' => $this->focus_keyword ?? '',
+            'canonical_url' => $this->canonical_url ?? '',
+            'og_title' => $this->og_title ?? '',
+            'og_description' => $this->og_description ?? '',
+            'og_image' => $this->og_image ?? '',
+            'seo_score' => $this->seo_score ?? 0,
 
             // Translation metadata
             'available_translations' => $this->translations->pluck('language')->toArray(),

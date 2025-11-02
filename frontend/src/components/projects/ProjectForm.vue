@@ -38,6 +38,7 @@
       <RichTextEditor
         v-model="formData.description"
         placeholder="Write your project description..."
+        min-height="250px"
         :error="errors.description"
         @blur="validateField('description')"
       />
@@ -46,10 +47,10 @@
       </p>
     </div>
 
-    <!-- Featured Image -->
+    <!-- Image Thumbnail -->
     <div>
       <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-        Featured Image
+        Image Thumbnail
       </label>
       <ImageUploader
         v-model="formData.featured_image"
