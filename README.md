@@ -103,9 +103,10 @@ A modern, full-stack portfolio website with integrated blog, project showcase, a
 - ✅ 70% reduction in API calls
 
 ### Development Environment
-- **Server:** XAMPP (Apache + MySQL)
+- **Server:** XAMPP (Apache Port 80 + MySQL Port 3306)
 - **OS:** Windows 11
 - **Package Manager:** Composer (backend), npm (frontend)
+- **Working Directory:** `C:\xampp\htdocs\Portfolio_v2\`
 
 ---
 
@@ -892,10 +893,11 @@ All rights reserved. Unauthorized copying, distribution, or modification of this
 
 ---
 
-**Last Updated:** October 30, 2025 - Performance Optimization Phase 2
+**Last Updated:** November 2, 2025
 **Version:** 2.0.0
 **Status:** ✅ 100% COMPLETE - PRODUCTION READY
 **Performance:** ⚡ All pages < 500ms cached (83% faster repeat visits)
+**Environment:** Windows 11 + XAMPP (Apache:80, MySQL:3306)
 
 **📚 Complete Documentation:**
 - [PROJECT_STATUS.md](./PROJECT_STATUS.md) - Development tracking (100% complete)
