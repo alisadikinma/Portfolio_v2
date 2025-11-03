@@ -53,10 +53,17 @@
                 />
               </div>
               <div class="flex items-center gap-2 mb-3">
+                <BaseBadge v-if="project.domain" variant="accent" size="sm">{{ project.domain }}</BaseBadge>
                 <BaseBadge variant="success" size="sm">{{ project.status }}</BaseBadge>
                 <span class="text-sm text-neutral-500">{{ formatDate(project.created_at) }}</span>
               </div>
               <h3 class="text-xl font-semibold mb-2">{{ project.title }}</h3>
+
+              <!-- Impact Statement (added Nov 3, 2025) -->
+              <p v-if="project.impact_statement" class="text-primary-600 dark:text-primary-400 text-sm font-semibold mb-2 line-clamp-2">
+                {{ project.impact_statement }}
+              </p>
+
               <p class="text-neutral-600 dark:text-neutral-400 text-sm mb-4 line-clamp-2">
                 {{ project.description }}
               </p>
@@ -159,13 +166,32 @@ const activeFilter = ref('all')
 const currentPage = ref(1)
 const perPage = 9 // Show 9 projects per page
 
-const filters = [
-  { label: 'All Projects', value: 'all' },
-  { label: 'Featured', value: 'featured' },
-  { label: 'Web Apps', value: 'web' },
-  { label: 'Mobile', value: 'mobile' },
-  { label: 'Open Source', value: 'opensource' }
-]
+// Dynamic domain filters based on available domains in projects
+const availableDomains = computed(() => {
+  const domains = new Set()
+  projects.value.forEach(project => {
+    if (project.domain) {
+      domains.add(project.domain)
+    }
+  })
+  return Array.from(domains).sort()
+})
+
+// Build filters dynamically
+const filters = computed(() => {
+  const baseFilters = [
+    { label: 'All Projects', value: 'all' },
+    { label: 'Featured', value: 'featured' }
+  ]
+
+  // Add domain filters
+  const domainFilters = availableDomains.value.map(domain => ({
+    label: domain,
+    value: domain
+  }))
+
+  return [...baseFilters, ...domainFilters]
+})
 
 // Filtered projects based on active filter
 const filteredProjects = computed(() => {
@@ -173,11 +199,10 @@ const filteredProjects = computed(() => {
     return projects.value
   }
   if (activeFilter.value === 'featured') {
-    return projects.value.filter(p => p.featured)
+    return projects.value.filter(p => p.is_featured)
   }
-  return projects.value.filter(p =>
-    p.category?.toLowerCase() === activeFilter.value
-  )
+  // Filter by domain
+  return projects.value.filter(p => p.domain === activeFilter.value)
 })
 
 // Total filtered projects count

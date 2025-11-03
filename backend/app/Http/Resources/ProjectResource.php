@@ -94,6 +94,16 @@ class ProjectResource extends JsonResource
             'related_project_ids' => $this->related_project_ids ?? [],
             'related_projects' => $this->getRelatedProjectsForDisplay(),
 
+            // Case Study fields (added Nov 3, 2025)
+            'domain' => $this->domain,
+            'impact_statement' => $this->impact_statement,
+            'context' => $this->context,
+            'role' => $this->role,
+            'problem' => $this->problem,
+            'solution' => $this->solution,
+            'integration' => $this->integration,
+            'result' => $this->result,
+
             // Timestamps
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),

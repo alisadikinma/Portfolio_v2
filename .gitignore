@@ -220,3 +220,4 @@ backend/public/uploads/*
 
 # Keep small placeholders
 !backend/storage/app/public/projects/placeholder.png
+backend/nul

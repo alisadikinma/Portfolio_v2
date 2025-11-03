@@ -1,29 +1,9 @@
 <template>
   <div>
-    <!-- Hero Section -->
-    <section class="relative bg-gradient-to-br from-primary-50 via-white to-accent-50 dark:from-neutral-900 dark:via-neutral-800 dark:to-neutral-900 overflow-hidden">
-      <div class="absolute inset-0 opacity-10">
-        <div class="absolute -top-40 -right-40 w-80 h-80 bg-primary-500 rounded-full blur-3xl"></div>
-        <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-accent-500 rounded-full blur-3xl"></div>
-      </div>
-
-      <div class="container-custom relative py-20">
-        <div class="max-w-4xl mx-auto text-center">
-          <h1 class="text-4xl md:text-5xl lg:text-6xl font-display font-bold mb-6 animate-fade-in-up">
-            About <span class="text-gradient">{{ siteSettings?.site_name || 'Me' }}</span>
-          </h1>
-          <p class="text-xl text-neutral-600 dark:text-neutral-300 animate-fade-in-up animate-delay-100">
-            {{ siteSettings?.site_description || 'Passionate developer crafting digital experiences' }}
-          </p>
-        </div>
-      </div>
-    </section>
-
     <!-- Introduction Section -->
-    <section class="section bg-white dark:bg-neutral-800">
+    <section class="section bg-white dark:bg-neutral-800 pt-20">
       <div class="container-custom">
         <div class="max-w-4xl mx-auto">
-          <div class="h-10"></div>
           <div class="grid md:grid-cols-2 gap-12 items-center">
             <div class="aspect-square bg-neutral-200 dark:bg-neutral-700 rounded-2xl overflow-hidden">
               <img
@@ -64,8 +44,195 @@
       <div class="h-10"></div>
     </section>
 
+    <!-- Mission Section - REDESIGNED (Nov 3, 2025) -->
+    <section v-if="about?.mission" class="relative py-20 bg-gradient-to-br from-primary-600 via-secondary-600 to-accent-600 overflow-hidden">
+      <!-- Animated background -->
+      <div class="absolute inset-0 opacity-10">
+        <div class="absolute w-96 h-96 bg-white rounded-full blur-3xl top-0 -left-20 animate-blob"></div>
+        <div class="absolute w-96 h-96 bg-white rounded-full blur-3xl top-0 -right-20 animate-blob animation-delay-2000"></div>
+        <div class="absolute w-96 h-96 bg-white rounded-full blur-3xl -bottom-20 left-1/2 animate-blob animation-delay-4000"></div>
+      </div>
+
+      <div class="container-custom relative z-10">
+        <div class="max-w-4xl mx-auto text-center">
+          <!-- Icon -->
+          <div class="flex justify-center mb-6">
+            <div class="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
+              <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+              </svg>
+            </div>
+          </div>
+
+          <h2 class="text-4xl md:text-5xl font-display font-bold text-white mb-6">Our Mission</h2>
+          <p class="text-xl md:text-2xl text-white/95 leading-relaxed font-medium">
+            {{ about.mission }}
+          </p>
+
+          <!-- Decorative line -->
+          <div class="flex justify-center mt-8">
+            <div class="w-24 h-1 bg-white/30 rounded-full"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- What I Do Section - REDESIGNED (Nov 3, 2025) -->
+    <section v-if="about?.what_i_do && about.what_i_do.length" class="py-20 bg-neutral-50 dark:bg-neutral-900">
+      <div class="container-custom">
+        <div class="text-center mb-16">
+          <p class="text-primary-600 dark:text-primary-400 font-semibold mb-3 uppercase tracking-wider text-sm">
+            Services & Expertise
+          </p>
+          <h2 class="text-4xl md:text-5xl font-display font-bold mb-4 text-neutral-900 dark:text-white">
+            What I Do
+          </h2>
+          <p class="text-xl text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto">
+            Transform your business with cutting-edge solutions
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+          <div
+            v-for="(service, index) in about.what_i_do"
+            :key="index"
+            class="group relative bg-white dark:bg-neutral-800 rounded-2xl p-8 hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border border-neutral-200 dark:border-neutral-700"
+          >
+            <!-- Gradient background on hover -->
+            <div class="absolute inset-0 bg-gradient-to-br from-primary-50 to-secondary-50 dark:from-primary-900/10 dark:to-secondary-900/10 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+
+            <div class="relative z-10">
+              <!-- Icon - BIGGER & CLEARER -->
+              <div class="w-20 h-20 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-xl">
+                <!-- Robot icon for AI Automation -->
+                <svg v-if="service.icon === '🤖' || service.title.includes('Automation')" class="w-11 h-11 text-white" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2a2 2 0 012 2v1h4a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2h4V4a2 2 0 012-2zm0 5a1 1 0 00-1 1v2a1 1 0 102 0V8a1 1 0 00-1-1zm-3 4a1 1 0 100 2h6a1 1 0 100-2H9z"/>
+                </svg>
+                
+                <!-- Code icon for Development -->
+                <svg v-else-if="service.icon === '💻' || service.title.includes('Development')" class="w-11 h-11 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+                </svg>
+                
+                <!-- Consulting icon -->
+                <svg v-else class="w-11 h-11 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                </svg>
+              </div>
+
+              <!-- Title -->
+              <h3 class="text-2xl font-bold text-neutral-900 dark:text-white mb-4 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
+                {{ service.title }}
+              </h3>
+
+              <!-- Description -->
+              <p class="text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                {{ service.description }}
+              </p>
+            </div>
+
+            <!-- Bottom accent line -->
+            <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-primary-500 via-secondary-500 to-accent-500 rounded-b-2xl transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Approach Section - REDESIGNED (Nov 3, 2025) -->
+    <section v-if="about?.approach" class="relative py-20 bg-white dark:bg-neutral-800 overflow-hidden">
+      <!-- Background decoration -->
+      <div class="absolute inset-0 opacity-5">
+        <div class="absolute inset-0" style="background-image: radial-gradient(circle, currentColor 1px, transparent 1px); background-size: 40px 40px;"></div>
+      </div>
+
+      <div class="container-custom relative z-10">
+        <div class="max-w-5xl mx-auto">
+          <div class="grid md:grid-cols-2 gap-12 items-center">
+            <!-- Left: Icon + Title -->
+            <div>
+              <div class="inline-flex items-center gap-3 mb-6">
+                <div class="w-16 h-16 bg-gradient-to-br from-accent-500 to-secondary-500 rounded-2xl flex items-center justify-center">
+                  <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                </div>
+              </div>
+              <h2 class="text-4xl md:text-5xl font-display font-bold mb-6 text-neutral-900 dark:text-white">
+                My Approach
+              </h2>
+              <p class="text-sm uppercase tracking-wider text-primary-600 dark:text-primary-400 font-semibold">
+                How I deliver results
+              </p>
+            </div>
+
+            <!-- Right: Content -->
+            <div>
+              <p class="text-lg md:text-xl text-neutral-600 dark:text-neutral-300 leading-relaxed">
+                {{ about.approach }}
+              </p>
+
+              <!-- Decorative quote marks -->
+              <div class="flex gap-2 mt-6">
+                <div class="w-12 h-1 bg-gradient-to-r from-primary-500 to-transparent rounded-full"></div>
+                <div class="w-8 h-1 bg-gradient-to-r from-secondary-500 to-transparent rounded-full"></div>
+                <div class="w-4 h-1 bg-gradient-to-r from-accent-500 to-transparent rounded-full"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Collaboration Modes Section - REDESIGNED (Nov 3, 2025) -->
+    <section v-if="about?.collaboration_modes && about.collaboration_modes.length" class="py-20 bg-gradient-to-b from-neutral-50 to-white dark:from-neutral-900 dark:to-neutral-800">
+      <div class="container-custom">
+        <div class="text-center mb-16">
+          <p class="text-accent-600 dark:text-accent-400 font-semibold mb-3 uppercase tracking-wider text-sm">
+            Flexible Partnership
+          </p>
+          <h2 class="text-4xl md:text-5xl font-display font-bold mb-4 text-neutral-900 dark:text-white">
+            How We Can Work Together
+          </h2>
+          <p class="text-xl text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto">
+            Choose the collaboration model that fits your needs
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+          <div
+            v-for="(mode, index) in about.collaboration_modes"
+            :key="index"
+            class="group relative bg-white dark:bg-neutral-800 rounded-2xl p-8 shadow-lg hover:shadow-2xl transition-all duration-300 border border-neutral-200 dark:border-neutral-700"
+          >
+            <!-- Number badge -->
+            <div class="absolute -top-4 -left-4 w-12 h-12 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg">
+              {{ index + 1 }}
+            </div>
+
+            <!-- Content -->
+            <div class="mt-4">
+              <h3 class="text-2xl font-bold text-neutral-900 dark:text-white mb-4 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
+                {{ mode.mode }}
+              </h3>
+              <p class="text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                {{ mode.description }}
+              </p>
+            </div>
+
+            <!-- Hover arrow -->
+            <div class="mt-6 flex items-center gap-2 text-primary-600 dark:text-primary-400 font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
+              <span class="text-sm">Learn more</span>
+              <svg class="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- Skills Section - COMPACT -->
-    <section class="py-16 bg-neutral-50 dark:bg-neutral-900">
+    <section class="py-10 bg-white dark:bg-neutral-800">
       <div class="container-custom">
         <div class="text-center mb-8">
           <h2 class="text-3xl md:text-4xl font-display font-bold mb-3">Skills & Expertise</h2>
@@ -77,7 +244,7 @@
             <span
               v-for="skill in about.skills"
               :key="skill"
-              class="px-3 py-1.5 bg-white dark:bg-neutral-800 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:bg-primary-50 dark:hover:bg-primary-900/20 hover:text-primary-600 dark:hover:text-primary-400 transition-colors shadow-sm"
+              class="px-3 py-1.5 bg-neutral-50 dark:bg-neutral-900 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:bg-primary-50 dark:hover:bg-primary-900/20 hover:text-primary-600 dark:hover:text-primary-400 transition-colors shadow-sm border border-neutral-200 dark:border-neutral-700"
             >
               {{ skill }}
             </span>
@@ -89,7 +256,7 @@
             <span
               v-for="skill in defaultSkills"
               :key="skill"
-              class="px-3 py-1.5 bg-white dark:bg-neutral-800 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:bg-primary-50 dark:hover:bg-primary-900/20 hover:text-primary-600 dark:hover:text-primary-400 transition-colors shadow-sm"
+              class="px-3 py-1.5 bg-neutral-50 dark:bg-neutral-900 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:bg-primary-50 dark:hover:bg-primary-900/20 hover:text-primary-600 dark:hover:text-primary-400 transition-colors shadow-sm border border-neutral-200 dark:border-neutral-700"
             >
               {{ skill }}
             </span>
@@ -99,7 +266,7 @@
     </section>
 
     <!-- Experience Section - IMPROVED UI -->
-    <section v-if="displayExperiences && displayExperiences.length > 0" class="section bg-white dark:bg-neutral-800">
+    <section v-if="displayExperiences && displayExperiences.length > 0" class="section bg-neutral-50 dark:bg-neutral-900">
       <div class="container-custom">
         <div class="text-center mb-12">
           <h2 class="text-3xl md:text-4xl font-display font-bold mb-4">Experience</h2>
@@ -112,7 +279,7 @@
           <div 
             v-for="(exp, index) in displayExperiences" 
             :key="index" 
-            class="bg-neutral-50 dark:bg-neutral-900 rounded-xl p-6 hover:shadow-lg transition-shadow"
+            class="bg-white dark:bg-neutral-800 rounded-xl p-6 hover:shadow-lg transition-shadow"
           >
             <div class="flex items-start gap-6">
               <!-- Company Logo -->
@@ -120,7 +287,7 @@
                 <img 
                   :src="exp.company_logo" 
                   :alt="exp.company"
-                  class="w-16 h-16 object-contain rounded-lg bg-white dark:bg-neutral-800 p-2"
+                  class="w-16 h-16 object-contain rounded-lg bg-neutral-50 dark:bg-neutral-700 p-2"
                   @error="handleLogoError"
                 />
               </div>
@@ -216,7 +383,7 @@
     <div class="h-10"></div>
 
     <!-- Education Section -->
-    <section v-if="displayEducation && displayEducation.length > 0" class="section bg-neutral-50 dark:bg-neutral-900">
+    <section v-if="displayEducation && displayEducation.length > 0" class="section bg-white dark:bg-neutral-800">
       <div class="container-custom">
         <div class="text-center mb-12">
           <h2 class="text-3xl md:text-4xl font-display font-bold mb-4">Education</h2>
@@ -239,52 +406,7 @@
     </section>
     <div class="h-10"></div>
 
-    <!-- Social Links Section - Minimal Style -->
-    <section v-if="displaySocialLinks && displaySocialLinks.length > 0" class="py-12 bg-white dark:bg-neutral-800">
-      <div class="container-custom">
-        <div class="flex flex-col items-center gap-6">
-          <h3 class="text-lg font-medium text-neutral-600 dark:text-neutral-400">Connect with me</h3>
-          <div class="flex gap-4">
-            <a
-              v-for="(link, index) in displaySocialLinks"
-              :key="index"
-              :href="link.url"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="w-12 h-12 rounded-full bg-neutral-100 dark:bg-neutral-700 flex items-center justify-center hover:bg-primary-500 dark:hover:bg-primary-500 hover:text-white transition-all hover:scale-110 group"
-              :title="link.platform"
-            >
-              <!-- Use icon class from DB if available -->
-              <i v-if="link.icon" :class="link.icon + ' text-xl text-neutral-600 dark:text-neutral-300 group-hover:text-white'"></i>
-              <!-- Fallback SVG icons -->
-              <svg v-else-if="link.platform.toLowerCase() === 'github'" class="w-5 h-5 text-neutral-600 dark:text-neutral-300 group-hover:text-white transition-colors" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-              </svg>
-              <svg v-else-if="link.platform.toLowerCase() === 'linkedin'" class="w-5 h-5 text-neutral-600 dark:text-neutral-300 group-hover:text-white transition-colors" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/>
-              </svg>
-              <svg v-else-if="link.platform.toLowerCase() === 'twitter' || link.platform.toLowerCase() === 'x'" class="w-5 h-5 text-neutral-600 dark:text-neutral-300 group-hover:text-white transition-colors" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-              </svg>
-              <svg v-else-if="link.platform.toLowerCase() === 'youtube'" class="w-5 h-5 text-neutral-600 dark:text-neutral-300 group-hover:text-white transition-colors" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-              </svg>
-              <svg v-else-if="link.platform.toLowerCase() === 'instagram'" class="w-5 h-5 text-neutral-600 dark:text-neutral-300 group-hover:text-white transition-colors" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
-              </svg>
-              <svg v-else-if="link.platform.toLowerCase() === 'tiktok'" class="w-5 h-5 text-neutral-600 dark:text-neutral-300 group-hover:text-white transition-colors" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
-              </svg>
-              <svg v-else class="w-5 h-5 text-neutral-600 dark:text-neutral-300 group-hover:text-white transition-colors" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm0 22c-5.514 0-10-4.486-10-10s4.486-10 10-10 10 4.486 10 10-4.486 10-10 10zm1-16h-2v7h7v-2h-5z"/>
-              </svg>
-            </a>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- CTA Section -->
+    <!-- CTA Section with Social Media -->
     <section class="section bg-gradient-to-r from-primary-600 to-accent-600 text-white">
       <div class="h-10"></div>
       <div class="container-custom text-center">
@@ -295,6 +417,51 @@
         <BaseButton variant="secondary" size="lg" @click="$router.push('/contact')">
           Contact Me
         </BaseButton>
+
+        <!-- Social Media Links -->
+        <div v-if="about?.social_links && about.social_links.length > 0" class="mt-10 pt-8 border-t border-white/20">
+          <p class="text-white/80 mb-5 text-sm font-medium">Connect with me</p>
+          <div class="flex justify-center gap-4">
+            <a 
+              v-for="(link, index) in about.social_links" 
+              :key="index"
+              :href="link.url || link"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="w-12 h-12 bg-white/10 hover:bg-white/20 rounded-xl flex items-center justify-center transition-all hover:scale-110"
+              :title="typeof link === 'object' ? (link.platform?.charAt(0).toUpperCase() + link.platform?.slice(1)) : 'Social Link'"
+            >
+              <!-- LinkedIn -->
+              <svg v-if="(link.platform || link).toLowerCase().includes('linkedin')" class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/>
+              </svg>
+              <!-- GitHub -->
+              <svg v-else-if="(link.platform || link).toLowerCase().includes('github')" class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+              </svg>
+              <!-- Twitter/X -->
+              <svg v-else-if="(link.platform || link).toLowerCase().includes('twitter') || (link.platform || link).toLowerCase().includes('x.com')" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+              </svg>
+              <!-- Instagram -->
+              <svg v-else-if="(link.platform || link).toLowerCase().includes('instagram')" class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+              </svg>
+              <!-- YouTube -->
+              <svg v-else-if="(link.platform || link).toLowerCase().includes('youtube')" class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+              </svg>
+              <!-- Facebook -->
+              <svg v-else-if="(link.platform || link).toLowerCase().includes('facebook')" class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+              </svg>
+              <!-- Generic link icon for others -->
+              <svg v-else class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+              </svg>
+            </a>
+          </div>
+        </div>
       </div>
       <div class="h-10"></div>
     </section>
@@ -377,7 +544,6 @@ import api from '@/services/api'
 import { useRouter } from 'vue-router'
 
 const about = ref(null)
-const siteSettings = ref(null)
 const loading = ref(true)
 const error = ref(null)
 const expandedExperience = ref({})
@@ -419,13 +585,6 @@ const displayExperiences = computed(() => {
 const displayEducation = computed(() => {
   if (about.value?.education && Array.isArray(about.value.education) && about.value.education.length > 0) {
     return about.value.education
-  }
-  return []
-})
-
-const displaySocialLinks = computed(() => {
-  if (about.value?.social_links && Array.isArray(about.value.social_links) && about.value.social_links.length > 0) {
-    return about.value.social_links
   }
   return []
 })
@@ -504,17 +663,13 @@ const handleImageError = (event) => {
 }
 
 onMounted(async () => {
-  await Promise.all([
-    fetchAboutData(),
-    fetchSiteSettings()
-  ])
+  await fetchAboutData()
 })
 
 // Re-fetch data when navigating to this page
 watch(() => router.currentRoute.value.path, (newPath) => {
   if (newPath === '/about') {
     fetchAboutData()
-    fetchSiteSettings()
   }
 })
 
@@ -539,20 +694,6 @@ async function fetchAboutData() {
     loading.value = false
   }
 }
-
-async function fetchSiteSettings() {
-  try {
-    const response = await api.get('/settings/site', {
-      params: { _t: Date.now() }
-    })
-
-    if (response.data.success && response.data.data) {
-      siteSettings.value = response.data.data
-    }
-  } catch (err) {
-    console.error('Failed to fetch site settings:', err)
-  }
-}
 </script>
 
 <style scoped>
@@ -565,5 +706,33 @@ async function fetchSiteSettings() {
 .modal-enter-from,
 .modal-leave-to {
   opacity: 0;
+}
+
+/* Blob animation */
+@keyframes blob {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  25% {
+    transform: translate(20px, -50px) scale(1.1);
+  }
+  50% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
+  75% {
+    transform: translate(50px, 50px) scale(1.05);
+  }
+}
+
+.animate-blob {
+  animation: blob 7s infinite;
+}
+
+.animation-delay-2000 {
+  animation-delay: 2s;
+}
+
+.animation-delay-4000 {
+  animation-delay: 4s;
 }
 </style>

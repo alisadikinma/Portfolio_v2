@@ -12,7 +12,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('projects', function (Blueprint $table) {
-            $table->longText('content')->nullable()->after('description');
+            // Check if column doesn't exist before adding
+            if (!Schema::hasColumn('projects', 'content')) {
+                $table->longText('content')->nullable()->after('description');
+            }
         });
     }
 
@@ -22,7 +25,9 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('projects', function (Blueprint $table) {
-            $table->dropColumn('content');
+            if (Schema::hasColumn('projects', 'content')) {
+                $table->dropColumn('content');
+            }
         });
     }
 };

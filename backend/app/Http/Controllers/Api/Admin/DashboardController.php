@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Post;
 use App\Models\Project;
 use App\Models\Gallery;
+use App\Models\Contact;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 
@@ -38,6 +39,11 @@ class DashboardController extends Controller
                 'views' => [
                     'total' => $this->getTotalViews(),
                     'change' => $this->calculateViewsChange(),
+                ],
+                'contacts' => [
+                    'total' => Contact::count(),
+                    'unread' => Contact::where('is_read', false)->count(),
+                    'change' => $this->calculateChange('contacts'),
                 ],
             ];
 
@@ -76,6 +82,24 @@ class DashboardController extends Controller
             // Recent activity (last 10 activities)
             $recentActivity = $this->getRecentActivity();
 
+            // Recent contacts (5 latest unread)
+            $recentContacts = Contact::select('id', 'name', 'email', 'subject', 'is_read', 'created_at')
+                ->where('is_read', false)
+                ->latest()
+                ->take(5)
+                ->get()
+                ->map(function ($contact) {
+                    return [
+                        'id' => $contact->id,
+                        'name' => $contact->name,
+                        'email' => $contact->email,
+                        'subject' => $contact->subject,
+                        'is_read' => $contact->is_read,
+                        'date' => $contact->created_at->format('M d, Y'),
+                        'time' => $contact->created_at->diffForHumans(),
+                    ];
+                });
+
             return response()->json([
                 'success' => true,
                 'data' => [
@@ -83,6 +107,7 @@ class DashboardController extends Controller
                     'recentProjects' => $recentProjects,
                     'recentPosts' => $recentPosts,
                     'recentActivity' => $recentActivity,
+                    'recentContacts' => $recentContacts,
                 ],
             ]);
         } catch (\Exception $e) {
@@ -105,6 +130,7 @@ class DashboardController extends Controller
             'projects' => Project::class,
             'posts' => Post::class,
             'gallery' => Gallery::class,
+            'contacts' => Contact::class,
             default => null,
         };
 
@@ -232,6 +258,23 @@ class DashboardController extends Controller
                 'description' => $item->title . ' added to gallery',
                 'time' => $item->created_at->diffForHumans(),
                 'timestamp' => $item->created_at->timestamp,
+            ];
+        }
+
+        // Recent contacts
+        $recentContacts = Contact::select('id', 'name', 'subject', 'created_at')
+            ->latest()
+            ->take(2)
+            ->get();
+
+        foreach ($recentContacts as $contact) {
+            $activities[] = [
+                'id' => 'contact_' . $contact->id,
+                'type' => 'contact',
+                'title' => 'New contact message',
+                'description' => $contact->name . ' sent a message: ' . $contact->subject,
+                'time' => $contact->created_at->diffForHumans(),
+                'timestamp' => $contact->created_at->timestamp,
             ];
         }
 

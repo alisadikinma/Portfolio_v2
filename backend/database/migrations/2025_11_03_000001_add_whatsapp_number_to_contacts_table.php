@@ -12,7 +12,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('contacts', function (Blueprint $table) {
-            $table->string('whatsapp_number', 20)->after('email')->nullable();
+            // Check if column doesn't exist before adding
+            if (!Schema::hasColumn('contacts', 'whatsapp_number')) {
+                $table->string('whatsapp_number', 20)->after('email')->nullable();
+            }
         });
     }
 
@@ -22,7 +25,9 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('contacts', function (Blueprint $table) {
-            $table->dropColumn('whatsapp_number');
+            if (Schema::hasColumn('contacts', 'whatsapp_number')) {
+                $table->dropColumn('whatsapp_number');
+            }
         });
     }
 };

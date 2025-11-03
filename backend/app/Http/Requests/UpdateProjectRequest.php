@@ -68,6 +68,16 @@ class UpdateProjectRequest extends FormRequest
             'cta_phone_number' => ['nullable', 'string', 'max:20'],
             'related_project_ids' => ['nullable', 'array'],
             'related_project_ids.*' => ['integer', 'exists:projects,id'],
+
+            // Case Study fields (added Nov 3, 2025)
+            'domain' => ['nullable', 'string', 'max:100'],
+            'impact_statement' => ['nullable', 'string', 'max:255'],
+            'context' => ['nullable', 'string'],
+            'role' => ['nullable', 'string', 'max:100'],
+            'problem' => ['nullable', 'string'],
+            'solution' => ['nullable', 'string'],
+            'integration' => ['nullable', 'string'],
+            'result' => ['nullable', 'string'],
         ];
     }
 

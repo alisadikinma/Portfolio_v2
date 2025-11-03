@@ -493,6 +493,149 @@
       </div>
     </div>
 
+    <!-- Case Study Fields Section (Collapsible) -->
+    <div class="border border-neutral-200 dark:border-neutral-700 rounded-lg">
+      <button
+        type="button"
+        @click="showCaseStudySection = !showCaseStudySection"
+        class="w-full px-4 py-3 bg-neutral-50 dark:bg-neutral-800 flex items-center justify-between hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
+      >
+        <div class="flex items-center gap-2">
+          <svg class="w-5 h-5 text-neutral-600 dark:text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          <span class="font-medium text-neutral-900 dark:text-neutral-100">Case Study Details</span>
+          <span class="text-sm text-neutral-500 dark:text-neutral-400">(Optional)</span>
+        </div>
+        <svg
+          class="w-5 h-5 text-neutral-600 dark:text-neutral-400 transition-transform"
+          :class="{ 'rotate-180': showCaseStudySection }"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      <div v-show="showCaseStudySection" class="p-4 space-y-4 bg-white dark:bg-neutral-900">
+        <!-- Domain -->
+        <div>
+          <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+            Domain / Category
+          </label>
+          <select
+            v-model="formData.domain"
+            class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          >
+            <option value="">Select domain...</option>
+            <option value="AI Automation">AI Automation</option>
+            <option value="Web Development">Web Development</option>
+            <option value="Mobile Apps">Mobile Apps</option>
+            <option value="IoT Solutions">IoT Solutions</option>
+            <option value="Data Analytics">Data Analytics</option>
+            <option value="Cloud Computing">Cloud Computing</option>
+          </select>
+        </div>
+
+        <!-- Impact Statement -->
+        <div>
+          <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+            Impact Statement <span class="text-xs text-neutral-500">(One-line summary, max 255 chars)</span>
+          </label>
+          <input
+            v-model="formData.impact_statement"
+            type="text"
+            maxlength="255"
+            class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            placeholder="e.g., Reduced processing time by 70% and saved $100K annually"
+          />
+          <p class="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+            {{ formData.impact_statement?.length || 0 }}/255 characters
+          </p>
+        </div>
+
+        <!-- Context -->
+        <div>
+          <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+            Context / Background
+          </label>
+          <textarea
+            v-model="formData.context"
+            rows="3"
+            class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+            placeholder="Describe the business background and why this project was needed..."
+          ></textarea>
+        </div>
+
+        <!-- Role -->
+        <div>
+          <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+            Your Role
+          </label>
+          <input
+            v-model="formData.role"
+            type="text"
+            maxlength="100"
+            class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            placeholder="e.g., Lead AI Architect & Implementation Lead"
+          />
+        </div>
+
+        <!-- Problem -->
+        <div>
+          <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+            Problem / Challenge
+          </label>
+          <textarea
+            v-model="formData.problem"
+            rows="3"
+            class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+            placeholder="Describe the specific challenges or problems that needed to be solved..."
+          ></textarea>
+        </div>
+
+        <!-- Solution -->
+        <div>
+          <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+            Solution Implemented
+          </label>
+          <textarea
+            v-model="formData.solution"
+            rows="4"
+            class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+            placeholder="Explain the technical solution you implemented..."
+          ></textarea>
+        </div>
+
+        <!-- Integration -->
+        <div>
+          <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+            Integration & Tech Stack
+          </label>
+          <textarea
+            v-model="formData.integration"
+            rows="3"
+            class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+            placeholder="List systems integrated and technologies used..."
+          ></textarea>
+        </div>
+
+        <!-- Result -->
+        <div>
+          <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+            Results & Outcomes
+          </label>
+          <textarea
+            v-model="formData.result"
+            rows="3"
+            class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+            placeholder="Quantify the measurable results achieved (e.g., 80% faster, $100K saved, 95% accuracy)"
+          ></textarea>
+        </div>
+      </div>
+    </div>
+
     <!-- Form Actions -->
     <div class="flex items-center justify-end gap-4 pt-6 border-t border-neutral-200 dark:border-neutral-700">
       <BaseButton
@@ -561,7 +704,16 @@ const formData = ref({
   meta_description: '',
   focus_keyword: '',
   canonical_url: '',
-  related_project_ids: []
+  related_project_ids: [],
+  // Case Study fields (added Nov 3, 2025)
+  domain: '',
+  impact_statement: '',
+  context: '',
+  role: '',
+  problem: '',
+  solution: '',
+  integration: '',
+  result: ''
 })
 
 // Form errors
@@ -570,6 +722,7 @@ const errors = ref({})
 // UI state
 const showSeoSection = ref(false)
 const showRelatedProjectsSection = ref(false)
+const showCaseStudySection = ref(false)
 const newTechnology = ref('')
 const imagePreview = ref(null)
 
@@ -601,9 +754,18 @@ if (props.project) {
     meta_description: props.project.meta_description || '',
     focus_keyword: props.project.focus_keyword || '',
     canonical_url: props.project.canonical_url || '',
-    related_project_ids: Array.isArray(props.project.related_project_ids) 
-      ? props.project.related_project_ids 
-      : []
+    related_project_ids: Array.isArray(props.project.related_project_ids)
+      ? props.project.related_project_ids
+      : [],
+    // Case Study fields (added Nov 3, 2025)
+    domain: props.project.domain || '',
+    impact_statement: props.project.impact_statement || '',
+    context: props.project.context || '',
+    role: props.project.role || '',
+    problem: props.project.problem || '',
+    solution: props.project.solution || '',
+    integration: props.project.integration || '',
+    result: props.project.result || ''
   }
   
   // Load selected projects for related projects section

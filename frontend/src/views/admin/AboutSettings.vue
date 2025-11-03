@@ -825,6 +825,77 @@
         </div>
       </BaseCard>
 
+      <!-- Hero & About Enhancement Card -->
+      <BaseCard>
+        <h2 class="text-xl font-display font-semibold text-neutral-900 dark:text-neutral-100 mb-6">
+          Hero & About Page Enhancement
+        </h2>
+
+        <!-- Hero Tagline -->
+        <div class="mb-6">
+          <label for="hero_tagline" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+            Hero Tagline <span class="text-xs text-neutral-500">(Main positioning statement)</span>
+          </label>
+          <input
+            id="hero_tagline"
+            v-model="formData.hero_tagline"
+            type="text"
+            maxlength="255"
+            class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="AI Automation Architect & Senior Tech Consultant"
+          />
+        </div>
+
+        <!-- Availability Note -->
+        <div class="mb-6">
+          <label for="availability_note" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+            Availability Note <span class="text-xs text-neutral-500">(Current status)</span>
+          </label>
+          <input
+            id="availability_note"
+            v-model="formData.availability_note"
+            type="text"
+            maxlength="255"
+            class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="Available for consulting and freelance projects"
+          />
+        </div>
+
+        <!-- Mission Statement -->
+        <div class="mb-6">
+          <label for="mission" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+            Mission Statement
+          </label>
+          <textarea
+            id="mission"
+            v-model="formData.mission"
+            rows="3"
+            class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="Empowering businesses through intelligent automation..."
+          ></textarea>
+        </div>
+
+        <!-- Approach -->
+        <div class="mb-6">
+          <label for="approach" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+            Approach / Methodology
+          </label>
+          <textarea
+            id="approach"
+            v-model="formData.approach"
+            rows="4"
+            class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="I believe in combining technical excellence with business impact..."
+          ></textarea>
+        </div>
+
+        <p class="text-sm text-neutral-500 dark:text-neutral-400 mt-4">
+          <strong>Note:</strong> Trust Strip, What I Do, and Collaboration Modes are complex arrays.
+          For now, they are seeded with default values.
+          Advanced editor coming soon.
+        </p>
+      </BaseCard>
+
       <!-- Form Actions -->
       <div class="flex items-center justify-end gap-4">
         <BaseButton
@@ -895,7 +966,20 @@ const formData = ref({
     projects_delivered: '50+',
     cost_savings: '$2M+',
     success_rate: '95%'
-  }
+  },
+  // Hero & About Enhancement fields (added Nov 3, 2025)
+  hero_tagline: '',
+  availability_note: '',
+  trust_strip: {
+    years_experience: '17+',
+    projects_delivered: '56+',
+    clients_served: '25+',
+    success_rate: '95%'
+  },
+  mission: '',
+  what_i_do: [],
+  approach: '',
+  collaboration_modes: []
 })
 
 const photoFile = ref(null)
@@ -1102,6 +1186,29 @@ async function handleSubmit() {
       data.append('statistics', JSON.stringify(formData.value.statistics))
     }
 
+    // Hero & About Enhancement fields (added Nov 3, 2025)
+    if (formData.value.hero_tagline) {
+      data.append('hero_tagline', formData.value.hero_tagline)
+    }
+    if (formData.value.availability_note) {
+      data.append('availability_note', formData.value.availability_note)
+    }
+    if (formData.value.trust_strip) {
+      data.append('trust_strip', JSON.stringify(formData.value.trust_strip))
+    }
+    if (formData.value.mission) {
+      data.append('mission', formData.value.mission)
+    }
+    if (formData.value.what_i_do && formData.value.what_i_do.length > 0) {
+      data.append('what_i_do', JSON.stringify(formData.value.what_i_do))
+    }
+    if (formData.value.approach) {
+      data.append('approach', formData.value.approach)
+    }
+    if (formData.value.collaboration_modes && formData.value.collaboration_modes.length > 0) {
+      data.append('collaboration_modes', JSON.stringify(formData.value.collaboration_modes))
+    }
+
     await settingsStore.updateAboutSettings(data)
     uiStore.showSuccess('About settings updated successfully', 'Settings Saved')
 
@@ -1171,7 +1278,20 @@ async function loadSettings() {
         projects_delivered: settingsStore.aboutSettings.statistics?.projects_delivered || '50+',
         cost_savings: settingsStore.aboutSettings.statistics?.cost_savings || '$2M+',
         success_rate: settingsStore.aboutSettings.statistics?.success_rate || '95%'
-      }
+      },
+      // Hero & About Enhancement fields (added Nov 3, 2025)
+      hero_tagline: settingsStore.aboutSettings.hero_tagline || '',
+      availability_note: settingsStore.aboutSettings.availability_note || '',
+      trust_strip: settingsStore.aboutSettings.trust_strip || {
+        years_experience: '17+',
+        projects_delivered: '56+',
+        clients_served: '25+',
+        success_rate: '95%'
+      },
+      mission: settingsStore.aboutSettings.mission || '',
+      what_i_do: settingsStore.aboutSettings.what_i_do || [],
+      approach: settingsStore.aboutSettings.approach || '',
+      collaboration_modes: settingsStore.aboutSettings.collaboration_modes || []
     }
   } catch (err) {
     console.error('❌ Failed to load settings:', err)

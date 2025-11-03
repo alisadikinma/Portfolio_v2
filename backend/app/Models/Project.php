@@ -49,6 +49,15 @@ class Project extends Model
         'meta_keywords',
         // Related projects
         'related_project_ids',
+        // Case Study fields (added Nov 3, 2025)
+        'domain',
+        'impact_statement',
+        'context',
+        'role',
+        'problem',
+        'solution',
+        'integration',
+        'result',
     ];
 
     protected $casts = [

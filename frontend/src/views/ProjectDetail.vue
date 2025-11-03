@@ -183,6 +183,90 @@
             </picture>
           </div>
 
+          <!-- Case Study Template (added Nov 3, 2025) -->
+          <div class="max-w-4xl mx-auto space-y-8">
+            <!-- Header with Domain and Impact Statement -->
+            <header v-if="project.domain || project.impact_statement || project.role" class="mb-8">
+              <div class="flex flex-wrap items-center gap-3 mb-4">
+                <span v-if="project.domain" class="px-4 py-2 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded-full text-sm font-semibold">
+                  {{ project.domain }}
+                </span>
+                <span v-if="project.role" class="text-neutral-600 dark:text-neutral-400 text-sm">
+                  <strong>Role:</strong> {{ project.role }}
+                </span>
+              </div>
+              <h1 class="text-4xl md:text-5xl font-display font-bold text-neutral-900 dark:text-neutral-100 mb-4">
+                {{ project.title }}
+              </h1>
+              <p v-if="project.impact_statement" class="text-xl md:text-2xl text-primary-600 dark:text-primary-400 font-semibold">
+                {{ project.impact_statement }}
+              </p>
+            </header>
+
+            <!-- Context Section -->
+            <section v-if="project.context" class="bg-white dark:bg-neutral-800 rounded-xl p-8 shadow-lg">
+              <h2 class="text-2xl font-bold text-neutral-900 dark:text-neutral-100 mb-4 flex items-center gap-2">
+                <span class="text-3xl">📋</span>
+                Background & Context
+              </h2>
+              <p class="text-lg text-neutral-700 dark:text-neutral-300 leading-relaxed whitespace-pre-line">
+                {{ project.context }}
+              </p>
+            </section>
+
+            <!-- Problem Section -->
+            <section v-if="project.problem" class="bg-red-50 dark:bg-red-900/10 rounded-xl p-8 shadow-lg border border-red-200 dark:border-red-900/30">
+              <h2 class="text-2xl font-bold text-neutral-900 dark:text-neutral-100 mb-4 flex items-center gap-2">
+                <span class="text-3xl">⚠️</span>
+                The Challenge
+              </h2>
+              <p class="text-lg text-neutral-700 dark:text-neutral-300 leading-relaxed whitespace-pre-line">
+                {{ project.problem }}
+              </p>
+            </section>
+
+            <!-- Solution Section -->
+            <section v-if="project.solution" class="bg-blue-50 dark:bg-blue-900/10 rounded-xl p-8 shadow-lg border border-blue-200 dark:border-blue-900/30">
+              <h2 class="text-2xl font-bold text-neutral-900 dark:text-neutral-100 mb-4 flex items-center gap-2">
+                <span class="text-3xl">💡</span>
+                The Solution
+              </h2>
+              <p class="text-lg text-neutral-700 dark:text-neutral-300 leading-relaxed whitespace-pre-line">
+                {{ project.solution }}
+              </p>
+            </section>
+
+            <!-- Integration Section -->
+            <section v-if="project.integration" class="bg-white dark:bg-neutral-800 rounded-xl p-8 shadow-lg">
+              <h2 class="text-2xl font-bold text-neutral-900 dark:text-neutral-100 mb-4 flex items-center gap-2">
+                <span class="text-3xl">🔧</span>
+                Integration & Technology
+              </h2>
+              <p class="text-lg text-neutral-700 dark:text-neutral-300 leading-relaxed whitespace-pre-line">
+                {{ project.integration }}
+              </p>
+            </section>
+
+            <!-- Results Section -->
+            <section v-if="project.result" class="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/10 dark:to-emerald-900/10 rounded-xl p-8 shadow-lg border-2 border-green-300 dark:border-green-900/30">
+              <h2 class="text-2xl font-bold text-neutral-900 dark:text-neutral-100 mb-4 flex items-center gap-2">
+                <span class="text-3xl">🎯</span>
+                Results & Impact
+              </h2>
+              <p class="text-lg text-neutral-700 dark:text-neutral-300 leading-relaxed whitespace-pre-line">
+                {{ project.result }}
+              </p>
+            </section>
+
+            <!-- Regular Description (fallback if no case study data) -->
+            <section v-if="!project.context && !project.problem && !project.solution && project.description" class="bg-white dark:bg-neutral-800 rounded-xl p-8 shadow-lg">
+              <h2 class="text-2xl font-bold text-neutral-900 dark:text-neutral-100 mb-4">
+                Project Description
+              </h2>
+              <div v-html="project.content || project.description" class="prose dark:prose-invert max-w-none"></div>
+            </section>
+          </div>
+
         </div>
 
         <!-- Related Projects Section (BEFORE CTA) -->

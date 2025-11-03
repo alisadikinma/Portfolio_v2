@@ -75,14 +75,14 @@
 
             <!-- Right: Content -->
             <div class="order-1 sm:order-2 text-center sm:text-left">
-              <!-- Badge -->
-              <div class="inline-flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 glass rounded-full mb-4 md:mb-6 animate-fade-in-down">
+              <!-- Badge - Availability Note -->
+              <div v-if="availabilityNote" class="inline-flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 glass rounded-full mb-4 md:mb-6 animate-fade-in-down">
                 <span class="relative flex h-2 w-2">
                   <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-400 opacity-75"></span>
                   <span class="relative inline-flex rounded-full h-2 w-2 bg-accent-500"></span>
                 </span>
                 <span class="text-xs md:text-sm font-semibold text-gray-700 dark:text-gray-300">
-                  Available for Freelance Work
+                  {{ availabilityNote }}
                 </span>
               </div>
 
@@ -90,8 +90,13 @@
               <h1 class="text-3xl md:text-5xl lg:text-6xl font-display font-bold text-gray-900 dark:text-white mb-3 md:mb-4 leading-tight animate-fade-in-up">
                 {{ heroName }}
               </h1>
-              
-              <h2 v-if="heroTitle" class="text-xl md:text-3xl font-display font-bold text-gradient mb-4 md:mb-6 animate-fade-in-up animate-delay-100">
+
+              <!-- Hero Tagline (new positioning) -->
+              <h2 v-if="heroTagline" class="text-xl md:text-3xl font-display font-bold text-gradient mb-4 md:mb-6 animate-fade-in-up animate-delay-100">
+                {{ heroTagline }}
+              </h2>
+              <!-- Fallback to old title if no tagline -->
+              <h2 v-else-if="heroTitle" class="text-xl md:text-3xl font-display font-bold text-gradient mb-4 md:mb-6 animate-fade-in-up animate-delay-100">
                 {{ heroTitle }}
               </h2>
 
@@ -100,7 +105,7 @@
                 {{ heroBio }}
               </p>
 
-              <!-- CTA Buttons -->
+              <!-- CTA Buttons - FIXED WhatsApp (Nov 3, 2025) -->
               <div class="flex flex-wrap gap-2 md:gap-3 mb-4 md:mb-6 animate-fade-in-up animate-delay-300 justify-center sm:justify-start">
                 <button
                   @click="$router.push('/projects')"
@@ -113,15 +118,32 @@
                     </svg>
                   </span>
                 </button>
-                <button
-                  @click="$router.push('/contact')"
-                  class="px-6 py-3 md:px-8 md:py-4 glass text-gray-700 dark:text-gray-300 text-sm md:text-base font-semibold rounded-xl hover:shadow-lg transition-all duration-300"
+                <!-- WhatsApp CTA with inviting effect -->
+                <a
+                  :href="contactWhatsApp"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="group relative px-6 py-3 md:px-8 md:py-4 glass text-gray-700 dark:text-gray-300 text-sm md:text-base font-semibold rounded-xl hover:shadow-lg transition-all duration-300 inline-flex items-center gap-2 overflow-hidden"
                 >
-                  Let's Talk
-                </button>
+                  <!-- Pulse effect background -->
+                  <span class="absolute inset-0 bg-green-500/10 rounded-xl animate-pulse group-hover:bg-green-500/20 transition-colors"></span>
+                  
+                  <!-- WhatsApp Icon -->
+                  <svg class="w-5 h-5 md:w-6 md:h-6 text-green-600 dark:text-green-400 relative z-10" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+                  </svg>
+                  
+                  <!-- Text with animation -->
+                  <span class="relative z-10 group-hover:translate-x-0.5 transition-transform">
+                    WhatsApp Me
+                  </span>
+                  
+                  <!-- Shine effect on hover -->
+                  <span class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-in-out"></span>
+                </a>
               </div>
 
-              <!-- Tech Stack / Skills - RESPONSIVE (MAX 2 LINES) -->
+              <!-- Tech Stack / Skills - FIXED (Nov 3, 2025) -->
               <div v-if="heroSkills.length > 0" class="animate-fade-in-up animate-delay-400">
                 <p class="text-xs text-gray-500 dark:text-gray-500 mb-1.5 md:mb-2 uppercase tracking-wider font-semibold">
                   SKILLS
@@ -145,24 +167,17 @@
                     See More ({{ heroSkills.length - 3 }}+)
                   </button>
                 </div>
-                <!-- Desktop: Max 6 skills (2 lines max) + See More -->
+                <!-- Desktop: Show ALL skills (no limit, no See More button) -->
                 <div class="hidden md:block">
-                  <div class="flex flex-wrap gap-1.5 justify-start max-h-[52px] overflow-hidden">
+                  <div class="flex flex-wrap gap-1.5 justify-start">
                     <span
-                      v-for="skill in (showAllSkills ? heroSkills : heroSkills.slice(0, 6))"
+                      v-for="skill in heroSkills"
                       :key="skill"
                       class="px-2.5 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-xs font-medium text-gray-700 dark:text-gray-300 hover:border-primary-500 hover:text-primary-600 dark:hover:text-primary-400 transition-all"
                     >
                       {{ skill }}
                     </span>
                   </div>
-                  <button
-                    v-if="heroSkills.length > 6 && !showAllSkills"
-                    @click="showAllSkills = true"
-                    class="mt-2 text-xs text-primary-600 dark:text-primary-400 hover:underline font-semibold"
-                  >
-                    See More ({{ heroSkills.length - 6 }}+)
-                  </button>
                 </div>
               </div>
             </div>
@@ -171,14 +186,15 @@
       </div>
     </section>
 
-    <!-- Stats Section - Clean Cards -->
+    <!-- Stats Section - FIXED Alignment (Nov 3, 2025) -->
     <section v-if="stats.length > 0" class="py-6 md:py-8 bg-white dark:bg-gray-950">
       <div class="container-custom">
-        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-6">
+        <!-- Use flex with justify-center for perfect centering with 4 items -->
+        <div class="flex flex-wrap justify-center gap-3 md:gap-6">
           <div
             v-for="(stat, index) in stats"
             :key="stat.label"
-            class="card-elevated p-4 md:p-6 lg:p-8 text-center hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+            class="card-elevated p-4 md:p-6 lg:p-8 text-center hover:shadow-xl hover:-translate-y-1 transition-all duration-300 w-[calc(50%-0.375rem)] sm:w-[calc(25%-1.125rem)] md:w-[calc(25%-1.125rem)]"
             :class="`animate-fade-in-up animate-delay-${index * 100}`"
           >
             <div class="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-gradient mb-1 md:mb-2 break-words">
@@ -248,6 +264,10 @@
                   'award-next': index > activeAwardIndex
                 }"
                 :style="getCardStyle(index)"
+                @mouseenter="isHoveringAwardCard = true"
+                @mouseleave="isHoveringAwardCard = false"
+                @touchstart="isHoveringAwardCard = true"
+                @touchend="isHoveringAwardCard = false"
               >
                 <!-- Card with glass morphism -->
                 <div 
@@ -1419,26 +1439,20 @@ const orderedSections = computed(() => {
 
 // About settings now managed by useAboutSettings composable
 
-// Stats computed from aboutSettings
+// Hero enhancements computed properties (added Nov 3, 2025)
+const heroTagline = computed(() => aboutSettings.value?.hero_tagline || '')
+const availabilityNote = computed(() => aboutSettings.value?.availability_note || '')
+
+// Stats computed from aboutSettings - FIXED (Nov 3, 2025)
 const stats = computed(() => {
-  if (!aboutSettings.value?.statistics) {
-    return [
-      { value: '16+', label: 'Years Experience' },
-      { value: '1K', label: 'Followers' },
-      { value: '50+', label: 'Projects Delivered' },
-      { value: '$2M+', label: 'Cost Savings' },
-      { value: '95%', label: 'Success Rate' }
-    ]
-  }
+  const s = aboutSettings.value?.statistics || {}
   
-  const s = aboutSettings.value.statistics
   return [
-    { value: s.years_experience || '16+', label: 'Years Experience' },
-    { value: s.followers || '1K', label: 'Followers' },
-    { value: s.projects_delivered || '50+', label: 'Projects Delivered' },
-    { value: s.cost_savings || '$2M+', label: 'Cost Savings' },
-    { value: s.success_rate || '95%', label: 'Success Rate' }
-  ].filter(stat => stat.value) // Only show stats with values
+    { value: s.years_experience || '17+', label: 'YEARS EXPERIENCE' },
+    { value: s.projects_delivered || '56+', label: 'PROJECTS DELIVERED' },
+    { value: s.cost_savings || '$2M+', label: 'COST SAVINGS' },
+    { value: s.success_rate || '95%', label: 'SUCCESS RATE' }
+  ].filter(stat => stat.value)
 })
 
 // fetchAboutSettings now managed by useAboutSettings composable
@@ -1470,6 +1484,7 @@ const carouselContainer = ref(null)
 const mouseX = ref(0)
 const mouseY = ref(0)
 const isHoveringCarousel = ref(false)
+const isHoveringAwardCard = ref(false) // NEW: Track if hovering any award card
 const screenSize = ref('desktop') // 'mobile' | 'tablet' | 'desktop'
 const windowWidth = ref(window.innerWidth)
 
@@ -1845,8 +1860,13 @@ const rotateTestimonials = () => {
   }
 }
 
-// Auto-rotate awards carousel
+// Auto-rotate awards carousel (FIXED: pause on hover - Nov 3, 2025)
 const rotateAwards = () => {
+  // Don't rotate if user is hovering over a card (reading)
+  if (isHoveringAwardCard.value) {
+    return
+  }
+  
   if (awards.value.length > 1) {
     activeAwardIndex.value = (activeAwardIndex.value + 1) % awards.value.length
   }

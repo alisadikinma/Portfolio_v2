@@ -32,7 +32,10 @@
       "Bash(mkdir:*)",
       "Bash(node process-images.js:*)",
       "Bash(powershell -Command \"(Get-ChildItem -Path ''frontend/public/storage/projects'' -Filter ''*.webp'' -File).Count\")",
-      "Bash(powershell -Command:*)"
+      "Bash(powershell -Command:*)",
+      "Bash(cat:*)",
+      "Bash(nul)",
+      "Bash(php verify_fields.php:*)"
     ],
     "deny": [],
     "ask": []
