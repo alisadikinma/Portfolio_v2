@@ -135,171 +135,63 @@
       </div>
     </section>
 
+    <div class="h-10"></div>
+    <!-- CTA Section (Component) -->
+    <CTASection
+      v-if="showCTASection"
+      heading="Let's Work Together"
+      description="Ready to transform your business with <strong>AI Automation & Custom Development</strong>? Let's discuss how I can help you achieve your goals."
+      whatsapp-message="Hi! I saw your portfolio and I'd like to discuss a project with you."
+      :social-links="about?.social_links"
+      :show-social-links="true"
+    />    
+
     <!-- Gallery Items Modal -->
-    <Teleport to="body">
-      <Transition name="modal">
-        <div
-          v-if="showGalleryModal && selectedGallery"
-          class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl"
-          @click.self="closeGalleryModal"
-        >
-          <div class="relative w-full max-w-7xl bg-white dark:bg-neutral-900 rounded-3xl shadow-2xl overflow-hidden border border-neutral-200 dark:border-neutral-800">
-            <!-- Modal Header -->
-            <div class="relative p-8 border-b border-neutral-200 dark:border-neutral-800 bg-gradient-to-r from-primary-50 to-accent-50 dark:from-primary-950/50 dark:to-accent-950/50">
-              <div class="flex items-start justify-between">
-                <div class="flex-1 pr-12">
-                  <div class="flex items-center gap-3 mb-3">
-                    <span v-if="selectedGallery.company" class="px-3 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded-full text-sm font-semibold">
-                      {{ selectedGallery.company }}
-                    </span>
-                    <span v-if="selectedGallery.period" class="text-sm text-neutral-500 dark:text-neutral-400">
-                      {{ selectedGallery.period }}
-                    </span>
-                  </div>
-                  <h3 class="text-3xl font-bold text-neutral-900 dark:text-white mb-2">
-                    {{ selectedGallery.title }}
-                  </h3>
-                  <p v-if="selectedGallery.description" class="text-neutral-600 dark:text-neutral-400">
-                    {{ selectedGallery.description }}
-                  </p>
-                </div>
-                <button
-                  @click="closeGalleryModal"
-                  class="flex-shrink-0 p-3 hover:bg-white/50 dark:hover:bg-neutral-800 rounded-2xl transition-colors group"
-                >
-                  <svg class="w-6 h-6 text-neutral-400 group-hover:text-neutral-900 dark:group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            <!-- Modal Body -->
-            <div class="p-8 max-h-[65vh] overflow-y-auto custom-scrollbar">
-              <!-- Loading State -->
-              <div v-if="loadingItems" class="flex items-center justify-center py-20">
-                <div class="relative">
-                  <div class="w-16 h-16 border-4 border-primary-200 dark:border-primary-900 rounded-full"></div>
-                  <div class="absolute inset-0 w-16 h-16 border-4 border-primary-600 border-t-transparent rounded-full animate-spin"></div>
-                </div>
-              </div>
-
-              <!-- Gallery Grid -->
-              <div v-else-if="galleryItems.length > 0" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                <div
-                  v-for="(item, index) in galleryItems"
-                  :key="item.id"
-                  class="relative group cursor-pointer aspect-square rounded-2xl overflow-hidden bg-neutral-100 dark:bg-neutral-800"
-                  :style="{ animationDelay: `${index * 30}ms` }"
-                  @click="openLightbox(index)"
-                >
-                  <img
-                    :src="item.file_url || getImageUrl(item.file_path)"
-                    :alt="item.title"
-                    class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                    @error="handleImageError"
-                  />
-                  <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <div class="absolute bottom-0 left-0 right-0 p-4">
-                      <p class="text-white text-sm font-semibold truncate">
-                        {{ item.title }}
-                      </p>
-                    </div>
-                  </div>
-                  <!-- Zoom Icon -->
-                  <div class="absolute top-3 right-3 w-8 h-8 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7"/>
-                    </svg>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Empty State -->
-              <div v-else class="text-center py-20">
-                <div class="inline-flex items-center justify-center w-20 h-20 bg-neutral-100 dark:bg-neutral-800 rounded-full mb-6">
-                  <svg class="w-10 h-10 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                  </svg>
-                </div>
-                <p class="text-xl text-neutral-500 dark:text-neutral-400">No photos available</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
+    <BaseGalleryModal
+      :show="showGalleryModal"
+      :title="selectedGallery?.title || ''"
+      :description="selectedGallery?.description || ''"
+      :company="selectedGallery?.company || ''"
+      :period="selectedGallery?.period || ''"
+      :items="galleryItems"
+      :loading="loadingItems"
+      @close="closeGalleryModal"
+      @open-lightbox="openLightbox"
+    />
 
     <!-- Lightbox -->
-    <Teleport to="body">
-      <Transition name="fade">
-        <div
-          v-if="showLightbox"
-          class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black"
-          @click.self="closeLightbox"
-        >
-          <!-- Close Button -->
-          <button
-            @click="closeLightbox"
-            class="absolute top-6 right-6 p-4 bg-white/10 hover:bg-white/20 rounded-full transition-all duration-300 backdrop-blur-md z-10 group"
-          >
-            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
-          </button>
-
-          <!-- Previous Button -->
-          <button
-            v-if="currentPhotoIndex > 0"
-            @click="previousPhoto"
-            class="absolute left-6 p-4 bg-white/10 hover:bg-white/20 rounded-full transition-all duration-300 backdrop-blur-md"
-          >
-            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-            </svg>
-          </button>
-
-          <!-- Image -->
-          <div class="max-w-7xl max-h-full flex flex-col items-center">
-            <img
-              :src="galleryItems[currentPhotoIndex]?.file_url || getImageUrl(galleryItems[currentPhotoIndex]?.file_path)"
-              :alt="galleryItems[currentPhotoIndex]?.title"
-              class="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl"
-            />
-            <div v-if="galleryItems[currentPhotoIndex]?.title" class="mt-6 text-center">
-              <p class="text-white text-lg font-semibold">
-                {{ galleryItems[currentPhotoIndex].title }}
-              </p>
-            </div>
-          </div>
-
-          <!-- Next Button -->
-          <button
-            v-if="currentPhotoIndex < galleryItems.length - 1"
-            @click="nextPhoto"
-            class="absolute right-6 p-4 bg-white/10 hover:bg-white/20 rounded-full transition-all duration-300 backdrop-blur-md"
-          >
-            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-            </svg>
-          </button>
-
-          <!-- Counter -->
-          <div class="absolute bottom-6 left-1/2 transform -translate-x-1/2 px-6 py-3 bg-white/10 backdrop-blur-md rounded-full text-white text-sm font-medium">
-            {{ currentPhotoIndex + 1 }} / {{ galleryItems.length }}
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
+    <BaseLightbox
+      :show="showLightbox"
+      :current-image="galleryItems[currentPhotoIndex]?.file_url || getImageUrl(galleryItems[currentPhotoIndex]?.file_path)"
+      :current-title="galleryItems[currentPhotoIndex]?.title"
+      :current-index="currentPhotoIndex"
+      :total-items="galleryItems.length"
+      @close="closeLightbox"
+      @prev="previousPhoto"
+      @next="nextPhoto"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { BaseButton, BaseLoader } from '@/components/base'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { BaseButton, BaseLoader, BaseGalleryModal, BaseLightbox } from '@/components/base'
+import CTASection from '@/components/CTASection.vue'
 import { useGallery } from '@/composables/useGallery'
+import { usePageSections } from '@/composables/usePageSections'
+import api from '@/services/api'
 
 const { galleries, loading, error, fetchGalleries, fetchGalleryItems } = useGallery()
+const { sections, fetchActiveSections } = usePageSections()
+
+// About data for social links
+const about = ref(null)
+
+// CTA visibility
+const showCTASection = computed(() => {
+  const section = sections.value.find(s => s.section_type === 'cta')
+  return section ? section.is_active : false
+})
 
 // Modal state
 const showGalleryModal = ref(false)
@@ -419,10 +311,26 @@ const handleKeydown = (e) => {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
+  await fetchActiveSections('gallery')
+  await fetchAboutData()
   loadGalleries()
   window.addEventListener('keydown', handleKeydown)
 })
+
+async function fetchAboutData() {
+  try {
+    const response = await api.get('/settings/about', {
+      params: { _t: Date.now() }
+    })
+
+    if (response.data.success && response.data.data) {
+      about.value = response.data.data
+    }
+  } catch (err) {
+    console.error('Failed to fetch about data:', err)
+  }
+}
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleKeydown)
@@ -524,42 +432,6 @@ onBeforeUnmount(() => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
-}
-
-.modal-enter-active,
-.modal-leave-active {
-  transition: opacity 0.3s ease;
-}
-
-.modal-enter-from,
-.modal-leave-to {
-  opacity: 0;
-}
-
-/* Custom Scrollbar */
-.custom-scrollbar::-webkit-scrollbar {
-  width: 8px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 4px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.3);
-}
-
-.dark .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
-}
-
-.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
 }
 
 /* Line Clamp */

@@ -26,6 +26,12 @@
         </div>
 
         <div v-else-if="awards.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <!-- DEBUG: Show raw data structure -->
+          <div class="col-span-full bg-yellow-100 dark:bg-yellow-900/20 border border-yellow-400 rounded-lg p-4 mb-4">
+            <h4 class="font-bold text-yellow-900 dark:text-yellow-200 mb-2">DEBUG: First Award Data</h4>
+            <pre class="text-xs overflow-auto">{{ JSON.stringify(awards[0], null, 2) }}</pre>
+          </div>
+
           <div
             v-for="award in awards"
             :key="award.id"
@@ -51,8 +57,11 @@
               <p class="text-sm text-primary-600 dark:text-primary-400 font-semibold mb-3 uppercase tracking-wide">
                 {{ award.issuing_organization }} • {{ formatYear(award.award_date) }}
               </p>
-              <p class="text-sm text-gray-400 line-clamp-3 mb-4">
-                {{ stripHtml(award.description) || 'Recognized for outstanding achievement and excellence in the field.' }}
+              <p v-if="award.description" class="text-sm text-gray-600 dark:text-gray-400 line-clamp-3 mb-4">
+                {{ stripHtml(award.description) }}
+              </p>
+              <p v-else class="text-sm text-gray-500 dark:text-gray-500 line-clamp-3 mb-4 italic">
+                No description available
               </p>
 
               <!-- Credential Info -->
@@ -131,34 +140,37 @@
       <Transition name="modal">
         <div
           v-if="showGalleryModal && selectedAward"
-          class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          class="fixed inset-0 z-50 flex items-start justify-center p-4 md:p-8 bg-black/90 backdrop-blur-sm overflow-y-auto"
           @click.self="closeGalleryModal"
         >
-          <div class="relative w-full max-w-6xl bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden">
+          <div class="relative w-full max-w-7xl bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-950 rounded-3xl shadow-2xl overflow-hidden my-8">
+            <!-- Close Button - Top Right -->
+            <button
+              @click="closeGalleryModal"
+              class="absolute top-6 right-6 z-10 p-2.5 bg-white/90 dark:bg-gray-800/90 hover:bg-white dark:hover:bg-gray-700 rounded-full shadow-lg transition-all duration-200 group"
+            >
+              <svg class="w-5 h-5 text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+
             <!-- Modal Header -->
-            <div class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800">
-              <div>
-                <h3 class="text-2xl font-bold text-gray-900 dark:text-white">
-                  {{ selectedAward.award_title }}
-                </h3>
-                <p class="text-sm text-primary-600 dark:text-primary-400 mt-1">
-                  {{ selectedAward.issuing_organization }} • {{ formatYear(selectedAward.award_date) }}
-                </p>
-              </div>
-              <button
-                @click="closeGalleryModal"
-                class="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-              >
-                <svg class="w-6 h-6 text-gray-400 hover:text-gray-900 dark:hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                </svg>
-              </button>
+            <div class="px-8 pt-8 pb-6">
+              <h3 class="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-3">
+                {{ selectedAward.award_title }}
+              </h3>
+              <p v-if="selectedAward.description" class="text-base text-gray-600 dark:text-gray-400 leading-relaxed max-w-4xl">
+                {{ stripHtml(selectedAward.description) }}
+              </p>
+              <p v-else class="text-base text-gray-500 dark:text-gray-500 leading-relaxed max-w-4xl italic">
+                No detailed description available for this award.
+              </p>
             </div>
 
             <!-- Modal Body - Gallery Grid -->
-            <div class="p-6 max-h-[70vh] overflow-y-auto">
+            <div class="px-8 pb-8">
               <!-- Loading State -->
-              <div v-if="loadingGallery" class="flex items-center justify-center py-20">
+              <div v-if="loadingGallery" class="flex items-center justify-center py-32">
                 <svg class="animate-spin h-12 w-12 text-primary-600" fill="none" viewBox="0 0 24 24">
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                   <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -166,35 +178,48 @@
               </div>
 
               <!-- Gallery Grid -->
-              <div v-else-if="galleryPhotos.length > 0" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              <div v-else-if="galleryPhotos.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div
                   v-for="(photo, index) in galleryPhotos"
                   :key="photo.id"
-                  class="relative group cursor-pointer aspect-square rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800"
+                  class="relative group cursor-pointer aspect-[4/3] rounded-2xl overflow-hidden bg-gray-200 dark:bg-gray-800 shadow-md hover:shadow-xl transition-all duration-300"
                   @click="openLightbox(index)"
                 >
                   <img
                     :src="photo.image"
                     :alt="photo.title"
-                    class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                    class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     @error="handleImageError"
                   />
-                  <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div class="absolute bottom-0 left-0 right-0 p-3">
-                      <p class="text-white text-sm font-semibold truncate">
-                        {{ photo.title }}
+                  <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <div class="absolute bottom-0 left-0 right-0 p-4">
+                      <p class="text-white text-sm font-medium truncate">
+                        {{ photo.title || 'Gallery Image' }}
                       </p>
+                    </div>
+                  </div>
+                  
+                  <!-- View Icon on Hover -->
+                  <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <div class="p-3 bg-white/20 backdrop-blur-sm rounded-full">
+                      <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                      </svg>
                     </div>
                   </div>
                 </div>
               </div>
 
               <!-- Empty State -->
-              <div v-else class="text-center py-20">
-                <svg class="mx-auto h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                </svg>
-                <p class="mt-4 text-gray-500 dark:text-gray-400">No photos available in this gallery.</p>
+              <div v-else class="text-center py-32">
+                <div class="w-20 h-20 mx-auto mb-6 bg-gray-200 dark:bg-gray-800 rounded-2xl flex items-center justify-center">
+                  <svg class="h-10 w-10 text-gray-400 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                  </svg>
+                </div>
+                <h4 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">No Photos Available</h4>
+                <p class="text-gray-500 dark:text-gray-400">This gallery doesn't have any photos yet.</p>
               </div>
             </div>
           </div>
@@ -282,10 +307,13 @@ const formatYear = (date) => {
 }
 
 const stripHtml = (html) => {
-  if (!html) return ''
+  if (!html) {
+    return ''
+  }
   const tmp = document.createElement('div')
   tmp.innerHTML = html
-  return tmp.textContent || tmp.innerText || ''
+  const result = tmp.textContent || tmp.innerText || ''
+  return result
 }
 
 const openGalleryModal = async (award) => {
@@ -363,8 +391,8 @@ const handleKeydown = (e) => {
   }
 }
 
-onMounted(async () => {
-  await fetchAwards()
+onMounted(() => {
+  // TanStack Query auto-fetches on mount, no need to call fetchAwards()
   window.addEventListener('keydown', handleKeydown)
 })
 

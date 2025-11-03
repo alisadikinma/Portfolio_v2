@@ -151,20 +151,42 @@
         </div>
       </div>
     </section>
+    <div class="h-10"></div>
+    <!-- CTA Section (Component) -->
+    <CTASection
+      v-if="showCTASection"
+      heading="Let's Build Something Amazing"
+      description="Have a project in mind? Let's discuss how I can help turn your ideas into reality with <strong>innovative solutions & cutting-edge technology</strong>."
+      whatsapp-message="Hi! I'm interested in working together on a project. Can we discuss?"
+      :social-links="aboutSettings?.social_links"
+      :show-social-links="true"
+    />    
   </div>
-  <div class="h-10"></div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useProjects } from '@/composables/useProjects'
+import { usePageSections } from '@/composables/usePageSections'
+import { useAboutSettings } from '@/composables/useAboutSettings'
 import { BaseButton, BaseCard, BaseBadge, BaseLoader } from '@/components/base'
+import CTASection from '@/components/CTASection.vue'
+import { useRouter } from 'vue-router'
 
 const { projects, isLoading, fetchProjects } = useProjects()
+const { sections, fetchActiveSections } = usePageSections()
+const { aboutSettings } = useAboutSettings()
+const router = useRouter()
 
 const activeFilter = ref('all')
 const currentPage = ref(1)
 const perPage = 9 // Show 9 projects per page
+
+// CTA visibility (controlled by page sections)
+const showCTASection = computed(() => {
+  const section = sections.value.find(s => s.section_type === 'cta')
+  return section ? section.is_active : false
+})
 
 // Dynamic domain filters based on available domains in projects
 const availableDomains = computed(() => {
@@ -272,8 +294,9 @@ watch(activeFilter, () => {
   currentPage.value = 1
 })
 
-// Fetch projects on mount
+// Fetch projects and page sections on mount
 onMounted(async () => {
+  await fetchActiveSections('projects') // Fetch page sections for Projects Page
   await fetchProjects()
 })
 </script>

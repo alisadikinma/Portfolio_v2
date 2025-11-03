@@ -425,10 +425,12 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '@/services/api'
 import { useMetaTags } from '@/composables/useMetaTags'
+import { useSettings } from '@/composables/useSettings'
 
 const route = useRoute()
 const router = useRouter()
 const { updatePageMeta, updateMetaTag } = useMetaTags()
+const { fetchSettings, getSettingValue } = useSettings()
 
 // State
 const project = ref(null)
@@ -590,13 +592,17 @@ function getDefaultCta() {
   }
 }
 
-// WhatsApp message with project title
+// WhatsApp link - ambil dari settings table (key: contact_phone)
 const whatsappLink = computed(() => {
-  if (!project.value) return 'https://wa.me/6281380163758'
+  const phone = getSettingValue('contact_phone') || '+6281234567890'
   
-  const message = `Hi Ali Ma, I'm interested in your solution: ${project.value.title}`
+  if (!project.value) {
+    return `https://wa.me/${phone.replace(/[^0-9]/g, '')}`
+  }
+  
+  const message = `Hi! I'm interested in your solution: ${project.value.title}`
   const encodedMessage = encodeURIComponent(message)
-  return `https://wa.me/6281380163758?text=${encodedMessage}`
+  return `https://wa.me/${phone.replace(/[^0-9]/g, '')}?text=${encodedMessage}`
 })
 
 // Fetch project from API
@@ -679,6 +685,15 @@ const updateMetaTags = () => {
     og_image: thumbnailUrl.value
   })
 }
+
+// Fetch settings saat mounted
+onMounted(async () => {
+  try {
+    await fetchSettings()
+  } catch (error) {
+    console.error('Failed to fetch settings:', error)
+  }
+})
 
 // Watch route changes
 watch(

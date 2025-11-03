@@ -187,7 +187,7 @@
     </section>
 
     <!-- Stats Section - FIXED Alignment (Nov 3, 2025) -->
-    <section v-if="stats.length > 0" class="py-6 md:py-8 bg-white dark:bg-gray-950">
+    <section v-if="stats.length > 0" class="pt-2 pb-8 md:pt-3 md:pb-12 bg-white dark:bg-gray-950">
       <div class="container-custom">
         <!-- Use flex with justify-center for perfect centering with 4 items -->
         <div class="flex flex-wrap justify-center gap-3 md:gap-6">
@@ -1159,127 +1159,33 @@
       </Transition>
     </Teleport>
 
-    <!-- Gallery Modal -->
-    <Teleport to="body">
-      <Transition name="modal">
-        <div
-          v-if="showGalleryModal && selectedAward"
-          class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
-          @click.self="closeGalleryModal"
-        >
-          <div class="relative w-full max-w-6xl bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden">
-            <!-- Modal Header -->
-            <div class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800">
-              <div>
-                <h3 class="text-2xl font-bold text-gray-900 dark:text-white">
-                  {{ selectedAward.award_title }}
-                </h3>
-                <p class="text-sm text-purple-600 dark:text-purple-400 mt-1">
-                  {{ selectedAward.issuing_organization }} • {{ formatYear(selectedAward.award_date) }}
-                </p>
-              </div>
-              <button
-                @click="closeGalleryModal"
-                class="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-              >
-                <svg class="w-6 h-6 text-gray-400 hover:text-gray-900 dark:hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                </svg>
-              </button>
-            </div>
+    <!-- Gallery Modal for Awards -->
+    <BaseGalleryModal
+      :show="showGalleryModal"
+      :title="selectedAward?.award_title || ''"
+      :description="selectedAward?.description || ''"
+      :company="selectedAward?.issuing_organization || ''"
+      :period="formatYear(selectedAward?.award_date)"
+      :items="galleryPhotos"
+      :loading="loadingGallery"
+      empty-message="No photos available in this gallery."
+      @close="closeGalleryModal"
+      @open-lightbox="openLightbox"
+    />
 
-            <!-- Modal Body - Gallery Grid -->
-            <div class="p-6 max-h-[70vh] overflow-y-auto">
-              <BaseLoader v-if="loadingGallery" text="Loading gallery..." class="py-20" />
+    <!-- Lightbox for Awards Gallery -->
+    <BaseLightbox
+      :show="showLightbox"
+      :current-image="currentAwardImage"
+      :current-title="currentAwardTitle"
+      :current-index="currentPhotoIndex"
+      :total-items="galleryPhotos.length"
+      @close="closeLightbox"
+      @next="nextPhoto"
+      @prev="previousPhoto"
+    />
 
-              <div v-else-if="galleryPhotos.length > 0" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                <div
-                  v-for="(photo, index) in galleryPhotos"
-                  :key="photo.id"
-                  class="relative group cursor-pointer aspect-square rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800"
-                  @click="openLightbox(index)"
-                >
-                  <img
-                    :src="photo.image"
-                    :alt="photo.title"
-                    class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                    @error="handleImageError"
-                  />
-                  <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div class="absolute bottom-0 left-0 right-0 p-3">
-                      <p class="text-white text-sm font-semibold truncate">
-                        {{ photo.title }}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div v-else class="text-center py-20">
-                <p class="text-gray-400">No photos available in this gallery.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
-
-    <!-- Lightbox for full image view -->
-    <Teleport to="body">
-      <Transition name="fade">
-        <div
-          v-if="showLightbox"
-          class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black"
-          @click.self="closeLightbox"
-        >
-          <button
-            @click="closeLightbox"
-            class="absolute top-4 right-4 p-3 bg-white/10 hover:bg-white/20 rounded-full transition-colors z-10"
-          >
-            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
-          </button>
-
-          <button
-            v-if="currentPhotoIndex > 0"
-            @click="previousPhoto"
-            class="absolute left-4 p-3 bg-white/10 hover:bg-white/20 rounded-full transition-colors"
-          >
-            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-            </svg>
-          </button>
-
-          <div class="max-w-6xl max-h-full">
-            <img
-              :src="galleryPhotos[currentPhotoIndex]?.image"
-              :alt="galleryPhotos[currentPhotoIndex]?.title"
-              class="max-w-full max-h-[90vh] object-contain"
-            />
-            <p v-if="galleryPhotos[currentPhotoIndex]?.title" class="text-center text-white mt-4 text-lg">
-              {{ galleryPhotos[currentPhotoIndex].title }}
-            </p>
-          </div>
-
-          <button
-            v-if="currentPhotoIndex < galleryPhotos.length - 1"
-            @click="nextPhoto"
-            class="absolute right-4 p-3 bg-white/10 hover:bg-white/20 rounded-full transition-colors"
-          >
-            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-            </svg>
-          </button>
-
-          <div class="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-white text-sm">
-            {{ currentPhotoIndex + 1 }} / {{ galleryPhotos.length }}
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
-
-    <!-- CTA Section - AI Automation Expert (100% AI-Built Proof) -->
+    <!-- CTA Section - Dynamic from Settings -->
     <section
       v-if="showCTASection"
       class="relative py-20 bg-gradient-to-br from-primary-600 via-secondary-600 to-accent-600 overflow-hidden"
@@ -1290,38 +1196,37 @@
       </div>
 
       <div class="container-custom text-center relative z-10">
-        <!-- Heading with AI Proof Angle -->
+        <!-- Main Heading - Dynamic -->
         <h2 class="text-4xl md:text-5xl font-display font-bold text-white mb-6 leading-tight">
-          Don't Believe AI Can Build A Site This Good?
+          {{ ctaHeading }}
         </h2>
         
-        <!-- Copy with AI Tech Stack -->
+        <!-- Subtext - Dynamic -->
         <p class="text-xl text-white/90 mb-8 max-w-3xl mx-auto leading-relaxed">
-          This website you're viewing is <strong class="text-white">100% built by AI Automation</strong>. Laravel + Vue.js + n8n + AI Agents. <span class="font-semibold text-white">ZERO manual coding</span>. 300+ hours of work automated to 3 days. If a complex website like this can be fully AI-powered, imagine how easy automating your business will be.
+          {{ ctaSubtext }}
         </p>
 
-        <!-- Stats Badge -->
-        <div class="flex flex-wrap items-center justify-center gap-4 mb-10">
-          <div class="flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full border border-white/20">
-            <span class="text-2xl">⚡</span>
-            <span class="text-white font-semibold text-sm">300+ hours saved</span>
-          </div>
-          <div class="flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full border border-white/20">
-            <span class="text-2xl">🤖</span>
-            <span class="text-white font-semibold text-sm">100% AI-built</span>
-          </div>
-          <div class="flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full border border-white/20">
-            <span class="text-2xl">💰</span>
-            <span class="text-white font-semibold text-sm">95% cost reduction</span>
+        <!-- Stats Badges - Dynamic -->
+        <div v-if="ctaStats.length > 0" class="flex flex-wrap items-center justify-center gap-4 mb-10">
+          <div
+            v-for="(stat, index) in ctaStats"
+            :key="index"
+            class="flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full border border-white/20"
+          >
+            <span class="text-2xl">{{ stat.icon }}</span>
+            <span class="text-white font-semibold text-sm">{{ stat.label }}</span>
           </div>
         </div>
 
-        <!-- CTA Text -->
-        <p class="text-lg text-white/95 mb-8 font-medium">
-          Want to see how? <span class="text-white font-bold">FREE 30-minute consultation!</span>
+        <!-- CTA Question & Urgency - Dynamic -->
+        <p class="text-lg text-white/95 mb-3 font-medium">
+          {{ ctaQuestion }}
+        </p>
+        <p class="text-base text-white/90 mb-8 font-semibold">
+          {{ ctaUrgency }}
         </p>
 
-        <!-- CTA Buttons -->
+        <!-- CTA Buttons - Dynamic Text -->
         <div class="flex flex-wrap items-center justify-center gap-4">
           <!-- Primary CTA: WhatsApp -->
           <a
@@ -1333,7 +1238,7 @@
             <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
               <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
             </svg>
-            <span>WhatsApp Me Now</span>
+            <span>{{ ctaPrimaryButton }}</span>
           </a>
 
           <!-- Secondary CTA: Contact Form -->
@@ -1341,7 +1246,7 @@
             @click="$router.push('/contact')"
             class="px-10 py-5 bg-white/10 backdrop-blur-sm border-2 border-white text-white font-bold text-lg rounded-xl hover:bg-white hover:text-primary-600 hover:shadow-2xl hover:scale-105 transition-all duration-300"
           >
-            Schedule Consultation
+            {{ ctaSecondaryButton }}
           </button>
         </div>
       </div>
@@ -1359,7 +1264,7 @@ import { useGallery } from '@/composables/useGallery'
 import { useAboutSettings } from '@/composables/useAboutSettings'
 import { usePageSections } from '@/composables/usePageSections'
 import { useSettings } from '@/composables/useSettings'
-import { BaseLoader, MobileCarousel } from '@/components/base'
+import { BaseLoader, MobileCarousel, BaseGalleryModal, BaseLightbox } from '@/components/base'
 import api from '@/services/api'
 
 // Import certification logos
@@ -1391,6 +1296,30 @@ const contactWhatsApp = computed(() => {
   const phone = getSettingValue('contact_phone') || '+6281234567890'
   const message = encodeURIComponent('Hi! I saw your AI-powered website and I\'m interested in discussing AI Automation for my business. Can we schedule a free consultation?')
   return `https://wa.me/${phone.replace(/[^0-9]/g, '')}?text=${message}`
+})
+
+// CTA Section - Dynamic Content from Settings
+const ctaHeading = computed(() => getSettingValue('cta.heading') || 'Seen Enough? Let\'s Automate Your Business.')
+const ctaSubtext = computed(() => getSettingValue('cta.subtext') || 'This AI-powered site? Built in 3 days. 300+ hours saved.')
+const ctaQuestion = computed(() => getSettingValue('cta.question') || 'Ready to see what AI can do for YOU?')
+const ctaUrgency = computed(() => getSettingValue('cta.urgency') || 'FREE 30-min consultation. Limited slots.')
+const ctaPrimaryButton = computed(() => getSettingValue('cta.primary_button_text') || 'Get Free Consultation')
+const ctaSecondaryButton = computed(() => getSettingValue('cta.secondary_button_text') || 'Schedule a Call')
+const ctaStats = computed(() => {
+  const statsJson = getSettingValue('cta.stats')
+  if (!statsJson) {
+    return [
+      { icon: '⚡', label: '300+ hours saved' },
+      { icon: '🤖', label: '100% AI-built' },
+      { icon: '💰', label: '95% cost cut' }
+    ]
+  }
+  try {
+    return JSON.parse(statsJson)
+  } catch (e) {
+    console.error('Failed to parse CTA stats:', e)
+    return []
+  }
 })
 
 // Section visibility computed properties
@@ -1454,6 +1383,10 @@ const stats = computed(() => {
     { value: s.success_rate || '95%', label: 'SUCCESS RATE' }
   ].filter(stat => stat.value)
 })
+
+// Computed for Awards Gallery Lightbox
+const currentAwardImage = computed(() => galleryPhotos.value[currentPhotoIndex.value]?.image || '')
+const currentAwardTitle = computed(() => galleryPhotos.value[currentPhotoIndex.value]?.title || '')
 
 // fetchAboutSettings now managed by useAboutSettings composable
 

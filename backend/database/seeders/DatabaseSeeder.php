@@ -29,6 +29,7 @@ class DatabaseSeeder extends Seeder
             PageSectionSeeder::class,
             AboutSettingsSeeder::class,
             SiteSettingsSeeder::class,
+            CtaSettingsSeeder::class, // CTA section settings
         ]);
 
         $this->command->info('✅ Database seeding completed successfully!');

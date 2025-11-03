@@ -121,6 +121,7 @@ import api from '@/services/api'
 
 const aboutSettings = ref({})
 const siteSettings = ref({})
+const menuItems = ref([]) // NEW: Menu items dari API
 const currentYear = computed(() => new Date().getFullYear())
 
 // Fetch settings on mount
@@ -136,6 +137,12 @@ onMounted(async () => {
     const siteRes = await api.get('/settings/site')
     if (siteRes.data.success) {
       siteSettings.value = siteRes.data.data
+    }
+
+    // Fetch active menu items (is_active = 1)
+    const menuRes = await api.get('/menu-items')
+    if (menuRes.data.success) {
+      menuItems.value = menuRes.data.data
     }
   } catch (error) {
     console.error('Failed to fetch settings:', error)
@@ -167,16 +174,20 @@ const displaySocialLinks = computed(() => {
   return []
 })
 
-const quickLinks = [
-  { name: 'Home', path: '/' },
-  { name: 'About', path: '/about' },
-  { name: 'Projects', path: '/projects' },
-  { name: 'Blog', path: '/blog' }
-]
+// Quick Links & Resources - Dynamic from menu_items API (is_active = 1)
+const quickLinks = computed(() => {
+  // First 4 active menu items
+  return menuItems.value.slice(0, 4).map(item => ({
+    name: item.title,
+    path: item.url
+  }))
+})
 
-const resources = [
-  { name: 'Gallery', path: '/gallery' },
-  { name: 'Contact', path: '/contact' },
-  { name: 'Categories', path: '/blog' }
-]
+const resources = computed(() => {
+  // Next 3 active menu items (skip first 4)
+  return menuItems.value.slice(4, 7).map(item => ({
+    name: item.title,
+    path: item.url
+  }))
+})
 </script>

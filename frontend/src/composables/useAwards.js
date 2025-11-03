@@ -15,17 +15,31 @@ export function useAwards(initialParams = {}) {
   } = useQuery({
     queryKey: ['awards', queryParams],
     queryFn: async () => {
+      console.log('[useAwards] Fetching awards from API...')
       const response = await api.get('/awards', { params: queryParams.value })
+      console.log('[useAwards] API Response:', response.data)
       return response.data
     },
     staleTime: 60 * 60 * 1000, // 1 hour
-    gcTime: 60 * 60 * 1000 // 1 hour
+    gcTime: 60 * 60 * 1000, // 1 hour
+    refetchOnMount: false, // Disable refetch on mount
+    refetchOnWindowFocus: false, // Disable refetch on window focus
+    refetchOnReconnect: false, // Disable refetch on reconnect
+    retry: false // Disable retry on error
   })
 
   // Computed values for backward compatibility
   const awards = computed(() => {
     // Handle both success: true format and direct data format
     const data = awardsData.value?.data || awardsData.value || []
+    console.log('[useAwards] Computed awards:', data.length, 'items')
+    if (data.length > 0) {
+      console.log('[useAwards] First award structure:', {
+        keys: Object.keys(data[0]),
+        hasDescription: 'description' in data[0],
+        description: data[0].description?.substring(0, 50)
+      })
+    }
     return data
   })
 

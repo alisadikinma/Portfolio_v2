@@ -140,6 +140,15 @@
           </div>
         </div>
       </section>
+
+      <!-- CTA Section (Component) -->
+      <CTASection
+        v-if="showCTASection"
+        heading="Have Questions or Ideas?"
+        description="Let's discuss how my expertise can help solve your challenges. <strong>Reach out today</strong> and let's start building something great together."
+        whatsapp-message="Hi! I read your blog post and I'd like to discuss working together."
+        :show-social-links="false"
+      />
       <div class="h-10"></div>
     </article>
   </div>
@@ -150,12 +159,21 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePosts } from '@/composables/usePosts'
 import { useMetaTags } from '@/composables/useMetaTags'
+import { usePageSections } from '@/composables/usePageSections'
 import { BaseButton, BaseCard, BaseBadge, BaseLoader } from '@/components/base'
+import CTASection from '@/components/CTASection.vue'
 
 const route = useRoute()
 const router = useRouter()
 const { post, isLoading, error, fetchPost } = usePosts()
 const { updatePageMeta, updateMetaTag } = useMetaTags()
+const { sections, fetchActiveSections } = usePageSections()
+
+// CTA visibility
+const showCTASection = computed(() => {
+  const section = sections.value.find(s => s.section_type === 'cta')
+  return section ? section.is_active : false
+})
 
 const defaultContent = `
   <h2>Introduction</h2>
@@ -274,6 +292,8 @@ watch(
 )
 
 onMounted(async () => {
+  await fetchActiveSections('blog')
+  
   const slug = route.params.slug
   await fetchPost(slug)
 
