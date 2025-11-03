@@ -98,41 +98,56 @@
               Previous
             </BaseButton>
             
-            <!-- First page -->
-            <BaseButton
-              :variant="currentPage === 1 ? 'primary' : 'outline'"
-              size="sm"
-              @click="goToPage(1)"
-            >
-              1
-            </BaseButton>
+            <!-- Show all pages if totalPages <= 10 -->
+            <template v-if="totalPages <= 10">
+              <BaseButton
+                v-for="page in totalPages"
+                :key="page"
+                :variant="currentPage === page ? 'primary' : 'outline'"
+                size="sm"
+                @click="goToPage(page)"
+              >
+                {{ page }}
+              </BaseButton>
+            </template>
 
-            <!-- Dots before current range -->
-            <span v-if="currentPage > 3" class="px-2 text-neutral-500">...</span>
+            <!-- Smart pagination for > 10 pages -->
+            <template v-else>
+              <!-- First page -->
+              <BaseButton
+                :variant="currentPage === 1 ? 'primary' : 'outline'"
+                size="sm"
+                @click="goToPage(1)"
+              >
+                1
+              </BaseButton>
 
-            <!-- Pages around current -->
-            <BaseButton
-              v-for="page in visiblePages"
-              :key="page"
-              :variant="currentPage === page ? 'primary' : 'outline'"
-              size="sm"
-              @click="goToPage(page)"
-            >
-              {{ page }}
-            </BaseButton>
+              <!-- Dots before current range -->
+              <span v-if="currentPage > 3" class="px-2 text-neutral-500">...</span>
 
-            <!-- Dots after current range -->
-            <span v-if="currentPage < totalPages - 2" class="px-2 text-neutral-500">...</span>
+              <!-- Pages around current -->
+              <BaseButton
+                v-for="page in visiblePages"
+                :key="page"
+                :variant="currentPage === page ? 'primary' : 'outline'"
+                size="sm"
+                @click="goToPage(page)"
+              >
+                {{ page }}
+              </BaseButton>
 
-            <!-- Last page -->
-            <BaseButton
-              v-if="totalPages > 1"
-              :variant="currentPage === totalPages ? 'primary' : 'outline'"
-              size="sm"
-              @click="goToPage(totalPages)"
-            >
-              {{ totalPages }}
-            </BaseButton>
+              <!-- Dots after current range -->
+              <span v-if="currentPage < totalPages - 2" class="px-2 text-neutral-500">...</span>
+
+              <!-- Last page -->
+              <BaseButton
+                :variant="currentPage === totalPages ? 'primary' : 'outline'"
+                size="sm"
+                @click="goToPage(totalPages)"
+              >
+                {{ totalPages }}
+              </BaseButton>
+            </template>
 
             <BaseButton
               variant="outline"
