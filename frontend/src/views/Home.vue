@@ -268,10 +268,10 @@
                       <!-- Award Icon with glow -->
                       <div class="relative">
                         <div class="absolute inset-0 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-2xl blur-xl opacity-60 group-hover:opacity-100 transition-opacity animate-pulse"></div>
-                        <div v-if="award.image" class="relative w-20 h-20 rounded-2xl overflow-hidden shadow-2xl transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
-                          <img :src="award.image" :alt="award.award_title" class="w-full h-full object-cover" />
+                        <div v-if="award.image" class="relative w-24 h-24 rounded-2xl overflow-hidden bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-800 p-3 shadow-2xl transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
+                          <img :src="award.image" :alt="award.award_title" class="w-full h-full object-contain" />
                         </div>
-                        <div v-else class="relative w-20 h-20 bg-gradient-to-br from-yellow-400 via-orange-500 to-red-500 rounded-2xl flex items-center justify-center shadow-2xl transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
+                        <div v-else class="relative w-24 h-24 bg-gradient-to-br from-yellow-400 via-orange-500 to-red-500 rounded-2xl flex items-center justify-center shadow-2xl transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
                           <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
                           </svg>

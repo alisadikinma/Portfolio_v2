@@ -146,14 +146,16 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePosts } from '@/composables/usePosts'
+import { useMetaTags } from '@/composables/useMetaTags'
 import { BaseButton, BaseCard, BaseBadge, BaseLoader } from '@/components/base'
 
 const route = useRoute()
 const router = useRouter()
 const { post, isLoading, error, fetchPost } = usePosts()
+const { updatePageMeta, updateMetaTag } = useMetaTags()
 
 const defaultContent = `
   <h2>Introduction</h2>
@@ -201,12 +203,84 @@ const goToRelatedPost = (postIndex) => {
   // router.push(`/blog/${relatedPost.slug}`)
 }
 
+// Thumbnail URL for Open Graph (from post meta tags)
+const thumbnailUrl = computed(() => {
+  if (!post.value) return ''
+  
+  // Priority: og_image > featured_image > default
+  if (post.value.og_image) {
+    if (post.value.og_image.startsWith('http')) {
+      return post.value.og_image
+    }
+    const backendUrl = import.meta.env.VITE_API_BASE_URL.replace('/api', '')
+    return `${backendUrl}${post.value.og_image}`
+  }
+  
+  if (post.value.featured_image) {
+    return post.value.featured_image
+  }
+  
+  return `${window.location.origin}/og-image.jpg`
+})
+
+// Update meta tags from post meta fields
+const updateMetaTags = () => {
+  if (!post.value) return
+
+  // Use post-specific meta tags from database
+  updatePageMeta({
+    title: post.value.meta_title || `${post.value.title} | Blog`,
+    description: post.value.meta_description || post.value.excerpt,
+    image: thumbnailUrl.value,
+    url: window.location.href,
+    type: 'article',
+    keywords: post.value.focus_keyword || post.value.tags?.join(', ')
+  })
+
+  // Additional OG tags from post
+  if (post.value.og_title) {
+    updateMetaTag('property', 'og:title', post.value.og_title)
+  }
+  if (post.value.og_description) {
+    updateMetaTag('property', 'og:description', post.value.og_description)
+  }
+  
+  // Article-specific meta tags
+  updateMetaTag('property', 'article:published_time', post.value.published_at)
+  updateMetaTag('property', 'article:author', post.value.author?.name || '')
+  if (post.value.tags?.length) {
+    post.value.tags.forEach(tag => {
+      const meta = document.createElement('meta')
+      meta.setAttribute('property', 'article:tag')
+      meta.setAttribute('content', tag)
+      document.head.appendChild(meta)
+    })
+  }
+  
+  console.log('✅ Meta tags updated from post:', {
+    title: post.value.meta_title || post.value.title,
+    og_image: thumbnailUrl.value
+  })
+}
+
+// Watch for post changes to update meta tags
+watch(
+  () => post.value,
+  (newPost) => {
+    if (newPost) {
+      updateMetaTags()
+    }
+  }
+)
+
 onMounted(async () => {
   const slug = route.params.slug
   await fetchPost(slug)
 
   if (error.value) {
     console.error('Failed to load post:', error.value)
+  } else if (post.value) {
+    updateMetaTags()
   }
 })
 </script>

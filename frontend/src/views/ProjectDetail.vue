@@ -158,24 +158,24 @@
             <picture>
               <!-- Mobile: 600px WebP -->
               <source 
-                :srcset="`/storage/projects/${project.slug}-600.webp`"
+                :srcset="getImageUrl(project.slug, '600', 'webp')"
                 media="(max-width: 767px)"
                 type="image/webp">
               
               <!-- Tablet: 900px WebP -->
               <source 
-                :srcset="`/storage/projects/${project.slug}-900.webp`"
+                :srcset="getImageUrl(project.slug, '900', 'webp')"
                 media="(max-width: 1023px)"
                 type="image/webp">
               
               <!-- Desktop: 1200px WebP -->
               <source 
-                :srcset="`/storage/projects/${project.slug}-1200.webp`"
+                :srcset="getImageUrl(project.slug, '1200', 'webp')"
                 type="image/webp">
               
               <!-- Fallback: JPEG for old browsers -->
               <img 
-                :src="`/storage/projects/${project.slug}-1200.jpg`"
+                :src="getImageUrl(project.slug, '1200', 'jpg')"
                 :alt="project.title"
                 loading="lazy"
                 class="w-full h-auto"
@@ -212,7 +212,7 @@
                       <!-- Image -->
                       <div class="relative h-40 bg-neutral-200 dark:bg-neutral-600 overflow-hidden">
                         <img
-                          :src="relatedProject.thumbnail || `/storage/projects/${relatedProject.slug}-600.webp`"
+                          :src="relatedProject.thumbnail || relatedProject.featured_image || getImageUrl(relatedProject.slug, '600', 'webp')"
                           :alt="relatedProject.title"
                           class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                           @error="handleRelatedImageError"
@@ -340,9 +340,11 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '@/services/api'
+import { useMetaTags } from '@/composables/useMetaTags'
 
 const route = useRoute()
 const router = useRouter()
+const { updatePageMeta, updateMetaTag } = useMetaTags()
 
 // State
 const project = ref(null)
@@ -363,11 +365,28 @@ const shareText = computed(() => {
   return `${project.value.title} - ${project.value.description}\n\nPortfolio: https://alisadikinma.com\nEmail: ali.sadikincom85@gmail.com\nWhatsApp: +6281380163758`
 })
 
-// Thumbnail URL for Open Graph
+// Thumbnail URL for Open Graph (from project meta tags)
 const thumbnailUrl = computed(() => {
   if (!project.value) return ''
-  const baseUrl = window.location.origin
-  return `${baseUrl}/storage/projects/${project.value.slug}-600.webp`
+  
+  // Priority: og_image > featured_image > constructed URL
+  if (project.value.og_image) {
+    // If og_image is full URL, use it
+    if (project.value.og_image.startsWith('http')) {
+      return project.value.og_image
+    }
+    // If og_image is relative path, construct full URL
+    const backendUrl = import.meta.env.VITE_API_BASE_URL.replace('/api', '')
+    return `${backendUrl}${project.value.og_image}`
+  }
+  
+  // Fallback to featured_image from API
+  if (project.value.featured_image) {
+    return project.value.featured_image
+  }
+  
+  // Last resort: construct from slug
+  return getImageUrl(project.value.slug, '600', 'webp')
 })
 
 // Share links with thumbnail
@@ -525,9 +544,22 @@ const fetchProject = async (slug) => {
   }
 }
 
+// Helper to construct backend image URL
+const getImageUrl = (slug, size, format) => {
+  const backendUrl = import.meta.env.VITE_API_BASE_URL.replace('/api', '')
+  return `${backendUrl}/storage/projects/${slug}-${size}.${format}`
+}
+
 // Handle image loading errors
 const handleImageError = (event) => {
   console.error('[ProjectDetail] Image failed to load:', event.target.src)
+}
+
+// Handle related project image errors
+const handleRelatedImageError = (event) => {
+  console.error('[ProjectDetail] Related image failed to load:', event.target.src)
+  // Set placeholder or default image
+  event.target.src = '/placeholder.png'
 }
 
 // Navigate to related project
@@ -536,42 +568,31 @@ const navigateToProject = (slug) => {
   router.push(`/projects/${slug}`)
 }
 
-// Update meta tags for social media sharing
+// Update meta tags for social media sharing (from project meta fields)
 const updateMetaTags = () => {
   if (!project.value) return
 
-  // Update page title
-  document.title = `${project.value.title} | Portfolio`
+  // Use project-specific meta tags from database
+  updatePageMeta({
+    title: project.value.meta_title || `${project.value.title} | Portfolio`,
+    description: project.value.meta_description || project.value.description,
+    image: thumbnailUrl.value,
+    url: currentUrl.value,
+    type: 'article',
+    keywords: project.value.focus_keyword || project.value.technologies?.join(', ')
+  })
 
-  // Remove existing meta tags
-  const existingTags = document.querySelectorAll('meta[data-dynamic="true"]')
-  existingTags.forEach(tag => tag.remove())
-
-  // Create meta tags
-  const metaTags = [
-    // Open Graph
-    { property: 'og:title', content: project.value.og_title || project.value.title },
-    { property: 'og:description', content: project.value.og_description || project.value.description },
-    { property: 'og:image', content: thumbnailUrl.value },
-    { property: 'og:url', content: currentUrl.value },
-    { property: 'og:type', content: 'website' },
-    // Twitter Card
-    { name: 'twitter:card', content: 'summary_large_image' },
-    { name: 'twitter:title', content: project.value.og_title || project.value.title },
-    { name: 'twitter:description', content: project.value.og_description || project.value.description },
-    { name: 'twitter:image', content: thumbnailUrl.value },
-    // Standard meta
-    { name: 'description', content: project.value.meta_description || project.value.description },
-  ]
-
-  // Append meta tags to head
-  metaTags.forEach(({ name, property, content }) => {
-    const meta = document.createElement('meta')
-    meta.setAttribute('data-dynamic', 'true')
-    if (name) meta.setAttribute('name', name)
-    if (property) meta.setAttribute('property', property)
-    meta.setAttribute('content', content)
-    document.head.appendChild(meta)
+  // Additional OG tags from project
+  if (project.value.og_title) {
+    updateMetaTag('property', 'og:title', project.value.og_title)
+  }
+  if (project.value.og_description) {
+    updateMetaTag('property', 'og:description', project.value.og_description)
+  }
+  
+  console.log('✅ Meta tags updated from project:', {
+    title: project.value.meta_title || project.value.title,
+    og_image: thumbnailUrl.value
   })
 }
 
@@ -598,9 +619,7 @@ watch(
 
 // Cleanup on unmount
 onUnmounted(() => {
-  const dynamicTags = document.querySelectorAll('meta[data-dynamic="true"]')
-  dynamicTags.forEach(tag => tag.remove())
-  document.title = 'Portfolio'
+  // Meta tags will be reset by next page load
 })
 </script>
 

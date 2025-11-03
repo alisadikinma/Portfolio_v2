@@ -33,10 +33,10 @@
           >
             <!-- Award Icon/Image -->
             <div class="relative mb-6">
-              <div v-if="award.image" class="w-20 h-20 rounded-xl overflow-hidden bg-gradient-to-br from-primary-400 to-secondary-400 p-1">
-                <img :src="award.image" :alt="award.award_title" class="w-full h-full object-cover rounded-lg" />
+              <div v-if="award.image" class="w-24 h-24 rounded-xl overflow-hidden bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-800 p-3">
+                <img :src="award.image" :alt="award.award_title" class="w-full h-full object-contain" />
               </div>
-              <div v-else class="w-20 h-20 bg-gradient-to-br from-primary-400 to-secondary-400 rounded-xl flex items-center justify-center">
+              <div v-else class="w-24 h-24 bg-gradient-to-br from-primary-400 to-secondary-400 rounded-xl flex items-center justify-center">
                 <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
                 </svg>

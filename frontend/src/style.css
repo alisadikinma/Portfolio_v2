@@ -3,7 +3,9 @@
 /* Tailwind CSS v4 Theme Configuration */
 @theme {
   /* Dark Mode Configuration - CRITICAL FIX */
-  --dark-mode: class;
+  /* Tailwind v4 uses @media (prefers-color-scheme: dark) by default */
+  /* We override to use .dark class selector */
+  --color-scheme: light dark;
 
   /* Custom Colors - MASTER_DESIGN_SYSTEM */
   --color-primary-50: #eef2ff;
@@ -133,13 +135,30 @@
 
 /* Base Styles */
 @layer base {
-  body {
-    @apply font-sans text-gray-900 dark:text-gray-50 bg-white dark:bg-gray-950;
+  /* Force class-based dark mode for Tailwind v4 */
+  @media (prefers-color-scheme: light) {
+    :root {
+      color-scheme: light;
+    }
   }
-
-  /* Ensure dark mode class works on HTML element */
+  
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+    }
+  }
+  
+  /* Override with class when explicitly set */
+  html.light {
+    color-scheme: light;
+  }
+  
   html.dark {
     color-scheme: dark;
+  }
+  
+  body {
+    @apply font-sans text-gray-900 dark:text-gray-50 bg-white dark:bg-gray-950;
   }
 }
 

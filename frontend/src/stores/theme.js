@@ -1,121 +1,47 @@
 import { defineStore } from 'pinia'
-import { ref, watch } from 'vue'
+import { ref } from 'vue'
 
 export const useThemeStore = defineStore('theme', () => {
-  // State
+  // State - ALWAYS LIGHT MODE
   const isDark = ref(false)
-  const colorScheme = ref('system') // 'light', 'dark', 'system'
+  const colorScheme = ref('light')
 
-  // Initialize theme from localStorage or system preference
+  // Initialize theme - PERMANENT LIGHT MODE
   const initTheme = () => {
-    console.log('🎨 Initializing theme...')
-    const savedTheme = localStorage.getItem('theme')
-    console.log('Saved theme from localStorage:', savedTheme)
-
-    if (savedTheme) {
-      colorScheme.value = savedTheme
-
-      if (savedTheme === 'system') {
-        isDark.value = window.matchMedia('(prefers-color-scheme: dark)').matches
-      } else {
-        isDark.value = savedTheme === 'dark'
-      }
-    } else {
-      // Default to system preference
-      isDark.value = window.matchMedia('(prefers-color-scheme: dark)').matches
-      colorScheme.value = 'system'
-    }
-
-    console.log('Theme initialized:', { isDark: isDark.value, colorScheme: colorScheme.value })
+    console.log('🎨 Setting permanent light mode...')
+    isDark.value = false
+    colorScheme.value = 'light'
+    localStorage.setItem('theme', 'light')
     applyTheme()
   }
 
-  // Apply theme to document
+  // Apply theme to document - ALWAYS LIGHT
   const applyTheme = () => {
-    console.log('🎨 Applying theme:', isDark.value ? 'dark' : 'light')
-    
-    // Remove any existing class first
-    document.documentElement.classList.remove('dark', 'light')
-    
-    // Add the appropriate class
-    if (isDark.value) {
-      document.documentElement.classList.add('dark')
-      document.documentElement.setAttribute('data-theme', 'dark')
-      console.log('✅ Dark mode enabled')
-    } else {
-      document.documentElement.classList.add('light')
-      document.documentElement.setAttribute('data-theme', 'light')
-      console.log('✅ Light mode enabled')
+    const html = document.documentElement
+    html.classList.remove('dark')
+    html.classList.add('light')
+    html.setAttribute('data-theme', 'light')
+    updateMetaThemeColor('#ffffff')
+  }
+
+  // Update mobile browser theme color
+  const updateMetaThemeColor = (color) => {
+    let metaTheme = document.querySelector('meta[name="theme-color"]')
+    if (!metaTheme) {
+      metaTheme = document.createElement('meta')
+      metaTheme.name = 'theme-color'
+      document.head.appendChild(metaTheme)
     }
-    
-    // Log the current classes for debugging
-    console.log('📋 Current HTML classes:', document.documentElement.className)
+    metaTheme.content = color
   }
-
-  // Toggle dark mode
-  const toggleDark = () => {
-    console.log('🔄 Toggle dark mode clicked!')
-    console.log('Before toggle - isDark:', isDark.value)
-    
-    isDark.value = !isDark.value
-    colorScheme.value = isDark.value ? 'dark' : 'light'
-    localStorage.setItem('theme', colorScheme.value)
-    
-    console.log('After toggle - isDark:', isDark.value)
-    console.log('Color scheme:', colorScheme.value)
-    
-    // Apply theme immediately
-    applyTheme()
-  }
-
-  // Set specific theme
-  const setTheme = (theme) => {
-    console.log('🎯 Setting theme to:', theme)
-    colorScheme.value = theme
-    localStorage.setItem('theme', theme)
-
-    if (theme === 'system') {
-      isDark.value = window.matchMedia('(prefers-color-scheme: dark)').matches
-    } else {
-      isDark.value = theme === 'dark'
-    }
-
-    applyTheme()
-  }
-
-  // Listen for system theme changes
-  const listenToSystemTheme = () => {
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-
-    const handleChange = (e) => {
-      console.log('🔔 System theme changed:', e.matches ? 'dark' : 'light')
-      if (colorScheme.value === 'system') {
-        isDark.value = e.matches
-        applyTheme()
-      }
-    }
-
-    mediaQuery.addEventListener('change', handleChange)
-    
-    // Return cleanup function
-    return () => mediaQuery.removeEventListener('change', handleChange)
-  }
-
-  // Watch for theme changes (redundant with direct applyTheme call, but keep for safety)
-  watch(isDark, () => {
-    console.log('👀 isDark watcher triggered:', isDark.value)
-  })
 
   return {
-    // State
+    // State (read-only)
     isDark,
     colorScheme,
 
     // Actions
     initTheme,
-    toggleDark,
-    setTheme,
-    listenToSystemTheme,
-    applyTheme // Export for manual use if needed
+    applyTheme
   }
 })

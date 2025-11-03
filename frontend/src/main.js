@@ -5,9 +5,15 @@ import router from './router'
 import './style.css'
 import App from './App.vue'
 import api from './services/api'
+import { useThemeStore } from './stores/theme'
 
 const app = createApp(App)
 const pinia = createPinia()
+
+// CRITICAL: Initialize theme BEFORE app mounts to prevent flash
+app.use(pinia)
+const themeStore = useThemeStore()
+themeStore.initTheme()
 
 // Configure QueryClient with cache policies
 const queryClient = new QueryClient({
@@ -42,7 +48,6 @@ const queryClient = new QueryClient({
   }
 })()
 
-app.use(pinia)
 app.use(router)
 app.use(VueQueryPlugin, { queryClient })
 app.mount('#app')

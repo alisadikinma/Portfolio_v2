@@ -400,8 +400,12 @@ router.beforeEach(async (to, from, next) => {
     console.log('[Router] ✅ Homepage data prefetched - instant render!')
   }
 
-  // Set page title
-  document.title = to.meta.title || 'Portfolio V2'
+  // Set page title ONLY for admin/auth pages (not public pages)
+  // Public pages will get title from CMS via App.vue + useMetaTags
+  if (to.meta.layout === 'admin' || to.meta.layout === 'auth') {
+    document.title = to.meta.title || 'Admin - Portfolio'
+  }
+  // For public pages: title will be set dynamically by useMetaTags composable from CMS
 
   // Check authentication
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
