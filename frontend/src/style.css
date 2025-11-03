@@ -142,17 +142,23 @@
     }
   }
   
+  /* DISABLED: Force light mode always, ignore system dark preference
   @media (prefers-color-scheme: dark) {
     :root {
       color-scheme: dark;
     }
   }
+  */
   
   /* Override with class when explicitly set */
   html.light {
-    color-scheme: light;
+    color-scheme: light !important;
   }
   
+  html.dark {
+    color-scheme: light !important; /* Force light even if dark class exists */
+  }
+  /* Force class-based dark mode for Tailwind v4 */
   html.dark {
     color-scheme: dark;
   }

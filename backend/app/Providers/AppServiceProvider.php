@@ -20,12 +20,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Fix asset URL for subdirectory installation
-        $appUrl = env('APP_URL', 'http://localhost');
+        // Fix asset URL - use config() instead of env() for cached configs
+        $appUrl = config('app.url', 'http://localhost');
         URL::forceRootUrl($appUrl);
         
         // Force HTTPS in production
-        if (env('APP_ENV') === 'production') {
+        if (config('app.env') === 'production') {
             URL::forceScheme('https');
         }
     }
