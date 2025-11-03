@@ -24,16 +24,19 @@ class ProjectResource extends JsonResource
         $language = $request->query('lang') ?? $request->header('Accept-Language', 'en');
         $language = strtolower(substr($language, 0, 2));
 
-        // Get translation for the specified language
-        $translation = $this->translations()
-            ->where('language', $language)
-            ->first();
-
-        // Fallback to English if translation not found
-        if (!$translation) {
+        // Get translation for the specified language (with null safety)
+        $translation = null;
+        if ($this->relationLoaded('translations')) {
             $translation = $this->translations()
-                ->where('language', 'en')
+                ->where('language', $language)
                 ->first();
+
+            // Fallback to English if translation not found
+            if (!$translation) {
+                $translation = $this->translations()
+                    ->where('language', 'en')
+                    ->first();
+            }
         }
 
         return [
@@ -41,11 +44,12 @@ class ProjectResource extends JsonResource
             'slug' => $this->slug,
             
             // Images (with alias for frontend compatibility)
-            'image' => $this->image ? asset('storage/' . $this->image) : null,
-            'featured_image' => $this->image ? asset('storage/' . $this->image) : null, // Frontend expects this
-            'images' => $this->images ? collect($this->images)->map(fn($img) => asset('storage/' . $img))->toArray() : [],
+            'image' => $this->getImageUrl($this->image),
+            'featured_image' => $this->getImageUrl($this->image), // Frontend expects this
+            'images' => $this->images ? collect($this->images)->map(fn($img) => $this->getImageUrl($img))->toArray() : [],
             
             'category' => $this->category,
+            'status' => $this->status ?? 'completed',
             'technologies' => $this->technologies ?? [],
             
             // Client & URLs (with aliases for frontend compatibility)
@@ -53,16 +57,16 @@ class ProjectResource extends JsonResource
             'client_name' => $this->client, // Frontend expects this
             'url' => $this->url,
             'project_url' => $this->url, // Frontend expects this
-            'github_url' => null, // Field doesn't exist yet
+            'github_url' => $this->github_url,
             
             // Dates (with aliases for frontend compatibility)
             'completed_at' => $this->completed_at?->format('Y-m-d'),
-            'start_date' => $this->completed_at?->format('Y-m-d'), // Use completed_at as fallback
-            'end_date' => null, // Field doesn't exist yet
+            'start_date' => $this->start_date?->format('Y-m-d'),
+            'end_date' => $this->end_date?->format('Y-m-d'),
             
             'featured' => (bool) $this->featured,
+            'is_featured' => (bool) $this->featured,
             'published' => (bool) $this->published,
-            'status' => 'completed', // Default status
             'order' => $this->sort_order ?? 0,
 
             // Translated content (prioritize translation, fallback to main fields)
@@ -70,43 +74,81 @@ class ProjectResource extends JsonResource
             'description' => $translation?->description ?? $this->description,
             'content' => $translation?->content ?? $this->content,
 
-            // SEO meta data
-            'seo' => [
-                'meta_title' => $translation?->meta_title ?? $translation?->title ?? $this->title,
-                'meta_description' => $translation?->meta_description ?? $translation?->description ?? $this->description,
-                'og_title' => $translation?->og_title,
-                'og_description' => $translation?->og_description,
-                'canonical_url' => $translation?->canonical_url,
-                'ai_summary' => $translation?->ai_summary,
-            ],
+            // SEO fields (flat structure for form compatibility)
+            'meta_title' => $this->meta_title ?: null,
+            'meta_description' => $this->meta_description ?: null,
+            'focus_keyword' => $this->focus_keyword ?: null,
+            'canonical_url' => $this->canonical_url ?: null,
+            'og_title' => $this->og_title ?: null,
+            'og_description' => $this->og_description ?: null,
+            'og_image' => $this->og_image ?: $this->getImageUrl($this->image),
+            'seo_score' => $this->seo_score ?? 0,
 
             // Translation metadata
-            'available_translations' => $this->translations->pluck('language')->toArray(),
+            'available_translations' => $this->whenLoaded('translations', function() {
+                return $this->translations->pluck('language')->toArray();
+            }, []),
             'current_language' => $language,
 
-            // CTA Section
-            'cta' => [
-                'title' => $this->cta_title,
-                'description' => $this->cta_description,
-                'button_text' => $this->cta_button_text,
-                'phone_number' => $this->cta_phone_number,
-                'has_cta' => $this->hasCta(),
-            ],
-
-            // Related Projects
-            'related_projects' => $this->related_project_ids ? 
-                collect($this->getRelatedProjects())->map(fn($p) => [
-                    'id' => $p->id,
-                    'title' => $p->title,
-                    'slug' => $p->slug,
-                    'featured_image' => $p->featured_image ? asset('storage/' . $p->featured_image) : null,
-                    'description' => $p->description,
-                ])->toArray() : [],
+            // Related Projects (return IDs array for form)
+            'related_project_ids' => $this->related_project_ids ?? [],
+            'related_projects' => $this->getRelatedProjectsForDisplay(),
 
             // Timestamps
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
             'deleted_at' => $this->deleted_at?->toISOString(),
         ];
+    }
+
+    /**
+     * Get related projects data for display
+     */
+    private function getRelatedProjectsForDisplay(): array
+    {
+        if (!$this->related_project_ids || !is_array($this->related_project_ids) || empty($this->related_project_ids)) {
+            return [];
+        }
+
+        try {
+            $projects = \App\Models\Project::whereIn('id', $this->related_project_ids)
+                ->select('id', 'title', 'slug', 'image', 'description')
+                ->get();
+
+            return $projects->map(function($p) {
+                $thumbnailUrl = $this->getImageUrl($p->image);
+
+                return [
+                    'id' => $p->id,
+                    'title' => $p->title,
+                    'slug' => $p->slug,
+                    'thumbnail' => $thumbnailUrl,
+                    'featured_image' => $thumbnailUrl,
+                    'description' => $p->description,
+                ];
+            })->toArray();
+        } catch (\Exception $e) {
+            \Log::error('Failed to load related projects: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Helper to get correct image URL
+     * Handles both /uploads/... and storage/... paths
+     */
+    private function getImageUrl($imagePath)
+    {
+        if (!$imagePath) {
+            return null;
+        }
+
+        // If starts with /, it's already a full path from public
+        if (str_starts_with($imagePath, '/')) {
+            return url($imagePath);
+        }
+
+        // Otherwise, assume it's in storage
+        return asset('storage/' . $imagePath);
     }
 }

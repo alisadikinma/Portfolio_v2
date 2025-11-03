@@ -471,9 +471,10 @@ import BaseButton from '@/components/base/BaseButton.vue'
 import BaseModal from '@/components/base/BaseModal.vue'
 
 const {
-  gallery,
-  isLoading,
+  galleries: gallery,
+  loading: isLoading,
   pagination,
+  fetchGalleries: fetchGalleriesFromApi,
   fetchGallery,
   fetchGalleryItem,
   uploadImage,
@@ -540,7 +541,7 @@ async function fetchGalleries() {
     ...filters.value,
     page: pagination.value.currentPage
   }
-  await fetchGallery(params)
+  await fetchGalleriesFromApi(params)
 }
 
 let searchTimeout = null

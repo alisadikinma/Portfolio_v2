@@ -16,9 +16,8 @@ export const useAutomation = defineStore('automation', {
   }),
 
   getters: {
-    activeTokens: (state) => state.tokens.filter(token => !token.revoked_at),
-    revokedTokens: (state) => state.tokens.filter(token => token.revoked_at),
-    totalActiveTokens: (state) => state.tokens.filter(token => !token.revoked_at).length,
+    totalActiveTokens: (state) => state.tokens.length,
+    totalRequests: (state) => state.tokens.reduce((sum, token) => sum + (token.requests_count || 0), 0),
   },
 
   actions: {
@@ -66,7 +65,7 @@ export const useAutomation = defineStore('automation', {
     },
 
     /**
-     * Revoke API token
+     * Revoke API token (deletes permanently)
      */
     async revokeToken(tokenId) {
       this.loading = true
@@ -75,10 +74,10 @@ export const useAutomation = defineStore('automation', {
       try {
         const response = await api.delete(`/admin/automation/tokens/${tokenId}`)
 
-        // Update the token in the list
+        // Remove the token from the list
         const tokenIndex = this.tokens.findIndex(t => t.id === tokenId)
         if (tokenIndex !== -1) {
-          this.tokens[tokenIndex].revoked_at = new Date().toISOString()
+          this.tokens.splice(tokenIndex, 1)
         }
 
         return response.data

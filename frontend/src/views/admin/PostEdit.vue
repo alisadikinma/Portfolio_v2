@@ -20,7 +20,7 @@ const fetchPost = async () => {
   error.value = null
 
   try {
-    post.value = await postsStore.fetchPost(postId.value)
+    post.value = await postsStore.fetchPostById(parseInt(postId.value, 10))
   } catch (err) {
     console.error('Error fetching post:', err)
     error.value = 'Failed to load post. Please try again.'
@@ -33,7 +33,7 @@ const handleSubmit = async (postData) => {
   isSubmitting.value = true
 
   try {
-    const updatedPost = await postsStore.updatePost(postId.value, postData)
+    const updatedPost = await postsStore.updatePost(parseInt(postId.value, 10), postData)
 
     // Show success message
     alert(`Post "${updatedPost.title}" ${postData.status === 'published' ? 'published' : 'updated'} successfully!`)

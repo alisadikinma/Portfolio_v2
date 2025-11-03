@@ -11,8 +11,8 @@ export default defineConfig({
     }
   },
   server: {
-    port: 5173, // Fixed port (default)
-    strictPort: true, // Fail if port already in use (don't auto-increment)
+    port: 5173,
+    strictPort: true,
     host: true
   }
 })

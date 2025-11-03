@@ -14,11 +14,17 @@
           to="/"
           class="flex items-center space-x-2 group"
         >
-          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-secondary-500 flex items-center justify-center shadow-lg group-hover:shadow-xl transition-shadow">
-            <span class="text-white font-bold text-xl">P</span>
+          <!-- Dynamic Logo -->
+          <div v-if="siteLogo" class="w-10 h-10 rounded-xl overflow-hidden shadow-lg group-hover:shadow-xl transition-shadow">
+            <img :src="siteLogo" :alt="siteName" class="w-full h-full object-cover" />
           </div>
-          <span class="text-xl font-display font-bold text-gradient hidden sm:block">
-            Portfolio
+          <div v-else class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-secondary-500 flex items-center justify-center shadow-lg group-hover:shadow-xl transition-shadow">
+            <span class="text-white font-bold text-xl">{{ siteName.charAt(0).toUpperCase() }}</span>
+          </div>
+          
+          <!-- Dynamic Site Name - Show on all screens -->
+          <span class="text-xl font-display font-bold text-gradient">
+            {{ siteName }}
           </span>
         </router-link>
 
@@ -122,11 +128,13 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useThemeStore } from '@/stores/theme'
 import { useUIStore } from '@/stores/ui'
 import { useMenuItems } from '@/composables/useMenuItems'
+import { useSiteSettings } from '@/composables/useSiteSettings'
 import IconDisplay from '@/components/admin/IconDisplay.vue'
 
 const themeStore = useThemeStore()
 const uiStore = useUIStore()
 const { menuItems, isLoading, fetchActiveMenuItems } = useMenuItems()
+const { siteName, siteLogo, fetchSiteSettings } = useSiteSettings()
 
 const isScrolled = ref(false)
 
@@ -153,8 +161,11 @@ const handleThemeToggle = () => {
 onMounted(async () => {
   window.addEventListener('scroll', handleScroll)
 
-  // Fetch active menu items from API
-  await fetchActiveMenuItems()
+  // Fetch active menu items and site settings from API (force refresh)
+  await Promise.all([
+    fetchActiveMenuItems(),
+    fetchSiteSettings(true) // Force refresh to get latest data
+  ])
 })
 
 onUnmounted(() => {

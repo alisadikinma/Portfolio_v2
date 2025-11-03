@@ -28,10 +28,24 @@ export function useSettings() {
 
     try {
       const response = await api.get('/settings')
-      settings.value = response.data.data
-      cache.value.all = response.data.data
+      
+      // API returns grouped data: { data: { profile: [...], about: [...], ... } }
+      // We need to flatten it to array: [{ key: 'profile.name', value: '...', group: 'profile' }, ...]
+      const groupedData = response.data.data
+      const flattenedSettings = []
+      
+      // Flatten grouped object to array
+      Object.keys(groupedData).forEach(groupName => {
+        const groupSettings = groupedData[groupName]
+        if (Array.isArray(groupSettings)) {
+          flattenedSettings.push(...groupSettings)
+        }
+      })
+      
+      settings.value = flattenedSettings
+      cache.value.all = flattenedSettings
 
-      return { success: true, data: response.data.data }
+      return { success: true, data: flattenedSettings }
     } catch (err) {
       error.value = err.response?.data?.message || 'Failed to fetch settings'
       return { success: false, error: error.value }

@@ -27,6 +27,8 @@ class DatabaseSeeder extends Seeder
             ContactSeeder::class,
             MenuItemSeeder::class,
             PageSectionSeeder::class,
+            AboutSettingsSeeder::class,
+            SiteSettingsSeeder::class,
         ]);
 
         $this->command->info('✅ Database seeding completed successfully!');

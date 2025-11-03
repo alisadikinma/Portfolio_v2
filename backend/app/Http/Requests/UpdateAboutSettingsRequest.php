@@ -27,6 +27,10 @@ class UpdateAboutSettingsRequest extends FormRequest
             'bio' => ['nullable', 'string'],
             'profile_photo' => ['nullable', 'image', 'max:5120'], // 5MB max
 
+            // Languages (array of strings)
+            'languages' => ['nullable'],
+            'languages.*' => ['string', 'max:100'],
+
             // Skills can be JSON string (from FormData) or array
             'skills' => ['nullable'],
             'skills.*' => ['string', 'max:255'],
@@ -35,6 +39,7 @@ class UpdateAboutSettingsRequest extends FormRequest
             'experience' => ['nullable'],
             'experience.*.title' => ['required', 'string', 'max:255'],
             'experience.*.company' => ['required', 'string', 'max:255'],
+            'experience.*.company_logo' => ['nullable', 'string'], // Will be URL after upload
             'experience.*.location' => ['nullable', 'string', 'max:255'],
             'experience.*.start_date' => ['required', 'string', 'max:50'],
             'experience.*.end_date' => ['nullable', 'string', 'max:50'],
@@ -55,6 +60,19 @@ class UpdateAboutSettingsRequest extends FormRequest
             'social_links.*.platform' => ['required', 'string', 'max:100'],
             'social_links.*.url' => ['required', 'url', 'max:500'],
             'social_links.*.icon' => ['nullable', 'string', 'max:100'],
+
+            // Statistics
+            'statistics' => ['nullable'],
+            'statistics.years_experience' => ['nullable', 'string', 'max:50'],
+            'statistics.followers' => ['nullable', 'string', 'max:50'],
+            'statistics.projects_delivered' => ['nullable', 'string', 'max:50'],
+            'statistics.cost_savings' => ['nullable', 'string', 'max:50'],
+            'statistics.success_rate' => ['nullable', 'string', 'max:50'],
+
+            // Certifications (array of objects with name and url)
+            'certifications' => ['nullable'],
+            'certifications.*.name' => ['required', 'string', 'max:255'],
+            'certifications.*.url' => ['required', 'url', 'max:500'],
         ];
     }
 
@@ -80,7 +98,7 @@ class UpdateAboutSettingsRequest extends FormRequest
         if ($this->has('bio')) $data['bio'] = $this->input('bio');
         
         // Decode JSON strings from FormData
-        foreach (['skills', 'experience', 'education', 'social_links'] as $field) {
+        foreach (['languages', 'skills', 'experience', 'education', 'social_links', 'statistics', 'certifications'] as $field) {
             if ($this->has($field)) {
                 $value = $this->input($field);
                 
@@ -133,6 +151,10 @@ class UpdateAboutSettingsRequest extends FormRequest
             'social_links.*.platform.required' => 'Platform name is required for each social link',
             'social_links.*.url.required' => 'URL is required for each social link',
             'social_links.*.url.url' => 'Please provide a valid URL for social links',
+
+            'certifications.*.name.required' => 'Certification name is required',
+            'certifications.*.url.required' => 'Certification URL is required',
+            'certifications.*.url.url' => 'Please provide a valid URL for certifications',
         ];
     }
 }

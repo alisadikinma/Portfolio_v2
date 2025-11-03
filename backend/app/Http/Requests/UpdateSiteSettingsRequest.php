@@ -27,6 +27,7 @@ class UpdateSiteSettingsRequest extends FormRequest
             'site_logo' => ['nullable', 'image', 'max:5120'], // 5MB max
             'contact_email' => ['nullable', 'email', 'max:255'],
             'contact_phone' => ['nullable', 'string', 'max:50'],
+            'location' => ['nullable', 'string', 'max:255'],
 
             // Social media links can be JSON string (from FormData) or array
             'social_media' => ['nullable'],

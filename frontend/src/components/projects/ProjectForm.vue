@@ -1,5 +1,5 @@
 <template>
-  <form @submit.prevent="handleSubmit" class="space-y-6">
+  <form @submit.prevent="handleSubmit" novalidate class="space-y-6">
     <!-- Title and Slug -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
       <div>
@@ -30,36 +30,115 @@
       </div>
     </div>
 
-    <!-- Description -->
+    <!-- Description (Simple Textarea) -->
     <div>
       <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
         Description <span class="text-red-500">*</span>
       </label>
-      <RichTextEditor
+      <textarea
         v-model="formData.description"
-        placeholder="Write your project description..."
-        :error="errors.description"
+        rows="2"
+        placeholder="Brief description of the project (short summary)"
+        class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+        :class="{ 'border-red-500': errors.description }"
         @blur="validateField('description')"
-      />
+      ></textarea>
       <p v-if="errors.description" class="mt-1 text-sm text-red-600 dark:text-red-400">
         {{ errors.description }}
       </p>
+      <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+        Short summary for project cards and listings
+      </p>
     </div>
 
-    <!-- Featured Image -->
+    <!-- Content (Rich Text Editor) -->
     <div>
       <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-        Featured Image
+        Content
       </label>
-      <ImageUploader
-        v-model="formData.featured_image"
-        :current-image="formData.current_featured_image"
-        :error="errors.featured_image"
-        @blur="validateField('featured_image')"
+      <RichTextEditor
+        v-model="formData.content"
+        placeholder="Write detailed project content with formatting..."
+        min-height="400px"
+        :error="errors.content"
+        @blur="validateField('content')"
       />
-      <p v-if="errors.featured_image" class="mt-1 text-sm text-red-600 dark:text-red-400">
-        {{ errors.featured_image }}
+      <p v-if="errors.content" class="mt-1 text-sm text-red-600 dark:text-red-400">
+        {{ errors.content }}
       </p>
+      <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+        Full project details with HTML formatting for the detail page (optional)
+      </p>
+    </div>
+
+    <!-- Image Thumbnail with Preview (Side by Side Layout) -->
+    <div>
+      <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+        Image Thumbnail
+      </label>
+      
+      <div class="flex gap-4">
+        <!-- Image Preview -->
+        <div class="flex-shrink-0">
+          <!-- Current Image -->
+          <div v-if="formData.current_featured_image && !imagePreview">
+            <p class="text-xs text-neutral-600 dark:text-neutral-400 mb-2">Current Image:</p>
+            <div class="relative inline-block">
+              <img 
+                :src="formData.current_featured_image" 
+                alt="Current thumbnail"
+                class="w-48 h-32 object-cover rounded-lg border border-neutral-300 dark:border-neutral-600"
+              />
+              <button
+                type="button"
+                @click="removeCurrentImage"
+                class="absolute -top-2 -right-2 p-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors shadow-lg"
+                aria-label="Remove current image"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- New Image Preview -->
+          <div v-if="imagePreview">
+            <p class="text-xs text-neutral-600 dark:text-neutral-400 mb-2">New Image:</p>
+            <div class="relative inline-block">
+              <img 
+                :src="imagePreview" 
+                alt="New thumbnail preview"
+                class="w-48 h-32 object-cover rounded-lg border border-neutral-300 dark:border-neutral-600"
+              />
+              <button
+                type="button"
+                @click="removeNewImage"
+                class="absolute -top-2 -right-2 p-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors shadow-lg"
+                aria-label="Remove new image"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Image Uploader -->
+        <div class="flex-1">
+          <ImageUploader
+            v-model="formData.featured_image"
+            :current-image="formData.current_featured_image"
+            :error="errors.featured_image"
+            @blur="validateField('featured_image')"
+            @update:modelValue="handleImageUpload"
+          />
+          <p v-if="errors.featured_image" class="mt-1 text-sm text-red-600 dark:text-red-400">
+            {{ errors.featured_image }}
+          </p>
+        </div>
+      </div>
     </div>
 
     <!-- Technologies -->
@@ -289,108 +368,21 @@
           <BaseInput
             v-model="formData.canonical_url"
             label="Canonical URL"
-            type="url"
-            placeholder="https://example.com/projects/project-name"
+            type="text"
+            placeholder="/projects/project-name or https://example.com/path"
             :error="errors.canonical_url"
             @blur="validateField('canonical_url')"
           >
             <template #help>
-              Leave empty to use default URL. Set only if this content exists elsewhere.
+              Leave empty to use default URL. Accepts relative paths or full URLs.
             </template>
           </BaseInput>
         </div>
       </div>
     </div>
 
-    <!-- CTA Section (Collapsible) -->
-    <div class="border border-neutral-200 dark:border-neutral-700 rounded-lg overflow-hidden">
-      <button
-        type="button"
-        @click="showCtaSection = !showCtaSection"
-        class="w-full px-4 py-3 bg-neutral-50 dark:bg-neutral-800 flex items-center justify-between hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
-      >
-        <div class="flex items-center gap-2">
-          <svg class="w-5 h-5 text-neutral-600 dark:text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5-4a2 2 0 11-4 0 2 2 0 014 0z" />
-          </svg>
-          <span class="font-medium text-neutral-900 dark:text-neutral-100">Call-to-Action (CTA)</span>
-          <span class="text-sm text-neutral-500 dark:text-neutral-400">(Optional)</span>
-        </div>
-        <svg
-          class="w-5 h-5 text-neutral-600 dark:text-neutral-400 transition-transform"
-          :class="{ 'rotate-180': showCtaSection }"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-
-      <div v-show="showCtaSection" class="p-4 space-y-4 bg-white dark:bg-neutral-900">
-        <!-- CTA Title -->
-        <div>
-          <BaseInput
-            v-model="formData.cta_title"
-            label="CTA Title"
-            type="text"
-            placeholder="e.g., 'Transform Your Business' or 'Ready for the next level?'"
-            :error="errors.cta_title"
-            @blur="validateField('cta_title')"
-          >
-            <template #help>
-              Catchy headline to grab attention
-            </template>
-          </BaseInput>
-        </div>
-
-        <!-- CTA Description -->
-        <div>
-          <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-            CTA Description
-          </label>
-          <textarea
-            v-model="formData.cta_description"
-            rows="3"
-            placeholder="Describe how this solution can help the user. Be specific about benefits."
-            class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
-            :class="{ 'border-red-500': errors.cta_description }"
-            @blur="validateField('cta_description')"
-          ></textarea>
-          <p v-if="errors.cta_description" class="mt-1 text-sm text-red-600 dark:text-red-400">
-            {{ errors.cta_description }}
-          </p>
-        </div>
-
-        <!-- CTA Button Text and Phone -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <BaseInput
-              v-model="formData.cta_button_text"
-              label="Button Text"
-              type="text"
-              placeholder="e.g., 'Get Started', 'Contact Us', 'Schedule a Call'"
-              :error="errors.cta_button_text"
-              @blur="validateField('cta_button_text')"
-            />
-          </div>
-
-          <div>
-            <BaseInput
-              v-model="formData.cta_phone_number"
-              label="Phone/Email"
-              type="text"
-              placeholder="+62-812-xxxx-xxxx or email@example.com"
-              :error="errors.cta_phone_number"
-              @blur="validateField('cta_phone_number')"
-            />
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Related Projects Section (Collapsible) -->
-    <div class="border border-neutral-200 dark:border-neutral-700 rounded-lg overflow-hidden">
+    <!-- Related Projects Section (Collapsible) with Autocomplete -->
+    <div class="border border-neutral-200 dark:border-neutral-700 rounded-lg">
       <button
         type="button"
         @click="showRelatedProjectsSection = !showRelatedProjectsSection"
@@ -415,38 +407,88 @@
       </button>
 
       <div v-show="showRelatedProjectsSection" class="p-4 space-y-4 bg-white dark:bg-neutral-900">
-        <!-- Related Projects List -->
-        <div>
-          <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-3">
-            Select Related Projects
+        <!-- Autocomplete Search -->
+        <div class="relative">
+          <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+            Search Projects
           </label>
-          <div class="space-y-2 max-h-64 overflow-y-auto border border-neutral-200 dark:border-neutral-700 rounded-lg p-3 bg-neutral-50 dark:bg-neutral-800">
-            <div v-if="availableProjects.length === 0" class="text-sm text-neutral-500 dark:text-neutral-400 py-4 text-center">
-              No other projects available
-            </div>
-            <div
-              v-for="project in availableProjects"
+          <div class="relative">
+            <input
+              v-model="searchQuery"
+              type="text"
+              placeholder="Type at least 3 characters to search..."
+              class="w-full px-4 py-2 pr-10 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              @input="handleSearchInput"
+            />
+            <svg class="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+
+          <!-- Search Results Dropdown -->
+          <div
+            v-if="showSearchResults && searchResults.length > 0"
+            class="absolute z-50 w-full mt-1 bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-600 rounded-lg shadow-xl max-h-80 overflow-y-auto"
+          >
+            <button
+              v-for="project in searchResults"
               :key="project.id"
-              class="flex items-center gap-2"
+              type="button"
+              @click="addRelatedProject(project)"
+              class="w-full px-4 py-3 text-left hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors border-b border-neutral-200 dark:border-neutral-700 last:border-b-0"
+              :class="{ 'opacity-50 cursor-not-allowed': isProjectSelected(project.id) }"
+              :disabled="isProjectSelected(project.id)"
             >
-              <input
-                :id="`project-${project.id}`"
-                type="checkbox"
-                :checked="formData.related_project_ids.includes(project.id)"
-                @change="toggleRelatedProject(project.id)"
-                class="w-4 h-4 text-primary-600 bg-white dark:bg-neutral-700 border-neutral-300 dark:border-neutral-600 rounded focus:ring-primary-500 focus:ring-2 cursor-pointer"
-              />
-              <label
-                :for="`project-${project.id}`"
-                class="text-sm text-neutral-700 dark:text-neutral-300 cursor-pointer flex-1 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
-              >
+              <div class="font-medium text-neutral-900 dark:text-neutral-100">
                 {{ project.title }}
-              </label>
+              </div>
+              <div class="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                {{ project.status }} • {{ project.technologies?.slice(0, 3).join(', ') }}
+              </div>
+            </button>
+          </div>
+
+          <!-- No Results Message -->
+          <div
+            v-else-if="showSearchResults && searchQuery.length >= 3 && searchResults.length === 0"
+            class="absolute z-50 w-full mt-1 bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-600 rounded-lg shadow-lg p-4 text-center text-sm text-neutral-500 dark:text-neutral-400"
+          >
+            No projects found
+          </div>
+        </div>
+
+        <!-- Selected Related Projects -->
+        <div v-if="selectedProjects.length > 0" class="space-y-2">
+          <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+            Selected Projects ({{ selectedProjects.length }}/5)
+          </label>
+          <!-- Compact horizontal chips layout -->
+          <div class="flex flex-wrap gap-2">
+            <div
+              v-for="project in selectedProjects"
+              :key="project.id"
+              class="inline-flex items-center gap-2 px-3 py-2 bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 rounded-lg text-sm"
+            >
+              <span class="font-medium text-primary-900 dark:text-primary-100">{{ project.title }}</span>
+              <button
+                type="button"
+                @click="removeRelatedProject(project.id)"
+                class="p-0.5 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 rounded transition-colors"
+                aria-label="Remove project"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
           </div>
-          <p class="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
-            {{ formData.related_project_ids.length }} project(s) selected (Max 5 recommended)
+          <p class="text-xs text-neutral-500 dark:text-neutral-400">
+            Maximum 5 related projects recommended
           </p>
+        </div>
+
+        <div v-else class="text-sm text-neutral-500 dark:text-neutral-400 text-center py-4">
+          No related projects selected. Use the search above to add projects.
         </div>
       </div>
     </div>
@@ -480,6 +522,7 @@ import BaseInput from '@/components/base/BaseInput.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import RichTextEditor from '@/components/blog/RichTextEditor.vue'
 import ImageUploader from '@/components/blog/ImageUploader.vue'
+import api from '@/services/api'
 
 const props = defineProps({
   project: {
@@ -503,6 +546,7 @@ const formData = ref({
   title: '',
   slug: '',
   description: '',
+  content: '',
   featured_image: null,
   current_featured_image: null,
   technologies: [],
@@ -517,10 +561,6 @@ const formData = ref({
   meta_description: '',
   focus_keyword: '',
   canonical_url: '',
-  cta_title: '',
-  cta_description: '',
-  cta_button_text: '',
-  cta_phone_number: '',
   related_project_ids: []
 })
 
@@ -529,9 +569,15 @@ const errors = ref({})
 
 // UI state
 const showSeoSection = ref(false)
-const showCtaSection = ref(false)
 const showRelatedProjectsSection = ref(false)
 const newTechnology = ref('')
+const imagePreview = ref(null)
+
+// Related Projects Autocomplete
+const searchQuery = ref('')
+const searchResults = ref([])
+const showSearchResults = ref(false)
+const selectedProjects = ref([])
 const allProjects = ref([])
 
 // Initialize form with project data if editing
@@ -540,6 +586,7 @@ if (props.project) {
     title: props.project.title || '',
     slug: props.project.slug || '',
     description: props.project.description || '',
+    content: props.project.content || '',
     featured_image: null,
     current_featured_image: props.project.featured_image || null,
     technologies: props.project.technologies || [],
@@ -554,11 +601,14 @@ if (props.project) {
     meta_description: props.project.meta_description || '',
     focus_keyword: props.project.focus_keyword || '',
     canonical_url: props.project.canonical_url || '',
-    cta_title: props.project.cta_title || '',
-    cta_description: props.project.cta_description || '',
-    cta_button_text: props.project.cta_button_text || '',
-    cta_phone_number: props.project.cta_phone_number || '',
-    related_project_ids: props.project.related_project_ids || []
+    related_project_ids: Array.isArray(props.project.related_project_ids) 
+      ? props.project.related_project_ids 
+      : []
+  }
+  
+  // Load selected projects for related projects section
+  if (props.project.related_projects && Array.isArray(props.project.related_projects)) {
+    selectedProjects.value = props.project.related_projects
   }
 }
 
@@ -579,6 +629,33 @@ function generateSlug(text) {
     .replace(/^-+|-+$/g, '')
 }
 
+// Image upload handler
+function handleImageUpload(file) {
+  if (file) {
+    // Create preview
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      imagePreview.value = e.target.result
+    }
+    reader.readAsDataURL(file)
+  } else {
+    imagePreview.value = null
+  }
+}
+
+// Remove current image
+function removeCurrentImage() {
+  formData.value.current_featured_image = null
+  formData.value.featured_image = null
+  imagePreview.value = null
+}
+
+// Remove new image
+function removeNewImage() {
+  formData.value.featured_image = null
+  imagePreview.value = null
+}
+
 // Meta title character count color
 const metaTitleClass = computed(() => {
   const length = formData.value.meta_title.length
@@ -597,11 +674,6 @@ const metaDescriptionClass = computed(() => {
   return 'text-red-600 dark:text-red-400'
 })
 
-// Available projects (excluding current project)
-const availableProjects = computed(() => {
-  return allProjects.value.filter(p => !props.project || p.id !== props.project.id)
-})
-
 // Add technology
 function addTechnology() {
   const tech = newTechnology.value.trim()
@@ -617,26 +689,100 @@ function removeTechnology(index) {
   formData.value.technologies.splice(index, 1)
 }
 
-// Toggle related project
-function toggleRelatedProject(projectId) {
-  const index = formData.value.related_project_ids.indexOf(projectId)
-  if (index > -1) {
-    formData.value.related_project_ids.splice(index, 1)
-  } else {
-    // Limit to 5 related projects
-    if (formData.value.related_project_ids.length < 5) {
-      formData.value.related_project_ids.push(projectId)
+// Handle search input with debounce
+let searchTimeout = null
+function handleSearchInput() {
+  clearTimeout(searchTimeout)
+  
+  if (searchQuery.value.length < 3) {
+    showSearchResults.value = false
+    searchResults.value = []
+    return
+  }
+
+  searchTimeout = setTimeout(() => {
+    performSearch()
+  }, 300)
+}
+
+// Perform search
+async function performSearch() {
+  if (searchQuery.value.length < 3) {
+    return
+  }
+
+  try {
+    const response = await api.get('/projects', {
+      params: {
+        q: searchQuery.value,
+        limit: 10
+      }
+    })
+
+    if (response.data.success) {
+      // Filter out current project and already selected projects
+      searchResults.value = (response.data.data || []).filter(p => {
+        const isCurrentProject = props.project && p.id === props.project.id
+        const isAlreadySelected = formData.value.related_project_ids.includes(p.id)
+        return !isCurrentProject && !isAlreadySelected
+      })
+      showSearchResults.value = true
     }
+  } catch (error) {
+    console.error('Search failed:', error)
+    searchResults.value = []
+    showSearchResults.value = false
   }
 }
 
-// Load all projects for selection
-const loadProjects = async () => {
+// Check if project is selected
+function isProjectSelected(projectId) {
+  return formData.value.related_project_ids.includes(projectId)
+}
+
+// Add related project
+function addRelatedProject(project) {
+  if (formData.value.related_project_ids.length >= 5) {
+    alert('Maximum 5 related projects allowed')
+    return
+  }
+
+  if (!isProjectSelected(project.id)) {
+    formData.value.related_project_ids.push(project.id)
+    selectedProjects.value.push(project)
+    
+    // Clear search
+    searchQuery.value = ''
+    showSearchResults.value = false
+    searchResults.value = []
+  }
+}
+
+// Remove related project
+function removeRelatedProject(projectId) {
+  const index = formData.value.related_project_ids.indexOf(projectId)
+  if (index > -1) {
+    formData.value.related_project_ids.splice(index, 1)
+    selectedProjects.value = selectedProjects.value.filter(p => p.id !== projectId)
+  }
+}
+
+// Load all projects for initial selection
+async function loadProjects() {
   try {
-    const response = await fetch('/api/projects')
-    const data = await response.json()
-    if (data.success) {
-      allProjects.value = data.data || []
+    const response = await api.get('/projects', {
+      params: { limit: 100 }
+    })
+    
+    if (response.data.success) {
+      allProjects.value = response.data.data || []
+      
+      // Load selected projects if editing
+      if (props.project && formData.value.related_project_ids.length > 0) {
+        selectedProjects.value = allProjects.value.filter(p => 
+          formData.value.related_project_ids.includes(p.id)
+        )
+      }
     }
   } catch (error) {
     console.error('Failed to load projects:', error)
@@ -670,28 +816,34 @@ function validateField(field) {
       }
       break
 
+    case 'content':
+      // Content is optional - no validation needed
+      break
+
     case 'status':
       if (!formData.value.status) {
         errors.value.status = 'Project status is required'
       }
       break
 
-    case 'project_url':
-      if (formData.value.project_url && !isValidUrl(formData.value.project_url)) {
+    case 'project_url': {
+      const trimmedUrl = (formData.value.project_url || '').trim()
+      if (trimmedUrl && !isValidUrl(trimmedUrl)) {
         errors.value.project_url = 'Please enter a valid URL'
       }
       break
+    }
 
-    case 'github_url':
-      if (formData.value.github_url && !isValidUrl(formData.value.github_url)) {
+    case 'github_url': {
+      const trimmedUrl = (formData.value.github_url || '').trim()
+      if (trimmedUrl && !isValidUrl(trimmedUrl)) {
         errors.value.github_url = 'Please enter a valid GitHub URL'
       }
       break
+    }
 
     case 'canonical_url':
-      if (formData.value.canonical_url && !isValidUrl(formData.value.canonical_url)) {
-        errors.value.canonical_url = 'Please enter a valid URL'
-      }
+      // Canonical URL accepts both full URLs and relative paths - no validation
       break
 
     case 'meta_title':
@@ -725,19 +877,43 @@ function validateForm() {
   validateField('title')
   validateField('slug')
   validateField('description')
+  // content is optional
   validateField('status')
-  validateField('project_url')
-  validateField('github_url')
-  validateField('canonical_url')
-  validateField('meta_title')
-  validateField('meta_description')
+  
+  // Only validate optional URL fields if they have values
+  if (formData.value.project_url && formData.value.project_url.trim()) {
+    validateField('project_url')
+  }
+  if (formData.value.github_url && formData.value.github_url.trim()) {
+    validateField('github_url')
+  }
+  // canonical_url is completely optional - skip validation in form submit
+  
+  // Only validate SEO fields if they have values
+  if (formData.value.meta_title && formData.value.meta_title.trim()) {
+    validateField('meta_title')
+  }
+  if (formData.value.meta_description && formData.value.meta_description.trim()) {
+    validateField('meta_description')
+  }
 
   return Object.keys(errors.value).every(key => !errors.value[key])
 }
 
 // Handle submit
-function handleSubmit() {
+function handleSubmit(event) {
+  // Prevent default form submission
+  event?.preventDefault()
+  
+  // Clear any existing errors from optional fields
+  delete errors.value.canonical_url
+  
   if (!validateForm()) {
+    // Scroll to first error
+    const firstError = Object.keys(errors.value).find(key => errors.value[key])
+    if (firstError) {
+      console.error('Validation failed:', firstError, errors.value[firstError])
+    }
     return
   }
 
@@ -748,6 +924,7 @@ function handleSubmit() {
   submissionData.append('title', formData.value.title.trim())
   submissionData.append('slug', formData.value.slug.trim())
   submissionData.append('description', formData.value.description.trim())
+  submissionData.append('content', formData.value.content.trim())
   
   // Add technologies as array items
   formData.value.technologies.forEach((tech, index) => {
@@ -757,15 +934,19 @@ function handleSubmit() {
   submissionData.append('status', formData.value.status)
   submissionData.append('is_featured', formData.value.is_featured ? '1' : '0')
 
-  // Add optional fields
-  if (formData.value.client_name) {
-    submissionData.append('client_name', formData.value.client_name.trim())
+  // Add optional fields (only if not empty)
+  const clientName = (formData.value.client_name || '').trim()
+  const projectUrl = (formData.value.project_url || '').trim()
+  const githubUrl = (formData.value.github_url || '').trim()
+  
+  if (clientName) {
+    submissionData.append('client_name', clientName)
   }
-  if (formData.value.project_url) {
-    submissionData.append('project_url', formData.value.project_url.trim())
+  if (projectUrl) {
+    submissionData.append('project_url', projectUrl)
   }
-  if (formData.value.github_url) {
-    submissionData.append('github_url', formData.value.github_url.trim())
+  if (githubUrl) {
+    submissionData.append('github_url', githubUrl)
   }
   if (formData.value.start_date) {
     submissionData.append('start_date', formData.value.start_date)
@@ -774,32 +955,23 @@ function handleSubmit() {
     submissionData.append('end_date', formData.value.end_date)
   }
 
-  // Add SEO fields
-  if (formData.value.meta_title) {
-    submissionData.append('meta_title', formData.value.meta_title.trim())
+  // Add SEO fields (only if not empty)
+  const metaTitle = (formData.value.meta_title || '').trim()
+  const metaDescription = (formData.value.meta_description || '').trim()
+  const focusKeyword = (formData.value.focus_keyword || '').trim()
+  const canonicalUrl = (formData.value.canonical_url || '').trim()
+  
+  if (metaTitle) {
+    submissionData.append('meta_title', metaTitle)
   }
-  if (formData.value.meta_description) {
-    submissionData.append('meta_description', formData.value.meta_description.trim())
+  if (metaDescription) {
+    submissionData.append('meta_description', metaDescription)
   }
-  if (formData.value.focus_keyword) {
-    submissionData.append('focus_keyword', formData.value.focus_keyword.trim())
+  if (focusKeyword) {
+    submissionData.append('focus_keyword', focusKeyword)
   }
-  if (formData.value.canonical_url) {
-    submissionData.append('canonical_url', formData.value.canonical_url.trim())
-  }
-
-  // Add CTA fields
-  if (formData.value.cta_title) {
-    submissionData.append('cta_title', formData.value.cta_title.trim())
-  }
-  if (formData.value.cta_description) {
-    submissionData.append('cta_description', formData.value.cta_description.trim())
-  }
-  if (formData.value.cta_button_text) {
-    submissionData.append('cta_button_text', formData.value.cta_button_text.trim())
-  }
-  if (formData.value.cta_phone_number) {
-    submissionData.append('cta_phone_number', formData.value.cta_phone_number.trim())
+  if (canonicalUrl) {
+    submissionData.append('canonical_url', canonicalUrl)
   }
 
   // Add related project IDs

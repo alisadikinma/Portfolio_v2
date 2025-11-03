@@ -20,19 +20,33 @@ class Project extends Model
         'image',
         'images',
         'category',
+        'status',
         'technologies',
         'client',
         'url',
+        'github_url',
         'completed_at',
+        'start_date',
+        'end_date',
         'featured',
         'published',
         'is_active',
         'sort_order',
-        // CTA fields
-        'cta_title',
-        'cta_description',
-        'cta_button_text',
-        'cta_phone_number',
+        // SEO fields
+        'meta_title',
+        'meta_description',
+        'focus_keyword',
+        'canonical_url',
+        'og_title',
+        'og_description',
+        'og_image',
+        'schema_markup',
+        'ai_summary',
+        'tech_stack_details',
+        'seo_score',
+        'index_follow',
+        'tags',
+        'meta_keywords',
         // Related projects
         'related_project_ids',
     ];
@@ -41,10 +55,16 @@ class Project extends Model
         'images' => 'array',
         'technologies' => 'array',
         'related_project_ids' => 'array',
+        'schema_markup' => 'array',
+        'tech_stack_details' => 'array',
+        'tags' => 'array',
         'completed_at' => 'date',
+        'start_date' => 'date',
+        'end_date' => 'date',
         'featured' => 'boolean',
         'published' => 'boolean',
         'is_active' => 'boolean',
+        'index_follow' => 'boolean',
     ];
 
     /**
@@ -60,14 +80,6 @@ class Project extends Model
             ->where('id', '!=', $this->id)
             ->limit($limit)
             ->get();
-    }
-
-    /**
-     * Check if project has CTA
-     */
-    public function hasCta()
-    {
-        return $this->cta_title || $this->cta_description || $this->cta_button_text;
     }
 
     /**
@@ -93,7 +105,7 @@ class Project extends Model
      */
     public function scopeFeatured($query)
     {
-        return $query->where('is_featured', true);
+        return $query->where('featured', true);
     }
 
     /**
@@ -118,5 +130,69 @@ class Project extends Model
     public function translation($language = 'en')
     {
         return $this->translations()->where('language', $language)->first();
+    }
+
+    /**
+     * Accessor for featured_image (alias for image)
+     */
+    public function getFeaturedImageAttribute()
+    {
+        return $this->image;
+    }
+
+    /**
+     * Accessor for client_name (alias for client)
+     */
+    public function getClientNameAttribute()
+    {
+        return $this->client;
+    }
+
+    /**
+     * Accessor for project_url (alias for url)
+     */
+    public function getProjectUrlAttribute()
+    {
+        return $this->url;
+    }
+
+    /**
+     * Accessor for is_featured (alias for featured)
+     */
+    public function getIsFeaturedAttribute()
+    {
+        return $this->featured;
+    }
+
+    /**
+     * Mutator for featured_image (write to image)
+     */
+    public function setFeaturedImageAttribute($value)
+    {
+        $this->attributes['image'] = $value;
+    }
+
+    /**
+     * Mutator for client_name (write to client)
+     */
+    public function setClientNameAttribute($value)
+    {
+        $this->attributes['client'] = $value;
+    }
+
+    /**
+     * Mutator for project_url (write to url)
+     */
+    public function setProjectUrlAttribute($value)
+    {
+        $this->attributes['url'] = $value;
+    }
+
+    /**
+     * Mutator for is_featured (write to featured)
+     */
+    public function setIsFeaturedAttribute($value)
+    {
+        $this->attributes['featured'] = (bool) $value;
     }
 }

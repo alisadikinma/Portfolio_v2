@@ -1,0 +1,222 @@
+# ====================================
+# Portfolio_v2 Project
+# Full-stack: Laravel + Vue
+# ====================================
+
+# ====================================
+# Laravel Backend (backend/)
+# ====================================
+
+# Dependencies
+backend/vendor/
+backend/node_modules/
+
+# Environment files
+backend/.env
+backend/.env.backup
+backend/.env.production
+
+# Storage & Cache
+backend/storage/*.key
+backend/storage/app/*
+!backend/storage/app/.gitkeep
+!backend/storage/app/public/
+backend/storage/app/public/*
+!backend/storage/app/public/.gitkeep
+backend/storage/framework/cache/*
+!backend/storage/framework/cache/.gitkeep
+backend/storage/framework/sessions/*
+!backend/storage/framework/sessions/.gitkeep
+backend/storage/framework/testing/*
+!backend/storage/framework/testing/.gitkeep
+backend/storage/framework/views/*
+!backend/storage/framework/views/.gitkeep
+backend/storage/logs/*
+!backend/storage/logs/.gitkeep
+
+# Bootstrap cache
+backend/bootstrap/cache/*
+!backend/bootstrap/cache/.gitkeep
+
+# Laravel specific
+backend/public/storage
+backend/public/hot
+
+# Testing
+backend/.phpunit.result.cache
+backend/coverage/
+
+# ====================================
+# Vue Frontend (frontend/)
+# ====================================
+
+# Dependencies
+frontend/node_modules/
+frontend/.pnp
+frontend/.pnp.js
+
+# Production build
+frontend/dist/
+frontend/build/
+
+# Environment files
+frontend/.env
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+
+# Logs
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/pnpm-debug.log*
+frontend/lerna-debug.log*
+
+# Vite cache
+frontend/.vite/
+
+# Testing
+frontend/coverage/
+frontend/.nyc_output/
+
+# ====================================
+# Claude Code & Raw Data
+# ====================================
+
+# Raw data files (HTML/PNG - too large for git)
+.claude/raw_data/*.html
+.claude/raw_data/*.png
+
+# Keep directory structure
+!.claude/raw_data/.gitkeep
+
+# Logs and temp files
+.claude/logs/
+.claude/temp/
+
+# ====================================
+# IDE & Editors
+# ====================================
+
+# VSCode
+.vscode/
+*.code-workspace
+
+# PhpStorm / IntelliJ
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# ====================================
+# OS Specific
+# ====================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# ====================================
+# Temporary & Build Files
+# ====================================
+
+# Logs
+*.log
+
+# Temp files
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+*~
+
+# Compiled files
+*.com
+*.class
+*.dll
+*.exe
+*.o
+*.so
+
+# Archives
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# ====================================
+# Database & Backups
+# ====================================
+
+# Database dumps (optional - uncomment if needed)
+# *.sql
+# *.sqlite
+# *.db
+
+# Backups
+*.backup
+*.old
+
+# ====================================
+# Custom Scripts & Tools
+# ====================================
+
+# Diagnostic scripts output (optional)
+backend/check-*.php
+backend/verify-*.php
+backend/diagnose.*
+backend/fix-*.bat
+backend/re-import.bat
+
+# Keep these if you want to commit them:
+# !backend/check-important-script.php
+
+# ====================================
+# Project Specific
+# ====================================
+
+# Uploaded files (if large)
+backend/public/uploads/*
+!backend/public/uploads/.gitkeep
+
+# Storage projects (if too large)
+# backend/storage/app/public/projects/*.png
+# backend/storage/app/public/projects/*.jpg
+
+# Keep small placeholders
+!backend/storage/app/public/projects/placeholder.png

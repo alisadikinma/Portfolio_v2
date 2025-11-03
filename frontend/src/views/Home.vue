@@ -3,7 +3,7 @@
     <!-- Hero Section - Clean & Professional -->
     <section
       v-if="showHeroSection"
-      class="relative pt-32 pb-8 md:pt-40 md:pb-12 bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-950"
+      class="relative pt-16 pb-6 md:pt-24 md:pb-12 bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-950"
     >
       <!-- Subtle Background Pattern -->
       <div class="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]">
@@ -11,63 +11,160 @@
       </div>
 
       <div class="container-custom relative z-10">
-        <div class="max-w-4xl mx-auto text-center">
-          <!-- Badge -->
-          <div class="inline-flex items-center gap-2 px-4 py-2 glass rounded-full mb-6 animate-fade-in-down">
-            <span class="relative flex h-2 w-2">
-              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-400 opacity-75"></span>
-              <span class="relative inline-flex rounded-full h-2 w-2 bg-accent-500"></span>
-            </span>
-            <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">
-              Available for Freelance Work
-            </span>
-          </div>
+        <div class="max-w-6xl mx-auto">
+          <!-- Grid Layout: Photo + Content -->
+          <div class="grid sm:grid-cols-2 gap-6 md:gap-8 lg:gap-10 items-center">
+            <!-- Left: Profile Photo -->
+            <div class="order-2 sm:order-1">
+              <div class="relative">
+                <!-- Photo Container - Responsive Size -->
+                <div class="relative w-48 h-48 sm:w-64 sm:h-64 md:w-80 md:h-80 lg:w-120 lg:h-120 mx-auto rounded-2xl overflow-hidden bg-gradient-to-br from-primary-100 to-secondary-100 dark:from-primary-900/20 dark:to-secondary-900/20 shadow-2xl">
+                  <img 
+                    v-if="heroAvatar" 
+                    :src="getProfilePhotoUrl(heroAvatar)" 
+                    :alt="heroName" 
+                    class="w-full h-full object-cover"
+                    @error="handleAvatarError"
+                  />
+                  <div v-else class="w-full h-full flex items-center justify-center">
+                    <svg class="w-32 h-32 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </div>
+                </div>
+                
+                <!-- Decorative Elements -->
+                <div class="absolute -top-4 -right-4 w-24 h-24 bg-accent-500/10 rounded-full blur-3xl"></div>
+                <div class="absolute -bottom-6 -left-6 w-32 h-32 bg-primary-500/10 rounded-full blur-3xl"></div>
+              </div>
 
-          <!-- Main Heading -->
-          <h1 class="text-5xl md:text-6xl lg:text-7xl font-display font-bold text-gray-900 dark:text-white mb-6 leading-tight animate-fade-in-up">
-            {{ heroName }} <br v-if="heroTitle" />
-            <span v-if="heroTitle" class="text-gradient">{{ heroTitle }}</span>
-          </h1>
+              <!-- Languages Flags -->
+              <div v-if="aboutSettings?.languages?.length > 0" class="mt-4 md:mt-6 flex items-center justify-center gap-2 md:gap-3">
+                <div
+                  v-for="lang in aboutSettings.languages.slice(0, 3)"
+                  :key="lang"
+                  class="flex items-center gap-1.5 md:gap-2 px-2.5 py-1.5 md:px-3 md:py-2 glass rounded-full"
+                >
+                  <img :src="getLangFlag(lang)" :alt="lang" class="w-5 h-5 md:w-6 md:h-6 object-contain rounded" />
+                  <span class="text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ lang }}
+                  </span>
+                </div>
+              </div>
 
-          <!-- Subtitle -->
-          <p class="text-xl md:text-2xl text-gray-600 dark:text-gray-400 mb-10 max-w-2xl mx-auto leading-relaxed animate-fade-in-up animate-delay-100">
-            {{ heroBio }}
-          </p>
+              <!-- Certifications - Moved Here -->
+              <div v-if="aboutSettings?.certifications?.length > 0" class="mt-3 md:mt-4">
+                <p class="text-xs text-gray-500 dark:text-gray-500 mb-2 md:mb-3 uppercase tracking-wider font-semibold text-center">
+                  CERTIFIED BY
+                </p>
+                <div class="flex flex-wrap gap-2 md:gap-3 justify-center">
+                  <a
+                    v-for="cert in aboutSettings.certifications"
+                    :key="cert.name"
+                    :href="cert.url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="group p-2 md:p-3 glass rounded-lg hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5"
+                    :title="cert.name"
+                  >
+                    <img :src="getCertLogo(cert.name)" :alt="cert.name" class="w-6 h-6 md:w-8 md:h-8 object-contain" />
+                  </a>
+                </div>
+              </div>
+            </div>
 
-          <!-- CTA Buttons -->
-          <div class="flex flex-wrap justify-center gap-4 mb-16 animate-fade-in-up animate-delay-200">
-            <button
-              @click="$router.push('/projects')"
-              class="group px-8 py-4 bg-gradient-to-r from-primary-600 to-secondary-600 text-white font-semibold rounded-xl hover:shadow-xl hover:scale-105 transition-all duration-300"
-            >
-              <span class="flex items-center gap-2">
-                View My Work
-                <svg class="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-                </svg>
-              </span>
-            </button>
-            <button
-              @click="$router.push('/contact')"
-              class="px-8 py-4 glass text-gray-700 dark:text-gray-300 font-semibold rounded-xl hover:shadow-lg transition-all duration-300"
-            >
-              Let's Talk
-            </button>
-          </div>
+            <!-- Right: Content -->
+            <div class="order-1 sm:order-2 text-center sm:text-left">
+              <!-- Badge -->
+              <div class="inline-flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 glass rounded-full mb-4 md:mb-6 animate-fade-in-down">
+                <span class="relative flex h-2 w-2">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-400 opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-2 w-2 bg-accent-500"></span>
+                </span>
+                <span class="text-xs md:text-sm font-semibold text-gray-700 dark:text-gray-300">
+                  Available for Freelance Work
+                </span>
+              </div>
 
-          <!-- Tech Stack / Skills -->
-          <div v-if="heroSkills.length > 0" class="animate-fade-in-up animate-delay-300">
-            <p class="text-sm text-gray-500 dark:text-gray-500 mb-4 uppercase tracking-wider">
-              {{ aboutSettings?.skills ? 'Skills' : 'Tech Stack' }}
-            </p>
-            <div class="flex flex-wrap justify-center gap-3">
-              <span
-                v-for="skill in heroSkills.slice(0, 8)"
-                :key="skill"
-                class="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:border-primary-500 hover:text-primary-600 dark:hover:text-primary-400 transition-all"
-              >
-                {{ skill }}
-              </span>
+              <!-- Main Heading -->
+              <h1 class="text-3xl md:text-5xl lg:text-6xl font-display font-bold text-gray-900 dark:text-white mb-3 md:mb-4 leading-tight animate-fade-in-up">
+                {{ heroName }}
+              </h1>
+              
+              <h2 v-if="heroTitle" class="text-xl md:text-3xl font-display font-bold text-gradient mb-4 md:mb-6 animate-fade-in-up animate-delay-100">
+                {{ heroTitle }}
+              </h2>
+
+              <!-- Subtitle -->
+              <p class="text-sm md:text-lg text-gray-600 dark:text-gray-400 mb-4 md:mb-6 leading-relaxed animate-fade-in-up animate-delay-200">
+                {{ heroBio }}
+              </p>
+
+              <!-- CTA Buttons -->
+              <div class="flex flex-wrap gap-2 md:gap-3 mb-4 md:mb-6 animate-fade-in-up animate-delay-300 justify-center sm:justify-start">
+                <button
+                  @click="$router.push('/projects')"
+                  class="group px-6 py-3 md:px-8 md:py-4 bg-gradient-to-r from-primary-600 to-secondary-600 text-white text-sm md:text-base font-semibold rounded-xl hover:shadow-xl hover:scale-105 transition-all duration-300"
+                >
+                  <span class="flex items-center gap-2">
+                    View My Work
+                    <svg class="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                    </svg>
+                  </span>
+                </button>
+                <button
+                  @click="$router.push('/contact')"
+                  class="px-6 py-3 md:px-8 md:py-4 glass text-gray-700 dark:text-gray-300 text-sm md:text-base font-semibold rounded-xl hover:shadow-lg transition-all duration-300"
+                >
+                  Let's Talk
+                </button>
+              </div>
+
+              <!-- Tech Stack / Skills - RESPONSIVE (MAX 2 LINES) -->
+              <div v-if="heroSkills.length > 0" class="animate-fade-in-up animate-delay-400">
+                <p class="text-xs text-gray-500 dark:text-gray-500 mb-1.5 md:mb-2 uppercase tracking-wider font-semibold">
+                  SKILLS
+                </p>
+                <!-- Mobile: Max 3 skills + See More -->
+                <div class="md:hidden">
+                  <div class="flex flex-wrap gap-1.5 justify-center">
+                    <span
+                      v-for="skill in (showAllSkills ? heroSkills : heroSkills.slice(0, 3))"
+                      :key="skill"
+                      class="px-2.5 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-xs font-medium text-gray-700 dark:text-gray-300 hover:border-primary-500 hover:text-primary-600 dark:hover:text-primary-400 transition-all"
+                    >
+                      {{ skill }}
+                    </span>
+                  </div>
+                  <button
+                    v-if="heroSkills.length > 3 && !showAllSkills"
+                    @click="showAllSkills = true"
+                    class="mt-2 text-xs text-primary-600 dark:text-primary-400 hover:underline font-semibold"
+                  >
+                    See More ({{ heroSkills.length - 3 }}+)
+                  </button>
+                </div>
+                <!-- Desktop: Max 6 skills (2 lines max) + See More -->
+                <div class="hidden md:block">
+                  <div class="flex flex-wrap gap-1.5 justify-start max-h-[52px] overflow-hidden">
+                    <span
+                      v-for="skill in (showAllSkills ? heroSkills : heroSkills.slice(0, 6))"
+                      :key="skill"
+                      class="px-2.5 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-xs font-medium text-gray-700 dark:text-gray-300 hover:border-primary-500 hover:text-primary-600 dark:hover:text-primary-400 transition-all"
+                    >
+                      {{ skill }}
+                    </span>
+                  </div>
+                  <button
+                    v-if="heroSkills.length > 6 && !showAllSkills"
+                    @click="showAllSkills = true"
+                    class="mt-2 text-xs text-primary-600 dark:text-primary-400 hover:underline font-semibold"
+                  >
+                    See More ({{ heroSkills.length - 6 }}+)
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -75,19 +172,19 @@
     </section>
 
     <!-- Stats Section - Clean Cards -->
-    <section class="py-12 bg-white dark:bg-gray-950">
+    <section v-if="stats.length > 0" class="py-6 md:py-8 bg-white dark:bg-gray-950">
       <div class="container-custom">
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-6">
           <div
             v-for="(stat, index) in stats"
             :key="stat.label"
-            class="card-elevated p-8 text-center hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+            class="card-elevated p-4 md:p-6 lg:p-8 text-center hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
             :class="`animate-fade-in-up animate-delay-${index * 100}`"
           >
-            <div class="text-4xl md:text-5xl font-bold text-gradient mb-2">
+            <div class="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-gradient mb-1 md:mb-2 break-words">
               {{ stat.value }}
             </div>
-            <div class="text-sm text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+            <div class="text-xs md:text-sm text-gray-600 dark:text-gray-400 uppercase tracking-wider leading-tight">
               {{ stat.label }}
             </div>
           </div>
@@ -95,91 +192,240 @@
       </div>
     </section>
 
-    <!-- Awards & Recognition Section -->
+    <!-- Awards & Recognition Section - 3D COVERFLOW + MAGNETIC -->
     <section
       v-if="showAwardsSection"
-      class="py-20 bg-gray-50 dark:bg-gray-900"
+      class="py-20 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden"
     >
-      <div class="container-custom">
+      <!-- Animated background particles -->
+      <div class="absolute inset-0 overflow-hidden">
+        <div class="absolute w-96 h-96 bg-purple-500/20 rounded-full blur-3xl top-0 -left-20 animate-blob"></div>
+        <div class="absolute w-96 h-96 bg-pink-500/20 rounded-full blur-3xl top-0 -right-20 animate-blob animation-delay-2000"></div>
+        <div class="absolute w-96 h-96 bg-blue-500/20 rounded-full blur-3xl -bottom-20 left-1/2 animate-blob animation-delay-4000"></div>
+      </div>
+
+      <div class="container-custom relative z-10">
         <!-- Section Header -->
-        <div class="max-w-2xl mb-16">
-          <p class="text-accent-600 dark:text-accent-400 font-semibold mb-2 uppercase tracking-wider text-sm">
+        <div class="text-center mb-16">
+          <p class="text-purple-400 font-semibold mb-3 uppercase tracking-wider text-sm flex items-center justify-center gap-2">
+            <svg class="w-5 h-5 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+            </svg>
             Recognition & Achievements
           </p>
-          <h2 class="text-4xl md:text-5xl font-display font-bold text-gray-900 dark:text-white mb-4">
-            Awards & Honors
+          <h2 class="text-5xl md:text-6xl font-display font-bold text-white mb-4">
+            Awards & <span class="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 animate-gradient">Honors</span>
           </h2>
-          <p class="text-xl text-gray-600 dark:text-gray-400">
+          <p class="text-xl text-gray-300 max-w-2xl mx-auto">
             Celebrating milestones and industry recognition
           </p>
         </div>
 
         <BaseLoader v-if="awardsLoading" text="Loading awards..." />
 
-        <!-- Awards Grid -->
-        <div v-else-if="awards.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div
-            v-for="award in awards"
-            :key="award.id"
-            class="award-card group relative bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 hover:border-primary-500 dark:hover:border-primary-500 hover:shadow-xl transition-all duration-300"
+        <!-- 3D Coverflow Carousel -->
+        <div v-else-if="awards.length > 0" class="relative">
+          <!-- Carousel container with perspective -->
+          <div 
+            ref="carouselContainer"
+            class="relative h-[600px] md:h-[650px]"
+            style="perspective: 2000px"
+            @mousemove="handleMouseMove"
+            @mouseleave="handleMouseLeave"
+            @touchstart="handleTouchStart"
+            @touchmove="handleTouchMove"
+            @touchend="handleTouchEnd"
           >
-            <!-- Award Icon/Image -->
-            <div class="relative mb-6">
-              <div v-if="award.image" class="w-16 h-16 rounded-xl overflow-hidden bg-gradient-to-br from-primary-400 to-secondary-400">
-                <img :src="award.image" :alt="award.award_title" class="w-full h-full object-cover" />
-              </div>
-              <div v-else class="w-16 h-16 bg-gradient-to-br from-primary-400 to-secondary-400 rounded-xl flex items-center justify-center">
-                <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
-                </svg>
+            <div class="absolute inset-0 flex items-center justify-center">
+              <!-- Award Cards in 3D -->
+              <div
+                v-for="(award, index) in awards"
+                :key="award.id"
+                class="award-3d-card absolute transition-all duration-700 ease-out"
+                :class="{
+                  'award-active': index === activeAwardIndex,
+                  'award-prev': index < activeAwardIndex,
+                  'award-next': index > activeAwardIndex
+                }"
+                :style="getCardStyle(index)"
+              >
+                <!-- Card with glass morphism -->
+                <div 
+                  class="relative w-[320px] md:w-[380px] h-[500px] md:h-[550px] rounded-2xl overflow-hidden backdrop-blur-xl border shadow-2xl group"
+                  :class="[
+                    index === activeAwardIndex 
+                      ? 'bg-white/60 border-white/50' 
+                      : 'bg-white/20 border-white/25'
+                  ]"
+                >
+                  <!-- Gradient overlay -->
+                  <div class="absolute inset-0 bg-gradient-to-br from-purple-500/20 via-transparent to-pink-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                  
+                  <!-- Content -->
+                  <div class="relative z-10 p-8 h-full flex flex-col">
+                    <!-- Top section -->
+                    <div class="flex items-start justify-between mb-6">
+                      <!-- Award Icon with glow -->
+                      <div class="relative">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-2xl blur-xl opacity-60 group-hover:opacity-100 transition-opacity animate-pulse"></div>
+                        <div v-if="award.image" class="relative w-20 h-20 rounded-2xl overflow-hidden shadow-2xl transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
+                          <img :src="award.image" :alt="award.award_title" class="w-full h-full object-cover" />
+                        </div>
+                        <div v-else class="relative w-20 h-20 bg-gradient-to-br from-yellow-400 via-orange-500 to-red-500 rounded-2xl flex items-center justify-center shadow-2xl transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
+                          <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
+                          </svg>
+                        </div>
+                      </div>
+
+                      <!-- Year badge -->
+                      <div class="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full shadow-lg">
+                        <span class="text-white font-bold text-sm">{{ formatYear(award.award_date) }}</span>
+                      </div>
+                    </div>
+
+                    <!-- Award title -->
+                    <h3 
+                      class="text-2xl font-bold mb-3 line-clamp-2 transition-colors"
+                      :class="[
+                        index === activeAwardIndex
+                          ? 'text-gray-900 hover:text-purple-600'
+                          : 'text-white hover:text-purple-300'
+                      ]"
+                    >
+                      {{ award.award_title }}
+                    </h3>
+
+                    <!-- Organization -->
+                    <div class="flex items-center gap-2 mb-4 pb-4 border-b border-white/10">
+                      <svg 
+                        class="w-5 h-5" 
+                        :class="index === activeAwardIndex ? 'text-purple-600' : 'text-purple-400'"
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24"
+                      >
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                      </svg>
+                      <p 
+                        class="font-semibold text-sm uppercase tracking-wide"
+                        :class="index === activeAwardIndex ? 'text-purple-700' : 'text-purple-300'"
+                      >
+                        {{ award.issuing_organization }}
+                      </p>
+                    </div>
+
+                    <!-- Description -->
+                    <p 
+                      v-if="award.description" 
+                      class="text-sm leading-relaxed line-clamp-3 mb-6 flex-1"
+                      :class="index === activeAwardIndex ? 'text-gray-700' : 'text-gray-300'"
+                    >
+                      {{ stripHtml(award.description) }}
+                    </p>
+
+                    <!-- Bottom badges -->
+                    <div class="flex items-center gap-3 mb-4">
+                      <div v-if="award.credential_id" class="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 rounded-lg backdrop-blur-sm">
+                        <svg 
+                          class="w-4 h-4" 
+                          :class="index === activeAwardIndex ? 'text-purple-600' : 'text-purple-400'"
+                          fill="none" 
+                          stroke="currentColor" 
+                          viewBox="0 0 24 24"
+                        >
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+                        </svg>
+                        <span 
+                          class="text-xs font-medium"
+                          :class="index === activeAwardIndex ? 'text-gray-900' : 'text-white'"
+                        >
+                          {{ award.credential_id }}
+                        </span>
+                      </div>
+                      <div v-if="award.total_photos > 0" class="flex items-center gap-1.5 px-3 py-1.5 bg-purple-500/30 rounded-lg backdrop-blur-sm">
+                        <svg 
+                          class="w-4 h-4" 
+                          :class="index === activeAwardIndex ? 'text-purple-600' : 'text-purple-300'"
+                          fill="none" 
+                          stroke="currentColor" 
+                          viewBox="0 0 24 24"
+                        >
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                        <span 
+                          class="text-xs font-semibold"
+                          :class="index === activeAwardIndex ? 'text-gray-900' : 'text-white'"
+                        >
+                          {{ award.total_photos }} Photos
+                        </span>
+                      </div>
+                    </div>
+
+                    <!-- View button -->
+                    <button
+                      v-if="award.total_photos > 0"
+                      @click="openGalleryModal(award)"
+                      class="w-full relative overflow-hidden px-6 py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-xl font-bold text-white shadow-xl shadow-purple-500/50 hover:shadow-2xl hover:shadow-purple-500/70 transition-all duration-300 transform hover:scale-105 flex items-center justify-center gap-2 group"
+                    >
+                      <span class="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></span>
+                      <svg class="w-5 h-5 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                      </svg>
+                      <span class="relative z-10">VIEW GALLERY</span>
+                    </button>
+                  </div>
+
+                  <!-- Reflection effect -->
+                  <div class="absolute inset-0 bg-gradient-to-t from-white/5 to-transparent pointer-events-none"></div>
+                </div>
               </div>
             </div>
+          </div>
 
-            <!-- Award Info -->
-            <div class="mb-6">
-              <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
-                {{ award.award_title }}
-              </h3>
-              <p class="text-sm text-purple-600 dark:text-purple-400 font-semibold mb-3 uppercase tracking-wide">
-                {{ award.issuing_organization }} • {{ formatYear(award.award_date) }}
-              </p>
-              <p v-if="award.description" class="text-sm text-gray-600 dark:text-gray-400 line-clamp-3 mb-4">
-                {{ stripHtml(award.description) }}
-              </p>
+          <!-- Navigation arrows -->
+          <button
+            v-if="awards.length > 1"
+            @click="previousAward"
+            class="absolute left-4 top-1/2 -translate-y-1/2 z-20 w-14 h-14 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-all hover:scale-110 shadow-xl"
+          >
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M15 19l-7-7 7-7"></path>
+            </svg>
+          </button>
+          <button
+            v-if="awards.length > 1"
+            @click="nextAward"
+            class="absolute right-4 top-1/2 -translate-y-1/2 z-20 w-14 h-14 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-all hover:scale-110 shadow-xl"
+          >
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9 5l7 7-7 7"></path>
+            </svg>
+          </button>
 
-              <!-- Credential Info -->
-              <div class="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-500 mb-4">
-                <div v-if="award.credential_id" class="flex items-center">
-                  <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
-                  </svg>
-                  ID: {{ award.credential_id }}
-                </div>
-                <div v-if="award.total_photos > 0" class="flex items-center">
-                  <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                  </svg>
-                  {{ award.total_photos }} {{ award.total_photos === 1 ? 'Photo' : 'Photos' }}
-                </div>
-              </div>
-            </div>
-
-            <!-- Action Button -->
+          <!-- Dots indicator -->
+          <div class="flex justify-center gap-2 mt-8">
             <button
-              v-if="award.total_photos > 0"
-              @click="openGalleryModal(award)"
-              class="w-full px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors duration-300 flex items-center justify-center gap-2"
-            >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-              </svg>
-              VIEW GALLERY
-            </button>
+              v-for="(award, index) in awards"
+              :key="`dot-${award.id}`"
+              @click="activeAwardIndex = index"
+              class="transition-all duration-300"
+              :class="[
+                index === activeAwardIndex 
+                  ? 'w-8 h-3 bg-gradient-to-r from-purple-500 to-pink-500' 
+                  : 'w-3 h-3 bg-white/30 hover:bg-white/50'
+              ]"
+              style="border-radius: 9999px"
+            ></button>
           </div>
         </div>
 
-        <div v-else class="text-center py-12">
-          <p class="text-gray-500 dark:text-gray-400">No awards to display yet.</p>
+        <div v-else class="text-center py-20">
+          <svg class="w-20 h-20 mx-auto text-white/20 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
+          </svg>
+          <p class="text-white/60 text-lg">No awards to display yet.</p>
         </div>
       </div>
     </section>
@@ -206,8 +452,53 @@
         <!-- Loading State -->
         <BaseLoader v-if="galleriesLoading" text="Loading gallery..." />
 
-        <!-- Gallery Grid -->
-        <div v-else-if="galleries.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div v-else-if="galleries.length > 0">
+          <!-- Gallery Carousel (Mobile) -->
+          <div class="md:hidden">
+            <MobileCarousel :items="galleries.slice(0, 6)" :show-arrows="true" :show-dots="true">
+              <template #default="{ item }">
+              <div
+                class="group cursor-pointer card-elevated overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 mx-1"
+                @click="openGalleryItemsModal(item)"
+              >
+                <!-- Gallery Thumbnail -->
+                <div class="relative aspect-video bg-gradient-to-br from-primary-100 to-secondary-100 dark:from-primary-900/20 dark:to-secondary-900/20 overflow-hidden">
+                  <img
+                    v-if="item.thumbnail"
+                    :src="item.thumbnail"
+                    :alt="item.title"
+                    class="w-full h-full object-contain"
+                    loading="lazy"
+                  />
+                  <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+
+                  <!-- Items Count Badge -->
+                  <div class="absolute top-4 right-4 px-3 py-1 bg-black/70 backdrop-blur-sm text-white text-xs font-semibold rounded-lg">
+                    {{ item.items_count || 0 }} Photos
+                  </div>
+                </div>
+
+                <!-- Content -->
+                <div class="p-6">
+                  <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
+                    {{ item.title }}
+                  </h3>
+                  <p v-if="item.description" class="text-gray-600 dark:text-gray-400 text-sm line-clamp-2 mb-3">
+                    {{ stripHtml(item.description) }}
+                  </p>
+                  <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-500">
+                    <span v-if="item.company">{{ item.company }}</span>
+                    <span v-if="item.company && item.period">•</span>
+                    <span v-if="item.period">{{ item.period }}</span>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </MobileCarousel>
+        </div>
+
+          <!-- Gallery Grid (Desktop) -->
+          <div class="hidden md:grid grid-cols-2 lg:grid-cols-3 gap-6">
           <div
             v-for="gallery in galleries.slice(0, 6)"
             :key="gallery.id"
@@ -257,6 +548,7 @@
             </div>
           </div>
         </div>
+        </div>
 
         <!-- Empty State -->
         <div v-else class="text-center py-12">
@@ -300,54 +592,156 @@
 
         <BaseLoader v-if="projectsLoading" text="Loading projects..." />
 
-        <!-- Projects Grid -->
-        <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div v-else>
+          <!-- Projects Carousel (Mobile) -->
+          <div class="md:hidden">
+            <MobileCarousel :items="featuredProjects.slice(0, 6)" :show-arrows="true" :show-dots="true">
+              <template #default="{ item }">
+              <div
+                @click="$router.push(`/projects/${item.slug}`)"
+                class="group relative cursor-pointer bg-white dark:bg-gray-800 rounded-2xl overflow-hidden hover:shadow-2xl transition-all duration-500 mx-1"
+              >
+                <!-- Premium Badge -->
+                <div class="absolute top-4 left-4 z-10 px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold rounded-full shadow-lg flex items-center gap-1.5">
+                  <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                  </svg>
+                  FEATURED
+                </div>
+
+                <!-- Image Section with Parallax Effect -->
+                <div class="relative aspect-[16/10] overflow-hidden bg-gradient-to-br from-primary-50 to-secondary-50 dark:from-gray-900 dark:to-gray-800">
+                  <div class="absolute inset-0 bg-gradient-to-br from-primary-500/10 to-secondary-500/10 group-hover:opacity-0 transition-opacity duration-500"></div>
+                  <img
+                    v-if="item.featured_image"
+                    :src="item.featured_image"
+                    :alt="item.title"
+                    class="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700 ease-out"
+                  />
+                  <!-- Gradient Overlay -->
+                  <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-60 group-hover:opacity-90 transition-opacity duration-300"></div>
+                  
+                  <!-- Hover CTA -->
+                  <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 transform group-hover:scale-100 scale-95">
+                    <div class="px-6 py-3 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm rounded-xl shadow-2xl flex items-center gap-2 border border-white/20">
+                      <span class="text-primary-600 dark:text-primary-400 font-bold text-sm">View Case Study</span>
+                      <svg class="w-5 h-5 text-primary-600 dark:text-primary-400 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Content Section -->
+                <div class="p-6 space-y-4">
+                  <!-- Title -->
+                  <h3 class="text-xl font-bold text-gray-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors line-clamp-2">
+                    {{ item.title }}
+                  </h3>
+                  
+                  <!-- Description -->
+                  <p class="text-sm text-gray-600 dark:text-gray-400 line-clamp-2 leading-relaxed">
+                    {{ item.description }}
+                  </p>
+                  
+                  <!-- Tech Stack -->
+                  <div class="flex flex-wrap gap-2 pt-2">
+                    <span
+                      v-for="tech in item.technologies?.slice(0, 3)"
+                      :key="tech"
+                      class="px-3 py-1.5 bg-gradient-to-r from-primary-50 to-secondary-50 dark:from-primary-900/20 dark:to-secondary-900/20 text-primary-700 dark:text-primary-300 rounded-lg text-xs font-semibold border border-primary-100 dark:border-primary-800/50 hover:border-primary-300 dark:hover:border-primary-600 transition-colors"
+                    >
+                      {{ tech }}
+                    </span>
+                    <span
+                      v-if="item.technologies?.length > 3"
+                      class="px-3 py-1.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-xs font-semibold"
+                    >
+                      +{{ item.technologies.length - 3 }}
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Bottom Glow Effect -->
+                <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-primary-500 via-secondary-500 to-accent-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left"></div>
+              </div>
+            </template>
+          </MobileCarousel>
+        </div>
+
+          <!-- Projects Grid (Desktop) -->
+          <div class="hidden md:grid grid-cols-3 gap-6">
           <div
-            v-for="(project, index) in featuredProjects"
+            v-for="(project, index) in featuredProjects.slice(0, 6)"
             :key="project.id"
             @click="$router.push(`/projects/${project.slug}`)"
-            class="group cursor-pointer card-elevated overflow-hidden hover:shadow-2xl hover:-translate-y-2 transition-all duration-300"
+            class="group relative cursor-pointer bg-white dark:bg-gray-800 rounded-xl overflow-hidden hover:shadow-2xl transition-all duration-500 hover:-translate-y-2"
           >
-            <!-- Project Image -->
-            <div class="relative aspect-video bg-gradient-to-br from-primary-100 to-secondary-100 dark:from-primary-900/20 dark:to-secondary-900/20 overflow-hidden">
+            <!-- Premium Badge -->
+            <div class="absolute top-4 left-4 z-10 px-3 py-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold rounded-full shadow-lg flex items-center gap-1.5">
+              <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+              </svg>
+              FEATURED
+            </div>
+
+            <!-- Image Section -->
+            <div class="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-primary-50 to-secondary-50 dark:from-gray-900 dark:to-gray-800">
+              <div class="absolute inset-0 bg-gradient-to-br from-primary-500/10 to-secondary-500/10 group-hover:opacity-0 transition-opacity duration-500"></div>
               <img
                 v-if="project.featured_image"
                 :src="project.featured_image"
                 :alt="project.title"
-                class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                class="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700 ease-out"
               />
-              <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-
-              <!-- View Button Overlay -->
-              <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                <span class="px-6 py-3 glass text-white font-semibold rounded-xl flex items-center gap-2">
-                  View Project
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+              <!-- Gradient Overlay -->
+              <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-60 group-hover:opacity-90 transition-opacity duration-300"></div>
+              
+              <!-- Hover CTA -->
+              <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 transform group-hover:scale-100 scale-95">
+                <div class="px-6 py-3 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm rounded-xl shadow-2xl flex items-center gap-2 border border-white/20">
+                  <span class="text-primary-600 dark:text-primary-400 font-bold text-sm">View Details</span>
+                  <svg class="w-4 h-4 text-primary-600 dark:text-primary-400 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
                   </svg>
-                </span>
+                </div>
               </div>
             </div>
 
-            <!-- Content -->
-            <div class="p-6">
-              <h3 class="text-2xl font-bold text-gray-900 dark:text-white mb-3 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
+            <!-- Content Section -->
+            <div class="p-5 space-y-3">
+              <!-- Title -->
+              <h3 class="text-lg font-bold text-gray-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors line-clamp-2">
                 {{ project.title }}
               </h3>
-              <p class="text-gray-600 dark:text-gray-400 mb-4 line-clamp-2">
+              
+              <!-- Description -->
+              <p class="text-sm text-gray-600 dark:text-gray-400 line-clamp-2 leading-relaxed">
                 {{ project.description }}
               </p>
-              <div class="flex flex-wrap gap-2">
+              
+              <!-- Tech Stack -->
+              <div class="flex flex-wrap gap-1.5 pt-2">
                 <span
-                  v-for="tech in project.technologies?.slice(0, 4)"
+                  v-for="tech in project.technologies?.slice(0, 3)"
                   :key="tech"
-                  class="px-3 py-1 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 rounded-lg text-xs font-semibold"
+                  class="px-2.5 py-1 bg-gradient-to-r from-primary-50 to-secondary-50 dark:from-primary-900/20 dark:to-secondary-900/20 text-primary-700 dark:text-primary-300 rounded-md text-xs font-semibold border border-primary-100 dark:border-primary-800/50 hover:border-primary-300 dark:hover:border-primary-600 transition-colors"
                 >
                   {{ tech }}
                 </span>
+                <span
+                  v-if="project.technologies?.length > 3"
+                  class="px-2.5 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-md text-xs font-semibold"
+                >
+                  +{{ project.technologies.length - 3 }}
+                </span>
               </div>
             </div>
+
+            <!-- Bottom Glow Effect -->
+            <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-primary-500 via-secondary-500 to-accent-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left"></div>
           </div>
+        </div>
         </div>
 
         <!-- View All Button -->
@@ -380,8 +774,58 @@
 
         <BaseLoader v-if="postsLoading" text="Loading posts..." />
 
-        <!-- Posts Grid -->
-        <div v-else class="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div v-else>
+          <!-- Posts Carousel (Mobile) -->
+          <div class="md:hidden">
+            <MobileCarousel :items="latestPosts" :show-arrows="true" :show-dots="true">
+              <template #default="{ item }">
+              <div
+                @click="$router.push(`/blog/${item.slug}`)"
+                class="group cursor-pointer card-elevated overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col mx-1"
+              >
+                <!-- Image -->
+                <div class="relative aspect-video bg-gradient-to-br from-secondary-100 to-accent-100 dark:from-secondary-900/20 dark:to-accent-900/20">
+                  <img
+                    v-if="item.featured_image"
+                    :src="item.featured_image"
+                    :alt="item.title"
+                    class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                  />
+                </div>
+
+                <!-- Content -->
+                <div class="p-6 flex-1 flex flex-col">
+                  <div class="flex items-center gap-3 mb-4">
+                    <span class="px-3 py-1 bg-secondary-50 dark:bg-secondary-900/20 text-secondary-700 dark:text-secondary-300 rounded-lg text-xs font-semibold uppercase">
+                      {{ item.category?.name }}
+                    </span>
+                    <span class="text-xs text-gray-500 dark:text-gray-500">
+                      {{ formatDate(item.published_at) }}
+                    </span>
+                  </div>
+
+                  <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-3 group-hover:text-secondary-600 dark:group-hover:text-secondary-400 transition-colors line-clamp-2">
+                    {{ item.title }}
+                  </h3>
+
+                  <p class="text-gray-600 dark:text-gray-400 text-sm line-clamp-3 flex-1 mb-4">
+                    {{ item.excerpt }}
+                  </p>
+
+                  <div class="flex items-center text-secondary-600 dark:text-secondary-400 font-semibold text-sm">
+                    <span>Read Article</span>
+                    <svg class="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </MobileCarousel>
+        </div>
+
+          <!-- Posts Grid (Desktop) -->
+          <div class="hidden md:grid grid-cols-3 gap-8">
           <div
             v-for="post in latestPosts"
             :key="post.id"
@@ -425,6 +869,7 @@
               </div>
             </div>
           </div>
+        </div>
         </div>
 
         <!-- View All Button -->
@@ -814,7 +1259,7 @@
       </Transition>
     </Teleport>
 
-    <!-- CTA Section - Clean & Direct -->
+    <!-- CTA Section - AI Automation Expert (100% AI-Built Proof) -->
     <section
       v-if="showCTASection"
       class="relative py-20 bg-gradient-to-br from-primary-600 via-secondary-600 to-accent-600 overflow-hidden"
@@ -825,18 +1270,60 @@
       </div>
 
       <div class="container-custom text-center relative z-10">
-        <h2 class="text-4xl md:text-5xl font-display font-bold text-white mb-6">
-          Let's Build Something Great
+        <!-- Heading with AI Proof Angle -->
+        <h2 class="text-4xl md:text-5xl font-display font-bold text-white mb-6 leading-tight">
+          Don't Believe AI Can Build A Site This Good?
         </h2>
-        <p class="text-xl text-white/90 mb-10 max-w-2xl mx-auto">
-          Ready to start your next project? Let's create something extraordinary together.
+        
+        <!-- Copy with AI Tech Stack -->
+        <p class="text-xl text-white/90 mb-8 max-w-3xl mx-auto leading-relaxed">
+          This website you're viewing is <strong class="text-white">100% built by AI Automation</strong>. Laravel + Vue.js + n8n + AI Agents. <span class="font-semibold text-white">ZERO manual coding</span>. 300+ hours of work automated to 3 days. If a complex website like this can be fully AI-powered, imagine how easy automating your business will be.
         </p>
-        <button
-          @click="$router.push('/contact')"
-          class="px-10 py-5 bg-white text-primary-600 font-bold text-lg rounded-xl hover:shadow-2xl hover:scale-105 transition-all duration-300"
-        >
-          Start a Project
-        </button>
+
+        <!-- Stats Badge -->
+        <div class="flex flex-wrap items-center justify-center gap-4 mb-10">
+          <div class="flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full border border-white/20">
+            <span class="text-2xl">⚡</span>
+            <span class="text-white font-semibold text-sm">300+ hours saved</span>
+          </div>
+          <div class="flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full border border-white/20">
+            <span class="text-2xl">🤖</span>
+            <span class="text-white font-semibold text-sm">100% AI-built</span>
+          </div>
+          <div class="flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full border border-white/20">
+            <span class="text-2xl">💰</span>
+            <span class="text-white font-semibold text-sm">95% cost reduction</span>
+          </div>
+        </div>
+
+        <!-- CTA Text -->
+        <p class="text-lg text-white/95 mb-8 font-medium">
+          Want to see how? <span class="text-white font-bold">FREE 30-minute consultation!</span>
+        </p>
+
+        <!-- CTA Buttons -->
+        <div class="flex flex-wrap items-center justify-center gap-4">
+          <!-- Primary CTA: WhatsApp -->
+          <a
+            :href="contactWhatsApp"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="group px-10 py-5 bg-white text-primary-600 font-bold text-lg rounded-xl hover:shadow-2xl hover:scale-105 transition-all duration-300 flex items-center gap-3"
+          >
+            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+            </svg>
+            <span>WhatsApp Me Now</span>
+          </a>
+
+          <!-- Secondary CTA: Contact Form -->
+          <button
+            @click="$router.push('/contact')"
+            class="px-10 py-5 bg-white/10 backdrop-blur-sm border-2 border-white text-white font-bold text-lg rounded-xl hover:bg-white hover:text-primary-600 hover:shadow-2xl hover:scale-105 transition-all duration-300"
+          >
+            Schedule Consultation
+          </button>
+        </div>
       </div>
     </section>
   </div>
@@ -851,17 +1338,40 @@ import { useTestimonials } from '@/composables/useTestimonials'
 import { useGallery } from '@/composables/useGallery'
 import { useAboutSettings } from '@/composables/useAboutSettings'
 import { usePageSections } from '@/composables/usePageSections'
-import { BaseLoader } from '@/components/base'
+import { useSettings } from '@/composables/useSettings'
+import { BaseLoader, MobileCarousel } from '@/components/base'
 import api from '@/services/api'
 
-const { projects: featuredProjects, isLoading: projectsLoading, fetchProjects } = useProjects()
+// Import certification logos
+import googleLogo from '@/assets/certifications/google.png'
+import oracleLogo from '@/assets/certifications/oracle.png'
+import outskillLogo from '@/assets/certifications/outskill.png'
+
+// Import language flags
+import idFlag from '@/assets/language/ID.png'
+import gbFlag from '@/assets/language/GB.png'
+import cnFlag from '@/assets/language/CN.png'
+
+const { projects, isLoading: projectsLoading, fetchProjects } = useProjects()
+
+// Featured projects computed (backend already filters, but we create alias for clarity)
+const featuredProjects = computed(() => projects.value)
 const { posts: latestPosts, isLoading: postsLoading, fetchPosts } = usePosts()
 const { awards, isLoading: awardsLoading, fetchAwards } = useAwards()
 const { testimonials, isLoading: testimonialsLoading, fetchTestimonials } = useTestimonials()
 const { galleries, loading: galleriesLoading, fetchGalleries, fetchGalleryItems } = useGallery()
 const { aboutSettings, loading: loadingAbout, heroName, heroTitle, heroBio, heroAvatar, heroSkills } = useAboutSettings()
 const { sections, fetchActiveSections } = usePageSections()
+const { settings, fetchSettings, getSettingValue } = useSettings()
 const currentTestimonialIndex = ref(0)
+const showAllSkills = ref(false)
+
+// WhatsApp Contact computed - uses getSettingValue from composable
+const contactWhatsApp = computed(() => {
+  const phone = getSettingValue('contact_phone') || '+6281234567890'
+  const message = encodeURIComponent('Hi! I saw your AI-powered website and I\'m interested in discussing AI Automation for my business. Can we schedule a free consultation?')
+  return `https://wa.me/${phone.replace(/[^0-9]/g, '')}?text=${message}`
+})
 
 // Section visibility computed properties
 const showHeroSection = computed(() => {
@@ -909,12 +1419,27 @@ const orderedSections = computed(() => {
 
 // About settings now managed by useAboutSettings composable
 
-const stats = ref([
-  { value: '50+', label: 'Projects' },
-  { value: '100+', label: 'Articles' },
-  { value: '200+', label: 'Clients' },
-  { value: '5+', label: 'Years' }
-])
+// Stats computed from aboutSettings
+const stats = computed(() => {
+  if (!aboutSettings.value?.statistics) {
+    return [
+      { value: '16+', label: 'Years Experience' },
+      { value: '1K', label: 'Followers' },
+      { value: '50+', label: 'Projects Delivered' },
+      { value: '$2M+', label: 'Cost Savings' },
+      { value: '95%', label: 'Success Rate' }
+    ]
+  }
+  
+  const s = aboutSettings.value.statistics
+  return [
+    { value: s.years_experience || '16+', label: 'Years Experience' },
+    { value: s.followers || '1K', label: 'Followers' },
+    { value: s.projects_delivered || '50+', label: 'Projects Delivered' },
+    { value: s.cost_savings || '$2M+', label: 'Cost Savings' },
+    { value: s.success_rate || '95%', label: 'Success Rate' }
+  ].filter(stat => stat.value) // Only show stats with values
+})
 
 // fetchAboutSettings now managed by useAboutSettings composable
 
@@ -938,6 +1463,27 @@ const stripHtml = (html) => {
   tmp.innerHTML = html
   return tmp.textContent || tmp.innerText || ''
 }
+
+// Awards 3D Coverflow state
+const activeAwardIndex = ref(0)
+const carouselContainer = ref(null)
+const mouseX = ref(0)
+const mouseY = ref(0)
+const isHoveringCarousel = ref(false)
+const screenSize = ref('desktop') // 'mobile' | 'tablet' | 'desktop'
+const windowWidth = ref(window.innerWidth)
+
+// Screen breakpoints
+const isMobile = computed(() => windowWidth.value < 768)
+const isTablet = computed(() => windowWidth.value >= 768 && windowWidth.value < 1024)
+const isDesktop = computed(() => windowWidth.value >= 1024)
+
+// Cards to show based on screen size
+const visibleCardsCount = computed(() => {
+  if (isMobile.value) return 1 // Mobile: 1 card (active only)
+  if (isTablet.value) return 2 // Tablet: 2 cards (active + 1 side)
+  return 3 // Desktop: 3 cards (active + 2 sides)
+})
 
 // Gallery modal state (for awards)
 const showGalleryModal = ref(false)
@@ -1068,7 +1614,210 @@ const handleImageError = (event) => {
   event.target.src = 'https://via.placeholder.com/400x300/e5e7eb/6b7280?text=Image+Not+Found'
 }
 
-// Keyboard navigation for lightbox
+const getProfilePhotoUrl = (path) => {
+  if (!path) return ''
+  if (path.startsWith('http')) return path
+  if (path.startsWith('/uploads/')) return import.meta.env.VITE_API_URL.replace('/api', '') + path
+  if (path.startsWith('/storage/')) return import.meta.env.VITE_API_URL.replace('/api', '') + path
+  return import.meta.env.VITE_API_URL.replace('/api', '') + '/uploads/' + path
+}
+
+const handleAvatarError = (event) => {
+  console.warn('[Home] Failed to load avatar:', event.target.src)
+  event.target.style.display = 'none'
+}
+
+// Get certification logo based on name
+const getCertLogo = (name) => {
+  const lowerName = name.toLowerCase()
+  if (lowerName.includes('google')) return googleLogo
+  if (lowerName.includes('oracle')) return oracleLogo
+  if (lowerName.includes('outskill')) return outskillLogo
+  return '' // no logo for unknown cert
+}
+
+// Get language flag based on name
+const getLangFlag = (lang) => {
+  const lowerLang = lang.toLowerCase()
+  if (lowerLang.includes('indonesia')) return idFlag
+  if (lowerLang.includes('english')) return gbFlag
+  if (lowerLang.includes('mandarin') || lowerLang.includes('chinese')) return cnFlag
+  return idFlag // default to ID flag
+}
+
+// 3D Coverflow + Magnetic Hover Functions
+const getCardStyle = (index) => {
+  const diff = index - activeAwardIndex.value
+  const isCurrent = diff === 0
+  const isPrev = diff < 0
+  const isNext = diff > 0
+  const absDiff = Math.abs(diff)
+  
+  // Visibility based on screen size
+  let maxVisible = 1 // Default: show center + 1 on each side (3 total)
+  if (isMobile.value) {
+    maxVisible = 0 // Mobile: only center (1 total)
+  } else if (isTablet.value) {
+    maxVisible = 1 // Tablet: center + 1 per side (up to 3 total, but we'll limit to 2)
+  } else {
+    maxVisible = 1 // Desktop: center + 1 per side (3 total)
+  }
+  
+  // Hide cards too far outside visible range
+  if (absDiff > maxVisible) {
+    return {
+      transform: `translateX(${diff > 0 ? '150%' : '-150%'}) scale(0.3)`,
+      opacity: 0,
+      zIndex: 0,
+      pointerEvents: 'none',
+      visibility: 'hidden'
+    }
+  }
+  
+  let translateX = diff * 100
+  let translateZ = isCurrent ? 0 : -300
+  let rotateY = 0
+  let scale = isCurrent ? 1 : 0.75
+  let opacity = isCurrent ? 1 : 0.85 // Increased from 0.5 to 0.85
+  let zIndex = isCurrent ? 30 : (20 - absDiff)
+  
+  // Responsive positioning adjustments
+  if (isMobile.value) {
+    // Mobile: Only show active card, hide all others
+    if (!isCurrent) {
+      return {
+        transform: `translateX(${diff > 0 ? '150%' : '-150%'}) scale(0.5)`,
+        opacity: 0,
+        zIndex: 0,
+        pointerEvents: 'none',
+        visibility: 'hidden'
+      }
+    }
+  } else if (isTablet.value) {
+    // Tablet: Show 2 cards (active + 1 side peek on right only for cleaner look)
+    if (absDiff > 1 || isPrev) {
+      // Hide cards on left and far right
+      return {
+        transform: `translateX(${diff > 0 ? '180%' : '-180%'}) scale(0.6)`,
+        opacity: 0,
+        zIndex: 0,
+        pointerEvents: 'none',
+        visibility: 'hidden'
+      }
+    }
+    // Show only next card (right side) as peek
+    if (isNext && absDiff === 1) {
+      rotateY = -35
+      translateX = 50
+      translateZ = -200
+      scale = 0.75
+      opacity = 0.8 // Increased from 0.6 to 0.8
+    }
+  } else {
+    // Desktop: Show 3 cards (active + 2 sides)
+    // Adjust spacing to keep cards in viewport
+    if (absDiff === 1) {
+      // Immediate neighbors (±1)
+      if (isPrev) {
+        rotateY = 45
+        translateX = -45 // Closer positioning
+        translateZ = -250
+        scale = 0.8
+      } else if (isNext) {
+        rotateY = -45
+        translateX = 45 // Closer positioning
+        translateZ = -250
+        scale = 0.8
+      }
+    } else if (absDiff > 1) {
+      // Cards beyond immediate neighbors - fade out more gently
+      opacity = 0.4 // Increased from 0.2 to 0.4
+      scale = 0.6
+      if (isPrev) {
+        rotateY = 60
+        translateX = -80
+        translateZ = -400
+      } else if (isNext) {
+        rotateY = -60
+        translateX = 80
+        translateZ = -400
+      }
+    }
+  }
+  
+  // Magnetic hover effect (only on active card and desktop)
+  if (isCurrent && isHoveringCarousel.value && carouselContainer.value && isDesktop.value) {
+    const rect = carouselContainer.value.getBoundingClientRect()
+    const centerX = rect.width / 2
+    const centerY = rect.height / 2
+    const deltaX = (mouseX.value - centerX) / 20
+    const deltaY = (mouseY.value - centerY) / 20
+    
+    translateX += deltaX
+    rotateY = -deltaX / 5
+  }
+  
+  return {
+    transform: `translateX(${translateX}%) translateZ(${translateZ}px) rotateY(${rotateY}deg) scale(${scale})`,
+    opacity,
+    zIndex,
+    pointerEvents: isCurrent ? 'auto' : 'none',
+    visibility: 'visible'
+  }
+}
+
+const nextAward = () => {
+  if (activeAwardIndex.value < awards.value.length - 1) {
+    activeAwardIndex.value++
+  }
+}
+
+const previousAward = () => {
+  if (activeAwardIndex.value > 0) {
+    activeAwardIndex.value--
+  }
+}
+
+const handleMouseMove = (event) => {
+  if (!carouselContainer.value) return
+  const rect = carouselContainer.value.getBoundingClientRect()
+  mouseX.value = event.clientX - rect.left
+  mouseY.value = event.clientY - rect.top
+  isHoveringCarousel.value = true
+}
+
+const handleMouseLeave = () => {
+  isHoveringCarousel.value = false
+}
+
+// Touch/Swipe support for mobile
+let touchStartX = 0
+let touchEndX = 0
+
+const handleTouchStart = (event) => {
+  touchStartX = event.touches[0].clientX
+}
+
+const handleTouchMove = (event) => {
+  touchEndX = event.touches[0].clientX
+}
+
+const handleTouchEnd = () => {
+  const swipeThreshold = 50
+  const diff = touchStartX - touchEndX
+  
+  if (Math.abs(diff) > swipeThreshold) {
+    if (diff > 0) {
+      // Swipe left - next
+      nextAward()
+    } else {
+      // Swipe right - previous
+      previousAward()
+    }
+  }
+}
+
+// Keyboard navigation for lightbox and carousel
 const handleKeydown = (e) => {
   if (showGalleryLightbox.value) {
     if (e.key === 'ArrowRight') nextGalleryPhoto()
@@ -1082,6 +1831,10 @@ const handleKeydown = (e) => {
     closeGalleryItemsModal()
   } else if (showGalleryModal.value && e.key === 'Escape') {
     closeGalleryModal()
+  } else if (showAwardsSection.value && awards.value.length > 1) {
+    // Awards carousel keyboard navigation (when no modal is open)
+    if (e.key === 'ArrowRight') nextAward()
+    if (e.key === 'ArrowLeft') previousAward()
   }
 }
 
@@ -1092,16 +1845,35 @@ const rotateTestimonials = () => {
   }
 }
 
+// Auto-rotate awards carousel
+const rotateAwards = () => {
+  if (awards.value.length > 1) {
+    activeAwardIndex.value = (activeAwardIndex.value + 1) % awards.value.length
+  }
+}
+
 let testimonialInterval
+let awardsInterval
 
 onMounted(async () => {
   // Performance tracking START
   const startTime = performance.now()
   
+  // Window resize listener for responsive carousel
+  const handleResize = () => {
+    windowWidth.value = window.innerWidth
+  }
+  window.addEventListener('resize', handleResize)
+  
   // Fetch page sections configuration
   console.log('🔄 Fetching page sections...')
   await fetchActiveSections('homepage')
   console.log('📋 Sections loaded:', sections.value)
+
+  // Fetch settings for WhatsApp number
+  console.log('🔄 Fetching settings...')
+  await fetchSettings()
+  console.log('⚙️ Settings loaded:', settings.value.length, 'items')
 
   // About settings auto-loads via TanStack Query (instant with placeholderData)
   // No need to await - composable handles loading state automatically
@@ -1112,7 +1884,10 @@ onMounted(async () => {
   
   // PARALLEL fetch instead of sequential (FASTEST!)
   await Promise.all([
-    fetchProjects({ featured: true, limit: 4 }),
+    fetchProjects({ featured: true, limit: 6 }).then(() => {
+      console.log('🎯 Featured Projects fetched:', projects.value.length, 'items')
+      console.log('📦 Projects data:', projects.value)
+    }),
     fetchPosts({ limit: 3 }),
     fetchAwards({ featured: true, limit: 6 }),
     fetchGalleries({ is_active: true, limit: 6 }).then(() => {
@@ -1162,8 +1937,16 @@ onMounted(async () => {
   // Start testimonial rotation
   testimonialInterval = setInterval(rotateTestimonials, 5000)
   
+  // Start awards carousel rotation
+  if (showAwardsSection.value && awards.value.length > 1) {
+    awardsInterval = setInterval(rotateAwards, 6000) // 6s interval (slower than testimonials)
+  }
+  
   // Add keyboard event listener
   window.addEventListener('keydown', handleKeydown)
+  
+  // Store resize handler for cleanup
+  window._resizeHandler = handleResize
 })
 
 // Cleanup on unmount
@@ -1171,6 +1954,9 @@ import { onUnmounted } from 'vue'
 onUnmounted(() => {
   if (testimonialInterval) {
     clearInterval(testimonialInterval)
+  }
+  if (awardsInterval) {
+    clearInterval(awardsInterval)
   }
   window.removeEventListener('keydown', handleKeydown)
 })
@@ -1189,6 +1975,108 @@ onUnmounted(() => {
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* Premium Award Card Animations */
+.award-premium-card {
+  animation: fadeInUp 0.6s ease-out forwards;
+  opacity: 0;
+  transform: translateY(30px);
+}
+
+@keyframes fadeInUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Shine animation */
+@keyframes shine {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shine {
+  animation: shine 2s ease-in-out infinite;
+}
+
+/* 3D Coverflow Styles */
+.award-3d-card {
+  position: absolute;
+  transform-style: preserve-3d;
+  will-change: transform, opacity;
+  transition: all 0.7s cubic-bezier(0.165, 0.84, 0.44, 1);
+}
+
+/* Active card (center) */
+.award-active {
+  transform: translateX(0) translateZ(0) rotateY(0deg) scale(1) !important;
+  opacity: 1 !important;
+  z-index: 30 !important;
+}
+
+/* Previous cards (left side) */
+.award-prev {
+  /* Removed excessive darkening - let opacity handle visibility */
+}
+
+/* Next cards (right side) */
+.award-next {
+  /* Removed excessive darkening - let opacity handle visibility */
+}
+
+/* Hover 3D tilt effect */
+.award-premium-card:hover {
+  transform: translateY(-8px) scale(1.02);
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Blob animations for background */
+@keyframes blob {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  25% {
+    transform: translate(20px, -50px) scale(1.1);
+  }
+  50% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
+  75% {
+    transform: translate(50px, 50px) scale(1.05);
+  }
+}
+
+.animate-blob {
+  animation: blob 7s infinite;
+}
+
+.animation-delay-2000 {
+  animation-delay: 2s;
+}
+
+.animation-delay-4000 {
+  animation-delay: 4s;
+}
+
+/* Gradient animation */
+@keyframes gradient {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradient 3s ease infinite;
 }
 
 .award-card {

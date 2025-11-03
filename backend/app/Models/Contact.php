@@ -12,6 +12,7 @@ class Contact extends Model
     protected $fillable = [
         'name',
         'email',
+        'whatsapp_number',
         'subject',
         'message',
         'is_read',

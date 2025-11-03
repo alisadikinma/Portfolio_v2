@@ -23,6 +23,7 @@ class ContactResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'email' => $this->email,
+            'whatsapp_number' => $this->whatsapp_number,
             'subject' => $this->subject,
             'message' => $this->message,
             'is_read' => $this->is_read,

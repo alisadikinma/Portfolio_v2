@@ -49,10 +49,8 @@ export const useSettingsStore = defineStore('settings', {
         console.log('📥 API Response:', response.data)
 
         if (response.data.success) {
-          this.aboutSettings = {
-            ...this.aboutSettings,
-            ...response.data.data
-          }
+          // REPLACE completely instead of merge to avoid stale data
+          this.aboutSettings = response.data.data
           
           console.log('✅ Store updated:', this.aboutSettings)
         }
@@ -82,10 +80,8 @@ export const useSettingsStore = defineStore('settings', {
         const response = await api.post('/admin/settings/about', settingsData, config)
 
         if (response.data.success) {
-          this.aboutSettings = {
-            ...this.aboutSettings,
-            ...response.data.data
-          }
+          // REPLACE completely instead of merge to avoid stale data
+          this.aboutSettings = response.data.data
         }
 
         return this.aboutSettings
@@ -109,10 +105,8 @@ export const useSettingsStore = defineStore('settings', {
         console.log('📥 API Response:', response.data)
 
         if (response.data.success) {
-          this.siteSettings = {
-            ...this.siteSettings,
-            ...response.data.data
-          }
+          // REPLACE completely instead of merge to avoid stale data
+          this.siteSettings = response.data.data
           
           console.log('✅ Store updated:', this.siteSettings)
         }
@@ -154,10 +148,8 @@ export const useSettingsStore = defineStore('settings', {
         console.log('📥 Response received:', response.data)
 
         if (response.data.success) {
-          this.siteSettings = {
-            ...this.siteSettings,
-            ...response.data.data
-          }
+          // REPLACE completely instead of merge to avoid stale data
+          this.siteSettings = response.data.data
           console.log('✅ Store updated successfully:', this.siteSettings)
         }
 

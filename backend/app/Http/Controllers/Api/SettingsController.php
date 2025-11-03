@@ -39,10 +39,19 @@ class SettingsController extends Controller
                 'title' => '',
                 'bio' => '',
                 'profile_photo' => null,
+                'languages' => [],
                 'skills' => [],
                 'experience' => [],
                 'education' => [],
-                'social_links' => []
+                'social_links' => [],
+                'certifications' => [],
+                'statistics' => [
+                    'years_experience' => '16+',
+                    'followers' => '1K',
+                    'projects_delivered' => '50+',
+                    'cost_savings' => '$2M+',
+                    'success_rate' => '95%'
+                ]
             ], $aboutData);
 
             return response()->json([
@@ -110,7 +119,7 @@ class SettingsController extends Controller
             }
 
             // Decode JSON strings from FormData
-            foreach (['skills', 'experience', 'education', 'social_links'] as $jsonField) {
+            foreach (['languages', 'skills', 'experience', 'education', 'social_links', 'statistics', 'certifications'] as $jsonField) {
                 if (isset($validated[$jsonField]) && is_string($validated[$jsonField])) {
                     $validated[$jsonField] = json_decode($validated[$jsonField], true);
                 }
@@ -121,7 +130,7 @@ class SettingsController extends Controller
                 $type = 'text';
 
                 // Determine type
-                if (in_array($key, ['skills', 'experience', 'education', 'social_links'])) {
+                if (in_array($key, ['languages', 'skills', 'experience', 'education', 'social_links', 'statistics', 'certifications'])) {
                     $type = 'json';
                     $value = json_encode($value);
                 } elseif ($key === 'profile_photo') {
@@ -224,6 +233,7 @@ class SettingsController extends Controller
                 'site_logo' => null,
                 'contact_email' => '',
                 'contact_phone' => '',
+                'location' => '',
                 'social_media' => [],
                 'meta_tags' => [],
                 'analytics_code' => ''
