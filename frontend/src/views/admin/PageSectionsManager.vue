@@ -15,6 +15,7 @@ const pageTypes = [
   { value: 'homepage', label: 'Homepage' },
   { value: 'about', label: 'About Page' },
   { value: 'projects', label: 'Projects Page' },
+  { value: 'gallery', label: 'Gallery Page' },
   { value: 'blog', label: 'Blog Page' },
 ]
 
