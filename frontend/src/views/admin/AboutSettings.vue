@@ -931,12 +931,14 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useQueryClient } from '@tanstack/vue-query'
 import { useSettingsStore } from '@/stores/settings'
 import { useUiStore } from '@/stores/ui'
 import BaseCard from '@/components/base/BaseCard.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import api from '@/services/api'
 
+const queryClient = useQueryClient()
 const settingsStore = useSettingsStore()
 const uiStore = useUiStore()
 
@@ -1210,6 +1212,22 @@ async function handleSubmit() {
     }
 
     await settingsStore.updateAboutSettings(data)
+    
+    // AGGRESSIVE CACHE CLEAR (Nov 4, 2025)
+    // 1. Invalidate TanStack Query cache
+    await queryClient.invalidateQueries({ queryKey: ['about-settings'] })
+    
+    // 2. Force remove from cache completely
+    queryClient.removeQueries({ queryKey: ['about-settings'] })
+    
+    // 3. Clear localStorage
+    localStorage.removeItem('about_settings')
+    
+    console.log('✅ [AboutSettings] AGGRESSIVE cache clear complete')
+    console.log('   - TanStack Query invalidated')
+    console.log('   - TanStack Query removed')
+    console.log('   - localStorage cleared')
+    
     uiStore.showSuccess('About settings updated successfully', 'Settings Saved')
 
     // Reload settings from backend to get fresh data

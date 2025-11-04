@@ -445,10 +445,16 @@ const currentUrl = computed(() => {
   return window.location.href
 })
 
-// Share text with thumbnail
+// Share text with professional format
 const shareText = computed(() => {
   if (!project.value) return ''
-  return `${project.value.title} - ${project.value.description}\n\nPortfolio: https://alisadikinma.com\nEmail: ali.sadikincom85@gmail.com\nWhatsApp: +6281380163758`
+  
+  // Project description (use meta_description if available, fallback to description)
+  const description = project.value.meta_description || project.value.description || 
+    'An innovative solution combining modern technology with practical functionality. This project demonstrates expertise in problem-solving, user-centric design, and delivering measurable results that drive business success.'
+  
+  // Format dengan empty lines dan bullet points
+  return `${project.value.title} - ${description}\n\nExplore here: ${currentUrl.value}\n\n📩 Let's discuss how I can help optimize your workflow:\n- Email: ali.sadikincom85@gmail.com\n- WhatsApp: +6281380163758`
 })
 
 // Thumbnail URL for Open Graph (from project meta tags)
@@ -482,7 +488,8 @@ const shareLinks = computed(() => {
   const image = encodeURIComponent(thumbnailUrl.value)
   
   return {
-    whatsapp: `https://wa.me/?text=${text}%0A${url}`,
+    // WhatsApp - text only (URL sudah ada di dalam shareText)
+    whatsapp: `https://wa.me/?text=${text}`,
     facebook: `https://www.facebook.com/sharer/sharer.php?u=${url}`,
     twitter: `https://twitter.com/intent/tweet?url=${url}&text=${text}`,
     linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${url}`

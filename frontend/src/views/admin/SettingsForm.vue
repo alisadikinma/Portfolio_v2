@@ -293,11 +293,13 @@
 import { ref, computed, onMounted } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useUiStore } from '@/stores/ui'
+import { useSettings } from '@/composables/useSettings'
 import BaseCard from '@/components/base/BaseCard.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 
 const settingsStore = useSettingsStore()
 const uiStore = useUiStore()
+const { clearCache } = useSettings()
 
 const logoInput = ref(null)
 const isSubmitting = ref(false)
@@ -430,6 +432,11 @@ async function handleSubmit() {
     await settingsStore.updateSiteSettings(data)
 
     console.log('✅ Settings updated successfully')
+    
+    // Clear TanStack Query + localStorage cache
+    clearCache()
+    console.log('🗑️ Cache cleared - frontend will fetch fresh data')
+    
     uiStore.showSuccess('Site settings updated successfully', 'Settings Saved')
 
     // Reload settings to update preview
