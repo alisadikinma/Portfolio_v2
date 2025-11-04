@@ -1,5 +1,5 @@
 <template>
-  <!-- Gallery Items Modal -->
+  <!-- Gallery Items Modal - FIXED: proper max-height, sticky close button -->
   <Teleport to="body">
     <Transition name="modal">
       <div
@@ -7,39 +7,40 @@
         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl"
         @click.self="$emit('close')"
       >
-        <div class="relative w-full max-w-7xl bg-white dark:bg-neutral-900 rounded-3xl shadow-2xl overflow-hidden border border-neutral-200 dark:border-neutral-800">
-          <!-- Modal Header -->
-          <div class="relative p-8 border-b border-neutral-200 dark:border-neutral-800 bg-gradient-to-r from-primary-50 to-accent-50 dark:from-primary-950/50 dark:to-accent-950/50">
-            <div class="flex items-start justify-between">
-              <div class="flex-1 pr-12">
-                <div v-if="company || period" class="flex items-center gap-3 mb-3">
-                  <span v-if="company" class="px-3 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded-full text-sm font-semibold">
-                    {{ company }}
-                  </span>
-                  <span v-if="period" class="text-sm text-neutral-500 dark:text-neutral-400">
-                    {{ period }}
-                  </span>
-                </div>
-                <h3 class="text-3xl font-bold text-neutral-900 dark:text-white mb-2">
-                  {{ title }}
-                </h3>
-                <p v-if="description" class="text-neutral-600 dark:text-neutral-400">
-                  {{ stripHtml(description) }}
-                </p>
-              </div>
-              <button
-                @click="$emit('close')"
-                class="flex-shrink-0 p-3 hover:bg-white/50 dark:hover:bg-neutral-800 rounded-2xl transition-colors group"
-              >
-                <svg class="w-6 h-6 text-neutral-400 group-hover:text-neutral-900 dark:group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                </svg>
-              </button>
+        <!-- FIXED: max-h-[90vh] + flex column layout -->
+        <div class="relative w-full max-w-7xl max-h-[90vh] bg-white dark:bg-neutral-900 rounded-3xl shadow-2xl overflow-hidden border border-neutral-200 dark:border-neutral-800 flex flex-col">
+          <!-- Close Button - FIXED: Sticky position, always visible -->
+          <button
+            @click="$emit('close')"
+            class="absolute top-4 right-4 z-50 p-3 bg-white dark:bg-neutral-800 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full shadow-lg transition-all hover:scale-110 group"
+            title="Close (ESC)"
+          >
+            <svg class="w-6 h-6 text-gray-500 group-hover:text-red-600 dark:text-gray-400 dark:group-hover:text-red-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+
+          <!-- Modal Header - FIXED: shrink-0 to prevent compression -->
+          <div class="shrink-0 p-8 pr-16 border-b border-neutral-200 dark:border-neutral-800 bg-gradient-to-r from-primary-50 to-accent-50 dark:from-primary-950/50 dark:to-accent-950/50">
+            <div v-if="company || period" class="flex items-center gap-3 mb-3">
+              <span v-if="company" class="px-3 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded-full text-sm font-semibold">
+                {{ company }}
+              </span>
+              <span v-if="period" class="text-sm text-neutral-500 dark:text-neutral-400">
+                {{ period }}
+              </span>
             </div>
+            <h3 class="text-3xl font-bold text-neutral-900 dark:text-white mb-2">
+              {{ title }}
+            </h3>
+            <!-- FIXED: Description with max 3 lines, show "Read more" if truncated -->
+            <p v-if="description" class="text-neutral-600 dark:text-neutral-400 line-clamp-3">
+              {{ stripHtml(description) }}
+            </p>
           </div>
 
-          <!-- Modal Body -->
-          <div class="p-8 max-h-[65vh] overflow-y-auto custom-scrollbar">
+          <!-- Modal Body - FIXED: flex-1 + overflow for proper scrolling -->
+          <div class="flex-1 p-8 overflow-y-auto custom-scrollbar">
             <!-- Loading State -->
             <div v-if="loading" class="flex items-center justify-center py-20">
               <div class="relative">
@@ -169,6 +170,14 @@ const handleImageError = (event) => {
 .modal-enter-from,
 .modal-leave-to {
   opacity: 0;
+}
+
+/* Description truncation */
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 /* Custom Scrollbar */

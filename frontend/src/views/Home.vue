@@ -382,10 +382,11 @@
                       </div>
                     </div>
 
-                    <!-- View button -->
+                    <!-- View button - FIXED: stop event propagation to prevent carousel navigation -->
                     <button
                       v-if="award.total_photos > 0"
-                      @click="openGalleryModal(award)"
+                      @click.stop="openGalleryModal(award)"
+                      @touchend.stop
                       class="w-full relative overflow-hidden px-6 py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-xl font-bold text-white shadow-xl shadow-purple-500/50 hover:shadow-2xl hover:shadow-purple-500/70 transition-all duration-300 transform hover:scale-105 flex items-center justify-center gap-2 group"
                     >
                       <span class="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></span>
@@ -1029,36 +1030,43 @@
     <!-- Gallery Items Modal (for galleries section) -->
     <Teleport to="body">
       <Transition name="modal">
-        <div
-          v-if="showGalleryItemsModal && selectedGallery"
-          class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
-          @click.self="closeGalleryItemsModal"
+      <div
+      v-if="showGalleryItemsModal && selectedGallery"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+      @click.self="closeGalleryItemsModal"
+      >
+      <!-- FIXED: max-h-[90vh] to prevent full-screen overflow -->
+      <div class="relative w-full max-w-6xl max-h-[90vh] bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+      <!-- Modal Header - FIXED: shrink-0 to prevent compression -->
+      <div class="shrink-0 flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-primary-50 to-secondary-50 dark:from-primary-900/20 dark:to-secondary-900/20">
+      <div class="flex-1 pr-4">
+      <h3 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+        {{ selectedGallery.title }}
+      </h3>
+      <p class="text-sm text-primary-600 dark:text-primary-400">
+      <span v-if="selectedGallery.company">{{ selectedGallery.company }}</span>
+      <span v-if="selectedGallery.company && selectedGallery.period"> • </span>
+        <span v-if="selectedGallery.period">{{ selectedGallery.period }}</span>
+        </p>
+        <!-- ADDED: Description preview (optional) -->
+      <p v-if="selectedGallery.description" class="text-sm text-gray-600 dark:text-gray-400 mt-2 line-clamp-2">
+        {{ stripHtml(selectedGallery.description) }}
+        </p>
+      </div>
+      <!-- FIXED: Close button with better visibility -->
+      <button
+        @click="closeGalleryItemsModal"
+          class="shrink-0 p-3 hover:bg-white dark:hover:bg-gray-800 rounded-xl transition-all hover:scale-110 group"
+              title="Close (ESC)"
         >
-          <div class="relative w-full max-w-6xl bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden">
-            <!-- Modal Header -->
-            <div class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800">
-              <div>
-                <h3 class="text-2xl font-bold text-gray-900 dark:text-white">
-                  {{ selectedGallery.title }}
-                </h3>
-                <p class="text-sm text-primary-600 dark:text-primary-400 mt-1">
-                  <span v-if="selectedGallery.company">{{ selectedGallery.company }}</span>
-                  <span v-if="selectedGallery.company && selectedGallery.period"> • </span>
-                  <span v-if="selectedGallery.period">{{ selectedGallery.period }}</span>
-                </p>
-              </div>
-              <button
-                @click="closeGalleryItemsModal"
-                class="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-              >
-                <svg class="w-6 h-6 text-gray-400 hover:text-gray-900 dark:hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                </svg>
-              </button>
-            </div>
+          <svg class="w-6 h-6 text-gray-500 group-hover:text-red-600 dark:text-gray-400 dark:group-hover:text-red-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
 
-            <!-- Modal Body - Gallery Grid -->
-            <div class="p-6 max-h-[70vh] overflow-y-auto">
+          <!-- Modal Body - FIXED: flex-1 + overflow-y-auto for proper scrolling -->
+          <div class="flex-1 p-6 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 scrollbar-track-transparent">
               <!-- Loading State -->
               <div v-if="loadingGalleryItems" class="flex items-center justify-center py-20">
                 <svg class="animate-spin h-12 w-12 text-primary-600" fill="none" viewBox="0 0 24 24">
@@ -1890,10 +1898,11 @@ onMounted(async () => {
   // Start testimonial rotation
   testimonialInterval = setInterval(rotateTestimonials, 5000)
   
-  // Start awards carousel rotation
-  if (showAwardsSection.value && awards.value.length > 1) {
-    awardsInterval = setInterval(rotateAwards, 6000) // 6s interval (slower than testimonials)
-  }
+  // DISABLED: Auto-rotation (Nov 4, 2025)
+  // User navigation only via arrows/dots
+  // if (showAwardsSection.value && awards.value.length > 1) {
+  //   awardsInterval = setInterval(rotateAwards, 6000)
+  // }
   
   // Add keyboard event listener
   window.addEventListener('keydown', handleKeydown)

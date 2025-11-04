@@ -85,7 +85,7 @@
             <div class="flex gap-3">
               <button
                 v-if="award.total_photos > 0"
-                @click="openGalleryModal(award)"
+                @click.stop.prevent="openGalleryModal(award)"
                 class="w-full px-4 py-2.5 bg-gradient-to-r from-primary-600 to-secondary-600 text-white font-semibold rounded-lg hover:from-primary-700 hover:to-secondary-700 transition-all duration-300 flex items-center justify-center gap-2 group/btn"
               >
                 <svg class="w-4 h-4 group-hover/btn:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -135,76 +135,82 @@
       </div>
     </section>
 
-    <!-- Gallery Modal -->
+    <!-- Gallery Modal - REDESIGNED -->
     <Teleport to="body">
       <Transition name="modal">
         <div
           v-if="showGalleryModal && selectedAward"
-          class="fixed inset-0 z-50 flex items-start justify-center p-4 md:p-8 bg-black/90 backdrop-blur-sm overflow-y-auto"
+          class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95 backdrop-blur-md"
           @click.self="closeGalleryModal"
         >
-          <div class="relative w-full max-w-7xl bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-950 rounded-3xl shadow-2xl overflow-hidden my-8">
-            <!-- Close Button - Top Right -->
-            <button
-              @click="closeGalleryModal"
-              class="absolute top-6 right-6 z-10 p-2.5 bg-white/90 dark:bg-gray-800/90 hover:bg-white dark:hover:bg-gray-700 rounded-full shadow-lg transition-all duration-200 group"
-            >
-              <svg class="w-5 h-5 text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
-              </svg>
-            </button>
-
-            <!-- Modal Header -->
-            <div class="px-8 pt-8 pb-6">
-              <h3 class="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-3">
-                {{ selectedAward.award_title }}
-              </h3>
-              <p v-if="selectedAward.description" class="text-base text-gray-600 dark:text-gray-400 leading-relaxed max-w-4xl">
-                {{ stripHtml(selectedAward.description) }}
-              </p>
-              <p v-else class="text-base text-gray-500 dark:text-gray-500 leading-relaxed max-w-4xl italic">
-                No detailed description available for this award.
-              </p>
+          <div class="relative w-full max-w-5xl max-h-[90vh] bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+            <!-- Header - Fixed -->
+            <div class="flex-shrink-0 px-6 py-5 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-primary-50 to-secondary-50 dark:from-primary-900/20 dark:to-secondary-900/20">
+              <div class="flex items-start justify-between gap-4">
+                <div class="flex-1 min-w-0">
+                  <h3 class="text-2xl font-bold text-gray-900 dark:text-white mb-2 line-clamp-1">
+                    {{ selectedAward.award_title }}
+                  </h3>
+                  <p v-if="selectedAward.description" class="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
+                    {{ stripHtml(selectedAward.description) }}
+                  </p>
+                </div>
+                
+                <!-- Close Button - Prominent -->
+                <button
+                  @click="closeGalleryModal"
+                  class="flex-shrink-0 p-2 bg-gray-100 dark:bg-gray-800 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 rounded-lg transition-all duration-200 group"
+                  title="Close (ESC)"
+                >
+                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                  </svg>
+                </button>
+              </div>
             </div>
 
-            <!-- Modal Body - Gallery Grid -->
-            <div class="px-8 pb-8">
+            <!-- Body - Scrollable -->
+            <div class="flex-1 overflow-y-auto p-6">
               <!-- Loading State -->
-              <div v-if="loadingGallery" class="flex items-center justify-center py-32">
-                <svg class="animate-spin h-12 w-12 text-primary-600" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
+              <div v-if="loadingGallery" class="flex items-center justify-center py-20">
+                <div class="text-center">
+                  <svg class="animate-spin h-12 w-12 text-primary-600 mx-auto mb-4" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <p class="text-gray-500 dark:text-gray-400">Loading gallery...</p>
+                </div>
               </div>
 
-              <!-- Gallery Grid -->
-              <div v-else-if="galleryPhotos.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <!-- Gallery Grid - 3 Columns -->
+              <div v-else-if="galleryPhotos.length > 0" class="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div
                   v-for="(photo, index) in galleryPhotos"
                   :key="photo.id"
-                  class="relative group cursor-pointer aspect-[4/3] rounded-2xl overflow-hidden bg-gray-200 dark:bg-gray-800 shadow-md hover:shadow-xl transition-all duration-300"
+                  class="relative group cursor-pointer aspect-square rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800 hover:ring-4 hover:ring-primary-500/50 transition-all duration-300"
                   @click="openLightbox(index)"
                 >
                   <img
                     :src="photo.image"
-                    :alt="photo.title"
-                    class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    :alt="photo.title || 'Gallery photo'"
+                    class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                     @error="handleImageError"
                   />
-                  <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <div class="absolute bottom-0 left-0 right-0 p-4">
-                      <p class="text-white text-sm font-medium truncate">
-                        {{ photo.title || 'Gallery Image' }}
+                  
+                  <!-- Overlay with title -->
+                  <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <div class="absolute bottom-0 left-0 right-0 p-3">
+                      <p class="text-white text-xs font-medium line-clamp-2">
+                        {{ photo.title || `Photo ${index + 1}` }}
                       </p>
                     </div>
                   </div>
                   
-                  <!-- View Icon on Hover -->
+                  <!-- Zoom Icon -->
                   <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <div class="p-3 bg-white/20 backdrop-blur-sm rounded-full">
-                      <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                    <div class="p-3 bg-white/90 dark:bg-gray-900/90 rounded-full shadow-lg">
+                      <svg class="w-6 h-6 text-gray-900 dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7"></path>
                       </svg>
                     </div>
                   </div>
@@ -212,71 +218,113 @@
               </div>
 
               <!-- Empty State -->
-              <div v-else class="text-center py-32">
-                <div class="w-20 h-20 mx-auto mb-6 bg-gray-200 dark:bg-gray-800 rounded-2xl flex items-center justify-center">
-                  <svg class="h-10 w-10 text-gray-400 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div v-else class="text-center py-20">
+                <div class="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
+                  <svg class="h-8 w-8 text-gray-400 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                   </svg>
                 </div>
-                <h4 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">No Photos Available</h4>
-                <p class="text-gray-500 dark:text-gray-400">This gallery doesn't have any photos yet.</p>
+                <h4 class="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">No Photos Yet</h4>
+                <p class="text-sm text-gray-500 dark:text-gray-400">This gallery doesn't have any photos.</p>
               </div>
+            </div>
+
+            <!-- Footer - Photo Count -->
+            <div v-if="galleryPhotos.length > 0" class="flex-shrink-0 px-6 py-3 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50">
+              <p class="text-sm text-gray-600 dark:text-gray-400 text-center">
+                <span class="font-semibold text-gray-900 dark:text-white">{{ galleryPhotos.length }}</span> {{ galleryPhotos.length === 1 ? 'photo' : 'photos' }}
+              </p>
             </div>
           </div>
         </div>
       </Transition>
     </Teleport>
 
-    <!-- Lightbox for full image view -->
+    <!-- Lightbox - REDESIGNED -->
     <Teleport to="body">
       <Transition name="fade">
         <div
           v-if="showLightbox"
-          class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black"
-          @click.self="closeLightbox"
+          class="fixed inset-0 z-[60] flex flex-col bg-black"
         >
-          <button
-            @click="closeLightbox"
-            class="absolute top-4 right-4 p-3 bg-white/10 hover:bg-white/20 rounded-full transition-colors z-10"
-          >
-            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
-          </button>
+          <!-- Header Bar -->
+          <div class="flex-shrink-0 flex items-center justify-between px-6 py-4 bg-black/50 backdrop-blur-sm">
+            <div class="flex items-center gap-3">
+              <p class="text-white font-semibold text-lg">
+                {{ galleryPhotos[currentPhotoIndex]?.title || `Photo ${currentPhotoIndex + 1}` }}
+              </p>
+              <span class="px-3 py-1 bg-white/10 backdrop-blur-sm rounded-full text-white text-sm">
+                {{ currentPhotoIndex + 1 }} / {{ galleryPhotos.length }}
+              </span>
+            </div>
+            
+            <button
+              @click="closeLightbox"
+              class="p-2 bg-white/10 hover:bg-red-500/20 hover:text-red-400 rounded-lg transition-all duration-200"
+              title="Close (ESC)"
+            >
+              <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
 
-          <button
-            v-if="currentPhotoIndex > 0"
-            @click="previousPhoto"
-            class="absolute left-4 p-3 bg-white/10 hover:bg-white/20 rounded-full transition-colors"
-          >
-            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-            </svg>
-          </button>
+          <!-- Main Image Area -->
+          <div class="flex-1 flex items-center justify-center p-8 relative" @click.self="closeLightbox">
+            <!-- Previous Button -->
+            <button
+              v-if="currentPhotoIndex > 0"
+              @click="previousPhoto"
+              class="absolute left-6 p-4 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full transition-all duration-200 group"
+              title="Previous (←)"
+            >
+              <svg class="w-8 h-8 text-white group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"></path>
+              </svg>
+            </button>
 
-          <div class="max-w-6xl max-h-full">
+            <!-- Image -->
             <img
               :src="galleryPhotos[currentPhotoIndex]?.image"
               :alt="galleryPhotos[currentPhotoIndex]?.title"
-              class="max-w-full max-h-[90vh] object-contain"
+              class="max-w-full max-h-[70vh] object-contain rounded-lg shadow-2xl"
             />
-            <p v-if="galleryPhotos[currentPhotoIndex]?.title" class="text-center text-white mt-4 text-lg">
-              {{ galleryPhotos[currentPhotoIndex].title }}
-            </p>
+
+            <!-- Next Button -->
+            <button
+              v-if="currentPhotoIndex < galleryPhotos.length - 1"
+              @click="nextPhoto"
+              class="absolute right-6 p-4 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full transition-all duration-200 group"
+              title="Next (→)"
+            >
+              <svg class="w-8 h-8 text-white group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path>
+              </svg>
+            </button>
           </div>
 
-          <button
-            v-if="currentPhotoIndex < galleryPhotos.length - 1"
-            @click="nextPhoto"
-            class="absolute right-4 p-3 bg-white/10 hover:bg-white/20 rounded-full transition-colors"
-          >
-            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-            </svg>
-          </button>
-
-          <div class="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-white text-sm">
-            {{ currentPhotoIndex + 1 }} / {{ galleryPhotos.length }}
+          <!-- Thumbnail Strip -->
+          <div class="flex-shrink-0 px-6 py-4 bg-black/50 backdrop-blur-sm overflow-x-auto">
+            <div class="flex gap-3 justify-center">
+              <button
+                v-for="(photo, index) in galleryPhotos"
+                :key="photo.id"
+                @click="currentPhotoIndex = index"
+                :class="[
+                  'relative flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden transition-all duration-200',
+                  currentPhotoIndex === index
+                    ? 'ring-4 ring-primary-500 scale-110'
+                    : 'opacity-60 hover:opacity-100 hover:scale-105'
+                ]"
+              >
+                <img
+                  :src="photo.image"
+                  :alt="photo.title"
+                  class="w-full h-full object-cover"
+                />
+                <div v-if="currentPhotoIndex === index" class="absolute inset-0 bg-primary-500/20"></div>
+              </button>
+            </div>
           </div>
         </div>
       </Transition>
