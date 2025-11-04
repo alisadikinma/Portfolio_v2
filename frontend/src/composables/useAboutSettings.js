@@ -51,7 +51,7 @@ export function useAboutSettings() {
       return DEFAULT_ABOUT // Fallback to default
     },
     placeholderData: DEFAULT_ABOUT, // INSTANT RENDER dengan default data!
-    staleTime: 30 * 60 * 1000, // 30 MINUTES
+    staleTime: 2 * 60 * 1000, // 2 MINUTES (faster updates for hero content)
     gcTime: 24 * 60 * 60 * 1000, // 24 HOURS
     retry: 2,
     initialData: () => {

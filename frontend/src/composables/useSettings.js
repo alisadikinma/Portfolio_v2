@@ -223,11 +223,16 @@ export function useSettings() {
 
   // Clear cache
   const clearCache = () => {
+    // Invalidate ALL settings-related queries
     queryClient.invalidateQueries({ queryKey: ['settings'] })
     queryClient.invalidateQueries({ queryKey: ['settings-group'] })
+    queryClient.invalidateQueries({ queryKey: ['about-settings'] }) // CRITICAL: Hero section cache
+    
+    console.log('✅ [useSettings] All caches invalidated (settings, groups, about)')
     
     // Clear localStorage cache
     setCache('settings_all', null, 0)
+    setCache('about_settings', null, 0) // CRITICAL: Hero section localStorage
     if (selectedGroup.value) {
       setCache(`settings_group_${selectedGroup.value}`, null, 0)
     }

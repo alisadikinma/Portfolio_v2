@@ -931,12 +931,14 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useQueryClient } from '@tanstack/vue-query'
 import { useSettingsStore } from '@/stores/settings'
 import { useUiStore } from '@/stores/ui'
 import BaseCard from '@/components/base/BaseCard.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import api from '@/services/api'
 
+const queryClient = useQueryClient()
 const settingsStore = useSettingsStore()
 const uiStore = useUiStore()
 
@@ -1210,6 +1212,11 @@ async function handleSubmit() {
     }
 
     await settingsStore.updateAboutSettings(data)
+    
+    // INVALIDATE CACHE - Force fresh fetch on homepage (critical fix)
+    await queryClient.invalidateQueries({ queryKey: ['about-settings'] })
+    console.log('✅ [AboutSettings] Cache invalidated - homepage will refresh')
+    
     uiStore.showSuccess('About settings updated successfully', 'Settings Saved')
 
     // Reload settings from backend to get fresh data
