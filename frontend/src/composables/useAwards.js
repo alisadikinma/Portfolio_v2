@@ -1,10 +1,26 @@
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import api from '@/services/api'
+import { useLocalCache } from './useLocalCache'
 
 export function useAwards(initialParams = {}) {
   const queryClient = useQueryClient()
+  const { setCache, getCache } = useLocalCache()
+  
   const queryParams = ref(initialParams)
+  
+  // State untuk instant data dari localStorage
+  const cachedAwards = ref(null)
+
+  // Load instant cache on mount
+  onMounted(() => {
+    const cacheKey = `awards_${JSON.stringify(queryParams.value)}`
+    cachedAwards.value = getCache(cacheKey)
+    
+    if (cachedAwards.value) {
+      console.log('[useAwards] âš¡ INSTANT from localStorage')
+    }
+  })
 
   // Fetch all awards with caching (1hr stale / 1hr cache)
   const {
@@ -15,36 +31,47 @@ export function useAwards(initialParams = {}) {
   } = useQuery({
     queryKey: ['awards', queryParams],
     queryFn: async () => {
-      console.log('[useAwards] Fetching awards from API...')
+      console.log('[useAwards] Background fetch...')
       const response = await api.get('/awards', { params: queryParams.value })
-      console.log('[useAwards] API Response:', response.data)
+      console.log('[useAwards] Background fetch complete')
+      
+      // Update localStorage cache
+      const cacheKey = `awards_${JSON.stringify(queryParams.value)}`
+      setCache(cacheKey, response.data, 60 * 60 * 1000) // 1 hour
+      
       return response.data
     },
     staleTime: 60 * 60 * 1000, // 1 hour
     gcTime: 60 * 60 * 1000, // 1 hour
-    refetchOnMount: false, // Disable refetch on mount
-    refetchOnWindowFocus: false, // Disable refetch on window focus
-    refetchOnReconnect: false, // Disable refetch on reconnect
-    retry: false // Disable retry on error
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    retry: false,
+    initialData: () => {
+      // Try get from localStorage first
+      const cacheKey = `awards_${JSON.stringify(queryParams.value)}`
+      return getCache(cacheKey)
+    }
   })
 
-  // Computed values for backward compatibility
+  // Computed values - prefer localStorage instant data
   const awards = computed(() => {
+    if (isLoading.value && cachedAwards.value) {
+      // Instant display while loading
+      const data = cachedAwards.value.data || cachedAwards.value || []
+      console.log('[useAwards] Using cached data:', data.length, 'items')
+      return data
+    }
+    
     // Handle both success: true format and direct data format
     const data = awardsData.value?.data || awardsData.value || []
-    console.log('[useAwards] Computed awards:', data.length, 'items')
-    if (data.length > 0) {
-      console.log('[useAwards] First award structure:', {
-        keys: Object.keys(data[0]),
-        hasDescription: 'description' in data[0],
-        description: data[0].description?.substring(0, 50)
-      })
-    }
+    console.log('[useAwards] Using query data:', data.length, 'items')
     return data
   })
 
   const pagination = computed(() => {
-    const meta = awardsData.value?.meta
+    const source = cachedAwards.value || awardsData.value
+    const meta = source?.meta
     return meta ? {
       currentPage: meta.current_page,
       perPage: meta.per_page,
@@ -63,6 +90,11 @@ export function useAwards(initialParams = {}) {
   // Fetch awards with params
   const fetchAwards = async (params = {}) => {
     queryParams.value = params
+    
+    // Check instant cache
+    const cacheKey = `awards_${JSON.stringify(params)}`
+    cachedAwards.value = getCache(cacheKey)
+    
     const result = await refetch()
     return {
       success: !result.isError,
@@ -73,9 +105,23 @@ export function useAwards(initialParams = {}) {
 
   // Fetch single award
   const fetchAward = async (id) => {
+    const cacheKey = `award_${id}`
+    
+    // Check localStorage first
+    const cached = getCache(cacheKey)
+    if (cached) {
+      console.log('[useAwards] âš¡ INSTANT award from localStorage:', id)
+      return { success: true, data: cached }
+    }
+    
     try {
       const response = await api.get(`/awards/${id}`)
-      return { success: true, data: response.data.data }
+      const data = response.data.data
+      
+      // Cache the result
+      setCache(cacheKey, data, 60 * 60 * 1000) // 1 hour
+      
+      return { success: true, data }
     } catch (err) {
       return {
         success: false,

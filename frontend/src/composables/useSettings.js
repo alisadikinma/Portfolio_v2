@@ -1,40 +1,46 @@
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import api from '@/services/api'
+import { useLocalCache } from './useLocalCache'
 
 export function useSettings() {
-  const settings = ref([])
-  const settingsByGroup = ref({})
+  const queryClient = useQueryClient()
+  const { setCache, getCache } = useLocalCache()
+  
+  const selectedGroup = ref(null)
+  const selectedKey = ref(null)
   const setting = ref(null)
-  const isLoading = ref(false)
-  const error = ref(null)
+  
+  // State untuk instant data dari localStorage
+  const cachedSettings = ref(null)
+  const cachedGroupSettings = ref(null)
 
-  // Cache for settings to avoid repeated API calls
-  const cache = ref({
-    all: null,
-    groups: {},
-    keys: {}
+  // Load instant cache on mount
+  onMounted(() => {
+    cachedSettings.value = getCache('settings_all')
+    
+    if (cachedSettings.value) {
+      console.log('[useSettings] âš¡ INSTANT from localStorage')
+    }
   })
 
-  // Fetch all settings
-  const fetchSettings = async (forceRefresh = false) => {
-    // Return cached data if available and not forcing refresh
-    if (cache.value.all && !forceRefresh) {
-      settings.value = cache.value.all
-      return { success: true, data: cache.value.all }
-    }
-
-    isLoading.value = true
-    error.value = null
-
-    try {
+  // Fetch all settings with caching (10min stale / 1hr cache)
+  const {
+    data: settingsData,
+    isLoading,
+    error: queryError,
+    refetch
+  } = useQuery({
+    queryKey: ['settings'],
+    queryFn: async () => {
       const response = await api.get('/settings')
+      console.log('[useSettings] Background fetch complete')
       
       // API returns grouped data: { data: { profile: [...], about: [...], ... } }
-      // We need to flatten it to array: [{ key: 'profile.name', value: '...', group: 'profile' }, ...]
+      // We need to flatten it to array
       const groupedData = response.data.data
       const flattenedSettings = []
       
-      // Flatten grouped object to array
       Object.keys(groupedData).forEach(groupName => {
         const groupSettings = groupedData[groupName]
         if (Array.isArray(groupSettings)) {
@@ -42,69 +48,157 @@ export function useSettings() {
         }
       })
       
-      settings.value = flattenedSettings
-      cache.value.all = flattenedSettings
-
-      return { success: true, data: flattenedSettings }
-    } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to fetch settings'
-      return { success: false, error: error.value }
-    } finally {
-      isLoading.value = false
-    }
-  }
-
-  // Fetch settings by group
-  const fetchSettingsByGroup = async (group, forceRefresh = false) => {
-    // Return cached data if available and not forcing refresh
-    if (cache.value.groups[group] && !forceRefresh) {
-      settingsByGroup.value = cache.value.groups[group]
-      return { success: true, data: cache.value.groups[group] }
-    }
-
-    isLoading.value = true
-    error.value = null
-
-    try {
-      const response = await api.get(`/settings/group/${group}`)
-      const data = response.data.data
+      // Update localStorage cache
+      setCache('settings_all', flattenedSettings, 10 * 60 * 1000) // 10min
       
-      settingsByGroup.value = data
-      cache.value.groups[group] = data
+      return flattenedSettings
+    },
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    gcTime: 60 * 60 * 1000, // 1 hour
+    initialData: () => {
+      // Try get from localStorage first
+      return getCache('settings_all') || []
+    }
+  })
 
-      return { success: true, data }
-    } catch (err) {
-      error.value = err.response?.data?.message || `Failed to fetch ${group} settings`
-      return { success: false, error: error.value }
-    } finally {
-      isLoading.value = false
+  // Computed values - prefer localStorage instant data
+  const settings = computed(() => {
+    if (isLoading.value && cachedSettings.value) {
+      return cachedSettings.value
+    }
+    return settingsData.value || []
+  })
+  
+  const error = computed(() => queryError.value?.response?.data?.message || queryError.value?.message || null)
+
+  // Fetch settings by group with caching
+  const {
+    data: groupSettingsData,
+    isLoading: isLoadingGroup,
+    refetch: refetchGroup
+  } = useQuery({
+    queryKey: ['settings-group', selectedGroup],
+    queryFn: async () => {
+      if (!selectedGroup.value) return []
+      
+      const response = await api.get(`/settings/group/${selectedGroup.value}`)
+      console.log('[useSettings] Group background fetch complete')
+      
+      // Update localStorage cache
+      const cacheKey = `settings_group_${selectedGroup.value}`
+      setCache(cacheKey, response.data.data, 10 * 60 * 1000) // 10min
+      
+      return response.data.data
+    },
+    enabled: computed(() => !!selectedGroup.value),
+    staleTime: 10 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
+    initialData: () => {
+      if (!selectedGroup.value) return []
+      const cacheKey = `settings_group_${selectedGroup.value}`
+      return getCache(cacheKey) || []
+    }
+  })
+
+  const settingsByGroup = computed(() => {
+    if (isLoadingGroup.value && cachedGroupSettings.value) {
+      return cachedGroupSettings.value
+    }
+    return groupSettingsData.value || []
+  })
+
+  // Fetch all settings - WITH CACHE
+  const fetchSettings = async (forceRefresh = false) => {
+    if (!forceRefresh) {
+      // Check instant localStorage
+      cachedSettings.value = getCache('settings_all')
+      
+      // Check TanStack Query cache
+      const queryCache = queryClient.getQueryData(['settings'])
+      if (queryCache) {
+        console.log('[useSettings] TanStack Query cache HIT')
+        return { success: true, data: queryCache }
+      }
+
+      if (!cachedSettings.value) {
+        console.log('[useSettings] Cache MISS - fetching...')
+      } else {
+        console.log('[useSettings] âš¡ INSTANT from localStorage, background refresh...')
+      }
+    } else {
+      console.log('[useSettings] Force refresh...')
+    }
+    
+    const result = await refetch()
+    
+    return {
+      success: !result.isError,
+      data: result.data,
+      error: result.error?.response?.data?.message
     }
   }
 
-  // Fetch single setting by key
-  const fetchSetting = async (key, forceRefresh = false) => {
-    // Return cached data if available and not forcing refresh
-    if (cache.value.keys[key] && !forceRefresh) {
-      setting.value = cache.value.keys[key]
-      return { success: true, data: cache.value.keys[key] }
+  // Fetch settings by group - WITH CACHE
+  const fetchSettingsByGroup = async (group, forceRefresh = false) => {
+    selectedGroup.value = group
+    
+    if (!forceRefresh) {
+      const cacheKey = `settings_group_${group}`
+      
+      // Check instant localStorage
+      cachedGroupSettings.value = getCache(cacheKey)
+      
+      // Check TanStack Query cache
+      const queryCache = queryClient.getQueryData(['settings-group', group])
+      if (queryCache) {
+        console.log('[useSettings] Group cache HIT:', group)
+        return { success: true, data: queryCache }
+      }
+
+      if (!cachedGroupSettings.value) {
+        console.log('[useSettings] Group cache MISS:', group)
+      } else {
+        console.log('[useSettings] âš¡ INSTANT group from localStorage:', group)
+      }
     }
+    
+    const result = await refetchGroup()
+    
+    return {
+      success: !result.isError,
+      data: result.data,
+      error: result.error?.response?.data?.message
+    }
+  }
 
-    isLoading.value = true
-    error.value = null
-
+  // Fetch single setting by key - WITH CACHE
+  const fetchSetting = async (key, forceRefresh = false) => {
+    const cacheKey = `setting_${key}`
+    
+    if (!forceRefresh) {
+      // Check localStorage first
+      const cached = getCache(cacheKey)
+      if (cached) {
+        console.log('[useSettings] âš¡ INSTANT setting from localStorage:', key)
+        setting.value = cached
+        return { success: true, data: cached }
+      }
+    }
+    
     try {
       const response = await api.get(`/settings/${key}`)
       const data = response.data.data
       
+      // Cache the result
+      setCache(cacheKey, data, 10 * 60 * 1000) // 10min
+      
       setting.value = data
-      cache.value.keys[key] = data
-
       return { success: true, data }
     } catch (err) {
-      error.value = err.response?.data?.message || `Failed to fetch setting: ${key}`
-      return { success: false, error: error.value }
-    } finally {
-      isLoading.value = false
+      return {
+        success: false,
+        error: err.response?.data?.message || `Failed to fetch setting: ${key}`
+      }
     }
   }
 
@@ -129,10 +223,13 @@ export function useSettings() {
 
   // Clear cache
   const clearCache = () => {
-    cache.value = {
-      all: null,
-      groups: {},
-      keys: {}
+    queryClient.invalidateQueries({ queryKey: ['settings'] })
+    queryClient.invalidateQueries({ queryKey: ['settings-group'] })
+    
+    // Clear localStorage cache
+    setCache('settings_all', null, 0)
+    if (selectedGroup.value) {
+      setCache(`settings_group_${selectedGroup.value}`, null, 0)
     }
   }
 

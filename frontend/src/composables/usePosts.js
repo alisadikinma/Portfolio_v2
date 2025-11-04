@@ -1,12 +1,29 @@
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import api from '@/services/api'
+import { useLocalCache } from './useLocalCache'
 
 export function usePosts(initialParams = {}) {
   const queryClient = useQueryClient()
+  const { setCache, getCache } = useLocalCache()
+  
   const queryParams = ref(initialParams)
   const selectedPostSlug = ref(null)
   const selectedLang = ref('en')
+  
+  // State untuk instant data dari localStorage
+  const cachedPosts = ref(null)
+  const cachedPost = ref(null)
+
+  // Load instant cache on mount
+  onMounted(() => {
+    const cacheKey = `posts_${JSON.stringify(queryParams.value)}`
+    cachedPosts.value = getCache(cacheKey)
+    
+    if (cachedPosts.value) {
+      console.log('[usePosts] âš¡ INSTANT from localStorage')
+    }
+  })
 
   // Fetch all posts with caching (5min stale / 30min cache)
   const {
@@ -18,11 +35,21 @@ export function usePosts(initialParams = {}) {
     queryKey: ['posts', queryParams],
     queryFn: async () => {
       const response = await api.get('/posts', { params: queryParams.value })
-      console.log('[usePosts] TanStack Query - Fetching posts list')
+      console.log('[usePosts] Background fetch complete')
+      
+      // Update localStorage cache
+      const cacheKey = `posts_${JSON.stringify(queryParams.value)}`
+      setCache(cacheKey, response.data, 5 * 60 * 1000) // 5min
+      
       return response.data
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 30 * 60 * 1000 // 30 minutes
+    gcTime: 30 * 60 * 1000, // 30 minutes
+    initialData: () => {
+      // Try get from localStorage first
+      const cacheKey = `posts_${JSON.stringify(queryParams.value)}`
+      return getCache(cacheKey)
+    }
   })
 
   // Fetch single post with TanStack Query (enabled only when slug is set)
@@ -36,27 +63,57 @@ export function usePosts(initialParams = {}) {
     queryFn: async () => {
       if (!selectedPostSlug.value) return null
       
-      console.log('[usePosts] TanStack Query - Fetching post:', selectedPostSlug.value)
+      console.log('[usePosts] Background fetch post:', selectedPostSlug.value)
       const response = await api.get(`/posts/${selectedPostSlug.value}`, {
         params: { lang: selectedLang.value }
       })
       
       if (response.data.success) {
-        console.log('[usePosts] Post loaded & cached:', selectedPostSlug.value)
+        console.log('[usePosts] Post cached:', selectedPostSlug.value)
+        
+        // Update localStorage
+        const cacheKey = `post_${selectedPostSlug.value}_${selectedLang.value}`
+        setCache(cacheKey, response.data.data, 10 * 60 * 1000) // 10min
+        
         return response.data.data
       }
       return null
     },
     enabled: computed(() => !!selectedPostSlug.value),
     staleTime: 10 * 60 * 1000, // 10 minutes
-    gcTime: 60 * 60 * 1000 // 1 hour
+    gcTime: 60 * 60 * 1000, // 1 hour
+    initialData: () => {
+      // Try get from localStorage first
+      if (!selectedPostSlug.value) return null
+      const cacheKey = `post_${selectedPostSlug.value}_${selectedLang.value}`
+      const cached = getCache(cacheKey)
+      if (cached) {
+        console.log('[usePosts] âš¡ INSTANT post from localStorage:', selectedPostSlug.value)
+      }
+      return cached
+    }
   })
 
-  // Computed values for backward compatibility
-  const posts = computed(() => postsData.value?.data || [])
-  const post = computed(() => postData.value || null)
+  // Computed values - prefer localStorage instant data, fallback to query data
+  const posts = computed(() => {
+    if (isLoading.value && cachedPosts.value) {
+      // Instant display while loading
+      return cachedPosts.value.data || []
+    }
+    return postsData.value?.data || []
+  })
+  
+  const post = computed(() => {
+    if (isLoadingPost.value && cachedPost.value) {
+      // Instant display while loading
+      return cachedPost.value
+    }
+    return postData.value || null
+  })
+  
   const pagination = computed(() => {
-    const meta = postsData.value?.meta
+    const source = cachedPosts.value || postsData.value
+    const meta = source?.meta
     return meta ? {
       currentPage: meta.current_page,
       perPage: meta.per_page,
@@ -69,11 +126,17 @@ export function usePosts(initialParams = {}) {
       lastPage: 1
     }
   })
+  
   const error = computed(() => queryError.value?.response?.data?.message || queryError.value?.message || null)
 
   // Fetch posts with params
   const fetchPosts = async (params = {}) => {
     queryParams.value = params
+    
+    // Check instant cache
+    const cacheKey = `posts_${JSON.stringify(params)}`
+    cachedPosts.value = getCache(cacheKey)
+    
     const result = await refetch()
     return {
       success: !result.isError,
@@ -82,16 +145,27 @@ export function usePosts(initialParams = {}) {
     }
   }
 
-  // Fetch single post (TanStack Query managed)
+  // Fetch single post (with instant localStorage)
   const fetchPost = async (slug, lang = 'en') => {
-    // Check if already cached
-    const cached = queryClient.getQueryData(['post', slug, lang])
-    if (cached) {
-      console.log('[usePosts] ⚡ Cache HIT for post:', slug, '(INSTANT)')
-      return { success: true, data: cached }
+    const cacheKey = `post_${slug}_${lang}`
+    
+    // Check instant localStorage
+    cachedPost.value = getCache(cacheKey)
+    
+    // Check TanStack Query cache
+    const queryCache = queryClient.getQueryData(['post', slug, lang])
+    if (queryCache) {
+      console.log('[usePosts] TanStack Query cache HIT:', slug)
+      return { success: true, data: queryCache }
     }
 
-    console.log('[usePosts] ⏳ Cache MISS for post:', slug, '- fetching via TanStack Query...')
+    // If no cache at all, show we're fetching
+    if (!cachedPost.value) {
+      console.log('[usePosts] Cache MISS for:', slug, '- fetching...')
+    } else {
+      console.log('[usePosts] âš¡ INSTANT from localStorage, background refresh...')
+    }
+    
     selectedPostSlug.value = slug
     selectedLang.value = lang
     
@@ -138,6 +212,9 @@ export function usePosts(initialParams = {}) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['posts'] })
+      // Clear localStorage cache
+      const cacheKey = `posts_${JSON.stringify(queryParams.value)}`
+      setCache(cacheKey, null, 0) // Expire immediately
     }
   })
 
@@ -150,6 +227,9 @@ export function usePosts(initialParams = {}) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['posts'] })
       queryClient.invalidateQueries({ queryKey: ['post'] })
+      // Clear related caches
+      const cacheKey = `posts_${JSON.stringify(queryParams.value)}`
+      setCache(cacheKey, null, 0)
     }
   })
 
@@ -160,6 +240,8 @@ export function usePosts(initialParams = {}) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['posts'] })
+      const cacheKey = `posts_${JSON.stringify(queryParams.value)}`
+      setCache(cacheKey, null, 0)
     }
   })
 
