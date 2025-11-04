@@ -81,7 +81,8 @@ class ProjectResource extends JsonResource
             'canonical_url' => $this->canonical_url ?: null,
             'og_title' => $this->og_title ?: null,
             'og_description' => $this->og_description ?: null,
-            'og_image' => $this->og_image ?: $this->getImageUrl($this->image),
+            // FIXED: Always return absolute URL for og_image (fallback to featured_image)
+            'og_image' => $this->getAbsoluteOgImage(),
             'seo_score' => $this->seo_score ?? 0,
 
             // Translation metadata
@@ -160,5 +161,36 @@ class ProjectResource extends JsonResource
 
         // Otherwise, assume it's in storage
         return asset('storage/' . $imagePath);
+    }
+
+    /**
+     * Get absolute OG image URL with fallback
+     * Priority: og_image (absolute URL) > og_image (relative /storage/...) > featured_image
+     */
+    private function getAbsoluteOgImage()
+    {
+        // Priority 1: og_image is already absolute URL
+        if ($this->og_image && str_starts_with($this->og_image, 'http')) {
+            return $this->og_image;
+        }
+
+        // Priority 2: og_image is relative path (e.g., /storage/projects/xxx.png)
+        if ($this->og_image && str_starts_with($this->og_image, '/')) {
+            $baseUrl = rtrim(config('app.url'), '/');
+            return $baseUrl . $this->og_image;
+        }
+
+        // Priority 3: og_image without leading slash (rare case)
+        if ($this->og_image) {
+            return $this->getImageUrl($this->og_image);
+        }
+
+        // Priority 4: Fallback to featured_image
+        if ($this->image) {
+            return $this->getImageUrl($this->image);
+        }
+
+        // Last resort: null
+        return null;
     }
 }
