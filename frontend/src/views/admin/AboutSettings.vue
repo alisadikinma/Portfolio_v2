@@ -1213,9 +1213,20 @@ async function handleSubmit() {
 
     await settingsStore.updateAboutSettings(data)
     
-    // INVALIDATE CACHE - Force fresh fetch on homepage (critical fix)
+    // AGGRESSIVE CACHE CLEAR (Nov 4, 2025)
+    // 1. Invalidate TanStack Query cache
     await queryClient.invalidateQueries({ queryKey: ['about-settings'] })
-    console.log('✅ [AboutSettings] Cache invalidated - homepage will refresh')
+    
+    // 2. Force remove from cache completely
+    queryClient.removeQueries({ queryKey: ['about-settings'] })
+    
+    // 3. Clear localStorage
+    localStorage.removeItem('about_settings')
+    
+    console.log('✅ [AboutSettings] AGGRESSIVE cache clear complete')
+    console.log('   - TanStack Query invalidated')
+    console.log('   - TanStack Query removed')
+    console.log('   - localStorage cleared')
     
     uiStore.showSuccess('About settings updated successfully', 'Settings Saved')
 
