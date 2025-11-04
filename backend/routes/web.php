@@ -46,33 +46,24 @@ Route::get('/projects/{slug}', function ($slug) {
         $ogImage = $baseUrl . $imagePath;
     }
     
+    $title = htmlspecialchars($project->meta_title ?: $project->title);
+    $description = htmlspecialchars($project->meta_description ?: $project->description);
+    $url = htmlspecialchars($baseUrl . '/projects/' . $slug);
+    $image = htmlspecialchars($ogImage);
+    
     // Load index.html
     $html = file_get_contents(base_path('../../frontend/dist/index.html'));
     
-    // Replace meta tags
-    $html = preg_replace(
-        '/<meta property="og:title" content="[^"]*">/',
-        '<meta property="og:title" content="' . htmlspecialchars($project->meta_title ?: $project->title) . '">',
-        $html
-    );
+    // Replace Open Graph meta tags
+    $html = preg_replace('/<meta property="og:title" content="[^"]*">/', '<meta property="og:title" content="' . $title . '">', $html);
+    $html = preg_replace('/<meta property="og:description" content="[^"]*">/', '<meta property="og:description" content="' . $description . '">', $html);
+    $html = preg_replace('/<meta property="og:image" content="[^"]*">/', '<meta property="og:image" content="' . $image . '">', $html);
+    $html = preg_replace('/<meta property="og:url" content="[^"]*">/', '<meta property="og:url" content="' . $url . '">', $html);
     
-    $html = preg_replace(
-        '/<meta property="og:description" content="[^"]*">/',
-        '<meta property="og:description" content="' . htmlspecialchars($project->meta_description ?: $project->description) . '">',
-        $html
-    );
-    
-    $html = preg_replace(
-        '/<meta property="og:image" content="[^"]*">/',
-        '<meta property="og:image" content="' . htmlspecialchars($ogImage) . '">',
-        $html
-    );
-    
-    $html = preg_replace(
-        '/<meta property="og:url" content="[^"]*">/',
-        '<meta property="og:url" content="' . htmlspecialchars($baseUrl . '/projects/' . $slug) . '">',
-        $html
-    );
+    // Replace Twitter Card meta tags
+    $html = preg_replace('/<meta name="twitter:title" content="[^"]*">/', '<meta name="twitter:title" content="' . $title . '">', $html);
+    $html = preg_replace('/<meta name="twitter:description" content="[^"]*">/', '<meta name="twitter:description" content="' . $description . '">', $html);
+    $html = preg_replace('/<meta name="twitter:image" content="[^"]*">/', '<meta name="twitter:image" content="' . $image . '">', $html);
     
     return response($html)->header('Content-Type', 'text/html');
 });
@@ -98,33 +89,24 @@ Route::get('/blog/{slug}', function ($slug) {
         $ogImage = $baseUrl . $imagePath;
     }
     
+    $title = htmlspecialchars($post->meta_title ?: $post->title);
+    $description = htmlspecialchars($post->meta_description ?: $post->excerpt);
+    $url = htmlspecialchars($baseUrl . '/blog/' . $slug);
+    $image = htmlspecialchars($ogImage);
+    
     // Load index.html
     $html = file_get_contents(base_path('../../frontend/dist/index.html'));
     
-    // Replace meta tags
-    $html = preg_replace(
-        '/<meta property="og:title" content="[^"]*">/',
-        '<meta property="og:title" content="' . htmlspecialchars($post->meta_title ?: $post->title) . '">',
-        $html
-    );
+    // Replace Open Graph meta tags
+    $html = preg_replace('/<meta property="og:title" content="[^"]*">/', '<meta property="og:title" content="' . $title . '">', $html);
+    $html = preg_replace('/<meta property="og:description" content="[^"]*">/', '<meta property="og:description" content="' . $description . '">', $html);
+    $html = preg_replace('/<meta property="og:image" content="[^"]*">/', '<meta property="og:image" content="' . $image . '">', $html);
+    $html = preg_replace('/<meta property="og:url" content="[^"]*">/', '<meta property="og:url" content="' . $url . '">', $html);
     
-    $html = preg_replace(
-        '/<meta property="og:description" content="[^"]*">/',
-        '<meta property="og:description" content="' . htmlspecialchars($post->meta_description ?: $post->excerpt) . '">',
-        $html
-    );
-    
-    $html = preg_replace(
-        '/<meta property="og:image" content="[^"]*">/',
-        '<meta property="og:image" content="' . htmlspecialchars($ogImage) . '">',
-        $html
-    );
-    
-    $html = preg_replace(
-        '/<meta property="og:url" content="[^"]*">/',
-        '<meta property="og:url" content="' . htmlspecialchars($baseUrl . '/blog/' . $slug) . '">',
-        $html
-    );
+    // Replace Twitter Card meta tags
+    $html = preg_replace('/<meta name="twitter:title" content="[^"]*">/', '<meta name="twitter:title" content="' . $title . '">', $html);
+    $html = preg_replace('/<meta name="twitter:description" content="[^"]*">/', '<meta name="twitter:description" content="' . $description . '">', $html);
+    $html = preg_replace('/<meta name="twitter:image" content="[^"]*">/', '<meta name="twitter:image" content="' . $image . '">', $html);
     
     return response($html)->header('Content-Type', 'text/html');
 });
