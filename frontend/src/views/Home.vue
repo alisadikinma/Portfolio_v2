@@ -38,37 +38,44 @@
                 <div class="absolute -bottom-6 -left-6 w-32 h-32 bg-primary-500/10 rounded-full blur-3xl"></div>
               </div>
 
-              <!-- Languages Flags -->
-              <div v-if="aboutSettings?.languages?.length > 0" class="mt-4 md:mt-6 flex items-center justify-center gap-2 md:gap-3">
-                <div
-                  v-for="lang in aboutSettings.languages.slice(0, 3)"
-                  :key="lang"
-                  class="flex items-center gap-1.5 md:gap-2 px-2.5 py-1.5 md:px-3 md:py-2 glass rounded-full"
-                >
-                  <img :src="getLangFlag(lang)" :alt="lang" class="w-5 h-5 md:w-6 md:h-6 object-contain rounded" />
-                  <span class="text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300">
-                    {{ lang }}
-                  </span>
+              <!-- Languages I Speak -->
+              <div v-if="aboutSettings?.languages?.length > 0" class="mt-4 md:mt-6">
+                <div class="flex items-center justify-center gap-3 md:gap-4 flex-wrap">
+                  <p class="text-xs text-gray-500 dark:text-gray-500 uppercase tracking-wider font-semibold">
+                    LANGUAGES I SPEAK:
+                  </p>
+                  <div class="flex gap-2 md:gap-3">
+                    <div
+                      v-for="lang in aboutSettings.languages.slice(0, 3)"
+                      :key="lang"
+                      class="p-2 md:p-2.5 glass rounded-lg hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5"
+                      :title="lang"
+                    >
+                      <img :src="getLangFlag(lang)" :alt="lang" class="w-6 h-6 md:w-7 md:h-7 object-contain rounded" />
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <!-- Certifications - Moved Here -->
+              <!-- Certifications -->
               <div v-if="aboutSettings?.certifications?.length > 0" class="mt-3 md:mt-4">
-                <p class="text-xs text-gray-500 dark:text-gray-500 mb-2 md:mb-3 uppercase tracking-wider font-semibold text-center">
-                  CERTIFIED BY
-                </p>
-                <div class="flex flex-wrap gap-2 md:gap-3 justify-center">
-                  <a
-                    v-for="cert in aboutSettings.certifications"
-                    :key="cert.name"
-                    :href="cert.url"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="group p-2 md:p-3 glass rounded-lg hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5"
-                    :title="cert.name"
-                  >
-                    <img :src="getCertLogo(cert.name)" :alt="cert.name" class="w-6 h-6 md:w-8 md:h-8 object-contain" />
-                  </a>
+                <div class="flex items-center justify-center gap-3 md:gap-4 flex-wrap">
+                  <p class="text-xs text-gray-500 dark:text-gray-500 uppercase tracking-wider font-semibold">
+                    CERTIFIED BY:
+                  </p>
+                  <div class="flex gap-2 md:gap-3">
+                    <a
+                      v-for="cert in aboutSettings.certifications"
+                      :key="cert.name"
+                      :href="cert.url"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="group p-2 md:p-3 glass rounded-lg hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5"
+                      :title="cert.name"
+                    >
+                      <img :src="getCertLogo(cert.name)" :alt="cert.name" class="w-6 h-6 md:w-8 md:h-8 object-contain" />
+                    </a>
+                  </div>
                 </div>
               </div>
             </div>
@@ -409,7 +416,13 @@
           <button
             v-if="awards.length > 1"
             @click="previousAward"
-            class="absolute left-4 top-1/2 -translate-y-1/2 z-20 w-14 h-14 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-all hover:scale-110 shadow-xl"
+            :disabled="activeAwardIndex === 0"
+            class="absolute left-4 top-1/2 -translate-y-1/2 z-20 w-14 h-14 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center text-white transition-all shadow-xl"
+            :class="[
+              activeAwardIndex === 0 
+                ? 'opacity-30 cursor-not-allowed' 
+                : 'hover:bg-white/20 hover:scale-110 cursor-pointer'
+            ]"
           >
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M15 19l-7-7 7-7"></path>
@@ -418,7 +431,13 @@
           <button
             v-if="awards.length > 1"
             @click="nextAward"
-            class="absolute right-4 top-1/2 -translate-y-1/2 z-20 w-14 h-14 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-all hover:scale-110 shadow-xl"
+            :disabled="activeAwardIndex === awards.length - 1"
+            class="absolute right-4 top-1/2 -translate-y-1/2 z-20 w-14 h-14 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center text-white transition-all shadow-xl"
+            :class="[
+              activeAwardIndex === awards.length - 1
+                ? 'opacity-30 cursor-not-allowed' 
+                : 'hover:bg-white/20 hover:scale-110 cursor-pointer'
+            ]"
           >
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9 5l7 7-7 7"></path>
@@ -1723,15 +1742,13 @@ const getCardStyle = (index) => {
 }
 
 const nextAward = () => {
-  if (activeAwardIndex.value < awards.value.length - 1) {
-    activeAwardIndex.value++
-  }
+  if (activeAwardIndex.value >= awards.value.length - 1) return
+  activeAwardIndex.value++
 }
 
 const previousAward = () => {
-  if (activeAwardIndex.value > 0) {
-    activeAwardIndex.value--
-  }
+  if (activeAwardIndex.value <= 0) return
+  activeAwardIndex.value--
 }
 
 const handleMouseMove = (event) => {
@@ -1763,11 +1780,11 @@ const handleTouchEnd = () => {
   const diff = touchStartX - touchEndX
   
   if (Math.abs(diff) > swipeThreshold) {
-    if (diff > 0) {
-      // Swipe left - next
+    if (diff > 0 && activeAwardIndex.value < awards.value.length - 1) {
+      // Swipe left - next (only if not at end)
       nextAward()
-    } else {
-      // Swipe right - previous
+    } else if (diff < 0 && activeAwardIndex.value > 0) {
+      // Swipe right - previous (only if not at start)
       previousAward()
     }
   }
@@ -1789,8 +1806,12 @@ const handleKeydown = (e) => {
     closeGalleryModal()
   } else if (showAwardsSection.value && awards.value.length > 1) {
     // Awards carousel keyboard navigation (when no modal is open)
-    if (e.key === 'ArrowRight') nextAward()
-    if (e.key === 'ArrowLeft') previousAward()
+    if (e.key === 'ArrowRight' && activeAwardIndex.value < awards.value.length - 1) {
+      nextAward()
+    }
+    if (e.key === 'ArrowLeft' && activeAwardIndex.value > 0) {
+      previousAward()
+    }
   }
 }
 

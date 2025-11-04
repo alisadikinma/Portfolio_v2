@@ -34,6 +34,24 @@
                   to stay at the forefront of web development.
                 </p>
               </div>
+
+              <!-- Languages I Speak Section -->
+              <div v-if="displayLanguages.length > 0" class="mb-6">
+                <p class="text-xs uppercase tracking-wider text-neutral-500 dark:text-neutral-400 font-semibold mb-3">
+                  Languages I Speak
+                </p>
+                <div class="flex items-center gap-4">
+                  <div 
+                    v-for="lang in displayLanguages" 
+                    :key="lang.code"
+                    class="flex items-center gap-2 px-3 py-2 bg-neutral-50 dark:bg-neutral-700/50 rounded-lg border border-neutral-200 dark:border-neutral-600"
+                  >
+                    <img :src="getLangFlagImage(lang.code)" :alt="lang.name" class="w-6 h-6 object-contain rounded" />
+                    <span class="text-sm font-medium text-neutral-700 dark:text-neutral-300">{{ lang.name }}</span>
+                  </div>
+                </div>
+              </div>
+
               <BaseButton variant="primary" @click="$router.push('/contact')">
                 Get in Touch
               </BaseButton>
@@ -495,6 +513,11 @@ import { usePageSections } from '@/composables/usePageSections'
 import api from '@/services/api'
 import { useRouter } from 'vue-router'
 
+// Import language flags
+import idFlag from '@/assets/language/ID.png'
+import gbFlag from '@/assets/language/GB.png'
+import cnFlag from '@/assets/language/CN.png'
+
 const about = ref(null)
 const loading = ref(true)
 const error = ref(null)
@@ -546,6 +569,69 @@ const displayEducation = computed(() => {
     return about.value.education
   }
   return []
+})
+
+// Display languages with auto-conversion from string to object
+const displayLanguages = computed(() => {
+  if (!about.value?.languages || !Array.isArray(about.value.languages) || about.value.languages.length === 0) {
+    return []
+  }
+
+  // Mapping language name to flag emoji and code
+  const languageMap = {
+    'bahasa': { code: 'id', flag: '🇮🇩', name: 'Bahasa' },
+    'indonesia': { code: 'id', flag: '🇮🇩', name: 'Indonesia' },
+    'indonesian': { code: 'id', flag: '🇮🇩', name: 'Indonesian' },
+    'english': { code: 'en', flag: '🇬🇧', name: 'English' },
+    'mandarin': { code: 'zh', flag: '🇨🇳', name: 'Mandarin' },
+    'chinese': { code: 'zh', flag: '🇨🇳', name: 'Chinese' },
+    'japanese': { code: 'jp', flag: '🇯🇵', name: 'Japanese' },
+    'korean': { code: 'kr', flag: '🇰🇷', name: 'Korean' },
+    'spanish': { code: 'es', flag: '🇪🇸', name: 'Spanish' },
+    'french': { code: 'fr', flag: '🇫🇷', name: 'French' },
+    'german': { code: 'de', flag: '🇩🇪', name: 'German' },
+    'arabic': { code: 'ar', flag: '🇸🇦', name: 'Arabic' },
+    'russian': { code: 'ru', flag: '🇷🇺', name: 'Russian' },
+    'portuguese': { code: 'pt', flag: '🇵🇹', name: 'Portuguese' },
+    'dutch': { code: 'nl', flag: '🇳🇱', name: 'Dutch' },
+    'italian': { code: 'it', flag: '🇮🇹', name: 'Italian' },
+    'thai': { code: 'th', flag: '🇹🇭', name: 'Thai' },
+    'vietnamese': { code: 'vi', flag: '🇻🇳', name: 'Vietnamese' },
+    'malay': { code: 'ms', flag: '🇲🇾', name: 'Malay' },
+    'tagalog': { code: 'tl', flag: '🇵🇭', name: 'Tagalog' },
+    'filipino': { code: 'tl', flag: '🇵🇭', name: 'Filipino' }
+  }
+
+  return about.value.languages.map(lang => {
+    // If already an object with required fields, return as is
+    if (typeof lang === 'object' && lang.code && lang.name && lang.flag) {
+      return lang
+    }
+
+    // If string, convert to object
+    if (typeof lang === 'string') {
+      const langLower = lang.toLowerCase().trim()
+      const mapped = languageMap[langLower]
+      
+      if (mapped) {
+        return mapped
+      }
+
+      // Fallback: use original string with generic flag
+      return {
+        code: langLower.substring(0, 2),
+        name: lang,
+        flag: '🌐' // Generic globe emoji
+      }
+    }
+
+    // Unknown format, return with generic flag
+    return {
+      code: 'xx',
+      name: String(lang),
+      flag: '🌐'
+    }
+  })
 })
 
 const formatPeriod = (startDate, endDate, isCurrent) => {
@@ -619,6 +705,30 @@ const getProfilePhotoUrl = (path) => {
 const handleImageError = (event) => {
   console.warn('Failed to load profile photo:', event.target.src)
   event.target.style.display = 'none'
+}
+
+// Get language flag image based on code
+const getLangFlagImage = (code) => {
+  const codeMap = {
+    'id': idFlag,
+    'en': gbFlag,
+    'zh': cnFlag,
+    'jp': cnFlag, // fallback
+    'kr': idFlag, // fallback
+    'es': idFlag,
+    'fr': gbFlag,
+    'de': gbFlag,
+    'ar': idFlag,
+    'ru': idFlag,
+    'pt': idFlag,
+    'nl': gbFlag,
+    'it': idFlag,
+    'th': idFlag,
+    'vi': idFlag,
+    'ms': idFlag,
+    'tl': idFlag
+  }
+  return codeMap[code] || idFlag
 }
 
 onMounted(async () => {
