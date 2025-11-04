@@ -22,10 +22,19 @@ class UpdateAboutSettingsRequest extends FormRequest
     public function rules(): array
     {
         return [
+            // Basic Info
             'name' => ['nullable', 'string', 'max:255'],
             'title' => ['nullable', 'string', 'max:255'],
             'bio' => ['nullable', 'string'],
             'profile_photo' => ['nullable', 'image', 'max:5120'], // 5MB max
+
+            // Hero & About Page Enhancement (NEW)
+            'hero_tagline' => ['nullable', 'string', 'max:500'],
+            'availability_note' => ['nullable', 'string', 'max:255'],
+            'mission' => ['nullable', 'string'],
+            'approach' => ['nullable', 'string'],
+            'trust_strip' => ['nullable'],
+            'what_i_do' => ['nullable'],
 
             // Languages (array of strings)
             'languages' => ['nullable'],
@@ -97,8 +106,14 @@ class UpdateAboutSettingsRequest extends FormRequest
         if ($this->has('title')) $data['title'] = $this->input('title');
         if ($this->has('bio')) $data['bio'] = $this->input('bio');
         
+        // Handle Hero & About Page Enhancement fields
+        if ($this->has('hero_tagline')) $data['hero_tagline'] = $this->input('hero_tagline');
+        if ($this->has('availability_note')) $data['availability_note'] = $this->input('availability_note');
+        if ($this->has('mission')) $data['mission'] = $this->input('mission');
+        if ($this->has('approach')) $data['approach'] = $this->input('approach');
+        
         // Decode JSON strings from FormData
-        foreach (['languages', 'skills', 'experience', 'education', 'social_links', 'statistics', 'certifications'] as $field) {
+        foreach (['languages', 'skills', 'experience', 'education', 'social_links', 'statistics', 'certifications', 'trust_strip', 'what_i_do'] as $field) {
             if ($this->has($field)) {
                 $value = $this->input($field);
                 

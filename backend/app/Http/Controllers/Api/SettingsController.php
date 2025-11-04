@@ -39,6 +39,14 @@ class SettingsController extends Controller
                 'title' => '',
                 'bio' => '',
                 'profile_photo' => null,
+                // Hero & About Page Enhancement
+                'hero_tagline' => '',
+                'availability_note' => '',
+                'mission' => '',
+                'approach' => '',
+                'trust_strip' => [],
+                'what_i_do' => [],
+                // Other fields
                 'languages' => [],
                 'skills' => [],
                 'experience' => [],
@@ -119,7 +127,7 @@ class SettingsController extends Controller
             }
 
             // Decode JSON strings from FormData
-            foreach (['languages', 'skills', 'experience', 'education', 'social_links', 'statistics', 'certifications'] as $jsonField) {
+            foreach (['languages', 'skills', 'experience', 'education', 'social_links', 'statistics', 'certifications', 'trust_strip', 'what_i_do'] as $jsonField) {
                 if (isset($validated[$jsonField]) && is_string($validated[$jsonField])) {
                     $validated[$jsonField] = json_decode($validated[$jsonField], true);
                 }
@@ -130,11 +138,13 @@ class SettingsController extends Controller
                 $type = 'text';
 
                 // Determine type
-                if (in_array($key, ['languages', 'skills', 'experience', 'education', 'social_links', 'statistics', 'certifications'])) {
+                if (in_array($key, ['languages', 'skills', 'experience', 'education', 'social_links', 'statistics', 'certifications', 'trust_strip', 'what_i_do'])) {
                     $type = 'json';
                     $value = json_encode($value);
                 } elseif ($key === 'profile_photo') {
                     $type = 'image';
+                } elseif (in_array($key, ['mission', 'approach', 'bio'])) {
+                    $type = 'textarea';
                 }
 
                 Log::info('💾 Saving setting', [

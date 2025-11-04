@@ -54,20 +54,6 @@
           </div>
         </div>
 
-        <!-- Bio -->
-        <div class="mt-6">
-          <label for="bio" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-            Bio
-          </label>
-          <textarea
-            id="bio"
-            v-model="formData.bio"
-            rows="4"
-            class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Tell us about yourself..."
-          ></textarea>
-        </div>
-
         <!-- Profile Photo -->
         <div class="mt-6">
           <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
@@ -128,6 +114,91 @@
             </BaseButton>
           </div>
         </div>
+      </BaseCard>
+
+      <!-- Hero & About Enhancement Card -->
+      <BaseCard>
+        <h2 class="text-xl font-display font-semibold text-neutral-900 dark:text-neutral-100 mb-6">
+          Hero & About Page Enhancement
+        </h2>
+
+        <!-- Availability Note -->
+        <div class="mb-6">
+          <label for="availability_note" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+            Availability Note <span class="text-xs text-neutral-500">(Current status)</span>
+          </label>
+          <input
+            id="availability_note"
+            v-model="formData.availability_note"
+            type="text"
+            maxlength="255"
+            class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="Available for consulting and freelance projects"
+          />
+        </div>
+
+        <!-- Hero Tagline -->
+        <div class="mb-6">
+          <label for="hero_tagline" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+            Hero Tagline <span class="text-xs text-neutral-500">(Main positioning statement)</span>
+          </label>
+          <input
+            id="hero_tagline"
+            v-model="formData.hero_tagline"
+            type="text"
+            maxlength="255"
+            class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="AI Automation Architect & Senior Tech Consultant"
+          />
+        </div>
+
+        <!-- Bio -->
+        <div class="mb-6">
+          <label for="bio" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+            Bio
+          </label>
+          <textarea
+            id="bio"
+            v-model="formData.bio"
+            rows="4"
+            class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="Tell us about yourself..."
+          ></textarea>
+        </div>
+
+        <!-- Mission Statement -->
+        <div class="mb-6">
+          <label for="mission" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+            Mission Statement
+          </label>
+          <textarea
+            id="mission"
+            v-model="formData.mission"
+            rows="3"
+            class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="Empowering businesses through intelligent automation..."
+          ></textarea>
+        </div>
+
+        <!-- Approach -->
+        <div class="mb-6">
+          <label for="approach" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+            Approach / Methodology
+          </label>
+          <textarea
+            id="approach"
+            v-model="formData.approach"
+            rows="4"
+            class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="I believe in combining technical excellence with business impact..."
+          ></textarea>
+        </div>
+
+        <p class="text-sm text-neutral-500 dark:text-neutral-400 mt-4">
+          <strong>Note:</strong> Trust Strip, What I Do, and Collaboration Modes are complex arrays.
+          For now, they are seeded with default values.
+          Advanced editor coming soon.
+        </p>
       </BaseCard>
 
       <!-- Languages Card -->
@@ -823,77 +894,6 @@
             />
           </div>
         </div>
-      </BaseCard>
-
-      <!-- Hero & About Enhancement Card -->
-      <BaseCard>
-        <h2 class="text-xl font-display font-semibold text-neutral-900 dark:text-neutral-100 mb-6">
-          Hero & About Page Enhancement
-        </h2>
-
-        <!-- Hero Tagline -->
-        <div class="mb-6">
-          <label for="hero_tagline" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-            Hero Tagline <span class="text-xs text-neutral-500">(Main positioning statement)</span>
-          </label>
-          <input
-            id="hero_tagline"
-            v-model="formData.hero_tagline"
-            type="text"
-            maxlength="255"
-            class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="AI Automation Architect & Senior Tech Consultant"
-          />
-        </div>
-
-        <!-- Availability Note -->
-        <div class="mb-6">
-          <label for="availability_note" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-            Availability Note <span class="text-xs text-neutral-500">(Current status)</span>
-          </label>
-          <input
-            id="availability_note"
-            v-model="formData.availability_note"
-            type="text"
-            maxlength="255"
-            class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Available for consulting and freelance projects"
-          />
-        </div>
-
-        <!-- Mission Statement -->
-        <div class="mb-6">
-          <label for="mission" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-            Mission Statement
-          </label>
-          <textarea
-            id="mission"
-            v-model="formData.mission"
-            rows="3"
-            class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Empowering businesses through intelligent automation..."
-          ></textarea>
-        </div>
-
-        <!-- Approach -->
-        <div class="mb-6">
-          <label for="approach" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-            Approach / Methodology
-          </label>
-          <textarea
-            id="approach"
-            v-model="formData.approach"
-            rows="4"
-            class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="I believe in combining technical excellence with business impact..."
-          ></textarea>
-        </div>
-
-        <p class="text-sm text-neutral-500 dark:text-neutral-400 mt-4">
-          <strong>Note:</strong> Trust Strip, What I Do, and Collaboration Modes are complex arrays.
-          For now, they are seeded with default values.
-          Advanced editor coming soon.
-        </p>
       </BaseCard>
 
       <!-- Form Actions -->
