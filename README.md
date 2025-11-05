@@ -12,65 +12,67 @@ A modern, scalable full-stack web application featuring RESTful API architecture
 
 ---
 
-## ðŸ"Š Executive Summary
+## Executive Summary
 
 | Aspect | Details |
 |--------|---------|
-| **Status** | âœ… Production Ready (100% Complete) |
+| **Status** | Production Ready (100% Complete) |
 | **Security Score** | 95/100 |
 | **Test Coverage** | 54+ test cases (100% passing) |
 | **API Endpoints** | 100+ documented endpoints |
 | **Performance** | <500ms cached loads (83% improvement) |
 | **Development Time** | ~360 hours across 4 sessions |
-| **Last Updated** | November 2, 2025 |
+| **Last Updated** | November 5, 2025 |
 
 ---
 
-## ðŸ"‹ Table of Contents
+## Table of Contents
 
-- [System Architecture](#-system-architecture)
-- [Quick Start Guide](#-quick-start-guide)
-- [Detailed Prerequisites](#-detailed-prerequisites)
-- [Installation & Configuration](#-installation--configuration)
-- [Development Workflow](#-development-workflow)
-- [Project Structure](#-project-structure)
-- [API Documentation](#-api-documentation)
-- [Testing Strategy](#-testing-strategy)
-- [Performance Optimization](#-performance-optimization)
-- [Security Implementation](#-security-implementation)
-- [Deployment Guide](#-deployment-guide)
-- [Troubleshooting](#-troubleshooting)
-- [Documentation Index](#-documentation-index)
-- [Contributing Guidelines](#-contributing-guidelines)
+- [System Architecture](#system-architecture)
+- [Quick Start Guide](#quick-start-guide)
+- [Detailed Prerequisites](#detailed-prerequisites)
+- [Installation & Configuration](#installation--configuration)
+- [Development Workflow](#development-workflow)
+- [Project Structure](#project-structure)
+- [API Documentation](#api-documentation)
+- [Testing Strategy](#testing-strategy)
+- [Performance Optimization](#performance-optimization)
+- [Security Implementation](#security-implementation)
+- [Deployment Guide](#deployment-guide)
+- [Troubleshooting](#troubleshooting)
+- [Documentation Index](#documentation-index)
+- [Contributing Guidelines](#contributing-guidelines)
 
 ---
 
-## ðŸ—ï¸ System Architecture
+## System Architecture
 
-### Technology Stack
+### Technology Stack Overview
 
 ```
-â"Œâ"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"
-â"‚                    CLIENT LAYER                           â"‚
-â"‚  Vue 3.5 SPA + Vite 7 + TanStack Query + Tailwind 4     â"‚
-â"‚  Port: 5173 (Development) | Static Assets (Production)   â"‚
-â""â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"¬â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"˜
-                         â"‚ HTTP/JSON (Axios)
-                         â"‚ Authorization: Bearer {token}
-                         â"‚
-â"Œâ"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"¼â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"
-â"‚              API LAYER (Laravel Sanctum)                  â"‚
-â"‚  Laravel 10 REST API + JWT Authentication                â"‚
-â"‚  Port: 80 (XAMPP Apache) | Endpoint: /api/*             â"‚
-â""â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"¬â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"˜
-                         â"‚ Eloquent ORM
-                         â"‚ PDO Connection Pool
-                         â"‚
-â"Œâ"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"¼â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"
-â"‚              DATA LAYER (MySQL 8)                         â"‚
-â"‚  18 Tables | ACID Compliant | InnoDB Engine             â"‚
-â"‚  Port: 3306 (XAMPP) | Database: portfolio_v2            â"‚
-â""â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"˜
+===============================================================
+                    CLIENT LAYER
+  Vue 3.5 SPA + Vite 7 + TanStack Query + Tailwind 4
+  Port: 5173 (Development) | Static Assets (Production)
+===============================================================
+                         |
+                         | HTTP/JSON (Axios)
+                         | Authorization: Bearer {token}
+                         |
+===============================================================
+              API LAYER (Laravel Sanctum)
+  Laravel 10 REST API + JWT Authentication
+  Port: 80 (XAMPP Apache) | Endpoint: /api/*
+===============================================================
+                         |
+                         | Eloquent ORM
+                         | PDO Connection Pool
+                         |
+===============================================================
+              DATA LAYER (MySQL 8)
+  18 Tables | ACID Compliant | InnoDB Engine
+  Port: 3306 (XAMPP) | Database: portfolio_v2
+===============================================================
 ```
 
 ### System Components
@@ -113,7 +115,7 @@ A modern, scalable full-stack web application featuring RESTful API architecture
 
 ---
 
-## âš¡ Quick Start Guide
+## Quick Start Guide
 
 **Estimated Setup Time:** 15-20 minutes
 
@@ -175,11 +177,11 @@ User::create([
 exit
 ```
 
-**âœ… Result:** Login at `http://localhost:5173/admin` with created credentials
+**Result:** Login at `http://localhost:5173/admin` with created credentials
 
 ---
 
-## ðŸ"§ Detailed Prerequisites
+## Detailed Prerequisites
 
 ### Minimum System Requirements
 
@@ -237,7 +239,7 @@ php -m | findstr "curl fileinfo gd mbstring openssl pdo_mysql"
 
 ---
 
-## ðŸ"¦ Installation & Configuration
+## Installation & Configuration
 
 ### Step 1: Repository Setup
 
@@ -283,8 +285,8 @@ DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
 DB_PORT=3306
 DB_DATABASE=portfolio_v2
-DB_USERNAME=ali
-DB_PASSWORD=aL1889900@@@
+DB_USERNAME=your_db_username
+DB_PASSWORD=your_secure_password
 
 SANCTUM_STATEFUL_DOMAINS=localhost:5173
 SESSION_DOMAIN=localhost
@@ -293,7 +295,7 @@ SESSION_DOMAIN=localhost
 #### 2.4 Database Migration
 ```bash
 # Create database (via phpMyAdmin or CLI)
-mysql -u ali -p -e "CREATE DATABASE portfolio_v2 CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+mysql -u your_db_username -p -e "CREATE DATABASE portfolio_v2 CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 
 # Run migrations
 php artisan migrate
@@ -378,7 +380,7 @@ curl http://localhost/Portfolio_v2/backend/public/api/health
 
 ---
 
-## ðŸ'¼ Development Workflow
+## Development Workflow
 
 ### Daily Development Routine
 
@@ -452,135 +454,135 @@ git push origin feature/your-feature-name
 
 ---
 
-## ðŸ" Project Structure
+## Project Structure
 
 ### Backend Structure (Laravel)
 
 ```
 backend/
-â"œâ"€â"€ app/
-â"‚   â"œâ"€â"€ Http/
-â"‚   â"‚   â"œâ"€â"€ Controllers/
-â"‚   â"‚   â"‚   â"œâ"€â"€ Api/                    # API Controllers
-â"‚   â"‚   â"‚   â"‚   â"œâ"€â"€ PostController.php      # Blog posts CRUD
-â"‚   â"‚   â"‚   â"‚   â"œâ"€â"€ ProjectController.php   # Portfolio projects
-â"‚   â"‚   â"‚   â"‚   â"œâ"€â"€ CategoryController.php  # Categories
-â"‚   â"‚   â"‚   â"‚   â"œâ"€â"€ AwardController.php     # Awards
-â"‚   â"‚   â"‚   â"‚   â"œâ"€â"€ ServiceController.php   # Services
-â"‚   â"‚   â"‚   â"‚   â"œâ"€â"€ GalleryController.php   # Galleries
-â"‚   â"‚   â"‚   â"‚   â""â"€â"€ [...]                   # Other controllers
-â"‚   â"‚   â"‚   â""â"€â"€ Controller.php          # Base controller
-â"‚   â"‚   â"œâ"€â"€ Requests/               # Form validation
-â"‚   â"‚   â"‚   â"œâ"€â"€ StorePostRequest.php
-â"‚   â"‚   â"‚   â"œâ"€â"€ UpdatePostRequest.php
-â"‚   â"‚   â"‚   â""â"€â"€ [...]
-â"‚   â"‚   â""â"€â"€ Resources/              # API response transformers
-â"‚   â"‚       â"œâ"€â"€ PostResource.php
-â"‚   â"‚       â"œâ"€â"€ PostCollection.php
-â"‚   â"‚       â""â"€â"€ [...]
-â"‚   â"œâ"€â"€ Models/                     # Eloquent models
-â"‚   â"‚   â"œâ"€â"€ User.php                # User model
-â"‚   â"‚   â"œâ"€â"€ Post.php                # Blog post
-â"‚   â"‚   â"œâ"€â"€ Project.php             # Portfolio project
-â"‚   â"‚   â"œâ"€â"€ Category.php            # Category
-â"‚   â"‚   â""â"€â"€ [...]                   # Other models
-â"‚   â""â"€â"€ Traits/
-â"‚       â"œâ"€â"€ HasSeoFields.php        # SEO functionality
-â"‚       â""â"€â"€ HasSlug.php             # Auto slug generation
-â"œâ"€â"€ database/
-â"‚   â"œâ"€â"€ migrations/                 # Database schema
-â"‚   â"œâ"€â"€ seeders/                    # Sample data
-â"‚   â""â"€â"€ factories/                  # Model factories
-â"œâ"€â"€ routes/
-â"‚   â"œâ"€â"€ api.php                     # API routes (100+ endpoints)
-â"‚   â""â"€â"€ web.php                     # Web routes
-â"œâ"€â"€ storage/
-â"‚   â"œâ"€â"€ app/
-â"‚   â"‚   â""â"€â"€ public/                 # Public files (images, etc.)
-â"‚   â"œâ"€â"€ logs/                       # Application logs
-â"‚   â""â"€â"€ framework/                  # Framework cache
-â"œâ"€â"€ tests/
-â"‚   â"œâ"€â"€ Feature/                    # Feature tests (54+ tests)
-â"‚   â""â"€â"€ Unit/                       # Unit tests
-â"œâ"€â"€ .env                            # Environment configuration
-â"œâ"€â"€ composer.json                   # PHP dependencies
-â""â"€â"€ phpunit.xml                     # Test configuration
+|-- app/
+|   |-- Http/
+|   |   |-- Controllers/
+|   |   |   |-- Api/                    # API Controllers
+|   |   |   |   |-- PostController.php      # Blog posts CRUD
+|   |   |   |   |-- ProjectController.php   # Portfolio projects
+|   |   |   |   |-- CategoryController.php  # Categories
+|   |   |   |   |-- AwardController.php     # Awards
+|   |   |   |   |-- ServiceController.php   # Services
+|   |   |   |   |-- GalleryController.php   # Galleries
+|   |   |   |   +-- [...]                   # Other controllers
+|   |   |   +-- Controller.php          # Base controller
+|   |   |-- Requests/               # Form validation
+|   |   |   |-- StorePostRequest.php
+|   |   |   |-- UpdatePostRequest.php
+|   |   |   +-- [...]
+|   |   +-- Resources/              # API response transformers
+|   |       |-- PostResource.php
+|   |       |-- PostCollection.php
+|   |       +-- [...]
+|   |-- Models/                     # Eloquent models
+|   |   |-- User.php                # User model
+|   |   |-- Post.php                # Blog post
+|   |   |-- Project.php             # Portfolio project
+|   |   |-- Category.php            # Category
+|   |   +-- [...]                   # Other models
+|   +-- Traits/
+|       |-- HasSeoFields.php        # SEO functionality
+|       +-- HasSlug.php             # Auto slug generation
+|-- database/
+|   |-- migrations/                 # Database schema
+|   |-- seeders/                    # Sample data
+|   +-- factories/                  # Model factories
+|-- routes/
+|   |-- api.php                     # API routes (100+ endpoints)
+|   +-- web.php                     # Web routes
+|-- storage/
+|   |-- app/
+|   |   +-- public/                 # Public files (images, etc.)
+|   |-- logs/                       # Application logs
+|   +-- framework/                  # Framework cache
+|-- tests/
+|   |-- Feature/                    # Feature tests (54+ tests)
+|   +-- Unit/                       # Unit tests
+|-- .env                            # Environment configuration
+|-- composer.json                   # PHP dependencies
++-- phpunit.xml                     # Test configuration
 ```
 
 ### Frontend Structure (Vue 3)
 
 ```
 frontend/
-â"œâ"€â"€ src/
-â"‚   â"œâ"€â"€ api/
-â"‚   â"‚   â""â"€â"€ index.js                # Axios instance & interceptors
-â"‚   â"œâ"€â"€ assets/                     # Static assets
-â"‚   â"‚   â"œâ"€â"€ css/
-â"‚   â"‚   â"œâ"€â"€ images/
-â"‚   â"‚   â""â"€â"€ fonts/
-â"‚   â"œâ"€â"€ components/
-â"‚   â"‚   â"œâ"€â"€ base/                   # Reusable UI components
-â"‚   â"‚   â"‚   â"œâ"€â"€ BaseButton.vue
-â"‚   â"‚   â"‚   â"œâ"€â"€ BaseCard.vue
-â"‚   â"‚   â"‚   â"œâ"€â"€ BaseInput.vue
-â"‚   â"‚   â"‚   â"œâ"€â"€ BaseModal.vue
-â"‚   â"‚   â"‚   â""â"€â"€ [...]               # 50+ components total
-â"‚   â"‚   â"œâ"€â"€ blog/                   # Blog-specific components
-â"‚   â"‚   â"‚   â"œâ"€â"€ RichTextEditor.vue  # CKEditor 5 integration
-â"‚   â"‚   â"‚   â"œâ"€â"€ ImageUploader.vue   # Drag & drop upload
-â"‚   â"‚   â"‚   â"œâ"€â"€ CategorySelect.vue  # Category selector
-â"‚   â"‚   â"‚   â""â"€â"€ BlogPostForm.vue    # Integrated post form
-â"‚   â"‚   â"œâ"€â"€ project/                # Project components
-â"‚   â"‚   â"œâ"€â"€ layout/                 # Layout components
-â"‚   â"‚   â""â"€â"€ common/                 # Common components
-â"‚   â"œâ"€â"€ composables/                # Vue composables
-â"‚   â"‚   â"œâ"€â"€ useAuth.js              # Authentication logic
-â"‚   â"‚   â"œâ"€â"€ usePosts.js             # Blog posts (TanStack Query)
-â"‚   â"‚   â"œâ"€â"€ useProjects.js          # Projects (TanStack Query)
-â"‚   â"‚   â"œâ"€â"€ useCategories.js        # Categories
-â"‚   â"‚   â"œâ"€â"€ useAwards.js            # Awards (TanStack Query)
-â"‚   â"‚   â"œâ"€â"€ useTestimonials.js      # Testimonials (TanStack Query)
-â"‚   â"‚   â""â"€â"€ useGallery.js           # Galleries (TanStack Query)
-â"‚   â"œâ"€â"€ layouts/                    # Layout wrappers
-â"‚   â"‚   â"œâ"€â"€ DefaultLayout.vue       # Public pages layout
-â"‚   â"‚   â"œâ"€â"€ AdminLayout.vue         # Admin pages layout
-â"‚   â"‚   â""â"€â"€ AuthLayout.vue          # Authentication pages
-â"‚   â"œâ"€â"€ router/
-â"‚   â"‚   â""â"€â"€ index.js                # Vue Router configuration
-â"‚   â"œâ"€â"€ stores/                     # Pinia state management
-â"‚   â"‚   â"œâ"€â"€ auth.js                 # Auth store
-â"‚   â"‚   â"œâ"€â"€ posts.js                # Posts store
-â"‚   â"‚   â"œâ"€â"€ projects.js             # Projects store
-â"‚   â"‚   â"œâ"€â"€ categories.js           # Categories store
-â"‚   â"‚   â""â"€â"€ ui.js                   # UI state (loading, toasts)
-â"‚   â"œâ"€â"€ views/                      # Page components
-â"‚   â"‚   â"œâ"€â"€ Home.vue                # Homepage
-â"‚   â"‚   â"œâ"€â"€ About.vue               # About page
-â"‚   â"‚   â"œâ"€â"€ Contact.vue             # Contact page
-â"‚   â"‚   â"œâ"€â"€ Blog.vue                # Blog listing
-â"‚   â"‚   â"œâ"€â"€ BlogDetail.vue          # Single post
-â"‚   â"‚   â"œâ"€â"€ Projects.vue            # Projects listing
-â"‚   â"‚   â"œâ"€â"€ ProjectDetail.vue       # Single project
-â"‚   â"‚   â"œâ"€â"€ auth/
-â"‚   â"‚   â"‚   â""â"€â"€ Login.vue           # Login page
-â"‚   â"‚   â""â"€â"€ admin/                  # Admin pages
-â"‚   â"‚       â"œâ"€â"€ Dashboard.vue       # Admin dashboard
-â"‚   â"‚       â"œâ"€â"€ PostCreate.vue      # Create post
-â"‚   â"‚       â"œâ"€â"€ PostEdit.vue        # Edit post
-â"‚   â"‚       â"œâ"€â"€ PostList.vue        # Posts management
-â"‚   â"‚       â""â"€â"€ [...]               # Other admin pages
-â"‚   â"œâ"€â"€ App.vue                     # Root component
-â"‚   â""â"€â"€ main.js                     # Application entry point
-â"œâ"€â"€ public/                         # Static files (index.html, favicon)
-â"œâ"€â"€ .env                            # Frontend configuration
-â"œâ"€â"€ package.json                    # JavaScript dependencies
-â"œâ"€â"€ vite.config.js                  # Vite configuration
-â""â"€â"€ tailwind.config.js              # Tailwind configuration
+|-- src/
+|   |-- api/
+|   |   +-- index.js                # Axios instance & interceptors
+|   |-- assets/                     # Static assets
+|   |   |-- css/
+|   |   |-- images/
+|   |   +-- fonts/
+|   |-- components/
+|   |   |-- base/                   # Reusable UI components
+|   |   |   |-- BaseButton.vue
+|   |   |   |-- BaseCard.vue
+|   |   |   |-- BaseInput.vue
+|   |   |   |-- BaseModal.vue
+|   |   |   +-- [...]               # 50+ components total
+|   |   |-- blog/                   # Blog-specific components
+|   |   |   |-- RichTextEditor.vue  # CKEditor 5 integration
+|   |   |   |-- ImageUploader.vue   # Drag & drop upload
+|   |   |   |-- CategorySelect.vue  # Category selector
+|   |   |   +-- BlogPostForm.vue    # Integrated post form
+|   |   |-- project/                # Project components
+|   |   |-- layout/                 # Layout components
+|   |   +-- common/                 # Common components
+|   |-- composables/                # Vue composables
+|   |   |-- useAuth.js              # Authentication logic
+|   |   |-- usePosts.js             # Blog posts (TanStack Query)
+|   |   |-- useProjects.js          # Projects (TanStack Query)
+|   |   |-- useCategories.js        # Categories
+|   |   |-- useAwards.js            # Awards (TanStack Query)
+|   |   |-- useTestimonials.js      # Testimonials (TanStack Query)
+|   |   +-- useGallery.js           # Galleries (TanStack Query)
+|   |-- layouts/                    # Layout wrappers
+|   |   |-- DefaultLayout.vue       # Public pages layout
+|   |   |-- AdminLayout.vue         # Admin pages layout
+|   |   +-- AuthLayout.vue          # Authentication pages
+|   |-- router/
+|   |   +-- index.js                # Vue Router configuration
+|   |-- stores/                     # Pinia state management
+|   |   |-- auth.js                 # Auth store
+|   |   |-- posts.js                # Posts store
+|   |   |-- projects.js             # Projects store
+|   |   |-- categories.js           # Categories store
+|   |   +-- ui.js                   # UI state (loading, toasts)
+|   |-- views/                      # Page components
+|   |   |-- Home.vue                # Homepage
+|   |   |-- About.vue               # About page
+|   |   |-- Contact.vue             # Contact page
+|   |   |-- Blog.vue                # Blog listing
+|   |   |-- BlogDetail.vue          # Single post
+|   |   |-- Projects.vue            # Projects listing
+|   |   |-- ProjectDetail.vue       # Single project
+|   |   |-- auth/
+|   |   |   +-- Login.vue           # Login page
+|   |   +-- admin/                  # Admin pages
+|   |       |-- Dashboard.vue       # Admin dashboard
+|   |       |-- PostCreate.vue      # Create post
+|   |       |-- PostEdit.vue        # Edit post
+|   |       |-- PostList.vue        # Posts management
+|   |       +-- [...]               # Other admin pages
+|   |-- App.vue                     # Root component
+|   +-- main.js                     # Application entry point
+|-- public/                         # Static files (index.html, favicon)
+|-- .env                            # Frontend configuration
+|-- package.json                    # JavaScript dependencies
+|-- vite.config.js                  # Vite configuration
++-- tailwind.config.js              # Tailwind configuration
 ```
 
 ---
 
-## ðŸ"š API Documentation
+## API Documentation
 
 ### API Base URL
 ```
@@ -704,7 +706,7 @@ DELETE /api/admin/projects/{id}
 
 ### Complete API Reference
 
-**ðŸ"– For full API documentation (100+ endpoints), see:**
+**For full API documentation (100+ endpoints), see:**
 - [API_ENDPOINTS.md](./API_ENDPOINTS.md) - **900+ lines comprehensive guide**
 
 Includes:
@@ -718,21 +720,21 @@ Includes:
 
 ---
 
-## ðŸ§ª Testing Strategy
+## Testing Strategy
 
 ### Backend Testing (PHPUnit/Pest)
 
 #### Test Structure
 ```
 tests/
-â"œâ"€â"€ Feature/                    # Integration tests
-â"‚   â"œâ"€â"€ PostApiTest.php        # Posts CRUD tests
-â"‚   â"œâ"€â"€ ProjectApiTest.php     # Projects CRUD tests
-â"‚   â"œâ"€â"€ ServiceApiTest.php     # Services API tests (17 tests)
-â"‚   â"œâ"€â"€ GalleryApiTest.php     # Gallery API tests (20 tests)
-â"‚   â""â"€â"€ [...]                  # Other feature tests
-â""â"€â"€ Unit/                       # Unit tests
-    â""â"€â"€ [...]                   # Model, helper tests
+|-- Feature/                    # Integration tests
+|   |-- PostApiTest.php        # Posts CRUD tests
+|   |-- ProjectApiTest.php     # Projects CRUD tests
+|   |-- ServiceApiTest.php     # Services API tests (17 tests)
+|   |-- GalleryApiTest.php     # Gallery API tests (20 tests)
+|   +-- [...]                  # Other feature tests
++-- Unit/                       # Unit tests
+    +-- [...]                   # Model, helper tests
 ```
 
 #### Running Tests
@@ -791,15 +793,15 @@ Frontend testing uses Playwright MCP through Claude Code:
 
 | Layer | Target Coverage | Current Status |
 |-------|----------------|----------------|
-| Backend Controllers | 90% | âœ… 95% |
-| Backend Models | 85% | âœ… 90% |
-| API Endpoints | 100% | âœ… 100% |
-| Frontend Components | 80% | âœ… 85% |
-| E2E Workflows | 90% | âœ… 92% |
+| Backend Controllers | 90% | 95% |
+| Backend Models | 85% | 90% |
+| API Endpoints | 100% | 100% |
+| Frontend Components | 80% | 85% |
+| E2E Workflows | 90% | 92% |
 
 ---
 
-## âš¡ Performance Optimization
+## Performance Optimization
 
 ### Caching Strategy (TanStack Query)
 
@@ -851,19 +853,19 @@ Awards:         8.0s (cold) / 0.4s (cached) - 95% faster
 API Calls/Page: 0-2 requests (70% reduction)
 ```
 
-**âœ… Result:** All pages < 500ms on cached loads
+**Result:** All pages < 500ms on cached loads
 
 ### Backend Optimization
 
 #### Database Query Optimization
 ```php
-// ❌ N+1 Query Problem
+// Bad: N+1 Query Problem
 $posts = Post::all();
 foreach ($posts as $post) {
     echo $post->category->name; // N queries!
 }
 
-// âœ… Eager Loading
+// Good: Eager Loading
 $posts = Post::with('category')->get(); // 2 queries only
 ```
 
@@ -884,18 +886,18 @@ public function toArray($request)
 
 ---
 
-## ðŸ"' Security Implementation
+## Security Implementation
 
 ### Security Score: 95/100
 
 #### Authentication & Authorization
-- âœ… **Laravel Sanctum** - JWT token-based authentication
-- âœ… **Token expiration** - Configurable TTL
-- âœ… **Refresh token** - Automatic token renewal
-- âœ… **Rate limiting** - 60 requests/minute per IP
-- âœ… **Password hashing** - bcrypt with cost factor 10
-- âœ… **CSRF protection** - Laravel's built-in CSRF
-- âœ… **XSS protection** - Input sanitization
+- **Laravel Sanctum** - JWT token-based authentication
+- **Token expiration** - Configurable TTL
+- **Refresh token** - Automatic token renewal
+- **Rate limiting** - 60 requests/minute per IP
+- **Password hashing** - bcrypt with cost factor 10
+- **CSRF protection** - Laravel's built-in CSRF
+- **XSS protection** - Input sanitization
 
 #### Input Validation
 ```php
@@ -929,10 +931,10 @@ class StorePostRequest extends FormRequest
 
 #### SQL Injection Prevention
 ```php
-// âœ… Eloquent ORM (parameterized queries)
+// Eloquent ORM (parameterized queries)
 Post::where('category_id', $categoryId)->get();
 
-// âœ… Query Builder (parameter binding)
+// Query Builder (parameter binding)
 DB::table('posts')
     ->where('status', '=', $status)
     ->get();
@@ -963,12 +965,12 @@ DB::table('posts')
 - [x] Error messages sanitized
 - [x] Security headers configured
 
-**ðŸ"– For complete security audit, see:**
+**For complete security audit, see:**
 - [SECURITY_AUDIT.md](./SECURITY_AUDIT.md) - **Security report (95/100 score)**
 
 ---
 
-## ðŸš€ Deployment Guide
+## Deployment Guide
 
 ### Pre-Deployment Checklist
 
@@ -1117,12 +1119,12 @@ gzip_types text/plain text/css application/json application/javascript;
 gzip_min_length 1000;
 ```
 
-**ðŸ"– For complete deployment guide, see:**
+**For complete deployment guide, see:**
 - [DEPLOYMENT_CHECKLIST.md](./DEPLOYMENT_CHECKLIST.md) - **16-section comprehensive guide**
 
 ---
 
-## ðŸ"§ Troubleshooting
+## Troubleshooting
 
 ### Common Issues & Solutions
 
@@ -1177,8 +1179,8 @@ SQLSTATE[HY000] [2002] No such file or directory
 DB_HOST=127.0.0.1
 DB_PORT=3306
 DB_DATABASE=portfolio_v2
-DB_USERNAME=ali
-DB_PASSWORD=aL1889900@@@
+DB_USERNAME=your_db_username
+DB_PASSWORD=your_secure_password
 
 # Solution 3: Test connection
 php artisan tinker
@@ -1196,7 +1198,7 @@ php artisan storage:link
 
 # Verify symlink exists
 dir public\storage
-# Should show: <SYMLINKD> → storage\app\public
+# Should show: <SYMLINKD> -> storage\app\public
 
 # If symlink exists but images not loading:
 chmod -R 755 storage
@@ -1277,27 +1279,27 @@ console.log('Auth Token:', localStorage.getItem('token'));
 
 ---
 
-## ðŸ"š Documentation Index
+## Documentation Index
 
 ### Project Documentation
 
 | Document | Description | Lines | Status |
 |----------|-------------|-------|--------|
-| [README.md](./README.md) | **This file** - Complete setup guide | 1800+ | âœ… Current |
-| [PROJECT_STATUS.md](./PROJECT_STATUS.md) | Development progress tracking | 500+ | âœ… 100% Complete |
-| [COMPLETION_SUMMARY.md](./COMPLETION_SUMMARY.md) | Project achievements & timeline | 400+ | âœ… Complete |
-| [API_ENDPOINTS.md](./API_ENDPOINTS.md) | **Complete API reference** | 900+ | âœ… Complete |
-| [SECURITY_AUDIT.md](./SECURITY_AUDIT.md) | Security report (95/100) | 300+ | âœ… Complete |
-| [DEPLOYMENT_CHECKLIST.md](./DEPLOYMENT_CHECKLIST.md) | Production deployment guide | 600+ | âœ… Complete |
-| [CLAUDE.md](./CLAUDE.md) | Claude Code instructions | 800+ | âœ… Complete |
+| [README.md](./README.md) | **This file** - Complete setup guide | 1800+ | Current |
+| [PROJECT_STATUS.md](./PROJECT_STATUS.md) | Development progress tracking | 500+ | 100% Complete |
+| [COMPLETION_SUMMARY.md](./COMPLETION_SUMMARY.md) | Project achievements & timeline | 400+ | Complete |
+| [API_ENDPOINTS.md](./API_ENDPOINTS.md) | **Complete API reference** | 900+ | Complete |
+| [SECURITY_AUDIT.md](./SECURITY_AUDIT.md) | Security report (95/100) | 300+ | Complete |
+| [DEPLOYMENT_CHECKLIST.md](./DEPLOYMENT_CHECKLIST.md) | Production deployment guide | 600+ | Complete |
+| [CLAUDE.md](./CLAUDE.md) | Claude Code instructions | 800+ | Complete |
 
 ### Component Documentation
 
 | Document | Description | Status |
 |----------|-------------|--------|
-| [backend/README.md](./backend/README.md) | Backend technical details | âœ… Complete |
-| [frontend/README.md](./frontend/README.md) | Frontend architecture | âœ… Complete |
-| [backend/SEO_IMPLEMENTATION.md](./backend/SEO_IMPLEMENTATION.md) | SEO features guide | âœ… Complete |
+| [backend/README.md](./backend/README.md) | Backend technical details | Complete |
+| [frontend/README.md](./frontend/README.md) | Frontend architecture | Complete |
+| [backend/SEO_IMPLEMENTATION.md](./backend/SEO_IMPLEMENTATION.md) | SEO features guide | Complete |
 
 ### Quick Links
 
@@ -1315,7 +1317,7 @@ console.log('Auth Token:', localStorage.getItem('token'));
 
 ---
 
-## ðŸ¤ Contributing Guidelines
+## Contributing Guidelines
 
 ### Development Process
 
@@ -1428,27 +1430,27 @@ git push origin feature/your-feature
 
 ---
 
-## ðŸ"„ License
+## License
 
-**Copyright Â© 2025 Ali Sadikin**
+**Copyright © 2025 Ali Sadikin**
 
 This project is **proprietary and confidential**. All rights reserved.
 
 **Restrictions:**
-- ❌ No copying, distribution, or modification without permission
-- ❌ No commercial use without license
-- ❌ No public hosting without authorization
+- No copying, distribution, or modification without permission
+- No commercial use without license
+- No public hosting without authorization
 
 **Permissions:**
-- âœ… View for educational purposes
-- âœ… Contribute via approved PRs
-- âœ… Use as portfolio reference
+- View for educational purposes
+- Contribute via approved PRs
+- Use as portfolio reference
 
 For licensing inquiries, contact: ali.sadikincom85@gmail.com
 
 ---
 
-## 📞 Contact & Support
+## Contact & Support
 
 ### Author Information
 
@@ -1480,7 +1482,7 @@ For licensing inquiries, contact: ali.sadikincom85@gmail.com
 
 ---
 
-## ðŸ™ Acknowledgments
+## Acknowledgments
 
 ### Technologies
 
@@ -1501,7 +1503,7 @@ For licensing inquiries, contact: ali.sadikincom85@gmail.com
 
 ---
 
-## ðŸ"Š Project Statistics
+## Project Statistics
 
 ### Final Metrics
 
@@ -1555,35 +1557,36 @@ For licensing inquiries, contact: ali.sadikincom85@gmail.com
 
 ---
 
-## ðŸ" Changelog Highlights
+## Changelog Highlights
 
-### November 2, 2025 - Documentation Overhaul
-- âœ… Rewrote README.md with senior system analyst approach
-- âœ… Added comprehensive troubleshooting section
-- âœ… Enhanced deployment guide with examples
-- âœ… Improved structure for better readability
-- âœ… Added performance metrics and statistics
+### November 5, 2025 - Documentation Overhaul
+- Rewrote README.md with senior system analyst approach
+- Removed special characters for universal compatibility
+- Added comprehensive troubleshooting section
+- Enhanced deployment guide with examples
+- Improved structure for better readability
+- Added performance metrics and statistics
 
 ### October 30, 2025 - Performance Optimization
-- âœ… Extended TanStack Query to all pages
-- âœ… Added backend `limit` parameter support
-- âœ… Achieved 83% faster repeat visits
-- âœ… 70% reduction in API calls
+- Extended TanStack Query to all pages
+- Added backend `limit` parameter support
+- Achieved 83% faster repeat visits
+- 70% reduction in API calls
 
 ### October 25, 2025 - Project Completion
-- âœ… Gallery system restructure (Phase 9)
-- âœ… Service API implementation
-- âœ… Comprehensive testing (54+ tests)
-- âœ… Security audit (95/100 score)
-- âœ… Complete documentation (5 files, 5000+ lines)
-- âœ… **Status: 100% COMPLETE - PRODUCTION READY**
+- Gallery system restructure (Phase 9)
+- Service API implementation
+- Comprehensive testing (54+ tests)
+- Security audit (95/100 score)
+- Complete documentation (5 files, 5000+ lines)
+- **Status: 100% COMPLETE - PRODUCTION READY**
 
 **For complete changelog, see:**
 - [PROJECT_STATUS.md](./PROJECT_STATUS.md) - Detailed development timeline
 
 ---
 
-## ðŸŽ¯ Quick Reference
+## Quick Reference
 
 ### Essential Commands
 
@@ -1622,8 +1625,8 @@ Database:    localhost:3306
 ### Default Credentials
 
 ```
-Database User:     ali
-Database Password: aL1889900@@@
+Database User:     your_db_username
+Database Password: your_secure_password
 Database Name:     portfolio_v2
 
 Admin Email:       admin@portfolio.test
@@ -1634,9 +1637,9 @@ Admin Password:    (set during installation)
 
 **Last Updated:** November 5, 2025  
 **Version:** 2.0.0  
-**Status:** âœ… Production Ready  
+**Status:** Production Ready  
 **Maintainer:** Ali Sadikin (ali.sadikincom85@gmail.com)
 
 ---
 
-*Built with â¤ï¸ using Laravel, Vue.js, and Tailwind CSS*
+*Built with love using Laravel, Vue.js, and Tailwind CSS*
