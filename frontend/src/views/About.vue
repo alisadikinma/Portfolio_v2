@@ -261,11 +261,7 @@
                     >
                       <div 
                         v-html="exp.description" 
-                        class="prose dark:prose-invert max-w-none text-neutral-600 dark:text-neutral-400 leading-relaxed"
-                        :class="{
-                          'text-left': index % 2 === 0,
-                          'text-right': index % 2 !== 0
-                        }"
+                        class="prose dark:prose-invert max-w-none text-neutral-600 dark:text-neutral-400 leading-relaxed text-left"
                       ></div>
                     </div>
                     
@@ -316,7 +312,7 @@
               @click="showAllExperience = !showAllExperience"
               class="inline-flex items-center gap-3 px-8 py-4 bg-white dark:bg-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-700 text-neutral-900 dark:text-white font-semibold rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl border-2 border-neutral-200 dark:border-neutral-700 hover:border-primary-500 dark:hover:border-primary-500 group"
             >
-              <span class="text-lg">{{ showAllExperience ? 'Show Less' : `See More (${experienceData.length - 4} more)` }}</span>
+              <span class="text-lg">{{ showAllExperience ? 'Show Less' : `See More (${experienceData.length - 3} more)` }}</span>
               <svg 
                 class="w-6 h-6 transition-transform duration-300"
                 :class="{
@@ -605,17 +601,17 @@ const experienceData = ref([])
 const expandedStates = ref({})
 const showAllExperience = ref(false)
 
-// Computed: Show only 4 latest or all
+// Computed: Show only 3 latest or all
 const displayedExperience = computed(() => {
   if (showAllExperience.value) {
     return experienceData.value
   }
-  return experienceData.value.slice(0, 4)
+  return experienceData.value.slice(0, 3)
 })
 
-// Check if there are more than 4 experiences
+// Check if there are more than 3 experiences
 const hasMoreExperience = computed(() => {
-  return experienceData.value.length > 4
+  return experienceData.value.length > 3
 })
 
 // Format end date - if empty show "Current Position"
@@ -1015,15 +1011,15 @@ const getWhatsAppLink = () => {
   color: rgb(var(--primary-400));
 }
 
-/* Right-aligned prose */
-.prose.text-right :deep(ul),
-.prose.text-right :deep(ol) {
-  padding-left: 0;
-  padding-right: 1.5rem;
-  text-align: right;
+/* Force all lists to left align */
+.prose :deep(ul),
+.prose :deep(ol) {
+  text-align: left;
+  padding-left: 1.5rem;
+  padding-right: 0;
 }
 
-.prose.text-right :deep(li) {
-  text-align: right;
+.prose :deep(li) {
+  text-align: left;
 }
 </style>
