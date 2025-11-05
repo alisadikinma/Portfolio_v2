@@ -1,7 +1,6 @@
-import { ref, computed, onMounted } from 'vue'
+import { computed } from 'vue'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import api from '@/services/api'
-import { useLocalCache } from './useLocalCache'
 
 // Default placeholder data for instant render
 const DEFAULT_ABOUT = {
@@ -14,21 +13,8 @@ const DEFAULT_ABOUT = {
 
 export function useAboutSettings() {
   const queryClient = useQueryClient()
-  const { setCache, getCache } = useLocalCache()
-  
-  // State untuk instant data dari localStorage
-  const cachedAbout = ref(null)
 
-  // Load instant cache on mount
-  onMounted(() => {
-    cachedAbout.value = getCache('about_settings')
-    
-    if (cachedAbout.value) {
-      console.log('[useAboutSettings] âš¡ INSTANT from localStorage')
-    }
-  })
-
-  // Fetch about settings with TanStack Query (AGGRESSIVE CACHE - 30min stale / 24hr persist)
+  // Fetch about settings with TanStack Query
   const {
     data: settingsData,
     isLoading,
@@ -37,65 +23,38 @@ export function useAboutSettings() {
   } = useQuery({
     queryKey: ['about-settings'],
     queryFn: async () => {
-      console.log('[useAboutSettings] Background fetch...')
+      console.log('[useAboutSettings] Fetching from API...')
       const response = await api.get('/settings/about')
       
       if (response.data.success) {
-        console.log('[useAboutSettings] Background fetch complete')
-        
-        // Update localStorage cache
-        setCache('about_settings', response.data.data, 30 * 60 * 1000) // 30min
-        
+        console.log('[useAboutSettings] ✅ Fresh data loaded')
         return response.data.data
       }
-      return DEFAULT_ABOUT // Fallback to default
+      return DEFAULT_ABOUT
     },
-    placeholderData: DEFAULT_ABOUT, // INSTANT RENDER dengan default data!
-    staleTime: 2 * 60 * 1000, // 2 MINUTES (faster updates for hero content)
-    gcTime: 24 * 60 * 60 * 1000, // 24 HOURS
+    placeholderData: DEFAULT_ABOUT, // Instant render
+    staleTime: 10 * 1000, // 10 SECONDS - very aggressive for instant updates
+    gcTime: 5 * 60 * 1000, // 5 MINUTES - short cache for fresh data
     retry: 2,
-    initialData: () => {
-      // Try get from localStorage first
-      return getCache('about_settings') || DEFAULT_ABOUT
-    }
+    refetchOnWindowFocus: true, // Auto-refetch when user returns to tab
+    refetchOnMount: 'always' // CRITICAL: Always refetch on mount
   })
 
-  // Computed values - prefer localStorage instant data
-  const aboutSettings = computed(() => {
-    if (isLoading.value && cachedAbout.value) {
-      return cachedAbout.value
-    }
-    return settingsData.value || DEFAULT_ABOUT
-  })
-  
+  // Computed values - ONLY use TanStack Query data
+  const aboutSettings = computed(() => settingsData.value || DEFAULT_ABOUT)
   const loading = computed(() => isLoading.value)
   const error = computed(() => queryError.value?.response?.data?.message || queryError.value?.message || null)
 
-  // Computed hero properties with defaults (never undefined)
+  // Computed hero properties with defaults
   const heroName = computed(() => aboutSettings.value?.name || DEFAULT_ABOUT.name)
   const heroTitle = computed(() => aboutSettings.value?.title || DEFAULT_ABOUT.title)
   const heroBio = computed(() => aboutSettings.value?.bio || DEFAULT_ABOUT.bio)
   const heroAvatar = computed(() => aboutSettings.value?.profile_photo || DEFAULT_ABOUT.profile_photo)
   const heroSkills = computed(() => aboutSettings.value?.skills || DEFAULT_ABOUT.skills)
 
-  // Fetch about settings (will use cache if available)
+  // Fetch about settings (force refetch)
   const fetchAboutSettings = async () => {
-    // Check localStorage first
-    cachedAbout.value = getCache('about_settings')
-    
-    // Check TanStack Query cache
-    const cached = queryClient.getQueryData(['about-settings'])
-    if (cached) {
-      console.log('[useAboutSettings] TanStack Query cache HIT')
-      return { success: true, data: cached }
-    }
-
-    if (!cachedAbout.value) {
-      console.log('[useAboutSettings] Cache MISS - fetching...')
-    } else {
-      console.log('[useAboutSettings] âš¡ INSTANT from localStorage, background refresh...')
-    }
-    
+    console.log('[useAboutSettings] Force refetch...')
     const result = await refetch()
     
     return {
@@ -105,30 +64,17 @@ export function useAboutSettings() {
     }
   }
 
-  // Prefetch function for early loading (call in router or main.js)
+  // Prefetch function for early loading
   const prefetchAboutSettings = async () => {
-    // Check localStorage first
-    const cached = getCache('about_settings')
-    if (cached) {
-      queryClient.setQueryData(['about-settings'], cached)
-      console.log('[useAboutSettings] âš¡ Prefetched from localStorage')
-      return
-    }
-    
     await queryClient.prefetchQuery({
       queryKey: ['about-settings'],
       queryFn: async () => {
         const response = await api.get('/settings/about')
-        const data = response.data.success ? response.data.data : DEFAULT_ABOUT
-        
-        // Cache to localStorage
-        setCache('about_settings', data, 30 * 60 * 1000) // 30min
-        
-        return data
+        return response.data.success ? response.data.data : DEFAULT_ABOUT
       },
-      staleTime: 15 * 60 * 1000
+      staleTime: 10 * 1000
     })
-    console.log('[useAboutSettings] ✅ Prefetched for instant homepage render')
+    console.log('[useAboutSettings] ✅ Prefetched')
   }
 
   return {

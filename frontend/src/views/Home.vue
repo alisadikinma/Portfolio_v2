@@ -107,10 +107,12 @@
                 {{ heroTitle }}
               </h2>
 
-              <!-- Subtitle -->
-              <p class="text-sm md:text-lg text-gray-600 dark:text-gray-400 mb-4 md:mb-6 leading-relaxed animate-fade-in-up animate-delay-200">
-                {{ heroBio }}
-              </p>
+              <!-- Subtitle (HTML Support) -->
+              <div 
+                v-if="heroBio" 
+                v-html="heroBio" 
+                class="text-sm md:text-lg text-gray-600 dark:text-gray-400 mb-4 md:mb-6 leading-relaxed animate-fade-in-up animate-delay-200 prose prose-sm md:prose-base dark:prose-invert max-w-none"
+              ></div>
 
               <!-- CTA Buttons - FIXED WhatsApp (Nov 3, 2025) -->
               <div class="flex flex-wrap gap-2 md:gap-3 mb-4 md:mb-6 animate-fade-in-up animate-delay-300 justify-center sm:justify-start">
@@ -150,41 +152,30 @@
                 </a>
               </div>
 
-              <!-- Tech Stack / Skills - FIXED (Nov 3, 2025) -->
+              <!-- Tech Stack / Skills - Max 5 items + See More inline -->
               <div v-if="heroSkills.length > 0" class="animate-fade-in-up animate-delay-400">
                 <p class="text-xs text-gray-500 dark:text-gray-500 mb-1.5 md:mb-2 uppercase tracking-wider font-semibold">
                   SKILLS
                 </p>
-                <!-- Mobile: Max 3 skills + See More -->
-                <div class="md:hidden">
-                  <div class="flex flex-wrap gap-1.5 justify-center">
-                    <span
-                      v-for="skill in (showAllSkills ? heroSkills : heroSkills.slice(0, 3))"
-                      :key="skill"
-                      class="px-2.5 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-xs font-medium text-gray-700 dark:text-gray-300 hover:border-primary-500 hover:text-primary-600 dark:hover:text-primary-400 transition-all"
-                    >
-                      {{ skill }}
-                    </span>
-                  </div>
-                  <button
-                    v-if="heroSkills.length > 3 && !showAllSkills"
-                    @click="showAllSkills = true"
-                    class="mt-2 text-xs text-primary-600 dark:text-primary-400 hover:underline font-semibold"
+                <!-- Skills container with inline See More button -->
+                <div class="flex flex-wrap gap-1.5 justify-center sm:justify-start items-center">
+                  <!-- Show first 5 skills or all if expanded -->
+                  <span
+                    v-for="skill in (showAllSkills ? heroSkills : heroSkills.slice(0, 5))"
+                    :key="skill"
+                    class="px-2.5 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-xs font-medium text-gray-700 dark:text-gray-300 hover:border-primary-500 hover:text-primary-600 dark:hover:text-primary-400 transition-all"
                   >
-                    See More ({{ heroSkills.length - 3 }}+)
+                    {{ skill }}
+                  </span>
+                  
+                  <!-- See More button (inline after skill 5) -->
+                  <button
+                    v-if="heroSkills.length > 5 && !showAllSkills"
+                    @click="showAllSkills = true"
+                    class="px-2.5 py-1 bg-primary-50 dark:bg-primary-900/20 border border-primary-300 dark:border-primary-700 rounded text-xs font-semibold text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/30 transition-all"
+                  >
+                    See More (+{{ heroSkills.length - 5 }})
                   </button>
-                </div>
-                <!-- Desktop: Show ALL skills (no limit, no See More button) -->
-                <div class="hidden md:block">
-                  <div class="flex flex-wrap gap-1.5 justify-start">
-                    <span
-                      v-for="skill in heroSkills"
-                      :key="skill"
-                      class="px-2.5 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-xs font-medium text-gray-700 dark:text-gray-300 hover:border-primary-500 hover:text-primary-600 dark:hover:text-primary-400 transition-all"
-                    >
-                      {{ skill }}
-                    </span>
-                  </div>
                 </div>
               </div>
             </div>

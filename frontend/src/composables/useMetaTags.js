@@ -3,6 +3,47 @@
  * All meta tags loaded from database settings (no hardcoded values)
  */
 export function useMetaTags() {
+  // Track if observer is already set up
+  let metaObserver = null
+  
+  /**
+   * Setup MutationObserver to protect meta tags from unwanted changes
+   */
+  const setupMetaProtection = () => {
+    if (metaObserver) return // Already set up
+    
+    metaObserver = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'attributes' && mutation.attributeName === 'content') {
+          const target = mutation.target
+          const key = target.getAttribute('name') || target.getAttribute('property')
+          
+          // Check if title was changed to description value
+          if (key === 'title') {
+            const titleValue = target.getAttribute('content')
+            const descTag = document.querySelector('meta[name="description"]')
+            
+            if (descTag && titleValue === descTag.getAttribute('content')) {
+              console.error('❌ [MetaProtection] DETECTED: Title was overwritten with description!', {
+                bad_title: titleValue,
+                description: descTag.getAttribute('content')
+              })
+              // We can't auto-fix here as we don't know the correct title
+              // User needs to check their code
+            }
+          }
+        }
+      })
+    })
+    
+    // Observe all meta tags in <head>
+    const metaTags = document.head.querySelectorAll('meta')
+    metaTags.forEach(tag => {
+      metaObserver.observe(tag, { attributes: true, attributeFilter: ['content'] })
+    })
+    
+    console.log('🔒 [MetaProtection] Observer active')
+  }
   /**
    * Set meta tags from site settings (from CMS)
    * @param {Object} siteSettings - Settings from database
@@ -16,9 +57,24 @@ export function useMetaTags() {
     let metaTags = {}
     if (siteSettings.meta_tags) {
       try {
-        metaTags = typeof siteSettings.meta_tags === 'string' 
+        const parsed = typeof siteSettings.meta_tags === 'string' 
           ? JSON.parse(siteSettings.meta_tags) 
           : siteSettings.meta_tags
+        
+        // CRITICAL: Handle both array and object formats (Nov 4, 2025)
+        if (Array.isArray(parsed)) {
+          // Database format: [{name: "title", content: "..."}, ...]
+          // Convert to object: {title: "...", description: "..."}
+          parsed.forEach(item => {
+            if (item.name && item.content) {
+              metaTags[item.name] = item.content
+            }
+          })
+          console.log('🔄 [setMetaFromSettings] Converted array to object:', metaTags)
+        } else {
+          // Already object format: {title: "...", description: "..."}
+          metaTags = parsed
+        }
       } catch (e) {
         console.warn('Failed to parse meta_tags:', e)
       }
@@ -38,9 +94,12 @@ export function useMetaTags() {
     // Site title pattern from settings
     const siteTitle = siteSettings.site_name || 'Portfolio'
     const siteDesc = siteSettings.site_description || 'Professional Portfolio Website'
+    
+    // Meta title from database (priority: meta_tags.title > default pattern)
+    const metaTitle = metaTags.title || `${siteTitle} - ${siteDesc}`
 
     // Update page title
-    document.title = `${siteTitle} - ${siteDesc}`
+    document.title = metaTitle
 
     // Update favicon dynamically
     if (logoUrl) {
@@ -48,7 +107,7 @@ export function useMetaTags() {
     }
 
     // Primary Meta Tags
-    updateMetaTag('name', 'title', `${siteTitle} - ${siteDesc}`)
+    updateMetaTag('name', 'title', metaTitle)
     updateMetaTag('name', 'description', siteDesc)
     updateMetaTag('name', 'keywords', metaTags.keywords || '')
     updateMetaTag('name', 'author', metaTags.author || siteTitle)
@@ -58,24 +117,24 @@ export function useMetaTags() {
     updateMetaTag('property', 'og:type', 'website')
     updateMetaTag('property', 'og:url', window.location.href)
     updateMetaTag('property', 'og:site_name', siteTitle)
-    updateMetaTag('property', 'og:title', metaTags.og_title || `${siteTitle} - ${siteDesc}`)
+    updateMetaTag('property', 'og:title', metaTags.og_title || metaTitle)
     updateMetaTag('property', 'og:description', metaTags.og_description || siteDesc)
     updateMetaTag('property', 'og:image', ogImage)
     updateMetaTag('property', 'og:image:width', '1200')
     updateMetaTag('property', 'og:image:height', '630')
     updateMetaTag('property', 'og:locale', metaTags.locale || 'en_US')
 
-    // Twitter
-    updateMetaTag('property', 'twitter:card', 'summary_large_image')
-    updateMetaTag('property', 'twitter:url', window.location.href)
-    updateMetaTag('property', 'twitter:title', metaTags.twitter_title || metaTags.og_title || `${siteTitle} - ${siteDesc}`)
-    updateMetaTag('property', 'twitter:description', metaTags.twitter_description || metaTags.og_description || siteDesc)
-    updateMetaTag('property', 'twitter:image', ogImage)
+    // Twitter (CRITICAL: Use 'name' not 'property' for Twitter cards)
+    updateMetaTag('name', 'twitter:card', 'summary_large_image')
+    updateMetaTag('name', 'twitter:url', window.location.href)
+    updateMetaTag('name', 'twitter:title', metaTags.twitter_title || metaTags.og_title || metaTitle)
+    updateMetaTag('name', 'twitter:description', metaTags.twitter_description || metaTags.og_description || siteDesc)
+    updateMetaTag('name', 'twitter:image', ogImage)
     
     // Twitter username if available
     if (siteSettings.social_media?.twitter) {
-      updateMetaTag('property', 'twitter:site', siteSettings.social_media.twitter)
-      updateMetaTag('property', 'twitter:creator', siteSettings.social_media.twitter)
+      updateMetaTag('name', 'twitter:site', siteSettings.social_media.twitter)
+      updateMetaTag('name', 'twitter:creator', siteSettings.social_media.twitter)
     }
 
     // Canonical URL
@@ -94,6 +153,35 @@ export function useMetaTags() {
       description: siteDesc,
       ogImage
     })
+    
+    // Setup protection observer after meta tags are set
+    setTimeout(() => setupMetaProtection(), 500)
+  }
+
+  /**
+   * Reset page-specific meta tags to site defaults
+   * Call this when navigating away from detail pages
+   */
+  const resetPageMeta = () => {
+    // Remove page-specific meta tags that might override site defaults
+    const pageSpecificTags = [
+      // Open Graph
+      { attr: 'property', key: 'og:type' },
+      
+      // No need to reset these as they'll be overwritten by setMetaFromSettings:
+      // - og:title, og:description, og:image
+      // - twitter:title, twitter:description, twitter:image
+      // - canonical URL
+    ]
+
+    pageSpecificTags.forEach(({ attr, key }) => {
+      const element = document.querySelector(`meta[${attr}="${key}"]`)
+      if (element && element.getAttribute('content') === 'article') {
+        element.setAttribute('content', 'website')
+      }
+    })
+
+    console.log('🧹 [useMetaTags] Page-specific meta tags reset')
   }
 
   /**
@@ -113,25 +201,25 @@ export function useMetaTags() {
       document.title = title
       updateMetaTag('name', 'title', title)
       updateMetaTag('property', 'og:title', title)
-      updateMetaTag('property', 'twitter:title', title)
+      updateMetaTag('name', 'twitter:title', title)
     }
 
     if (description) {
       updateMetaTag('name', 'description', description)
       updateMetaTag('property', 'og:description', description)
-      updateMetaTag('property', 'twitter:description', description)
+      updateMetaTag('name', 'twitter:description', description)
     }
 
     if (image) {
       const absoluteImage = image.startsWith('http') ? image : `${window.location.origin}${image}`
       updateMetaTag('property', 'og:image', absoluteImage)
-      updateMetaTag('property', 'twitter:image', absoluteImage)
+      updateMetaTag('name', 'twitter:image', absoluteImage)
     }
 
     if (url) {
       const absoluteUrl = url.startsWith('http') ? url : `${window.location.origin}${url}`
       updateMetaTag('property', 'og:url', absoluteUrl)
-      updateMetaTag('property', 'twitter:url', absoluteUrl)
+      updateMetaTag('name', 'twitter:url', absoluteUrl)
       updateLinkTag('canonical', absoluteUrl)
     }
 
@@ -144,10 +232,41 @@ export function useMetaTags() {
 
   /**
    * Update or create a meta tag
+   * CRITICAL: Remove old tags with wrong attribute type first
    */
   const updateMetaTag = (attribute, key, value) => {
     if (!value) return
 
+    // DEFENSIVE: Prevent title from being set to description value
+    if (key === 'title' && value.length > 200) {
+      console.warn(`⚠️ Meta title too long (${value.length} chars), truncating...`)
+      value = value.substring(0, 200)
+    }
+
+    // DEFENSIVE: Ensure title and description are different
+    if (key === 'title') {
+      const descTag = document.querySelector('meta[name="description"]')
+      if (descTag && descTag.getAttribute('content') === value) {
+        console.error('❌ ERROR: Title cannot be same as description!', {
+          title: value,
+          description: descTag.getAttribute('content')
+        })
+        return // Abort if trying to set title = description
+      }
+    }
+
+    // Remove old tag with OPPOSITE attribute (e.g., property when we want name)
+    const oppositeAttr = attribute === 'name' ? 'property' : 'name'
+    const oldElement = document.querySelector(`meta[${oppositeAttr}="${key}"]`)
+    if (oldElement) {
+      oldElement.remove()
+      // Only log for Twitter tags to avoid spam
+      if (key.startsWith('twitter:')) {
+        console.log(`🗑️ Removed old meta tag: ${oppositeAttr}="${key}"`)
+      }
+    }
+
+    // Get or create the correct element
     let element = document.querySelector(`meta[${attribute}="${key}"]`)
     
     if (!element) {
@@ -157,6 +276,11 @@ export function useMetaTags() {
     }
     
     element.setAttribute('content', value)
+    
+    // Verify after setting (defensive check)
+    if (key === 'title') {
+      console.log('✅ [updateMetaTag] Title set:', value.substring(0, 100))
+    }
   }
 
   /**
@@ -250,6 +374,7 @@ export function useMetaTags() {
   return {
     setMetaFromSettings,
     updatePageMeta,
+    resetPageMeta,
     updateMetaTag,
     updateLinkTag,
     updateFavicon

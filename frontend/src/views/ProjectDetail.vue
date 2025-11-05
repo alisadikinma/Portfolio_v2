@@ -669,16 +669,42 @@ const navigateToProject = (slug) => {
 const updateMetaTags = () => {
   if (!project.value) return
 
+  // Construct absolute image URL for social media
+  let socialImage = ''
+  
+  // Priority: og_image > featured_image > constructed URL
+  if (project.value.og_image) {
+    socialImage = project.value.og_image.startsWith('http') 
+      ? project.value.og_image
+      : `${import.meta.env.VITE_API_BASE_URL.replace('/api', '')}${project.value.og_image}`
+  } else if (project.value.featured_image) {
+    socialImage = project.value.featured_image
+  } else {
+    socialImage = getImageUrl(project.value.slug, '1200', 'webp')
+  }
+
+  console.log('🐦 [ProjectDetail] Twitter Image:', {
+    og_image_from_db: project.value.og_image,
+    featured_image: project.value.featured_image,
+    final_twitter_image: socialImage
+  })
+
   // Use project-specific meta tags from database
   updatePageMeta({
     title: project.value.meta_title || `${project.value.title} | Portfolio`,
     description: project.value.meta_description || project.value.description,
-    image: thumbnailUrl.value,
+    image: socialImage,
     url: currentUrl.value,
     type: 'article',
     keywords: project.value.focus_keyword || project.value.technologies?.join(', ')
   })
 
+  // CRITICAL: Explicitly set Twitter card image (Nov 4, 2025)
+  // Twitter uses 'name' attribute, not 'property'
+  updateMetaTag('name', 'twitter:card', 'summary_large_image')
+  updateMetaTag('name', 'twitter:image', socialImage)
+  updateMetaTag('property', 'og:image', socialImage)
+  
   // Additional OG tags from project
   if (project.value.og_title) {
     updateMetaTag('property', 'og:title', project.value.og_title)
@@ -687,9 +713,10 @@ const updateMetaTags = () => {
     updateMetaTag('property', 'og:description', project.value.og_description)
   }
   
-  console.log('✅ Meta tags updated from project:', {
+  console.log('✅ [ProjectDetail] Meta tags updated:', {
     title: project.value.meta_title || project.value.title,
-    og_image: thumbnailUrl.value
+    twitter_image: socialImage,
+    og_image: socialImage
   })
 }
 

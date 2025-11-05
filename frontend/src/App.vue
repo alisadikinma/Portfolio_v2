@@ -5,7 +5,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onBeforeMount } from 'vue'
+import { computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useThemeStore } from '@/stores/theme'
 import { useSiteSettings } from '@/composables/useSiteSettings'
@@ -17,7 +17,7 @@ import AuthLayout from '@/layouts/AuthLayout.vue'
 const route = useRoute()
 const themeStore = useThemeStore()
 const { fetchSiteSettings, siteSettings } = useSiteSettings()
-const { setMetaFromSettings } = useMetaTags()
+const { setMetaFromSettings, resetPageMeta } = useMetaTags()
 
 const layout = computed(() => {
   const layoutName = route.meta.layout || 'default'
@@ -48,4 +48,29 @@ onMounted(async () => {
     document.title = 'Portfolio - Loading...'
   }
 })
+
+// CRITICAL: Reset meta tags on route change (Nov 4, 2025)
+watch(
+  () => route.path,
+  (newPath, oldPath) => {
+    // Only reset if coming from detail pages to homepage/list pages
+    const fromDetailPage = oldPath?.includes('/projects/') || oldPath?.includes('/blog/')
+    const toListPage = newPath === '/' || newPath === '/projects' || newPath === '/blog'
+    
+    if (fromDetailPage && toListPage) {
+      console.log('🔄 Route changed from detail to list page, resetting meta tags')
+      
+      // Reset page-specific meta tags
+      resetPageMeta()
+      
+      // Re-apply global site settings
+      if (siteSettings.value) {
+        setTimeout(() => {
+          setMetaFromSettings(siteSettings.value)
+          console.log('✅ Global meta tags restored')
+        }, 100) // Small delay to ensure cleanup first
+      }
+    }
+  }
+)
 </script>

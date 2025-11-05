@@ -1213,22 +1213,24 @@ async function handleSubmit() {
 
     await settingsStore.updateAboutSettings(data)
     
-    // AGGRESSIVE CACHE CLEAR (Nov 4, 2025)
-    // 1. Invalidate TanStack Query cache
-    await queryClient.invalidateQueries({ queryKey: ['about-settings'] })
-    
-    // 2. Force remove from cache completely
+    // FORCE REFETCH ALL INSTANCES (Nov 4, 2025)
+    // Step 1: Remove from cache completely
     queryClient.removeQueries({ queryKey: ['about-settings'] })
+    console.log('✅ [AboutSettings] Cache cleared')
     
-    // 3. Clear localStorage
-    localStorage.removeItem('about_settings')
+    // Step 2: Force refetch ALL active queries (including homepage if open)
+    await queryClient.refetchQueries({ 
+      queryKey: ['about-settings'],
+      type: 'all'
+    })
+    console.log('✅ [AboutSettings] All instances refetched')
     
-    console.log('✅ [AboutSettings] AGGRESSIVE cache clear complete')
-    console.log('   - TanStack Query invalidated')
-    console.log('   - TanStack Query removed')
-    console.log('   - localStorage cleared')
+    console.log('🎉 [AboutSettings] Homepage will show changes immediately!')
     
-    uiStore.showSuccess('About settings updated successfully', 'Settings Saved')
+    uiStore.showSuccess(
+      'About settings updated successfully. Refresh homepage to see changes!', 
+      'Settings Saved'
+    )
 
     // Reload settings from backend to get fresh data
     await loadSettings()
