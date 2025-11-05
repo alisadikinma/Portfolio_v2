@@ -119,6 +119,229 @@
       </div>
     </section>
 
+    <!-- Work Experience Section - NEW -->
+    <section class="py-20 bg-gradient-to-b from-white to-neutral-50 dark:from-neutral-800 dark:to-neutral-900">
+      <div class="container-custom">
+        <div class="text-center mb-16">
+          <p class="text-primary-600 dark:text-primary-400 font-semibold mb-3 uppercase tracking-wider text-sm">
+            Professional Journey
+          </p>
+          <h2 class="text-4xl md:text-5xl font-display font-bold mb-2 text-neutral-900 dark:text-white">
+            Work Experience
+          </h2>
+          <p class="text-2xl font-bold text-primary-600 dark:text-primary-400 mb-4">
+            17 Years Experience
+          </p>
+          <p class="text-xl text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto">
+            Building impactful solutions across industries and technologies
+          </p>
+        </div>
+
+        <div v-if="experienceData && experienceData.length > 0" class="max-w-5xl mx-auto">
+          <!-- Experience Items Container -->
+          <div class="relative">
+            <!-- Timeline Line (only for experience items) -->
+            <div class="absolute left-[31px] md:left-1/2 top-0 bottom-0 w-0.5 bg-gradient-to-b from-primary-500 via-secondary-500 to-accent-500 hidden md:block"></div>
+            <div class="absolute left-[31px] top-0 bottom-0 w-0.5 bg-gradient-to-b from-primary-500 via-secondary-500 to-accent-500 md:hidden"></div>
+
+            <!-- Experience Items -->
+            <div class="space-y-12">
+            <div
+              v-for="(exp, index) in displayedExperience"
+              :key="index"
+              class="relative"
+              :class="index % 2 === 0 ? 'md:pr-[50%]' : 'md:pl-[50%] md:text-right'"
+            >
+              <!-- Timeline Dot with Country Flag -->
+              <div 
+                class="absolute left-0 md:left-1/2 w-16 h-16 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-2xl flex items-center justify-center shadow-xl z-10 transform md:-translate-x-1/2 p-2"
+                :class="{
+                  'animate-pulse-slow': index === 0
+                }"
+              >
+                <img :src="getCountryFlag(exp.location)" :alt="exp.location" class="w-full h-full object-contain rounded-lg" />
+              </div>
+
+              <!-- Duration Badge (Conditional Position) -->
+              <div 
+                class="absolute z-20 hidden md:block"
+                :class="{
+                  'left-20 md:left-1/2 md:ml-12 top-4': index % 2 === 0,
+                  'right-20 md:right-1/2 md:mr-12 top-4': index % 2 !== 0
+                }"
+              >
+                <div class="inline-flex flex-col gap-1 px-4 py-2 bg-white dark:bg-neutral-800 rounded-lg shadow-md border-2 border-primary-200 dark:border-primary-700">
+                  <span class="text-xs font-bold text-primary-600 dark:text-primary-400 whitespace-nowrap">{{ exp.start_date }} - {{ formatEndDate(exp.end_date) }}</span>
+                  <span class="text-xs text-neutral-600 dark:text-neutral-400 whitespace-nowrap">{{ formatDuration(calculateDuration(exp.start_date, exp.end_date)) }}</span>
+                </div>
+              </div>
+
+              <!-- Content Card -->
+              <div 
+                class="ml-24 md:ml-0 group"
+                :class="index % 2 === 0 ? 'md:mr-12' : 'md:ml-12'"
+              >
+                <div class="bg-white dark:bg-neutral-800 rounded-2xl p-8 shadow-lg hover:shadow-2xl transition-all duration-500 border-2 border-neutral-200 dark:border-neutral-700 hover:border-primary-500 dark:hover:border-primary-500 hover:-translate-y-1 relative">
+                  <!-- Organization Icon (Conditional Position) -->
+                  <div 
+                    v-if="getOrganizationIcon(exp.company)"
+                    class="absolute top-6 w-12 h-12"
+                    :class="{
+                      'right-6': index % 2 === 0,
+                      'left-6': index % 2 !== 0
+                    }"
+                  >
+                    <img 
+                      :src="getOrganizationIcon(exp.company)" 
+                      :alt="exp.company" 
+                      class="w-full h-full object-contain opacity-30 group-hover:opacity-60 transition-opacity"
+                    />
+                  </div>
+
+                  <!-- Header -->
+                  <div class="mb-6">
+                    <h3 
+                      class="text-xl font-bold text-neutral-900 dark:text-white mb-3 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors line-clamp-2"
+                      :class="{
+                        'pr-16': index % 2 === 0 && getOrganizationIcon(exp.company),
+                        'pl-16': index % 2 !== 0 && getOrganizationIcon(exp.company)
+                      }"
+                    >
+                      {{ exp.title || exp.position }}
+                    </h3>
+                    <div 
+                      class="flex items-center gap-2"
+                      :class="{
+                        'justify-start': index % 2 === 0,
+                        'justify-end': index % 2 !== 0
+                      }"
+                    >
+                      <svg class="w-5 h-5 text-primary-600 dark:text-primary-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                      </svg>
+                      <a 
+                        v-if="exp.company_url" 
+                        :href="exp.company_url" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        class="text-base font-semibold text-neutral-700 dark:text-neutral-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors underline decoration-transparent hover:decoration-primary-600 dark:hover:decoration-primary-400"
+                      >
+                        {{ exp.company }}
+                      </a>
+                      <span v-else class="text-base font-semibold text-neutral-700 dark:text-neutral-300">{{ exp.company }}</span>
+                    </div>
+                    
+                    <!-- Mobile Duration Info -->
+                    <div class="md:hidden mt-2 flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">
+                      <img :src="getCountryFlag(exp.location)" :alt="exp.location" class="w-4 h-4 object-contain rounded" />
+                      <span class="font-semibold">{{ exp.start_date }} - {{ formatEndDate(exp.end_date) }}</span>
+                      <span class="text-neutral-400 dark:text-neutral-500">•</span>
+                      <span>{{ formatDuration(calculateDuration(exp.start_date, exp.end_date)) }}</span>
+                    </div>
+                  </div>
+
+                  <!-- Job Description Header -->
+                  <div class="mb-3">
+                    <h4 class="text-sm font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 flex items-center gap-2">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <span>Job Description</span>
+                    </h4>
+                  </div>
+
+                  <!-- Description -->
+                  <div class="relative">
+                    <div 
+                      class="overflow-hidden transition-all duration-500 ease-in-out"
+                      :class="{
+                        'max-h-24': !isExpanded(index),
+                        'max-h-[2000px]': isExpanded(index)
+                      }"
+                    >
+                      <div 
+                        v-html="exp.description" 
+                        class="prose dark:prose-invert max-w-none text-neutral-600 dark:text-neutral-400 leading-relaxed"
+                        :class="{
+                          'text-left': index % 2 === 0,
+                          'text-right': index % 2 !== 0
+                        }"
+                      ></div>
+                    </div>
+                    
+                    <!-- Gradient Overlay (when collapsed) -->
+                    <div 
+                      v-if="!isExpanded(index) && isDescriptionLong(exp.description)"
+                      class="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-white dark:from-neutral-800 to-transparent pointer-events-none"
+                    ></div>
+                  </div>
+
+                  <!-- See More/Less Button -->
+                  <button
+                    v-if="isDescriptionLong(exp.description)"
+                    @click="toggleExpand(index)"
+                    class="mt-4 inline-flex items-center gap-2 text-primary-600 dark:text-primary-400 font-semibold hover:text-primary-700 dark:hover:text-primary-300 transition-colors group/btn"
+                    :class="{
+                      '': index % 2 === 0,
+                      'ml-auto flex-row-reverse': index % 2 !== 0
+                    }"
+                  >
+                    <span>{{ isExpanded(index) ? 'Show Less' : 'See More' }}</span>
+                    <svg 
+                      class="w-5 h-5 transition-transform duration-300" 
+                      :class="{
+                        'rotate-180': isExpanded(index),
+                        'group-hover/btn:translate-y-1': !isExpanded(index),
+                        'group-hover/btn:-translate-y-1': isExpanded(index)
+                      }"
+                      fill="none" 
+                      stroke="currentColor" 
+                      viewBox="0 0 24 24"
+                    >
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          </div>
+
+          <!-- See More Button (Outside Timeline) -->
+          <div v-if="hasMoreExperience" class="mt-16 text-center">
+            <div class="mb-4 text-sm text-neutral-600 dark:text-neutral-400">
+              Showing {{ displayedExperience.length }} of {{ experienceData.length }} experiences
+            </div>
+            <button
+              @click="showAllExperience = !showAllExperience"
+              class="inline-flex items-center gap-3 px-8 py-4 bg-white dark:bg-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-700 text-neutral-900 dark:text-white font-semibold rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl border-2 border-neutral-200 dark:border-neutral-700 hover:border-primary-500 dark:hover:border-primary-500 group"
+            >
+              <span class="text-lg">{{ showAllExperience ? 'Show Less' : `See More (${experienceData.length - 4} more)` }}</span>
+              <svg 
+                class="w-6 h-6 transition-transform duration-300"
+                :class="{
+                  'rotate-180': showAllExperience
+                }"
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- No Data State -->
+        <div v-else class="text-center py-12">
+          <svg class="w-20 h-20 mx-auto text-neutral-400 dark:text-neutral-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+          <p class="text-lg text-neutral-600 dark:text-neutral-400">No work experience data available</p>
+        </div>
+      </div>
+    </section>
+
     <!-- Mission Section -->
     <section v-if="aboutSettings?.mission" class="relative py-20 bg-gradient-to-br from-primary-600 via-secondary-600 to-accent-600 overflow-hidden">
       <div class="absolute inset-0 opacity-10">
@@ -348,7 +571,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
 import CTASection from '@/components/CTASection.vue'
 import { usePageSections } from '@/composables/usePageSections'
 import { useAboutSettings } from '@/composables/useAboutSettings'
@@ -358,15 +581,249 @@ import { useSettings } from '@/composables/useSettings'
 import idFlag from '@/assets/language/ID.png'
 import gbFlag from '@/assets/language/GB.png'
 import cnFlag from '@/assets/language/CN.png'
+import sgFlag from '@/assets/language/SG.png'
+
+// Import organization icons
+import universityIcon from '@/assets/organization/university.png'
+import supplyChainIcon from '@/assets/organization/supply-chain-management.png'
+import cyberSecurityIcon from '@/assets/organization/cyber-security.png'
+import maritimeIcon from '@/assets/organization/maritime.png'
+import startupIcon from '@/assets/organization/startup.png'
+import manufacturingIcon from '@/assets/organization/manufacturing.png'
 
 // Composables
 const { aboutSettings, loading } = useAboutSettings()
 const { sections, fetchActiveSections } = usePageSections()
-const { fetchSettings, getSettingValue } = useSettings()
+const { settings, fetchSettings, getSettingValue } = useSettings()
 
 // Fetch sections on mount
 fetchActiveSections('about')
 fetchSettings() // Fetch settings for WhatsApp phone
+
+// Work Experience Data
+const experienceData = ref([])
+const expandedStates = ref({})
+const showAllExperience = ref(false)
+
+// Computed: Show only 4 latest or all
+const displayedExperience = computed(() => {
+  if (showAllExperience.value) {
+    return experienceData.value
+  }
+  return experienceData.value.slice(0, 4)
+})
+
+// Check if there are more than 4 experiences
+const hasMoreExperience = computed(() => {
+  return experienceData.value.length > 4
+})
+
+// Format end date - if empty show "Current Position"
+const formatEndDate = (endDate) => {
+  if (!endDate || endDate.trim() === '') {
+    return 'Current Position'
+  }
+  return endDate
+}
+
+// Parse month name to number
+const monthToNumber = (monthName) => {
+  const months = {
+    'jan': 0, 'january': 0,
+    'feb': 1, 'february': 1,
+    'mar': 2, 'march': 2,
+    'apr': 3, 'april': 3,
+    'may': 4,
+    'jun': 5, 'june': 5,
+    'jul': 6, 'july': 6,
+    'aug': 7, 'august': 7,
+    'sep': 8, 'september': 8,
+    'oct': 9, 'october': 9,
+    'nov': 10, 'november': 10,
+    'dec': 11, 'december': 11
+  }
+  return months[monthName.toLowerCase()] || 0
+}
+
+// Parse date string like "Apr 2008" to Date object
+const parseExperienceDate = (dateStr) => {
+  if (!dateStr || dateStr.trim() === '') return new Date()
+  
+  // Handle "Present" or "Current Position" or similar
+  if (dateStr.toLowerCase().includes('present') || dateStr.toLowerCase().includes('current')) {
+    return new Date()
+  }
+  
+  const parts = dateStr.trim().split(' ')
+  if (parts.length === 2) {
+    const month = monthToNumber(parts[0])
+    const year = parseInt(parts[1])
+    return new Date(year, month)
+  }
+  
+  return new Date()
+}
+
+// Calculate duration in months between two dates
+const calculateDuration = (startDate, endDate) => {
+  const start = parseExperienceDate(startDate)
+  const end = parseExperienceDate(endDate)
+  
+  const years = end.getFullYear() - start.getFullYear()
+  const months = end.getMonth() - start.getMonth()
+  
+  return (years * 12) + months
+}
+
+// Format duration to human readable
+const formatDuration = (months) => {
+  const years = Math.floor(months / 12)
+  const remainingMonths = months % 12
+  
+  if (years === 0) {
+    return `${remainingMonths} ${remainingMonths === 1 ? 'month' : 'months'}`
+  }
+  
+  if (remainingMonths === 0) {
+    return `${years} ${years === 1 ? 'year' : 'years'}`
+  }
+  
+  return `${years} ${years === 1 ? 'year' : 'years'}, ${remainingMonths} ${remainingMonths === 1 ? 'month' : 'months'}`
+}
+
+// Get country flag image based on location
+const getCountryFlag = (location) => {
+  if (!location) return idFlag // Default Indonesia
+  
+  const loc = location.toLowerCase()
+  
+  if (loc.includes('singapore')) return sgFlag
+  if (loc.includes('indonesia') || loc.includes('batam') || loc.includes('jakarta')) return idFlag
+  if (loc.includes('china')) return cnFlag
+  if (loc.includes('uk') || loc.includes('united kingdom') || loc.includes('london')) return gbFlag
+  
+  return idFlag // Default Indonesia
+}
+
+// Get organization icon based on company name
+const getOrganizationIcon = (company) => {
+  if (!company) return null
+  
+  const companyLower = company.toLowerCase()
+  
+  // exsys → university
+  if (companyLower.includes('exsys') || companyLower.includes('ex sys')) {
+    return universityIcon
+  }
+  // DHL → supply chain
+  if (companyLower.includes('dhl') || companyLower.includes('supply chain')) {
+    return supplyChainIcon
+  }
+  // Thales → cyber security
+  if (companyLower.includes('thales')) {
+    return cyberSecurityIcon
+  }
+  // MPA → maritime
+  if (companyLower.includes('mpa') || companyLower.includes('maritime')) {
+    return maritimeIcon
+  }
+  // Marlin → startup
+  if (companyLower.includes('marlin')) {
+    return startupIcon
+  }
+  // SATNUSA → manufacturing
+  if (companyLower.includes('satnusa') || companyLower.includes('sat nusa') || companyLower.includes('nusapersada')) {
+    return manufacturingIcon
+  }
+  
+  return null
+}
+
+// Calculate total experience in years
+const totalExperienceYears = computed(() => {
+  if (!experienceData.value || experienceData.value.length === 0) return 0
+  
+  const totalMonths = experienceData.value.reduce((sum, exp) => {
+    const duration = calculateDuration(exp.start_date, exp.end_date)
+    return sum + duration
+  }, 0)
+  
+  return Math.floor(totalMonths / 12)
+})
+
+// Force load settings on mount
+onMounted(async () => {
+  await fetchSettings(true) // Force refresh
+})
+
+// Parse and watch experience data from settings
+watch(
+  () => settings.value,
+  (settingsArray) => {
+    if (!settingsArray || settingsArray.length === 0) {
+      return
+    }
+    
+    // Find experience setting
+    const experienceSetting = settingsArray.find(s => s.key === 'experience')
+    
+    if (!experienceSetting) {
+      experienceData.value = []
+      return
+    }
+    
+    const experienceValue = experienceSetting.value
+    
+    try {
+      let parsedData = []
+      
+      // Check if it's already an array
+      if (Array.isArray(experienceValue)) {
+        parsedData = experienceValue
+      } 
+      // Try parsing if it's a JSON string
+      else if (typeof experienceValue === 'string') {
+        parsedData = JSON.parse(experienceValue)
+      }
+      
+      // Sort by start_date descending (newest first)
+      parsedData.sort((a, b) => {
+        const dateA = parseExperienceDate(a.start_date)
+        const dateB = parseExperienceDate(b.start_date)
+        return dateB - dateA // Descending order
+      })
+      
+      experienceData.value = parsedData
+      
+      console.log('[About] Total experiences loaded:', parsedData.length)
+      console.log('[About] Has more than 4?', parsedData.length > 4)
+      console.log('[About] First experience data:', parsedData[0])
+      console.log('[About] Field names available:', Object.keys(parsedData[0] || {}))
+    } catch (error) {
+      console.error('[About] Error parsing experience data:', error)
+      experienceData.value = []
+    }
+  },
+  { immediate: true, deep: true }
+)
+
+// Toggle expand/collapse for description
+const toggleExpand = (index) => {
+  expandedStates.value[index] = !expandedStates.value[index]
+}
+
+// Check if experience item is expanded
+const isExpanded = (index) => {
+  return expandedStates.value[index] || false
+}
+
+// Check if description is long enough to need expand/collapse
+const isDescriptionLong = (description) => {
+  if (!description) return false
+  // Remove HTML tags for accurate character count
+  const textOnly = description.replace(/<[^>]*>/g, '')
+  return textOnly.length > 200 // ~3 lines of text
+}
 
 // CTA visibility
 const showCTASection = computed(() => {
@@ -470,7 +927,8 @@ const getLangFlagImage = (code) => {
   const codeMap = {
     'id': idFlag,
     'en': gbFlag,
-    'zh': cnFlag
+    'zh': cnFlag,
+    'sg': sgFlag
   }
   return codeMap[code] || idFlag
 }
@@ -500,8 +958,23 @@ const getWhatsAppLink = () => {
   }
 }
 
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
 .animate-blob {
   animation: blob 7s infinite;
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
 .animation-delay-2000 {
@@ -510,5 +983,47 @@ const getWhatsAppLink = () => {
 
 .animation-delay-4000 {
   animation-delay: 4s;
+}
+
+/* Prose styling for experience descriptions */
+.prose :deep(p) {
+  margin-bottom: 0.75rem;
+}
+
+.prose :deep(ul),
+.prose :deep(ol) {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  padding-left: 1.5rem;
+}
+
+.prose :deep(li) {
+  margin-bottom: 0.25rem;
+}
+
+.prose :deep(strong) {
+  font-weight: 600;
+  color: inherit;
+}
+
+.prose :deep(a) {
+  color: rgb(var(--primary-600));
+  text-decoration: underline;
+}
+
+.dark .prose :deep(a) {
+  color: rgb(var(--primary-400));
+}
+
+/* Right-aligned prose */
+.prose.text-right :deep(ul),
+.prose.text-right :deep(ol) {
+  padding-left: 0;
+  padding-right: 1.5rem;
+  text-align: right;
+}
+
+.prose.text-right :deep(li) {
+  text-align: right;
 }
 </style>
