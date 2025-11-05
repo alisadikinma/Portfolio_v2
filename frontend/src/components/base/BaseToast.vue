@@ -44,7 +44,8 @@
 </template>
 
 <script setup>
-import { ref, computed, h } from 'vue'
+import { ref, computed, h, watch } from 'vue'
+import { useUIStore } from '@/stores/ui'
 
 const props = defineProps({
   position: {
@@ -57,7 +58,8 @@ const props = defineProps({
   }
 })
 
-const toasts = ref([])
+const uiStore = useUIStore()
+const toasts = computed(() => uiStore.toasts)
 const timers = ref({})
 
 const containerClasses = computed(() => {
@@ -151,33 +153,8 @@ const getIcon = (type) => {
   return icons[type || 'default']
 }
 
-const addToast = (options) => {
-  const id = Date.now() + Math.random()
-  const toast = {
-    id,
-    type: options.type || 'default',
-    title: options.title,
-    message: options.message,
-    duration: options.duration ?? 5000,
-    closable: options.closable !== false
-  }
-
-  toasts.value.push(toast)
-
-  if (toast.duration > 0) {
-    timers.value[id] = setTimeout(() => {
-      removeToast(id)
-    }, toast.duration)
-  }
-
-  return id
-}
-
 const removeToast = (id) => {
-  const index = toasts.value.findIndex(t => t.id === id)
-  if (index !== -1) {
-    toasts.value.splice(index, 1)
-  }
+  uiStore.removeToast(id)
   if (timers.value[id]) {
     clearTimeout(timers.value[id])
     delete timers.value[id]
@@ -199,8 +176,24 @@ const resumeTimer = (id) => {
   }
 }
 
+// Watch for new toasts and set timers
+watch(
+  () => uiStore.toasts,
+  (newToasts, oldToasts) => {
+    // Find newly added toasts
+    newToasts.forEach(toast => {
+      // Check if this toast already has a timer
+      if (!timers.value[toast.id] && toast.duration > 0) {
+        timers.value[toast.id] = setTimeout(() => {
+          removeToast(toast.id)
+        }, toast.duration)
+      }
+    })
+  },
+  { deep: true }
+)
+
 defineExpose({
-  addToast,
   removeToast
 })
 </script>

@@ -142,12 +142,16 @@
                 </p>
               </div>
 
-              <!-- reCAPTCHA v3 Badge Info -->
-              <div class="text-xs text-neutral-500 dark:text-neutral-400">
-                This site is protected by reCAPTCHA and the Google
-                <a href="https://policies.google.com/privacy" target="_blank" class="underline hover:text-primary-600">Privacy Policy</a> and
-                <a href="https://policies.google.com/terms" target="_blank" class="underline hover:text-primary-600">Terms of Service</a> apply.
-              </div>
+              <!-- Honeypot Field (Hidden from users, bots will fill it) -->
+              <input
+                v-model="form.website"
+                type="text"
+                name="website"
+                autocomplete="off"
+                tabindex="-1"
+                class="absolute -left-[9999px] w-0 h-0 opacity-0"
+                aria-hidden="true"
+              />
 
               <!-- Submit Button -->
               <BaseButton
@@ -296,7 +300,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useUIStore } from '@/stores/ui'
 import { BaseButton } from '@/components/base'
 import api from '@/services/api'
@@ -308,16 +312,15 @@ const form = ref({
   email: '',
   whatsapp_number: '',
   subject: '',
-  message: ''
+  message: '',
+  website: '', // Honeypot field (must stay empty)
+  form_timestamp: null // Time-based validation
 })
 
 const formErrors = ref({})
 const isSubmitting = ref(false)
 const siteSettings = ref(null)
 const loadingSettings = ref(false)
-
-// reCAPTCHA v3 Site Key
-const RECAPTCHA_SITE_KEY = '6Lf5xAIsAAAAAJxqKwWhMvQ_yh8dH5DYnxkCSElW'
 
 // Social links computed (from about settings - moved from About page)
 const displaySocialLinks = computed(() => {
@@ -413,13 +416,6 @@ const handleSubmit = async () => {
   isSubmitting.value = true
 
   try {
-    // Get reCAPTCHA token
-    if (!window.grecaptcha) {
-      throw new Error('reCAPTCHA not loaded')
-    }
-
-    const recaptchaToken = await window.grecaptcha.execute(RECAPTCHA_SITE_KEY, { action: 'contact_form' })
-
     // Sanitize input (basic XSS prevention)
     const sanitizedForm = {
       name: form.value.name.trim(),
@@ -427,7 +423,8 @@ const handleSubmit = async () => {
       whatsapp_number: form.value.whatsapp_number.trim(),
       subject: form.value.subject.trim(),
       message: form.value.message.trim(),
-      recaptcha_token: recaptchaToken
+      website: form.value.website, // Honeypot (must be empty)
+      form_timestamp: form.value.form_timestamp // Time-based validation
     }
 
     // Actual API call
@@ -447,39 +444,39 @@ const handleSubmit = async () => {
         email: '',
         whatsapp_number: '',
         subject: '',
-        message: ''
+        message: '',
+        website: '', // Reset honeypot
+        form_timestamp: Math.floor(Date.now() / 1000) // Reset timestamp
       }
       formErrors.value = {}
     }
   } catch (error) {
-    uiStore.showError(
-      error.response?.data?.message || 'Failed to send message. Please try again.',
-      'Error'
-    )
+    // Handle validation errors from backend (422)
+    if (error.response?.status === 422 && error.response?.data?.errors) {
+      formErrors.value = error.response.data.errors
+      uiStore.showError(
+        'Please check the form fields for errors',
+        'Validation Error'
+      )
+    }
+    // Handle rate limiting (429)
+    else if (error.response?.status === 429) {
+      uiStore.showError(
+        'Too many requests. Please wait a few minutes before trying again.',
+        'Rate Limit Exceeded',
+        0 // Persistent
+      )
+    }
+    // Handle other errors
+    else {
+      uiStore.showError(
+        error.response?.data?.message || 'Failed to send message. Please try again.',
+        'Error'
+      )
+    }
   } finally {
     isSubmitting.value = false
   }
-}
-
-// Load reCAPTCHA v3 script
-const loadRecaptcha = () => {
-  return new Promise((resolve, reject) => {
-    if (window.grecaptcha) {
-      // Wait for grecaptcha.ready
-      window.grecaptcha.ready(() => resolve())
-      return
-    }
-
-    const script = document.createElement('script')
-    script.src = `https://www.google.com/recaptcha/api.js?render=${RECAPTCHA_SITE_KEY}`
-    script.async = true
-    script.defer = true
-    script.onload = () => {
-      window.grecaptcha.ready(() => resolve())
-    }
-    script.onerror = () => reject(new Error('Failed to load reCAPTCHA'))
-    document.head.appendChild(script)
-  })
 }
 
 // Clear error when user types
@@ -508,17 +505,7 @@ const fetchSiteSettings = async () => {
 onMounted(async () => {
   await fetchSiteSettings()
   
-  // Load reCAPTCHA v3
-  try {
-    await loadRecaptcha()
-    console.log('reCAPTCHA v3 loaded successfully')
-  } catch (error) {
-    console.error('Failed to load reCAPTCHA:', error)
-  }
-})
-
-// No cleanup needed for reCAPTCHA v3
-onUnmounted(() => {
-  // reCAPTCHA v3 handles cleanup automatically
+  // Set initial form timestamp (for time-based validation)
+  form.value.form_timestamp = Math.floor(Date.now() / 1000)
 })
 </script>

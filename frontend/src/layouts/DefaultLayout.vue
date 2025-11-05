@@ -20,24 +20,12 @@
     <TheFooter />
 
     <!-- Global Toast -->
-    <BaseToast ref="toastRef" position="top-right" />
+    <BaseToast position="top-right" />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useUIStore } from '@/stores/ui'
 import TheNavigation from '@/components/TheNavigation.vue'
 import TheFooter from '@/components/TheFooter.vue'
 import { BaseToast } from '@/components/base'
-
-const uiStore = useUIStore()
-const toastRef = ref(null)
-
-onMounted(() => {
-  // Connect UI store to toast component
-  if (toastRef.value) {
-    uiStore.toastRef = toastRef.value
-  }
-})
 </script>

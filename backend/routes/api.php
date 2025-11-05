@@ -82,8 +82,8 @@ Route::prefix('gallery')->group(function () {
     Route::get('/{galleryId}/items', [GalleryItemController::class, 'index']);
 });
 
-// Public Contact Route (Rate Limited)
-Route::post('/contact', [ContactController::class, 'store'])->middleware('throttle:5,60'); // 5 requests per minute
+// Public Contact Route (Rate Limited: 3 requests per 15 minutes per IP)
+Route::post('/contact', [ContactController::class, 'store'])->middleware('throttle:3,15');
 
 // Public Testimonials Routes
 Route::prefix('testimonials')->group(function () {

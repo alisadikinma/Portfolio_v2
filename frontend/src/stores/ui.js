@@ -85,13 +85,7 @@ export const useUIStore = defineStore('ui', () => {
     }
 
     toasts.value.push(newToast)
-
-    // Auto-remove toast after duration
-    if (newToast.duration > 0) {
-      setTimeout(() => {
-        removeToast(id)
-      }, newToast.duration)
-    }
+    // Note: Timer is handled by BaseToast component for pause/resume capability
 
     return id
   }
@@ -128,12 +122,12 @@ export const useUIStore = defineStore('ui', () => {
     })
   }
 
-  const showError = (message, title = null, duration = 0) => {
+  const showError = (message, title = null, duration = 7000) => {
     return addToast({
       type: 'error',
       title,
       message,
-      duration // 0 = persistent
+      duration // Default 7 seconds, 0 = persistent
     })
   }
 

@@ -3,13 +3,16 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 /**
  * StoreContactRequest
  *
- * Validates contact form submissions with reCAPTCHA v3 verification
+ * Validates contact form submissions with 3-layer anti-bot protection:
+ * 1. Honeypot field (invisible trap)
+ * 2. Rate limiting (handled by middleware)
+ * 3. Time-based validation (minimum 3 seconds)
  */
 class StoreContactRequest extends FormRequest
 {
@@ -66,9 +69,27 @@ class StoreContactRequest extends FormRequest
             ],
             'subject' => ['required', 'string', 'max:255', 'min:3'],
             'message' => ['required', 'string', 'max:5000', 'min:10'],
-            'recaptcha_token' => ['required', 'string', function ($attribute, $value, $fail) {
-                if (!$this->verifyRecaptcha($value)) {
-                    $fail('reCAPTCHA verification failed. Please try again.');
+            
+            // Anti-bot: Honeypot field (must be empty)
+            'website' => ['nullable', 'max:0'],
+            
+            // Anti-bot: Form timestamp (minimum 3 seconds)
+            'form_timestamp' => ['required', 'integer', function ($attribute, $value, $fail) {
+                $currentTime = time();
+                $timeDiff = $currentTime - $value;
+                
+                // Reject if submitted too quickly (<3 seconds)
+                if ($timeDiff < 3) {
+                    Log::warning('Contact form submitted too quickly (bot detected)', [
+                        'ip' => request()->ip(),
+                        'time_diff' => $timeDiff,
+                    ]);
+                    $fail('Please take a moment to review your message before submitting.');
+                }
+                
+                // Reject if timestamp is too old (>1 hour)
+                if ($timeDiff > 3600) {
+                    $fail('Form expired. Please refresh and try again.');
                 }
             }],
         ];
@@ -94,7 +115,7 @@ class StoreContactRequest extends FormRequest
             'message.required' => 'Please enter your message',
             'message.min' => 'Message must be at least 10 characters',
             'message.max' => 'Message cannot exceed 5000 characters',
-            'recaptcha_token.required' => 'reCAPTCHA verification is required',
+            'form_timestamp.required' => 'Invalid form submission',
         ];
     }
 
@@ -112,75 +133,26 @@ class StoreContactRequest extends FormRequest
     }
 
     /**
-     * Verify reCAPTCHA v3 token with Google API
+     * Handle a failed validation attempt.
      *
-     * @param string $token
-     * @return bool
+     * @param  \Illuminate\Contracts\Validation\Validator  $validator
+     * @return void
+     *
+     * @throws \Illuminate\Validation\ValidationException
      */
-    protected function verifyRecaptcha(string $token): bool
+    protected function failedValidation(\Illuminate\Contracts\Validation\Validator $validator)
     {
-        // Get reCAPTCHA secret from env
-        $secret = env('RECAPTCHA_SECRET_KEY', '6Lf5xAIsAAAAAJsN4txoM5lX1Tu_95OtHX_MjkWC');
-        
-        // Skip verification in local/testing if explicitly disabled
-        if (app()->environment('local') && env('RECAPTCHA_SKIP_VERIFY', false)) {
-            Log::info('reCAPTCHA verification skipped in local environment');
-            return true;
+        // Log honeypot trap if triggered
+        if ($this->filled('website')) {
+            Log::warning('Honeypot trap triggered (bot detected)', [
+                'ip' => $this->ip(),
+                'user_agent' => $this->userAgent(),
+                'honeypot_value' => $this->input('website'),
+            ]);
         }
 
-        try {
-            $response = Http::asForm()->post('https://www.google.com/recaptcha/api/siteverify', [
-                'secret' => $secret,
-                'response' => $token,
-                'remoteip' => $this->ip(),
-            ]);
-
-            $result = $response->json();
-
-            if (!$response->successful() || !isset($result['success'])) {
-                Log::error('reCAPTCHA API request failed', [
-                    'status' => $response->status(),
-                    'response' => $result,
-                ]);
-                return false;
-            }
-
-            // Check success
-            if (!$result['success']) {
-                Log::warning('reCAPTCHA verification failed', [
-                    'error_codes' => $result['error-codes'] ?? [],
-                ]);
-                return false;
-            }
-
-            // Check score (v3 returns 0.0 - 1.0, higher is better)
-            // Threshold: 0.5 (recommended by Google)
-            $score = $result['score'] ?? 0;
-            if ($score < 0.5) {
-                Log::warning('reCAPTCHA score too low', [
-                    'score' => $score,
-                    'action' => $result['action'] ?? 'unknown',
-                ]);
-                return false;
-            }
-
-            // Verify action matches
-            if (isset($result['action']) && $result['action'] !== 'contact_form') {
-                Log::warning('reCAPTCHA action mismatch', [
-                    'expected' => 'contact_form',
-                    'actual' => $result['action'],
-                ]);
-            }
-
-            Log::info('reCAPTCHA verification success', [
-                'score' => $score,
-                'action' => $result['action'] ?? 'unknown',
-            ]);
-
-            return true;
-        } catch (\Exception $e) {
-            Log::error('reCAPTCHA verification exception: ' . $e->getMessage());
-            return false;
-        }
+        throw (new ValidationException($validator))
+            ->errorBag($this->errorBag)
+            ->redirectTo($this->getRedirectUrl());
     }
 }
