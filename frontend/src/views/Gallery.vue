@@ -43,7 +43,7 @@
             </svg>
           </div>
           <p class="text-red-600 dark:text-red-400 mb-4">{{ error }}</p>
-          <BaseButton variant="outline" @click="loadGalleries">
+          <BaseButton variant="outline" @click="fetchGalleries({ is_active: 1, order_by: 'sort_order', order_dir: 'asc' })">
             Try Again
           </BaseButton>
         </div>
@@ -181,7 +181,11 @@ import { useGallery } from '@/composables/useGallery'
 import { usePageSections } from '@/composables/usePageSections'
 import api from '@/services/api'
 
-const { galleries, loading, error, fetchGalleries, fetchGalleryItems } = useGallery()
+const { galleries, loading, error, fetchGalleries, fetchGalleryItems } = useGallery({
+  is_active: 1,
+  order_by: 'sort_order', 
+  order_dir: 'asc'
+})
 const { sections, fetchActiveSections } = usePageSections()
 
 // About data for social links
@@ -292,14 +296,6 @@ const handleImageError = (event) => {
   event.target.style.display = 'none'
 }
 
-const loadGalleries = async () => {
-  await fetchGalleries({
-    is_active: 1,
-    order_by: 'sort_order',
-    order_dir: 'asc'
-  })
-}
-
 // Keyboard navigation
 const handleKeydown = (e) => {
   if (showLightbox.value) {
@@ -314,7 +310,14 @@ const handleKeydown = (e) => {
 onMounted(async () => {
   await fetchActiveSections('gallery')
   await fetchAboutData()
-  loadGalleries()
+  
+  // ✅ Direct call fetchGalleries untuk leverage cache
+  await fetchGalleries({
+    is_active: 1,
+    order_by: 'sort_order',
+    order_dir: 'asc'
+  })
+  
   window.addEventListener('keydown', handleKeydown)
 })
 

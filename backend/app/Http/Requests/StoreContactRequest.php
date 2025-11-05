@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Log;
 /**
  * StoreContactRequest
  *
- * Validates contact form submissions with hCaptcha verification
+ * Validates contact form submissions with reCAPTCHA v3 verification
  */
 class StoreContactRequest extends FormRequest
 {
@@ -66,9 +66,9 @@ class StoreContactRequest extends FormRequest
             ],
             'subject' => ['required', 'string', 'max:255', 'min:3'],
             'message' => ['required', 'string', 'max:5000', 'min:10'],
-            'captcha_token' => ['required', 'string', function ($attribute, $value, $fail) {
-                if (!$this->verifyHCaptcha($value)) {
-                    $fail('Captcha verification failed. Please try again.');
+            'recaptcha_token' => ['required', 'string', function ($attribute, $value, $fail) {
+                if (!$this->verifyRecaptcha($value)) {
+                    $fail('reCAPTCHA verification failed. Please try again.');
                 }
             }],
         ];
@@ -94,7 +94,7 @@ class StoreContactRequest extends FormRequest
             'message.required' => 'Please enter your message',
             'message.min' => 'Message must be at least 10 characters',
             'message.max' => 'Message cannot exceed 5000 characters',
-            'captcha_token.required' => 'Please complete the captcha verification',
+            'recaptcha_token.required' => 'reCAPTCHA verification is required',
         ];
     }
 
@@ -112,24 +112,24 @@ class StoreContactRequest extends FormRequest
     }
 
     /**
-     * Verify hCaptcha token with hCaptcha API
+     * Verify reCAPTCHA v3 token with Google API
      *
      * @param string $token
      * @return bool
      */
-    protected function verifyHCaptcha(string $token): bool
+    protected function verifyRecaptcha(string $token): bool
     {
-        // Get hCaptcha secret from env (use test secret by default)
-        $secret = env('HCAPTCHA_SECRET', '0x0000000000000000000000000000000000000000');
+        // Get reCAPTCHA secret from env
+        $secret = env('RECAPTCHA_SECRET_KEY', '6Lf5xAIsAAAAAJsN4txoM5lX1Tu_95OtHX_MjkWC');
         
-        // Skip verification in local/testing if no secret configured
-        if (app()->environment('local') && $secret === '0x0000000000000000000000000000000000000000') {
-            Log::info('hCaptcha verification skipped in local environment');
+        // Skip verification in local/testing if explicitly disabled
+        if (app()->environment('local') && env('RECAPTCHA_SKIP_VERIFY', false)) {
+            Log::info('reCAPTCHA verification skipped in local environment');
             return true;
         }
 
         try {
-            $response = Http::asForm()->post('https://hcaptcha.com/siteverify', [
+            $response = Http::asForm()->post('https://www.google.com/recaptcha/api/siteverify', [
                 'secret' => $secret,
                 'response' => $token,
                 'remoteip' => $this->ip(),
@@ -138,22 +138,48 @@ class StoreContactRequest extends FormRequest
             $result = $response->json();
 
             if (!$response->successful() || !isset($result['success'])) {
-                Log::error('hCaptcha API request failed', [
+                Log::error('reCAPTCHA API request failed', [
                     'status' => $response->status(),
                     'response' => $result,
                 ]);
                 return false;
             }
 
+            // Check success
             if (!$result['success']) {
-                Log::warning('hCaptcha verification failed', [
+                Log::warning('reCAPTCHA verification failed', [
                     'error_codes' => $result['error-codes'] ?? [],
+                ]);
+                return false;
+            }
+
+            // Check score (v3 returns 0.0 - 1.0, higher is better)
+            // Threshold: 0.5 (recommended by Google)
+            $score = $result['score'] ?? 0;
+            if ($score < 0.5) {
+                Log::warning('reCAPTCHA score too low', [
+                    'score' => $score,
+                    'action' => $result['action'] ?? 'unknown',
+                ]);
+                return false;
+            }
+
+            // Verify action matches
+            if (isset($result['action']) && $result['action'] !== 'contact_form') {
+                Log::warning('reCAPTCHA action mismatch', [
+                    'expected' => 'contact_form',
+                    'actual' => $result['action'],
                 ]);
             }
 
-            return $result['success'] === true;
+            Log::info('reCAPTCHA verification success', [
+                'score' => $score,
+                'action' => $result['action'] ?? 'unknown',
+            ]);
+
+            return true;
         } catch (\Exception $e) {
-            Log::error('hCaptcha verification exception: ' . $e->getMessage());
+            Log::error('reCAPTCHA verification exception: ' . $e->getMessage());
             return false;
         }
     }

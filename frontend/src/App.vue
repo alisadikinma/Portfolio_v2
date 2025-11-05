@@ -2,6 +2,7 @@
   <component :is="layout">
     <router-view />
   </component>
+  <ScrollToTop />
 </template>
 
 <script setup>
@@ -13,6 +14,7 @@ import { useMetaTags } from '@/composables/useMetaTags'
 import DefaultLayout from '@/layouts/DefaultLayout.vue'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import AuthLayout from '@/layouts/AuthLayout.vue'
+import ScrollToTop from '@/components/base/ScrollToTop.vue'
 
 const route = useRoute()
 const themeStore = useThemeStore()

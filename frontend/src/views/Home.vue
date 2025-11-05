@@ -3,7 +3,7 @@
     <!-- Hero Section - Clean & Professional -->
     <section
       v-if="showHeroSection"
-      class="relative pt-16 pb-6 md:pt-24 md:pb-12 bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-950"
+      class="relative pt-16 pb-3 md:pt-24 md:pb-6 bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-950"
     >
       <!-- Subtle Background Pattern -->
       <div class="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]">
@@ -38,27 +38,8 @@
                 <div class="absolute -bottom-6 -left-6 w-32 h-32 bg-primary-500/10 rounded-full blur-3xl"></div>
               </div>
 
-              <!-- Languages I Speak -->
-              <div v-if="aboutSettings?.languages?.length > 0" class="mt-4 md:mt-6">
-                <div class="flex items-center justify-center gap-3 md:gap-4 flex-wrap">
-                  <p class="text-xs text-gray-500 dark:text-gray-500 uppercase tracking-wider font-semibold">
-                    LANGUAGES I SPEAK:
-                  </p>
-                  <div class="flex gap-2 md:gap-3">
-                    <div
-                      v-for="lang in aboutSettings.languages.slice(0, 3)"
-                      :key="lang"
-                      class="p-2 md:p-2.5 glass rounded-lg hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5"
-                      :title="lang"
-                    >
-                      <img :src="getLangFlag(lang)" :alt="lang" class="w-6 h-6 md:w-7 md:h-7 object-contain rounded" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
               <!-- Certifications -->
-              <div v-if="aboutSettings?.certifications?.length > 0" class="mt-3 md:mt-4">
+              <div v-if="aboutSettings?.certifications?.length > 0" class="mt-5 md:mt-6">
                 <div class="flex items-center justify-center gap-3 md:gap-4 flex-wrap">
                   <p class="text-xs text-gray-500 dark:text-gray-500 uppercase tracking-wider font-semibold">
                     CERTIFIED BY:
@@ -185,7 +166,7 @@
     </section>
 
     <!-- Stats Section - FIXED Alignment (Nov 3, 2025) -->
-    <section v-if="stats.length > 0" class="pt-2 pb-8 md:pt-3 md:pb-12 bg-white dark:bg-gray-950">
+    <section v-if="stats.length > 0" class="pt-0 pb-8 md:pt-0 md:pb-12 bg-white dark:bg-gray-950">
       <div class="container-custom">
         <!-- Use flex with justify-center for perfect centering with 4 items -->
         <div class="flex flex-wrap justify-center gap-3 md:gap-6">
@@ -1290,11 +1271,6 @@ import googleLogo from '@/assets/certifications/google.png'
 import oracleLogo from '@/assets/certifications/oracle.png'
 import outskillLogo from '@/assets/certifications/outskill.png'
 
-// Import language flags
-import idFlag from '@/assets/language/ID.png'
-import gbFlag from '@/assets/language/GB.png'
-import cnFlag from '@/assets/language/CN.png'
-
 const { projects, isLoading: projectsLoading, fetchProjects } = useProjects()
 
 // Featured projects computed (backend already filters, but we create alias for clarity)
@@ -1311,7 +1287,7 @@ const showAllSkills = ref(false)
 
 // WhatsApp Contact computed - uses getSettingValue from composable
 const contactWhatsApp = computed(() => {
-  const phone = getSettingValue('contact_phone') || '+6281234567890'
+  const phone = getSettingValue('contact_phone') || '+6281380163758'
   const message = encodeURIComponent('Hi! I saw your AI-powered website and I\'m interested in discussing AI Automation for my business. Can we schedule a free consultation?')
   return `https://wa.me/${phone.replace(/[^0-9]/g, '')}?text=${message}`
 })
@@ -1600,15 +1576,6 @@ const getCertLogo = (name) => {
   if (lowerName.includes('oracle')) return oracleLogo
   if (lowerName.includes('outskill')) return outskillLogo
   return '' // no logo for unknown cert
-}
-
-// Get language flag based on name
-const getLangFlag = (lang) => {
-  const lowerLang = lang.toLowerCase()
-  if (lowerLang.includes('indonesia')) return idFlag
-  if (lowerLang.includes('english')) return gbFlag
-  if (lowerLang.includes('mandarin') || lowerLang.includes('chinese')) return cnFlag
-  return idFlag // default to ID flag
 }
 
 // 3D Coverflow + Magnetic Hover Functions

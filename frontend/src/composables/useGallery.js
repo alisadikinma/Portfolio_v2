@@ -1,4 +1,4 @@
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import api from '@/services/api'
 import { useLocalCache } from './useLocalCache'
@@ -10,19 +10,13 @@ export function useGallery(initialParams = {}) {
   const queryParams = ref(initialParams)
   const selectedGalleryId = ref(null)
   
-  // State untuk instant data dari localStorage
-  const cachedGalleries = ref(null)
-  const cachedGalleryItems = ref(null)
-
-  // Load instant cache on mount
-  onMounted(() => {
-    const cacheKey = `galleries_${JSON.stringify(queryParams.value)}`
-    cachedGalleries.value = getCache(cacheKey)
-    
-    if (cachedGalleries.value) {
-      console.log('[useGallery] âš¡ INSTANT from localStorage')
-    }
-  })
+  // âœ… INSTANT cache check (sebelum query)
+  const getCacheKey = (params) => `galleries_${JSON.stringify(params)}`
+  const instantCache = getCache(getCacheKey(queryParams.value))
+  
+  if (instantCache) {
+    console.log('[useGallery] âš¡ INSTANT cache available')
+  }
 
   // Fetch all galleries with caching (10min stale / 1hr cache)
   const {
@@ -34,24 +28,23 @@ export function useGallery(initialParams = {}) {
     queryKey: ['galleries', queryParams],
     queryFn: async () => {
       const response = await api.get('/galleries', { params: queryParams.value })
-      console.log('[useGallery] Background fetch complete')
+      console.log('[useGallery] âœ… Background fetch complete')
       
       // Update localStorage cache
-      const cacheKey = `galleries_${JSON.stringify(queryParams.value)}`
+      const cacheKey = getCacheKey(queryParams.value)
       setCache(cacheKey, response.data, 10 * 60 * 1000) // 10min
       
       return response.data
     },
+    enabled: false, // âœ… MANUAL trigger only - prevents auto-fetch on mount
     staleTime: 10 * 60 * 1000, // 10 minutes
     gcTime: 60 * 60 * 1000, // 1 hour
-    initialData: () => {
-      // Try get from localStorage first
-      const cacheKey = `galleries_${JSON.stringify(queryParams.value)}`
-      return getCache(cacheKey)
-    }
+    initialData: instantCache // âœ… Use instant cache directly as initial data
   })
 
   // Fetch gallery items with TanStack Query (enabled only when selectedGalleryId is set)
+  const getItemsCacheKey = (id) => `gallery_items_${id}`
+  
   const {
     data: galleryItemsData,
     isLoading: isLoadingItems,
@@ -70,7 +63,7 @@ export function useGallery(initialParams = {}) {
         console.log('[useGallery] Items cached:', items.length)
         
         // Update localStorage
-        const cacheKey = `gallery_items_${selectedGalleryId.value}`
+        const cacheKey = getItemsCacheKey(selectedGalleryId.value)
         setCache(cacheKey, items, 10 * 60 * 1000) // 10min
         
         return items
@@ -80,47 +73,34 @@ export function useGallery(initialParams = {}) {
     enabled: computed(() => !!selectedGalleryId.value),
     staleTime: 10 * 60 * 1000, // 10 minutes
     gcTime: 60 * 60 * 1000, // 1 hour
-    initialData: () => {
-      // Try get from localStorage first
+    placeholderData: () => {
+      // âœ… Instant display from localStorage
       if (!selectedGalleryId.value) return null
-      const cacheKey = `gallery_items_${selectedGalleryId.value}`
-      const cached = getCache(cacheKey)
+      const cached = getCache(getItemsCacheKey(selectedGalleryId.value))
       if (cached) {
         console.log('[useGallery] âš¡ INSTANT items from localStorage:', selectedGalleryId.value)
       }
       return cached
+    },
+    initialData: () => {
+      // âœ… Fallback initialData
+      if (!selectedGalleryId.value) return null
+      return getCache(getItemsCacheKey(selectedGalleryId.value))
     }
   })
 
-  // Computed values - prefer localStorage instant data
-  const galleries = computed(() => {
-    if (isLoading.value && cachedGalleries.value) {
-      // Instant display while loading
-      return cachedGalleries.value.data || []
-    }
-    return galleriesData.value?.data || []
-  })
+  // Computed values - TanStack Query handles instant display
+  const galleries = computed(() => galleriesData.value?.data || [])
   
-  const loading = computed(() => isLoading.value)
+  const loading = computed(() => isLoading.value && !galleriesData.value) // âœ… Loading hanya jika NO data
   const error = computed(() => queryError.value?.response?.data?.message || queryError.value?.message || null)
   
-  const galleryItems = computed(() => {
-    if (isLoadingItems.value && cachedGalleryItems.value) {
-      // Instant display while loading
-      return cachedGalleryItems.value
-    }
-    return galleryItemsData.value || []
-  })
-  
-  const loadingItems = computed(() => isLoadingItems.value)
+  const galleryItems = computed(() => galleryItemsData.value || [])
+  const loadingItems = computed(() => isLoadingItems.value && !galleryItemsData.value) // âœ… Loading hanya jika NO data
 
   // Fetch galleries with params
   const fetchGalleries = async (params = {}) => {
     queryParams.value = params
-    
-    // Check instant cache
-    const cacheKey = `galleries_${JSON.stringify(params)}`
-    cachedGalleries.value = getCache(cacheKey)
     
     const result = await refetch()
     return {
@@ -155,7 +135,7 @@ export function useGallery(initialParams = {}) {
       
       // Cache the result
       setCache(cacheKey, data, 10 * 60 * 1000) // 10min
-      queryClient.setQueryData(['gallery', id], response.data, {
+      queryClient.setQueryData(['gallery', id], data, { // âœ… Fix: data only, not response.data
         staleTime: 10 * 60 * 1000,
         gcTime: 60 * 60 * 1000
       })
@@ -172,11 +152,6 @@ export function useGallery(initialParams = {}) {
 
   // Fetch gallery items (TanStack Query managed with localStorage)
   const fetchGalleryItems = async (galleryId) => {
-    const cacheKey = `gallery_items_${galleryId}`
-    
-    // Check instant localStorage
-    cachedGalleryItems.value = getCache(cacheKey)
-    
     // Check TanStack Query cache
     const queryCache = queryClient.getQueryData(['gallery-items', galleryId])
     if (queryCache) {
@@ -184,11 +159,13 @@ export function useGallery(initialParams = {}) {
       return queryCache
     }
 
-    // If no cache at all, show we're fetching
-    if (!cachedGalleryItems.value) {
-      console.log('[useGallery] Cache MISS for items:', galleryId, '- fetching...')
-    } else {
+    // Check localStorage
+    const cacheKey = getItemsCacheKey(galleryId)
+    const cached = getCache(cacheKey)
+    if (cached) {
       console.log('[useGallery] âš¡ INSTANT from localStorage, background refresh...')
+    } else {
+      console.log('[useGallery] Cache MISS for items:', galleryId, '- fetching...')
     }
     
     // Set gallery ID to trigger query
@@ -220,7 +197,7 @@ export function useGallery(initialParams = {}) {
       
       // Invalidate cache
       await refetch()
-      const cacheKey = `galleries_${JSON.stringify(queryParams.value)}`
+      const cacheKey = getCacheKey(queryParams.value) // âœ… Use helper
       setCache(cacheKey, null, 0)
       
       return { success: true, data: response.data.data }
@@ -241,7 +218,7 @@ export function useGallery(initialParams = {}) {
       
       // Invalidate cache
       await refetch()
-      const cacheKey = `galleries_${JSON.stringify(queryParams.value)}`
+      const cacheKey = getCacheKey(queryParams.value) // âœ… Use helper
       setCache(cacheKey, null, 0)
       
       return { success: true, data: response.data.data }
@@ -264,7 +241,7 @@ export function useGallery(initialParams = {}) {
       await refetch()
       
       // Clear related caches
-      const cacheKey = `galleries_${JSON.stringify(queryParams.value)}`
+      const cacheKey = getCacheKey(queryParams.value) // âœ… Use helper
       setCache(cacheKey, null, 0)
       setCache(`gallery_${id}`, null, 0)
       
@@ -286,7 +263,7 @@ export function useGallery(initialParams = {}) {
       await refetch()
       
       // Clear related caches
-      const cacheKey = `galleries_${JSON.stringify(queryParams.value)}`
+      const cacheKey = getCacheKey(queryParams.value) // âœ… Use helper
       setCache(cacheKey, null, 0)
       setCache(`gallery_${id}`, null, 0)
       
@@ -311,7 +288,7 @@ export function useGallery(initialParams = {}) {
       await refetch()
       
       // Clear main cache
-      const cacheKey = `galleries_${JSON.stringify(queryParams.value)}`
+      const cacheKey = getCacheKey(queryParams.value) // âœ… Use helper
       setCache(cacheKey, null, 0)
       
       return { success: true }

@@ -142,12 +142,11 @@
                 </p>
               </div>
 
-              <!-- hCaptcha -->
-              <div>
-                <div ref="captchaContainer" class="flex justify-center"></div>
-                <p v-if="formErrors.captcha" class="mt-2 text-sm text-red-600 dark:text-red-400 text-center">
-                  {{ formErrors.captcha }}
-                </p>
+              <!-- reCAPTCHA v3 Badge Info -->
+              <div class="text-xs text-neutral-500 dark:text-neutral-400">
+                This site is protected by reCAPTCHA and the Google
+                <a href="https://policies.google.com/privacy" target="_blank" class="underline hover:text-primary-600">Privacy Policy</a> and
+                <a href="https://policies.google.com/terms" target="_blank" class="underline hover:text-primary-600">Terms of Service</a> apply.
               </div>
 
               <!-- Submit Button -->
@@ -316,12 +315,9 @@ const formErrors = ref({})
 const isSubmitting = ref(false)
 const siteSettings = ref(null)
 const loadingSettings = ref(false)
-const captchaContainer = ref(null)
-const captchaToken = ref(null)
-let hcaptchaWidgetId = null
 
-// hCaptcha Site Key (Test Key - ganti dengan site key production nanti)
-const HCAPTCHA_SITE_KEY = '10000000-ffff-ffff-ffff-000000000001' // Test key dari hCaptcha
+// reCAPTCHA v3 Site Key
+const RECAPTCHA_SITE_KEY = '6Lf5xAIsAAAAAJxqKwWhMvQ_yh8dH5DYnxkCSElW'
 
 // Social links computed (from about settings - moved from About page)
 const displaySocialLinks = computed(() => {
@@ -398,11 +394,6 @@ const validateForm = () => {
     errors.message = 'Message is too long (max 5000 characters)'
   }
 
-  // Captcha validation
-  if (!captchaToken.value) {
-    errors.captcha = 'Please complete the captcha verification'
-  }
-
   return errors
 }
 
@@ -422,6 +413,13 @@ const handleSubmit = async () => {
   isSubmitting.value = true
 
   try {
+    // Get reCAPTCHA token
+    if (!window.grecaptcha) {
+      throw new Error('reCAPTCHA not loaded')
+    }
+
+    const recaptchaToken = await window.grecaptcha.execute(RECAPTCHA_SITE_KEY, { action: 'contact_form' })
+
     // Sanitize input (basic XSS prevention)
     const sanitizedForm = {
       name: form.value.name.trim(),
@@ -429,7 +427,7 @@ const handleSubmit = async () => {
       whatsapp_number: form.value.whatsapp_number.trim(),
       subject: form.value.subject.trim(),
       message: form.value.message.trim(),
-      captcha_token: captchaToken.value // Send captcha token
+      recaptcha_token: recaptchaToken
     }
 
     // Actual API call
@@ -452,20 +450,8 @@ const handleSubmit = async () => {
         message: ''
       }
       formErrors.value = {}
-      
-      // Reset captcha
-      captchaToken.value = null
-      if (window.hcaptcha && hcaptchaWidgetId !== null) {
-        window.hcaptcha.reset(hcaptchaWidgetId)
-      }
     }
   } catch (error) {
-    // Reset captcha on error
-    captchaToken.value = null
-    if (window.hcaptcha && hcaptchaWidgetId !== null) {
-      window.hcaptcha.reset(hcaptchaWidgetId)
-    }
-    
     uiStore.showError(
       error.response?.data?.message || 'Failed to send message. Please try again.',
       'Error'
@@ -475,45 +461,25 @@ const handleSubmit = async () => {
   }
 }
 
-// Load hCaptcha script
-const loadHCaptcha = () => {
+// Load reCAPTCHA v3 script
+const loadRecaptcha = () => {
   return new Promise((resolve, reject) => {
-    if (window.hcaptcha) {
-      resolve()
+    if (window.grecaptcha) {
+      // Wait for grecaptcha.ready
+      window.grecaptcha.ready(() => resolve())
       return
     }
 
     const script = document.createElement('script')
-    script.src = 'https://js.hcaptcha.com/1/api.js'
+    script.src = `https://www.google.com/recaptcha/api.js?render=${RECAPTCHA_SITE_KEY}`
     script.async = true
     script.defer = true
-    script.onload = () => resolve()
-    script.onerror = () => reject(new Error('Failed to load hCaptcha'))
+    script.onload = () => {
+      window.grecaptcha.ready(() => resolve())
+    }
+    script.onerror = () => reject(new Error('Failed to load reCAPTCHA'))
     document.head.appendChild(script)
   })
-}
-
-// Initialize hCaptcha widget
-const initHCaptcha = () => {
-  if (!captchaContainer.value || !window.hcaptcha) return
-
-  try {
-    hcaptchaWidgetId = window.hcaptcha.render(captchaContainer.value, {
-      sitekey: HCAPTCHA_SITE_KEY,
-      callback: (token) => {
-        captchaToken.value = token
-        clearError('captcha')
-      },
-      'expired-callback': () => {
-        captchaToken.value = null
-      },
-      'error-callback': () => {
-        captchaToken.value = null
-      }
-    })
-  } catch (error) {
-    console.error('Failed to initialize hCaptcha:', error)
-  }
 }
 
 // Clear error when user types
@@ -542,27 +508,17 @@ const fetchSiteSettings = async () => {
 onMounted(async () => {
   await fetchSiteSettings()
   
-  // Load and initialize hCaptcha
+  // Load reCAPTCHA v3
   try {
-    await loadHCaptcha()
-    // Wait a bit for DOM to be ready
-    setTimeout(() => {
-      initHCaptcha()
-    }, 100)
+    await loadRecaptcha()
+    console.log('reCAPTCHA v3 loaded successfully')
   } catch (error) {
-    console.error('Failed to load hCaptcha:', error)
+    console.error('Failed to load reCAPTCHA:', error)
   }
 })
 
-// Cleanup on unmount
+// No cleanup needed for reCAPTCHA v3
 onUnmounted(() => {
-  // Remove hCaptcha widget if exists
-  if (window.hcaptcha && hcaptchaWidgetId !== null) {
-    try {
-      window.hcaptcha.remove(hcaptchaWidgetId)
-    } catch (error) {
-      // Ignore errors
-    }
-  }
+  // reCAPTCHA v3 handles cleanup automatically
 })
 </script>

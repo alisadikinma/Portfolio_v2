@@ -85,6 +85,40 @@
     </section>
     <div class="h-10"></div>
 
+    <!-- Skills Section -->
+    <section class="py-10 bg-white dark:bg-neutral-800">
+      <div class="container-custom">
+        <div class="text-center mb-8">
+          <h2 class="text-3xl md:text-4xl font-display font-bold mb-3">Skills & Expertise</h2>
+          <p class="text-neutral-600 dark:text-neutral-400 text-sm">Technologies and tools I work with</p>
+        </div>
+
+        <div v-if="aboutSettings?.skills && Array.isArray(aboutSettings.skills) && aboutSettings.skills.length > 0" class="max-w-6xl mx-auto">
+          <div class="flex flex-wrap justify-center gap-2">
+            <span
+              v-for="skill in aboutSettings.skills"
+              :key="skill"
+              class="px-3 py-1.5 bg-neutral-50 dark:bg-neutral-900 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:bg-primary-50 dark:hover:bg-primary-900/20 hover:text-primary-600 dark:hover:text-primary-400 transition-colors shadow-sm border border-neutral-200 dark:border-neutral-700"
+            >
+              {{ skill }}
+            </span>
+          </div>
+        </div>
+
+        <div v-else class="max-w-6xl mx-auto">
+          <div class="flex flex-wrap justify-center gap-2">
+            <span
+              v-for="skill in defaultSkills"
+              :key="skill"
+              class="px-3 py-1.5 bg-neutral-50 dark:bg-neutral-900 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:bg-primary-50 dark:hover:bg-primary-900/20 hover:text-primary-600 dark:hover:text-primary-400 transition-colors shadow-sm border border-neutral-200 dark:border-neutral-700"
+            >
+              {{ skill }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- Mission Section -->
     <section v-if="aboutSettings?.mission" class="relative py-20 bg-gradient-to-br from-primary-600 via-secondary-600 to-accent-600 overflow-hidden">
       <div class="absolute inset-0 opacity-10">
@@ -209,26 +243,66 @@
       </div>
     </section>
 
-    <!-- Collaboration Modes Section -->
+    <!-- Collaboration Modes Section - REVISED -->
     <section v-if="aboutSettings?.collaboration_modes && aboutSettings.collaboration_modes.length" class="py-20 bg-gradient-to-b from-neutral-50 to-white dark:from-neutral-900 dark:to-neutral-800">
       <div class="container-custom">
-        <div class="text-center mb-16">
+        <div class="text-center mb-12">
           <p class="text-accent-600 dark:text-accent-400 font-semibold mb-3 uppercase tracking-wider text-sm">
             Flexible Partnership
           </p>
           <h2 class="text-4xl md:text-5xl font-display font-bold mb-4 text-neutral-900 dark:text-white">
-            How We Can Work Together
+            Let's Build Results Together
           </h2>
           <p class="text-xl text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto">
-            Choose the collaboration model that fits your needs
+            Collaboration models designed for <strong class="text-primary-600 dark:text-primary-400">long-term impact</strong> and <strong class="text-primary-600 dark:text-primary-400">real business growth</strong>
           </p>
+        </div>
+
+        <!-- Trust Badges -->
+        <div class="flex flex-wrap justify-center gap-4 md:gap-6 mb-12 max-w-4xl mx-auto">
+          <div class="flex items-center gap-3 px-4 md:px-5 py-3 bg-white dark:bg-neutral-800 rounded-xl shadow-md border border-neutral-200 dark:border-neutral-700">
+            <div class="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 rounded-lg flex items-center justify-center flex-shrink-0">
+              <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
+            <div>
+              <p class="text-xl md:text-2xl font-bold text-neutral-900 dark:text-white">56+</p>
+              <p class="text-xs md:text-sm text-neutral-600 dark:text-neutral-400">Projects Delivered</p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-3 px-4 md:px-5 py-3 bg-white dark:bg-neutral-800 rounded-xl shadow-md border border-neutral-200 dark:border-neutral-700">
+            <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center flex-shrink-0">
+              <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
+            <div>
+              <p class="text-xl md:text-2xl font-bold text-neutral-900 dark:text-white">24/7</p>
+              <p class="text-xs md:text-sm text-neutral-600 dark:text-neutral-400">Available US/Asia</p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-3 px-4 md:px-5 py-3 bg-white dark:bg-neutral-800 rounded-xl shadow-md border border-neutral-200 dark:border-neutral-700">
+            <div class="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center flex-shrink-0">
+              <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+              </svg>
+            </div>
+            <div>
+              <p class="text-xl md:text-2xl font-bold text-neutral-900 dark:text-white">100%</p>
+              <p class="text-xs md:text-sm text-neutral-600 dark:text-neutral-400">Client Satisfaction</p>
+            </div>
+          </div>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
           <div
-            v-for="(mode, index) in aboutSettings.collaboration_modes"
+            v-for="(mode, index) in getEnhancedModes"
             :key="index"
-            class="group relative bg-white dark:bg-neutral-800 rounded-2xl p-8 shadow-lg hover:shadow-2xl transition-all duration-300 border border-neutral-200 dark:border-neutral-700"
+            @click="scrollToCTA"
+            class="group relative bg-white dark:bg-neutral-800 rounded-2xl p-8 shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-neutral-200 dark:border-neutral-700 hover:border-primary-500 dark:hover:border-primary-500 cursor-pointer"
           >
             <div class="absolute -top-4 -left-4 w-12 h-12 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg">
               {{ index + 1 }}
@@ -238,13 +312,19 @@
               <h3 class="text-2xl font-bold text-neutral-900 dark:text-white mb-4 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
                 {{ mode.mode }}
               </h3>
-              <p class="text-neutral-600 dark:text-neutral-400 leading-relaxed">
+              <p class="text-neutral-600 dark:text-neutral-400 leading-relaxed mb-4">
                 {{ mode.description }}
               </p>
+              <!-- Enhanced Value Proposition -->
+              <div class="mt-4 pt-4 border-t border-neutral-200 dark:border-neutral-700">
+                <p class="text-sm font-semibold text-primary-600 dark:text-primary-400 leading-relaxed">
+                  {{ mode.value }}
+                </p>
+              </div>
             </div>
 
             <div class="mt-6 flex items-center gap-2 text-primary-600 dark:text-primary-400 font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
-              <span class="text-sm">Learn more</span>
+              <span class="text-sm">Let's discuss this</span>
               <svg class="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
               </svg>
@@ -254,48 +334,12 @@
       </div>
     </section>
 
-    <!-- Skills Section - COMPACT -->
-    <section class="py-10 bg-white dark:bg-neutral-800">
-      <div class="container-custom">
-        <div class="text-center mb-8">
-          <h2 class="text-3xl md:text-4xl font-display font-bold mb-3">Skills & Expertise</h2>
-          <p class="text-neutral-600 dark:text-neutral-400 text-sm">Technologies and tools I work with</p>
-        </div>
-
-        <div v-if="aboutSettings?.skills && Array.isArray(aboutSettings.skills) && aboutSettings.skills.length > 0" class="max-w-6xl mx-auto">
-          <div class="flex flex-wrap justify-center gap-2">
-            <span
-              v-for="skill in aboutSettings.skills"
-              :key="skill"
-              class="px-3 py-1.5 bg-neutral-50 dark:bg-neutral-900 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:bg-primary-50 dark:hover:bg-primary-900/20 hover:text-primary-600 dark:hover:text-primary-400 transition-colors shadow-sm border border-neutral-200 dark:border-neutral-700"
-            >
-              {{ skill }}
-            </span>
-          </div>
-        </div>
-
-        <div v-else class="max-w-6xl mx-auto">
-          <div class="flex flex-wrap justify-center gap-2">
-            <span
-              v-for="skill in defaultSkills"
-              :key="skill"
-              class="px-3 py-1.5 bg-neutral-50 dark:bg-neutral-900 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:bg-primary-50 dark:hover:bg-primary-900/20 hover:text-primary-600 dark:hover:text-primary-400 transition-colors shadow-sm border border-neutral-200 dark:border-neutral-700"
-            >
-              {{ skill }}
-            </span>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Experience, Education, CTA sections stay the same -->
-    <!-- ... rest of template ... -->
-
     <!-- CTA Section -->
     <CTASection
+      ref="ctaSectionRef"
       v-if="showCTASection"
-      heading="Let's Work Together"
-      description="Ready to transform your business with <strong>AI Automation & Custom Development</strong>? Let's discuss how I can help you achieve your goals."
+      heading="Ready for more than just a consultant?"
+      description="I'm invested in seeing your business win. Let's discuss how I can <strong>accelerate your next milestone</strong> - reach out now for candid, actionable insight."
       whatsapp-message="Hi! I saw your portfolio and I'd like to discuss a project with you."
       :social-links="aboutSettings?.social_links"
       :show-social-links="true"
@@ -304,23 +348,25 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import { BaseButton } from '@/components/base'
+import { computed, ref } from 'vue'
 import CTASection from '@/components/CTASection.vue'
 import { usePageSections } from '@/composables/usePageSections'
 import { useAboutSettings } from '@/composables/useAboutSettings'
+import { useSettings } from '@/composables/useSettings'
 
 // Import language flags
 import idFlag from '@/assets/language/ID.png'
 import gbFlag from '@/assets/language/GB.png'
 import cnFlag from '@/assets/language/CN.png'
 
-// âœ… PAKAI COMPOSABLE (with localStorage cache!)
+// Composables
 const { aboutSettings, loading } = useAboutSettings()
 const { sections, fetchActiveSections } = usePageSections()
+const { fetchSettings, getSettingValue } = useSettings()
 
-// Fetch sections on mount (auto-triggers via composable)
+// Fetch sections on mount
 fetchActiveSections('about')
+fetchSettings() // Fetch settings for WhatsApp phone
 
 // CTA visibility
 const showCTASection = computed(() => {
@@ -328,12 +374,41 @@ const showCTASection = computed(() => {
   return section ? section.is_active : false
 })
 
+// CTA Section Ref
+const ctaSectionRef = ref(null)
+
+// Scroll to CTA function
+const scrollToCTA = () => {
+  if (ctaSectionRef.value && ctaSectionRef.value.$el) {
+    ctaSectionRef.value.$el.scrollIntoView({ 
+      behavior: 'smooth', 
+      block: 'start' 
+    })
+  }
+}
+
 // Default skills as fallback
 const defaultSkills = [
   'Vue.js', 'React', 'TypeScript', 'Tailwind CSS', 'HTML5', 'CSS3',
   'Node.js', 'Express', 'Laravel', 'PHP', 'MySQL', 'MongoDB',
   'Git', 'Docker', 'AWS', 'CI/CD', 'Linux', 'Nginx'
 ]
+
+// Enhanced collaboration modes with value propositions
+const getEnhancedModes = computed(() => {
+  if (!aboutSettings.value?.collaboration_modes) return []
+  
+  const valuePropositions = {
+    'Project-Based': 'Clear deliverables, fast iterations, and full accountability. Perfect for teams that want results - not just reports.',
+    'Retainer': 'Continuous optimization with dedicated leadership - more than just hours, it is a partnership for measurable progress every month.',
+    'Consulting': 'Strategic guidance by someone who actually builds products. My advice is grounded in execution, not theory - so you get impact and momentum, not just a blueprint.'
+  }
+  
+  return aboutSettings.value.collaboration_modes.map(mode => ({
+    ...mode,
+    value: valuePropositions[mode.mode] || 'Tailored approach designed for your specific business needs and growth objectives.'
+  }))
+})
 
 // Display languages with auto-conversion
 const displayLanguages = computed(() => {
@@ -401,16 +476,10 @@ const getLangFlagImage = (code) => {
 }
 
 const getWhatsAppLink = () => {
-  // Default WhatsApp number
-  const defaultPhone = '+6281380163758'
+  const phone = getSettingValue('contact_phone') || '+6281380163758'
   const defaultMessage = "Hi! I saw your portfolio and I'd like to discuss a project with you."
-  
-  // Format phone number (remove +, spaces, and hyphens)
-  const formattedPhone = defaultPhone.replace(/[^0-9]/g, '')
-  
-  // Encode message for URL
+  const formattedPhone = phone.replace(/[^0-9]/g, '')
   const encodedMessage = encodeURIComponent(defaultMessage)
-  
   return `https://wa.me/${formattedPhone}?text=${encodedMessage}`
 }
 </script>

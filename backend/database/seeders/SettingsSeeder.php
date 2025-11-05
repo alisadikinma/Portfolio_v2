@@ -14,6 +14,24 @@ class SettingsSeeder extends Seeder
     public function run(): void
     {
         $settings = [
+            // Site/Contact Settings
+            [
+                'key' => 'contact_phone',
+                'value' => '+6281234567890',
+                'group' => 'site',
+                'type' => 'text',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'key' => 'contact_email',
+                'value' => 'hello@example.com',
+                'group' => 'site',
+                'type' => 'text',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+
             // Profile Settings
             [
                 'key' => 'profile.name',
