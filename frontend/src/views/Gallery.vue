@@ -341,7 +341,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-/* Bento Grid Layout */
+/* Bento Grid Layout with Fixed Heights */
 .bento-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -352,22 +352,34 @@ onBeforeUnmount(() => {
 @media (min-width: 768px) {
   .bento-grid {
     grid-template-columns: repeat(4, 1fr);
+    grid-auto-rows: 250px; /* ✅ Fixed base height */
   }
   
   .bento-large {
     grid-column: span 2;
     grid-row: span 2;
+    height: 100%; /* ✅ Force height */
   }
   
   .bento-medium {
     grid-column: span 2;
     grid-row: span 1;
+    height: 100%; /* ✅ Force height */
   }
   
   .bento-small {
     grid-column: span 1;
     grid-row: span 1;
+    height: 100%; /* ✅ Force height */
   }
+}
+
+/* ✅ Force consistent image sizing */
+.gallery-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
 }
 
 /* Animations */
