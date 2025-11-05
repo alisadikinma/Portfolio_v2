@@ -89,12 +89,12 @@
                   </svg>
                 </div>
 
-                <!-- Content Overlay -->
-                <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent opacity-60 group-hover:opacity-80 transition-opacity duration-500"></div>
+                <!-- Content Overlay - MINIMIZED by default, FULL on hover -->
+                <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-40 group-hover:opacity-90 transition-opacity duration-500"></div>
                 
                 <div class="absolute inset-0 p-6 flex flex-col justify-end z-20">
-                  <!-- Badges -->
-                  <div class="flex items-center gap-2 mb-3 transform translate-y-2 group-hover:translate-y-0 transition-transform duration-500">
+                  <!-- Badges - Always visible -->
+                  <div class="flex items-center gap-2 mb-3 transform translate-y-0 transition-transform duration-500">
                     <div v-if="item.items_count" class="px-3 py-1.5 bg-white/20 backdrop-blur-md rounded-full text-white text-xs font-semibold border border-white/30">
                       <svg class="w-3 h-3 inline-block mr-1" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z"/>
@@ -106,18 +106,18 @@
                     </div>
                   </div>
 
-                  <!-- Title -->
-                  <h3 class="text-2xl font-bold text-white mb-2 transform translate-y-2 group-hover:translate-y-0 transition-transform duration-500 delay-75">
+                  <!-- Title - Always visible but smaller by default -->
+                  <h3 class="text-lg md:text-xl group-hover:text-2xl font-bold text-white mb-0 group-hover:mb-2 transform translate-y-0 transition-all duration-500">
                     {{ item.title }}
                   </h3>
 
-                  <!-- Description -->
-                  <p v-if="item.description" class="text-white/80 text-sm line-clamp-2 transform translate-y-2 group-hover:translate-y-0 transition-transform duration-500 delay-100">
+                  <!-- Description - HIDDEN by default, VISIBLE on hover -->
+                  <p v-if="item.description" class="text-white/80 text-sm line-clamp-2 opacity-0 group-hover:opacity-100 max-h-0 group-hover:max-h-20 overflow-hidden transform translate-y-2 group-hover:translate-y-0 transition-all duration-500 delay-75">
                     {{ item.description }}
                   </p>
 
-                  <!-- Period -->
-                  <p v-if="item.period" class="text-white/60 text-xs mt-2 transform translate-y-2 group-hover:translate-y-0 transition-transform duration-500 delay-150">
+                  <!-- Period - HIDDEN by default, VISIBLE on hover -->
+                  <p v-if="item.period" class="text-white/60 text-xs mt-0 group-hover:mt-2 opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 transition-all duration-500 delay-100">
                     {{ item.period }}
                   </p>
 
