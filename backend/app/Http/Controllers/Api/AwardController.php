@@ -106,6 +106,15 @@ class AwardController extends Controller
             $awards = $query->limit($limit)->get();
 
             $formattedAwards = $awards->map(function($award) {
+                // Get thumbnail from first gallery
+                $thumbnail = null;
+                $firstGallery = $award->galleries->first();
+                if ($firstGallery && $firstGallery->thumbnail) {
+                    $thumbnail = str_starts_with($firstGallery->thumbnail, '/storage/') 
+                        ? url($firstGallery->thumbnail) 
+                        : asset('storage/' . $firstGallery->thumbnail);
+                }
+
                 return [
                     'id' => $award->id,
                     'award_title' => $award->title,
@@ -120,6 +129,7 @@ class AwardController extends Controller
                             ? url($award->image)
                             : asset('uploads/awards/' . $award->image))
                         : null,
+                    'thumbnail' => $thumbnail,
                     'award_date' => $award->received_at,
                     'received_at' => $award->received_at,
                     'sort_order' => $award->sort_order ?? 0,
@@ -139,6 +149,15 @@ class AwardController extends Controller
         $awards = $query->get();
 
         $formattedAwards = $awards->map(function($award) {
+            // Get thumbnail from first gallery
+            $thumbnail = null;
+            $firstGallery = $award->galleries->first();
+            if ($firstGallery && $firstGallery->thumbnail) {
+                $thumbnail = str_starts_with($firstGallery->thumbnail, '/storage/') 
+                    ? url($firstGallery->thumbnail) 
+                    : asset('storage/' . $firstGallery->thumbnail);
+            }
+
             return [
                 'id' => $award->id,
                 'award_title' => $award->title,
@@ -153,6 +172,7 @@ class AwardController extends Controller
                         ? url($award->image)
                         : asset('uploads/awards/' . $award->image))
                     : null,
+                'thumbnail' => $thumbnail,
                 'award_date' => $award->received_at,
                 'received_at' => $award->received_at,
                 'sort_order' => $award->sort_order ?? 0,

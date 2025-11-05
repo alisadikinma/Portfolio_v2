@@ -238,7 +238,7 @@ import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useAwards } from '@/composables/useAwards'
 import api from '@/services/api'
 
-const { awards, isLoading, error } = useAwards()
+const { awards, isLoading, error, fetchAwards } = useAwards()
 
 const showGalleryModal = ref(false)
 const selectedAward = ref(null)
@@ -335,6 +335,9 @@ const handleKeydown = (e) => {
 }
 
 onMounted(() => {
+  // Fetch all awards (no filters - show all)
+  fetchAwards()
+  
   window.addEventListener('keydown', handleKeydown)
 })
 

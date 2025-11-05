@@ -201,7 +201,7 @@
 
       <div class="container-custom relative z-10">
         <!-- Section Header -->
-        <div class="text-center mb-16">
+        <div class="text-center mb-6 md:mb-12">
           <p class="text-purple-400 font-semibold mb-3 uppercase tracking-wider text-sm flex items-center justify-center gap-2">
             <svg class="w-5 h-5 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
               <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
@@ -248,133 +248,99 @@
                 @touchstart="isHoveringAwardCard = true"
                 @touchend="isHoveringAwardCard = false"
               >
-                <!-- Card with glass morphism -->
+                <!-- Card with glass morphism - NEW 60/40 Layout -->
                 <div 
                   class="relative w-[320px] md:w-[380px] h-[500px] md:h-[550px] rounded-2xl overflow-hidden backdrop-blur-xl border shadow-2xl group"
                   :class="[
                     index === activeAwardIndex 
-                      ? 'bg-white/60 border-white/50' 
-                      : 'bg-white/20 border-white/25'
+                      ? 'bg-white/90 border-white/50' 
+                      : 'bg-white/30 border-white/25'
                   ]"
                 >
                   <!-- Gradient overlay -->
                   <div class="absolute inset-0 bg-gradient-to-br from-purple-500/20 via-transparent to-pink-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                   
-                  <!-- Content -->
-                  <div class="relative z-10 p-8 h-full flex flex-col">
-                    <!-- Top section -->
-                    <div class="flex items-start justify-between mb-6">
-                      <!-- Award Icon with glow -->
-                      <div class="relative">
-                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-2xl blur-xl opacity-60 group-hover:opacity-100 transition-opacity animate-pulse"></div>
-                        <div v-if="award.image" class="relative w-24 h-24 rounded-2xl overflow-hidden bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-800 p-3 shadow-2xl transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
-                          <img :src="award.image" :alt="award.award_title" class="w-full h-full object-contain" />
-                        </div>
-                        <div v-else class="relative w-24 h-24 bg-gradient-to-br from-yellow-400 via-orange-500 to-red-500 rounded-2xl flex items-center justify-center shadow-2xl transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
-                          <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
-                          </svg>
-                        </div>
+                  <!-- Content: 60/40 Vertical Split -->
+                  <div class="relative z-10 h-full flex flex-col">
+                    <!-- Top 60%: Trophy Photo Section -->
+                    <div class="h-[60%] relative overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900">
+                      <!-- Trophy Image (280x280) -->
+                      <img 
+                        v-if="award.thumbnail" 
+                        :src="award.thumbnail" 
+                        :alt="award.award_title"
+                        class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        @error="(e) => e.target.src = award.image || 'https://via.placeholder.com/280x280/e5e7eb/6b7280?text=No+Photo'"
+                      />
+                      <div v-else class="w-full h-full flex items-center justify-center bg-gradient-to-br from-yellow-400 via-orange-500 to-red-500">
+                        <svg class="w-24 h-24 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
+                        </svg>
                       </div>
-
-                      <!-- Year badge -->
-                      <div class="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full shadow-lg">
+                      
+                      <!-- Year Badge Overlay -->
+                      <div class="absolute bottom-4 right-4 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full shadow-lg">
                         <span class="text-white font-bold text-sm">{{ formatYear(award.award_date) }}</span>
                       </div>
-                    </div>
-
-                    <!-- Award title -->
-                    <h3 
-                      class="text-2xl font-bold mb-3 line-clamp-2 transition-colors"
-                      :class="[
-                        index === activeAwardIndex
-                          ? 'text-gray-900 hover:text-purple-600'
-                          : 'text-white hover:text-purple-300'
-                      ]"
-                    >
-                      {{ award.award_title }}
-                    </h3>
-
-                    <!-- Organization -->
-                    <div class="flex items-center gap-2 mb-4 pb-4 border-b border-white/10">
-                      <svg 
-                        class="w-5 h-5" 
-                        :class="index === activeAwardIndex ? 'text-purple-600' : 'text-purple-400'"
-                        fill="none" 
-                        stroke="currentColor" 
-                        viewBox="0 0 24 24"
-                      >
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
-                      </svg>
-                      <p 
-                        class="font-semibold text-sm uppercase tracking-wide"
-                        :class="index === activeAwardIndex ? 'text-purple-700' : 'text-purple-300'"
-                      >
-                        {{ award.issuing_organization }}
-                      </p>
-                    </div>
-
-                    <!-- Description -->
-                    <p 
-                      v-if="award.description" 
-                      class="text-sm leading-relaxed line-clamp-3 mb-6 flex-1"
-                      :class="index === activeAwardIndex ? 'text-gray-700' : 'text-gray-300'"
-                    >
-                      {{ stripHtml(award.description) }}
-                    </p>
-
-                    <!-- Bottom badges -->
-                    <div class="flex items-center gap-3 mb-4">
-                      <div v-if="award.credential_id" class="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 rounded-lg backdrop-blur-sm">
-                        <svg 
-                          class="w-4 h-4" 
-                          :class="index === activeAwardIndex ? 'text-purple-600' : 'text-purple-400'"
-                          fill="none" 
-                          stroke="currentColor" 
-                          viewBox="0 0 24 24"
-                        >
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
-                        </svg>
-                        <span 
-                          class="text-xs font-medium"
-                          :class="index === activeAwardIndex ? 'text-gray-900' : 'text-white'"
-                        >
-                          {{ award.credential_id }}
-                        </span>
-                      </div>
-                      <div v-if="award.total_photos > 0" class="flex items-center gap-1.5 px-3 py-1.5 bg-purple-500/30 rounded-lg backdrop-blur-sm">
-                        <svg 
-                          class="w-4 h-4" 
-                          :class="index === activeAwardIndex ? 'text-purple-600' : 'text-purple-300'"
-                          fill="none" 
-                          stroke="currentColor" 
-                          viewBox="0 0 24 24"
-                        >
+                      
+                      <!-- Photos Count Badge -->
+                      <div v-if="award.total_photos > 0" class="absolute bottom-4 left-4 px-3 py-1.5 bg-black/70 backdrop-blur-sm rounded-lg flex items-center gap-1.5">
+                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                         </svg>
-                        <span 
-                          class="text-xs font-semibold"
-                          :class="index === activeAwardIndex ? 'text-gray-900' : 'text-white'"
-                        >
-                          {{ award.total_photos }} Photos
-                        </span>
+                        <span class="text-white text-xs font-semibold">{{ award.total_photos }}</span>
                       </div>
                     </div>
 
-                    <!-- View button - FIXED: stop event propagation to prevent carousel navigation -->
-                    <button
-                      v-if="award.total_photos > 0"
-                      @click.stop="openGalleryModal(award)"
-                      @touchend.stop
-                      class="w-full relative overflow-hidden px-6 py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-xl font-bold text-white shadow-xl shadow-purple-500/50 hover:shadow-2xl hover:shadow-purple-500/70 transition-all duration-300 transform hover:scale-105 flex items-center justify-center gap-2 group"
-                    >
-                      <span class="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></span>
-                      <svg class="w-5 h-5 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                      </svg>
-                      <span class="relative z-10">VIEW GALLERY</span>
-                    </button>
+                    <!-- Bottom 40%: Content Section -->
+                    <div class="h-[40%] p-6 flex flex-col gap-3">
+                      <!-- Award Title -->
+                      <h3 
+                        class="text-lg font-bold line-clamp-2 transition-colors"
+                        :class="[
+                          index === activeAwardIndex
+                            ? 'text-gray-900 hover:text-purple-600'
+                            : 'text-gray-800 hover:text-purple-400'
+                        ]"
+                      >
+                        {{ award.award_title }}
+                      </h3>
+
+                      <!-- Organization -->
+                      <div class="flex items-center gap-2">
+                        <svg 
+                          class="w-4 h-4 shrink-0" 
+                          :class="index === activeAwardIndex ? 'text-purple-600' : 'text-purple-500'"
+                          fill="none" 
+                          stroke="currentColor" 
+                          viewBox="0 0 24 24"
+                        >
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                        </svg>
+                        <p 
+                          class="font-semibold text-xs uppercase tracking-wide truncate"
+                          :class="index === activeAwardIndex ? 'text-purple-700' : 'text-purple-600'"
+                        >
+                          {{ award.issuing_organization }}
+                        </p>
+                      </div>
+
+                      
+                      <!-- View Gallery Button -->
+                      <button
+                        v-if="award.total_photos > 0"
+                        @click.stop="openGalleryModal(award)"
+                        @touchend.stop
+                        class="w-full relative overflow-hidden px-5 py-3 mt-auto bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-xl font-bold text-white text-sm shadow-lg shadow-purple-500/50 hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2 group"
+                      >
+                        <span class="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></span>
+                        <svg class="w-4 h-4 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                        </svg>
+                        <span class="relative z-10">VIEW GALLERY</span>
+                      </button>
+                    </div>
                   </div>
 
                   <!-- Reflection effect -->
@@ -646,6 +612,16 @@
 
                 <!-- Content Section -->
                 <div class="p-6 space-y-4">
+                  <!-- Client Name (NEW) -->
+                  <div v-if="item.client" class="flex items-center gap-2">
+                    <svg class="w-4 h-4 text-primary-600 dark:text-primary-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                    </svg>
+                    <span class="text-sm font-semibold text-primary-600 dark:text-primary-400 truncate">
+                      {{ item.client }}
+                    </span>
+                  </div>
+                  
                   <!-- Title -->
                   <h3 class="text-xl font-bold text-gray-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors line-clamp-2">
                     {{ item.title }}
@@ -722,6 +698,16 @@
 
             <!-- Content Section -->
             <div class="p-5 space-y-3">
+              <!-- Client Name (NEW) -->
+              <div v-if="project.client" class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-primary-600 dark:text-primary-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                </svg>
+                <span class="text-sm font-semibold text-primary-600 dark:text-primary-400 truncate">
+                  {{ project.client }}
+                </span>
+              </div>
+              
               <!-- Title -->
               <h3 class="text-lg font-bold text-gray-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors line-clamp-2">
                 {{ project.title }}
