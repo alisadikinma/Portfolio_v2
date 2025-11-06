@@ -3,7 +3,7 @@ import axios from 'axios'
 // Create axios instance
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost/Portfolio_v2/backend/public/api',
-  timeout: 15000,
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
