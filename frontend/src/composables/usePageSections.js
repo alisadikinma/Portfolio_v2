@@ -12,6 +12,11 @@ export function usePageSections() {
   
   // State untuk instant data dari localStorage
   const cachedSections = ref(null)
+  
+  // Separate state for admin data (no cache)
+  const adminSections = ref([])
+  const adminLoading = ref(false)
+  const adminError = ref(null)
 
   // Load instant cache on mount
   onMounted(() => {
@@ -28,7 +33,7 @@ export function usePageSections() {
   // Fetch active sections with caching (10min stale / 1hr cache)
   const {
     data: sectionsData,
-    isLoading,
+    isLoading: publicLoading,
     error: queryError,
     refetch
   } = useQuery({
@@ -57,27 +62,44 @@ export function usePageSections() {
     }
   })
 
-  // Computed values - prefer localStorage instant data
+  // Computed values - prefer admin data if available, otherwise public data
   const sections = computed(() => {
-    if (isLoading.value && cachedSections.value) {
+    // Admin data takes precedence
+    if (adminSections.value.length > 0) {
+      return adminSections.value
+    }
+    
+    // Otherwise use public data with cache
+    if (publicLoading.value && cachedSections.value) {
       return cachedSections.value
     }
     return sectionsData.value || []
   })
   
-  const error = computed(() => queryError.value?.response?.data?.message || queryError.value?.message || null)
+  const isLoading = computed(() => adminLoading.value || publicLoading.value)
+  const error = computed(() => adminError.value || queryError.value?.response?.data?.message || queryError.value?.message || null)
 
   // Fetch all sections (admin) - NO CACHE (admin data)
   const fetchSections = async (page = null) => {
+    adminLoading.value = true
+    adminError.value = null
+    
     try {
       const params = page ? { page } : {}
       const response = await api.get('/admin/page-sections', { params })
+      
+      // Update admin sections state
+      adminSections.value = response.data.data
+      
       return { success: true, data: response.data.data }
     } catch (err) {
+      adminError.value = err.response?.data?.message || 'Failed to fetch sections'
       return {
         success: false,
-        error: err.response?.data?.message || 'Failed to fetch sections'
+        error: adminError.value
       }
+    } finally {
+      adminLoading.value = false
     }
   }
 
@@ -117,7 +139,13 @@ export function usePageSections() {
     try {
       const response = await api.put(`/admin/page-sections/${id}`, data)
 
-      // Invalidate cache
+      // Update local admin sections
+      const index = adminSections.value.findIndex(s => s.id === id)
+      if (index !== -1) {
+        adminSections.value[index] = response.data.data
+      }
+
+      // Invalidate public cache
       queryClient.invalidateQueries({ queryKey: ['page-sections'] })
       if (selectedPage.value) {
         const cacheKey = `page_sections_${selectedPage.value}`
@@ -139,7 +167,10 @@ export function usePageSections() {
     try {
       const response = await api.put('/admin/page-sections/reorder', { items })
       
-      // Invalidate cache
+      // Update local admin sections
+      adminSections.value = response.data.data
+      
+      // Invalidate public cache
       queryClient.invalidateQueries({ queryKey: ['page-sections'] })
       if (selectedPage.value) {
         const cacheKey = `page_sections_${selectedPage.value}`
