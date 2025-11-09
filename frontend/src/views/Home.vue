@@ -38,23 +38,38 @@
                 <div class="absolute -bottom-6 -left-6 w-32 h-32 bg-primary-500/10 rounded-full blur-3xl"></div>
               </div>
 
-              <!-- Certifications -->
-              <div v-if="aboutSettings?.certifications?.length > 0" class="mt-5 md:mt-6">
-                <div class="flex items-center justify-center gap-3 md:gap-4 flex-wrap">
-                  <p class="text-xs text-gray-500 dark:text-gray-500 uppercase tracking-wider font-semibold">
+              <!-- Certifications - OPTIMIZED (Nov 9, 2025) -->
+              <div v-if="aboutSettings?.certifications?.length > 0" class="mt-6 md:mt-8">
+                <div class="flex flex-col items-center gap-4">
+                  <p class="text-xs md:text-sm text-gray-600 dark:text-gray-400 uppercase tracking-wider font-semibold">
                     CERTIFIED BY:
                   </p>
-                  <div class="flex gap-2 md:gap-3">
+                  <div class="flex items-center justify-center gap-4 md:gap-6 flex-wrap">
                     <a
                       v-for="cert in aboutSettings.certifications"
                       :key="cert.name"
                       :href="cert.url"
                       target="_blank"
                       rel="noopener noreferrer"
-                      class="group p-2 md:p-3 glass rounded-lg hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5"
+                      class="group relative p-3 md:p-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-primary-500 dark:hover:border-primary-400 hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
                       :title="cert.name"
                     >
-                      <img :src="getCertLogo(cert.name)" :alt="cert.name" class="w-6 h-6 md:w-8 md:h-8 object-contain" />
+                      <!-- Glow effect on hover -->
+                      <div class="absolute inset-0 bg-gradient-to-r from-primary-500/10 to-secondary-500/10 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                      
+                      <img 
+                        v-if="getCertLogo(cert)" 
+                        :src="getCertLogo(cert)" 
+                        :alt="cert.name" 
+                        class="relative z-10 w-6 h-6 md:w-10 md:h-10 object-contain filter grayscale-0 group-hover:grayscale-0 transition-all"
+                        @error="(e) => { console.error('[Home] Cert logo failed:', cert.name, getCertLogo(cert)); e.target.style.display='none' }"
+                      />
+                      <span 
+                        v-else 
+                        class="relative z-10 text-xs font-semibold text-neutral-600 dark:text-neutral-400 px-3"
+                      >
+                        {{ cert.name }}
+                      </span>
                     </a>
                   </div>
                 </div>
@@ -1252,11 +1267,6 @@ import { useSettings } from '@/composables/useSettings'
 import { BaseLoader, MobileCarousel, BaseGalleryModal, BaseLightbox } from '@/components/base'
 import api from '@/services/api'
 
-// Import certification logos
-import googleLogo from '@/assets/certifications/google.png'
-import oracleLogo from '@/assets/certifications/oracle.png'
-import outskillLogo from '@/assets/certifications/outskill.png'
-
 const { projects, isLoading: projectsLoading, fetchProjects } = useProjects()
 
 // Featured projects computed (backend already filters, but we create alias for clarity)
@@ -1555,13 +1565,31 @@ const handleAvatarError = (event) => {
   event.target.style.display = 'none'
 }
 
-// Get certification logo based on name
-const getCertLogo = (name) => {
-  const lowerName = name.toLowerCase()
-  if (lowerName.includes('google')) return googleLogo
-  if (lowerName.includes('oracle')) return oracleLogo
-  if (lowerName.includes('outskill')) return outskillLogo
-  return '' // no logo for unknown cert
+// Get certification logo from database or fallback
+const getCertLogo = (cert) => {
+  if (!cert) {
+    console.warn('[Home] getCertLogo: cert is null/undefined')
+    return ''
+  }
+  
+  console.log('[Home] getCertLogo:', { name: cert.name, logo: cert.logo })
+  
+  // Use uploaded logo if available
+  if (cert.logo) {
+    const logo = cert.logo
+    if (logo.startsWith('http://') || logo.startsWith('https://')) {
+      return logo
+    }
+    
+    // FIXED: Path already includes /uploads/, don't double it
+    const fullUrl = import.meta.env.VITE_API_URL.replace('/api', '') + logo
+    console.log('[Home] Full logo URL:', fullUrl)
+    return fullUrl
+  }
+  
+  // Fallback: return placeholder or empty
+  console.warn('[Home] No logo found for:', cert.name)
+  return ''
 }
 
 // 3D Coverflow + Magnetic Hover Functions
@@ -1844,6 +1872,13 @@ onMounted(async () => {
   console.log('   Gallery:', showGallerySection.value)
   console.log('   Testimonials:', showTestimonialsSection.value)
   console.log('   CTA:', showCTASection.value)
+  console.log('\n🎓 Certifications Data:')
+  console.log('   Count:', aboutSettings.value?.certifications?.length || 0)
+  if (aboutSettings.value?.certifications) {
+    aboutSettings.value.certifications.forEach((cert, i) => {
+      console.log(`   [${i}] ${cert.name}:`, cert.logo ? 'HAS LOGO' : 'NO LOGO', cert.logo || '')
+    })
+  }
   console.groupEnd()
   
   // Image performance on window load

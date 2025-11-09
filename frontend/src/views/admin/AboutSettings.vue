@@ -810,6 +810,66 @@
                 </p>
               </div>
             </div>
+
+            <!-- Logo Upload -->
+            <div class="mt-4">
+              <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                Certification Logo
+              </label>
+              <div class="flex items-center gap-4">
+                <!-- Current Logo Preview -->
+                <div class="relative w-16 h-16 rounded-lg overflow-hidden bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center">
+                  <img 
+                    v-if="getCertLogoPreview(index)" 
+                    :src="getCertLogoPreview(index)" 
+                    :alt="cert.name" 
+                    class="w-full h-full object-contain"
+                  />
+                  <svg 
+                    v-else
+                    class="w-8 h-8 text-neutral-400 dark:text-neutral-500" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+
+                <!-- Upload Input -->
+                <div class="flex-1">
+                  <input
+                    :ref="el => certLogoInputs[index] = el"
+                    type="file"
+                    accept="image/png,image/jpeg,image/jpg,image/svg+xml"
+                    class="hidden"
+                    @change="handleCertLogoChange(index, $event)"
+                  />
+                  <BaseButton
+                    type="button"
+                    button-type="secondary"
+                    size="sm"
+                    @click="certLogoInputs[index]?.click()"
+                  >
+                    {{ getCertLogoPreview(index) ? 'Change Logo' : 'Upload Logo' }}
+                  </BaseButton>
+                  <p class="text-xs text-neutral-500 dark:text-neutral-400 mt-2">
+                    PNG, JPG, SVG (max 2MB)
+                  </p>
+                </div>
+
+                <!-- Remove Logo Button -->
+                <BaseButton
+                  v-if="getCertLogoPreview(index)"
+                  type="button"
+                  button-type="danger"
+                  size="sm"
+                  @click="removeCertLogo(index)"
+                >
+                  Remove
+                </BaseButton>
+              </div>
+            </div>
           </div>
         </div>
       </BaseCard>
@@ -986,6 +1046,9 @@ const formData = ref({
 
 const photoFile = ref(null)
 const photoRemoved = ref(false)
+const certLogoInputs = ref([])
+const certLogoFiles = ref({}) // { index: File }
+const certLogosRemoved = ref([]) // [index]
 
 // Current photo URL
 const currentPhotoUrl = computed(() => {
@@ -1080,12 +1143,70 @@ function removeSocialLink(index) {
 function addCertification() {
   formData.value.certifications.push({
     name: '',
-    url: ''
+    url: '',
+    logo: null
   })
 }
 
 function removeCertification(index) {
   formData.value.certifications.splice(index, 1)
+  // Clean up logo files
+  delete certLogoFiles.value[index]
+  certLogosRemoved.value = certLogosRemoved.value.filter(i => i !== index)
+}
+
+// Certification logo handling
+function handleCertLogoChange(index, event) {
+  const file = event.target.files[0]
+  if (file) {
+    if (file.size > 2 * 1024 * 1024) {
+      uiStore.showError('Logo file size must not exceed 2MB', 'Upload Error')
+      return
+    }
+    certLogoFiles.value[index] = file
+    certLogosRemoved.value = certLogosRemoved.value.filter(i => i !== index)
+  }
+}
+
+function removeCertLogo(index) {
+  certLogoFiles.value[index] = null
+  certLogosRemoved.value.push(index)
+  if (certLogoInputs.value[index]) {
+    certLogoInputs.value[index].value = ''
+  }
+}
+
+function getCertLogoPreview(index) {
+  console.log(`[AboutSettings] getCertLogoPreview(${index}):`, {
+    hasFile: !!certLogoFiles.value[index],
+    removed: certLogosRemoved.value.includes(index),
+    dbLogo: formData.value.certifications[index]?.logo
+  })
+  
+  if (certLogosRemoved.value.includes(index)) return null
+  
+  if (certLogoFiles.value[index]) {
+    const url = URL.createObjectURL(certLogoFiles.value[index])
+    console.log(`[AboutSettings] Preview from file:`, url)
+    return url
+  }
+  
+  if (formData.value.certifications[index]?.logo) {
+    const logo = formData.value.certifications[index].logo
+    console.log(`[AboutSettings] DB logo path:`, logo)
+    
+    if (logo.startsWith('http://') || logo.startsWith('https://')) {
+      return logo
+    }
+    
+    // FIXED: Path already includes /uploads/, don't double it
+    const fullUrl = import.meta.env.VITE_API_URL.replace('/api', '') + logo
+    console.log(`[AboutSettings] Preview from DB:`, fullUrl)
+    return fullUrl
+  }
+  
+  console.warn(`[AboutSettings] No logo for cert #${index}`)
+  return null
 }
 
 // Photo handling
@@ -1165,6 +1286,13 @@ async function handleSubmit() {
       data.append('profile_photo', photoFile.value)
     }
 
+    // Certification logos
+    Object.keys(certLogoFiles.value).forEach(index => {
+      if (certLogoFiles.value[index]) {
+        data.append(`certification_logo_${index}`, certLogoFiles.value[index])
+      }
+    })
+
     // Arrays as JSON strings
     if (cleanedLanguages.length > 0) {
       data.append('languages', JSON.stringify(cleanedLanguages))
@@ -1238,6 +1366,8 @@ async function handleSubmit() {
     // Reset photo upload state
     photoFile.value = null
     photoRemoved.value = false
+    certLogoFiles.value = {}
+    certLogosRemoved.value = []
     if (fileInput.value) {
       fileInput.value.value = ''
     }

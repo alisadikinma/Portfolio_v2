@@ -78,10 +78,14 @@ class UpdateAboutSettingsRequest extends FormRequest
             'statistics.cost_savings' => ['nullable', 'string', 'max:50'],
             'statistics.success_rate' => ['nullable', 'string', 'max:50'],
 
-            // Certifications (array of objects with name and url)
+            // Certifications (array of objects with name, url, and optional logo)
             'certifications' => ['nullable'],
             'certifications.*.name' => ['required', 'string', 'max:255'],
             'certifications.*.url' => ['required', 'url', 'max:500'],
+            'certifications.*.logo' => ['nullable', 'string', 'max:500'], // Path to uploaded logo
+            
+            // Dynamic logo uploads per certification (certification_logo_0, certification_logo_1, etc.)
+            'certification_logo_*' => ['nullable', 'image', 'mimes:jpg,jpeg,png,svg', 'max:2048'], // 2MB max
         ];
     }
 

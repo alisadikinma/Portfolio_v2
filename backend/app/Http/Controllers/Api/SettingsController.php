@@ -97,6 +97,14 @@ class SettingsController extends Controller
             
             $validated = $request->validated();
             
+            // DEBUG: Log certifications BEFORE processing
+            Log::info('🎓 CERTIFICATIONS BEFORE PROCESSING:', [
+                'exists' => isset($validated['certifications']),
+                'is_array' => isset($validated['certifications']) && is_array($validated['certifications']),
+                'count' => isset($validated['certifications']) ? count($validated['certifications']) : 0,
+                'data' => $validated['certifications'] ?? null
+            ]);
+            
             Log::info('📝 About settings update started', [
                 'validated_keys' => array_keys($validated),
                 'has_photo' => $request->hasFile('profile_photo')
@@ -133,6 +141,54 @@ class SettingsController extends Controller
                 }
             }
 
+            // Handle certification logo uploads
+            if (isset($validated['certifications']) && is_array($validated['certifications'])) {
+                Log::info('🎓 Processing certification logos...');
+                
+                $uploadPath = public_path('uploads/certifications');
+                if (!file_exists($uploadPath)) {
+                    mkdir($uploadPath, 0755, true);
+                    Log::info('📁 Created certifications upload directory');
+                }
+
+                foreach ($validated['certifications'] as $index => $cert) {
+                    $fileKey = "certification_logo_{$index}";
+                    
+                    Log::info("🔍 Checking cert #{$index}:", [
+                        'fileKey' => $fileKey,
+                        'hasFile' => $request->hasFile($fileKey),
+                        'cert_name' => $cert['name'] ?? 'N/A',
+                        'existing_logo' => $cert['logo'] ?? null
+                    ]);
+                    
+                    if ($request->hasFile($fileKey)) {
+                        $file = $request->file($fileKey);
+                        $filename = time() . "_{$index}_" . $file->getClientOriginalName();
+                        $file->move($uploadPath, $filename);
+                        $validated['certifications'][$index]['logo'] = '/uploads/certifications/' . $filename;
+                        
+                        Log::info("✅ Logo uploaded for cert #{$index}:", [
+                            'filename' => $filename,
+                            'path' => $validated['certifications'][$index]['logo']
+                        ]);
+
+                        // Delete old logo if exists
+                        if (!empty($cert['logo']) && file_exists(public_path($cert['logo']))) {
+                            unlink(public_path($cert['logo']));
+                            Log::info("🗑️ Deleted old logo: {$cert['logo']}");
+                        }
+                    } else {
+                        Log::info("ℹ️ No new logo for cert #{$index}, keeping existing");
+                    }
+                }
+                
+                Log::info('🎓 CERTIFICATIONS AFTER PROCESSING:', [
+                    'data' => $validated['certifications']
+                ]);
+            } else {
+                Log::warning('⚠️ Certifications not found or not an array in validated data');
+            }
+
             // Save each setting
             foreach ($validated as $key => $value) {
                 $type = 'text';
@@ -150,7 +206,8 @@ class SettingsController extends Controller
                 Log::info('💾 Saving setting', [
                     'key' => $key,
                     'type' => $type,
-                    'value_length' => strlen($value)
+                    'value_length' => strlen($value),
+                    'value_preview' => $key === 'certifications' ? $value : (strlen($value) > 100 ? substr($value, 0, 100) . '...' : $value)
                 ]);
 
                 $setting = Setting::updateOrCreate(
