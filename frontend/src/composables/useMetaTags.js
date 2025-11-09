@@ -108,7 +108,7 @@ export function useMetaTags() {
 
     // Primary Meta Tags
     updateMetaTag('name', 'title', metaTitle)
-    updateMetaTag('name', 'description', siteDesc)
+    updateMetaTag('name', 'description', metaTags.description || siteDesc)
     updateMetaTag('name', 'keywords', metaTags.keywords || '')
     updateMetaTag('name', 'author', metaTags.author || siteTitle)
     updateMetaTag('name', 'robots', metaTags.robots || 'index, follow')
@@ -118,7 +118,7 @@ export function useMetaTags() {
     updateMetaTag('property', 'og:url', window.location.href)
     updateMetaTag('property', 'og:site_name', siteTitle)
     updateMetaTag('property', 'og:title', metaTags.og_title || metaTitle)
-    updateMetaTag('property', 'og:description', metaTags.og_description || siteDesc)
+    updateMetaTag('property', 'og:description', metaTags.og_description || metaTags.description || siteDesc)
     updateMetaTag('property', 'og:image', ogImage)
     updateMetaTag('property', 'og:image:width', '1200')
     updateMetaTag('property', 'og:image:height', '630')
@@ -128,7 +128,7 @@ export function useMetaTags() {
     updateMetaTag('name', 'twitter:card', 'summary_large_image')
     updateMetaTag('name', 'twitter:url', window.location.href)
     updateMetaTag('name', 'twitter:title', metaTags.twitter_title || metaTags.og_title || metaTitle)
-    updateMetaTag('name', 'twitter:description', metaTags.twitter_description || metaTags.og_description || siteDesc)
+    updateMetaTag('name', 'twitter:description', metaTags.twitter_description || metaTags.og_description || metaTags.description || siteDesc)
     updateMetaTag('name', 'twitter:image', ogImage)
     
     // Twitter username if available

@@ -49,11 +49,17 @@ export function useSiteSettings() {
   const contactEmail = computed(() => siteSettings.value?.contact_email || '')
   const contactPhone = computed(() => siteSettings.value?.contact_phone || '')
 
+  const clearCache = () => {
+    siteSettings.value = null
+    console.log('🗑️ [useSiteSettings] Cache cleared')
+  }
+
   return {
     siteSettings,
     loading,
     error,
     fetchSiteSettings,
+    clearCache,
     siteName,
     siteLogo,
     siteTagline,
