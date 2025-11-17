@@ -17,6 +17,26 @@
     <!-- Filters Section -->
     <section class="section bg-white dark:bg-neutral-800">
       <div class="container-custom">
+        <!-- Search Bar -->
+        <div class="max-w-2xl mx-auto mb-8">
+          <div class="relative">
+            <input
+              v-model="searchQuery"
+              type="text"
+              placeholder="Search projects by title, description, client, or technologies..."
+              class="w-full px-6 py-4 pr-12 border-2 border-neutral-300 dark:border-neutral-600 rounded-xl bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 placeholder-neutral-500 dark:placeholder-neutral-400 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+              @input="handleSearch"
+            />
+            <svg class="absolute right-4 top-1/2 -translate-y-1/2 w-6 h-6 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <p v-if="searchQuery" class="mt-2 text-sm text-neutral-600 dark:text-neutral-400 text-center">
+            {{ filteredProjects.length }} {{ filteredProjects.length === 1 ? 'result' : 'results' }} found
+          </p>
+        </div>
+
+        <!-- Category Filters -->
         <div class="flex flex-wrap gap-4 justify-center mb-8">
           <BaseButton
             v-for="filter in filters"
@@ -49,6 +69,12 @@
                   <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                 </svg>
                 FEATURED
+              </div>
+
+              <!-- Category Badge -->
+              <div v-if="project.category" class="absolute top-4 right-4 z-10 px-3 py-1 text-white text-xs font-bold rounded-full shadow-lg"
+                :class="getCategoryClass(project.category)">
+                {{ categoryLabels[project.category] || project.category }}
               </div>
 
               <!-- Image Section -->
@@ -212,7 +238,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useProjects } from '@/composables/useProjects'
 import { usePageSections } from '@/composables/usePageSections'
 import { useAboutSettings } from '@/composables/useAboutSettings'
@@ -226,6 +252,7 @@ const { aboutSettings } = useAboutSettings()
 const router = useRouter()
 
 const activeFilter = ref('all')
+const searchQuery = ref('')
 const currentPage = ref(1)
 const perPage = 9 // Show 9 projects per page
 
@@ -235,43 +262,76 @@ const showCTASection = computed(() => {
   return section ? section.is_active : false
 })
 
-// Dynamic domain filters based on available domains in projects
-const availableDomains = computed(() => {
-  const domains = new Set()
+// Dynamic category filters based on available categories in projects
+const availableCategories = computed(() => {
+  const categories = new Set()
   projects.value.forEach(project => {
-    if (project.domain) {
-      domains.add(project.domain)
+    if (project.category) {
+      categories.add(project.category)
     }
   })
-  return Array.from(domains).sort()
+  return Array.from(categories).sort()
 })
+
+// Category display mapping
+const categoryLabels = {
+  'AI': 'AI & Machine Learning',
+  'RPA': 'Automation',
+  'IoT': 'IoT',
+  'Web': 'Web Development',
+  'Mobile': 'Mobile Apps'
+}
 
 // Build filters dynamically
 const filters = computed(() => {
   const baseFilters = [
-    { label: 'All Projects', value: 'all' },
-    { label: 'Featured', value: 'featured' }
+    { label: 'All Projects', value: 'all' }
   ]
 
-  // Add domain filters
-  const domainFilters = availableDomains.value.map(domain => ({
-    label: domain,
-    value: domain
+  // Add category filters with display labels
+  const categoryFilters = availableCategories.value.map(category => ({
+    label: categoryLabels[category] || category,
+    value: category
   }))
 
-  return [...baseFilters, ...domainFilters]
+  return [...baseFilters, ...categoryFilters]
 })
 
-// Filtered projects based on active filter
+// Filtered projects based on active filter and search query
 const filteredProjects = computed(() => {
-  if (activeFilter.value === 'all') {
-    return projects.value
+  let results = projects.value
+
+  // Filter by category
+  if (activeFilter.value !== 'all') {
+    results = results.filter(p => p.category === activeFilter.value)
   }
-  if (activeFilter.value === 'featured') {
-    return projects.value.filter(p => p.is_featured)
+
+  // Filter by search query
+  if (searchQuery.value.trim()) {
+    const query = searchQuery.value.toLowerCase().trim()
+    results = results.filter(project => {
+      // Search in title
+      if (project.title?.toLowerCase().includes(query)) return true
+      
+      // Search in description
+      if (project.description?.toLowerCase().includes(query)) return true
+      
+      // Search in client name
+      if (project.client?.toLowerCase().includes(query)) return true
+      if (project.client_name?.toLowerCase().includes(query)) return true
+      
+      // Search in technologies
+      if (project.technologies && Array.isArray(project.technologies)) {
+        return project.technologies.some(tech => 
+          tech.toLowerCase().includes(query)
+        )
+      }
+      
+      return false
+    })
   }
-  // Filter by domain
-  return projects.value.filter(p => p.domain === activeFilter.value)
+
+  return results
 })
 
 // Total filtered projects count
@@ -325,6 +385,24 @@ const goToPage = (page) => {
 const changeFilter = (filterValue) => {
   activeFilter.value = filterValue
   currentPage.value = 1 // Reset to first page
+  searchQuery.value = '' // Clear search when changing filter
+}
+
+// Handle search
+const handleSearch = () => {
+  currentPage.value = 1 // Reset to first page on search
+}
+
+// Get category badge color class
+const getCategoryClass = (category) => {
+  const classes = {
+    'AI': 'bg-gradient-to-r from-purple-500 to-indigo-600',
+    'RPA': 'bg-gradient-to-r from-blue-500 to-cyan-600',
+    'IoT': 'bg-gradient-to-r from-green-500 to-emerald-600',
+    'Web': 'bg-gradient-to-r from-orange-500 to-red-600',
+    'Mobile': 'bg-gradient-to-r from-pink-500 to-rose-600'
+  }
+  return classes[category] || 'bg-gradient-to-r from-gray-500 to-gray-600'
 }
 
 // Format date
@@ -335,11 +413,6 @@ const formatDate = (date) => {
     month: 'short'
   })
 }
-
-// Watch filter changes
-watch(activeFilter, () => {
-  currentPage.value = 1
-})
 
 // Fetch projects and page sections on mount
 onMounted(async () => {

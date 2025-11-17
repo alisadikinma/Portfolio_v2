@@ -44,6 +44,7 @@ class UpdateProjectRequest extends FormRequest
             'slug' => ['nullable', 'string', 'max:255', Rule::unique('projects', 'slug')->ignore($projectId)],
             'description' => ['nullable', 'string'],
             'content' => ['nullable', 'string'],
+            'category' => ['nullable', 'string', 'max:100'],
             'featured_image' => ['nullable', 'image', 'max:5120'], // 5MB
             'technologies' => ['nullable', 'array'],
             'technologies.*' => ['string', 'max:100'],
@@ -70,7 +71,6 @@ class UpdateProjectRequest extends FormRequest
             'related_project_ids.*' => ['integer', 'exists:projects,id'],
 
             // Case Study fields (added Nov 3, 2025)
-            'domain' => ['nullable', 'string', 'max:100'],
             'impact_statement' => ['nullable', 'string', 'max:255'],
             'context' => ['nullable', 'string'],
             'role' => ['nullable', 'string', 'max:100'],

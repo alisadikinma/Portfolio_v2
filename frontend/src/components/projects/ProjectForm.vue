@@ -519,22 +519,21 @@
       </button>
 
       <div v-show="showCaseStudySection" class="p-4 space-y-4 bg-white dark:bg-neutral-900">
-        <!-- Domain -->
+        <!-- Category -->
         <div>
           <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-            Domain / Category
+            Category
           </label>
           <select
-            v-model="formData.domain"
+            v-model="formData.category"
             class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
           >
-            <option value="">Select domain...</option>
-            <option value="AI Automation">AI Automation</option>
-            <option value="Web Development">Web Development</option>
-            <option value="Mobile Apps">Mobile Apps</option>
-            <option value="IoT Solutions">IoT Solutions</option>
-            <option value="Data Analytics">Data Analytics</option>
-            <option value="Cloud Computing">Cloud Computing</option>
+            <option value="">Select category...</option>
+            <option value="AI">AI</option>
+            <option value="RPA">RPA</option>
+            <option value="IoT">IoT</option>
+            <option value="Web">Web</option>
+            <option value="Mobile">Mobile</option>
           </select>
         </div>
 
@@ -700,13 +699,13 @@ const formData = ref({
   start_date: '',
   end_date: '',
   is_featured: false,
+  category: '',
   meta_title: '',
   meta_description: '',
   focus_keyword: '',
   canonical_url: '',
   related_project_ids: [],
   // Case Study fields (added Nov 3, 2025)
-  domain: '',
   impact_statement: '',
   context: '',
   role: '',
@@ -750,6 +749,7 @@ if (props.project) {
     start_date: props.project.start_date || '',
     end_date: props.project.end_date || '',
     is_featured: props.project.is_featured || false,
+    category: props.project.category || '',
     meta_title: props.project.meta_title || '',
     meta_description: props.project.meta_description || '',
     focus_keyword: props.project.focus_keyword || '',
@@ -758,7 +758,6 @@ if (props.project) {
       ? props.project.related_project_ids
       : [],
     // Case Study fields (added Nov 3, 2025)
-    domain: props.project.domain || '',
     impact_statement: props.project.impact_statement || '',
     context: props.project.context || '',
     role: props.project.role || '',

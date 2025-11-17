@@ -217,6 +217,7 @@ class ProjectController extends Controller
                 'slug',
                 'description',
                 'content',
+                'category',
                 'technologies',
                 'client_name',
                 'project_url',
@@ -230,6 +231,14 @@ class ProjectController extends Controller
                 'focus_keyword',
                 'canonical_url',
                 'related_project_ids',
+                // Case Study fields
+                'impact_statement',
+                'context',
+                'role',
+                'problem',
+                'solution',
+                'integration',
+                'result',
             ]);
 
             // Handle featured (boolean conversion)
@@ -313,6 +322,7 @@ class ProjectController extends Controller
                 'slug',
                 'description',
                 'content',
+                'category',
                 'technologies',
                 'client_name',
                 'project_url',
@@ -326,6 +336,14 @@ class ProjectController extends Controller
                 'focus_keyword',
                 'canonical_url',
                 'related_project_ids',
+                // Case Study fields
+                'impact_statement',
+                'context',
+                'role',
+                'problem',
+                'solution',
+                'integration',
+                'result',
             ]);
 
             // Handle featured (boolean conversion)
