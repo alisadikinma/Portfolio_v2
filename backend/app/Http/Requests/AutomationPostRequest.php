@@ -22,7 +22,7 @@ class AutomationPostRequest extends FormRequest
         $rules = [
             'title' => 'required|string|max:255',
             'content' => 'required|string',
-            'category_id' => 'required|exists:blog_categories,id',
+            'category_id' => 'required|exists:categories,id',
             'slug' => 'nullable|string|max:255|unique:posts,slug,' . ($this->route('id') ?? 'NULL'),
             'excerpt' => 'nullable|string|max:500',
             'featured_image' => 'nullable|string', // Supports URL or base64

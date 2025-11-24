@@ -335,7 +335,7 @@ class AutomationController extends Controller
             'posts' => 'required|array|max:50',
             'posts.*.title' => 'required|string|max:255',
             'posts.*.content' => 'required|string',
-            'posts.*.category_id' => 'required|exists:blog_categories,id',
+            'posts.*.category_id' => 'required|exists:categories,id',
         ]);
 
         $posts = $request->input('posts');
