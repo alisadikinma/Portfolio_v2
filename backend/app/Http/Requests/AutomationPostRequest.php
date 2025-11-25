@@ -21,7 +21,7 @@ class AutomationPostRequest extends FormRequest
     {
         $rules = [
             'title' => 'required|string|max:255',
-            'content' => 'required|string',
+            'content' => 'required|string|min:10', // Min 10 chars to prevent empty content
             'category_id' => 'required|exists:categories,id',
             'slug' => 'nullable|string|max:255|unique:posts,slug,' . ($this->route('id') ?? 'NULL'),
             'excerpt' => 'nullable|string|max:500',
@@ -31,6 +31,16 @@ class AutomationPostRequest extends FormRequest
             'is_premium' => 'nullable|boolean',
             'published' => 'nullable|boolean',
             'published_at' => 'nullable|date',
+            
+            // SEO fields (optional)
+            'meta_title' => 'nullable|string|max:60',
+            'meta_description' => 'nullable|string|max:160',
+            'meta_keywords' => 'nullable|string|max:255',
+            'og_title' => 'nullable|string|max:60',
+            'og_description' => 'nullable|string|max:500',
+            'og_image' => 'nullable|string|max:255',
+            'canonical_url' => 'nullable|url|max:255',
+            'ai_summary' => 'nullable|string',
         ];
 
         return $rules;

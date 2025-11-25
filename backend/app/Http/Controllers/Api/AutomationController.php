@@ -166,12 +166,36 @@ class AutomationController extends Controller
 
             // Set default views
             $postData['views'] = 0;
+            
+            // Handle SEO fields from request
+            $seoFields = ['meta_title', 'meta_description', 'meta_keywords', 'og_title', 'og_description', 'og_image', 'canonical_url', 'ai_summary'];
+            foreach ($seoFields as $field) {
+                if ($request->filled($field)) {
+                    $postData[$field] = $request->input($field);
+                }
+            }
 
             $post = Post::create($postData);
 
+            // Auto-create default English translation for compatibility
+            // This ensures posts work with both API and Admin panel
+            $post->translations()->create([
+                'language' => 'en',
+                'title' => $postData['title'],
+                'slug' => $postData['slug'],
+                'excerpt' => $postData['excerpt'] ?? null,
+                'content' => $postData['content'],
+                'meta_title' => $postData['meta_title'] ?? $postData['title'],
+                'meta_description' => $postData['meta_description'] ?? $postData['excerpt'],
+                'og_title' => $postData['og_title'] ?? $postData['title'],
+                'og_description' => $postData['og_description'] ?? $postData['excerpt'],
+                'canonical_url' => $postData['canonical_url'] ?? null,
+                'ai_summary' => $postData['ai_summary'] ?? null,
+            ]);
+
             DB::commit();
 
-            $post->load(['category']);
+            $post->load(['category', 'translations']);
 
             $this->logAutomationRequest($request, 'posts.create', [
                 'post_id' => $post->id,

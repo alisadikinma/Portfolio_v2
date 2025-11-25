@@ -54,15 +54,27 @@ export const usePostsStore = defineStore('posts', () => {
       const response = await api.get('/admin/posts', { params: queryParams })
       console.log('[posts.js] Raw API response:', response)
 
-      // Handle response structure
+      // Handle response structure - support both array and object responses
       const responseData = response.data || response
       console.log('[posts.js] Response data:', responseData)
       
-      posts.value = responseData.data || []
+      // FIX: Check if responseData is array or has data property
+      if (Array.isArray(responseData)) {
+        posts.value = responseData
+      } else {
+        posts.value = responseData.data || []
+      }
       console.log('[posts.js] Posts extracted:', posts.value.length, 'items')
       
-      // Update pagination if meta exists
-      if (responseData.meta) {
+      // Update pagination - check response.meta first, then responseData.meta
+      if (response.meta) {
+        pagination.value = {
+          currentPage: response.meta.current_page || 1,
+          perPage: response.meta.per_page || 10,
+          total: response.meta.total || 0,
+          lastPage: response.meta.last_page || 1,
+        }
+      } else if (responseData.meta) {
         pagination.value = {
           currentPage: responseData.meta.current_page || 1,
           perPage: responseData.meta.per_page || 10,
