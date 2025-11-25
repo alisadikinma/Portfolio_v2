@@ -263,6 +263,14 @@ Route::middleware(['auth:sanctum'])->prefix('admin/page-sections')->group(functi
 // ============================================
 // Automation API Routes (n8n, Zapier, Make.com)
 // ============================================
+
+// Public automation routes (no auth required)
+Route::prefix('automation')->group(function () {
+    // Check duplicate post (public, no auth needed)
+    Route::post('/posts/check-duplicate', [PostController::class, 'checkDuplicate']);
+});
+
+// Protected automation routes (require auth token)
 Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->group(function () {
     // Image uploads for blog content
     Route::post('/upload-images', [AutomationController::class, 'uploadImages']); // Batch (recommended)
