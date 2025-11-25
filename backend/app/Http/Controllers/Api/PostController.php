@@ -243,7 +243,7 @@ class PostController extends Controller
                 'is_premium',
                 'published',
                 'published_at',
-                // SEO fields
+                // Global SEO fields (not per-language)
                 'meta_keywords',
                 'og_image',
                 'schema_markup',
@@ -251,6 +251,9 @@ class PostController extends Controller
                 'seo_score',
                 'index_follow',
             ]);
+            
+            // Note: Per-language SEO fields (meta_title, meta_description, og_title, 
+            // og_description, canonical_url, ai_summary) are in post_translations table
 
             // Handle featured image (base64 or file)
             if ($request->filled('featured_image')) {
@@ -337,7 +340,7 @@ class PostController extends Controller
                 'is_premium',
                 'published',
                 'published_at',
-                // SEO fields
+                // Global SEO fields (not per-language)
                 'meta_keywords',
                 'og_image',
                 'schema_markup',
@@ -345,6 +348,9 @@ class PostController extends Controller
                 'seo_score',
                 'index_follow',
             ]);
+            
+            // Note: Per-language SEO fields (meta_title, meta_description, og_title,
+            // og_description, canonical_url, ai_summary) are in post_translations table
 
             // Handle featured image (base64 or file)
             if ($request->filled('featured_image')) {
