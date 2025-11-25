@@ -243,6 +243,13 @@ class PostController extends Controller
                 'is_premium',
                 'published',
                 'published_at',
+                // SEO fields
+                'meta_keywords',
+                'og_image',
+                'schema_markup',
+                'faq_schema',
+                'seo_score',
+                'index_follow',
             ]);
 
             // Handle featured image (base64 or file)
@@ -330,6 +337,13 @@ class PostController extends Controller
                 'is_premium',
                 'published',
                 'published_at',
+                // SEO fields
+                'meta_keywords',
+                'og_image',
+                'schema_markup',
+                'faq_schema',
+                'seo_score',
+                'index_follow',
             ]);
 
             // Handle featured image (base64 or file)

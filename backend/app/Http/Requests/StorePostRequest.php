@@ -34,6 +34,14 @@ class StorePostRequest extends FormRequest
             'published' => ['nullable', 'boolean'],
             'published_at' => ['nullable', 'date'],
 
+            // SEO Fields (global - on posts table)
+            'meta_keywords' => ['nullable', 'string', 'max:255'],
+            'og_image' => ['nullable', 'string', 'max:255'],
+            'schema_markup' => ['nullable', 'json'],
+            'faq_schema' => ['nullable', 'json'],
+            'seo_score' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'index_follow' => ['nullable', 'boolean'],
+
             // Translations
             'translations' => ['required', 'array', 'min:1'],
             'translations.*.language' => ['required', 'string', Rule::in(['en', 'id'])],

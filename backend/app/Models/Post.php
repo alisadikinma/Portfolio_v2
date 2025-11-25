@@ -25,6 +25,13 @@ class Post extends Model
         'published_at',
         'views',
         'reading_time',
+        // SEO fields
+        'meta_keywords',
+        'og_image',
+        'schema_markup',
+        'faq_schema',
+        'seo_score',
+        'index_follow',
     ];
 
     protected $casts = [
@@ -32,6 +39,9 @@ class Post extends Model
         'is_premium' => 'boolean',
         'published' => 'boolean',
         'published_at' => 'datetime',
+        'schema_markup' => 'array',
+        'faq_schema' => 'array',
+        'index_follow' => 'boolean',
     ];
 
     /**
