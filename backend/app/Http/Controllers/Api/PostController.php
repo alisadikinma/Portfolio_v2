@@ -427,4 +427,88 @@ class PostController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Check for duplicate posts by title or slug.
+     * Useful for automation workflows (n8n, Zapier) before creating posts.
+     */
+    public function checkDuplicate(Request $request): JsonResponse
+    {
+        $request->validate([
+            'title' => 'required|string|max:255',
+            'slug' => 'nullable|string|max:255',
+            'similarity_threshold' => 'nullable|integer|min:70|max:100',
+        ]);
+
+        $title = $request->input('title');
+        $slug = $request->input('slug');
+        $threshold = $request->input('similarity_threshold', 85);
+
+        // 1. Exact title match (case-insensitive)
+        $exactMatch = Post::whereRaw('LOWER(title) = ?', [strtolower($title)])->first();
+
+        // 2. Slug match (if provided)
+        $slugMatch = null;
+        if ($slug) {
+            $slugMatch = Post::where('slug', $slug)->first();
+        }
+
+        // 3. Find similar titles (85%+ similarity by default)
+        $similarPosts = [];
+        $allPosts = Post::select('id', 'title', 'slug', 'published', 'created_at')->get();
+        
+        foreach ($allPosts as $post) {
+            similar_text(
+                strtolower($post->title),
+                strtolower($title),
+                $percent
+            );
+            
+            if ($percent >= $threshold && strtolower($post->title) !== strtolower($title)) {
+                $similarPosts[] = [
+                    'id' => $post->id,
+                    'title' => $post->title,
+                    'slug' => $post->slug,
+                    'similarity' => round($percent, 2),
+                    'published' => $post->published,
+                    'created_at' => $post->created_at,
+                ];
+            }
+        }
+
+        // Sort by similarity DESC
+        usort($similarPosts, function ($a, $b) {
+            return $b['similarity'] <=> $a['similarity'];
+        });
+
+        // Take top 5
+        $similarPosts = array_slice($similarPosts, 0, 5);
+
+        $isDuplicate = $exactMatch !== null || $slugMatch !== null;
+
+        return response()->json([
+            'is_duplicate' => $isDuplicate,
+            'duplicate_type' => $isDuplicate 
+                ? ($exactMatch ? 'exact_title' : 'slug') 
+                : null,
+            'exact_match' => $exactMatch ? [
+                'id' => $exactMatch->id,
+                'title' => $exactMatch->title,
+                'slug' => $exactMatch->slug,
+                'published' => $exactMatch->published,
+                'created_at' => $exactMatch->created_at,
+            ] : null,
+            'slug_match' => $slugMatch ? [
+                'id' => $slugMatch->id,
+                'title' => $slugMatch->title,
+                'slug' => $slugMatch->slug,
+                'published' => $slugMatch->published,
+                'created_at' => $slugMatch->created_at,
+            ] : null,
+            'similar_posts' => $similarPosts,
+            'message' => $isDuplicate 
+                ? 'Duplicate post found. Please review before creating.' 
+                : 'No exact duplicates found.',
+        ]);
+    }
 }

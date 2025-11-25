@@ -59,6 +59,7 @@ Route::prefix('projects')->group(function () {
 // Public Posts Routes
 Route::prefix('posts')->group(function () {
     Route::get('/', [PostController::class, 'index']);
+    Route::post('/check-duplicate', [PostController::class, 'checkDuplicate']); // For n8n/automation workflows
     Route::get('/{slug}', [PostController::class, 'show']);
 });
 
