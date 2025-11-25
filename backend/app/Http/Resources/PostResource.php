@@ -45,12 +45,12 @@ class PostResource extends JsonResource
                 // Per-language SEO fields (from post_translations)
                 'meta_title' => $translation?->meta_title ?? $translation?->title ?? $this->title,
                 'meta_description' => $translation?->meta_description ?? $translation?->excerpt ?? $this->excerpt,
+                'meta_keywords' => $translation?->meta_keywords,
                 'og_title' => $translation?->og_title,
                 'og_description' => $translation?->og_description,
                 'canonical_url' => $translation?->canonical_url,
                 'ai_summary' => $translation?->ai_summary,
                 // Global SEO fields (from posts table)
-                'meta_keywords' => $this->meta_keywords,
                 'og_image' => $this->og_image ? url($this->og_image) : null,
                 'schema_markup' => $this->schema_markup,
                 'faq_schema' => $this->faq_schema,
@@ -76,6 +76,7 @@ class PostResource extends JsonResource
                     'content' => $trans->content,
                     'meta_title' => $trans->meta_title,
                     'meta_description' => $trans->meta_description,
+                    'meta_keywords' => $trans->meta_keywords,
                     'og_title' => $trans->og_title,
                     'og_description' => $trans->og_description,
                     'canonical_url' => $trans->canonical_url,

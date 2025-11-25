@@ -24,6 +24,7 @@ class PostTranslation extends Model
         'content',
         'meta_title',
         'meta_description',
+        'meta_keywords',
         'og_title',
         'og_description',
         'canonical_url',

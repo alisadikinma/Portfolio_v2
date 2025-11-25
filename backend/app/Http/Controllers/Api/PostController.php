@@ -244,7 +244,6 @@ class PostController extends Controller
                 'published',
                 'published_at',
                 // Global SEO fields (not per-language)
-                'meta_keywords',
                 'og_image',
                 'schema_markup',
                 'faq_schema',
@@ -341,7 +340,6 @@ class PostController extends Controller
                 'published',
                 'published_at',
                 // Global SEO fields (not per-language)
-                'meta_keywords',
                 'og_image',
                 'schema_markup',
                 'faq_schema',

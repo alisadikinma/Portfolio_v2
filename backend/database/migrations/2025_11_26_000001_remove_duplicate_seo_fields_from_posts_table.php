@@ -22,6 +22,7 @@ return new class extends Migration
             $table->dropColumn([
                 'meta_title',       // Per-language -> post_translations
                 'meta_description', // Per-language -> post_translations
+                'meta_keywords',    // Per-language -> post_translations
                 'og_title',         // Per-language -> post_translations
                 'og_description',   // Per-language -> post_translations
                 'canonical_url',    // Per-language -> post_translations

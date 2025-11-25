@@ -25,8 +25,7 @@ class Post extends Model
         'published_at',
         'views',
         'reading_time',
-        // SEO fields
-        'meta_keywords',
+        // SEO fields (global only)
         'og_image',
         'schema_markup',
         'faq_schema',
