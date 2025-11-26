@@ -509,17 +509,11 @@ class AutomationController extends Controller
     }
 
     /**
-     * Upload multiple images from URLs (for blog content images)
-     * Supports variable number of images (0-20 per request)
+     * Upload multiple images via direct file upload (multipart/form-data)
+     * Supports 1-20 images per request
      *
-     * @param Request $request
-     * {
-     *   "images": [
-     *     { "url": "https://dalle-url-1" },
-     *     { "url": "https://dalle-url-2" },
-     *     ...variable count
-     *   ]
-     * }
+     * @param Request $request (multipart/form-data)
+     * Field: images[] - array of image files
      *
      * @return JsonResponse
      * {
@@ -539,76 +533,44 @@ class AutomationController extends Controller
     public function uploadImages(Request $request): JsonResponse
     {
         $request->validate([
-            'images' => 'required|array|min:1|max:20', // Max 20 images per request
-            'images.*.url' => 'required|url'
+            'images' => 'required|array|min:1|max:20',
+            'images.*' => 'required|file|image|mimes:jpeg,jpg,png,gif,webp|max:10240' // 10MB max per file
         ]);
 
-        $images = $request->input('images');
+        $images = $request->file('images');
         $uploaded = [];
         $failed = [];
 
-        foreach ($images as $index => $imageData) {
+        foreach ($images as $index => $file) {
             try {
-                $imageUrl = $imageData['url'];
-
-                // Download dengan timeout
-                $context = stream_context_create([
-                    'http' => [
-                        'timeout' => 30,
-                        'user_agent' => 'Mozilla/5.0'
-                    ]
-                ]);
-
-                $imageContent = @file_get_contents($imageUrl, false, $context);
-
-                if ($imageContent === false) {
+                // Validate file is valid
+                if (!$file->isValid()) {
                     $failed[] = [
                         'index' => $index,
-                        'url' => $imageUrl,
-                        'error' => 'Failed to download image from URL'
+                        'original_name' => $file->getClientOriginalName(),
+                        'error' => 'Invalid file upload: ' . $file->getErrorMessage()
                     ];
                     continue;
                 }
 
-                // Validate image size (max 10MB)
-                if (strlen($imageContent) > 10 * 1024 * 1024) { // 10MB
-                    $failed[] = [
-                        'index' => $index,
-                        'url' => $imageUrl,
-                        'error' => 'Image too large. Max 10MB'
-                    ];
-                    continue;
-                }
-
-                // Validate mime type (security)
-                $finfo = new \finfo(FILEINFO_MIME_TYPE);
-                $mimeType = $finfo->buffer($imageContent);
-
-                $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-                if (!in_array($mimeType, $allowedTypes)) {
-                    $failed[] = [
-                        'index' => $index,
-                        'url' => $imageUrl,
-                        'error' => "Invalid image type: {$mimeType}. Allowed: jpg, png, gif, webp"
-                    ];
-                    continue;
-                }
-
-                // Generate filename dengan extension yang benar
+                // Get mime type
+                $mimeType = $file->getMimeType();
+                
+                // Generate extension from mime type
                 $extension = match($mimeType) {
                     'image/jpeg' => 'jpg',
                     'image/png' => 'png',
                     'image/gif' => 'gif',
                     'image/webp' => 'webp',
-                    default => 'png'
+                    default => $file->getClientOriginalExtension()
                 };
 
-                // Include index in filename untuk maintain order
+                // Generate unique filename with index to maintain order
                 $filename = 'content_' . time() . '_' . $index . '_' . Str::random(6) . '.' . $extension;
                 $path = 'images/' . $filename;
 
                 // Save to storage/app/public/images/
-                Storage::disk('public')->put($path, $imageContent);
+                Storage::disk('public')->put($path, file_get_contents($file->getRealPath()));
 
                 $fullUrl = url('storage/' . $path);
 
@@ -616,14 +578,15 @@ class AutomationController extends Controller
                     'index' => $index,
                     'url' => $fullUrl,
                     'filename' => $filename,
-                    'size' => strlen($imageContent),
+                    'original_name' => $file->getClientOriginalName(),
+                    'size' => $file->getSize(),
                     'mime_type' => $mimeType
                 ];
 
             } catch (\Exception $e) {
                 $failed[] = [
                     'index' => $index,
-                    'url' => $imageData['url'] ?? 'unknown',
+                    'original_name' => $file->getClientOriginalName() ?? 'unknown',
                     'error' => $e->getMessage()
                 ];
             }
@@ -640,7 +603,7 @@ class AutomationController extends Controller
         $statusCode = count($failed) > 0 ? 207 : 200;
 
         return response()->json([
-            'success' => count($uploaded) > 0, // Success if at least 1 uploaded
+            'success' => count($uploaded) > 0,
             'data' => [
                 'uploaded' => $uploaded,
                 'failed' => $failed
@@ -659,46 +622,83 @@ class AutomationController extends Controller
     }
 
     /**
-     * Upload single image from URL (fallback method)
-     * Internally calls uploadImages() for consistency
+     * Upload single image via direct file upload
      *
-     * @param Request $request { "url": "https://image-url" }
+     * @param Request $request (multipart/form-data)
+     * Field: image - single image file
      * @return JsonResponse
      */
     public function uploadImage(Request $request): JsonResponse
     {
         $request->validate([
-            'url' => 'required|url'
+            'image' => 'required|file|image|mimes:jpeg,jpg,png,gif,webp|max:10240'
         ]);
 
-        // Convert single URL to batch format
-        $request->merge([
-            'images' => [
-                ['url' => $request->input('url')]
-            ]
-        ]);
+        try {
+            $file = $request->file('image');
 
-        // Call batch upload
-        $batchResult = $this->uploadImages($request);
-        $data = $batchResult->getData(true);
+            if (!$file->isValid()) {
+                return response()->json([
+                    'success' => false,
+                    'error' => [
+                        'code' => 'UPLOAD_FAILED',
+                        'message' => 'Invalid file upload: ' . $file->getErrorMessage()
+                    ]
+                ], 400);
+            }
 
-        // Extract single result
-        if (!empty($data['data']['uploaded'])) {
+            // Get mime type
+            $mimeType = $file->getMimeType();
+            
+            // Generate extension from mime type
+            $extension = match($mimeType) {
+                'image/jpeg' => 'jpg',
+                'image/png' => 'png',
+                'image/gif' => 'gif',
+                'image/webp' => 'webp',
+                default => $file->getClientOriginalExtension()
+            };
+
+            // Generate unique filename
+            $filename = 'content_' . time() . '_' . Str::random(8) . '.' . $extension;
+            $path = 'images/' . $filename;
+
+            // Save to storage/app/public/images/
+            Storage::disk('public')->put($path, file_get_contents($file->getRealPath()));
+
+            $fullUrl = url('storage/' . $path);
+
+            // Log for audit
+            $this->logAutomationRequest($request, 'images.single_upload', [
+                'filename' => $filename,
+                'size' => $file->getSize()
+            ]);
+
             return response()->json([
                 'success' => true,
-                'data' => $data['data']['uploaded'][0],
+                'data' => [
+                    'url' => $fullUrl,
+                    'filename' => $filename,
+                    'original_name' => $file->getClientOriginalName(),
+                    'size' => $file->getSize(),
+                    'mime_type' => $mimeType
+                ],
                 'message' => 'Image uploaded successfully'
             ]);
-        }
 
-        $error = $data['data']['failed'][0] ?? ['error' => 'Unknown error'];
-        return response()->json([
-            'success' => false,
-            'error' => [
-                'code' => 'UPLOAD_FAILED',
-                'message' => $error['error']
-            ]
-        ], 400);
+        } catch (\Exception $e) {
+            $this->logAutomationRequest($request, 'images.single_upload.failed', [
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'UPLOAD_FAILED',
+                    'message' => $e->getMessage()
+                ]
+            ], 500);
+        }
     }
 
     /**

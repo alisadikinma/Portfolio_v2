@@ -458,12 +458,28 @@ class PostController extends Controller
             'similarity_threshold' => 'nullable|integer|min:70|max:100',
         ]);
 
-        $title = $request->input('title');
-        $slug = $request->input('slug');
+        $title = trim($request->input('title'));
+        $slug = $request->input('slug') ? trim($request->input('slug')) : null;
         $threshold = $request->input('similarity_threshold', 85);
 
-        // 1. Exact title match (case-insensitive)
-        $exactMatch = Post::whereRaw('LOWER(title) = ?', [strtolower($title)])->first();
+        // Get total posts count for debugging
+        $totalPosts = Post::count();
+
+        // Early return if no posts exist
+        if ($totalPosts === 0) {
+            return response()->json([
+                'is_duplicate' => false,
+                'duplicate_type' => null,
+                'exact_match' => null,
+                'slug_match' => null,
+                'similar_posts' => [],
+                'posts_count' => 0,
+                'message' => 'No posts in database. Safe to create.',
+            ]);
+        }
+
+        // 1. Exact title match (case-insensitive, trimmed)
+        $exactMatch = Post::whereRaw('LOWER(TRIM(title)) = ?', [strtolower($title)])->first();
 
         // 2. Slug match (if provided)
         $slugMatch = null;
@@ -477,12 +493,12 @@ class PostController extends Controller
         
         foreach ($allPosts as $post) {
             similar_text(
-                strtolower($post->title),
+                strtolower(trim($post->title)),
                 strtolower($title),
                 $percent
             );
             
-            if ($percent >= $threshold && strtolower($post->title) !== strtolower($title)) {
+            if ($percent >= $threshold && strtolower(trim($post->title)) !== strtolower($title)) {
                 $similarPosts[] = [
                     'id' => $post->id,
                     'title' => $post->title,
@@ -524,6 +540,7 @@ class PostController extends Controller
                 'created_at' => $slugMatch->created_at,
             ] : null,
             'similar_posts' => $similarPosts,
+            'posts_count' => $totalPosts,
             'message' => $isDuplicate 
                 ? 'Duplicate post found. Please review before creating.' 
                 : 'No exact duplicates found.',
