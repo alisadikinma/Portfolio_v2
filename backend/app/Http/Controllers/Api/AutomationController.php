@@ -511,50 +511,93 @@ class AutomationController extends Controller
     /**
      * Upload multiple images via direct file upload (multipart/form-data)
      * Supports 1-20 images per request
+     * 
+     * Accepts multiple formats:
+     * - images[] (array of files) - standard multipart
+     * - images (single file) - will be converted to array
+     * - image (single file) - alias for convenience
      *
      * @param Request $request (multipart/form-data)
-     * Field: images[] - array of image files
-     *
      * @return JsonResponse
-     * {
-     *   "success": true,
-     *   "data": {
-     *     "uploaded": [
-     *       { "index": 0, "url": "storage-url-1", "filename": "..." },
-     *       { "index": 1, "url": "storage-url-2", "filename": "..." }
-     *     ],
-     *     "failed": [
-     *       { "index": 2, "error": "..." }
-     *     ]
-     *   },
-     *   "summary": { "total": 3, "uploaded": 2, "failed": 1 }
-     * }
      */
     public function uploadImages(Request $request): JsonResponse
     {
-        $request->validate([
-            'images' => 'required|array|min:1|max:20',
-            'images.*' => 'required|file|image|mimes:jpeg,jpg,png,gif,webp|max:10240' // 10MB max per file
-        ]);
+        // Normalize input: accept 'images', 'images[]', or 'image' field
+        $files = [];
+        
+        if ($request->hasFile('images')) {
+            $images = $request->file('images');
+            // Could be single file or array
+            $files = is_array($images) ? $images : [$images];
+        } elseif ($request->hasFile('image')) {
+            // Single file with 'image' field name
+            $files = [$request->file('image')];
+        }
 
-        $images = $request->file('images');
+        // Validate we have files
+        if (empty($files)) {
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'NO_FILES',
+                    'message' => 'No image files provided. Use field name: images[] or image'
+                ]
+            ], 422);
+        }
+
+        // Validate max count
+        if (count($files) > 20) {
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'TOO_MANY_FILES',
+                    'message' => 'Maximum 20 images per request. Received: ' . count($files)
+                ]
+            ], 422);
+        }
+
         $uploaded = [];
         $failed = [];
 
-        foreach ($images as $index => $file) {
+        foreach ($files as $index => $file) {
             try {
+                // Skip null entries
+                if (!$file) {
+                    continue;
+                }
+
                 // Validate file is valid
                 if (!$file->isValid()) {
                     $failed[] = [
                         'index' => $index,
-                        'original_name' => $file->getClientOriginalName(),
+                        'original_name' => $file->getClientOriginalName() ?? 'unknown',
                         'error' => 'Invalid file upload: ' . $file->getErrorMessage()
                     ];
                     continue;
                 }
 
-                // Get mime type
+                // Validate mime type
                 $mimeType = $file->getMimeType();
+                $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+                
+                if (!in_array($mimeType, $allowedTypes)) {
+                    $failed[] = [
+                        'index' => $index,
+                        'original_name' => $file->getClientOriginalName(),
+                        'error' => "Invalid image type: {$mimeType}. Allowed: jpeg, png, gif, webp"
+                    ];
+                    continue;
+                }
+
+                // Validate file size (max 10MB)
+                if ($file->getSize() > 10 * 1024 * 1024) {
+                    $failed[] = [
+                        'index' => $index,
+                        'original_name' => $file->getClientOriginalName(),
+                        'error' => 'File too large. Max 10MB'
+                    ];
+                    continue;
+                }
                 
                 // Generate extension from mime type
                 $extension = match($mimeType) {
@@ -586,7 +629,7 @@ class AutomationController extends Controller
             } catch (\Exception $e) {
                 $failed[] = [
                     'index' => $index,
-                    'original_name' => $file->getClientOriginalName() ?? 'unknown',
+                    'original_name' => $file ? $file->getClientOriginalName() : 'unknown',
                     'error' => $e->getMessage()
                 ];
             }
@@ -594,7 +637,7 @@ class AutomationController extends Controller
 
         // Log batch upload untuk audit
         $this->logAutomationRequest($request, 'images.batch_upload', [
-            'total_requested' => count($images),
+            'total_requested' => count($files),
             'uploaded' => count($uploaded),
             'failed' => count($failed)
         ]);
@@ -609,7 +652,7 @@ class AutomationController extends Controller
                 'failed' => $failed
             ],
             'summary' => [
-                'total' => count($images),
+                'total' => count($files),
                 'uploaded' => count($uploaded),
                 'failed' => count($failed)
             ],
