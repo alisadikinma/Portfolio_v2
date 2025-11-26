@@ -41,6 +41,8 @@ class AutomationPostRequest extends FormRequest
             'og_image' => 'nullable|string|max:255',
             'canonical_url' => 'nullable|url|max:255',
             'ai_summary' => 'nullable|string',
+            'schema_markup' => 'nullable|array',
+            'faq_schema' => 'nullable|array',
         ];
 
         return $rules;
@@ -91,6 +93,30 @@ class AutomationPostRequest extends FormRequest
                 $tags = json_decode($this->input('tags'), true);
                 if (is_array($tags)) {
                     $this->merge(['tags' => $tags]);
+                }
+            } catch (\Exception $e) {
+                // Keep original value if JSON parsing fails
+            }
+        }
+
+        // Parse schema_markup if sent as JSON string
+        if ($this->has('schema_markup') && is_string($this->input('schema_markup'))) {
+            try {
+                $schemaMarkup = json_decode($this->input('schema_markup'), true);
+                if (is_array($schemaMarkup)) {
+                    $this->merge(['schema_markup' => $schemaMarkup]);
+                }
+            } catch (\Exception $e) {
+                // Keep original value if JSON parsing fails
+            }
+        }
+
+        // Parse faq_schema if sent as JSON string
+        if ($this->has('faq_schema') && is_string($this->input('faq_schema'))) {
+            try {
+                $faqSchema = json_decode($this->input('faq_schema'), true);
+                if (is_array($faqSchema)) {
+                    $this->merge(['faq_schema' => $faqSchema]);
                 }
             } catch (\Exception $e) {
                 // Keep original value if JSON parsing fails

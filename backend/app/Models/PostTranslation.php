@@ -29,11 +29,15 @@ class PostTranslation extends Model
         'og_description',
         'canonical_url',
         'ai_summary',
+        'schema_markup',
+        'faq_schema',
     ];
 
     protected $casts = [
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'schema_markup' => 'array',
+        'faq_schema' => 'array',
     ];
 
     public function post(): BelongsTo

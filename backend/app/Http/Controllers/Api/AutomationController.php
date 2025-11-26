@@ -168,7 +168,7 @@ class AutomationController extends Controller
             $postData['views'] = 0;
             
             // Handle SEO fields from request
-            $seoFields = ['meta_title', 'meta_description', 'meta_keywords', 'og_title', 'og_description', 'og_image', 'canonical_url', 'ai_summary'];
+            $seoFields = ['meta_title', 'meta_description', 'meta_keywords', 'og_title', 'og_description', 'og_image', 'canonical_url', 'ai_summary', 'schema_markup', 'faq_schema'];
             foreach ($seoFields as $field) {
                 if ($request->filled($field)) {
                     $postData[$field] = $request->input($field);
@@ -187,10 +187,13 @@ class AutomationController extends Controller
                 'content' => $postData['content'],
                 'meta_title' => $postData['meta_title'] ?? $postData['title'],
                 'meta_description' => $postData['meta_description'] ?? $postData['excerpt'],
+                'meta_keywords' => $postData['meta_keywords'] ?? null,
                 'og_title' => $postData['og_title'] ?? $postData['title'],
                 'og_description' => $postData['og_description'] ?? $postData['excerpt'],
                 'canonical_url' => $postData['canonical_url'] ?? null,
                 'ai_summary' => $postData['ai_summary'] ?? null,
+                'schema_markup' => $postData['schema_markup'] ?? null,
+                'faq_schema' => $postData['faq_schema'] ?? null,
             ]);
 
             DB::commit();
@@ -516,23 +519,81 @@ class AutomationController extends Controller
      * - images[] (array of files) - standard multipart
      * - images (single file) - will be converted to array
      * - image (single file) - alias for convenience
+     * - Any file field name (for n8n compatibility)
+     * - Base64 data in JSON body
      *
-     * @param Request $request (multipart/form-data)
+     * @param Request $request (multipart/form-data or JSON)
      * @return JsonResponse
      */
     public function uploadImages(Request $request): JsonResponse
     {
-        // Normalize input: accept 'images', 'images[]', or 'image' field
         $files = [];
         
+        // Method 1: Check specific field names
         if ($request->hasFile('images')) {
             $images = $request->file('images');
-            // Could be single file or array
             $files = is_array($images) ? $images : [$images];
         } elseif ($request->hasFile('image')) {
-            // Single file with 'image' field name
             $files = [$request->file('image')];
+        } elseif ($request->hasFile('file')) {
+            $files = [$request->file('file')];
+        } elseif ($request->hasFile('data')) {
+            $dataFiles = $request->file('data');
+            $files = is_array($dataFiles) ? $dataFiles : [$dataFiles];
+        } else {
+            // Method 2: Get ALL uploaded files (n8n sends with dynamic names)
+            $allFiles = $request->allFiles();
+            if (!empty($allFiles)) {
+                foreach ($allFiles as $key => $fileOrArray) {
+                    if (is_array($fileOrArray)) {
+                        $files = array_merge($files, $fileOrArray);
+                    } else {
+                        $files[] = $fileOrArray;
+                    }
+                }
+            }
         }
+
+        // Method 3: Check for base64 data in JSON body
+        if (empty($files)) {
+            $jsonImages = $request->input('images');
+            if (is_array($jsonImages)) {
+                foreach ($jsonImages as $index => $imgData) {
+                    // Support base64 format: { "data": "base64string", "filename": "name.jpg" }
+                    // Or direct base64 string
+                    $base64 = is_array($imgData) ? ($imgData['data'] ?? $imgData['base64'] ?? null) : $imgData;
+                    
+                    if ($base64 && preg_match('/^data:image\/(\w+);base64,/', $base64, $matches)) {
+                        $imageData = substr($base64, strpos($base64, ',') + 1);
+                        $imageContent = base64_decode($imageData);
+                        $extension = $matches[1];
+                        
+                        if ($imageContent) {
+                            $filename = 'content_' . time() . '_' . $index . '_' . Str::random(6) . '.' . $extension;
+                            $path = 'images/' . $filename;
+                            Storage::disk('public')->put($path, $imageContent);
+                            
+                            $files[] = (object)[
+                                '_base64_processed' => true,
+                                'url' => url('storage/' . $path),
+                                'filename' => $filename,
+                                'size' => strlen($imageContent),
+                                'mime_type' => 'image/' . $extension
+                            ];
+                        }
+                    }
+                }
+            }
+        }
+
+        // Debug: Log what we received
+        \Log::info('[uploadImages] Request info', [
+            'content_type' => $request->header('Content-Type'),
+            'has_files' => $request->hasFile('images') || $request->hasFile('image'),
+            'all_files_keys' => array_keys($request->allFiles()),
+            'all_input_keys' => array_keys($request->all()),
+            'files_count' => count($files)
+        ]);
 
         // Validate we have files
         if (empty($files)) {
@@ -540,7 +601,13 @@ class AutomationController extends Controller
                 'success' => false,
                 'error' => [
                     'code' => 'NO_FILES',
-                    'message' => 'No image files provided. Use field name: images[] or image'
+                    'message' => 'No image files provided.',
+                    'hint' => 'Use multipart/form-data with field: images, image, file, or data. Or send JSON with base64 images array.',
+                    'debug' => [
+                        'content_type' => $request->header('Content-Type'),
+                        'received_keys' => array_keys($request->all()),
+                        'file_keys' => array_keys($request->allFiles())
+                    ]
                 ]
             ], 422);
         }
@@ -566,7 +633,27 @@ class AutomationController extends Controller
                     continue;
                 }
 
-                // Validate file is valid
+                // Check if already processed (base64)
+                if (is_object($file) && isset($file->_base64_processed)) {
+                    $uploaded[] = [
+                        'index' => $index,
+                        'url' => $file->url,
+                        'filename' => $file->filename,
+                        'size' => $file->size,
+                        'mime_type' => $file->mime_type
+                    ];
+                    continue;
+                }
+
+                // Validate file is valid UploadedFile
+                if (!($file instanceof \Illuminate\Http\UploadedFile)) {
+                    $failed[] = [
+                        'index' => $index,
+                        'error' => 'Invalid file object type: ' . gettype($file)
+                    ];
+                    continue;
+                }
+
                 if (!$file->isValid()) {
                     $failed[] = [
                         'index' => $index,
@@ -629,7 +716,6 @@ class AutomationController extends Controller
             } catch (\Exception $e) {
                 $failed[] = [
                     'index' => $index,
-                    'original_name' => $file ? $file->getClientOriginalName() : 'unknown',
                     'error' => $e->getMessage()
                 ];
             }
