@@ -1,5 +1,5 @@
 <template>
-  <section ref="sectionRef" class="py-24 md:py-32 overflow-hidden">
+  <section ref="sectionRef" class="py-12 md:py-16 overflow-hidden w-full">
     <div class="container-custom">
       <div class="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-14 items-center">
 

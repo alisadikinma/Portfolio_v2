@@ -1,72 +1,85 @@
 <template>
-  <div class="min-h-screen">
+  <div class="min-h-screen snap-y snap-mandatory overflow-y-auto h-[100dvh]">
 
     <!-- 1. HERO — VEO Warrior Video -->
-    <CinematicHero v-if="isSectionActive('hero')" />
+    <div class="snap-start">
+      <CinematicHero v-if="isSectionActive('hero')" />
+    </div>
 
     <!-- 2. SKILLS REEL — Kinetic Marquee -->
-    <SkillsReel v-if="isSectionActive('skills-reel')" />
+    <div class="snap-start">
+      <SkillsReel v-if="isSectionActive('skills-reel')" />
+    </div>
 
-    <!-- 3. VIBE CODING — Split Layout (video left) -->
-    <SkillShowcase
-      v-if="isSectionActive('skill-vibe-coding')"
-      :title="getSectionField('skill-vibe-coding', 'title', 'Vibe Coding')"
-      subtitle="Ship Products 10x Faster"
-      :description="getSectionField('skill-vibe-coding', 'description', vibeCodingDesc)"
-      :bullets="vibeCodingBullets"
-      :video-src="getSectionField('skill-vibe-coding', 'video_url', '/videos/vibe-coding.mp4')"
-      accent-color="gold"
-      :reversed="false"
-      :links="vibeCodingLinks"
-    />
+    <!-- 3. VIBE CODING -->
+    <div class="snap-start min-h-[100dvh] flex items-center">
+      <SkillShowcase
+        v-if="isSectionActive('skill-vibe-coding')"
+        :title="getSectionField('skill-vibe-coding', 'title', 'Vibe Coding')"
+        subtitle="Ship Products 10x Faster"
+        :description="getSectionField('skill-vibe-coding', 'description', vibeCodingDesc)"
+        :bullets="vibeCodingBullets"
+        :video-src="getSectionField('skill-vibe-coding', 'video_url', '/videos/vibe-coding.mp4')"
+        accent-color="gold"
+        :reversed="false"
+        :links="vibeCodingLinks"
+      />
+    </div>
 
-    <!-- 4. AI AUTOMATION — Reversed Split (video right) -->
-    <SkillShowcase
-      v-if="isSectionActive('skill-ai-automation')"
-      :title="getSectionField('skill-ai-automation', 'title', 'AI Automation')"
-      subtitle="Zero Manual Work"
-      :description="getSectionField('skill-ai-automation', 'description', aiAutomationDesc)"
-      :bullets="aiAutomationBullets"
-      :video-src="getSectionField('skill-ai-automation', 'video_url', '/videos/ai-automation.mp4')"
-      accent-color="cyan"
-      :reversed="true"
-    />
+    <!-- 4. AI AUTOMATION -->
+    <div class="snap-start min-h-[100dvh] flex items-center">
+      <SkillShowcase
+        v-if="isSectionActive('skill-ai-automation')"
+        :title="getSectionField('skill-ai-automation', 'title', 'AI Automation')"
+        subtitle="Zero Manual Work"
+        :description="getSectionField('skill-ai-automation', 'description', aiAutomationDesc)"
+        :bullets="aiAutomationBullets"
+        :video-src="getSectionField('skill-ai-automation', 'video_url', '/videos/ai-automation.mp4')"
+        accent-color="cyan"
+        :reversed="true"
+      />
+    </div>
 
-    <!-- 5. AI AGENTS — Split Layout (video left) -->
-    <SkillShowcase
-      v-if="isSectionActive('skill-ai-agents')"
-      :title="getSectionField('skill-ai-agents', 'title', 'AI Agents')"
-      subtitle="Autonomous Task Execution"
-      :description="getSectionField('skill-ai-agents', 'description', aiAgentsDesc)"
-      :bullets="aiAgentsBullets"
-      :video-src="getSectionField('skill-ai-agents', 'video_url', '/videos/ai-agents.mp4')"
-      accent-color="indigo"
-      :reversed="false"
-    />
+    <!-- 5. AI AGENTS -->
+    <div class="snap-start min-h-[100dvh] flex items-center">
+      <SkillShowcase
+        v-if="isSectionActive('skill-ai-agents')"
+        :title="getSectionField('skill-ai-agents', 'title', 'AI Agents')"
+        subtitle="Autonomous Task Execution"
+        :description="getSectionField('skill-ai-agents', 'description', aiAgentsDesc)"
+        :bullets="aiAgentsBullets"
+        :video-src="getSectionField('skill-ai-agents', 'video_url', '/videos/ai-agents.mp4')"
+        accent-color="indigo"
+        :reversed="false"
+      />
+    </div>
 
-    <!-- 6. AI VIDEO GENERATION — Reversed Split (video right) -->
-    <SkillShowcase
-      v-if="isSectionActive('skill-ai-video')"
-      :title="getSectionField('skill-ai-video', 'title', 'AI Video Generation')"
-      subtitle="From Prompt to Film"
-      :description="getSectionField('skill-ai-video', 'description', aiVideoDesc)"
-      :bullets="aiVideoBullets"
-      :video-src="getSectionField('skill-ai-video', 'video_url', '/videos/ai-video.mp4')"
-      :youtube-videos="aiVideoYouTube"
-      :social-links="aiVideoSocials"
-      accent-color="gold"
-      :reversed="true"
-    />
+    <!-- 6. AI VIDEO GENERATION -->
+    <div class="snap-start min-h-[100dvh] flex items-center">
+      <SkillShowcase
+        v-if="isSectionActive('skill-ai-video')"
+        :title="getSectionField('skill-ai-video', 'title', 'AI Video Generation')"
+        subtitle="From Prompt to Film"
+        :description="getSectionField('skill-ai-video', 'description', aiVideoDesc)"
+        :bullets="aiVideoBullets"
+        :video-src="getSectionField('skill-ai-video', 'video_url', '/videos/ai-video.mp4')"
+        :youtube-videos="aiVideoYouTube"
+        :social-links="aiVideoSocials"
+        accent-color="gold"
+        :reversed="true"
+      />
+    </div>
 
-    <!-- 7. FEATURED PROJECTS — Asymmetric Bento Grid -->
-    <ProjectsBento v-if="isSectionActive('featured-projects')" />
+    <!-- 7. FEATURED PROJECTS -->
+    <div class="snap-start min-h-[100dvh] flex items-center">
+      <ProjectsBento v-if="isSectionActive('featured-projects')" />
+    </div>
 
-
-    <!-- 9. STATS + CTA -->
-    <template v-if="isSectionActive('stats-cta')">
+    <!-- 8. STATS + CTA -->
+    <div class="snap-start" v-if="isSectionActive('stats-cta')">
       <StatsBar />
       <CTASection />
-    </template>
+    </div>
 
   </div>
 </template>
