@@ -6,7 +6,7 @@
     <video
       v-if="hasVideo"
       ref="videoRef"
-      class="absolute inset-0 w-full h-full object-cover object-[center_20%]"
+      class="absolute inset-0 w-full h-full object-cover"
       autoplay
       loop
       muted

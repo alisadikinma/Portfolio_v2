@@ -1,12 +1,12 @@
 <template>
-  <!-- Floating Glass Pill Navigation -->
+  <!-- Floating Glass Pill Navigation — hidden at top, reveals on scroll -->
   <nav class="fixed top-0 left-0 right-0 z-40 flex justify-center pointer-events-none">
     <div
       class="pointer-events-auto mt-5 mx-4 transition-all duration-700 ease-spring"
       :class="[
         isScrolled
-          ? 'w-full max-w-3xl'
-          : 'w-full max-w-2xl'
+          ? 'w-full max-w-3xl opacity-100 translate-y-0'
+          : 'w-full max-w-2xl opacity-0 -translate-y-4'
       ]"
     >
       <!-- Outer Bezel Shell -->
@@ -58,7 +58,6 @@
             class="md:hidden relative w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/5 transition-all duration-700 ease-spring"
             aria-label="Toggle menu"
           >
-            <!-- Line 1 — morphs to X top arm -->
             <span
               class="absolute w-5 h-[1.5px] bg-fg-primary rounded-full transition-all duration-500 ease-spring"
               :class="[
@@ -67,14 +66,12 @@
                   : '-translate-y-[5px]'
               ]"
             />
-            <!-- Line 2 — fades out -->
             <span
               class="absolute w-5 h-[1.5px] bg-fg-primary rounded-full transition-all duration-500 ease-spring"
               :class="[
                 menuOpen ? 'opacity-0 scale-x-0' : 'opacity-100'
               ]"
             />
-            <!-- Line 3 — morphs to X bottom arm -->
             <span
               class="absolute w-5 h-[1.5px] bg-fg-primary rounded-full transition-all duration-500 ease-spring"
               :class="[
@@ -170,7 +167,8 @@ function closeMenu() {
 }
 
 const handleScroll = () => {
-  isScrolled.value = window.scrollY > 40
+  // Nav appears after scrolling past 80% of viewport height (past hero)
+  isScrolled.value = window.scrollY > window.innerHeight * 0.8
 }
 
 onMounted(async () => {
