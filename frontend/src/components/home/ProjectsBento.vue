@@ -36,7 +36,7 @@
           <div class="bezel-shell-sm h-full">
             <div class="bezel-core-sm p-5 h-full flex flex-col">
               <!-- Thumbnail (compact) -->
-              <div class="rounded-lg overflow-hidden mb-3 bg-bg-elevated flex-shrink-0 aspect-[16/7]">
+              <div class="rounded-lg overflow-hidden mb-3 bg-bg-elevated flex-shrink-0 aspect-[16/5]">
                 <img
                   v-if="project.thumbnail"
                   :src="project.thumbnail"
