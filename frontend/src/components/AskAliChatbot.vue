@@ -1,5 +1,5 @@
 <template>
-  <div class="fixed bottom-6 right-6 z-40">
+  <div class="fixed bottom-6 left-6 z-40">
     <!-- Chat Panel -->
     <Transition
       enter-active-class="transition-all duration-500 ease-spring"
@@ -11,7 +11,7 @@
     >
       <div
         v-if="isOpen"
-        class="absolute bottom-16 right-0 w-80 md:w-[22rem] h-[28rem]"
+        class="absolute bottom-16 left-0 w-80 md:w-[22rem] h-[28rem]"
       >
         <div class="bezel-shell h-full">
           <div class="bezel-core h-full flex flex-col overflow-hidden">
