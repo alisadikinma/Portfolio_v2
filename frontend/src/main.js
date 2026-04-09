@@ -5,6 +5,7 @@ import router from './router'
 import './style.css'
 import App from './App.vue'
 import api from './services/api'
+import i18n from './i18n'
 import { useThemeStore } from './stores/theme'
 
 const app = createApp(App)
@@ -120,5 +121,6 @@ console.log('[App] ✅ Persistent cache initialized!')
 })()
 
 app.use(router)
+app.use(i18n)
 app.use(VueQueryPlugin, { queryClient })
 app.mount('#app')

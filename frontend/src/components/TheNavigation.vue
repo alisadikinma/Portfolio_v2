@@ -129,7 +129,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUIStore } from '@/stores/ui'
 import { useMenuItems } from '@/composables/useMenuItems'
@@ -166,12 +166,32 @@ function closeMenu() {
   uiStore.isMobileMenuOpen = false
 }
 
+const isHomePage = computed(() => route.path === '/')
+
 const handleScroll = () => {
-  // Nav appears after scrolling past 80% of viewport height (past hero)
-  isScrolled.value = window.scrollY > window.innerHeight * 0.8
+  if (isHomePage.value) {
+    // Home page only: hide at top, reveal after scrolling past hero
+    isScrolled.value = window.scrollY > window.innerHeight * 0.8
+  } else {
+    // All other pages: always visible
+    isScrolled.value = true
+  }
 }
 
+// When route changes, immediately update visibility
+watch(isHomePage, (isHome) => {
+  if (!isHome) {
+    isScrolled.value = true
+  } else {
+    handleScroll()
+  }
+})
+
 onMounted(async () => {
+  // Set initial state before scroll listener
+  if (!isHomePage.value) {
+    isScrolled.value = true
+  }
   window.addEventListener('scroll', handleScroll, { passive: true })
   await Promise.all([
     fetchActiveMenuItems(),

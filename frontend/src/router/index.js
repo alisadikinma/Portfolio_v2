@@ -8,7 +8,7 @@ const routes = [
     name: 'home',
     component: () => import('@/views/Home.vue'),
     meta: {
-      title: 'Home - Portfolio V2',
+      title: 'Ali Sadikin Ma - AI Generalist Expert',
       requiresAuth: false
     }
   },
@@ -17,7 +17,7 @@ const routes = [
     name: 'about',
     component: () => import('@/views/About.vue'),
     meta: {
-      title: 'About - Portfolio V2',
+      title: 'About - Ali Sadikin Ma',
       requiresAuth: false
     }
   },
@@ -26,7 +26,7 @@ const routes = [
     name: 'projects',
     component: () => import('@/views/Projects.vue'),
     meta: {
-      title: 'Projects - Portfolio V2',
+      title: 'Projects - Ali Sadikin Ma',
       requiresAuth: false
     }
   },
@@ -35,25 +35,30 @@ const routes = [
     name: 'project-detail',
     component: () => import('@/views/ProjectDetail.vue'),
     meta: {
-      title: 'Project - Portfolio V2',
+      title: 'Project - Ali Sadikin Ma',
+      requiresAuth: false
+    }
+  },
+  {
+    path: '/work',
+    name: 'work',
+    component: () => import('@/views/Work.vue'),
+    meta: {
+      title: 'My Work - Ali Sadikin Ma',
       requiresAuth: false
     }
   },
   {
     path: '/awards',
     name: 'awards',
-    component: () => import('@/views/Awards.vue'),
-    meta: {
-      title: 'Awards & Recognition - Portfolio V2',
-      requiresAuth: false
-    }
+    redirect: '/work?tab=awards'
   },
   {
     path: '/awards-debug',
     name: 'awards-debug',
     component: () => import('@/views/Awards-DEBUG.vue'),
     meta: {
-      title: 'Awards Debug - Portfolio V2',
+      title: 'Awards Debug',
       requiresAuth: false
     }
   },
@@ -62,7 +67,7 @@ const routes = [
     name: 'blog',
     component: () => import('@/views/Blog.vue'),
     meta: {
-      title: 'Blog - Portfolio V2',
+      title: 'Blog - Ali Sadikin Ma',
       requiresAuth: false
     }
   },
@@ -71,7 +76,7 @@ const routes = [
     name: 'blog-detail',
     component: () => import('@/views/BlogDetail.vue'),
     meta: {
-      title: 'Blog Post - Portfolio V2',
+      title: 'Blog - Ali Sadikin Ma',
       requiresAuth: false
     }
   },
@@ -80,25 +85,21 @@ const routes = [
     name: 'blog-category',
     component: () => import('@/views/BlogCategory.vue'),
     meta: {
-      title: 'Category - Portfolio V2',
+      title: 'Category - Ali Sadikin Ma',
       requiresAuth: false
     }
   },
   {
     path: '/gallery',
     name: 'gallery',
-    component: () => import('@/views/Gallery.vue'),
-    meta: {
-      title: 'Gallery - Portfolio V2',
-      requiresAuth: false
-    }
+    redirect: '/work?tab=awards'
   },
   {
     path: '/contact',
     name: 'contact',
     component: () => import('@/views/Contact.vue'),
     meta: {
-      title: 'Contact - Portfolio V2',
+      title: 'Contact - Ali Sadikin Ma',
       requiresAuth: false
     }
   },
@@ -107,7 +108,7 @@ const routes = [
     name: 'login',
     component: () => import('@/views/auth/Login.vue'),
     meta: {
-      title: 'Login - Portfolio V2',
+      title: 'Login - Ali Sadikin Ma',
       requiresAuth: false,
       layout: 'auth'
     }
@@ -384,6 +385,17 @@ const router = createRouter({
       }
     } else {
       return { top: 0, behavior: 'smooth' }
+    }
+  }
+})
+
+// View Transitions API (Chrome/Edge)
+router.beforeResolve(async (to, from) => {
+  if (document.startViewTransition && to.path !== from.path) {
+    try {
+      await document.startViewTransition().ready
+    } catch {
+      // Fallback: no animation in unsupported browsers
     }
   }
 })

@@ -13,10 +13,14 @@
     "@heroicons/vue": "^2.2.0",
     "@tanstack/query-sync-storage-persister": "^5.90.8",
     "@tanstack/vue-query": "^5.90.5",
+    "@tresjs/core": "^5.7.0",
     "axios": "^1.12.2",
+    "gsap": "^3.14.2",
     "pinia": "^3.0.3",
     "sortablejs": "^1.15.6",
+    "three": "^0.183.2",
     "vue": "^3.5.22",
+    "vue-i18n": "^11.3.0",
     "vue-router": "^4.5.1"
   },
   "devDependencies": {

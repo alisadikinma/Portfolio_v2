@@ -1,0 +1,97 @@
+{
+  "nav": {
+    "home": "Beranda",
+    "work": "Karya",
+    "blog": "Blog",
+    "about": "Tentang",
+    "contact": "Kontak"
+  },
+  "hero": {
+    "subtitle": "Pakar AI Generalis",
+    "champion": "Juara #1",
+    "countries": "16 Negara",
+    "startups": "26 Startup",
+    "scroll": "Gulir"
+  },
+  "sections": {
+    "featuredWork": "Karya Pilihan",
+    "featuredWorkDesc": "Proyek terpilih dari 56+ yang terkirim.",
+    "viewAllWork": "Lihat Semua Karya",
+    "achievements": "Pencapaian",
+    "latestBlog": "Blog Terbaru",
+    "latestBlogDesc": "Wawasan tentang AI, teknologi, dan membangun produk.",
+    "allPosts": "Semua Post",
+    "whatClientsSay": "Kata Klien",
+    "recentActivity": "Aktivitas Terbaru",
+    "whatIBuild": "Yang Saya Bangun dengan AI",
+    "whatIBuildDesc": "Demonstrasi langsung keahlian AI — dari prompt engineering hingga otomasi.",
+    "letsWork": "Mari Bangun Sesuatu yang Luar Biasa",
+    "letsWorkDesc": "Mencari pakar AI untuk mentransformasi bisnis Anda? Mari diskusikan bagaimana AI dapat mempercepat tujuan Anda.",
+    "subscribe": "Berlangganan newsletter"
+  },
+  "stats": {
+    "years": "Tahun Pengalaman",
+    "projects": "Proyek Terkirim",
+    "champion": "Juara #1",
+    "countries": "Negara"
+  },
+  "work": {
+    "title": "Karya Saya",
+    "desc": "Proyek, penghargaan, dan studi kasus dari 17+ tahun berkarya.",
+    "projects": "Proyek",
+    "awards": "Penghargaan",
+    "caseStudies": "Studi Kasus",
+    "searchProjects": "Cari proyek..."
+  },
+  "about": {
+    "title": "Tentang Saya",
+    "globalImpact": "Dampak Global",
+    "skills": "Keahlian & Kompetensi",
+    "experience": "Pengalaman Kerja",
+    "certifications": "Sertifikasi",
+    "collaboration": "Mode Kolaborasi"
+  },
+  "blog": {
+    "title": "Blog",
+    "search": "Cari post...",
+    "readMore": "Baca Selengkapnya",
+    "readingTime": "menit baca",
+    "relatedPosts": "Post Terkait",
+    "share": "Bagikan",
+    "featured": "Unggulan"
+  },
+  "contact": {
+    "title": "Hubungi Saya",
+    "name": "Nama Lengkap",
+    "email": "Alamat Email",
+    "subject": "Subjek",
+    "message": "Pesan Anda",
+    "whatsapp": "Nomor WhatsApp",
+    "send": "Kirim Pesan",
+    "sending": "Mengirim...",
+    "success": "Pesan berhasil dikirim! Saya akan segera membalas.",
+    "whatsappMe": "WhatsApp Saya",
+    "getInTouch": "Hubungi Saya"
+  },
+  "newsletter": {
+    "placeholder": "email@anda.com",
+    "subscribe": "Berlangganan",
+    "success": "Berhasil berlangganan!",
+    "duplicate": "Email sudah terdaftar."
+  },
+  "common": {
+    "loading": "Memuat...",
+    "error": "Terjadi kesalahan",
+    "comingSoon": "Segera hadir",
+    "viewAll": "Lihat Semua",
+    "backToHome": "Kembali ke Beranda"
+  },
+  "footer": {
+    "quickLinks": "Tautan Cepat",
+    "resources": "Sumber Daya",
+    "contact": "Kontak",
+    "rights": "Hak cipta dilindungi.",
+    "privacy": "Kebijakan Privasi",
+    "terms": "Ketentuan Layanan"
+  }
+}

@@ -40,7 +40,7 @@
         class="font-display font-bold tracking-[-0.04em] leading-none text-gradient mb-4 text-shadow-lg"
         :class="[
           contentVisible ? 'opacity-100' : 'opacity-0',
-          'text-4xl sm:text-5xl md:text-6xl lg:text-8xl'
+          'text-4xl sm:text-6xl md:text-7xl lg:text-8xl'
         ]"
         :style="contentVisible ? 'transform:translateY(0);transition:opacity 900ms cubic-bezier(0.32,0.72,0,1) 100ms,transform 900ms cubic-bezier(0.32,0.72,0,1) 100ms;' : 'transform:translateY(24px);'"
       >

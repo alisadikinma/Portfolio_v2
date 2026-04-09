@@ -1,0 +1,20 @@
+[
+  {
+    "id": 1,
+    "title": "Blog Post Generation",
+    "before": "Write a blog post about AI",
+    "after": "You are an expert tech blogger writing for a senior developer audience. Write a 1500-word blog post about practical applications of RAG (Retrieval-Augmented Generation) in enterprise settings. Include: a compelling hook with a real-world scenario, 3 concrete use cases with code snippets, performance benchmarks comparing RAG vs fine-tuning, and a conclusion with actionable next steps. Tone: authoritative but approachable. Format: H2 headers, bullet points for key takeaways."
+  },
+  {
+    "id": 2,
+    "title": "Product Description",
+    "before": "Describe this product",
+    "after": "You are a conversion-optimized copywriter. Write a product description for a SaaS project management tool targeting remote teams of 10-50 people. Structure: opening pain point (2 sentences), solution statement, 4 benefit-driven bullet points (feature → benefit format), social proof placeholder, and a single clear CTA. Voice: confident, empathetic, no jargon. Max 200 words."
+  },
+  {
+    "id": 3,
+    "title": "Data Analysis",
+    "before": "Analyze this data",
+    "after": "You are a senior data analyst. I'll provide a CSV dataset of monthly sales figures. Perform: (1) descriptive statistics summary, (2) month-over-month growth rate calculation, (3) identify the top 3 anomalies with possible explanations, (4) 3-month forecast using simple moving average. Present findings in a structured report with tables. Flag any data quality issues you notice."
+  }
+]

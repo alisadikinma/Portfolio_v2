@@ -1,0 +1,26 @@
+[
+  {
+    "id": 1,
+    "prompt": "Cinematic portrait of a futuristic AI researcher in a holographic lab, volumetric lighting, 8K",
+    "image": "/uploads/showcase/ai-researcher.jpg",
+    "category": "Portrait"
+  },
+  {
+    "id": 2,
+    "prompt": "Aerial view of a smart city at golden hour, flying vehicles, neon accents, ultra-wide lens",
+    "image": "/uploads/showcase/smart-city.jpg",
+    "category": "Architecture"
+  },
+  {
+    "id": 3,
+    "prompt": "Abstract liquid metal flowing through geometric shapes, gold and cyan palette, studio lighting",
+    "image": "/uploads/showcase/liquid-metal.jpg",
+    "category": "Abstract"
+  },
+  {
+    "id": 4,
+    "prompt": "Product photography of a luxury tech device on dark marble, rim lighting, shallow depth of field",
+    "image": "/uploads/showcase/tech-product.jpg",
+    "category": "Product"
+  }
+]

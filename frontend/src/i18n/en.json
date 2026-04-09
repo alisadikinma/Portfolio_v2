@@ -1,0 +1,97 @@
+{
+  "nav": {
+    "home": "Home",
+    "work": "Work",
+    "blog": "Blog",
+    "about": "About",
+    "contact": "Contact"
+  },
+  "hero": {
+    "subtitle": "AI Generalist Expert",
+    "champion": "#1 Champion",
+    "countries": "16 Countries",
+    "startups": "26 Startups",
+    "scroll": "Scroll"
+  },
+  "sections": {
+    "featuredWork": "Featured Work",
+    "featuredWorkDesc": "Selected projects from 56+ delivered.",
+    "viewAllWork": "View All Work",
+    "achievements": "Achievements",
+    "latestBlog": "Latest Blog",
+    "latestBlogDesc": "Insights on AI, tech, and building products.",
+    "allPosts": "All Posts",
+    "whatClientsSay": "What Clients Say",
+    "recentActivity": "Recent Activity",
+    "whatIBuild": "What I Build With AI",
+    "whatIBuildDesc": "Hands-on demonstrations of AI skills — from prompt engineering to automation pipelines.",
+    "letsWork": "Let's Build Something Amazing",
+    "letsWorkDesc": "Looking for an AI expert to transform your business? Let's discuss how AI can accelerate your goals.",
+    "subscribe": "Subscribe to my newsletter"
+  },
+  "stats": {
+    "years": "Years Experience",
+    "projects": "Projects Delivered",
+    "champion": "#1 Champion",
+    "countries": "Countries"
+  },
+  "work": {
+    "title": "My Work",
+    "desc": "Projects, awards, and case studies from 17+ years of building.",
+    "projects": "Projects",
+    "awards": "Awards",
+    "caseStudies": "Case Studies",
+    "searchProjects": "Search projects..."
+  },
+  "about": {
+    "title": "About Me",
+    "globalImpact": "Global Impact",
+    "skills": "Skills & Expertise",
+    "experience": "Work Experience",
+    "certifications": "Certifications",
+    "collaboration": "Collaboration Modes"
+  },
+  "blog": {
+    "title": "Blog",
+    "search": "Search posts...",
+    "readMore": "Read More",
+    "readingTime": "min read",
+    "relatedPosts": "Related Posts",
+    "share": "Share",
+    "featured": "Featured"
+  },
+  "contact": {
+    "title": "Get in Touch",
+    "name": "Full Name",
+    "email": "Email Address",
+    "subject": "Subject",
+    "message": "Your Message",
+    "whatsapp": "WhatsApp Number",
+    "send": "Send Message",
+    "sending": "Sending...",
+    "success": "Message sent successfully! I'll get back to you soon.",
+    "whatsappMe": "WhatsApp Me",
+    "getInTouch": "Get in Touch"
+  },
+  "newsletter": {
+    "placeholder": "your@email.com",
+    "subscribe": "Subscribe",
+    "success": "Successfully subscribed!",
+    "duplicate": "Already subscribed."
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Something went wrong",
+    "comingSoon": "Coming soon",
+    "viewAll": "View All",
+    "backToHome": "Back to Home"
+  },
+  "footer": {
+    "quickLinks": "Quick Links",
+    "resources": "Resources",
+    "contact": "Contact",
+    "rights": "All rights reserved.",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Service"
+  }
+}

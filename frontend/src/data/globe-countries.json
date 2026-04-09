@@ -1,0 +1,20 @@
+[
+  { "name": "Singapore", "lat": 1.35, "lng": 103.82 },
+  { "name": "Hong Kong", "lat": 22.32, "lng": 114.17 },
+  { "name": "Japan", "lat": 35.68, "lng": 139.69 },
+  { "name": "Thailand", "lat": 13.76, "lng": 100.50 },
+  { "name": "Indonesia", "lat": -6.21, "lng": 106.85, "home": true },
+  { "name": "India", "lat": 12.97, "lng": 77.59 },
+  { "name": "Canada", "lat": 51.05, "lng": -114.07 },
+  { "name": "USA - Seattle", "lat": 47.61, "lng": -122.33 },
+  { "name": "USA - Washington DC", "lat": 38.91, "lng": -77.04 },
+  { "name": "USA - Michigan", "lat": 42.33, "lng": -83.05 },
+  { "name": "USA - Virginia", "lat": 37.43, "lng": -79.14 },
+  { "name": "UK - London", "lat": 51.51, "lng": -0.13 },
+  { "name": "UK - Scotland", "lat": 55.95, "lng": -3.19 },
+  { "name": "France", "lat": 48.86, "lng": 2.35 },
+  { "name": "UAE - Dubai", "lat": 25.20, "lng": 55.27 },
+  { "name": "Saudi Arabia", "lat": 24.71, "lng": 46.67 },
+  { "name": "South Africa", "lat": -33.92, "lng": 18.42 },
+  { "name": "Mauritius", "lat": -20.35, "lng": 57.55 }
+]

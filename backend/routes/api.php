@@ -20,6 +20,10 @@ use App\Http\Controllers\Api\PageSectionController;
 use App\Http\Controllers\Api\Admin\DashboardController;
 use App\Http\Controllers\Api\GalleryItemController;
 use App\Http\Controllers\Api\ServiceController;
+use App\Http\Controllers\Api\ChatbotController;
+use App\Http\Controllers\Api\GeoController;
+use App\Http\Controllers\Api\ActivityFeedController;
+use App\Http\Controllers\Api\NewsletterController;
 
 // ============================================
 // Authentication Routes
@@ -114,6 +118,20 @@ Route::get('/sitemap-projects.xml', [SitemapController::class, 'projects'])->nam
 
 // Health check
 Route::get('/health', fn() => response()->json(['status' => 'ok', 'timestamp' => now()]));
+
+// Chatbot
+Route::post('/chatbot/ask', [ChatbotController::class, 'ask'])->middleware('throttle:10,1');
+
+// GEO — Machine-readable portfolio for AI crawlers
+Route::get('/llms.txt', [GeoController::class, 'llmsTxt']);
+Route::get('/llms-full.txt', [GeoController::class, 'llmsFullTxt']);
+
+// Activity Feed
+Route::get('/activity-feed', [ActivityFeedController::class, 'index']);
+
+// Newsletter
+Route::post('/newsletter/subscribe', [NewsletterController::class, 'subscribe'])->middleware('throttle:5,60');
+Route::delete('/newsletter/unsubscribe', [NewsletterController::class, 'unsubscribe']);
 
 // Public Menu Items Routes (for navbar)
 Route::get('/menu-items', [MenuItemController::class, 'publicMenuItems']);
