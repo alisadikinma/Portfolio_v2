@@ -82,13 +82,18 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
+import { gsap } from 'gsap'
+import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import api from '@/services/api'
+
+gsap.registerPlugin(ScrollTrigger)
 
 const projects = ref([])
 const isLoading = ref(true)
 const isVisible = ref(false)
 const sectionRef = ref(null)
 let observer = null
+const triggers = []
 
 // Asymmetric 7/5 alternating grid — NOT 3-equal-column
 function getGridSpan(index) {
@@ -113,19 +118,26 @@ onMounted(async () => {
     isLoading.value = false
   }
 
-  observer = new IntersectionObserver(
-    ([entry]) => {
-      if (entry.isIntersecting) {
+  // GSAP stagger reveal for project cards
+  const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  if (!prefersReduced && sectionRef.value) {
+    const st = ScrollTrigger.create({
+      trigger: sectionRef.value,
+      start: 'top 80%',
+      once: true,
+      onEnter: () => {
         isVisible.value = true
-        observer.disconnect()
+        const cards = sectionRef.value.querySelectorAll('.group')
+        gsap.fromTo(cards, { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6, ease: 'power3.out', stagger: 0.1 })
       }
-    },
-    { threshold: 0.1 }
-  )
-  if (sectionRef.value) observer.observe(sectionRef.value)
+    })
+    triggers.push(st)
+  } else {
+    isVisible.value = true
+  }
 })
 
 onUnmounted(() => {
-  if (observer) observer.disconnect()
+  triggers.forEach(st => st.kill())
 })
 </script>

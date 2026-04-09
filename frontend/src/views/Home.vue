@@ -94,7 +94,7 @@ const tiktokIcon = '<svg fill="currentColor" viewBox="0 0 24 24"><path d="M12.52
 
 // ── Skill Descriptions (extended, proof-driven) ───────────────────
 
-const vibeCodingDesc = 'I turn a single prompt into a deployed, production-grade application. Claude Code is my primary IDE — I describe what I want in natural language, the AI writes the code, I review and ship. This is not prototyping. Sparkfluence Studio (a full SaaS platform), this portfolio site, and Indusia AI HMI (industrial monitoring with computer vision) were all built this way. I also write open-source Claude Code plugins that other developers install to get the same speed: gaspol-dev (multi-skill development framework), ai-image-carousel-prompt-gen (cinematic image prompts), and ai-video-promo-engine (full video production pipeline).'
+const vibeCodingDesc = 'I turn prompts into deployed production apps. Claude Code is my IDE — I describe what I want, the AI writes the code, I review and ship. Not prototypes. Real products, live in production.'
 
 const vibeCodingBullets = [
   'Shipped 3 production apps via vibe coding: Sparkfluence Studio, this portfolio, Indusia AI HMI',
@@ -103,7 +103,7 @@ const vibeCodingBullets = [
   'Average build time: 3-7 days from first prompt to live deployment'
 ]
 
-const aiAutomationDesc = 'I replace repetitive human tasks with intelligent pipelines that run around the clock. Using n8n as the orchestration backbone and custom API integrations, I connect CRMs, databases, email systems, payment gateways, and AI models into self-executing workflows. When a lead comes in, the pipeline scores it, enriches the data, routes it to the right salesperson, sends a personalized follow-up, and logs everything — all in under 4 seconds, no human touch required.'
+const aiAutomationDesc = 'I wire APIs, databases, and AI models into pipelines that run 24/7. Using n8n and custom integrations, I replace entire manual workflows with self-executing automation.'
 
 const aiAutomationBullets = [
   'Built 56+ automation workflows across e-commerce, manufacturing, and SaaS',
@@ -112,7 +112,7 @@ const aiAutomationBullets = [
   'API orchestration: webhook triggers, conditional routing, error retry, dead-letter queues'
 ]
 
-const aiAgentsDesc = 'I design systems where multiple AI agents collaborate autonomously to complete tasks that no single prompt can handle. Using OpenClaw for orchestration and Claude API for reasoning, I build agent swarms where a Researcher agent gathers data, an Analyzer agent processes it, a Coder agent writes the implementation, and a Reviewer agent validates the output. Each agent is purpose-built with its own system prompt, tools, and memory — then wired into a coordination layer that manages task delegation, conflict resolution, and quality gates.'
+const aiAgentsDesc = 'I architect multi-agent systems where specialized AI workers coordinate autonomously. Researcher, Coder, Reviewer — each purpose-built, then wired into an orchestration layer.'
 
 const aiAgentsBullets = [
   'Built multi-agent systems with 3-5 specialized agents coordinating per task',
@@ -121,7 +121,7 @@ const aiAgentsBullets = [
   'Tools integration: web search, file system, database queries, API calls per agent'
 ]
 
-const aiVideoDesc = 'I produce broadcast-ready promotional videos without a camera, crew, or studio. My pipeline starts with strategic scripting (7-beat narrative arc), then generates photorealistic keyframe images using NB2 (Nano Banana 2), and converts them into cinematic video clips using VEO 3.1 with precise camera movements, 3-layer audio design (dialogue + SFX + ambient), and frame-accurate lip sync. I built a complete Claude Code plugin (ai-video-promo-engine) that automates this entire pipeline from brainstorm to final cut — including domain research, cast management, and multi-platform prompt generation for VEO, Kling AI, and Seedance 2.0.'
+const aiVideoDesc = 'I produce broadcast-ready video without a camera or crew. Script to keyframes to cinematic render — all AI-generated with 3-layer audio and frame-accurate lip sync.'
 
 const aiVideoBullets = [
   'End-to-end AI video pipeline: script, storyboard, keyframes, video, audio — all AI-generated',

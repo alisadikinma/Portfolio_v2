@@ -1,13 +1,12 @@
 <template>
-  <section ref="sectionRef" class="py-28">
+  <section ref="sectionRef" class="py-24 md:py-32 overflow-hidden">
     <div class="container-custom">
-      <div
-        class="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-12 items-start reveal"
-        :class="{ 'is-visible': isVisible }"
-      >
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-14 items-center">
+
         <!-- Video Side (7 cols) -->
         <div
-          class="md:col-span-7"
+          ref="videoSide"
+          class="md:col-span-7 opacity-0"
           :class="reversed ? 'md:order-2' : 'md:order-1'"
         >
           <div class="bezel-shell">
@@ -40,111 +39,118 @@
               </div>
             </div>
           </div>
-
-          <!-- YouTube Thumbnails (below main video) -->
-          <div v-if="youtubeVideos && youtubeVideos.length" class="grid grid-cols-2 gap-3 mt-3">
-            <a
-              v-for="yt in youtubeVideos"
-              :key="yt.url"
-              :href="yt.url"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="group"
-            >
-              <div class="bezel-shell-sm">
-                <div class="bezel-core-sm overflow-hidden">
-                  <div class="aspect-video relative bg-bg-elevated">
-                    <img
-                      :src="getYouTubeThumbnail(yt.url)"
-                      :alt="yt.title"
-                      class="w-full h-full object-cover transition-transform duration-700 ease-spring group-hover:scale-105"
-                      loading="lazy"
-                    />
-                    <!-- Play icon overlay -->
-                    <div class="absolute inset-0 flex items-center justify-center bg-bg-deep/30 group-hover:bg-bg-deep/10 transition-all duration-700 ease-spring">
-                      <div class="w-10 h-10 rounded-full bg-white/15 border border-white/20 flex items-center justify-center group-hover:scale-110 transition-transform duration-700 ease-spring">
-                        <svg class="w-4 h-4 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="p-3">
-                    <p class="text-xs text-fg-muted font-light line-clamp-2 group-hover:text-fg-primary transition-colors duration-700 ease-spring">{{ yt.title }}</p>
-                  </div>
-                </div>
-              </div>
-            </a>
-          </div>
         </div>
 
         <!-- Text Side (5 cols) -->
         <div
-          class="md:col-span-5"
+          ref="textSide"
+          class="md:col-span-5 opacity-0"
           :class="reversed ? 'md:order-1' : 'md:order-2'"
         >
           <!-- Eyebrow -->
-          <span
-            class="eyebrow-tag mb-4 inline-flex"
-            :class="accentClasses.eyebrow"
-          >
+          <span class="eyebrow-tag mb-4 inline-flex" :class="accentClasses.eyebrow">
             {{ subtitle }}
           </span>
 
           <!-- Heading -->
-          <h2 class="section-heading text-3xl md:text-4xl text-fg-primary mt-4 mb-5">
+          <h2 class="section-heading text-3xl md:text-4xl text-fg-primary mt-4 mb-4">
             {{ title }}
           </h2>
 
-          <!-- Description -->
-          <p class="text-fg-muted text-base leading-relaxed font-light mb-6 max-w-lg">
+          <!-- Short Description (max 3 lines) -->
+          <p class="text-fg-muted text-sm leading-relaxed font-light mb-5 line-clamp-3">
             {{ description }}
           </p>
 
-          <!-- Bullet Points (proof points) -->
-          <ul v-if="bullets && bullets.length" class="space-y-3 mb-8">
+          <!-- Bullet Points (compact) -->
+          <ul v-if="bullets && bullets.length" class="space-y-2 mb-5">
             <li
-              v-for="(bullet, i) in bullets"
+              v-for="(bullet, i) in bullets.slice(0, 4)"
               :key="i"
-              class="flex items-start gap-3"
+              class="flex items-start gap-2.5"
             >
-              <span class="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" :class="accentClasses.bulletBg">
-                <svg class="w-3 h-3" :class="accentClasses.bulletIcon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+              <span class="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" :class="accentClasses.bulletBg">
+                <svg class="w-2.5 h-2.5" :class="accentClasses.bulletIcon" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
               </span>
-              <span class="text-sm text-fg-muted font-light leading-relaxed">{{ bullet }}</span>
+              <span class="text-xs text-fg-muted font-light leading-relaxed">{{ bullet }}</span>
             </li>
           </ul>
 
-          <!-- Links -->
-          <div v-if="links && links.length" class="flex flex-wrap gap-2.5 mb-6">
+          <!-- Links (compact pills) -->
+          <div v-if="links && links.length" class="flex flex-wrap gap-2 mb-4">
             <a
               v-for="link in links"
               :key="link.url"
               :href="link.url"
               target="_blank"
               rel="noopener noreferrer"
-              class="btn-glass text-xs py-2 px-4 group"
+              class="inline-flex items-center gap-1.5 text-[11px] py-1.5 px-3 rounded-full bg-white/4 border border-border-hairline text-fg-muted hover:text-accent-gold hover:border-accent-gold/20 transition-all duration-700 ease-spring"
             >
-              <span v-if="link.icon" class="w-3.5 h-3.5" v-html="link.icon"></span>
               {{ link.label }}
-              <span class="btn-icon-island w-5 h-5">
-                <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"/></svg>
-              </span>
+              <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"/></svg>
             </a>
           </div>
 
           <!-- Social Links -->
-          <div v-if="socialLinks && socialLinks.length" class="flex gap-2.5">
+          <div v-if="socialLinks && socialLinks.length" class="flex gap-2">
             <a
               v-for="social in socialLinks"
               :key="social.url"
               :href="social.url"
               target="_blank"
               rel="noopener noreferrer"
-              class="w-9 h-9 rounded-full bg-white/4 border border-border-hairline flex items-center justify-center text-fg-muted hover:text-accent-gold hover:border-accent-gold/30 transition-all duration-700 ease-spring"
+              class="w-8 h-8 rounded-full bg-white/4 border border-border-hairline flex items-center justify-center text-fg-muted hover:text-accent-gold hover:border-accent-gold/30 transition-all duration-700 ease-spring"
               :aria-label="social.label"
             >
-              <span class="w-4 h-4" v-html="social.icon"></span>
+              <span class="w-3.5 h-3.5" v-html="social.icon"></span>
             </a>
           </div>
+        </div>
+      </div>
+
+      <!-- YouTube Row — BELOW the main grid, full width -->
+      <div
+        v-if="youtubeVideos && youtubeVideos.length"
+        ref="youtubeRow"
+        class="mt-10 opacity-0"
+      >
+        <p class="eyebrow-tag text-fg-dim mb-4 inline-flex">Published Work</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
+          <a
+            v-for="yt in youtubeVideos"
+            :key="yt.url"
+            :href="yt.url"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="group"
+          >
+            <div class="bezel-shell-sm">
+              <div class="bezel-core-sm overflow-hidden flex flex-col sm:flex-row">
+                <!-- Thumbnail -->
+                <div class="sm:w-48 flex-shrink-0 aspect-video sm:aspect-auto relative bg-bg-elevated">
+                  <img
+                    :src="getYouTubeThumbnail(yt.url)"
+                    :alt="yt.title"
+                    class="w-full h-full object-cover transition-transform duration-700 ease-spring group-hover:scale-105"
+                    loading="lazy"
+                  />
+                  <div class="absolute inset-0 flex items-center justify-center">
+                    <div class="w-9 h-9 rounded-full bg-white/15 border border-white/20 flex items-center justify-center group-hover:scale-110 group-hover:bg-white/25 transition-all duration-700 ease-spring">
+                      <svg class="w-3.5 h-3.5 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                    </div>
+                  </div>
+                </div>
+                <!-- Info -->
+                <div class="p-4 flex flex-col justify-center">
+                  <p class="text-sm text-fg-primary font-medium line-clamp-2 group-hover:text-accent-gold transition-colors duration-700 ease-spring">{{ yt.title }}</p>
+                  <p class="text-[11px] text-fg-dim mt-1.5 flex items-center gap-1.5">
+                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                    Watch on YouTube
+                  </p>
+                </div>
+              </div>
+            </div>
+          </a>
         </div>
       </div>
     </div>
@@ -153,7 +159,11 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { gsap } from 'gsap'
+import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { useVideoReveal } from '@/composables/useVideoReveal'
+
+gsap.registerPlugin(ScrollTrigger)
 
 const props = defineProps({
   title: { type: String, required: true },
@@ -168,13 +178,15 @@ const props = defineProps({
   accentColor: { type: String, default: 'gold' }
 })
 
+const sectionRef = ref(null)
+const videoSide = ref(null)
+const textSide = ref(null)
+const youtubeRow = ref(null)
 const videoRef = ref(null)
 const videoError = ref(false)
-const isVisible = ref(false)
-const sectionRef = ref(null)
-let observer = null
 
 const { setupVideoReveal } = useVideoReveal()
+const triggers = []
 
 const accentClasses = computed(() => {
   const map = {
@@ -215,19 +227,61 @@ onMounted(() => {
   if (videoRef.value) {
     setupVideoReveal(videoRef.value)
   }
-  observer = new IntersectionObserver(
-    ([entry]) => {
-      if (entry.isIntersecting) {
-        isVisible.value = true
-        observer.disconnect()
+
+  const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  if (prefersReduced) {
+    if (videoSide.value) videoSide.value.style.opacity = '1'
+    if (textSide.value) textSide.value.style.opacity = '1'
+    if (youtubeRow.value) youtubeRow.value.style.opacity = '1'
+    return
+  }
+
+  // Video side slides in from left (or right if reversed)
+  if (videoSide.value) {
+    const fromX = props.reversed ? 60 : -60
+    gsap.set(videoSide.value, { x: fromX, opacity: 0 })
+    const st = ScrollTrigger.create({
+      trigger: sectionRef.value,
+      start: 'top 80%',
+      once: true,
+      onEnter: () => {
+        gsap.to(videoSide.value, { x: 0, opacity: 1, duration: 0.9, ease: 'power3.out' })
       }
-    },
-    { threshold: 0.1 }
-  )
-  if (sectionRef.value) observer.observe(sectionRef.value)
+    })
+    triggers.push(st)
+  }
+
+  // Text side slides in from opposite direction, slightly delayed
+  if (textSide.value) {
+    const fromX = props.reversed ? -40 : 40
+    gsap.set(textSide.value, { x: fromX, opacity: 0 })
+    const st = ScrollTrigger.create({
+      trigger: sectionRef.value,
+      start: 'top 80%',
+      once: true,
+      onEnter: () => {
+        gsap.to(textSide.value, { x: 0, opacity: 1, duration: 0.9, ease: 'power3.out', delay: 0.15 })
+      }
+    })
+    triggers.push(st)
+  }
+
+  // YouTube row fades up
+  if (youtubeRow.value) {
+    gsap.set(youtubeRow.value, { y: 30, opacity: 0 })
+    const st = ScrollTrigger.create({
+      trigger: youtubeRow.value,
+      start: 'top 90%',
+      once: true,
+      onEnter: () => {
+        gsap.to(youtubeRow.value, { y: 0, opacity: 1, duration: 0.7, ease: 'power3.out' })
+      }
+    })
+    triggers.push(st)
+  }
 })
 
 onUnmounted(() => {
-  if (observer) observer.disconnect()
+  triggers.forEach(st => st.kill())
 })
 </script>
