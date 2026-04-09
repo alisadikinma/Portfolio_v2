@@ -36,7 +36,7 @@
           <div class="bezel-shell-sm h-full">
             <div class="bezel-core-sm p-5 h-full flex flex-col">
               <!-- Thumbnail (compact) -->
-              <div class="rounded-lg overflow-hidden mb-3 bg-bg-elevated flex-shrink-0 aspect-[16/5]">
+              <div class="rounded-lg overflow-hidden mb-3 bg-bg-elevated flex-shrink-0 aspect-[16/4]">
                 <img
                   v-if="project.thumbnail"
                   :src="project.thumbnail"
@@ -112,7 +112,7 @@ function getGridSpan(index) {
 
 onMounted(async () => {
   try {
-    const res = await api.get('/projects', { params: { per_page: 6, featured: 1 } })
+    const res = await api.get('/projects', { params: { per_page: 4, featured: 1 } })
     projects.value = res.data.data || []
   } catch (err) {
     console.error('Failed to fetch featured projects:', err)
