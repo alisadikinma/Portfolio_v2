@@ -12,6 +12,10 @@ class PageSection extends Model
     protected $fillable = [
         'page_type',
         'section_type',
+        'title',
+        'description',
+        'video_url',
+        'content',
         'is_active',
         'sequence',
     ];
@@ -19,27 +23,19 @@ class PageSection extends Model
     protected $casts = [
         'is_active' => 'boolean',
         'sequence' => 'integer',
+        'content' => 'array',
     ];
 
-    /**
-     * Get sections for specific page type
-     */
     public function scopeForPage($query, $pageType)
     {
         return $query->where('page_type', $pageType);
     }
 
-    /**
-     * Get only active sections
-     */
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
     }
 
-    /**
-     * Get sections ordered by sequence
-     */
     public function scopeOrdered($query)
     {
         return $query->orderBy('sequence');

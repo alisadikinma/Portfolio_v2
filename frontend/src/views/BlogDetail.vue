@@ -1,155 +1,313 @@
 <template>
-  <div>
-    <BaseLoader v-if="isLoading" text="Loading post..." class="min-h-screen" />
+  <div class="min-h-screen bg-bg-deep text-fg-primary">
 
-    <div v-else-if="error" class="min-h-screen flex items-center justify-center">
-      <BaseCard class="max-w-md text-center">
-        <h2 class="text-2xl font-bold mb-4">Post Not Found</h2>
-        <p class="text-neutral-600 dark:text-neutral-400 mb-6">
-          The blog post you're looking for doesn't exist or has been removed.
-        </p>
-        <BaseButton variant="primary" @click="$router.push('/blog')">
-          Back to Blog
-        </BaseButton>
-      </BaseCard>
+    <!-- ─── Loading ─── -->
+    <div v-if="isLoading" class="flex items-center justify-center min-h-screen">
+      <div class="text-center">
+        <div class="w-10 h-10 border-2 border-accent-gold/30 border-t-accent-gold rounded-full animate-spin mx-auto mb-4"></div>
+        <p class="mono-label text-fg-dim">Loading article...</p>
+      </div>
     </div>
 
+    <!-- ─── Error / Not Found ─── -->
+    <div v-else-if="fetchError" class="flex items-center justify-center min-h-screen px-4">
+      <div class="glass-card p-10 max-w-md w-full text-center">
+        <div class="w-14 h-14 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-6">
+          <svg class="w-7 h-7 text-destructive" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+          </svg>
+        </div>
+        <h2 class="section-heading text-2xl font-bold mb-3 text-fg-primary">Post Not Found</h2>
+        <p class="text-fg-muted mb-8 text-sm leading-relaxed">
+          The blog post you're looking for doesn't exist or has been removed.
+        </p>
+        <button class="btn-gold text-sm" @click="$router.push('/blog')">
+          ← Back to Blog
+        </button>
+      </div>
+    </div>
+
+    <!-- ─── Article ─── -->
     <article v-else-if="post">
-      <!-- Hero Section -->
-      <section class="relative bg-gradient-to-br from-primary-50 via-white to-accent-50 dark:from-neutral-900 dark:via-neutral-800 dark:to-neutral-900 overflow-hidden">
-        <div class="container-custom relative py-20">
+
+      <!-- ─── Hero Header ─── -->
+      <header class="relative pt-24 pb-12 overflow-hidden">
+        <!-- Background image blur (if available) -->
+        <div v-if="post.featured_image" class="pointer-events-none absolute inset-0 overflow-hidden">
+          <img
+            :src="post.featured_image"
+            :alt="post.title"
+            class="w-full h-full object-cover opacity-10 scale-110 blur-xl"
+          />
+          <div class="absolute inset-0 bg-gradient-to-b from-bg-deep/60 via-bg-deep/80 to-bg-deep"></div>
+        </div>
+
+        <!-- Ambient orbs -->
+        <div class="pointer-events-none absolute inset-0 overflow-hidden">
+          <div class="absolute -top-32 left-1/3 w-96 h-96 rounded-full bg-accent-gold/6 blur-3xl animate-aurora-float"></div>
+          <div class="absolute top-10 right-1/4 w-72 h-72 rounded-full bg-accent-cyan/5 blur-3xl animate-aurora-float animate-delay-500"></div>
+        </div>
+
+        <div class="container-custom relative">
           <div class="max-w-4xl mx-auto">
-            <div class="flex items-center gap-2 mb-4">
-              <BaseButton variant="outline" size="sm" @click="$router.push('/blog')">
-                ← Back
-              </BaseButton>
-              <BaseBadge variant="info" size="sm">{{ post.category?.name }}</BaseBadge>
+            <!-- Back + Category -->
+            <div class="flex items-center gap-3 mb-8">
+              <button
+                class="btn-glass px-4 py-2 text-sm flex items-center gap-2"
+                @click="$router.push('/blog')"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                </svg>
+                Blog
+              </button>
+              <span
+                v-if="post.category?.name"
+                class="px-3 py-1 rounded-full text-xs font-mono bg-accent-cyan/15 text-accent-cyan border border-accent-cyan/25"
+              >
+                {{ post.category.name }}
+              </span>
             </div>
-            <h1 class="text-4xl md:text-5xl lg:text-6xl font-display font-bold mb-6">
+
+            <!-- Title -->
+            <h1 class="section-heading text-4xl md:text-5xl lg:text-6xl font-bold text-fg-primary mb-6 leading-tight animate-fade-in-up">
               {{ post.title }}
             </h1>
-            <div class="flex items-center gap-2 text-neutral-600 dark:text-neutral-400">
-              <span>{{ formatDate(post.published_at) }}</span>
-              <span>•</span>
-              <span>{{ post.read_time }} min read</span>
-              <span>•</span>
-              <span>{{ post.views || 0 }} views</span>
+
+            <!-- Meta bar -->
+            <div class="flex flex-wrap items-center gap-4 text-sm text-fg-muted animate-fade-in-up animate-delay-100">
+              <span class="mono-label flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-fg-dim" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+                {{ formatDate(post.published_at) }}
+              </span>
+              <span class="text-fg-dim">·</span>
+              <span class="mono-label flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-fg-dim" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                {{ estimatedReadTime }} min read
+              </span>
+              <span class="text-fg-dim">·</span>
+              <span class="mono-label flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-fg-dim" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                </svg>
+                {{ post.views || 0 }} views
+              </span>
             </div>
           </div>
         </div>
-      </section>
+      </header>
 
-      <!-- Featured Image -->
-      <!--section class="section bg-neutral-50 dark:bg-neutral-900">
-        <div class="container-custom">
-          <div class="max-w-5xl mx-auto">
-            <div class="aspect-video bg-neutral-200 dark:bg-neutral-700 rounded-2xl"></div>
+      <!-- ─── Featured Image ─── -->
+      <div v-if="post.featured_image" class="container-custom mb-12">
+        <div class="max-w-4xl mx-auto">
+          <div class="rounded-2xl overflow-hidden aspect-video bg-bg-elevated">
+            <img
+              :src="post.featured_image"
+              :alt="post.title"
+              class="w-full h-full object-cover"
+            />
           </div>
         </div>
-      </section-->
+      </div>
 
-      <!-- Post Content -->
-      <section class="section bg-white dark:bg-neutral-800">
-        <div class="container-custom">
-          <div class="max-w-4xl mx-auto grid md:grid-cols-4 gap-12">
-            <!-- Share Sidebar -->
-            <div class="md:col-span-1 order-2 md:order-1">
-              <div class="sticky top-24 space-y-4">
-                <p class="text-sm font-semibold text-neutral-900 dark:text-neutral-100 mb-3">Share this post</p>
+      <!-- ─── Content Layout ─── -->
+      <div class="container-custom mb-16">
+        <div class="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-[1fr_3fr] gap-10">
+
+          <!-- ── Left Column: Sticky Share + Meta ── -->
+          <aside>
+            <div class="sticky top-28 space-y-6">
+
+              <!-- Share -->
+              <div class="glass-card p-5">
+                <p class="mono-label text-fg-dim mb-4">Share</p>
                 <div class="flex md:flex-col gap-3">
-                  <button class="p-3 rounded-lg bg-neutral-100 dark:bg-neutral-700 hover:bg-neutral-200 dark:hover:bg-neutral-600 transition-colors">
-                    <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/>
+
+                  <!-- Twitter / X -->
+                  <button
+                    class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-white/5 border border-border-hairline hover:border-accent-cyan/40 hover:bg-accent-cyan/5 transition-all duration-200 group"
+                    :title="'Share on X'"
+                    @click="shareTwitter"
+                  >
+                    <svg class="w-4 h-4 text-fg-muted group-hover:text-accent-cyan transition-colors flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.748l7.73-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
                     </svg>
+                    <span class="text-xs text-fg-muted group-hover:text-fg-primary transition-colors hidden md:block">Post on X</span>
                   </button>
-                  <button class="p-3 rounded-lg bg-neutral-100 dark:bg-neutral-700 hover:bg-neutral-200 dark:hover:bg-neutral-600 transition-colors">
-                    <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+
+                  <!-- LinkedIn -->
+                  <button
+                    class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-white/5 border border-border-hairline hover:border-accent-cyan/40 hover:bg-accent-cyan/5 transition-all duration-200 group"
+                    title="Share on LinkedIn"
+                    @click="shareLinkedIn"
+                  >
+                    <svg class="w-4 h-4 text-fg-muted group-hover:text-accent-cyan transition-colors flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
                     </svg>
+                    <span class="text-xs text-fg-muted group-hover:text-fg-primary transition-colors hidden md:block">LinkedIn</span>
                   </button>
-                  <button class="p-3 rounded-lg bg-neutral-100 dark:bg-neutral-700 hover:bg-neutral-200 dark:hover:bg-neutral-600 transition-colors">
-                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
+
+                  <!-- Copy URL -->
+                  <button
+                    class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-white/5 border border-border-hairline hover:border-accent-gold/40 hover:bg-accent-gold/5 transition-all duration-200 group"
+                    title="Copy link"
+                    @click="copyUrl"
+                  >
+                    <svg
+                      v-if="!urlCopied"
+                      class="w-4 h-4 text-fg-muted group-hover:text-accent-gold transition-colors flex-shrink-0"
+                      fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                    >
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
                     </svg>
+                    <svg
+                      v-else
+                      class="w-4 h-4 text-success flex-shrink-0"
+                      fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                    >
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                    </svg>
+                    <span class="text-xs transition-colors hidden md:block" :class="urlCopied ? 'text-success' : 'text-fg-muted group-hover:text-fg-primary'">
+                      {{ urlCopied ? 'Copied!' : 'Copy link' }}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Tags -->
+              <div v-if="post.tags?.length" class="glass-card p-5">
+                <p class="mono-label text-fg-dim mb-4">Tags</p>
+                <div class="flex flex-wrap gap-2">
+                  <span
+                    v-for="tag in post.tags"
+                    :key="tag"
+                    class="px-2.5 py-1 rounded-md text-xs bg-white/5 border border-border-hairline text-fg-muted"
+                  >
+                    #{{ tag }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </aside>
+
+          <!-- ── Main Article Content ── -->
+          <main>
+
+            <!-- AI Summary Box -->
+            <div
+              v-if="post.ai_summary"
+              class="glass-card p-6 mb-8 border border-accent-cyan/25"
+              style="border-color: rgba(6, 182, 212, 0.25);"
+            >
+              <div class="flex items-center gap-2.5 mb-4">
+                <div class="w-6 h-6 rounded-full bg-accent-cyan/20 flex items-center justify-center flex-shrink-0">
+                  <svg class="w-3.5 h-3.5 text-accent-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                  </svg>
+                </div>
+                <p class="mono-label text-accent-cyan">AI Summary</p>
+              </div>
+              <p class="text-fg-muted text-sm leading-relaxed">{{ post.ai_summary }}</p>
+            </div>
+
+            <!-- Excerpt / Lead -->
+            <p v-if="post.excerpt" class="text-xl text-fg-muted leading-relaxed mb-8 font-serif italic">
+              {{ post.excerpt }}
+            </p>
+
+            <!-- Article body -->
+            <div
+              v-if="post.content"
+              class="blog-content"
+              v-html="post.content"
+            ></div>
+
+            <!-- Author Card -->
+            <div class="mt-12 glass-card p-6">
+              <div class="flex items-start gap-4">
+                <div class="w-14 h-14 rounded-full bg-accent-gold/10 border border-accent-gold/20 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                  <img
+                    v-if="post.author?.avatar"
+                    :src="post.author.avatar"
+                    :alt="post.author?.name"
+                    class="w-full h-full object-cover"
+                  />
+                  <svg v-else class="w-7 h-7 text-accent-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                  </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="mono-label text-fg-dim mb-1">Written by</p>
+                  <h3 class="font-semibold font-display text-fg-primary text-lg mb-1">
+                    {{ post.author?.name || 'Ali Sadikin' }}
+                  </h3>
+                  <p class="text-fg-muted text-sm leading-relaxed">
+                    {{ post.author?.bio || 'AI Generalist Expert. Building intelligent systems and sharing insights on AI, engineering, and the future of work.' }}
+                  </p>
+                  <button
+                    class="btn-glass mt-4 text-xs px-4 py-2"
+                    @click="$router.push('/about')"
+                  >
+                    View Profile
                   </button>
                 </div>
               </div>
             </div>
-
-            <!-- Main Content -->
-            <div class="md:col-span-3 order-1 md:order-2">
-              <div class="prose prose-neutral dark:prose-invert max-w-none">
-                <p class="lead text-xl text-neutral-600 dark:text-neutral-400 mb-8">
-                  {{ post.excerpt }}
-                </p>
-
-                <div v-html="post.content || defaultContent" class="blog-content"></div>
-
-                <!-- Tags -->
-                <div v-if="post.tags?.length" class="mt-12 pt-8 border-t border-neutral-200 dark:border-neutral-700">
-                  <p class="text-sm font-semibold text-neutral-900 dark:text-neutral-100 mb-3">Tags</p>
-                  <div class="flex flex-wrap gap-2">
-                    <BaseBadge v-for="tag in post.tags" :key="tag" variant="outline" size="sm">
-                      {{ tag }}
-                    </BaseBadge>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Author Card -->
-              <div class="mt-12 p-6 bg-neutral-50 dark:bg-neutral-900 rounded-2xl">
-                <div class="flex items-start gap-4">
-                  <div class="w-16 h-16 rounded-full bg-neutral-200 dark:bg-neutral-700 flex-shrink-0"></div>
-                  <div>
-                    <h3 class="text-lg font-semibold mb-1">{{ post.author?.name || 'Author Name' }}</h3>
-                    <p class="text-neutral-600 dark:text-neutral-400 text-sm mb-3">
-                      {{ post.author?.bio || 'Passionate developer and writer sharing knowledge through articles and tutorials.' }}
-                    </p>
-                    <BaseButton variant="outline" size="sm" @click="goToProfile">
-                      View Profile
-                    </BaseButton>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          </main>
         </div>
-      </section>
+      </div>
 
-      <!-- Related Posts -->
-      <section class="section bg-neutral-50 dark:bg-neutral-900">
-        <div class="container-custom">
-          <div class="text-center mb-12">
-            <h2 class="text-3xl md:text-4xl font-display font-bold mb-4">Related Posts</h2>
+      <!-- ─── Related Posts ─── -->
+      <section v-if="relatedPosts.length" class="container-custom mb-20">
+        <div class="max-w-4xl mx-auto">
+          <div class="flex items-center gap-4 mb-8">
+            <p class="mono-label text-accent-gold">Continue Reading</p>
+            <div class="flex-1 h-px bg-border-hairline"></div>
           </div>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            <BaseCard 
-              v-for="i in 3" 
-              :key="i" 
-              hover 
-              class="cursor-pointer"
-              @click="goToRelatedPost(i)"
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <article
+              v-for="related in relatedPosts"
+              :key="related.id"
+              class="glass-card p-0 overflow-hidden cursor-pointer group"
+              @click="$router.push(`/blog/${related.slug}`)"
             >
-              <div class="aspect-video bg-neutral-200 dark:bg-neutral-700 rounded-lg mb-4"></div>
-              <BaseBadge variant="info" size="sm" class="mb-3">Category</BaseBadge>
-              <h3 class="text-lg font-semibold mb-2">Related Post {{ i }}</h3>
-              <p class="text-neutral-600 dark:text-neutral-400 text-sm">
-                Another interesting article you might enjoy reading
-              </p>
-            </BaseCard>
+              <div class="aspect-video bg-bg-elevated overflow-hidden flex-shrink-0">
+                <img
+                  v-if="related.featured_image"
+                  :src="related.featured_image"
+                  :alt="related.title"
+                  class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                />
+                <div v-else class="w-full h-full flex items-center justify-center">
+                  <svg class="w-8 h-8 text-fg-dim" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1"
+                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                  </svg>
+                </div>
+              </div>
+              <div class="p-5">
+                <span
+                  v-if="related.category?.name"
+                  class="inline-block mb-2 px-2 py-0.5 rounded text-xs font-mono bg-accent-cyan/10 text-accent-cyan"
+                >
+                  {{ related.category.name }}
+                </span>
+                <h3 class="font-semibold font-display text-fg-primary text-base leading-snug group-hover:text-accent-gold transition-colors line-clamp-2">
+                  {{ related.title }}
+                </h3>
+                <p class="mono-label text-fg-dim mt-2">{{ formatDate(related.published_at) }}</p>
+              </div>
+            </article>
           </div>
         </div>
       </section>
 
-      <!-- CTA Section (Component) -->
-      <CTASection
-        v-if="showCTASection"
-        heading="Have Questions or Ideas?"
-        description="Let's discuss how my expertise can help solve your challenges. <strong>Reach out today</strong> and let's start building something great together."
-        whatsapp-message="Hi! I read your blog post and I'd like to discuss working together."
-        :show-social-links="false"
-      />
-      <div class="h-10"></div>
     </article>
   </div>
 </template>
@@ -160,41 +318,31 @@ import { useRoute, useRouter } from 'vue-router'
 import { usePosts } from '@/composables/usePosts'
 import { useMetaTags } from '@/composables/useMetaTags'
 import { usePageSections } from '@/composables/usePageSections'
-import { BaseButton, BaseCard, BaseBadge, BaseLoader } from '@/components/base'
-import CTASection from '@/components/CTASection.vue'
+import { useToast } from '@/composables/useToast'
+import api from '@/services/api'
 
 const route = useRoute()
 const router = useRouter()
-const { post, isLoading, error, fetchPost } = usePosts()
-const { updatePageMeta, updateMetaTag } = useMetaTags()
-const { sections, fetchActiveSections } = usePageSections()
+const toast = useToast()
 
-// CTA visibility
-const showCTASection = computed(() => {
-  const section = sections.value.find(s => s.section_type === 'cta')
-  return section ? section.is_active : false
+const { post, isLoadingPost: isLoading, fetchPost } = usePosts()
+const { updatePageMeta, updateMetaTag } = useMetaTags()
+const { fetchActiveSections } = usePageSections()
+
+// ── State ─────────────────────────────────────────────────────────────────────
+const fetchError = ref(null)
+const relatedPosts = ref([])
+const urlCopied = ref(false)
+
+// ── Reading time ──────────────────────────────────────────────────────────────
+const estimatedReadTime = computed(() => {
+  if (!post.value) return 1
+  const text = (post.value.content || '') + (post.value.excerpt || '')
+  const words = text.replace(/<[^>]+>/g, '').split(/\s+/).filter(Boolean).length
+  return Math.max(1, Math.round(words / 200))
 })
 
-const defaultContent = `
-  <h2>Introduction</h2>
-  <p>This is a comprehensive guide covering important topics in web development. In this article, we'll explore key concepts, best practices, and practical examples that will help you improve your skills.</p>
-
-  <h2>Key Concepts</h2>
-  <p>Understanding the fundamentals is crucial for any developer. Let's dive into the core concepts that form the foundation of modern web development.</p>
-
-  <h3>Performance Optimization</h3>
-  <p>Performance is a critical aspect of web development. Users expect fast, responsive applications that provide a smooth experience across all devices.</p>
-
-  <h3>Best Practices</h3>
-  <p>Following industry best practices ensures your code is maintainable, scalable, and efficient. This includes proper code organization, testing, and documentation.</p>
-
-  <h2>Practical Examples</h2>
-  <p>Let's look at some practical examples that demonstrate these concepts in action. These examples will help you understand how to apply what you've learned.</p>
-
-  <h2>Conclusion</h2>
-  <p>By understanding these concepts and applying them in your projects, you'll be able to create better, more efficient applications. Keep learning and experimenting with new technologies to stay ahead in the field.</p>
-`
-
+// ── Helpers ───────────────────────────────────────────────────────────────────
 const formatDate = (date) => {
   if (!date) return ''
   return new Date(date).toLocaleDateString('en-US', {
@@ -204,48 +352,43 @@ const formatDate = (date) => {
   })
 }
 
-// Handler for View Profile button
-const goToProfile = () => {
-  // TODO: Navigate to author profile page
-  // For now, navigate to about page or show a toast
-  console.log('Navigate to profile:', post.value?.author?.name)
-  router.push('/about')
+// ── Share actions ─────────────────────────────────────────────────────────────
+const shareTwitter = () => {
+  const url = encodeURIComponent(window.location.href)
+  const text = encodeURIComponent(post.value?.title || '')
+  window.open(`https://twitter.com/intent/tweet?url=${url}&text=${text}`, '_blank', 'noopener,noreferrer')
 }
 
-// Handler for Related Post cards
-const goToRelatedPost = (postIndex) => {
-  // TODO: Navigate to actual related post
-  // For now, just log and show a placeholder
-  console.log('Navigate to related post:', postIndex)
-  // You can replace this with actual related post slug when you have the data
-  // router.push(`/blog/${relatedPost.slug}`)
+const shareLinkedIn = () => {
+  const url = encodeURIComponent(window.location.href)
+  window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${url}`, '_blank', 'noopener,noreferrer')
 }
 
-// Thumbnail URL for Open Graph (from post meta tags)
+const copyUrl = async () => {
+  try {
+    await navigator.clipboard.writeText(window.location.href)
+    urlCopied.value = true
+    toast.success('Link copied to clipboard!')
+    setTimeout(() => { urlCopied.value = false }, 2500)
+  } catch {
+    toast.error('Could not copy link.')
+  }
+}
+
+// ── Thumbnail for OG ──────────────────────────────────────────────────────────
 const thumbnailUrl = computed(() => {
   if (!post.value) return ''
-  
-  // Priority: og_image > featured_image > default
   if (post.value.og_image) {
-    if (post.value.og_image.startsWith('http')) {
-      return post.value.og_image
-    }
-    const backendUrl = import.meta.env.VITE_API_BASE_URL.replace('/api', '')
-    return `${backendUrl}${post.value.og_image}`
+    if (post.value.og_image.startsWith('http')) return post.value.og_image
+    const base = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || ''
+    return `${base}${post.value.og_image}`
   }
-  
-  if (post.value.featured_image) {
-    return post.value.featured_image
-  }
-  
-  return `${window.location.origin}/og-image.jpg`
+  return post.value.featured_image || `${window.location.origin}/og-image.jpg`
 })
 
-// Update meta tags from post meta fields
+// ── Meta tags ─────────────────────────────────────────────────────────────────
 const updateMetaTags = () => {
   if (!post.value) return
-
-  // Use post-specific meta tags from database
   updatePageMeta({
     title: post.value.meta_title || `${post.value.title} | Blog`,
     description: post.value.meta_description || post.value.excerpt,
@@ -254,147 +397,196 @@ const updateMetaTags = () => {
     type: 'article',
     keywords: post.value.focus_keyword || post.value.tags?.join(', ')
   })
-
-  // Additional OG tags from post
-  if (post.value.og_title) {
-    updateMetaTag('property', 'og:title', post.value.og_title)
-  }
-  if (post.value.og_description) {
-    updateMetaTag('property', 'og:description', post.value.og_description)
-  }
-  
-  // Article-specific meta tags
+  if (post.value.og_title) updateMetaTag('property', 'og:title', post.value.og_title)
+  if (post.value.og_description) updateMetaTag('property', 'og:description', post.value.og_description)
   updateMetaTag('property', 'article:published_time', post.value.published_at)
   updateMetaTag('property', 'article:author', post.value.author?.name || '')
-  if (post.value.tags?.length) {
-    post.value.tags.forEach(tag => {
-      const meta = document.createElement('meta')
-      meta.setAttribute('property', 'article:tag')
-      meta.setAttribute('content', tag)
-      document.head.appendChild(meta)
-    })
-  }
-  
-  console.log('✅ Meta tags updated from post:', {
-    title: post.value.meta_title || post.value.title,
-    og_image: thumbnailUrl.value
-  })
 }
 
-// Watch for post changes to update meta tags
+// ── Related posts ─────────────────────────────────────────────────────────────
+const fetchRelatedPosts = async () => {
+  if (!post.value) return
+  try {
+    const params = {}
+    if (post.value.category?.id) params.category_id = post.value.category.id
+    const res = await api.get('/posts', { params })
+    const all = res.data?.data || []
+    relatedPosts.value = all
+      .filter(p => p.id !== post.value.id)
+      .slice(0, 3)
+  } catch {
+    // related posts are non-critical
+  }
+}
+
+// ── Watch post changes ────────────────────────────────────────────────────────
 watch(
   () => post.value,
   (newPost) => {
     if (newPost) {
       updateMetaTags()
+      fetchRelatedPosts()
     }
   }
 )
 
+// ── Mount ─────────────────────────────────────────────────────────────────────
 onMounted(async () => {
   await fetchActiveSections('blog')
-  
-  const slug = route.params.slug
-  await fetchPost(slug)
 
-  if (error.value) {
-    console.error('Failed to load post:', error.value)
+  const slug = route.params.slug
+  const result = await fetchPost(slug)
+
+  if (!result.success) {
+    fetchError.value = result.error || 'Post not found'
   } else if (post.value) {
     updateMetaTags()
+    await fetchRelatedPosts()
   }
 })
 </script>
 
 <style scoped>
-/* Use Tailwind typography plugin styles */
-.prose {
-  color: #404040;
+/* ── Dark Cinematic Article Typography ── */
+.blog-content {
+  color: #EDEDEF;
+  line-height: 1.85;
+  font-size: 1.0625rem;
 }
 
-.dark .prose {
-  color: #d4d4d4;
-}
-
-.prose :deep(h2) {
-  font-size: 1.5rem;
+.blog-content :deep(h2) {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.625rem;
   font-weight: 700;
-  margin-top: 2rem;
+  letter-spacing: -0.02em;
+  margin-top: 2.5rem;
   margin-bottom: 1rem;
-  color: #171717;
+  color: #EDEDEF;
 }
 
-.dark .prose :deep(h2) {
-  color: #fafafa;
-}
-
-.prose :deep(h3) {
+.blog-content :deep(h3) {
+  font-family: 'Space Grotesk', sans-serif;
   font-size: 1.25rem;
   font-weight: 600;
-  margin-top: 1.5rem;
+  margin-top: 2rem;
   margin-bottom: 0.75rem;
-  color: #171717;
+  color: #EDEDEF;
 }
 
-.dark .prose :deep(h3) {
-  color: #fafafa;
+.blog-content :deep(h4) {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  color: #D4D4D8;
 }
 
-.prose :deep(p) {
-  margin-bottom: 1rem;
-  line-height: 1.75;
+.blog-content :deep(p) {
+  margin-bottom: 1.25rem;
+  color: #A1A1AA;
 }
 
-.prose :deep(ul), 
-.prose :deep(ol) {
-  margin-bottom: 1rem;
+.blog-content :deep(ul),
+.blog-content :deep(ol) {
   padding-left: 1.5rem;
+  margin-bottom: 1.25rem;
+  color: #A1A1AA;
 }
 
-.prose :deep(li) {
+.blog-content :deep(li) {
   margin-bottom: 0.5rem;
 }
 
-.prose :deep(a) {
-  color: #2563eb;
+.blog-content :deep(a) {
+  color: #06B6D4;
   text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: rgba(6, 182, 212, 0.4);
+  transition: color 0.2s, text-decoration-color 0.2s;
 }
 
-.prose :deep(a):hover {
-  color: #1d4ed8;
+.blog-content :deep(a:hover) {
+  color: #D4A843;
+  text-decoration-color: rgba(212, 168, 67, 0.5);
 }
 
-.dark .prose :deep(a) {
-  color: #60a5fa;
+.blog-content :deep(blockquote) {
+  border-left: 3px solid #D4A843;
+  padding: 0.75rem 1.25rem;
+  margin: 1.5rem 0;
+  background: rgba(212, 168, 67, 0.05);
+  border-radius: 0 8px 8px 0;
+  color: #8A8F98;
+  font-style: italic;
 }
 
-.dark .prose :deep(a):hover {
-  color: #93c5fd;
+.blog-content :deep(code) {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85em;
+  padding: 0.15em 0.45em;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 5px;
+  color: #06B6D4;
 }
 
-.prose :deep(code) {
-  padding: 0.25rem 0.5rem;
-  background-color: #f5f5f5;
-  border-radius: 0.25rem;
+.blog-content :deep(pre) {
+  background: #0C0C0F;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 1.25rem;
+  overflow-x: auto;
+  margin: 1.5rem 0;
+}
+
+.blog-content :deep(pre code) {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: #EDEDEF;
   font-size: 0.875rem;
 }
 
-.dark .prose :deep(code) {
-  background-color: #262626;
+.blog-content :deep(img) {
+  max-width: 100%;
+  border-radius: 12px;
+  margin: 1.5rem 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.prose :deep(pre) {
-  padding: 1rem;
-  background-color: #f5f5f5;
-  border-radius: 0.5rem;
-  overflow-x: auto;
-  margin-bottom: 1rem;
+.blog-content :deep(hr) {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin: 2.5rem 0;
 }
 
-.dark .prose :deep(pre) {
-  background-color: #262626;
+.blog-content :deep(strong) {
+  color: #EDEDEF;
+  font-weight: 600;
 }
 
-.blog-content {
-  color: inherit;
+.blog-content :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+}
+
+.blog-content :deep(th) {
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: left;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #8A8F98;
+}
+
+.blog-content :deep(td) {
+  padding: 0.75rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  color: #A1A1AA;
+  font-size: 0.9375rem;
 }
 </style>

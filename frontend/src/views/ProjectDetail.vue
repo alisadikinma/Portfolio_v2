@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-neutral-50 dark:bg-neutral-900">
+  <div class="min-h-screen bg-bg-deep text-fg-primary">
     <!-- Floating Share Button -->
     <div 
       v-if="project" 
