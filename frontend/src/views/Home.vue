@@ -1,15 +1,13 @@
 <template>
-  <div class="min-h-screen snap-y snap-mandatory overflow-y-auto h-[100dvh]">
+  <div class="min-h-screen snap-y snap-proximity">
 
     <!-- 1. HERO — VEO Warrior Video -->
     <div class="snap-start">
       <CinematicHero v-if="isSectionActive('hero')" />
     </div>
 
-    <!-- 2. SKILLS REEL — Kinetic Marquee -->
-    <div class="snap-start">
-      <SkillsReel v-if="isSectionActive('skills-reel')" />
-    </div>
+    <!-- 2. SKILLS REEL — Kinetic Marquee (no snap, flows naturally) -->
+    <SkillsReel v-if="isSectionActive('skills-reel')" />
 
     <!-- 3. VIBE CODING -->
     <div class="snap-start min-h-[100dvh] flex items-center">
