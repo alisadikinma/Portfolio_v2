@@ -6,7 +6,7 @@
     <video
       v-if="hasVideo"
       ref="videoRef"
-      class="absolute inset-0 w-full h-full object-cover"
+      class="absolute inset-0 w-full h-full object-cover object-[center_25%]"
       autoplay
       loop
       muted
@@ -32,8 +32,8 @@
     <div class="absolute inset-0 bg-bg-deep/60" />
     <div class="absolute inset-0 pointer-events-none" style="box-shadow: inset 0 0 200px 80px #050505;" />
 
-    <!-- Content overlay -->
-    <div class="relative z-10 text-center px-4 w-full max-w-6xl mx-auto">
+    <!-- Content overlay — pushed to bottom half -->
+    <div class="relative z-10 text-center px-4 w-full max-w-6xl mx-auto mt-[25vh]">
 
       <!-- Name — Massive Display Typography -->
       <h1
