@@ -35,21 +35,9 @@
     <!-- Content overlay -->
     <div class="relative z-10 text-center px-4 w-full max-w-6xl mx-auto">
 
-      <!-- Eyebrow Tag -->
-      <div
-        class="flex justify-center mb-8"
-        :class="contentVisible ? 'opacity-100' : 'opacity-0'"
-        :style="contentVisible ? 'transform:translateY(0);transition:opacity 800ms cubic-bezier(0.32,0.72,0,1),transform 800ms cubic-bezier(0.32,0.72,0,1);' : 'transform:translateY(16px);'"
-      >
-        <span class="eyebrow-tag text-accent-gold border-accent-gold/20">
-          <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-          AI Generalist Expert
-        </span>
-      </div>
-
       <!-- Name — Massive Display Typography -->
       <h1
-        class="font-display font-bold tracking-[-0.04em] leading-none text-gradient mb-6 text-shadow-lg"
+        class="font-display font-bold tracking-[-0.04em] leading-none text-gradient mb-4 text-shadow-lg"
         :class="[
           contentVisible ? 'opacity-100' : 'opacity-0',
           'text-6xl sm:text-7xl md:text-8xl lg:text-9xl'
@@ -59,11 +47,23 @@
         ALI SADIKIN MA
       </h1>
 
-      <!-- Subtitle — Lighter weight, generous letter-spacing -->
+      <!-- Eyebrow Tag — below name -->
+      <div
+        class="flex justify-center mb-6"
+        :class="contentVisible ? 'opacity-100' : 'opacity-0'"
+        :style="contentVisible ? 'transform:translateY(0);transition:opacity 900ms cubic-bezier(0.32,0.72,0,1) 200ms,transform 900ms cubic-bezier(0.32,0.72,0,1) 200ms;' : 'transform:translateY(16px);'"
+      >
+        <span class="eyebrow-tag text-accent-gold border-accent-gold/20">
+          <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+          AI Generalist Expert
+        </span>
+      </div>
+
+      <!-- Subtitle -->
       <p
         class="font-sans text-lg sm:text-xl md:text-2xl text-fg-muted font-light tracking-wide mb-16 text-shadow"
         :class="contentVisible ? 'opacity-100' : 'opacity-0'"
-        :style="contentVisible ? 'transform:translateY(0);transition:opacity 900ms cubic-bezier(0.32,0.72,0,1) 200ms,transform 900ms cubic-bezier(0.32,0.72,0,1) 200ms;' : 'transform:translateY(16px);'"
+        :style="contentVisible ? 'transform:translateY(0);transition:opacity 900ms cubic-bezier(0.32,0.72,0,1) 300ms,transform 900ms cubic-bezier(0.32,0.72,0,1) 300ms;' : 'transform:translateY(16px);'"
       >
         Bridging AI &amp; Business Outcomes
       </p>
