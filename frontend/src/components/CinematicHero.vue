@@ -6,7 +6,7 @@
     <video
       v-if="hasVideo"
       ref="videoRef"
-      class="absolute inset-0 w-full h-full object-cover"
+      class="absolute inset-0 w-full h-full object-cover object-[center_20%]"
       autoplay
       loop
       muted
@@ -56,7 +56,7 @@
         ]"
         :style="contentVisible ? 'transform:translateY(0);transition:opacity 900ms cubic-bezier(0.32,0.72,0,1) 100ms,transform 900ms cubic-bezier(0.32,0.72,0,1) 100ms;' : 'transform:translateY(24px);'"
       >
-        ALI SADIKIN
+        ALI SADIKIN MA
       </h1>
 
       <!-- Subtitle — Lighter weight, generous letter-spacing -->

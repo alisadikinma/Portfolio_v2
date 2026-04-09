@@ -61,10 +61,7 @@
     <!-- 7. FEATURED PROJECTS — Asymmetric Bento Grid -->
     <ProjectsBento v-if="isSectionActive('featured-projects')" />
 
-    <!-- 8. LATEST BLOG -->
-    <LatestBlog v-if="isSectionActive('latest-blog')" />
-
-    <!-- 9. STATS + CTA -->
+    <!-- 8. STATS + CTA -->
     <template v-if="isSectionActive('stats-cta')">
       <StatsBar />
       <CTASection />
@@ -81,7 +78,6 @@ import CinematicHero from '@/components/CinematicHero.vue'
 import SkillsReel from '@/components/home/SkillsReel.vue'
 import SkillShowcase from '@/components/home/SkillShowcase.vue'
 import ProjectsBento from '@/components/home/ProjectsBento.vue'
-import LatestBlog from '@/components/home/LatestBlog.vue'
 import StatsBar from '@/components/home/StatsBar.vue'
 import CTASection from '@/components/home/CTASection.vue'
 
