@@ -35,18 +35,20 @@
         >
           <div class="bezel-shell-sm h-full">
             <div class="bezel-core-sm p-5 h-full flex flex-col">
-              <!-- Thumbnail -->
-              <div
-                v-if="project.thumbnail"
-                class="rounded-xl overflow-hidden mb-4 bg-bg-elevated flex-shrink-0"
-                :class="index < 2 ? 'aspect-[16/9]' : 'aspect-video'"
-              >
+              <!-- Thumbnail (always visible) -->
+              <div class="rounded-xl overflow-hidden mb-4 bg-bg-elevated flex-shrink-0 aspect-[16/10]">
                 <img
+                  v-if="project.thumbnail"
                   :src="project.thumbnail"
                   :alt="project.title"
                   class="w-full h-full object-cover transition-transform duration-700 ease-spring group-hover:scale-105"
                   loading="lazy"
                 />
+                <div v-else class="w-full h-full flex items-center justify-center bg-gradient-to-br from-accent-gold/5 to-accent-cyan/5">
+                  <svg class="w-10 h-10 text-fg-dim/30" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5a2.25 2.25 0 002.25-2.25V5.25a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v13.5a2.25 2.25 0 002.25 2.25z"/>
+                  </svg>
+                </div>
               </div>
               <!-- Content -->
               <div class="flex-1 flex flex-col">
