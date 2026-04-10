@@ -7,14 +7,13 @@ const router = useRouter()
 const route = useRoute()
 
 const languages = [
-  { code: 'en', label: 'EN' },
-  { code: 'id', label: 'ID' }
+  { code: 'en', flag: '🇺🇸' },
+  { code: 'id', flag: '🇮🇩' }
 ]
 
 function switchLanguage(lang) {
   if (locale.value === lang) return
 
-  // Replace the lang segment in the current path
   const currentLang = route.params.lang || locale.value
   const newPath = route.fullPath.replace(`/${currentLang}`, `/${lang}`)
 
@@ -30,14 +29,15 @@ function switchLanguage(lang) {
       v-for="lang in languages"
       :key="lang.code"
       @click="switchLanguage(lang.code)"
-      class="px-2.5 py-1 rounded-full text-xs font-mono font-medium tracking-wider transition-all duration-300"
+      class="px-1.5 py-0.5 rounded-full text-sm transition-all duration-300"
       :class="[
         locale === lang.code
-          ? 'bg-accent-gold/15 text-accent-gold border border-accent-gold/30'
-          : 'text-fg-muted hover:text-fg-primary hover:bg-white/5 border border-transparent'
+          ? 'bg-accent-gold/15 border border-accent-gold/30 scale-110'
+          : 'opacity-50 hover:opacity-80 hover:bg-white/5 border border-transparent'
       ]"
+      :title="lang.code === 'en' ? 'English' : 'Indonesian'"
     >
-      {{ lang.label }}
+      {{ lang.flag }}
     </button>
   </div>
 </template>

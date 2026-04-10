@@ -389,22 +389,22 @@ onMounted(() => {
 
 <template>
   <form class="blog-post-form" @submit.prevent="handleSubmit('draft')">
-    <!-- Language Tabs — sticky top bar -->
-    <div class="flex items-center gap-2 border-b border-gray-700 pb-3 mb-6">
+    <!-- Language Tabs — flags only -->
+    <div class="flex items-center gap-1.5 border-b border-gray-700 pb-3 mb-6">
       <button
-        v-for="lang in [{code:'en',label:'EN',flag:'🇺🇸'},{code:'id',label:'ID',flag:'🇮🇩'}]"
+        v-for="lang in [{code:'en',flag:'🇺🇸'},{code:'id',flag:'🇮🇩'}]"
         :key="lang.code"
         type="button"
         @click="switchTab(lang.code)"
-        class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold tracking-wide transition-all duration-200"
+        class="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-base transition-all duration-200"
         :class="[
           activeTranslationTab === lang.code
-            ? 'bg-blue-600 text-white'
-            : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+            ? 'bg-blue-600 ring-2 ring-blue-400/50 scale-110'
+            : 'bg-gray-800 opacity-50 hover:opacity-80 hover:bg-gray-700'
         ]"
+        :title="lang.code === 'en' ? 'English' : 'Indonesian'"
       >
         <span>{{ lang.flag }}</span>
-        {{ lang.label }}
         <span v-if="translationData[lang.code]?.title" class="w-1.5 h-1.5 rounded-full" :class="activeTranslationTab === lang.code ? 'bg-white/60' : 'bg-green-500'"></span>
       </button>
       <span v-if="activeTranslationTab === 'id'" class="ml-auto text-[10px] text-amber-500">Keep tech terms in English</span>
