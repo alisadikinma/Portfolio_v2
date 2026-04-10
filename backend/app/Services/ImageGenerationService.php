@@ -189,7 +189,9 @@ class ImageGenerationService
             $imageData = Http::timeout(30)->get($imageUrl)->body();
             $filename = 'blog-images/' . time() . '_' . uniqid() . '.jpg';
             Storage::disk('public')->put($filename, $imageData);
-            return '/storage/' . $filename;
+
+            // Return full URL so images work from both backend and frontend
+            return url('/storage/' . $filename);
         } catch (\Exception $e) {
             Log::error("[ImageGen] Download failed: {$e->getMessage()}");
             return $imageUrl; // Fallback: use remote URL

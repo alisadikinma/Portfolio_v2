@@ -187,8 +187,8 @@ class PostController extends Controller
         $query = Post::with(['category', 'translations'])
             ->where('slug', $slug);
 
-        // Allow preview of unpublished posts with ?preview=1 and valid auth
-        if (!$request->boolean('preview') || !$request->user('sanctum')) {
+        // Allow preview of unpublished posts with ?preview=1
+        if (!$request->boolean('preview')) {
             $query->where('published', true);
         }
 

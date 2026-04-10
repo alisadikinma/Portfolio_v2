@@ -268,8 +268,7 @@ defineExpose({
         <img
           :src="previewUrl"
           :alt="fileName"
-          class="w-full h-auto object-cover"
-          :class="aspectRatio ? 'aspect-[16/9]' : 'max-h-96'"
+          class="w-full h-auto object-cover max-h-48"
         />
 
         <!-- Remove Button -->

@@ -293,28 +293,37 @@ defineExpose({
   padding: 1rem;
 }
 
-/* Dark mode support */
+/* Dark mode editor content area */
 .dark .ck-editor__editable_inline {
-  background-color: #1f2937;
-  color: #f3f4f6;
-  border-color: #374151;
+  background-color: #0f172a !important;
+  color: #e2e8f0;
+  border-color: #334155 !important;
 }
 
-/* Keep toolbar light in dark mode for better visibility */
+.dark .ck-editor__editable_inline:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
+}
+
+.dark .ck.ck-editor__main > .ck-editor__editable {
+  background-color: #0f172a !important;
+}
+
+/* Dark mode toolbar */
 .dark .ck.ck-toolbar {
-  background-color: #f7f7f7 !important;
-  border-color: #c4c4c4 !important;
+  background-color: #111827 !important;
+  border-color: #374151 !important;
 }
 
 .dark .ck.ck-toolbar .ck-button,
 .dark .ck.ck-toolbar .ck-dropdown__button,
 .dark .ck.ck-toolbar .ck-button .ck-button__label,
 .dark .ck.ck-toolbar .ck-dropdown__button .ck-dropdown__arrow {
-  color: #333 !important;
+  color: #d1d5db !important;
 }
 
 .dark .ck.ck-toolbar .ck-button:not(.ck-on):hover {
-  background-color: #e6e6e6 !important;
+  background-color: #1f2937 !important;
 }
 
 .dark .ck.ck-toolbar .ck-button.ck-on {
@@ -324,8 +333,22 @@ defineExpose({
 
 .dark .ck.ck-toolbar .ck-icon,
 .dark .ck.ck-toolbar .ck-icon * {
-  color: #333 !important;
-  fill: #333 !important;
+  color: #9ca3af !important;
+  fill: #9ca3af !important;
+}
+
+/* Dark mode dropdowns */
+.dark .ck.ck-dropdown__panel {
+  background-color: #1f2937 !important;
+  border-color: #374151 !important;
+}
+
+.dark .ck.ck-list__item .ck-button {
+  color: #d1d5db !important;
+}
+
+.dark .ck.ck-list__item .ck-button:hover {
+  background-color: #374151 !important;
 }
 
 /* Content styles for better readability */
