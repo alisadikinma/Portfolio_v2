@@ -367,11 +367,12 @@ class TrendingTopicService
         $text = strtolower($title);
 
         $map = [
-            1 => ['laravel', 'vue', 'react', 'next.js', 'frontend', 'backend', 'web dev', 'api', 'javascript', 'typescript', 'css', 'html', 'php', 'node'],
-            2 => ['design', 'ui', 'ux', 'figma', 'tailwind', 'animation'],
-            3 => ['ai', 'artificial intelligence', 'machine learning', 'openai', 'chatgpt', 'claude', 'gemini', 'gpt', 'llm', 'tech', 'nvidia', 'apple', 'google', 'microsoft', 'meta', 'robot', 'quantum', 'chip', 'agent'],
-            4 => ['tutorial', 'how to', 'guide', 'step by step', 'learn', 'build'],
-            5 => ['career', 'job', 'hire', 'salary', 'interview', 'remote'],
+            1 => ['ai', 'artificial intelligence', 'machine learning', 'deep learning', 'openai', 'chatgpt', 'claude', 'gemini', 'gpt', 'llm', 'diffusion', 'neural', 'transformer', 'agent', 'copilot', 'midjourney'],
+            2 => ['tech', 'apple', 'google', 'microsoft', 'meta', 'nvidia', 'tesla', 'samsung', 'chip', 'semiconductor', 'quantum', 'robot', 'ar', 'vr', 'blockchain', 'crypto', 'cybersecurity', 'android', 'ios'],
+            3 => ['laravel', 'vue', 'react', 'next.js', 'python', 'javascript', 'typescript', 'api', 'database', 'cloud', 'aws', 'saas', 'devops', 'docker', 'kubernetes', 'programming', 'coding', 'developer', 'software', 'open source', 'framework', 'php', 'node'],
+            4 => ['tutorial', 'how to', 'guide', 'step by step', 'learn', 'build', 'setup', 'install'],
+            5 => ['industry', 'market', 'trend', 'forecast', 'report', 'analysis', 'startup', 'funding', 'ipo', 'acquisition', 'career', 'job', 'salary'],
+            6 => ['review', 'comparison', 'vs', 'best', 'top', 'alternative', 'tool', 'app', 'product'],
         ];
 
         foreach ($map as $id => $keywords) {
@@ -380,6 +381,6 @@ class TrendingTopicService
             }
         }
 
-        return 3; // Default: Technology
+        return 2; // Default: Technology
     }
 }

@@ -184,10 +184,15 @@ class PostController extends Controller
         $language = $request->query('lang', $request->header('Accept-Language', 'en'));
         $language = strtolower(substr($language, 0, 2));
 
-        $post = Post::with(['category', 'translations'])
-            ->where('slug', $slug)
-            ->where('published', true)
-            ->first();
+        $query = Post::with(['category', 'translations'])
+            ->where('slug', $slug);
+
+        // Allow preview of unpublished posts with ?preview=1 and valid auth
+        if (!$request->boolean('preview') || !$request->user('sanctum')) {
+            $query->where('published', true);
+        }
+
+        $post = $query->first();
 
         if (!$post) {
             return response()->json([
@@ -196,8 +201,10 @@ class PostController extends Controller
             ], 404);
         }
 
-        // Increment views
-        $post->incrementViews();
+        // Only increment views for published posts (not previews)
+        if ($post->published) {
+            $post->incrementViews();
+        }
 
         return response()->json([
             'data' => (new PostResource($post))->additional(['lang' => $language]),

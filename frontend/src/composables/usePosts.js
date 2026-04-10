@@ -64,9 +64,12 @@ export function usePosts(initialParams = {}) {
       if (!selectedPostSlug.value) return null
       
       console.log('[usePosts] Background fetch post:', selectedPostSlug.value)
-      const response = await api.get(`/posts/${selectedPostSlug.value}`, {
-        params: { lang: selectedLang.value }
-      })
+      // Pass preview=1 if URL has ?preview=1 (allows viewing draft posts)
+      const urlParams = new URLSearchParams(window.location.search)
+      const params = { lang: selectedLang.value }
+      if (urlParams.get('preview')) params.preview = 1
+
+      const response = await api.get(`/posts/${selectedPostSlug.value}`, { params })
       
       if (response.data.success) {
         console.log('[usePosts] Post cached:', selectedPostSlug.value)

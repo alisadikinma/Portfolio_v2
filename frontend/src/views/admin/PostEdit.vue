@@ -77,7 +77,7 @@ onMounted(() => {
           <!-- Preview Button -->
           <a
             v-if="post?.slug"
-            :href="`/en/blog/${post.slug}`"
+            :href="`/en/blog/${post.slug}?preview=1`"
             target="_blank"
             class="flex items-center px-4 py-2 text-sm bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors"
           >
