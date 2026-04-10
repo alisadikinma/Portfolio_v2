@@ -222,14 +222,33 @@
       <div class="flex-1 transition-all duration-300" :class="uiStore.isSidebarOpen ? 'lg:ml-64' : 'lg:ml-0'">
         <!-- Top Bar -->
         <header class="h-16 bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 flex items-center justify-between px-6">
-          <button
-            @click="uiStore.toggleSidebar"
-            class="text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
-          >
-            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
+          <div class="flex items-center gap-3">
+            <button
+              @click="uiStore.toggleSidebar"
+              class="text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
+            >
+              <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+
+            <!-- Branding in topbar when sidebar is hidden -->
+            <transition
+              enter-active-class="transition duration-200 ease-out"
+              enter-from-class="opacity-0 -translate-x-4"
+              enter-to-class="opacity-100 translate-x-0"
+              leave-active-class="transition duration-150 ease-in"
+              leave-from-class="opacity-100 translate-x-0"
+              leave-to-class="opacity-0 -translate-x-4"
+            >
+              <router-link v-if="!uiStore.isSidebarOpen" to="/admin" class="flex items-center gap-2">
+                <div class="w-7 h-7 rounded-lg overflow-hidden flex-shrink-0 bg-gradient-to-br from-amber-500 to-cyan-500">
+                  <img v-if="siteLogoUrl" :src="siteLogoUrl" alt="Ali Sadikin Ma" class="w-full h-full object-cover" />
+                </div>
+                <span class="text-sm font-bold text-neutral-100 tracking-tight">ALI SADIKIN MA</span>
+              </router-link>
+            </transition>
+          </div>
 
           <div class="flex items-center gap-4">
             <button
