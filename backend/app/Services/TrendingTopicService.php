@@ -345,14 +345,16 @@ class TrendingTopicService
     {
         $slug = Str::slug($title);
 
+        // Check slug match on posts table
         if (Post::where('slug', $slug)->exists()) return true;
 
-        $recentPosts = Post::select('title')
+        // Check title similarity against recent translations (title lives in post_translations)
+        $recentTitles = \App\Models\PostTranslation::select('title')
             ->orderByDesc('created_at')
             ->limit(50)
             ->pluck('title');
 
-        foreach ($recentPosts as $existing) {
+        foreach ($recentTitles as $existing) {
             similar_text(strtolower($title), strtolower($existing), $percent);
             if ($percent > 70) return true;
         }

@@ -92,12 +92,11 @@ class BlogPipelineController extends Controller
     public function saveDraft(Request $request, ImageGenerationService $imageService): JsonResponse
     {
         $request->validate([
-            'title' => 'required|string|max:255',
             'category_id' => 'required|integer|exists:categories,id',
             'translations' => 'required|array',
             'translations.en' => 'required|array',
-            'translations.en.title' => 'required|string',
-            'translations.en.content' => 'required|string',
+            'translations.en.title' => 'required|string|max:255',
+            'translations.en.content' => 'required|string|min:100',
         ]);
 
         try {
@@ -145,7 +144,8 @@ class BlogPipelineController extends Controller
             }
 
             // 3. Create the post
-            $slug = $request->input('slug') ?: Str::slug($request->input('title'));
+            $enTitle = $translations['en']['title'];
+            $slug = $request->input('slug') ?: Str::slug($enTitle);
 
             // Ensure unique slug
             $originalSlug = $slug;
@@ -159,10 +159,7 @@ class BlogPipelineController extends Controller
 
             $post = Post::create([
                 'category_id' => $request->input('category_id'),
-                'title' => $enData['title'],
                 'slug' => $slug,
-                'excerpt' => $enData['excerpt'] ?? Str::limit(strip_tags($enData['content']), 150),
-                'content' => $enData['content'],
                 'featured_image' => $heroImageUrl,
                 'tags' => $request->input('tags', []),
                 'published' => false, // ALWAYS DRAFT
