@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'geminigen' => [
+        'api_key' => env('GEMINIGEN_API_KEY', ''),
+    ],
+
 ];

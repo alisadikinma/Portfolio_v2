@@ -307,6 +307,10 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
 
     // Webhook endpoint
     Route::post('/webhook/published', [AutomationController::class, 'postPublishedWebhook']);
+
+    // Blog Pipeline (Claude Scheduled Task integration)
+    Route::get('/blog/trending-topic', [\App\Http\Controllers\Api\BlogPipelineController::class, 'trendingTopic']);
+    Route::post('/blog/save-draft', [\App\Http\Controllers\Api\BlogPipelineController::class, 'saveDraft']);
 });
 
 // Admin Automation Management Routes
