@@ -245,7 +245,10 @@
                 <div class="w-7 h-7 rounded-lg overflow-hidden flex-shrink-0 bg-gradient-to-br from-amber-500 to-cyan-500">
                   <img v-if="siteLogoUrl" :src="siteLogoUrl" alt="Ali Sadikin Ma" class="w-full h-full object-cover" />
                 </div>
-                <span class="text-sm font-bold text-neutral-100 tracking-tight">ALI SADIKIN MA</span>
+                <div class="flex flex-col leading-none">
+                  <span class="text-sm font-bold text-neutral-100 tracking-tight">ALI SADIKIN MA</span>
+                  <span class="text-[9px] text-neutral-500 font-medium tracking-wider uppercase">Admin Panel</span>
+                </div>
               </router-link>
             </transition>
           </div>
