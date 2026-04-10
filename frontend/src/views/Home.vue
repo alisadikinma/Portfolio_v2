@@ -150,7 +150,8 @@ const vibeCodingLinks = [
 // ── AI Video YouTube + Socials ────────────────────────────────────
 const aiVideoYouTube = [
   { title: 'Smart Port System Ubah Pelabuhan Dumai Jadi Hub Biomass Asia Tenggara', url: 'https://youtu.be/ZCxOIMDkbvc' },
-  { title: 'Sistem Tracking Karyawan Real-Time: Disiplin Naik, Produksi Naik | INDUSIA Pulse', url: 'https://youtu.be/g_UErugvoOQ' }
+  { title: 'Sistem Tracking Karyawan Real-Time: Disiplin Naik, Produksi Naik | INDUSIA Pulse', url: 'https://youtu.be/g_UErugvoOQ' },
+  { title: 'Aplikasi Keamanan Komplek Perumahan Digital — SentraJaga Batam | Siskamling Digital 2026', url: 'https://youtu.be/LqdQMZvQ7fg' }
 ]
 
 const aiVideoSocials = [
