@@ -60,18 +60,11 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="max-w-5xl mx-auto px-4 py-8">
+  <div class="w-full max-w-7xl mx-auto px-4 py-6">
     <!-- Header -->
-    <div class="mb-8">
+    <div class="mb-5">
       <div class="flex items-center justify-between">
-        <div>
-          <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
-            Edit Post
-          </h1>
-          <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            Update your blog post
-          </p>
-        </div>
+        <h1 class="text-xl font-bold text-white">Edit Post</h1>
 
         <div class="flex items-center gap-3">
           <!-- Preview Button -->
@@ -180,10 +173,7 @@ onMounted(() => {
     </div>
 
     <!-- Form -->
-    <div
-      v-else-if="post"
-      class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6"
-    >
+    <div v-else-if="post">
       <BlogPostForm
         :post="post"
         submit-label="Update Post"
