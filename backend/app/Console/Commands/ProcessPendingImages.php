@@ -42,10 +42,11 @@ class ProcessPendingImages extends Command
                 $status = (int) ($data['status'] ?? 0);
 
                 // Image URL can be in different locations depending on the API response
+                // Priority: image_url (R2 signed, works) > file_download_url (needs extra auth) > thumbnail
                 $remoteUrl = $data['generate_result']
                     ?? $data['media_url']
-                    ?? ($data['generated_image'][0]['file_download_url'] ?? null)
                     ?? ($data['generated_image'][0]['image_url'] ?? null)
+                    ?? ($data['generated_image'][0]['file_download_url'] ?? null)
                     ?? ($data['thumbnail_url'] ?? null);
 
                 if ($status === 2 && $remoteUrl) {
