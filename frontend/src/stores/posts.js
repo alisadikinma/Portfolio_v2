@@ -140,7 +140,8 @@ export const usePostsStore = defineStore('posts', () => {
       const api = useApi()
 
       const response = await api.get(`/admin/posts/${id}`)
-      currentPost.value = response.data.data
+      // useApi.get() returns response.data (already unwrapped), so data is at response.data
+      currentPost.value = response.data || response
 
       return currentPost.value
     } catch (err) {
