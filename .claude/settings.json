@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ffmpeg -version)",
+      "Bash(ffprobe -v error -show_entries stream=codec_name,width,height,duration,bit_rate,r_frame_rate -of compact \"D:/Projects/Portfolio_v2/frontend/public/videos/warrior-front.mp4\")",
+      "Bash(ffprobe -v error -show_entries stream=codec_name,width,height,duration,bit_rate,r_frame_rate -of compact \"D:/Projects/Portfolio_v2/frontend/public/videos/warrior-left.mp4\")",
+      "Bash(ffprobe -v error -show_entries stream=codec_name,width,height,duration,bit_rate,r_frame_rate -of compact \"D:/Projects/Portfolio_v2/frontend/public/videos/warrior-right.mp4\")",
+      "Bash(ffmpeg -y -i \"D:/Projects/Portfolio_v2/frontend/public/videos/warrior-original/warrior-front.mp4\" -an -c:v libx264 -crf 28 -preset medium -movflags +faststart -pix_fmt yuv420p \"D:/Projects/Portfolio_v2/frontend/public/videos/warrior-front.mp4\")"
+    ],
+    "additionalDirectories": [
+      "D:\\Projects\\Portfolio_v2\\frontend\\public\\videos"
+    ]
+  }
+}
