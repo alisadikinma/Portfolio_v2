@@ -4,7 +4,7 @@
     <!-- ══════════════════════════════════════
          HERO — Photo + Bio + Title + Languages
          ══════════════════════════════════════ -->
-    <section class="pt-28 pb-24 relative overflow-hidden">
+    <section class="pt-16 sm:pt-20 pb-12 sm:pb-16 relative overflow-hidden">
       <div class="container-custom relative z-10">
         <div class="bezel-shell max-w-5xl mx-auto">
           <div class="bezel-core p-8 md:p-12">
@@ -93,29 +93,14 @@
       </div>
     </section>
 
-    <!-- ══════════════════════════════════════
-         GLOBAL IMPACT — 3D Globe Placeholder
-         ══════════════════════════════════════ -->
-    <section class="py-28">
-      <div class="container-custom">
-        <div class="text-center mb-14">
-          <span class="eyebrow-tag text-accent-cyan mb-4 inline-flex">Worldwide Presence</span>
-          <h2 class="section-heading text-3xl md:text-4xl text-fg-primary mt-4">Global Impact</h2>
-        </div>
-        <div class="bezel-shell max-w-4xl mx-auto">
-          <div id="globe-container" class="bezel-core w-full h-[400px] flex items-center justify-center">
-            <p class="text-fg-dim font-light">3D Globe — Phase 4C</p>
-          </div>
-        </div>
-      </div>
-    </section>
+    <!-- 3D Globe — Phase 4C (hidden until implemented) -->
 
     <!-- ══════════════════════════════════════
          SKILLS & EXPERTISE
          ══════════════════════════════════════ -->
-    <section class="py-28">
+    <section class="py-12 sm:py-20">
       <div class="container-custom">
-        <div class="text-center mb-14">
+        <div class="text-center mb-6 sm:mb-10">
           <span class="eyebrow-tag text-accent-gold mb-4 inline-flex">Technical Stack</span>
           <h2 class="section-heading text-3xl md:text-4xl text-fg-primary mt-4 mb-3">Skills & Expertise</h2>
           <p class="text-fg-muted font-light">Technologies and tools I work with every day</p>
@@ -138,7 +123,7 @@
     <!-- ══════════════════════════════════════
          WORK EXPERIENCE TIMELINE
          ══════════════════════════════════════ -->
-    <section class="py-28">
+    <section class="py-12 sm:py-20">
       <div class="container-custom">
         <div class="text-center mb-16">
           <span class="eyebrow-tag text-accent-indigo mb-4 inline-flex">Professional Journey</span>
@@ -263,9 +248,9 @@
     <!-- ══════════════════════════════════════
          CERTIFICATIONS
          ══════════════════════════════════════ -->
-    <section class="py-28">
+    <section class="py-12 sm:py-20">
       <div class="container-custom">
-        <div class="text-center mb-14">
+        <div class="text-center mb-6 sm:mb-10">
           <span class="eyebrow-tag text-accent-gold mb-4 inline-flex">Recognition</span>
           <h2 class="section-heading text-3xl md:text-4xl text-fg-primary mt-4">Certifications & Awards</h2>
         </div>
@@ -314,7 +299,7 @@
     <!-- ══════════════════════════════════════
          MISSION
          ══════════════════════════════════════ -->
-    <section v-if="aboutSettings?.mission" class="py-28">
+    <section v-if="aboutSettings?.mission" class="py-12 sm:py-20">
       <div class="container-custom">
         <div class="max-w-3xl mx-auto text-center">
           <!-- Icon -->
@@ -338,7 +323,7 @@
     <!-- ══════════════════════════════════════
          APPROACH
          ══════════════════════════════════════ -->
-    <section v-if="aboutSettings?.approach" class="py-28">
+    <section v-if="false && aboutSettings?.approach" class="py-12 sm:py-20">
       <div class="container-custom">
         <div class="max-w-5xl mx-auto">
           <div class="grid md:grid-cols-2 gap-12 items-center">
@@ -362,7 +347,7 @@
     <!-- ══════════════════════════════════════
          COLLABORATION MODES
          ══════════════════════════════════════ -->
-    <section v-if="getEnhancedModes.length > 0" class="py-28">
+    <section v-if="getEnhancedModes.length > 0" class="py-12 sm:py-20">
       <div class="container-custom">
         <div class="text-center mb-12">
           <span class="eyebrow-tag text-accent-gold mb-4 inline-flex">Flexible Partnership</span>

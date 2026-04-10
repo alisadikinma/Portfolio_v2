@@ -158,6 +158,21 @@
     scroll-behavior: smooth;
   }
 
+  /* Scroll snap — only on homepage via class toggle */
+  html.snap-page {
+    scroll-snap-type: y proximity;
+  }
+
+  .snap-section {
+    scroll-snap-align: start;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: center;
+    width: 100%;
+  }
+
   body {
     background-color: #050505;
     color: #EDEDEF;
@@ -187,8 +202,9 @@
 @layer components {
   /* Container */
   .container-custom {
-    @apply container mx-auto px-4 sm:px-6 lg:px-8;
-    max-width: 1280px;
+    width: 100%;
+    margin-inline: auto;
+    padding-inline: clamp(1rem, 5vw, 6rem);
   }
 
   /* ── Gradient Text ── */

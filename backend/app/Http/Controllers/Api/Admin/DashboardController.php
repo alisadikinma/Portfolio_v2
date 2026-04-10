@@ -64,16 +64,20 @@ class DashboardController extends Controller
                 });
 
             // Recent posts (5 latest)
-            $recentPosts = Post::select('id', 'title', 'slug', 'views', 'created_at')
+            $recentPosts = Post::with(['translations' => function ($q) {
+                    $q->where('language', 'en');
+                }])
+                ->select('id', 'slug', 'views', 'created_at')
                 ->latest()
                 ->take(5)
                 ->get()
                 ->map(function ($post) {
+                    $translation = $post->translations->first();
                     return [
                         'id' => $post->id,
-                        'title' => $post->title,
+                        'title' => $translation->title ?? 'Untitled',
                         'slug' => $post->slug,
-                        'status' => 'Published', // Default for now
+                        'status' => 'Published',
                         'views' => $this->formatNumber($post->views ?? 0),
                         'date' => $post->created_at->format('M d, Y'),
                     ];
@@ -227,18 +231,23 @@ class DashboardController extends Controller
         }
 
         // Recent posts
-        $recentPosts = Post::select('id', 'title', 'created_at', 'updated_at')
+        $recentPosts = Post::with(['translations' => function ($q) {
+                $q->where('language', 'en');
+            }])
+            ->select('id', 'created_at', 'updated_at')
             ->latest('updated_at')
             ->take(3)
             ->get();
 
         foreach ($recentPosts as $post) {
+            $translation = $post->translations->first();
+            $postTitle = $translation->title ?? 'Untitled';
             $isNew = $post->created_at->eq($post->updated_at);
             $activities[] = [
                 'id' => 'post_' . $post->id,
                 'type' => 'post',
                 'title' => $isNew ? 'New blog post published' : 'Blog post updated',
-                'description' => $post->title . ' has been ' . ($isNew ? 'published' : 'updated'),
+                'description' => $postTitle . ' has been ' . ($isNew ? 'published' : 'updated'),
                 'time' => $post->updated_at->diffForHumans(),
                 'timestamp' => $post->updated_at->timestamp,
             ];

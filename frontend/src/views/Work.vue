@@ -1,15 +1,62 @@
 <template>
-  <div class="min-h-screen pt-28 pb-24">
+  <div class="min-h-screen pt-16 sm:pt-20 pb-16">
     <div class="container-custom">
-      <!-- Header -->
-      <div class="mb-16">
-        <span class="eyebrow-tag text-accent-gold mb-4 inline-flex">Portfolio</span>
-        <h1 class="section-heading text-5xl md:text-6xl lg:text-7xl text-gradient mt-4 mb-4">My Work</h1>
-        <p class="text-fg-muted text-lg font-light max-w-lg">Projects, awards, and case studies from 17+ years of building.</p>
+      <!-- Header with search toggle -->
+      <div class="flex items-start justify-between mb-3 sm:mb-6">
+        <div>
+          <span class="eyebrow-tag text-accent-gold mb-1 inline-flex">Portfolio</span>
+          <h1 class="section-heading text-3xl md:text-5xl lg:text-7xl text-gradient mt-2 mb-1">My Work</h1>
+          <p class="text-fg-muted text-xs sm:text-lg font-light max-w-lg">Projects, awards, and case studies from 17+ years of building.</p>
+        </div>
+        <!-- Search icon toggle -->
+        <button
+          v-if="activeTab === 'projects'"
+          @click="searchOpen = !searchOpen"
+          class="mt-2 w-9 h-9 sm:w-10 sm:h-10 flex-shrink-0 flex items-center justify-center rounded-full transition-all duration-300"
+          :class="searchOpen ? 'bg-accent-gold/15 text-accent-gold border border-accent-gold/25' : 'text-fg-muted bg-white/4 border border-border-hairline hover:text-fg-primary hover:border-border-hover'"
+          aria-label="Toggle search"
+        >
+          <svg v-if="!searchOpen" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
       </div>
 
+      <!-- Search Bar — expandable -->
+      <Transition
+        enter-active-class="transition-all duration-300 ease-out"
+        enter-from-class="opacity-0 -translate-y-2 max-h-0"
+        enter-to-class="opacity-100 translate-y-0 max-h-24"
+        leave-active-class="transition-all duration-200 ease-in"
+        leave-from-class="opacity-100 translate-y-0 max-h-24"
+        leave-to-class="opacity-0 -translate-y-2 max-h-0"
+      >
+        <div v-if="searchOpen && activeTab === 'projects'" class="mb-3 sm:mb-4 overflow-hidden">
+          <div class="max-w-2xl mx-auto">
+            <div class="relative">
+              <input
+                ref="searchInputRef"
+                v-model="searchQuery"
+                type="text"
+                placeholder="Search projects..."
+                class="w-full px-4 py-2.5 pr-10 bg-bg-elevated border border-border-hairline rounded-xl text-fg-primary placeholder:text-fg-dim text-sm focus:outline-none focus:border-accent-gold/40 transition-colors"
+              />
+              <svg class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-fg-dim" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+            <p v-if="searchQuery" class="mt-1 text-xs text-fg-muted text-center">
+              {{ filteredProjects.length }} {{ filteredProjects.length === 1 ? 'result' : 'results' }} found
+            </p>
+          </div>
+        </div>
+      </Transition>
+
       <!-- Tab Bar — Pill buttons -->
-      <div class="flex gap-2 mb-14">
+      <div class="flex gap-2 mb-3 sm:mb-5">
         <button
           v-for="tab in tabs"
           :key="tab.key"
@@ -27,26 +74,9 @@
 
       <!-- ═══ Projects Tab ═══ -->
       <div v-if="activeTab === 'projects'">
-        <!-- Search Bar -->
-        <div class="max-w-2xl mx-auto mb-8">
-          <div class="relative">
-            <input
-              v-model="searchQuery"
-              type="text"
-              placeholder="Search projects by title, description, client, or technologies..."
-              class="w-full px-5 py-3.5 pr-12 bg-bg-elevated border border-border-hairline rounded-xl text-fg-primary placeholder:text-fg-dim text-sm focus:outline-none focus:border-accent-gold/40 transition-colors"
-            />
-            <svg class="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-fg-dim" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </div>
-          <p v-if="searchQuery" class="mt-2 text-xs text-fg-muted text-center">
-            {{ filteredProjects.length }} {{ filteredProjects.length === 1 ? 'result' : 'results' }} found
-          </p>
-        </div>
 
         <!-- Category Filters -->
-        <div class="flex flex-wrap gap-2.5 justify-center mb-10">
+        <div class="flex flex-wrap gap-1.5 sm:gap-2.5 justify-center mb-4 sm:mb-8">
           <button
             @click="selectedCategory = ''"
             class="px-4 py-2 rounded-full text-xs font-semibold transition-all duration-300"
@@ -165,7 +195,7 @@
         <!-- Full-bleed purple gradient -->
         <div class="awards-gradient-bg">
           <!-- Header -->
-          <div class="text-center pt-10 pb-6 px-4">
+          <div class="text-center pt-4 sm:pt-8 pb-4 sm:pb-6 px-4">
             <span class="inline-flex items-center gap-2 text-[11px] tracking-[0.2em] uppercase font-mono text-purple-300/70 mb-3">
               <svg class="w-3.5 h-3.5 text-amber-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
               Recognition & Achievements
@@ -346,7 +376,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '@/services/api'
 
@@ -369,6 +399,8 @@ const tabs = [
 
 const activeTab = ref(route.query.tab || 'projects')
 const searchQuery = ref('')
+const searchOpen = ref(false)
+const searchInputRef = ref(null)
 const selectedCategory = ref('')
 
 const allProjects = ref([])
@@ -422,6 +454,14 @@ function goToPage(page) {
 
 // Reset page when filters change
 watch([searchQuery, selectedCategory], () => { currentProjectPage.value = 1 })
+
+watch(searchOpen, (open) => {
+  if (open) {
+    nextTick(() => searchInputRef.value?.focus())
+  } else {
+    searchQuery.value = ''
+  }
+})
 
 function getCategoryBadgeClass(cat) {
   const map = {

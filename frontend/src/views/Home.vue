@@ -1,8 +1,8 @@
 <template>
-  <div class="min-h-screen snap-y snap-proximity">
+  <div class="min-h-screen">
 
     <!-- 1. HERO — VEO Warrior Video -->
-    <div class="snap-start">
+    <div class="snap-section">
       <CinematicHero v-if="isSectionActive('hero')" />
     </div>
 
@@ -10,7 +10,7 @@
     <SkillsReel v-if="isSectionActive('skills-reel')" />
 
     <!-- 3. VIBE CODING -->
-    <div class="snap-start min-h-[100dvh] flex items-center">
+    <div class="snap-section">
       <SkillShowcase
         v-if="isSectionActive('skill-vibe-coding')"
         :title="getSectionField('skill-vibe-coding', 'title', 'Vibe Coding')"
@@ -25,7 +25,7 @@
     </div>
 
     <!-- 4. AI AUTOMATION -->
-    <div class="snap-start min-h-[100dvh] flex items-center">
+    <div class="snap-section">
       <SkillShowcase
         v-if="isSectionActive('skill-ai-automation')"
         :title="getSectionField('skill-ai-automation', 'title', 'AI Automation')"
@@ -39,7 +39,7 @@
     </div>
 
     <!-- 5. AI AGENTS -->
-    <div class="snap-start min-h-[100dvh] flex items-center">
+    <div class="snap-section">
       <SkillShowcase
         v-if="isSectionActive('skill-ai-agents')"
         :title="getSectionField('skill-ai-agents', 'title', 'AI Agents')"
@@ -53,7 +53,7 @@
     </div>
 
     <!-- 6. AI VIDEO GENERATION -->
-    <div class="snap-start min-h-[100dvh] flex items-center">
+    <div class="snap-section">
       <SkillShowcase
         v-if="isSectionActive('skill-ai-video')"
         :title="getSectionField('skill-ai-video', 'title', 'AI Video Generation')"
@@ -69,12 +69,12 @@
     </div>
 
     <!-- 7. FEATURED PROJECTS -->
-    <div class="snap-start min-h-[100dvh] flex items-center">
+    <div class="snap-section">
       <ProjectsBento v-if="isSectionActive('featured-projects')" />
     </div>
 
     <!-- 8. STATS + CTA -->
-    <div class="snap-start" v-if="isSectionActive('stats-cta')">
+    <div class="snap-section" v-if="isSectionActive('stats-cta')">
       <StatsBar />
       <CTASection />
     </div>
@@ -83,7 +83,7 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { onMounted, onUnmounted } from 'vue'
 import { usePageSections } from '@/composables/usePageSections'
 
 import CinematicHero from '@/components/CinematicHero.vue'
@@ -172,5 +172,10 @@ function getSectionField(sectionType, field, fallback = '') {
 
 onMounted(() => {
   fetchActiveSections('homepage')
+  document.documentElement.classList.add('snap-page')
+})
+
+onUnmounted(() => {
+  document.documentElement.classList.remove('snap-page')
 })
 </script>

@@ -1,20 +1,18 @@
 <template>
-  <section ref="sectionRef" class="py-16 relative z-10">
+  <section ref="sectionRef" class="pt-4 pb-2 sm:py-10 relative z-10">
     <div class="container-custom">
-      <!-- Outer Bezel Shell -->
-      <div class="bezel-shell">
-        <!-- Inner Core — the glass plate -->
-        <div class="bezel-core p-6 md:p-8">
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
+      <div class="bezel-shell-sm sm:bezel-shell">
+        <div class="bezel-core-sm sm:bezel-core p-3 sm:p-6 md:p-8">
+          <div class="grid grid-cols-4 gap-2 sm:gap-6 md:gap-8">
             <div
               v-for="(stat, index) in stats"
               :key="stat.label"
               class="text-center"
             >
-              <div class="font-display text-4xl md:text-5xl font-bold text-accent-gold mb-2 tracking-tight">
+              <div class="font-display text-lg sm:text-3xl md:text-5xl font-bold text-accent-gold mb-0.5 sm:mb-2 tracking-tight">
                 {{ animatedValues[index] }}{{ stat.suffix }}
               </div>
-              <div class="mono-label text-[10px]">
+              <div class="mono-label text-[6px] sm:text-[9px] md:text-[10px] leading-tight">
                 {{ stat.label }}
               </div>
             </div>

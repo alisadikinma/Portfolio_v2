@@ -4,7 +4,7 @@
     <div
       class="pointer-events-auto mt-5 mx-4 transition-all duration-700 ease-spring"
       :class="[
-        isScrolled
+        isScrolled || menuOpen
           ? 'w-full max-w-3xl opacity-100 translate-y-0'
           : 'w-full max-w-2xl opacity-0 -translate-y-4'
       ]"
@@ -29,7 +29,7 @@
             <div v-else class="w-8 h-8 rounded-xl bg-gradient-to-br from-accent-gold to-accent-cyan flex items-center justify-center transition-all duration-700 ease-spring group-hover:shadow-glow-gold">
               <span class="text-bg-deep font-bold text-sm">{{ siteName.charAt(0).toUpperCase() }}</span>
             </div>
-            <span class="text-sm font-display font-bold text-gradient hidden sm:inline">
+            <span class="text-xs sm:text-sm font-display font-bold text-gradient">
               {{ siteName }}
             </span>
           </router-link>
@@ -96,8 +96,18 @@
     >
       <div
         v-if="menuOpen"
-        class="md:hidden fixed inset-0 bg-bg-deep/90 backdrop-blur-3xl z-30 pointer-events-auto"
+        class="md:hidden fixed inset-0 bg-bg-deep/95 backdrop-blur-3xl z-50 pointer-events-auto"
       >
+        <!-- Close button -->
+        <button
+          @click="closeMenu"
+          class="absolute top-6 right-6 w-10 h-10 flex items-center justify-center rounded-full bg-white/5 border border-white/10 text-fg-primary hover:bg-white/10 transition-all duration-300 z-10"
+          aria-label="Close menu"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
         <div class="flex flex-col items-center justify-center h-full px-8 gap-3">
           <TransitionGroup
             appear

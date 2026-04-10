@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-neutral-100 dark:bg-neutral-900">
+  <div class="dark min-h-screen bg-neutral-100 dark:bg-neutral-900">
     <div class="flex">
       <!-- Sidebar -->
       <aside
