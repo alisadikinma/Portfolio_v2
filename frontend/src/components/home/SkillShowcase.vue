@@ -115,7 +115,7 @@
         class="mt-10 opacity-0"
       >
         <p class="eyebrow-tag text-fg-dim mb-4 inline-flex">Published Work</p>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-3">
           <a
             v-for="yt in youtubeVideos"
             :key="yt.url"
@@ -125,9 +125,9 @@
             class="group"
           >
             <div class="bezel-shell-sm">
-              <div class="bezel-core-sm overflow-hidden flex flex-col sm:flex-row">
+              <div class="bezel-core-sm overflow-hidden flex flex-col">
                 <!-- Thumbnail -->
-                <div class="sm:w-48 flex-shrink-0 aspect-video sm:aspect-auto relative bg-bg-elevated">
+                <div class="aspect-video relative bg-bg-elevated">
                   <img
                     :src="getYouTubeThumbnail(yt.url)"
                     :alt="yt.title"
@@ -141,11 +141,11 @@
                   </div>
                 </div>
                 <!-- Info -->
-                <div class="p-4 flex flex-col justify-center">
-                  <p class="text-sm text-fg-primary font-medium line-clamp-2 group-hover:text-accent-gold transition-colors duration-700 ease-spring">{{ yt.title }}</p>
-                  <p class="text-[11px] text-fg-dim mt-1.5 flex items-center gap-1.5">
+                <div class="p-3 flex flex-col justify-center">
+                  <p class="text-xs text-fg-primary font-medium line-clamp-2 group-hover:text-accent-gold transition-colors duration-700 ease-spring">{{ yt.title }}</p>
+                  <p class="text-[10px] text-fg-dim mt-1.5 flex items-center gap-1.5">
                     <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
-                    Watch on YouTube
+                    YouTube
                   </p>
                 </div>
               </div>
