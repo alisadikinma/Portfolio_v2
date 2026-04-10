@@ -151,32 +151,16 @@ export function usePosts(initialParams = {}) {
     }
   }
 
-  // Fetch single post (with instant localStorage)
+  // Fetch single post
   const fetchPost = async (slug, lang = 'en') => {
-    const cacheKey = `post_${slug}_${lang}`
-    
-    // Check instant localStorage
-    cachedPost.value = getCache(cacheKey)
-    
-    // Check TanStack Query cache
-    const queryCache = queryClient.getQueryData(['post', slug, lang])
-    if (queryCache) {
-      console.log('[usePosts] TanStack Query cache HIT:', slug)
-      return { success: true, data: queryCache }
-    }
-
-    // If no cache at all, show we're fetching
-    if (!cachedPost.value) {
-      console.log('[usePosts] Cache MISS for:', slug, '- fetching...')
-    } else {
-      console.log('[usePosts] âš¡ INSTANT from localStorage, background refresh...')
-    }
-    
     selectedPostSlug.value = slug
     selectedLang.value = lang
-    
+
+    // Invalidate stale cache for this slug+lang combo
+    queryClient.invalidateQueries({ queryKey: ['post', slug, lang] })
+
     await refetchPost()
-    
+
     return {
       success: !!post.value,
       data: post.value,
