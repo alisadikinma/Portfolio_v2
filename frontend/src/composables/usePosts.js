@@ -70,15 +70,17 @@ export function usePosts(initialParams = {}) {
       if (urlParams.get('preview')) params.preview = 1
 
       const response = await api.get(`/posts/${selectedPostSlug.value}`, { params })
-      
-      if (response.data.success) {
+
+      // API returns { data: {...} } — extract the post data
+      const postResult = response.data?.data || response.data
+      if (postResult) {
         console.log('[usePosts] Post cached:', selectedPostSlug.value)
-        
+
         // Update localStorage
         const cacheKey = `post_${selectedPostSlug.value}_${selectedLang.value}`
-        setCache(cacheKey, response.data.data, 10 * 60 * 1000) // 10min
-        
-        return response.data.data
+        setCache(cacheKey, postResult, 10 * 60 * 1000) // 10min
+
+        return postResult
       }
       return null
     },
