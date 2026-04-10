@@ -205,8 +205,8 @@
         </div>
       </aside>
 
-      <!-- Main Content -->
-      <div class="flex-1 lg:ml-64">
+      <!-- Main Content — dynamic margin based on sidebar state -->
+      <div class="flex-1 transition-all duration-300" :class="uiStore.isSidebarOpen ? 'lg:ml-64' : 'lg:ml-0'">
         <!-- Top Bar -->
         <header class="h-16 bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 flex items-center justify-between px-6">
           <button
