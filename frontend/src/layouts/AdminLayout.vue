@@ -7,14 +7,27 @@
         :class="{ '-translate-x-full': !uiStore.isSidebarOpen, 'translate-x-0': uiStore.isSidebarOpen }"
       >
         <div class="h-full flex flex-col">
-          <!-- Sidebar Header -->
-          <div class="h-16 flex items-center justify-between px-6 border-b border-neutral-200 dark:border-neutral-700">
-            <h2 class="text-xl font-bold text-neutral-900 dark:text-neutral-100">Admin</h2>
+          <!-- Sidebar Header — Branding -->
+          <div class="h-16 flex items-center justify-between px-5 border-b border-neutral-200 dark:border-neutral-700">
+            <router-link to="/admin" class="flex items-center gap-2.5 group">
+              <div class="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0 bg-gradient-to-br from-amber-500 to-cyan-500">
+                <img
+                  v-if="siteLogoUrl"
+                  :src="siteLogoUrl"
+                  alt="Ali Sadikin Ma"
+                  class="w-full h-full object-cover"
+                />
+              </div>
+              <div class="flex flex-col leading-none">
+                <span class="text-sm font-bold text-neutral-100 tracking-tight">ALI SADIKIN MA</span>
+                <span class="text-[10px] text-neutral-500 font-medium tracking-wider uppercase">Admin Panel</span>
+              </div>
+            </router-link>
             <button
               @click="uiStore.toggleSidebar"
               class="lg:hidden text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
             >
-              <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
@@ -242,17 +255,27 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useThemeStore } from '@/stores/theme'
 import { useUIStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
+import { useSiteSettings } from '@/composables/useSiteSettings'
 import { BaseToast } from '@/components/base'
 
 const router = useRouter()
 const themeStore = useThemeStore()
 const uiStore = useUIStore()
 const authStore = useAuthStore()
+const { siteLogo, fetchSiteSettings } = useSiteSettings()
+
+const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost/Portfolio_v2/backend/public/api'
+const backendBase = apiBase.replace('/api', '')
+const siteLogoUrl = computed(() => {
+  if (!siteLogo.value) return null
+  if (siteLogo.value.startsWith('http')) return siteLogo.value
+  return backendBase + siteLogo.value
+})
 const toastRef = ref(null)
 
 const handleLogout = async () => {
@@ -260,9 +283,10 @@ const handleLogout = async () => {
   router.push('/login')
 }
 
-onMounted(() => {
+onMounted(async () => {
   if (toastRef.value) {
     uiStore.toastRef = toastRef.value
   }
+  await fetchSiteSettings()
 })
 </script>
