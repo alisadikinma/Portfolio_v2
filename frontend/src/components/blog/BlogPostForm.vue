@@ -70,8 +70,8 @@ const validationRules = {
   excerpt: { maxLength: 500 },
   content: { required: true, minLength: 100 },
   category_id: { required: true },
-  meta_title: { maxLength: 60 },
-  meta_description: { maxLength: 160 },
+  meta_title: { maxLength: 255 },
+  meta_description: { maxLength: 500 },
   focus_keyword: { maxLength: 100 },
   canonical_url: { pattern: /^https?:\/\/.+/ }
 }
@@ -493,40 +493,44 @@ onMounted(() => {
           <ImageUploader :model-value="uploadedImageFile" description="PNG, JPG, WEBP (max 5MB)" aspect-ratio="16:9" :disabled="isSubmitting" @update:model-value="handleImageChange" />
         </div>
 
-        <!-- SEO Settings -->
+        <!-- SEO Settings (per language) -->
         <div class="rounded-lg border border-gray-700 bg-gray-900/50 p-4">
           <button type="button" class="flex items-center justify-between w-full" @click="showAdvancedSeo = !showAdvancedSeo">
-            <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">SEO Settings</h3>
+            <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+              SEO Settings
+              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-gray-800 text-blue-400 normal-case">{{ activeTranslationTab.toUpperCase() }}</span>
+            </h3>
             <svg class="w-4 h-4 text-gray-500 transition-transform" :class="{ 'rotate-180': showAdvancedSeo }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
             </svg>
           </button>
           <div v-show="showAdvancedSeo" class="mt-3 space-y-3">
+            <p class="text-[10px] text-gray-600">SEO fields are per-language. Switch EN/ID tab to edit each.</p>
             <div>
-              <label class="block text-[11px] text-gray-500 mb-1">Meta Title</label>
+              <label class="block text-[11px] text-gray-500 mb-1">Meta Title <span class="text-gray-600">(recommended: 50-60 chars)</span></label>
               <input v-model="formData.meta_title" type="text" :disabled="isSubmitting"
                 class="w-full px-2.5 py-1.5 text-xs border rounded bg-gray-900 text-white border-gray-700 focus:ring-1 focus:ring-blue-500 placeholder-gray-600"
-                placeholder="SEO title..." />
-              <p class="text-[10px] text-right mt-0.5" :class="getCountColor(metaTitleCount, 60)">{{ metaTitleCount }}/60</p>
+                placeholder="SEO title for search engines..." />
+              <p class="text-[10px] text-right mt-0.5" :class="metaTitleCount > 60 ? 'text-amber-400' : metaTitleCount > 50 ? 'text-green-400' : 'text-gray-500'">{{ metaTitleCount }}/60 {{ metaTitleCount > 60 ? '(may be truncated in search)' : '' }}</p>
             </div>
             <div>
-              <label class="block text-[11px] text-gray-500 mb-1">Meta Description</label>
-              <textarea v-model="formData.meta_description" rows="2" :disabled="isSubmitting"
-                class="w-full px-2.5 py-1.5 text-xs border rounded bg-gray-900 text-white border-gray-700 focus:ring-1 focus:ring-blue-500 resize-none placeholder-gray-600"
-                placeholder="SEO description..."></textarea>
-              <p class="text-[10px] text-right mt-0.5" :class="getCountColor(metaDescriptionCount, 160)">{{ metaDescriptionCount }}/160</p>
+              <label class="block text-[11px] text-gray-500 mb-1">Meta Description <span class="text-gray-600">(recommended: 120-160 chars)</span></label>
+              <textarea v-model="formData.meta_description" rows="4" :disabled="isSubmitting"
+                class="w-full px-2.5 py-1.5 text-xs border rounded bg-gray-900 text-white border-gray-700 focus:ring-1 focus:ring-blue-500 resize-y placeholder-gray-600"
+                placeholder="Compelling description for search results. Include primary keyword naturally..."></textarea>
+              <p class="text-[10px] text-right mt-0.5" :class="metaDescriptionCount > 160 ? 'text-amber-400' : metaDescriptionCount > 120 ? 'text-green-400' : 'text-gray-500'">{{ metaDescriptionCount }}/160</p>
             </div>
             <div>
-              <label class="block text-[11px] text-gray-500 mb-1">Focus Keyword</label>
+              <label class="block text-[11px] text-gray-500 mb-1">Focus Keywords <span class="text-gray-600">(comma separated)</span></label>
               <input v-model="formData.focus_keyword" type="text" :disabled="isSubmitting"
                 class="w-full px-2.5 py-1.5 text-xs border rounded bg-gray-900 text-white border-gray-700 focus:ring-1 focus:ring-blue-500 placeholder-gray-600"
-                placeholder="Primary keyword..." />
+                :placeholder="activeTranslationTab === 'id' ? 'kata kunci utama, kata kunci sekunder' : 'primary keyword, secondary keyword'" />
             </div>
             <div>
               <label class="block text-[11px] text-gray-500 mb-1">Canonical URL</label>
               <input v-model="formData.canonical_url" type="url" :disabled="isSubmitting"
                 class="w-full px-2.5 py-1.5 text-xs border rounded bg-gray-900 text-white border-gray-700 focus:ring-1 focus:ring-blue-500 placeholder-gray-600"
-                placeholder="https://..." />
+                placeholder="https://alisadikinma.com/en/blog/..." />
             </div>
           </div>
         </div>
