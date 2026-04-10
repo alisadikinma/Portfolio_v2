@@ -12,14 +12,24 @@
           <div class="bezel-shell">
             <div class="bezel-core overflow-hidden">
               <div class="aspect-video relative bg-bg-elevated">
+                <!-- Poster image: shows immediately, hidden once video is ready -->
+                <img
+                  v-if="videoSrc && !videoReady"
+                  :src="posterSrc"
+                  alt=""
+                  class="absolute inset-0 w-full h-full object-cover"
+                />
+                <!-- Video: only loads when section is in viewport -->
                 <video
-                  v-if="videoSrc"
+                  v-if="videoSrc && shouldLoadVideo"
                   ref="videoRef"
-                  class="w-full h-full object-cover"
+                  class="w-full h-full object-cover transition-opacity duration-500"
+                  :class="videoReady ? 'opacity-100' : 'opacity-0'"
                   loop
                   muted
                   playsinline
-                  preload="metadata"
+                  preload="none"
+                  @canplay="videoReady = true"
                   @error="videoError = true"
                 >
                   <source :src="videoSrc" type="video/mp4" />
@@ -158,7 +168,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { useVideoReveal } from '@/composables/useVideoReveal'
@@ -184,9 +194,20 @@ const textSide = ref(null)
 const youtubeRow = ref(null)
 const videoRef = ref(null)
 const videoError = ref(false)
+const videoReady = ref(false)
+const shouldLoadVideo = ref(false)
 
 const { setupVideoReveal } = useVideoReveal()
 const triggers = []
+
+// Poster: use first frame screenshot stored as .webp alongside the .mp4
+// e.g. /videos/ai-video.mp4 → /videos/ai-video-poster.webp
+// Falls back to a tiny gradient placeholder if poster doesn't exist
+const posterSrc = computed(() => {
+  if (!props.videoSrc) return ''
+  return props.videoSrc.replace(/\.mp4$/, '-poster.webp')
+})
+
 
 const accentClasses = computed(() => {
   const map = {
@@ -223,10 +244,32 @@ function getYouTubeThumbnail(url) {
   return match ? `https://img.youtube.com/vi/${match[1]}/mqdefault.jpg` : ''
 }
 
+// Lazy load video only when section enters viewport
+let videoObserver = null
+
+function initVideoLazyLoad() {
+  if (!props.videoSrc || !sectionRef.value) return
+
+  videoObserver = new IntersectionObserver(
+    ([entry]) => {
+      if (entry.isIntersecting) {
+        shouldLoadVideo.value = true
+        videoObserver?.disconnect()
+        // Once video element exists, set up auto-play/pause
+        nextTick(() => {
+          if (videoRef.value) {
+            setupVideoReveal(videoRef.value)
+          }
+        })
+      }
+    },
+    { rootMargin: '200px' } // Start loading 200px before visible
+  )
+  videoObserver.observe(sectionRef.value)
+}
+
 onMounted(() => {
-  if (videoRef.value) {
-    setupVideoReveal(videoRef.value)
-  }
+  initVideoLazyLoad()
 
   const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
   if (prefersReduced) {
@@ -283,5 +326,6 @@ onMounted(() => {
 
 onUnmounted(() => {
   triggers.forEach(st => st.kill())
+  videoObserver?.disconnect()
 })
 </script>
