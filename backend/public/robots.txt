@@ -1,5 +1,5 @@
-# SEO Robots Configuration for Portfolio_v2
-# Last Updated: October 16, 2025
+# SEO Robots Configuration for alisadikinma.com
+# Last Updated: April 10, 2026
 
 # Allow all bots to crawl the site
 User-agent: *
@@ -14,6 +14,16 @@ Crawl-delay: 0
 User-agent: Bingbot
 Allow: /
 Crawl-delay: 1
+
+# AI Crawlers — welcome
+User-agent: GPTBot
+Allow: /
+User-agent: ClaudeBot
+Allow: /
+User-agent: PerplexityBot
+Allow: /
+User-agent: GoogleOther
+Allow: /
 
 # Disallow admin and sensitive areas
 User-agent: *
@@ -47,10 +57,11 @@ User-agent: DotBot
 Disallow: /
 
 # Sitemaps
-Sitemap: https://example.com/api/sitemap.xml
-Sitemap: https://example.com/api/sitemap-index.xml
-Sitemap: https://example.com/api/sitemap-posts.xml
-Sitemap: https://example.com/api/sitemap-projects.xml
+Sitemap: https://alisadikinma.com/sitemap.xml
+Sitemap: https://alisadikinma.com/api/sitemap.xml
+Sitemap: https://alisadikinma.com/api/sitemap-index.xml
+Sitemap: https://alisadikinma.com/api/sitemap-posts.xml
+Sitemap: https://alisadikinma.com/api/sitemap-projects.xml
 
 # Crawl delay for other bots (in seconds)
 Crawl-delay: 1

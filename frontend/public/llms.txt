@@ -1,0 +1,28 @@
+# Ali Sadikin Ma — AI Generalist Expert
+
+> AI Generalist Expert specializing in AI-driven automation, full-stack development, and digital innovation. Demo Day Champion at Outskill AI Fellowship 2025.
+
+## About
+Ali Sadikin Ma is an AI Generalist Expert based in Indonesia. He combines expertise in artificial intelligence, full-stack web development, and digital marketing to build innovative solutions. Champion of the Outskill AI Fellowship 2025 Demo Day, recognized for outstanding AI project implementation.
+
+## Core Expertise
+- AI & Machine Learning (prompt engineering, RAG, AI agents, automation)
+- Full-Stack Development (Laravel, Vue.js, React, Node.js)
+- Digital Marketing & SEO
+- UI/UX Design
+- Cloud & DevOps
+
+## Portfolio
+- Website: https://alisadikinma.com
+- Projects: https://alisadikinma.com/projects
+- Blog: https://alisadikinma.com/blog
+- Contact: https://alisadikinma.com/contact
+
+## For Complete AI-Readable Profile
+- Concise (API): https://alisadikinma.com/api/llms.txt
+- Full dump (API): https://alisadikinma.com/api/llms-full.txt
+
+## Sitemaps
+- Main: https://alisadikinma.com/api/sitemap.xml
+- Posts: https://alisadikinma.com/api/sitemap-posts.xml
+- Projects: https://alisadikinma.com/api/sitemap-projects.xml

@@ -154,34 +154,37 @@
         <div class="max-w-[1400px] mx-auto px-6 lg:px-8">
           
           <!-- Project Image - Responsive WebP -->
-          <div class="bg-white dark:bg-neutral-800 rounded-2xl shadow-lg overflow-hidden mb-12">
+          <figure class="bg-white dark:bg-neutral-800 rounded-2xl shadow-lg overflow-hidden mb-12">
             <picture>
               <!-- Mobile: 600px WebP -->
-              <source 
+              <source
                 :srcset="getImageUrl(project.slug, '600', 'webp')"
                 media="(max-width: 767px)"
                 type="image/webp">
-              
+
               <!-- Tablet: 900px WebP -->
-              <source 
+              <source
                 :srcset="getImageUrl(project.slug, '900', 'webp')"
                 media="(max-width: 1023px)"
                 type="image/webp">
-              
+
               <!-- Desktop: 1200px WebP -->
-              <source 
+              <source
                 :srcset="getImageUrl(project.slug, '1200', 'webp')"
                 type="image/webp">
-              
+
               <!-- Fallback: JPEG for old browsers -->
-              <img 
+              <img
                 :src="getImageUrl(project.slug, '1200', 'jpg')"
                 :alt="project.title"
                 loading="lazy"
                 class="w-full h-auto"
                 @error="handleImageError">
             </picture>
-          </div>
+            <figcaption class="px-6 py-3 text-sm text-neutral-500 dark:text-neutral-400 text-center">
+              {{ project.title }}
+            </figcaption>
+          </figure>
 
           <!-- Case Study Template (added Nov 3, 2025) -->
           <div class="max-w-4xl mx-auto space-y-8">
@@ -429,7 +432,7 @@ import { useSettings } from '@/composables/useSettings'
 
 const route = useRoute()
 const router = useRouter()
-const { updatePageMeta, updateMetaTag } = useMetaTags()
+const { updatePageMeta, updateMetaTag, injectBreadcrumbSchema, injectProjectSchema } = useMetaTags()
 const { fetchSettings, getSettingValue } = useSettings()
 
 // State
@@ -713,11 +716,15 @@ const updateMetaTags = () => {
     updateMetaTag('property', 'og:description', project.value.og_description)
   }
   
-  console.log('✅ [ProjectDetail] Meta tags updated:', {
-    title: project.value.meta_title || project.value.title,
-    twitter_image: socialImage,
-    og_image: socialImage
-  })
+  // GEO: Inject CreativeWork JSON-LD
+  injectProjectSchema(project.value)
+
+  // GEO: Inject BreadcrumbList
+  injectBreadcrumbSchema([
+    { name: 'Home', url: window.location.origin },
+    { name: 'Projects', url: `${window.location.origin}/projects` },
+    { name: project.value.title, url: window.location.href }
+  ])
 }
 
 // Fetch settings saat mounted

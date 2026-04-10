@@ -35,7 +35,7 @@ phpMyAdmin:    http://localhost/phpmyadmin
 
 ### Backend Architecture (Laravel 12)
 
-**Controller Map (17 controllers):**
+**Controller Map (18 controllers):**
 ```
 app/Http/Controllers/Api/
 ├── Admin/
@@ -47,6 +47,7 @@ app/Http/Controllers/Api/
 ├── ContactController.php          # Contact form + CSV export
 ├── GalleryController.php          # Gallery CRUD + bulk upload
 ├── GalleryItemController.php      # Gallery items CRUD + bulk upload
+├── GeoController.php              # GEO: llms.txt & llms-full.txt endpoints
 ├── MenuItemController.php         # Dynamic navbar menu items
 ├── PageSectionController.php      # Dynamic page sections (homepage)
 ├── PostController.php             # Blog posts CRUD + check-duplicate
@@ -218,6 +219,7 @@ GET    /api/services, /api/services/{slug}
 GET    /api/settings, /api/settings/about, /api/settings/site, /api/settings/{group}
 GET    /api/menu-items, /api/page-sections
 GET    /api/sitemap.xml, /api/sitemap-index.xml, /api/sitemap-posts.xml, /api/sitemap-projects.xml
+GET    /api/llms.txt, /api/llms-full.txt
 GET    /api/health
 POST   /api/contact (throttle: 3/15min)
 ```
@@ -345,6 +347,62 @@ Located at `D:\Projects\Portfolio_v2\.claude\agents\`:
 2. Update documentation if needed
 3. Commit with conventional commits: `feat:`, `fix:`, `docs:`, etc.
 
+## GEO (Generative Engine Optimization) / LLM-Friendly
+
+### Current State (Fixed April 10, 2026)
+
+**Overall Score: 7.5/10** — All P0-P2 issues resolved. Remaining gap: SPA without SSR (P0 deferred — needs architecture decision).
+
+### What's Implemented
+
+**Backend GEO Infrastructure:**
+- `GeoController.php` → `/api/llms.txt` (concise) + `/api/llms-full.txt` (comprehensive)
+- `SitemapController.php` → 4 XML sitemaps at `/api/sitemap*.xml` + `apiUrl()` helper for https
+- `HasSeoFields` trait → Person, BlogPosting, CreativeWork JSON-LD schemas
+- `PostResource` / `ProjectResource` → Rich SEO metadata (meta_title, og_image, schema_markup, faq_schema, ai_summary, canonical_url)
+- `robots.txt` (backend) → Crawl rules, AI bot allow-list (GPTBot, ClaudeBot, PerplexityBot), rate limiting
+
+**Frontend SEO Infrastructure:**
+- `useMetaTags.js` → Dynamic meta tags, JSON-LD injection, BreadcrumbList schema, ArticleSchema, ProjectSchema
+- `index.html` → Static OG/Twitter meta tags + `<link rel="alternate" href="/llms.txt">` + `<link rel="sitemap">`
+- `frontend/public/llms.txt` → Static root-level LLM profile (+ link to dynamic API version)
+- `frontend/public/sitemap.xml` → Root sitemap index pointing to API sitemaps
+- `robots.txt` (frontend) → Production URLs, AI crawler allow-list, sitemap references
+- Semantic HTML: `<article>`, `<section>`, `<main>`, `<aside>`, `<header>`, `<footer>`, `<figure>`, `<figcaption>`, `<time>`
+- BreadcrumbList JSON-LD on BlogDetail and ProjectDetail pages
+- BlogPosting JSON-LD on blog posts, CreativeWork JSON-LD on projects
+- Proper H1→H2→H3 hierarchy, alt text on all images, slug-based URLs
+
+### Remaining Issue
+
+| Priority | Issue | Status |
+|----------|-------|--------|
+| **P0** | **SPA without SSR** — Server returns `<div id="app"></div>`. JS-required for content. | Deferred — needs `vite-plugin-prerender` or Nuxt migration |
+| **P3** | No `.well-known/ai-plugin.json` | Optional |
+
+### Fixed Issues (April 10, 2026)
+
+- **robots.txt** — Both frontend/backend now use `https://alisadikinma.com/api/sitemap*.xml`
+- **Root /llms.txt** — Static file in `frontend/public/llms.txt` with profile + API links
+- **Root /sitemap.xml** — Static sitemap index in `frontend/public/sitemap.xml`
+- **sitemap-index.xml** — Fixed `http://` → `https://` via `apiUrl()` helper
+- **Per-page meta tags** — BlogDetail + ProjectDetail inject dynamic OG/Twitter/canonical
+- **`<time datetime>`** — Blog.vue, BlogDetail.vue use semantic `<time>` elements
+- **`<figure>/<figcaption>`** — BlogDetail featured image + ProjectDetail hero image
+- **BreadcrumbList** — JSON-LD on BlogDetail (Home→Blog→Category→Post) and ProjectDetail (Home→Projects→Project)
+- **Article schema** — BlogPosting JSON-LD injected on blog post pages
+- **Project schema** — CreativeWork JSON-LD injected on project detail pages
+- **AI crawler allow-list** — GPTBot, ClaudeBot, PerplexityBot, GoogleOther explicitly allowed in robots.txt
+- **index.html** — Added `<link rel="alternate">` for llms.txt and `<link rel="sitemap">` for sitemap
+
+### llms.txt Specification
+
+The site follows the [llms.txt standard](https://llmstxt.org/):
+- **`/llms.txt`** — Static root file: name, expertise, links to API endpoints
+- **`/api/llms.txt`** — Dynamic concise: name, title, bio, top 20 projects, 10 recent posts, contact
+- **`/api/llms-full.txt`** — Dynamic full dump: skills, all awards, all projects, all blog posts with excerpts
+- API endpoints return `text/plain; charset=utf-8`, data pulled live from database
+
 ## ULTRA Redesign — In Progress (March 2026)
 
 **Brand:** Ali Sadikin Ma — AI Generalist Expert
@@ -393,7 +451,7 @@ Effects:
 
 ---
 
-**Last Updated:** March 22, 2026
+**Last Updated:** April 10, 2026
 **Maintainer:** Ali Sadikin (ali.sadikincom85@gmail.com)
 **Environment:** Windows 11, D:\Projects\Portfolio_v2
 **PHP:** D:\xampp\php\php.exe (8.2.12) — use full path, not in system PATH

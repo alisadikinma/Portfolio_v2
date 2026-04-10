@@ -1,10 +1,26 @@
-# Frontend robots.txt
-# Redirect all crawler requests to backend
+# Robots.txt for alisadikinma.com
+# Last Updated: April 10, 2026
 
 User-agent: *
 Allow: /
-Disallow: /admin
+Disallow: /admin/
 
-# Sitemaps (served from backend)
-Sitemap: http://localhost/Portfolio_v2/backend/public/sitemap.xml
-Sitemap: http://localhost/Portfolio_v2/backend/public/sitemap-index.xml
+# AI Crawlers — welcome
+User-agent: GPTBot
+Allow: /
+User-agent: ClaudeBot
+Allow: /
+User-agent: PerplexityBot
+Allow: /
+User-agent: GoogleOther
+Allow: /
+
+# LLM-readable content
+# See /llms.txt for concise profile, /api/llms-full.txt for comprehensive dump
+
+# Sitemaps
+Sitemap: https://alisadikinma.com/sitemap.xml
+Sitemap: https://alisadikinma.com/api/sitemap.xml
+Sitemap: https://alisadikinma.com/api/sitemap-index.xml
+Sitemap: https://alisadikinma.com/api/sitemap-posts.xml
+Sitemap: https://alisadikinma.com/api/sitemap-projects.xml
