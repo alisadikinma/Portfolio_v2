@@ -32,9 +32,9 @@ export function usePosts(initialParams = {}) {
     error: queryError,
     refetch
   } = useQuery({
-    queryKey: ['posts', queryParams],
+    queryKey: ['posts', queryParams, selectedLang],
     queryFn: async () => {
-      const response = await api.get('/posts', { params: queryParams.value })
+      const response = await api.get('/posts', { params: { ...queryParams.value, lang: selectedLang.value } })
       console.log('[usePosts] Background fetch complete')
       
       // Update localStorage cache
@@ -130,11 +130,12 @@ export function usePosts(initialParams = {}) {
   const error = computed(() => queryError.value?.response?.data?.message || queryError.value?.message || null)
 
   // Fetch posts with params
-  const fetchPosts = async (params = {}) => {
+  const fetchPosts = async (params = {}, lang = null) => {
     queryParams.value = params
-    
+    if (lang) selectedLang.value = lang
+
     // Check instant cache
-    const cacheKey = `posts_${JSON.stringify(params)}`
+    const cacheKey = `posts_${JSON.stringify(params)}_${selectedLang.value}`
     cachedPosts.value = getCache(cacheKey)
     
     const result = await refetch()

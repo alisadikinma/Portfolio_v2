@@ -53,12 +53,24 @@
   },
   "blog": {
     "title": "Blog",
-    "search": "Search posts...",
+    "search": "Search articles...",
     "readMore": "Read More",
-    "readingTime": "min read",
+    "readingTime": "{minutes} min read",
     "relatedPosts": "Related Posts",
     "share": "Share",
-    "featured": "Featured"
+    "featured": "Featured",
+    "categories": "Categories",
+    "allCategories": "All",
+    "loadMore": "Load More",
+    "published": "Published",
+    "noResults": "No posts found",
+    "newsletterTitle": "Stay Updated",
+    "newsletterDesc": "Get the latest articles delivered to your inbox.",
+    "newsletterCta": "Subscribe",
+    "tableOfContents": "Table of Contents",
+    "views": "views",
+    "copyLink": "Copy Link",
+    "linkCopied": "Link copied!"
   },
   "contact": {
     "title": "Get in Touch",

@@ -382,14 +382,14 @@ class PostController extends Controller
 
             $post->update($updateData);
 
-            // Handle translations if provided
+            // Handle translations if provided — upsert by language
             if ($request->has('translations')) {
                 foreach ($request->input('translations', []) as $translation) {
-                    if (isset($translation['id'])) {
-                        $post->translations()->where('id', $translation['id'])->update($translation);
-                    } else {
-                        $post->translations()->create($translation);
-                    }
+                    if (!isset($translation['language'])) continue;
+                    $post->translations()->updateOrCreate(
+                        ['language' => $translation['language']],
+                        $translation
+                    );
                 }
             }
 

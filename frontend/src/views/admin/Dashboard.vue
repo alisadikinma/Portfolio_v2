@@ -234,6 +234,49 @@
           </div>
         </BaseCard>
 
+        <!-- Pending Drafts (AI Pipeline) -->
+        <BaseCard v-if="draftPosts.length > 0" class="glassmorphism">
+          <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
+            <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+            </svg>
+            Pending Drafts
+            <BaseBadge variant="warning" class="ml-auto">{{ draftPosts.length }}</BaseBadge>
+          </h2>
+          <div class="space-y-3">
+            <div
+              v-for="draft in draftPosts.slice(0, 5)"
+              :key="draft.id"
+              class="flex items-center gap-3 p-3 rounded-xl bg-amber-50/50 dark:bg-amber-900/10 border border-amber-200/50 dark:border-amber-800/30"
+            >
+              <div v-if="draft.featured_image" class="flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden bg-neutral-200 dark:bg-neutral-700">
+                <img :src="draft.featured_image" :alt="draft.title" class="w-full h-full object-cover" />
+              </div>
+              <div v-else class="flex-shrink-0 w-12 h-12 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="font-medium text-sm truncate">{{ draft.title }}</p>
+                <p class="text-xs text-neutral-500">{{ formatDraftDate(draft.created_at) }}</p>
+              </div>
+              <router-link
+                :to="`/admin/posts/${draft.id}/edit`"
+                class="flex-shrink-0 px-3 py-1.5 text-xs font-medium bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors"
+              >
+                Review
+              </router-link>
+            </div>
+          </div>
+          <router-link
+            to="/admin/posts"
+            class="mt-3 block text-center text-sm text-primary-600 hover:text-primary-700 font-medium"
+          >
+            View all posts →
+          </router-link>
+        </BaseCard>
+
         <!-- Quick Actions -->
         <BaseCard class="glassmorphism">
           <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
@@ -447,6 +490,24 @@ const statsCards = computed(() => [
     gradientBg: 'bg-gradient-to-br from-orange-500/10 to-amber-500/10'
   }
 ])
+
+// Draft posts for pipeline status
+const draftPosts = computed(() => {
+  return (dashboardData.value.recentPosts || []).filter(p => !p.published)
+})
+
+const formatDraftDate = (dateStr) => {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  const now = new Date()
+  const diffMs = now - d
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+  if (diffHours < 1) return 'Just now'
+  if (diffHours < 24) return `${diffHours}h ago`
+  const diffDays = Math.floor(diffHours / 24)
+  if (diffDays < 7) return `${diffDays}d ago`
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
 
 const quickActions = [
   {

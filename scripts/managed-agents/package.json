@@ -1,0 +1,15 @@
+{
+  "name": "portfolio-managed-agents",
+  "version": "1.0.0",
+  "description": "Claude Managed Agents setup scripts — Skills upload + Blog Agent creation",
+  "type": "module",
+  "scripts": {
+    "upload-skills": "npx tsx upload-skills.ts",
+    "setup-blog-agent": "npx tsx setup-blog-agent.ts",
+    "test-session": "npx tsx test-session.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.52.0",
+    "tsx": "^4.19.0"
+  }
+}

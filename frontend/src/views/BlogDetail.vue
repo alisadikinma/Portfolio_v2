@@ -76,12 +76,12 @@
 
             <!-- Meta bar -->
             <div class="flex flex-wrap items-center gap-4 text-sm text-fg-muted animate-fade-in-up animate-delay-100">
-              <span class="mono-label flex items-center gap-1.5">
+              <time :datetime="post.published_at" class="mono-label flex items-center gap-1.5">
                 <svg class="w-3.5 h-3.5 text-fg-dim" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                 </svg>
                 {{ formatDate(post.published_at) }}
-              </span>
+              </time>
               <span class="text-fg-dim">·</span>
               <span class="mono-label flex items-center gap-1.5">
                 <svg class="w-3.5 h-3.5 text-fg-dim" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -103,7 +103,7 @@
       </header>
 
       <!-- ─── Featured Image ─── -->
-      <div v-if="post.featured_image" class="container-custom mb-12">
+      <figure v-if="post.featured_image" class="container-custom mb-12">
         <div class="max-w-4xl mx-auto">
           <div class="rounded-2xl overflow-hidden aspect-video bg-bg-elevated">
             <img
@@ -112,8 +112,11 @@
               class="w-full h-full object-cover"
             />
           </div>
+          <figcaption v-if="post.title" class="mt-3 text-center text-sm text-fg-dim mono-label">
+            {{ post.title }}
+          </figcaption>
         </div>
-      </div>
+      </figure>
 
       <!-- ─── Content Layout ─── -->
       <div class="container-custom mb-16">
@@ -301,7 +304,7 @@
                 <h3 class="font-semibold font-display text-fg-primary text-base leading-snug group-hover:text-accent-gold transition-colors line-clamp-2">
                   {{ related.title }}
                 </h3>
-                <p class="mono-label text-fg-dim mt-2">{{ formatDate(related.published_at) }}</p>
+                <time :datetime="related.published_at" class="mono-label text-fg-dim mt-2 block">{{ formatDate(related.published_at) }}</time>
               </div>
             </article>
           </div>
@@ -326,7 +329,7 @@ const router = useRouter()
 const toast = useToast()
 
 const { post, isLoadingPost: isLoading, fetchPost } = usePosts()
-const { updatePageMeta, updateMetaTag } = useMetaTags()
+const { updatePageMeta, updateMetaTag, injectBreadcrumbSchema, injectArticleSchema, updateHreflang } = useMetaTags()
 const { fetchActiveSections } = usePageSections()
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -401,6 +404,27 @@ const updateMetaTags = () => {
   if (post.value.og_description) updateMetaTag('property', 'og:description', post.value.og_description)
   updateMetaTag('property', 'article:published_time', post.value.published_at)
   updateMetaTag('property', 'article:author', post.value.author?.name || '')
+
+  // GEO: Inject BlogPosting JSON-LD with language
+  injectArticleSchema(post.value, lang.value)
+
+  // SEO: Inject hreflang alternate links
+  updateHreflang(lang.value, post.value.slug, post.value.available_translations || [lang.value])
+
+  // GEO: Inject BreadcrumbList
+  const currentLang = lang.value
+  const breadcrumbs = [
+    { name: 'Home', url: `${window.location.origin}/${currentLang}` },
+    { name: 'Blog', url: `${window.location.origin}/${currentLang}/blog` }
+  ]
+  if (post.value.category?.name) {
+    breadcrumbs.push({
+      name: post.value.category.name,
+      url: `${window.location.origin}/blog/category/${post.value.category.slug}`
+    })
+  }
+  breadcrumbs.push({ name: post.value.title, url: window.location.href })
+  injectBreadcrumbSchema(breadcrumbs)
 }
 
 // ── Related posts ─────────────────────────────────────────────────────────────
@@ -431,17 +455,30 @@ watch(
 )
 
 // ── Mount ─────────────────────────────────────────────────────────────────────
+const lang = computed(() => route.params.lang || 'en')
+
 onMounted(async () => {
   await fetchActiveSections('blog')
 
   const slug = route.params.slug
-  const result = await fetchPost(slug)
+  const result = await fetchPost(slug, lang.value)
 
   if (!result.success) {
     fetchError.value = result.error || 'Post not found'
   } else if (post.value) {
     updateMetaTags()
     await fetchRelatedPosts()
+  }
+})
+
+// Refetch when language changes (user switches via LanguageSwitcher)
+watch(lang, async (newLang) => {
+  const slug = route.params.slug
+  if (slug) {
+    const result = await fetchPost(slug, newLang)
+    if (result.success && post.value) {
+      updateMetaTags()
+    }
   }
 })
 </script>

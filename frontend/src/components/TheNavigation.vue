@@ -20,7 +20,7 @@
         >
           <!-- Logo -->
           <router-link
-            to="/"
+            :to="`/${route.params.lang || locale || 'en'}`"
             class="flex items-center gap-2.5 group"
           >
             <div v-if="siteLogo" class="w-8 h-8 rounded-xl overflow-hidden transition-all duration-700 ease-spring group-hover:shadow-glow-gold">
@@ -50,6 +50,11 @@
               <IconDisplay v-if="item.icon" :name="item.icon" class="w-3.5 h-3.5" />
               {{ item.name }}
             </router-link>
+          </div>
+
+          <!-- Language Switcher (desktop) -->
+          <div class="hidden md:flex items-center ml-2">
+            <LanguageSwitcher />
           </div>
 
           <!-- Hamburger Morph Button (mobile) -->
@@ -132,6 +137,10 @@
               {{ item.name }}
             </router-link>
           </TransitionGroup>
+          <!-- Language Switcher (mobile) -->
+          <div class="mt-6">
+            <LanguageSwitcher />
+          </div>
         </div>
       </div>
     </Transition>
@@ -141,10 +150,14 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useUIStore } from '@/stores/ui'
 import { useMenuItems } from '@/composables/useMenuItems'
 import { useSiteSettings } from '@/composables/useSiteSettings'
 import IconDisplay from '@/components/admin/IconDisplay.vue'
+import LanguageSwitcher from '@/components/LanguageSwitcher.vue'
+
+const { locale } = useI18n()
 
 const route = useRoute()
 const uiStore = useUIStore()
@@ -155,15 +168,20 @@ const isScrolled = ref(false)
 const menuOpen = ref(false)
 
 const navItems = computed(() => {
+  const lang = route.params.lang || locale.value || 'en'
   return menuItems.value.map(item => ({
     name: item.title,
-    path: item.url,
+    path: `/${lang}${item.url}`,
     icon: item.icon
   }))
 })
 
 function isActive(path) {
-  return route.path === path || route.path.startsWith(path + '/')
+  if (route.path === path) return true
+  if (route.path.startsWith(path + '/')) return true
+  // Also match if path is just the lang root (e.g., /en) and we're on home
+  const lang = route.params.lang || locale.value || 'en'
+  return path === `/${lang}` && route.path === `/${lang}`
 }
 
 function toggleMenu() {
@@ -176,7 +194,10 @@ function closeMenu() {
   uiStore.isMobileMenuOpen = false
 }
 
-const isHomePage = computed(() => route.path === '/')
+const isHomePage = computed(() => {
+  const lang = route.params.lang || locale.value || 'en'
+  return route.path === '/' || route.path === `/${lang}`
+})
 
 const handleScroll = () => {
   if (isHomePage.value) {

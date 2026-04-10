@@ -153,6 +153,7 @@ const currentPage = ref(1)
 const perPage = 9
 
 const categorySlug = computed(() => route.params.category)
+const lang = computed(() => route.params.lang || 'en')
 
 const categories = {
   'web-development': {
@@ -252,6 +253,10 @@ watch(categorySlug, () => {
 })
 
 onMounted(async () => {
-  await fetchPosts()
+  await fetchPosts({}, lang.value)
+})
+
+watch(lang, async (newLang) => {
+  await fetchPosts({}, newLang)
 })
 </script>

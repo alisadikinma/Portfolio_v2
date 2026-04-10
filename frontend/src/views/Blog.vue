@@ -46,7 +46,7 @@
             <!-- Content -->
             <div class="p-8 md:p-10 flex flex-col justify-center">
               <div class="flex items-center gap-3 mb-5">
-                <span class="mono-label text-fg-dim">{{ formatDate(featuredPost.published_at) }}</span>
+                <time :datetime="featuredPost.published_at" class="mono-label text-fg-dim">{{ formatDate(featuredPost.published_at) }}</time>
                 <span class="text-fg-dim text-xs">&middot;</span>
                 <span class="mono-label text-fg-dim">{{ readingTime(featuredPost.content || featuredPost.excerpt) }} min read</span>
               </div>
@@ -183,7 +183,7 @@
               <!-- Body -->
               <div class="p-5 flex flex-col flex-grow">
                 <div class="flex items-center gap-2 mb-3">
-                  <span class="mono-label text-fg-dim text-[10px]">{{ formatDate(post.published_at) }}</span>
+                  <time :datetime="post.published_at" class="mono-label text-fg-dim text-[10px]">{{ formatDate(post.published_at) }}</time>
                   <span class="text-fg-dim text-[10px]">&middot;</span>
                   <span class="mono-label text-fg-dim text-[10px]">{{ readingTime(post.content || post.excerpt) }} min</span>
                 </div>
@@ -288,10 +288,12 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { usePosts } from '@/composables/usePosts'
 import { useToast } from '@/composables/useToast'
 import api from '@/services/api'
 
+const route = useRoute()
 const { posts, isLoading, fetchPosts } = usePosts()
 const toast = useToast()
 
@@ -302,12 +304,19 @@ const currentPage = ref(1)
 const perPage = 9
 const newsletterEmail = ref('')
 
+const lang = computed(() => route.params.lang || 'en')
+
 onMounted(async () => {
-  await fetchPosts()
+  await fetchPosts({}, lang.value)
   try {
     const res = await api.get('/categories')
     categories.value = res.data?.data || res.data || []
   } catch {}
+})
+
+// Refetch when language changes
+watch(lang, async (newLang) => {
+  await fetchPosts({}, newLang)
 })
 
 const featuredPost = computed(() => posts.value?.[0] ?? null)

@@ -371,12 +371,155 @@ export function useMetaTags() {
     injectStructuredData(schema)
   }
 
+  /**
+   * Inject BreadcrumbList JSON-LD schema
+   * @param {Array} items - [{name, url}, ...] breadcrumb items
+   */
+  const injectBreadcrumbSchema = (items) => {
+    if (!items || items.length === 0) return
+
+    const schema = {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": items.map((item, index) => ({
+        "@type": "ListItem",
+        "position": index + 1,
+        "name": item.name,
+        "item": item.url
+      }))
+    }
+
+    // Append as additional schema (don't remove existing)
+    const script = document.createElement('script')
+    script.type = 'application/ld+json'
+    script.dataset.schema = 'breadcrumb'
+    // Remove old breadcrumb schema first
+    const old = document.querySelector('script[data-schema="breadcrumb"]')
+    if (old) old.remove()
+    script.textContent = JSON.stringify(schema)
+    document.head.appendChild(script)
+  }
+
+  /**
+   * Inject Article/BlogPosting JSON-LD schema
+   */
+  /**
+   * Inject hreflang alternate link tags for multilingual pages
+   */
+  const updateHreflang = (currentLang, slug, availableLanguages = []) => {
+    // Remove existing hreflang links
+    document.querySelectorAll('link[hreflang]').forEach(el => el.remove())
+
+    if (!slug || availableLanguages.length < 2) return
+
+    const base = 'https://alisadikinma.com'
+    availableLanguages.forEach(lang => {
+      const link = document.createElement('link')
+      link.rel = 'alternate'
+      link.hreflang = lang
+      link.href = `${base}/${lang}/blog/${slug}`
+      document.head.appendChild(link)
+    })
+
+    // x-default always points to English
+    const xdefault = document.createElement('link')
+    xdefault.rel = 'alternate'
+    xdefault.hreflang = 'x-default'
+    xdefault.href = `${base}/en/blog/${slug}`
+    document.head.appendChild(xdefault)
+  }
+
+  const injectArticleSchema = (post, lang = 'en') => {
+    if (!post) return
+
+    const schema = {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      "headline": post.title,
+      "description": post.excerpt || post.meta_description || '',
+      "image": post.featured_image || '',
+      "inLanguage": lang,
+      "datePublished": post.published_at,
+      "dateModified": post.updated_at || post.published_at,
+      "author": {
+        "@type": "Person",
+        "name": post.author?.name || "Ali Sadikin Ma",
+        "url": window.location.origin + '/about'
+      },
+      "publisher": {
+        "@type": "Person",
+        "name": "Ali Sadikin Ma",
+        "url": window.location.origin
+      },
+      "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": window.location.href
+      }
+    }
+
+    if (post.tags?.length) {
+      schema.keywords = post.tags.join(', ')
+    }
+    if (post.category?.name) {
+      schema.articleSection = post.category.name
+    }
+
+    const script = document.createElement('script')
+    script.type = 'application/ld+json'
+    script.dataset.schema = 'article'
+    const old = document.querySelector('script[data-schema="article"]')
+    if (old) old.remove()
+    script.textContent = JSON.stringify(schema)
+    document.head.appendChild(script)
+  }
+
+  /**
+   * Inject CreativeWork JSON-LD schema for projects
+   */
+  const injectProjectSchema = (project) => {
+    if (!project) return
+
+    const schema = {
+      "@context": "https://schema.org",
+      "@type": "CreativeWork",
+      "name": project.title,
+      "description": project.description || project.meta_description || '',
+      "image": project.featured_image || '',
+      "author": {
+        "@type": "Person",
+        "name": "Ali Sadikin Ma",
+        "url": window.location.origin + '/about'
+      },
+      "url": window.location.href
+    }
+
+    if (project.technologies?.length) {
+      schema.keywords = project.technologies.join(', ')
+    }
+    if (project.url) {
+      schema.url = project.url
+    }
+
+    const script = document.createElement('script')
+    script.type = 'application/ld+json'
+    script.dataset.schema = 'project'
+    const old = document.querySelector('script[data-schema="project"]')
+    if (old) old.remove()
+    script.textContent = JSON.stringify(schema)
+    document.head.appendChild(script)
+  }
+
   return {
     setMetaFromSettings,
     updatePageMeta,
     resetPageMeta,
     updateMetaTag,
     updateLinkTag,
-    updateFavicon
+    updateFavicon,
+    injectBreadcrumbSchema,
+    injectArticleSchema,
+    injectProjectSchema,
+    injectStructuredData,
+    updateHreflang
   }
 }

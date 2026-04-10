@@ -53,12 +53,24 @@
   },
   "blog": {
     "title": "Blog",
-    "search": "Cari post...",
+    "search": "Cari artikel...",
     "readMore": "Baca Selengkapnya",
-    "readingTime": "menit baca",
-    "relatedPosts": "Post Terkait",
+    "readingTime": "{minutes} menit baca",
+    "relatedPosts": "Artikel Terkait",
     "share": "Bagikan",
-    "featured": "Unggulan"
+    "featured": "Unggulan",
+    "categories": "Kategori",
+    "allCategories": "Semua",
+    "loadMore": "Muat Lebih Banyak",
+    "published": "Dipublikasikan",
+    "noResults": "Belum ada artikel",
+    "newsletterTitle": "Tetap Update",
+    "newsletterDesc": "Dapatkan artikel terbaru langsung di inbox kamu.",
+    "newsletterCta": "Langganan",
+    "tableOfContents": "Daftar Isi",
+    "views": "dilihat",
+    "copyLink": "Salin Link",
+    "linkCopied": "Link disalin!"
   },
   "contact": {
     "title": "Hubungi Saya",
