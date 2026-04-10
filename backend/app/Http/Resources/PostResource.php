@@ -17,10 +17,12 @@ class PostResource extends JsonResource
         $language = $request->query('lang') ?? $request->header('Accept-Language', 'en');
         $language = strtolower(substr($language, 0, 2));
 
-        $translation = $this->translations()->where('language', $language)->first();
+        // Use eager-loaded collection (not query) to avoid N+1 and work correctly
+        $translations = $this->relationLoaded('translations') ? $this->translations : $this->translations()->get();
 
+        $translation = $translations->firstWhere('language', $language);
         if (!$translation) {
-            $translation = $this->translations()->where('language', 'en')->first();
+            $translation = $translations->firstWhere('language', 'en');
         }
 
         return [

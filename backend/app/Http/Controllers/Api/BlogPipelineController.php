@@ -5,29 +5,19 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Post;
 use App\Models\Category;
+use App\Models\ImageGenerationJob;
 use App\Services\TrendingTopicService;
 use App\Services\ImageGenerationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
-/**
- * BlogPipelineController
- *
- * Two endpoints for the automated blog pipeline:
- * 1. GET  /trending-topic  — Backend finds & returns the best AI/tech topic
- * 2. POST /save-draft      — Backend generates images + saves the article as draft
- *
- * Claude Scheduled Task only handles article generation (copywriting + image prompts).
- */
 class BlogPipelineController extends Controller
 {
     /**
      * GET /api/automation/blog/trending-topic
-     *
-     * Fetches Google Trends RSS, filters for AI/tech topics,
-     * deduplicates against existing posts, returns the best topic.
      */
     public function trendingTopic(TrendingTopicService $trendService): JsonResponse
     {
@@ -41,7 +31,6 @@ class BlogPipelineController extends Controller
             ]);
         }
 
-        // Suggest a category
         $categoryId = $trendService->suggestCategory($topic['title']);
         $category = Category::find($categoryId);
 
@@ -64,30 +53,8 @@ class BlogPipelineController extends Controller
     /**
      * POST /api/automation/blog/save-draft
      *
-     * Receives complete article from Claude (EN + ID content + image prompts),
-     * generates all images via GeminiGen, inserts images into content,
-     * and saves as draft post.
-     *
-     * Expected payload:
-     * {
-     *   "title": "EN title",
-     *   "slug": "en-slug" (optional, auto-generated),
-     *   "category_id": 3,
-     *   "tags": ["AI", "Technology"],
-     *   "hero_image_prompt": "A cinematic wide shot of...",
-     *   "translations": {
-     *     "en": {
-     *       "title": "...", "slug": "...", "excerpt": "...", "content": "<HTML>",
-     *       "meta_title": "...", "meta_description": "...", "meta_keywords": "...",
-     *       "ai_summary": "..."
-     *     },
-     *     "id": { ... same fields ... }
-     *   },
-     *   "inline_image_prompts": [
-     *     { "prompt": "...", "insert_after_heading": "H2 heading text" },
-     *     { "prompt": "...", "insert_after_heading": "Another H2" }
-     *   ]
-     * }
+     * Saves article immediately, queues image generation via GeminiGen (webhook-based).
+     * Images are attached to the post asynchronously when GeminiGen webhook fires.
      */
     public function saveDraft(Request $request, ImageGenerationService $imageService): JsonResponse
     {
@@ -102,48 +69,7 @@ class BlogPipelineController extends Controller
         try {
             DB::beginTransaction();
 
-            // 1. Generate hero image
-            $heroImageUrl = null;
-            $heroPrompt = $request->input('hero_image_prompt');
-            if ($heroPrompt) {
-                $heroImageUrl = $imageService->generate($heroPrompt, 'imagen-pro', '16:9', 'Photorealistic');
-            }
-
-            // 2. Generate inline images and insert into content
             $translations = $request->input('translations');
-            $inlinePrompts = $request->input('inline_image_prompts', []);
-
-            foreach ($inlinePrompts as $imgSpec) {
-                $prompt = $imgSpec['prompt'] ?? '';
-                $afterHeading = $imgSpec['insert_after_heading'] ?? '';
-                if (empty($prompt)) continue;
-
-                $imgUrl = $imageService->generate($prompt, 'imagen-pro', '4:3', 'Photorealistic');
-                if (!$imgUrl) continue;
-
-                $imgTag = '<figure class="my-8"><img src="' . e($imgUrl) . '" alt="' . e(Str::limit($prompt, 100)) . '" class="w-full rounded-xl" loading="lazy" /><figcaption class="text-sm text-gray-500 mt-2 text-center">' . e(Str::limit($afterHeading, 80)) . '</figcaption></figure>';
-
-                // Insert image after the matching H2 heading in both EN and ID content
-                foreach (['en', 'id'] as $lang) {
-                    if (!isset($translations[$lang]['content'])) continue;
-                    $content = $translations[$lang]['content'];
-
-                    if (!empty($afterHeading)) {
-                        // Insert after the H2 that contains this text
-                        $pattern = '/(<\/h2>)/i';
-                        $headingPos = stripos($content, $afterHeading);
-                        if ($headingPos !== false) {
-                            $closeTagPos = strpos($content, '</h2>', $headingPos);
-                            if ($closeTagPos !== false) {
-                                $insertPos = $closeTagPos + 5; // after </h2>
-                                $translations[$lang]['content'] = substr($content, 0, $insertPos) . "\n" . $imgTag . "\n" . substr($content, $insertPos);
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 3. Create the post
             $enTitle = $translations['en']['title'];
             $slug = $request->input('slug') ?: Str::slug($enTitle);
 
@@ -155,20 +81,18 @@ class BlogPipelineController extends Controller
                 $counter++;
             }
 
-            $enData = $translations['en'];
-
+            // 1. Create post immediately (no waiting for images)
             $post = Post::create([
                 'category_id' => $request->input('category_id'),
                 'slug' => $slug,
-                'featured_image' => $heroImageUrl,
                 'tags' => $request->input('tags', []),
-                'published' => false, // ALWAYS DRAFT
+                'published' => false,
                 'published_at' => null,
                 'views' => 0,
                 'index_follow' => true,
             ]);
 
-            // 4. Create translations
+            // 2. Create translations
             foreach ($translations as $lang => $transData) {
                 if (empty($transData['title']) || empty($transData['content'])) continue;
 
@@ -192,19 +116,36 @@ class BlogPipelineController extends Controller
 
             DB::commit();
 
+            // 3. Queue image generation (fire-and-forget, webhook handles completion)
+            $imageJobs = [];
+
+            $heroPrompt = $request->input('hero_image_prompt');
+            if ($heroPrompt) {
+                $uuid = $imageService->queue($post->id, $heroPrompt, 'hero', null, 'imagen-pro', '16:9');
+                if ($uuid) $imageJobs[] = ['type' => 'hero', 'uuid' => $uuid];
+            }
+
+            foreach ($request->input('inline_image_prompts', []) as $imgSpec) {
+                $prompt = $imgSpec['prompt'] ?? '';
+                $afterHeading = $imgSpec['insert_after_heading'] ?? '';
+                if (empty($prompt)) continue;
+
+                $uuid = $imageService->queue($post->id, $prompt, 'inline', $afterHeading, 'imagen-pro', '4:3');
+                if ($uuid) $imageJobs[] = ['type' => 'inline', 'uuid' => $uuid];
+            }
+
             $post->load(['category', 'translations']);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Draft article saved successfully.',
+                'message' => 'Draft saved. Images generating in background.',
                 'data' => [
                     'post_id' => $post->id,
                     'slug' => $post->slug,
-                    'title' => $post->title,
-                    'featured_image' => $heroImageUrl,
-                    'inline_images_generated' => count(array_filter($inlinePrompts, fn($p) => !empty($p['prompt']))),
                     'translations' => $post->translations->pluck('language')->toArray(),
                     'status' => 'draft',
+                    'image_jobs' => $imageJobs,
+                    'image_jobs_count' => count($imageJobs),
                 ],
             ], 201);
         } catch (\Exception $e) {
@@ -216,5 +157,60 @@ class BlogPipelineController extends Controller
                 'error' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * POST /api/automation/blog/image-webhook
+     *
+     * GeminiGen calls this when image generation completes or fails.
+     * Public endpoint (no auth) — verified by GeminiGen signature.
+     */
+    public function imageWebhook(Request $request, ImageGenerationService $imageService): JsonResponse
+    {
+        $event = $request->input('event');
+        $uuid = $request->input('uuid');
+        $data = $request->input('data', []);
+
+        Log::info("[ImageWebhook] Received: event={$event}, uuid={$uuid}");
+
+        if (!$uuid || !$event) {
+            return response()->json(['error' => 'Missing event or uuid'], 400);
+        }
+
+        $success = $imageService->handleWebhook($uuid, $event, $data);
+
+        return response()->json([
+            'success' => $success,
+            'message' => $success ? 'Image processed' : 'Failed to process',
+        ]);
+    }
+
+    /**
+     * GET /api/automation/blog/image-status/{postId}
+     *
+     * Check image generation status for a post.
+     */
+    public function imageStatus(int $postId): JsonResponse
+    {
+        $jobs = ImageGenerationJob::where('post_id', $postId)
+            ->select('id', 'uuid', 'type', 'status', 'image_url', 'error_message', 'created_at')
+            ->get();
+
+        $pending = $jobs->where('status', 'processing')->count();
+        $completed = $jobs->where('status', 'completed')->count();
+        $failed = $jobs->where('status', 'failed')->count();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'post_id' => $postId,
+                'total' => $jobs->count(),
+                'pending' => $pending,
+                'completed' => $completed,
+                'failed' => $failed,
+                'all_done' => $pending === 0,
+                'jobs' => $jobs,
+            ],
+        ]);
     }
 }

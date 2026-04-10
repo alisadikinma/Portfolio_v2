@@ -286,6 +286,9 @@ Route::middleware(['auth:sanctum'])->prefix('admin/page-sections')->group(functi
 Route::prefix('automation')->group(function () {
     // Check duplicate post (public, no auth needed)
     Route::post('/posts/check-duplicate', [PostController::class, 'checkDuplicate']);
+
+    // GeminiGen image webhook (public, no auth — called by GeminiGen servers)
+    Route::post('/blog/image-webhook', [\App\Http\Controllers\Api\BlogPipelineController::class, 'imageWebhook']);
 });
 
 // Protected automation routes (require auth token)
@@ -311,6 +314,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
     // Blog Pipeline (Claude Scheduled Task integration)
     Route::get('/blog/trending-topic', [\App\Http\Controllers\Api\BlogPipelineController::class, 'trendingTopic']);
     Route::post('/blog/save-draft', [\App\Http\Controllers\Api\BlogPipelineController::class, 'saveDraft']);
+    Route::get('/blog/image-status/{postId}', [\App\Http\Controllers\Api\BlogPipelineController::class, 'imageStatus']);
 });
 
 // Admin Automation Management Routes
