@@ -1,8 +1,9 @@
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted } from 'vue'
 import RichTextEditor from './RichTextEditor.vue'
 import ImageUploader from './ImageUploader.vue'
 import CategorySelect from './CategorySelect.vue'
+import api from '@/services/api'
 
 const props = defineProps({
   post: {
@@ -61,6 +62,43 @@ const errors = ref({})
 // Other state
 const isAutoSlug = ref(true)
 const showAdvancedSeo = ref(false)
+
+// Related posts
+const allPosts = ref([])
+const selectedRelatedPosts = ref([])
+const relatedSearch = ref('')
+const showRelatedDropdown = ref(false)
+
+const filteredAvailablePosts = computed(() => {
+  const selectedIds = new Set(selectedRelatedPosts.value.map(p => p.id))
+  const currentId = props.post?.id
+  let available = allPosts.value.filter(p => p.id !== currentId && !selectedIds.has(p.id))
+
+  if (relatedSearch.value.trim()) {
+    const q = relatedSearch.value.toLowerCase()
+    available = available.filter(p => p.title?.toLowerCase().includes(q))
+  }
+
+  return available.slice(0, 8)
+})
+
+const addRelatedPost = (post) => {
+  if (selectedRelatedPosts.value.length >= 5) return
+  selectedRelatedPosts.value.push({ id: post.id, title: post.title, slug: post.slug, category: post.category })
+  relatedSearch.value = ''
+  showRelatedDropdown.value = false
+}
+
+const removeRelatedPost = (index) => {
+  selectedRelatedPosts.value.splice(index, 1)
+}
+
+const fetchAllPosts = async () => {
+  try {
+    const res = await api.get('/posts', { params: { per_page: 50 } })
+    allPosts.value = res.data?.data || []
+  } catch { /* non-critical */ }
+}
 const uploadedImageFile = ref(null) // Store the File object separately
 
 // Validation rules
@@ -261,7 +299,8 @@ const handleSubmit = async (status = 'draft') => {
     seo_score: 0,
     index_follow: true,
     // Per-language translations — save current tab first
-    translations: buildTranslationsPayload()
+    translations: buildTranslationsPayload(),
+    related_post_ids: selectedRelatedPosts.value.map(p => p.id)
   }
 
   function buildTranslationsPayload() {
@@ -380,10 +419,18 @@ watch(() => props.post, (newPost) => {
 }, { immediate: true, deep: true })
 
 // Initialize on mount
-onMounted(() => {
+onMounted(async () => {
   if (props.post) {
     loadPostData(props.post)
   }
+  await fetchAllPosts()
+
+  // Close dropdown when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('[data-related-search]')) {
+      showRelatedDropdown.value = false
+    }
+  })
 })
 </script>
 
@@ -450,10 +497,13 @@ onMounted(() => {
           <p class="text-[10px] text-right mt-0.5" :class="getCountColor(excerptCount, 500)">{{ excerptCount }}/500</p>
         </div>
 
-        <!-- Content -->
+        <!-- Content (collapsible — drag to resize) -->
         <div>
           <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">Content *</label>
-          <RichTextEditor v-model="formData.content" placeholder="Start writing..." :disabled="isSubmitting" min-height="400px" />
+          <div class="overflow-hidden rounded-md border border-gray-700" style="resize: vertical; min-height: 200px; max-height: 80vh; height: 300px;">
+            <RichTextEditor v-model="formData.content" placeholder="Start writing..." :disabled="isSubmitting" min-height="100%" />
+          </div>
+          <p class="text-[10px] text-gray-600 mt-1">Drag bottom edge to resize</p>
           <p v-if="errors.content" class="mt-1 text-xs text-red-400">{{ errors.content }}</p>
         </div>
       </div>
@@ -491,6 +541,56 @@ onMounted(() => {
         <div class="rounded-lg border border-gray-700 bg-gray-900/50 p-4">
           <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Featured Image</h3>
           <ImageUploader :model-value="uploadedImageFile" description="PNG, JPG, WEBP (max 5MB)" aspect-ratio="16:9" :disabled="isSubmitting" @update:model-value="handleImageChange" />
+        </div>
+
+        <!-- Related Posts -->
+        <div class="rounded-lg border border-gray-700 bg-gray-900/50 p-4">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Related Posts</h3>
+            <span class="text-[10px] text-gray-600">{{ selectedRelatedPosts.length }}/5</span>
+          </div>
+
+          <!-- Search to add -->
+          <div class="relative mb-3">
+            <input
+              v-model="relatedSearch"
+              type="text"
+              placeholder="Search posts to add..."
+              class="w-full px-2.5 py-1.5 text-xs border rounded bg-gray-900 text-white border-gray-700 focus:ring-1 focus:ring-blue-500 placeholder-gray-600"
+              @focus="showRelatedDropdown = true"
+            />
+            <!-- Dropdown -->
+            <div v-if="showRelatedDropdown && filteredAvailablePosts.length" class="absolute z-10 top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto rounded-md border border-gray-700 bg-gray-900 shadow-xl">
+              <button
+                v-for="p in filteredAvailablePosts"
+                :key="p.id"
+                type="button"
+                class="w-full text-left px-3 py-2 text-xs text-gray-300 hover:bg-gray-800 border-b border-gray-800 last:border-0 transition-colors"
+                @mousedown.prevent="addRelatedPost(p)"
+              >
+                <span class="line-clamp-1">{{ p.title }}</span>
+                <span v-if="p.category?.name" class="text-[10px] text-gray-600 ml-1">· {{ p.category.name }}</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Selected related posts -->
+          <div v-if="selectedRelatedPosts.length" class="space-y-1.5">
+            <div
+              v-for="(rp, idx) in selectedRelatedPosts"
+              :key="rp.id"
+              class="flex items-center gap-2 px-2.5 py-1.5 rounded bg-gray-800 border border-gray-700"
+            >
+              <span class="text-[10px] text-gray-500 font-mono w-4">{{ idx + 1 }}</span>
+              <span class="text-xs text-gray-300 flex-1 line-clamp-1">{{ rp.title }}</span>
+              <button type="button" @click="removeRelatedPost(idx)" class="text-gray-600 hover:text-red-400 transition-colors">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+          <p v-else class="text-[10px] text-gray-600 text-center py-2">No related posts selected</p>
         </div>
 
         <!-- SEO Settings (per language) -->
