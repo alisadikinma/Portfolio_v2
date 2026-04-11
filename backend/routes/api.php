@@ -24,6 +24,7 @@ use App\Http\Controllers\Api\ChatbotController;
 use App\Http\Controllers\Api\GeoController;
 use App\Http\Controllers\Api\ActivityFeedController;
 use App\Http\Controllers\Api\NewsletterController;
+use App\Http\Controllers\Api\CarouselDraftController;
 
 // ============================================
 // Authentication Routes
@@ -289,6 +290,9 @@ Route::prefix('automation')->group(function () {
 
     // GeminiGen image webhook (public, no auth — called by GeminiGen servers)
     Route::post('/blog/image-webhook', [\App\Http\Controllers\Api\BlogPipelineController::class, 'imageWebhook']);
+
+    // Carousel webhook (Content Engine calls this to save carousel draft)
+    Route::post('/carousel/save-draft', [CarouselDraftController::class, 'saveDraft']);
 });
 
 // Protected automation routes (require auth token)
@@ -315,6 +319,11 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
     Route::get('/blog/trending-topic', [\App\Http\Controllers\Api\BlogPipelineController::class, 'trendingTopic']);
     Route::post('/blog/save-draft', [\App\Http\Controllers\Api\BlogPipelineController::class, 'saveDraft']);
     Route::get('/blog/image-status/{postId}', [\App\Http\Controllers\Api\BlogPipelineController::class, 'imageStatus']);
+
+    // Carousel endpoints (protected)
+    Route::get('/carousel/accounts', [CarouselDraftController::class, 'listAccounts']);
+    Route::get('/carousel/drafts', [CarouselDraftController::class, 'index']);
+    Route::get('/carousel/drafts/{id}', [CarouselDraftController::class, 'show']);
 });
 
 // Admin Automation Management Routes
@@ -327,4 +336,14 @@ Route::middleware(['auth:sanctum'])->prefix('admin/automation')->group(function 
     // Logs management
     Route::get('/logs', [TokenController::class, 'logs']);
     Route::delete('/logs', [TokenController::class, 'clearLogs']);
+});
+
+// Admin Carousel Drafts Routes
+Route::middleware(['auth:sanctum'])->prefix('admin/carousel-drafts')->group(function () {
+    Route::get('/', [CarouselDraftController::class, 'index']);
+    Route::get('/{id}', [CarouselDraftController::class, 'show']);
+    Route::post('/{id}/approve', [CarouselDraftController::class, 'approve']);
+    Route::post('/{id}/reject', [CarouselDraftController::class, 'reject']);
+    Route::post('/{id}/schedule', [CarouselDraftController::class, 'schedule']);
+    Route::patch('/{id}/slides/{slideId}/status', [CarouselDraftController::class, 'updateSlideStatus']);
 });

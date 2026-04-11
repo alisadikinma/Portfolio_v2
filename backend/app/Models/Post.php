@@ -112,6 +112,13 @@ class Post extends Model
         return $this->hasMany(PostTranslation::class);
     }
 
+    public function relatedPosts()
+    {
+        return $this->belongsToMany(Post::class, 'related_posts', 'post_id', 'related_post_id')
+            ->withPivot('sort_order')
+            ->orderByPivot('sort_order');
+    }
+
     /**
      * Get translation for specific language
      */

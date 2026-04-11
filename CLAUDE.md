@@ -204,6 +204,16 @@ Recent migrations (post-initial):
 - `post_translations` / `project_translations` - i18n support
 - `schema_fields` on translations - SEO extensions
 
+## Critical Schema Notes
+
+**`posts` table has NO `title`, `content`, or `excerpt` columns.**
+These fields live in `post_translations` table. The Post model uses
+`translations()` hasMany relationship. Always query `PostTranslation`
+for title/content, never `Post` directly.
+
+**Spatie HasSlug:** Post model uses `doNotGenerateSlugsOnUpdate()` —
+slug is pre-set by controllers since there's no `title` column to generate from.
+
 ## API Routes (120+ endpoints)
 
 ### Public Routes
@@ -254,6 +264,23 @@ GET    /api/automation/categories
 POST   /api/automation/upload-image, /api/automation/upload-images
 POST   /api/automation/webhook/published
 ```
+
+## Blog Pipeline Architecture
+
+**2-Agent System (planned):**
+- Research Agent (3x/day) → discovers topics from HN, Reddit, GitHub, WebSearch
+- Writer Agent (hourly) → picks best topic from queue, writes article EN+ID
+
+**Current Endpoints:**
+- `GET /api/automation/blog/trending-topic` — 4-source trend aggregation (Google Trends, TikTok, YouTube, Google News)
+- `POST /api/automation/blog/save-draft` — saves article + queues image generation
+- `POST /api/automation/blog/image-webhook` — GeminiGen callback (public, no auth)
+- `GET /api/automation/blog/image-status/{postId}` — poll image job status
+- `php artisan blog:process-images` — fallback: polls GeminiGen for pending jobs
+
+**Image Generation:** GeminiGen API, fire-and-forget with webhook.
+Use `generated_image[0].image_url` (R2 signed URL), NOT `file_download_url` (requires extra auth).
+Store full URLs (`url('/storage/...')`), not relative paths.
 
 ## Essential Commands
 

@@ -386,6 +386,28 @@ const routes = [
     }
   },
 
+  // Carousel Drafts Management
+  {
+    path: '/admin/carousel-drafts',
+    name: 'admin-carousel-drafts',
+    component: () => import('@/views/admin/CarouselDraftsList.vue'),
+    meta: {
+      title: 'Carousel Drafts - Admin',
+      requiresAuth: true,
+      layout: 'admin'
+    }
+  },
+  {
+    path: '/admin/carousel-drafts/:id',
+    name: 'admin-carousel-drafts-detail',
+    component: () => import('@/views/admin/CarouselDraftDetail.vue'),
+    meta: {
+      title: 'Carousel Draft - Admin',
+      requiresAuth: true,
+      layout: 'admin'
+    }
+  },
+
   {
     path: '/:pathMatch(.*)*',
     name: 'not-found',

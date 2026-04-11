@@ -708,9 +708,17 @@ src/
 - [ ] Dark mode support: `dark:text-white`
 - [ ] Hover/focus states for interactive elements
 
+## Gotchas
+
+- `useApi.get()` returns `response.data` (already unwrapped). Do NOT access `response.data.data` — that double-unwraps to undefined
+- TanStack Query caches `null` from failed fetches. Call `queryClient.invalidateQueries()` before refetching after errors
+- Admin layout sidebar: `lg:ml-64` must be dynamic via `uiStore.isSidebarOpen` — not hardcoded
+- Blog preview: add `?preview=1` to URL to view unpublished/draft posts
+- Language switcher: flags only (🇺🇸/🇮🇩), no text labels
+
 ---
 
-**Last Updated:** November 2, 2025
+**Last Updated:** April 11, 2026
 **Environment:** Windows 11 (Frontend: Vite:5173, Backend: XAMPP:80)
 **Status:** ✅ 100% COMPLETE - PRODUCTION READY
 **See also:** `/CLAUDE.md` (root), `backend/CLAUDE.md`

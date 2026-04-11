@@ -26,7 +26,7 @@ class PostController extends Controller
         $language = $request->query('lang', $request->header('Accept-Language', 'en'));
         $language = strtolower(substr($language, 0, 2));
 
-        $query = Post::with(['category', 'translations'])
+        $query = Post::with(['category', 'translations', 'relatedPosts.translations'])
             ->where('published', true)
             ->whereNotNull('published_at')
             ->where('published_at', '<=', now());
@@ -104,7 +104,7 @@ class PostController extends Controller
      */
     public function indexForAdmin(Request $request): JsonResponse
     {
-        $query = Post::with(['category', 'translations']);
+        $query = Post::with(['category', 'translations', 'relatedPosts.translations']);
 
         // Filter by published status
         if ($request->has('published')) {
@@ -184,7 +184,7 @@ class PostController extends Controller
         $language = $request->query('lang', $request->header('Accept-Language', 'en'));
         $language = strtolower(substr($language, 0, 2));
 
-        $query = Post::with(['category', 'translations'])
+        $query = Post::with(['category', 'translations', 'relatedPosts.translations'])
             ->where('slug', $slug);
 
         // Allow preview of unpublished posts with ?preview=1
@@ -216,7 +216,7 @@ class PostController extends Controller
      */
     public function showById(int $id): JsonResponse
     {
-        $post = Post::with(['category', 'translations'])->find($id);
+        $post = Post::with(['category', 'translations', 'relatedPosts.translations'])->find($id);
 
         if (!$post) {
             return response()->json([
@@ -300,9 +300,18 @@ class PostController extends Controller
                 $post->translations()->create($translation);
             }
 
+            // Handle related posts
+            if ($request->has('related_post_ids')) {
+                $ids = collect($request->input('related_post_ids'))
+                    ->filter()
+                    ->values()
+                    ->mapWithKeys(fn($id, $i) => [$id => ['sort_order' => $i]]);
+                $post->relatedPosts()->sync($ids);
+            }
+
             DB::commit();
 
-            $post->load(['category', 'translations']);
+            $post->load(['category', 'translations', 'relatedPosts']);
 
             return response()->json([
                 'message' => 'Post created successfully',
@@ -400,9 +409,18 @@ class PostController extends Controller
                 }
             }
 
+            // Handle related posts
+            if ($request->has('related_post_ids')) {
+                $ids = collect($request->input('related_post_ids'))
+                    ->filter()
+                    ->values()
+                    ->mapWithKeys(fn($id, $i) => [$id => ['sort_order' => $i]]);
+                $post->relatedPosts()->sync($ids);
+            }
+
             DB::commit();
 
-            $post->load(['category', 'translations']);
+            $post->load(['category', 'translations', 'relatedPosts']);
 
             return response()->json([
                 'message' => 'Post updated successfully',

@@ -134,7 +134,31 @@ class BlogPipelineController extends Controller
                 if ($uuid) $imageJobs[] = ['type' => 'inline', 'uuid' => $uuid];
             }
 
-            $post->load(['category', 'translations']);
+            // 4. Auto-assign related posts (same category, most recent, max 3)
+            $relatedIds = Post::where('id', '!=', $post->id)
+                ->where('category_id', $post->category_id)
+                ->where('published', true)
+                ->orderByDesc('created_at')
+                ->limit(3)
+                ->pluck('id');
+
+            // If not enough from same category, fill from other published posts
+            if ($relatedIds->count() < 3) {
+                $moreIds = Post::where('id', '!=', $post->id)
+                    ->whereNotIn('id', $relatedIds)
+                    ->where('published', true)
+                    ->orderByDesc('created_at')
+                    ->limit(3 - $relatedIds->count())
+                    ->pluck('id');
+                $relatedIds = $relatedIds->merge($moreIds);
+            }
+
+            if ($relatedIds->isNotEmpty()) {
+                $syncData = $relatedIds->values()->mapWithKeys(fn($id, $i) => [$id => ['sort_order' => $i]]);
+                $post->relatedPosts()->sync($syncData);
+            }
+
+            $post->load(['category', 'translations', 'relatedPosts']);
 
             return response()->json([
                 'success' => true,
@@ -146,6 +170,7 @@ class BlogPipelineController extends Controller
                     'status' => 'draft',
                     'image_jobs' => $imageJobs,
                     'image_jobs_count' => count($imageJobs),
+                    'related_posts_count' => $relatedIds->count(),
                 ],
             ], 201);
         } catch (\Exception $e) {

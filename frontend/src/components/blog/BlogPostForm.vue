@@ -410,6 +410,13 @@ const loadPostData = (post) => {
     uploadedImageFile.value = post.featured_image
   }
 
+  // Load related posts
+  if (post.related_posts?.length) {
+    selectedRelatedPosts.value = post.related_posts.map(rp => ({
+      id: rp.id, title: rp.title, slug: rp.slug, category: rp.category
+    }))
+  }
+
   isAutoSlug.value = false
 }
 
@@ -461,7 +468,7 @@ onMounted(async () => {
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
       <!-- LEFT COLUMN: Content (8 cols) -->
-      <div class="lg:col-span-8 space-y-5">
+      <div class="lg:col-span-8 flex flex-col gap-5">
         <!-- Title -->
         <div>
           <label for="title" class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">Title *</label>
@@ -497,13 +504,12 @@ onMounted(async () => {
           <p class="text-[10px] text-right mt-0.5" :class="getCountColor(excerptCount, 500)">{{ excerptCount }}/500</p>
         </div>
 
-        <!-- Content (collapsible — drag to resize) -->
-        <div>
+        <!-- Content (resizable — drag bottom edge) -->
+        <div class="flex-1 flex flex-col">
           <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">Content *</label>
-          <div class="overflow-hidden rounded-md border border-gray-700" style="resize: vertical; min-height: 200px; max-height: 80vh; height: 300px;">
+          <div class="overflow-hidden rounded-md border border-gray-700 flex-1" style="resize: vertical; min-height: 150px; height: 280px;">
             <RichTextEditor v-model="formData.content" placeholder="Start writing..." :disabled="isSubmitting" min-height="100%" />
           </div>
-          <p class="text-[10px] text-gray-600 mt-1">Drag bottom edge to resize</p>
           <p v-if="errors.content" class="mt-1 text-xs text-red-400">{{ errors.content }}</p>
         </div>
       </div>

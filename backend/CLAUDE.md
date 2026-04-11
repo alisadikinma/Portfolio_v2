@@ -526,9 +526,17 @@ tests/
 - [ ] Test eager loading (no N+1)
 - [ ] Test translations if applicable
 
+## Gotchas
+
+- `PostResource`: use `$this->translations` (eager-loaded collection), NOT `$this->translations()` (re-queries DB)
+- `Post::create()`: do NOT pass `title`, `content`, `excerpt` — they don't exist on posts table
+- Image URLs: always store full URLs via `url('/storage/...')`, not relative `/storage/...`
+- GeminiGen: `file_download_url` returns 401. Use `generated_image[0].image_url` instead
+- `related_posts` pivot table: `post_id` + `related_post_id` + `sort_order`
+
 ---
 
-**Last Updated:** November 2, 2025
+**Last Updated:** April 11, 2026
 **Environment:** Windows 11 + XAMPP (Apache:80, MySQL:3306)
 **Status:** ✅ 100% COMPLETE - PRODUCTION READY
 **See also:** `/CLAUDE.md` (root), `frontend/CLAUDE.md`

@@ -88,6 +88,22 @@ class PostResource extends JsonResource
                 ];
             })->toArray(),
 
+            // Related posts
+            'related_posts' => $this->whenLoaded('relatedPosts', function () {
+                return $this->relatedPosts->map(function ($rp) {
+                    $t = $rp->translations->first();
+                    return [
+                        'id' => $rp->id,
+                        'slug' => $rp->slug,
+                        'title' => $t?->title ?? '',
+                        'featured_image' => $rp->featured_image
+                            ? (str_starts_with($rp->featured_image, 'http') ? $rp->featured_image : url($rp->featured_image))
+                            : null,
+                        'category' => $rp->category ? ['name' => $rp->category->name, 'slug' => $rp->category->slug] : null,
+                    ];
+                });
+            }),
+
             // Timestamps
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),

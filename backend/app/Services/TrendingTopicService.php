@@ -21,17 +21,44 @@ use Illuminate\Support\Str;
  */
 class TrendingTopicService
 {
+    /**
+     * Blog focus: AI tools & ecosystem
+     * Topics: Vibe Coding, AI Automation, AI Agents, AI Image/Video Gen, LLMs
+     */
     private array $techKeywords = [
-        'ai', 'artificial intelligence', 'machine learning', 'deep learning', 'llm',
-        'chatgpt', 'openai', 'claude', 'gemini', 'gpt', 'copilot', 'midjourney',
-        'programming', 'coding', 'developer', 'software', 'web development',
-        'laravel', 'vue', 'react', 'next.js', 'python', 'javascript', 'typescript',
-        'api', 'database', 'cloud', 'aws', 'saas', 'startup', 'tech',
-        'cybersecurity', 'blockchain', 'crypto', 'robotics', 'automation',
-        'apple', 'google', 'microsoft', 'meta', 'nvidia', 'tesla',
-        'android', 'ios', 'app', 'data', 'algorithm', 'neural',
-        'quantum', 'ar', 'vr', 'chip', 'semiconductor', 'open source',
-        'agent', 'prompt', 'diffusion', 'transformer', 'fine-tuning',
+        // Vibe Coding Tools
+        'vibe coding', 'cursor', 'windsurf', 'claude code', 'copilot', 'codeium',
+        'v0', 'bolt', 'lovable', 'replit', 'devin', 'aide', 'trae',
+        'coding assistant', 'ai coding', 'ai ide', 'code generation',
+
+        // AI Agents
+        'ai agent', 'openclaw', 'open claw', 'mcp', 'model context protocol',
+        'managed agents', 'autonomous agent', 'agentic', 'crew ai', 'crewai',
+        'autogen', 'langchain', 'langgraph', 'agent framework',
+
+        // AI Automation
+        'ai automation', 'n8n', 'make.com', 'zapier ai', 'workflow automation',
+        'rpa', 'ai pipeline', 'prompt engineering', 'ai workflow',
+
+        // LLMs & AI Companies
+        'claude', 'anthropic', 'chatgpt', 'openai', 'gemini', 'gpt',
+        'llm', 'large language model', 'grok', 'mistral', 'llama',
+        'deepseek', 'qwen', 'phi', 'sonnet', 'opus', 'haiku',
+
+        // AI Image Generation
+        'midjourney', 'dall-e', 'stable diffusion', 'flux', 'imagen',
+        'nano banana', 'ai image', 'image generation', 'text to image',
+        'comfyui', 'automatic1111', 'fooocus', 'seedream',
+
+        // AI Video Generation
+        'sora', 'runway', 'pika', 'kling', 'veo', 'wan',
+        'ai video', 'video generation', 'text to video',
+        'luma', 'minimax', 'hailuo',
+
+        // General AI/ML
+        'artificial intelligence', 'machine learning', 'deep learning',
+        'transformer', 'fine-tuning', 'rag', 'neural', 'diffusion',
+        'ai tool', 'ai app', 'generative ai', 'gen ai',
     ];
 
     /**
@@ -344,19 +371,33 @@ class TrendingTopicService
     private function isDuplicate(string $title): bool
     {
         $slug = Str::slug($title);
+        $titleLower = strtolower($title);
 
-        // Check slug match on posts table
-        if (Post::where('slug', $slug)->exists()) return true;
+        // 1. Exact slug match (any post, including trashed)
+        if (Post::withTrashed()->where('slug', $slug)->exists()) return true;
 
-        // Check title similarity against recent translations (title lives in post_translations)
-        $recentTitles = \App\Models\PostTranslation::select('title')
-            ->orderByDesc('created_at')
-            ->limit(50)
+        // 2. Title similarity against ALL post translations (not just recent 50)
+        $allTitles = \App\Models\PostTranslation::select('title')
             ->pluck('title');
 
-        foreach ($recentTitles as $existing) {
-            similar_text(strtolower($title), strtolower($existing), $percent);
-            if ($percent > 70) return true;
+        foreach ($allTitles as $existing) {
+            similar_text($titleLower, strtolower($existing), $percent);
+            if ($percent > 65) return true;
+        }
+
+        // 3. Keyword overlap check — if 3+ significant words match, likely same topic
+        $titleWords = collect(explode(' ', $titleLower))
+            ->filter(fn($w) => strlen($w) > 3) // skip short words
+            ->values();
+
+        foreach ($allTitles as $existing) {
+            $existingWords = collect(explode(' ', strtolower($existing)))
+                ->filter(fn($w) => strlen($w) > 3);
+
+            $overlap = $titleWords->intersect($existingWords)->count();
+            if ($overlap >= 3 && $overlap >= $titleWords->count() * 0.5) {
+                return true;
+            }
         }
 
         return false;
@@ -366,13 +407,14 @@ class TrendingTopicService
     {
         $text = strtolower($title);
 
+        // Categories: 1=AI, 2=Technology, 3=Software Dev, 4=Tutorial, 5=Industry Insights, 6=Product Reviews
         $map = [
-            1 => ['ai', 'artificial intelligence', 'machine learning', 'deep learning', 'openai', 'chatgpt', 'claude', 'gemini', 'gpt', 'llm', 'diffusion', 'neural', 'transformer', 'agent', 'copilot', 'midjourney'],
-            2 => ['tech', 'apple', 'google', 'microsoft', 'meta', 'nvidia', 'tesla', 'samsung', 'chip', 'semiconductor', 'quantum', 'robot', 'ar', 'vr', 'blockchain', 'crypto', 'cybersecurity', 'android', 'ios'],
-            3 => ['laravel', 'vue', 'react', 'next.js', 'python', 'javascript', 'typescript', 'api', 'database', 'cloud', 'aws', 'saas', 'devops', 'docker', 'kubernetes', 'programming', 'coding', 'developer', 'software', 'open source', 'framework', 'php', 'node'],
-            4 => ['tutorial', 'how to', 'guide', 'step by step', 'learn', 'build', 'setup', 'install'],
-            5 => ['industry', 'market', 'trend', 'forecast', 'report', 'analysis', 'startup', 'funding', 'ipo', 'acquisition', 'career', 'job', 'salary'],
-            6 => ['review', 'comparison', 'vs', 'best', 'top', 'alternative', 'tool', 'app', 'product'],
+            1 => ['ai', 'artificial intelligence', 'machine learning', 'llm', 'openai', 'chatgpt', 'claude', 'anthropic', 'gemini', 'gpt', 'agent', 'copilot', 'midjourney', 'diffusion', 'transformer', 'deep learning', 'generative ai', 'prompt', 'rag', 'fine-tuning', 'neural', 'sora', 'dall-e', 'stable diffusion', 'flux'],
+            2 => ['tech', 'nvidia', 'chip', 'semiconductor', 'quantum', 'robot', 'ar', 'vr', 'blockchain', 'automation', 'n8n', 'mcp', 'openclaw', 'workflow'],
+            3 => ['vibe coding', 'cursor', 'windsurf', 'claude code', 'v0', 'bolt', 'lovable', 'replit', 'devin', 'coding', 'developer', 'programming', 'laravel', 'vue', 'react', 'python', 'javascript', 'api', 'framework', 'open source'],
+            4 => ['tutorial', 'how to', 'guide', 'step by step', 'learn', 'build', 'setup'],
+            5 => ['industry', 'market', 'trend', 'forecast', 'analysis', 'startup', 'funding', 'acquisition'],
+            6 => ['review', 'comparison', 'vs', 'best', 'top', 'alternative', 'tool', 'app'],
         ];
 
         foreach ($map as $id => $keywords) {
