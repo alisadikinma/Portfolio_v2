@@ -134,7 +134,7 @@ export function usePageSections() {
     }
   }
 
-  // Update section (toggle active/inactive) - INVALIDATE CACHE
+  // Update section (toggle active/inactive) - INVALIDATE ALL CACHE LAYERS
   const updateSection = async (id, data) => {
     try {
       const response = await api.put(`/admin/page-sections/${id}`, data)
@@ -145,11 +145,31 @@ export function usePageSections() {
         adminSections.value[index] = response.data.data
       }
 
-      // Invalidate public cache
+      // Layer 1: Invalidate TanStack Query cache
       queryClient.invalidateQueries({ queryKey: ['page-sections'] })
+
+      // Layer 2: Clear useLocalCache
       if (selectedPage.value) {
         const cacheKey = `page_sections_${selectedPage.value}`
         setCache(cacheKey, null, 0)
+      }
+      // Also clear common page keys
+      setCache('page_sections_homepage', null, 0)
+
+      // Layer 3: Clear persistent 24hr cache in main.js (PORTFOLIO_QUERY_CACHE)
+      try {
+        const persistentCache = localStorage.getItem('PORTFOLIO_QUERY_CACHE')
+        if (persistentCache) {
+          const parsed = JSON.parse(persistentCache)
+          if (parsed.queries) {
+            // Remove all page-sections entries from persistent cache
+            const keysToRemove = Object.keys(parsed.queries).filter(k => k.includes('page-sections'))
+            keysToRemove.forEach(k => delete parsed.queries[k])
+            localStorage.setItem('PORTFOLIO_QUERY_CACHE', JSON.stringify(parsed))
+          }
+        }
+      } catch (e) {
+        // Non-fatal
       }
 
       return { success: true, data: response.data.data }
@@ -162,19 +182,37 @@ export function usePageSections() {
     }
   }
 
-  // Reorder sections - INVALIDATE CACHE
+  // Reorder sections - INVALIDATE ALL CACHE LAYERS
   const reorderSections = async (items) => {
     try {
       const response = await api.put('/admin/page-sections/reorder', { items })
-      
+
       // Update local admin sections
       adminSections.value = response.data.data
-      
-      // Invalidate public cache
+
+      // Layer 1: Invalidate TanStack Query cache
       queryClient.invalidateQueries({ queryKey: ['page-sections'] })
+
+      // Layer 2: Clear useLocalCache
       if (selectedPage.value) {
         const cacheKey = `page_sections_${selectedPage.value}`
         setCache(cacheKey, null, 0)
+      }
+      setCache('page_sections_homepage', null, 0)
+
+      // Layer 3: Clear persistent 24hr cache
+      try {
+        const persistentCache = localStorage.getItem('PORTFOLIO_QUERY_CACHE')
+        if (persistentCache) {
+          const parsed = JSON.parse(persistentCache)
+          if (parsed.queries) {
+            const keysToRemove = Object.keys(parsed.queries).filter(k => k.includes('page-sections'))
+            keysToRemove.forEach(k => delete parsed.queries[k])
+            localStorage.setItem('PORTFOLIO_QUERY_CACHE', JSON.stringify(parsed))
+          }
+        }
+      } catch (e) {
+        // Non-fatal
       }
 
       return { success: true, data: response.data.data }

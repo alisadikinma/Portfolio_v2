@@ -124,3 +124,10 @@ app.use(router)
 app.use(i18n)
 app.use(VueQueryPlugin, { queryClient })
 app.mount('#app')
+
+// Register Service Worker for media caching (videos + images)
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  navigator.serviceWorker.register('/sw.js')
+    .then((reg) => console.log('[SW] Media cache active'))
+    .catch((err) => console.warn('[SW] Registration failed:', err))
+}

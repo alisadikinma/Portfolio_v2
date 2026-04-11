@@ -161,9 +161,11 @@ const aiVideoSocials = [
 ]
 
 function isSectionActive(sectionType) {
+  // If sections not loaded yet, show all (will re-evaluate once data arrives)
   if (!sections.value || sections.value.length === 0) return true
   const section = sections.value.find(s => s.section_type === sectionType)
-  return section ? section.is_active : false
+  // If section exists in DB, respect is_active. If not found in DB, hide it.
+  return section ? !!section.is_active : false
 }
 
 function getSectionField(sectionType, field, fallback = '') {
