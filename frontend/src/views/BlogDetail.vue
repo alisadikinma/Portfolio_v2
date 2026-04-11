@@ -1,6 +1,11 @@
 <template>
   <div class="min-h-screen bg-bg-deep text-fg-primary">
 
+    <!-- ─── Reading Progress Bar ─── -->
+    <div v-if="post && !isLoading && !fetchError" class="fixed top-0 left-0 right-0 z-50 h-0.5">
+      <div class="h-full bg-accent-gold transition-all duration-100 ease-out" :style="{ width: readingProgress + '%' }"></div>
+    </div>
+
     <!-- ─── Loading ─── -->
     <div v-if="isLoading" class="flex items-center justify-center min-h-screen">
       <div class="text-center">
@@ -118,195 +123,144 @@
         </div>
       </figure>
 
-      <!-- ─── Content Layout ─── -->
-      <div class="container-custom mb-16">
-        <div class="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-[1fr_3fr] gap-10">
+      <!-- ─── Content Layout — Clean Centered Column ─── -->
+      <div class="container-custom mb-16" ref="articleContent">
+        <div class="max-w-3xl mx-auto">
 
-          <!-- ── Left Column: Sticky Share + Meta ── -->
-          <aside>
-            <div class="sticky top-28 space-y-6">
+          <!-- AI Summary Box -->
+          <div
+            v-if="post.ai_summary"
+            class="rounded-xl p-5 mb-10 bg-accent-cyan/5 border border-accent-cyan/15"
+          >
+            <div class="flex items-center gap-2 mb-3">
+              <svg class="w-4 h-4 text-accent-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+              </svg>
+              <span class="text-xs font-mono font-medium text-accent-cyan uppercase tracking-wider">TL;DR</span>
+            </div>
+            <p class="text-fg-muted text-sm leading-relaxed">{{ post.ai_summary }}</p>
+          </div>
 
-              <!-- Share -->
-              <div class="glass-card p-5">
-                <p class="mono-label text-fg-dim mb-4">Share</p>
-                <div class="flex md:flex-col gap-3">
+          <!-- Excerpt / Lead paragraph -->
+          <p v-if="post.excerpt" class="text-xl md:text-2xl text-fg-muted leading-relaxed mb-10 font-light" style="text-wrap: pretty;">
+            {{ post.excerpt }}
+          </p>
 
-                  <!-- Twitter / X -->
-                  <button
-                    class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-white/5 border border-border-hairline hover:border-accent-cyan/40 hover:bg-accent-cyan/5 transition-all duration-200 group"
-                    :title="'Share on X'"
-                    @click="shareTwitter"
-                  >
-                    <svg class="w-4 h-4 text-fg-muted group-hover:text-accent-cyan transition-colors flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.748l7.73-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-                    </svg>
-                    <span class="text-xs text-fg-muted group-hover:text-fg-primary transition-colors hidden md:block">Post on X</span>
-                  </button>
+          <!-- Article body -->
+          <div
+            v-if="post.content"
+            class="blog-content"
+            v-html="post.content"
+          ></div>
 
-                  <!-- LinkedIn -->
-                  <button
-                    class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-white/5 border border-border-hairline hover:border-accent-cyan/40 hover:bg-accent-cyan/5 transition-all duration-200 group"
-                    title="Share on LinkedIn"
-                    @click="shareLinkedIn"
-                  >
-                    <svg class="w-4 h-4 text-fg-muted group-hover:text-accent-cyan transition-colors flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
-                    </svg>
-                    <span class="text-xs text-fg-muted group-hover:text-fg-primary transition-colors hidden md:block">LinkedIn</span>
-                  </button>
+          <!-- Tags -->
+          <div v-if="post.tags?.length" class="mt-10 pt-8 border-t border-white/5">
+            <div class="flex flex-wrap gap-2">
+              <span
+                v-for="tag in post.tags"
+                :key="tag"
+                class="px-3 py-1.5 rounded-full text-xs bg-white/5 border border-white/8 text-fg-muted hover:text-accent-cyan hover:border-accent-cyan/30 transition-colors cursor-default"
+              >
+                #{{ tag }}
+              </span>
+            </div>
+          </div>
 
-                  <!-- Copy URL -->
-                  <button
-                    class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-white/5 border border-border-hairline hover:border-accent-gold/40 hover:bg-accent-gold/5 transition-all duration-200 group"
-                    title="Copy link"
-                    @click="copyUrl"
-                  >
-                    <svg
-                      v-if="!urlCopied"
-                      class="w-4 h-4 text-fg-muted group-hover:text-accent-gold transition-colors flex-shrink-0"
-                      fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                    >
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
-                    </svg>
-                    <svg
-                      v-else
-                      class="w-4 h-4 text-success flex-shrink-0"
-                      fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                    >
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                    </svg>
-                    <span class="text-xs transition-colors hidden md:block" :class="urlCopied ? 'text-success' : 'text-fg-muted group-hover:text-fg-primary'">
-                      {{ urlCopied ? 'Copied!' : 'Copy link' }}
-                    </span>
-                  </button>
-                </div>
+          <!-- Share Bar — inline after article -->
+          <div class="mt-10 pt-8 border-t border-white/5">
+            <p class="mono-label text-fg-dim mb-4 text-xs">Share this article</p>
+            <div class="flex gap-2">
+              <button @click="shareTwitter" title="Share on X"
+                class="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-white/5 border border-white/8 hover:border-accent-cyan/40 hover:bg-accent-cyan/5 transition-all duration-200 group">
+                <svg class="w-4 h-4 text-fg-muted group-hover:text-accent-cyan transition-colors" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.748l7.73-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                </svg>
+                <span class="text-xs text-fg-muted group-hover:text-fg-primary">X</span>
+              </button>
+              <button @click="shareLinkedIn" title="Share on LinkedIn"
+                class="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-white/5 border border-white/8 hover:border-accent-cyan/40 hover:bg-accent-cyan/5 transition-all duration-200 group">
+                <svg class="w-4 h-4 text-fg-muted group-hover:text-accent-cyan transition-colors" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                </svg>
+                <span class="text-xs text-fg-muted group-hover:text-fg-primary">LinkedIn</span>
+              </button>
+              <button @click="copyUrl" title="Copy link"
+                class="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-white/5 border border-white/8 hover:border-accent-gold/40 hover:bg-accent-gold/5 transition-all duration-200 group">
+                <svg v-if="!urlCopied" class="w-4 h-4 text-fg-muted group-hover:text-accent-gold transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                </svg>
+                <svg v-else class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </svg>
+                <span class="text-xs" :class="urlCopied ? 'text-green-400' : 'text-fg-muted group-hover:text-fg-primary'">
+                  {{ urlCopied ? 'Copied' : 'Copy link' }}
+                </span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Author Card -->
+          <div class="mt-10 pt-8 border-t border-white/5">
+            <div class="flex items-start gap-4">
+              <div class="w-12 h-12 rounded-full bg-accent-gold/10 border border-accent-gold/20 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                <img v-if="post.author?.avatar" :src="post.author.avatar" :alt="post.author?.name" class="w-full h-full object-cover" />
+                <svg v-else class="w-6 h-6 text-accent-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                </svg>
               </div>
-
-              <!-- Tags -->
-              <div v-if="post.tags?.length" class="glass-card p-5">
-                <p class="mono-label text-fg-dim mb-4">Tags</p>
-                <div class="flex flex-wrap gap-2">
-                  <span
-                    v-for="tag in post.tags"
-                    :key="tag"
-                    class="px-2.5 py-1 rounded-md text-xs bg-white/5 border border-border-hairline text-fg-muted"
-                  >
-                    #{{ tag }}
-                  </span>
-                </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-xs text-fg-dim mb-0.5">Written by</p>
+                <h3 class="font-semibold font-display text-fg-primary mb-1">
+                  {{ post.author?.name || 'Ali Sadikin Ma' }}
+                </h3>
+                <p class="text-fg-muted text-sm leading-relaxed">
+                  {{ post.author?.bio || 'AI Generalist Expert. Building intelligent systems and sharing insights on AI, engineering, and the future of work.' }}
+                </p>
               </div>
             </div>
-          </aside>
-
-          <!-- ── Main Article Content ── -->
-          <main>
-
-            <!-- AI Summary Box -->
-            <div
-              v-if="post.ai_summary"
-              class="glass-card p-6 mb-8 border border-accent-cyan/25"
-              style="border-color: rgba(6, 182, 212, 0.25);"
-            >
-              <div class="flex items-center gap-2.5 mb-4">
-                <div class="w-6 h-6 rounded-full bg-accent-cyan/20 flex items-center justify-center flex-shrink-0">
-                  <svg class="w-3.5 h-3.5 text-accent-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
-                  </svg>
-                </div>
-                <p class="mono-label text-accent-cyan">AI Summary</p>
-              </div>
-              <p class="text-fg-muted text-sm leading-relaxed">{{ post.ai_summary }}</p>
-            </div>
-
-            <!-- Excerpt / Lead -->
-            <p v-if="post.excerpt" class="text-xl text-fg-muted leading-relaxed mb-8 font-serif italic">
-              {{ post.excerpt }}
-            </p>
-
-            <!-- Article body -->
-            <div
-              v-if="post.content"
-              class="blog-content"
-              v-html="post.content"
-            ></div>
-
-            <!-- Author Card -->
-            <div class="mt-12 glass-card p-6">
-              <div class="flex items-start gap-4">
-                <div class="w-14 h-14 rounded-full bg-accent-gold/10 border border-accent-gold/20 flex items-center justify-center flex-shrink-0 overflow-hidden">
-                  <img
-                    v-if="post.author?.avatar"
-                    :src="post.author.avatar"
-                    :alt="post.author?.name"
-                    class="w-full h-full object-cover"
-                  />
-                  <svg v-else class="w-7 h-7 text-accent-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-                  </svg>
-                </div>
-                <div class="flex-1 min-w-0">
-                  <p class="mono-label text-fg-dim mb-1">Written by</p>
-                  <h3 class="font-semibold font-display text-fg-primary text-lg mb-1">
-                    {{ post.author?.name || 'Ali Sadikin' }}
-                  </h3>
-                  <p class="text-fg-muted text-sm leading-relaxed">
-                    {{ post.author?.bio || 'AI Generalist Expert. Building intelligent systems and sharing insights on AI, engineering, and the future of work.' }}
-                  </p>
-                  <button
-                    class="btn-glass mt-4 text-xs px-4 py-2"
-                    @click="$router.push('/about')"
-                  >
-                    View Profile
-                  </button>
-                </div>
-              </div>
-            </div>
-          </main>
+          </div>
         </div>
       </div>
 
-      <!-- ─── Related Posts ─── -->
+      <!-- ─── Related Posts — Continue Reading ─── -->
       <section v-if="relatedPosts.length" class="container-custom mb-20">
-        <div class="max-w-4xl mx-auto">
+        <div class="max-w-5xl mx-auto">
           <div class="flex items-center gap-4 mb-8">
-            <p class="mono-label text-accent-gold">Continue Reading</p>
-            <div class="flex-1 h-px bg-border-hairline"></div>
+            <p class="mono-label text-accent-gold">Continue reading</p>
+            <div class="flex-1 h-px bg-white/5"></div>
           </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <article
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <router-link
               v-for="related in relatedPosts"
               :key="related.id"
-              class="glass-card p-0 overflow-hidden cursor-pointer group"
-              @click="$router.push(`/blog/${related.slug}`)"
+              :to="`/${lang}/blog/${related.slug}`"
+              class="group rounded-xl overflow-hidden bg-bg-elevated/50 border border-white/5 hover:border-accent-gold/20 transition-all duration-300"
             >
-              <div class="aspect-video bg-bg-elevated overflow-hidden flex-shrink-0">
+              <div class="aspect-[16/10] bg-bg-elevated overflow-hidden">
                 <img
                   v-if="related.featured_image"
                   :src="related.featured_image"
                   :alt="related.title"
                   class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  loading="lazy"
                 />
                 <div v-else class="w-full h-full flex items-center justify-center">
                   <svg class="w-8 h-8 text-fg-dim" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1"
-                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                   </svg>
                 </div>
               </div>
-              <div class="p-5">
-                <span
-                  v-if="related.category?.name"
-                  class="inline-block mb-2 px-2 py-0.5 rounded text-xs font-mono bg-accent-cyan/10 text-accent-cyan"
-                >
+              <div class="p-4">
+                <span v-if="related.category?.name" class="inline-block mb-2 text-[10px] font-mono uppercase tracking-wider text-accent-cyan">
                   {{ related.category.name }}
                 </span>
-                <h3 class="font-semibold font-display text-fg-primary text-base leading-snug group-hover:text-accent-gold transition-colors line-clamp-2">
+                <h3 class="font-semibold font-display text-fg-primary text-sm leading-snug group-hover:text-accent-gold transition-colors line-clamp-2 mb-2">
                   {{ related.title }}
                 </h3>
-                <time :datetime="related.published_at" class="mono-label text-fg-dim mt-2 block">{{ formatDate(related.published_at) }}</time>
+                <time :datetime="related.published_at" class="text-[11px] text-fg-dim font-mono">{{ formatDate(related.published_at) }}</time>
               </div>
-            </article>
+            </router-link>
           </div>
         </div>
       </section>
@@ -316,8 +270,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { usePosts } from '@/composables/usePosts'
 import { useMetaTags } from '@/composables/useMetaTags'
 import { usePageSections } from '@/composables/usePageSections'
@@ -325,7 +279,6 @@ import { useToast } from '@/composables/useToast'
 import api from '@/services/api'
 
 const route = useRoute()
-const router = useRouter()
 const toast = useToast()
 
 const { post, isLoadingPost: isLoading, fetchPost } = usePosts()
@@ -336,6 +289,18 @@ const { fetchActiveSections } = usePageSections()
 const fetchError = ref(null)
 const relatedPosts = ref([])
 const urlCopied = ref(false)
+const articleContent = ref(null)
+const readingProgress = ref(0)
+
+// Reading progress tracking
+const handleScroll = () => {
+  if (!articleContent.value) return
+  const el = articleContent.value
+  const rect = el.getBoundingClientRect()
+  const total = el.scrollHeight
+  const scrolled = Math.max(0, -rect.top)
+  readingProgress.value = Math.min(100, Math.round((scrolled / (total - window.innerHeight)) * 100))
+}
 
 // ── Reading time ──────────────────────────────────────────────────────────────
 const estimatedReadTime = computed(() => {
@@ -458,6 +423,8 @@ watch(
 const lang = computed(() => route.params.lang || 'en')
 
 onMounted(async () => {
+  window.addEventListener('scroll', handleScroll, { passive: true })
+
   await fetchActiveSections('blog')
 
   const slug = route.params.slug
@@ -469,6 +436,10 @@ onMounted(async () => {
     updateMetaTags()
     await fetchRelatedPosts()
   }
+})
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', handleScroll)
 })
 
 // Refetch when language changes (user switches via LanguageSwitcher)
