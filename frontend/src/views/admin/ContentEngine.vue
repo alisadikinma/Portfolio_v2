@@ -245,6 +245,14 @@
             <option v-for="src in trendingSources" :key="src.value" :value="src.value">{{ src.label }}</option>
           </select>
         </div>
+        <!-- Search + Select All -->
+        <div class="flex items-center gap-3 mb-3">
+          <input v-model="trendingSearch" type="text" placeholder="Search topics... (e.g. claude)" class="flex-1 rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 text-sm px-3 py-2 focus:ring-amber-500 focus:border-amber-500 placeholder-neutral-400" />
+          <label v-if="filteredTrending.length" class="flex items-center gap-2 cursor-pointer whitespace-nowrap text-xs text-neutral-500 dark:text-neutral-400">
+            <input type="checkbox" :checked="allFilteredSelected" @change="toggleSelectAll" class="rounded border-neutral-300 text-amber-600 focus:ring-amber-500" />
+            Select All
+          </label>
+        </div>
         <div class="flex-1 overflow-y-auto space-y-2 min-h-0">
           <div v-if="trendingLoading" class="py-8 text-center text-neutral-500 dark:text-neutral-400">
             <svg class="animate-spin h-6 w-6 mx-auto mb-2 text-amber-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
@@ -444,10 +452,27 @@ const editData = reactive({ id: null, title: '', pillar: '', priority: 'medium' 
 const trendingTopics = ref([])
 const selectedTrending = ref([])
 const trendingSourceFilter = ref('')
+const trendingSearch = ref('')
 const filteredTrending = computed(() => {
-  if (!trendingSourceFilter.value) return trendingTopics.value
-  return trendingTopics.value.filter(t => t.source === trendingSourceFilter.value)
+  let results = trendingTopics.value
+  if (trendingSourceFilter.value) {
+    results = results.filter(t => t.source === trendingSourceFilter.value)
+  }
+  if (trendingSearch.value.trim()) {
+    const q = trendingSearch.value.trim().toLowerCase()
+    results = results.filter(t => (t.title || '').toLowerCase().includes(q))
+  }
+  return results
 })
+const allFilteredSelected = computed(() => filteredTrending.value.length > 0 && filteredTrending.value.every(t => selectedTrending.value.includes(t)))
+function toggleSelectAll() {
+  if (allFilteredSelected.value) {
+    selectedTrending.value = selectedTrending.value.filter(t => !filteredTrending.value.includes(t))
+  } else {
+    const toAdd = filteredTrending.value.filter(t => !selectedTrending.value.includes(t))
+    selectedTrending.value = [...selectedTrending.value, ...toAdd]
+  }
+}
 
 // Config modal
 const configOutputTypes = ref([])
@@ -590,6 +615,7 @@ async function handleRestore(id) {
 async function openTrendingModal(source) {
   trendingDropdownOpen.value = false
   trendingSourceFilter.value = source || ''
+  trendingSearch.value = ''
   selectedTrending.value = []
   showTrendingModal.value = true
   trendingLoading.value = true
