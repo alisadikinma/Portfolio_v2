@@ -64,6 +64,8 @@ export function useContentEngine() {
 
   const getResearch = (id) => request('get', `/admin/content-engine/ideas/${id}/research`)
 
+  const getProgress = (id) => request('get', `/admin/content-engine/ideas/${id}/progress`)
+
   const approveArticle = async (id, data = {}) => {
     return request('post', `/admin/content-engine/ideas/${id}/approve-article`, data)
   }
@@ -107,6 +109,7 @@ export function useContentEngine() {
     importTrending,
     startResearch,
     getResearch,
+    getProgress,
     approveArticle,
     startImageGeneration,
     approveAndPublish,

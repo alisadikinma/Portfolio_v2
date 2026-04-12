@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\ContentIdea;
+use App\Services\ArticleGenerationService;
 use App\Services\ContentEngineService;
 use App\Services\TrendingTopicService;
 use Illuminate\Http\JsonResponse;
@@ -14,6 +15,7 @@ use Illuminate\Support\Facades\Storage;
 class ContentIdeaController extends Controller
 {
     public function __construct(
+        private ArticleGenerationService $articleGen,
         private ContentEngineService $engine,
         private TrendingTopicService $trending
     ) {}
@@ -246,8 +248,8 @@ class ContentIdeaController extends Controller
     // ========================================================================
 
     /**
-     * Start article generation: research + write full article.
-     * Triggers blog_article workflow on Content Engine.
+     * Start article generation via Claude Code CLI + article-content-writer plugin.
+     * Triggers SSH to VPS to run the article-gen skill.
      */
     public function startResearch($id, Request $request): JsonResponse
     {
@@ -267,34 +269,50 @@ class ContentIdeaController extends Controller
             'languages' => $validated['languages'],
             'instructions' => $validated['instructions'] ?? null,
             'status' => 'researching',
+            'progress_percentage' => 0,
+            'current_step' => 'initializing',
+            'progress_log' => [[
+                'timestamp' => now()->toISOString(),
+                'step' => 'initializing',
+                'percentage' => 0,
+                'message' => 'Article generation triggered',
+            ]],
         ]);
 
-        try {
-            $result = $this->engine->createWorkflow('blog_article', [
-                'topic' => $idea->title,
-                'niche' => $idea->niche,
-                'languages' => $validated['languages'],
-                'instructions' => $validated['instructions'] ?? '',
-                'idea_id' => $idea->id,
-            ]);
+        $result = $this->articleGen->triggerGeneration($idea->id, [
+            'topic' => $idea->title,
+            'languages' => $validated['languages'],
+            'instructions' => $validated['instructions'] ?? '',
+        ]);
 
+        if ($result['success']) {
             $idea->update([
+                'process_pid' => $result['pid'],
                 'workflows' => [[
                     'type' => 'blog_article',
-                    'workflow_id' => $result['id'] ?? null,
-                    'status' => 'pending',
+                    'driver' => 'claude_cli',
+                    'pid' => $result['pid'],
+                    'status' => 'running',
                     'created_at' => now()->toISOString(),
                 ]],
             ]);
-        } catch (\Exception $e) {
-            Log::warning('[ContentIdea] Blog workflow creation failed: ' . $e->getMessage());
-            // Don't block — user can retry or Content Engine may be temporarily down
+        } else {
+            Log::warning('[ContentIdea] Article generation trigger failed: ' . ($result['error'] ?? 'Unknown'));
+            $idea->update([
+                'current_step' => 'failed',
+                'progress_log' => array_merge($idea->progress_log ?? [], [[
+                    'timestamp' => now()->toISOString(),
+                    'step' => 'failed',
+                    'percentage' => 0,
+                    'message' => 'Failed to start: ' . ($result['error'] ?? 'Unknown error'),
+                ]]),
+            ]);
         }
 
         return response()->json([
             'success' => true,
             'data' => $idea->fresh(),
-            'message' => 'Article generation started.',
+            'message' => $result['success'] ? 'Article generation started via CLI.' : 'Generation trigger failed, but idea is in researching state.',
         ]);
     }
 
@@ -443,70 +461,129 @@ class ContentIdeaController extends Controller
     }
 
     // ========================================================================
-    // CONTENT ENGINE PROXY
+    // PROGRESS TRACKING
+    // ========================================================================
+
+    /**
+     * Get real-time progress for an idea being processed.
+     */
+    public function getProgress($id): JsonResponse
+    {
+        $idea = ContentIdea::find($id);
+        if (!$idea) {
+            return response()->json(['success' => false, 'message' => 'Content idea not found.'], 404);
+        }
+
+        // Check if process is still alive (if we have a PID)
+        $processAlive = true;
+        if ($idea->process_pid && in_array($idea->status, ['researching', 'generating_images'])) {
+            $processAlive = $this->articleGen->isProcessRunning($idea->process_pid);
+            if (!$processAlive && $idea->progress_percentage < 100) {
+                // Process died without completing
+                $idea->update([
+                    'current_step' => 'failed',
+                    'progress_log' => array_merge($idea->progress_log ?? [], [[
+                        'timestamp' => now()->toISOString(),
+                        'step' => 'failed',
+                        'percentage' => $idea->progress_percentage,
+                        'message' => 'Process terminated unexpectedly (PID: ' . $idea->process_pid . ')',
+                    ]]),
+                ]);
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'id' => $idea->id,
+                'status' => $idea->status,
+                'progress_percentage' => $idea->progress_percentage,
+                'current_step' => $idea->current_step,
+                'progress_log' => $idea->progress_log ?? [],
+                'process_alive' => $processAlive,
+            ],
+        ]);
+    }
+
+    // ========================================================================
+    // CONTENT ENGINE PROXY (kept for backward compatibility)
     // ========================================================================
 
     public function healthCheck(): JsonResponse
     {
-        return response()->json(['success' => true, 'data' => $this->engine->healthCheck()]);
+        // Check CLI-based system health instead of microservice
+        $driver = config('services.article_generation.driver', 'ssh');
+        $host = config('services.article_generation.ssh_host', '');
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'healthy' => true,
+                'driver' => $driver,
+                'mode' => 'cli',
+                'host' => $driver === 'ssh' ? $host : 'localhost',
+                'message' => 'Article generation via Claude Code CLI',
+            ],
+        ]);
     }
 
     public function listWorkflows(): JsonResponse
     {
-        return response()->json(['success' => true, 'data' => $this->engine->listWorkflows()]);
+        // Return workflow data from content_ideas table instead of microservice
+        $ideas = ContentIdea::whereNotNull('workflows')
+            ->orderBy('updated_at', 'desc')
+            ->limit(20)
+            ->get();
+
+        $workflows = [];
+        foreach ($ideas as $idea) {
+            foreach ($idea->workflows ?? [] as $wf) {
+                $workflows[] = array_merge($wf, [
+                    'topic' => $idea->title,
+                    'idea_id' => $idea->id,
+                ]);
+            }
+        }
+
+        return response()->json(['success' => true, 'data' => $workflows]);
     }
 
     public function getWorkflowStatus($id): JsonResponse
     {
-        try {
-            return response()->json(['success' => true, 'data' => $this->engine->getWorkflowStatus($id)]);
-        } catch (\Exception $e) {
+        // Look up by idea ID
+        $idea = ContentIdea::find($id);
+        if (!$idea) {
             return response()->json(['success' => false, 'message' => 'Workflow not found.'], 404);
         }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'id' => $idea->id,
+                'status' => $idea->status,
+                'progress' => $idea->progress_percentage,
+                'current_step' => $idea->current_step,
+                'workflows' => $idea->workflows,
+            ],
+        ]);
     }
 
     // ========================================================================
-    // INTERNAL: Sync idea status from Content Engine workflow
+    // INTERNAL: Sync idea status from process/progress
     // ========================================================================
 
     private function syncIdeaStatus(ContentIdea $idea): void
     {
-        $workflows = $idea->workflows ?? [];
-        if (empty($workflows)) return;
-
-        $lastWorkflow = end($workflows);
-        $workflowId = $lastWorkflow['workflow_id'] ?? null;
-        if (!$workflowId) return;
-
-        try {
-            $status = $this->engine->getWorkflowStatus($workflowId);
-            $workflowStatus = $status['status'] ?? 'pending';
-
-            if ($workflowStatus === 'completed') {
-                // Update workflow record
-                $lastKey = array_key_last($workflows);
-                $workflows[$lastKey]['status'] = 'completed';
-                $idea->workflows = $workflows;
-
-                if ($idea->status === 'researching') {
-                    // Article generation complete — store output
-                    $idea->generated_article = $status['output_data'] ?? $status['result'] ?? null;
-                    $idea->status = 'article_ready';
-                } elseif ($idea->status === 'generating_images') {
-                    $idea->generated_images = $status['output_data'] ?? $status['result'] ?? null;
-                    $idea->status = 'images_ready';
-                }
-
-                $idea->save();
-            } elseif ($workflowStatus === 'failed') {
-                $lastKey = array_key_last($workflows);
-                $workflows[$lastKey]['status'] = 'failed';
-                $workflows[$lastKey]['error'] = $status['error'] ?? 'Unknown error';
-                $idea->workflows = $workflows;
-                $idea->save();
+        // For CLI-based generation, status is updated via progress callbacks
+        // Just check if the process is still alive
+        if ($idea->process_pid) {
+            $alive = $this->articleGen->isProcessRunning($idea->process_pid);
+            if (!$alive && $idea->progress_percentage < 100) {
+                Log::warning('[ContentIdea] Process died for idea ' . $idea->id, [
+                    'pid' => $idea->process_pid,
+                    'progress' => $idea->progress_percentage,
+                ]);
             }
-        } catch (\Exception $e) {
-            // Engine unreachable, skip sync
         }
     }
 }

@@ -29,6 +29,10 @@ class ContentIdea extends Model
         'generated_images',
         'image_instructions',
         'image_references',
+        'progress_percentage',
+        'current_step',
+        'progress_log',
+        'process_pid',
     ];
 
     protected $casts = [
@@ -41,6 +45,7 @@ class ContentIdea extends Model
         'generated_article' => 'array',
         'generated_images' => 'array',
         'image_references' => 'array',
+        'progress_log' => 'array',
     ];
 
     /**

@@ -95,9 +95,10 @@ app/Models/
 **Services:**
 ```
 app/Services/
-├── ContentEngineService.php    # HTTP client to Content Engine (127.0.0.1:8100)
-├── ImageGenerationService.php  # GeminiGen image generation
-└── TrendingTopicService.php    # 4-source trend aggregation (Google Trends, TikTok, YouTube, Google News)
+├── ArticleGenerationService.php # SSH/local exec to trigger Claude CLI on VPS
+├── ContentEngineService.php     # Legacy HTTP client (kept for health check proxy)
+├── ImageGenerationService.php   # GeminiGen image generation
+└── TrendingTopicService.php     # 4-source trend aggregation (Google Trends, TikTok, YouTube, Google News)
 ```
 
 **Filament Admin (partial):**
@@ -297,10 +298,10 @@ DELETE /api/newsletter/unsubscribe
 /api/admin/content-engine/* (see Content Engine section below)
 ```
 
-### Admin Content Engine Routes (auth:sanctum, 17 endpoints)
+### Admin Content Engine Routes (auth:sanctum, 18 endpoints)
 ```
-GET    /api/admin/content-engine/health              # Content Engine health check proxy
-GET    /api/admin/content-engine/workflows            # List workflows
+GET    /api/admin/content-engine/health              # CLI system health check
+GET    /api/admin/content-engine/workflows            # List workflows from DB
 GET    /api/admin/content-engine/workflows/{id}       # Workflow status
 GET    /api/admin/content-engine/ideas                # List ideas (filter: pillar, status)
 POST   /api/admin/content-engine/ideas                # Create idea
@@ -311,8 +312,9 @@ POST   /api/admin/content-engine/ideas/{id}/restore   # Restore archived idea
 POST   /api/admin/content-engine/ideas/{id}/revert    # Revert to draft
 GET    /api/admin/content-engine/trending             # Pull trending topics
 POST   /api/admin/content-engine/trending/import      # Import trending as ideas
-POST   /api/admin/content-engine/ideas/{id}/research          # Gate 1: Start research/article generation
+POST   /api/admin/content-engine/ideas/{id}/research          # Gate 1: Start article generation (SSH → Claude CLI)
 GET    /api/admin/content-engine/ideas/{id}/research          # Get research status
+GET    /api/admin/content-engine/ideas/{id}/progress          # Real-time progress (percentage + log)
 POST   /api/admin/content-engine/ideas/{id}/approve-article   # Gate 1: Approve article text
 POST   /api/admin/content-engine/ideas/{id}/generate-images   # Gate 2: Start image generation
 POST   /api/admin/content-engine/ideas/{id}/publish           # Gate 2: Approve images & publish
@@ -355,15 +357,17 @@ draft → researching → article_ready → generating_images → images_ready �
 The `ContentIdeaController` orchestrates the full pipeline through the admin UI (`ContentEngine.vue`).
 
 **Key Components:**
-- `ContentIdea` model — tracks ideas through the pipeline with status, research_data, generated_article, generated_images
-- `ContentIdeaController` — 17 admin endpoints for full pipeline management
-- `ContentEngineService` — HTTP client to Content Engine FastAPI microservice at 127.0.0.1:8100
+- `ContentIdea` model — tracks ideas with status, progress_percentage, current_step, progress_log, generated_article, generated_images
+- `ContentIdeaController` — 18 admin endpoints for full pipeline management (incl. progress tracking)
+- `ArticleGenerationService` — SSH/local exec to trigger Claude Code CLI on VPS
+- `ContentEngineService` — Legacy HTTP client (kept for backward compatibility)
 - `TrendingTopicService` — aggregates trends from Google Trends, TikTok, YouTube, Google News
-- `useContentEngine.js` — Vue composable with 15+ API methods for the admin UI
+- `useContentEngine.js` — Vue composable with 16+ API methods (incl. getProgress)
 
-**Automation Endpoints (for external agents):**
+**Automation Endpoints (for CLI plugin callbacks):**
 - `GET /api/automation/content-ideas/pending` — get next idea in `researching` status
-- `PUT /api/automation/content-ideas/{id}/complete` — mark idea as `article_ready` with generated content
+- `PUT /api/automation/content-ideas/{id}/progress` — progress callback (step, percentage, message)
+- `PUT /api/automation/content-ideas/{id}/complete` — mark as `article_ready` with generated article
 
 ### Blog Pipeline (Legacy Endpoints)
 
@@ -390,6 +394,7 @@ php artisan tinker                     # Interactive console
 php artisan cache:clear && php artisan config:clear && php artisan route:clear
 php artisan test                       # Run tests
 php artisan projects:import-raw-data   # Bulk import 56 projects
+php artisan article:simulate {ideaId}  # Simulate article generation progress (local testing)
 ```
 
 ### Frontend (Vue)
@@ -584,33 +589,46 @@ Admin Panel (/admin/content-engine)
   Add ideas (manual or Pull Trending)
   Status: draft → researching → article_ready → generating_images → images_ready → completed
        │
-  Gate 1: Review article text → Approve
+  Gate 1: Configure (languages + instructions) → Start Research
   Gate 2: Configure image gen (instructions + reference uploads) → Approve
        │
   ┌────▼────────────────────────────────────────────────────────┐
+  │  Laravel Backend (ArticleGenerationService)                 │
+  │    SSH → VPS (production) or local exec (development)       │
+  │                                                            │
   │  VPS: Claude Code CLI + article-content-writer plugin       │
   │                                                            │
-  │  On-demand:  claude -p "/article-generate --idea 5"        │
-  │  Scheduled:  crontab */30 * * * * claude -p "/article-generate --auto" │
+  │  On-demand:                                                │
+  │    claude -p "/article-gen --idea-id 5 --api-url https://..."│
+  │  Scheduled:                                                │
+  │    crontab */30 * * * * claude -p "/article-gen --auto"     │
   │                                                            │
-  │  Plugin reads:                                             │
-  │    .claude/article-writer.md  ← brand config (per-project) │
-  │    references/                ← writing framework, hooks    │
+  │  Plugin pipeline mode (11 steps):                          │
+  │    Step 0-1: Input + Research (10%)                        │
+  │    Step 2-5: Framework + Arc + Hook + Outline (35%)        │
+  │    Step 6-7: Article Writing + Style Pass (80%)            │
+  │    Step 8-10: Images + Virality + Quality (95%)            │
+  │    Step 11: Complete (100%)                                │
   │                                                            │
-  │  Cron auto mode:                                           │
-  │    1. Check pending ideas → generate if found              │
-  │    2. No pending? → pull trending → auto-generate          │
+  │  Each step → callback:                                     │
+  │    PUT /api/automation/content-ideas/{id}/progress          │
+  │    { step, percentage, message }                           │
+  │                                                            │
+  │  On complete:                                              │
+  │    PUT /api/automation/content-ideas/{id}/complete          │
+  │    { generated_article: {title, content, scores, ...} }    │
   └──────────────┬─────────────────────────────────────────────┘
                  │
-  Save result → PUT /api/automation/content-ideas/{id}/complete
-  Or direct  → POST /api/automation/blog/save-draft
+  Frontend polls GET /ideas/{id}/progress every 3 seconds
+  Progress Modal: progress bar + step indicators + streaming log
 ```
 
 ### Admin UI: Content Engine Page (`ContentEngine.vue`)
 - **Spreadsheet-style idea management** with filters (pillar, status, priority, search)
 - **Pull Trending** — 5 sources (Google Trends, YouTube, TikTok, Google News, Instagram) with search + select all
 - **2-gate approval pipeline** — nothing auto-generates without user confirmation
-- **4 modals**: Trending Preview, Config (language + instructions), Article Preview, Image Config (with reference upload)
+- **5 modals**: Trending Preview, Config (language + instructions), **Progress Modal** (progress bar + step indicators + streaming log), Article Preview, Image Config (with reference upload)
+- **Real-time progress tracking** — clickable "View Progress" button on researching ideas, polls every 3 seconds
 
 ### Content Idea Status Flow
 ```
@@ -619,9 +637,10 @@ draft → researching → article_ready → generating_images → images_ready �
                       Gate 1: approve text              Gate 2: approve images
 ```
 
-### Automation Endpoints (for CLI agent)
+### Automation Endpoints (for CLI plugin callbacks)
 ```
 GET  /api/automation/content-ideas/pending       → Get next idea to generate
+PUT  /api/automation/content-ideas/{id}/progress  → Report step progress (percentage + message)
 PUT  /api/automation/content-ideas/{id}/complete  → Save generated article + update status
 POST /api/automation/blog/save-draft             → Direct blog post save (fallback)
 ```
@@ -629,9 +648,33 @@ POST /api/automation/blog/save-draft             → Direct blog post save (fall
 ### Plugin: article-content-writer
 ```
 Location: D:\Projects\claude-plugin\article-content-writer\
-Status:   Design complete, implementation pending
-Skills:   article-generate, article-research, article-validate
+Status:   Integrated with Portfolio backend (pipeline mode)
+Skills:   article-gen (11-step pipeline + API callbacks), article-brief, article-validate
 Config:   Per-project via .claude/article-writer.md (brand-agnostic)
+
+Pipeline mode flags:
+  --idea-id {id}      Content idea ID in Portfolio database
+  --api-url {url}     Base API URL for callbacks
+  --api-token {token} Bearer token for authentication
+  --topic "{topic}"   Article topic
+  --languages en,id   Output languages
+
+Pipeline mode behavior:
+  - Skip interactive confirmations (auto-proceed)
+  - Report progress at each step via PUT /automation/content-ideas/{id}/progress
+  - Send completed article via PUT /automation/content-ideas/{id}/complete
+  - Auto-select recommended framework, primary hook, etc.
+```
+
+### Article Generation Environment Variables
+```env
+ARTICLE_GEN_DRIVER=ssh              # 'ssh' (production) or 'local' (development)
+ARTICLE_GEN_SSH_HOST=your-vps-ip    # VPS IP address
+ARTICLE_GEN_SSH_USER=root           # SSH user
+ARTICLE_GEN_SSH_KEY=/path/to/key    # SSH private key path
+ARTICLE_GEN_CLAUDE_PATH=claude      # Path to claude CLI binary on VPS
+ARTICLE_GEN_API_URL=https://alisadikinma.com/api  # Callback URL for plugin
+ARTICLE_GEN_API_TOKEN=your-token    # Bearer token (from admin Automation Tokens)
 ```
 
 ### Service Worker (Media Caching)
@@ -639,7 +682,7 @@ Config:   Per-project via .claude/article-writer.md (brand-agnostic)
 
 ---
 
-**Last Updated:** April 12, 2026 (CLI-based content pipeline, updated architecture)
+**Last Updated:** April 13, 2026 (CLI + SSH article generation with real-time progress tracking)
 **Maintainer:** Ali Sadikin (ali.sadikincom85@gmail.com)
 **Environment:** Windows 11, D:\Projects\Portfolio_v2
 **PHP:** D:\xampp\php\php.exe (8.2.12) — use full path, not in system PATH

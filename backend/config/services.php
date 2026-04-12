@@ -44,4 +44,14 @@ return [
         'api_key' => env('CONTENT_ENGINE_API_KEY', ''),
     ],
 
+    'article_generation' => [
+        'driver' => env('ARTICLE_GEN_DRIVER', 'ssh'),
+        'ssh_host' => env('ARTICLE_GEN_SSH_HOST', ''),
+        'ssh_user' => env('ARTICLE_GEN_SSH_USER', 'root'),
+        'ssh_key' => env('ARTICLE_GEN_SSH_KEY', ''),
+        'claude_path' => env('ARTICLE_GEN_CLAUDE_PATH', 'claude'),
+        'api_url' => env('ARTICLE_GEN_API_URL', 'https://alisadikinma.com/api'),
+        'api_token' => env('ARTICLE_GEN_API_TOKEN', ''),
+    ],
+
 ];

@@ -320,7 +320,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
     Route::get('/blog/trending-topic', [\App\Http\Controllers\Api\BlogPipelineController::class, 'trendingTopic']);
     Route::post('/blog/save-draft', [\App\Http\Controllers\Api\BlogPipelineController::class, 'saveDraft']);
 
-    // Content Ideas Pipeline (for Claude Remote Trigger agent)
+    // Content Ideas Pipeline (for Claude CLI article-content-writer plugin)
     Route::get('/content-ideas/pending', function () {
         $idea = \App\Models\ContentIdea::where('status', 'researching')
             ->orderBy('updated_at', 'asc')
@@ -335,12 +335,51 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
             'data' => $idea,
         ]);
     });
+
+    // Progress callback — called by CLI plugin at each step
+    Route::put('/content-ideas/{id}/progress', function (\Illuminate\Http\Request $request, $id) {
+        $idea = \App\Models\ContentIdea::find($id);
+        if (!$idea) {
+            return response()->json(['success' => false, 'message' => 'Idea not found.'], 404);
+        }
+
+        $request->validate([
+            'step' => 'required|string|max:50',
+            'percentage' => 'required|integer|min:0|max:100',
+            'message' => 'required|string|max:500',
+        ]);
+
+        $logEntry = [
+            'timestamp' => now()->toISOString(),
+            'step' => $request->input('step'),
+            'percentage' => $request->input('percentage'),
+            'message' => $request->input('message'),
+        ];
+
+        $idea->update([
+            'progress_percentage' => $request->input('percentage'),
+            'current_step' => $request->input('step'),
+            'progress_log' => array_merge($idea->progress_log ?? [], [$logEntry]),
+        ]);
+
+        return response()->json(['success' => true, 'data' => $logEntry]);
+    });
+
+    // Completion callback — called by CLI plugin when article is done
     Route::put('/content-ideas/{id}/complete', function (\Illuminate\Http\Request $request, $id) {
         $idea = \App\Models\ContentIdea::findOrFail($id);
         $idea->update([
             'status' => 'article_ready',
             'generated_article' => $request->input('generated_article'),
             'research_data' => $request->input('research_data'),
+            'progress_percentage' => 100,
+            'current_step' => 'completed',
+            'progress_log' => array_merge($idea->progress_log ?? [], [[
+                'timestamp' => now()->toISOString(),
+                'step' => 'completed',
+                'percentage' => 100,
+                'message' => 'Article generation completed successfully',
+            ]]),
         ]);
 
         return response()->json(['success' => true, 'data' => $idea->fresh()]);
@@ -398,6 +437,7 @@ Route::middleware(['auth:sanctum'])->prefix('admin/content-engine')->group(funct
     // Pipeline: Gate 1 (Article)
     Route::post('/ideas/{id}/research', [ContentIdeaController::class, 'startResearch']);
     Route::get('/ideas/{id}/research', [ContentIdeaController::class, 'getResearch']);
+    Route::get('/ideas/{id}/progress', [ContentIdeaController::class, 'getProgress']);
     Route::post('/ideas/{id}/approve-article', [ContentIdeaController::class, 'approveArticle']);
 
     // Pipeline: Gate 2 (Images)

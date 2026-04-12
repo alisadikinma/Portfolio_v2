@@ -131,17 +131,17 @@
                   <button v-if="idea.status === 'draft'" @click="openConfigModal(idea)" class="px-2.5 py-1 text-xs font-medium rounded bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50 transition-colors">
                     Next &rarr;
                   </button>
-                  <span v-else-if="idea.status === 'researching'" class="inline-flex items-center gap-1 px-2.5 py-1 text-xs text-blue-600 dark:text-blue-400">
+                  <button v-else-if="idea.status === 'researching'" @click="openProgressModal(idea)" class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 transition-colors">
                     <svg class="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                    Researching...
-                  </span>
+                    {{ idea.progress_percentage || 0 }}% — View Progress
+                  </button>
                   <button v-else-if="idea.status === 'article_ready'" @click="openResearchModal(idea)" class="px-2.5 py-1 text-xs font-medium rounded bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:hover:bg-purple-900/50 transition-colors">
                     Preview Article
                   </button>
-                  <span v-else-if="idea.status === 'generating_images'" class="inline-flex items-center gap-1 px-2.5 py-1 text-xs text-yellow-600 dark:text-yellow-400">
+                  <button v-else-if="idea.status === 'generating_images'" @click="openProgressModal(idea)" class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded bg-yellow-100 text-yellow-700 hover:bg-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:hover:bg-yellow-900/50 transition-colors">
                     <svg class="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                    Generating images...
-                  </span>
+                    {{ idea.progress_percentage || 0 }}% — View Progress
+                  </button>
                   <button v-else-if="idea.status === 'images_ready'" @click="openImagesPreview(idea)" class="px-2.5 py-1 text-xs font-medium rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 transition-colors">
                     Preview Images
                   </button>
@@ -311,6 +311,84 @@
       </div>
     </div>
 
+    <!-- Progress Modal -->
+    <div v-if="showProgressModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="closeProgressModal">
+      <div class="bg-white dark:bg-neutral-800 rounded-xl shadow-xl max-w-2xl w-full mx-4 p-6 max-h-[80vh] flex flex-col">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 class="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Article Generation Progress</h3>
+            <p class="text-sm text-neutral-500 dark:text-neutral-400 mt-0.5">{{ progressIdea?.title }}</p>
+          </div>
+          <button @click="closeProgressModal" class="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="mb-4">
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="text-sm font-medium text-neutral-700 dark:text-neutral-300">{{ formatStepName(progressData.current_step) }}</span>
+            <span class="text-sm font-mono text-amber-600 dark:text-amber-400">{{ progressData.progress_percentage }}%</span>
+          </div>
+          <div class="w-full bg-neutral-200 dark:bg-neutral-700 rounded-full h-3 overflow-hidden">
+            <div
+              class="h-full rounded-full transition-all duration-700 ease-out"
+              :class="progressData.current_step === 'failed' ? 'bg-red-500' : 'bg-gradient-to-r from-amber-500 to-amber-400'"
+              :style="{ width: progressData.progress_percentage + '%' }"
+            ></div>
+          </div>
+        </div>
+
+        <!-- Step Indicators -->
+        <div class="flex flex-wrap gap-1.5 mb-4">
+          <span
+            v-for="step in progressSteps"
+            :key="step.name"
+            class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors"
+            :class="stepIndicatorClass(step)"
+          >
+            <svg v-if="stepIsDone(step)" class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+            <svg v-else-if="stepIsCurrent(step)" class="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+            {{ step.label }}
+          </span>
+        </div>
+
+        <!-- Log Viewer -->
+        <div class="flex-1 min-h-0 bg-neutral-950 rounded-lg overflow-hidden">
+          <div class="px-3 py-2 bg-neutral-900 border-b border-neutral-800 flex items-center justify-between">
+            <span class="text-xs font-mono text-neutral-400">Generation Log</span>
+            <span class="text-[10px] font-mono text-neutral-500">{{ (progressData.progress_log || []).length }} entries</span>
+          </div>
+          <div ref="logContainer" class="overflow-y-auto max-h-[300px] p-3 space-y-1 font-mono text-xs">
+            <div v-if="!(progressData.progress_log || []).length" class="text-neutral-500 py-4 text-center">Waiting for log entries...</div>
+            <div
+              v-for="(entry, i) in (progressData.progress_log || [])"
+              :key="i"
+              class="flex gap-2"
+              :class="entry.step === 'failed' ? 'text-red-400' : 'text-neutral-300'"
+            >
+              <span class="text-neutral-600 shrink-0">{{ formatLogTime(entry.timestamp) }}</span>
+              <span :class="entry.step === 'failed' ? 'text-red-400' : entry.step === 'completed' ? 'text-green-400' : 'text-amber-400'" class="shrink-0">[{{ entry.step }}]</span>
+              <span class="text-neutral-300">{{ entry.message }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Status Footer -->
+        <div class="flex items-center justify-between mt-4 pt-3 border-t border-neutral-200 dark:border-neutral-700">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full" :class="progressData.process_alive !== false ? 'bg-green-500 animate-pulse' : 'bg-red-500'"></span>
+            <span class="text-xs text-neutral-500 dark:text-neutral-400">
+              {{ progressData.process_alive !== false ? 'Process running' : 'Process stopped' }}
+            </span>
+          </div>
+          <button @click="closeProgressModal" class="px-4 py-2 text-sm font-medium rounded-lg border border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Article Preview Modal -->
     <div v-if="showResearchModal && currentIdea?.status === 'article_ready'" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="showResearchModal = false">
       <div class="bg-white dark:bg-neutral-800 rounded-xl shadow-xl max-w-4xl w-full mx-4 p-6 max-h-[85vh] flex flex-col">
@@ -431,6 +509,7 @@ const {
   importTrending,
   startResearch,
   getResearch,
+  getProgress,
   approveArticle,
   startImageGeneration,
   approveAndPublish,
@@ -516,6 +595,33 @@ const imageRefInput = ref(null)
 
 // Images preview modal
 const showImagesPreviewModal = ref(false)
+
+// Progress modal
+const showProgressModal = ref(false)
+const progressIdea = ref(null)
+const progressData = ref({
+  progress_percentage: 0,
+  current_step: 'initializing',
+  progress_log: [],
+  process_alive: true,
+})
+let progressPollInterval = null
+const logContainer = ref(null)
+
+const progressSteps = [
+  { name: 'input_collection', label: 'Input', pct: 5 },
+  { name: 'topic_research', label: 'Research', pct: 10 },
+  { name: 'framework_selection', label: 'Framework', pct: 15 },
+  { name: 'emotional_arc', label: 'Arc', pct: 20 },
+  { name: 'hook_generation', label: 'Hook', pct: 25 },
+  { name: 'outline_generation', label: 'Outline', pct: 35 },
+  { name: 'article_writing', label: 'Writing', pct: 70 },
+  { name: 'style_pass', label: 'Style', pct: 80 },
+  { name: 'image_prompts', label: 'Images', pct: 85 },
+  { name: 'virality_score', label: 'Virality', pct: 90 },
+  { name: 'quality_gate', label: 'Quality', pct: 95 },
+  { name: 'completed', label: 'Done', pct: 100 },
+]
 
 // Research preview
 const researchData = ref(null)
@@ -704,9 +810,14 @@ async function handleStartResearch() {
     instructions: configInstructions.value || undefined,
   })
   if (result.success) {
-    toast.success('Research started')
+    toast.success('Article generation started via CLI')
     showConfigModal.value = false
     await refreshIdeas()
+    // Auto-open progress modal
+    const updatedIdea = ideas.value.find(i => i.id === currentIdea.value.id)
+    if (updatedIdea) {
+      openProgressModal(updatedIdea)
+    }
   } else {
     toast.error(result.error || 'Failed to start research')
   }
@@ -811,6 +922,99 @@ async function handleApproveAndPublish() {
   }
 }
 
+// Progress modal
+function formatStepName(step) {
+  if (!step) return 'Initializing...'
+  const map = {
+    initializing: 'Initializing...',
+    input_collection: 'Collecting input...',
+    topic_research: 'Researching topic...',
+    framework_selection: 'Selecting framework...',
+    emotional_arc: 'Mapping emotional arc...',
+    hook_generation: 'Generating hooks...',
+    outline_generation: 'Creating outline...',
+    article_writing: 'Writing article...',
+    style_pass: 'Editing style...',
+    image_prompts: 'Generating image prompts...',
+    virality_score: 'Scoring virality...',
+    quality_gate: 'Quality gate check...',
+    completed: 'Completed!',
+    failed: 'Failed',
+  }
+  return map[step] || step.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
+
+function formatLogTime(timestamp) {
+  if (!timestamp) return '--:--:--'
+  return new Date(timestamp).toLocaleTimeString('en-US', { hour12: false })
+}
+
+function stepIsDone(step) {
+  return progressData.value.progress_percentage > step.pct
+}
+
+function stepIsCurrent(step) {
+  return progressData.value.current_step === step.name
+}
+
+function stepIndicatorClass(step) {
+  if (stepIsDone(step)) return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+  if (stepIsCurrent(step)) return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 ring-1 ring-amber-400'
+  return 'bg-neutral-100 text-neutral-400 dark:bg-neutral-700 dark:text-neutral-500'
+}
+
+function openProgressModal(idea) {
+  progressIdea.value = idea
+  progressData.value = {
+    progress_percentage: idea.progress_percentage || 0,
+    current_step: idea.current_step || 'initializing',
+    progress_log: idea.progress_log || [],
+    process_alive: true,
+  }
+  showProgressModal.value = true
+  startProgressPolling(idea.id)
+}
+
+function closeProgressModal() {
+  showProgressModal.value = false
+  stopProgressPolling()
+}
+
+function startProgressPolling(ideaId) {
+  stopProgressPolling()
+  pollProgress(ideaId)
+  progressPollInterval = setInterval(() => pollProgress(ideaId), 3000)
+}
+
+function stopProgressPolling() {
+  if (progressPollInterval) {
+    clearInterval(progressPollInterval)
+    progressPollInterval = null
+  }
+}
+
+async function pollProgress(ideaId) {
+  const result = await getProgress(ideaId)
+  if (result.success && result.data) {
+    progressData.value = result.data
+    // Auto-scroll log to bottom
+    if (logContainer.value) {
+      setTimeout(() => {
+        logContainer.value.scrollTop = logContainer.value.scrollHeight
+      }, 50)
+    }
+    // Auto-close and refresh when completed
+    if (result.data.status === 'article_ready' || result.data.current_step === 'completed') {
+      stopProgressPolling()
+      await refreshIdeas()
+    }
+    // Stop polling if process died or failed
+    if (result.data.process_alive === false || result.data.current_step === 'failed') {
+      stopProgressPolling()
+    }
+  }
+}
+
 // View drafts -> navigate to posts
 function viewDrafts(idea) {
   router.push({ path: '/admin/posts', query: { search: idea.title } })
@@ -825,5 +1029,6 @@ onMounted(async () => {
 onUnmounted(() => {
   if (pollInterval) clearInterval(pollInterval)
   if (searchTimeout) clearTimeout(searchTimeout)
+  stopProgressPolling()
 })
 </script>

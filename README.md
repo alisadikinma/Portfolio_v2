@@ -22,7 +22,7 @@ Modern, scalable full-stack portfolio and CMS featuring RESTful API architecture
 | **API Endpoints** | 140+ documented endpoints |
 | **Performance** | <500ms cached loads (83% improvement) |
 | **Security Score** | 95/100 |
-| **Last Updated** | April 12, 2026 |
+| **Last Updated** | April 13, 2026 |
 
 ---
 
@@ -52,8 +52,9 @@ Modern, scalable full-stack portfolio and CMS featuring RESTful API architecture
 ├─────────────────────────────────────────────────────────┤
 │              AI CONTENT PIPELINE                        │
 │  Claude Code CLI + article-content-writer plugin       │
-│  Article Pipeline: Ideas → Research → Images → Publish │
-│  On-demand + Scheduled (cron) via CLI                  │
+│  Trigger: Laravel SSH → VPS → claude -p "/article-gen" │
+│  Progress: 11-step callbacks → real-time admin modal   │
+│  Pipeline: Ideas → Research → Article → Images → Pub   │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -123,7 +124,7 @@ php artisan tinker
 
 ## Project Structure
 
-### Backend (25 Controllers, 21 Models, 3 Services)
+### Backend (25 Controllers, 21 Models, 4 Services)
 
 ```
 backend/
@@ -156,7 +157,8 @@ backend/
 │   │   ├── TestimonialController.php
 │   │   └── TokenController.php           # API token management
 │   ├── Services/
-│   │   ├── ContentEngineService.php      # Content Engine health check + workflow proxy
+│   │   ├── ArticleGenerationService.php  # SSH/local exec → Claude CLI on VPS
+│   │   ├── ContentEngineService.php      # Legacy health check proxy
 │   │   ├── ImageGenerationService.php    # GeminiGen integration
 │   │   └── TrendingTopicService.php      # Trend aggregation
 │   ├── Filament/                         # Filament 4.1 admin panels
@@ -240,7 +242,7 @@ Menu Items:   CRUD /api/admin/menu-items (+reorder)
 Page Sections:/api/admin/page-sections (list, update, reorder)
 Automation:   /api/admin/automation/tokens, /api/admin/automation/logs
 Carousels:    /api/admin/carousel-drafts (list, show, approve, reject, schedule)
-Content Eng:  /api/admin/content-engine/* (17 endpoints: ideas CRUD, trending, pipeline gates)
+Content Eng:  /api/admin/content-engine/* (18 endpoints: ideas CRUD, trending, pipeline gates, progress)
 ```
 
 ### Automation API (n8n/Zapier/Make.com)
@@ -251,7 +253,7 @@ Images:       POST /api/automation/upload-image(s)
 Webhook:      POST /api/automation/webhook/published
 Duplicate:    POST /api/automation/posts/check-duplicate (public)
 Blog:         GET /api/automation/blog/trending-topic, POST /save-draft, POST /image-webhook
-Content:      GET /api/automation/content-ideas/pending, PUT /{id}/complete
+Content:      GET /api/automation/content-ideas/pending, PUT /{id}/progress, PUT /{id}/complete
 Carousels:    GET /api/automation/carousel/accounts, /drafts
 ```
 
@@ -298,9 +300,12 @@ Carousels:    GET /api/automation/carousel/accounts, /drafts
 - 2-gate approval system (article text review, then image review)
 - Trending topic aggregation from 5 sources (Google Trends, TikTok, YouTube, Google News, Instagram)
 - Spreadsheet-style admin UI for idea management
-- **Claude Code CLI + article-content-writer plugin** (NOT HTTP microservice)
-- On-demand (`claude -p "/article-generate --idea 5"`) + scheduled (cron every 30 min)
-- Plugin is brand-agnostic: reads `.claude/article-writer.md` per project
+- **Claude Code CLI + article-content-writer plugin** triggered via SSH to VPS
+- `ArticleGenerationService` handles SSH/local exec with configurable driver
+- **Real-time progress tracking**: 11-step progress callbacks, progress modal with bar + step indicators + streaming log
+- On-demand (`claude -p "/article-gen --idea-id 5 --api-url ..."`) + scheduled (cron every 30 min)
+- Plugin pipeline mode: auto-proceed through all steps, report progress via API callbacks
+- Local testing via `php artisan article:simulate {ideaId}`
 
 ### Performance
 - TanStack Query caching (5-60min stale times per resource)
@@ -335,6 +340,7 @@ php artisan tinker                     # Console
 php artisan cache:clear && php artisan config:clear && php artisan route:clear
 php artisan test                       # Run tests
 php artisan projects:import-raw-data   # Bulk import 56 projects
+php artisan article:simulate {id}     # Simulate article generation (local testing)
 
 # Frontend
 cd D:\Projects\Portfolio_v2\frontend
@@ -401,7 +407,7 @@ Production runs on VPS with Nginx + SSL (Let's Encrypt) at alisadikinma.com.
 |----------|-------|
 | Backend Controllers | 25 |
 | Backend Models | 21 |
-| Backend Services | 3 |
+| Backend Services | 4 |
 | API Endpoints | 140+ |
 | Database Tables | 30+ |
 | Database Migrations | 48 |
@@ -432,4 +438,4 @@ Contact: ali.sadikincom85@gmail.com | Location: Batam, Indonesia
 
 ---
 
-**Last Updated:** April 12, 2026 | **Version:** 2.1.0 | **Status:** Production Ready
+**Last Updated:** April 13, 2026 | **Version:** 2.2.0 | **Status:** Production Ready
