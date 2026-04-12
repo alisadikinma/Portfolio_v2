@@ -35,20 +35,26 @@ phpMyAdmin:    http://localhost/phpmyadmin
 
 ### Backend Architecture (Laravel 12)
 
-**Controller Map (18 controllers):**
+**Controller Map (25 controllers):**
 ```
 app/Http/Controllers/Api/
 ├── Admin/
+│   ├── ContentIdeaController.php  # Content Engine idea pipeline (17 routes)
 │   └── DashboardController.php    # Admin dashboard stats
+├── ActivityFeedController.php     # Public activity feed
 ├── AuthController.php             # Login, register, logout, me
 ├── AutomationController.php       # n8n/Zapier automation API
 ├── AwardController.php            # Awards CRUD + gallery linking
+├── BlogPipelineController.php     # Blog pipeline: trending, save-draft, image webhook
+├── CarouselDraftController.php    # Carousel draft save/approve/reject/schedule
 ├── CategoryController.php         # Blog categories CRUD
+├── ChatbotController.php          # AI chatbot endpoint
 ├── ContactController.php          # Contact form + CSV export
 ├── GalleryController.php          # Gallery CRUD + bulk upload
 ├── GalleryItemController.php      # Gallery items CRUD + bulk upload
 ├── GeoController.php              # GEO: llms.txt & llms-full.txt endpoints
 ├── MenuItemController.php         # Dynamic navbar menu items
+├── NewsletterController.php       # Newsletter subscribe/unsubscribe
 ├── PageSectionController.php      # Dynamic page sections (homepage)
 ├── PostController.php             # Blog posts CRUD + check-duplicate
 ├── ProjectController.php          # Projects CRUD + import
@@ -60,14 +66,18 @@ app/Http/Controllers/Api/
 └── TokenController.php            # Automation API token management
 ```
 
-**Model Map (16 models):**
+**Model Map (21 models):**
 ```
 app/Models/
 ├── Award.php              # HasSeoFields trait
+├── CarouselDraft.php      # Carousel draft from Content Engine
+├── CarouselSlide.php      # Individual carousel slide
 ├── Category.php           # HasSeoFields, HasSlug
 ├── Contact.php
+├── ContentIdea.php        # Content Engine idea pipeline
 ├── Gallery.php            # award_id relationship
 ├── GalleryItem.php        # Belongs to Gallery
+├── ImageGenerationJob.php # GeminiGen image job tracking
 ├── MenuItem.php           # Dynamic navbar
 ├── Newsletter.php
 ├── PageSection.php        # Dynamic homepage sections
@@ -77,8 +87,17 @@ app/Models/
 ├── ProjectTranslation.php # i18n for projects
 ├── Service.php            # HasSlug
 ├── Setting.php            # Key-value pairs
+├── SocialAccount.php      # Social media account for carousel publishing
 ├── Testimonial.php
 └── User.php
+```
+
+**Services:**
+```
+app/Services/
+├── ContentEngineService.php    # HTTP client to Content Engine (127.0.0.1:8100)
+├── ImageGenerationService.php  # GeminiGen image generation
+└── TrendingTopicService.php    # 4-source trend aggregation (Google Trends, TikTok, YouTube, Google News)
 ```
 
 **Filament Admin (partial):**
@@ -104,11 +123,12 @@ return response()->json(['success' => false, 'error' => ['code' => '...', 'messa
 
 ### Frontend Architecture (Vue 3)
 
-**Views (13 public + 22 admin + 1 auth):**
+**Views (13 public + 25 admin + 1 auth = 39 total):**
 ```
 src/views/
 ├── Home.vue              # Hero, stats, projects, blog, testimonials, CTA
 ├── About.vue             # Skills, experience, education, social
+├── Work.vue              # Work/portfolio page
 ├── Projects.vue          # Grid with filters, pagination
 ├── ProjectDetail.vue     # Full project case study
 ├── Awards.vue            # Awards cards with gallery modal
@@ -133,42 +153,55 @@ src/views/
     ├── PageSectionsManager.vue    # Homepage section editor
     ├── AutomationTokens.vue       # API token management
     ├── AutomationLogs.vue         # Automation activity logs
-    └── AutomationDocs.vue         # API documentation page
+    ├── AutomationDocs.vue         # API documentation page
+    ├── CarouselDraftsList.vue     # Carousel drafts management
+    ├── CarouselDraftDetail.vue    # Carousel draft review/approve
+    └── ContentEngine.vue          # Content idea pipeline (spreadsheet UI, 4 modals)
 ```
 
-**Stores (14 Pinia stores):**
+**Stores (15 Pinia stores):**
 ```
 src/stores/
 ├── auth.js / auth-fixed.js  # Authentication & token management
 ├── automation.js             # Automation API state
 ├── awards.js / categories.js / contacts.js / galleries.js
+├── carouselDrafts.js         # Carousel draft state
 ├── posts.js / projects.js / settings.js / testimonials.js
 ├── theme.js                  # Light/dark theme
 ├── ui.js                     # Loading states, modals, toasts
 └── index.js                  # Store exports
 ```
 
-**Composables (20 composables):**
+**Composables (29 composables):**
 ```
 src/composables/
 ├── useAboutSettings.js    # About page data + prefetch
+├── useActivityFeed.js     # Activity feed data
 ├── useApi.js              # Base API wrapper
 ├── useAuth.js             # Auth composable
 ├── useAutomation.js       # Automation API
 ├── useAwards.js           # TanStack Query cached
+├── useCarouselDrafts.js   # Carousel draft management
 ├── useCategories.js
+├── useChatbot.js          # AI chatbot interaction
 ├── useContact.js
+├── useContentEngine.js    # Content Engine pipeline (15+ API methods)
+├── useCursorSparks.js     # Cursor spark effects
 ├── useGallery.js          # TanStack Query cached
+├── useGlobe.js            # 3D globe visualization
 ├── useLocalCache.js       # Local storage caching
 ├── useMenuItems.js        # Dynamic menu
 ├── useMetaTags.js         # Dynamic SEO meta from CMS
 ├── useModal.js
+├── useNewsletter.js       # Newsletter subscribe/unsubscribe
 ├── usePageSections.js     # Dynamic page sections
 ├── usePosts.js            # TanStack Query cached
 ├── useProjects.js         # TanStack Query cached
+├── useScrollReveal.js     # Scroll-triggered reveal animations
 ├── useSettings.js / useSiteSettings.js
 ├── useTestimonials.js     # TanStack Query cached
 ├── useToast.js
+├── useVideoReveal.js      # Video reveal animations
 └── index.js
 ```
 
@@ -192,9 +225,9 @@ src/components/
 └── TheFooter.vue
 ```
 
-## Database Schema (42 migrations, 25+ tables)
+## Database Schema (48 migrations, 30+ tables)
 
-Key tables: users, posts, post_translations, blog_categories, projects, project_translations, awards, award_gallery_pivot, galleries, gallery_items, services, testimonials, contacts, newsletters, settings, menu_items, page_sections, automation_logs, personal_access_tokens, cache, jobs
+Key tables: users, posts, post_translations, blog_categories, projects, project_translations, awards, award_gallery_pivot, galleries, gallery_items, services, testimonials, contacts, newsletters, settings, menu_items, page_sections, automation_logs, personal_access_tokens, cache, jobs, image_generation_jobs, carousel_drafts, carousel_slides, social_accounts, content_ideas
 
 Recent migrations (post-initial):
 - `menu_items` & `page_sections` - Dynamic content management
@@ -203,6 +236,11 @@ Recent migrations (post-initial):
 - `whatsapp_number` on contacts
 - `post_translations` / `project_translations` - i18n support
 - `schema_fields` on translations - SEO extensions
+- `image_generation_jobs` - GeminiGen job tracking
+- `carousel_drafts` & `carousel_slides` - Content Engine carousel output
+- `social_accounts` - Social media publishing accounts
+- `content_ideas` - Content idea pipeline with status flow
+- `update_content_ideas_article_pipeline` - Article pipeline fields (generated_article, generated_images, image_instructions)
 
 ## Critical Schema Notes
 
@@ -214,7 +252,7 @@ for title/content, never `Post` directly.
 **Spatie HasSlug:** Post model uses `doNotGenerateSlugsOnUpdate()` —
 slug is pre-set by controllers since there's no `title` column to generate from.
 
-## API Routes (120+ endpoints)
+## API Routes (140+ endpoints)
 
 ### Public Routes
 ```
@@ -231,7 +269,11 @@ GET    /api/menu-items, /api/page-sections
 GET    /api/sitemap.xml, /api/sitemap-index.xml, /api/sitemap-posts.xml, /api/sitemap-projects.xml
 GET    /api/llms.txt, /api/llms-full.txt
 GET    /api/health
+GET    /api/activity-feed
 POST   /api/contact (throttle: 3/15min)
+POST   /api/chatbot/ask (throttle: 10/min)
+POST   /api/newsletter/subscribe (throttle: 5/60min)
+DELETE /api/newsletter/unsubscribe
 ```
 
 ### Admin Routes (auth:sanctum)
@@ -251,11 +293,36 @@ POST   /api/contact (throttle: 3/15min)
 /api/admin/menu-items (CRUD + reorder)
 /api/admin/page-sections (list, reorder, update)
 /api/admin/automation/tokens (CRUD) + /api/admin/automation/logs (list, clear)
+/api/admin/carousel-drafts (list, show, approve, reject, schedule, slide status)
+/api/admin/content-engine/* (see Content Engine section below)
+```
+
+### Admin Content Engine Routes (auth:sanctum, 17 endpoints)
+```
+GET    /api/admin/content-engine/health              # Content Engine health check proxy
+GET    /api/admin/content-engine/workflows            # List workflows
+GET    /api/admin/content-engine/workflows/{id}       # Workflow status
+GET    /api/admin/content-engine/ideas                # List ideas (filter: pillar, status)
+POST   /api/admin/content-engine/ideas                # Create idea
+PUT    /api/admin/content-engine/ideas/{id}           # Update idea
+DELETE /api/admin/content-engine/ideas/{id}           # Delete idea
+POST   /api/admin/content-engine/ideas/{id}/archive   # Archive idea
+POST   /api/admin/content-engine/ideas/{id}/restore   # Restore archived idea
+POST   /api/admin/content-engine/ideas/{id}/revert    # Revert to draft
+GET    /api/admin/content-engine/trending             # Pull trending topics
+POST   /api/admin/content-engine/trending/import      # Import trending as ideas
+POST   /api/admin/content-engine/ideas/{id}/research          # Gate 1: Start research/article generation
+GET    /api/admin/content-engine/ideas/{id}/research          # Get research status
+POST   /api/admin/content-engine/ideas/{id}/approve-article   # Gate 1: Approve article text
+POST   /api/admin/content-engine/ideas/{id}/generate-images   # Gate 2: Start image generation
+POST   /api/admin/content-engine/ideas/{id}/publish           # Gate 2: Approve images & publish
 ```
 
 ### Automation Routes
 ```
 POST   /api/automation/posts/check-duplicate (public)
+POST   /api/automation/blog/image-webhook (public, GeminiGen callback)
+POST   /api/automation/carousel/save-draft (public, Content Engine callback)
 GET    /api/automation/posts (auth + throttle:60/min)
 POST   /api/automation/posts, /api/automation/posts/bulk
 PUT    /api/automation/posts/{id}
@@ -263,16 +330,45 @@ DELETE /api/automation/posts/{id}
 GET    /api/automation/categories
 POST   /api/automation/upload-image, /api/automation/upload-images
 POST   /api/automation/webhook/published
+GET    /api/automation/blog/trending-topic
+POST   /api/automation/blog/save-draft
+GET    /api/automation/blog/image-status/{postId}
+GET    /api/automation/content-ideas/pending
+PUT    /api/automation/content-ideas/{id}/complete
+GET    /api/automation/carousel/accounts, /drafts, /drafts/{id}
 ```
 
-## Blog Pipeline Architecture
+## Blog & Content Pipeline Architecture
 
-**2-Agent System (planned):**
-- Research Agent (3x/day) → discovers topics from HN, Reddit, GitHub, WebSearch
-- Writer Agent (hourly) → picks best topic from queue, writes article EN+ID
+### Content Idea Pipeline (Active)
 
-**Current Endpoints:**
-- `GET /api/automation/blog/trending-topic` — 4-source trend aggregation (Google Trends, TikTok, YouTube, Google News)
+**Status Flow:**
+```
+draft → researching → article_ready → generating_images → images_ready → completed → archived
+```
+
+**2-Gate Approval System:**
+- **Gate 1 (Article):** Idea → Start Research → Review Generated Article → Approve Article Text
+- **Gate 2 (Images):** Generate Images → Review Images → Approve & Publish to Blog
+
+**CLI-Based Triggering:** Content generation triggered via Claude Code CLI (not RemoteTrigger).
+The `ContentIdeaController` orchestrates the full pipeline through the admin UI (`ContentEngine.vue`).
+
+**Key Components:**
+- `ContentIdea` model — tracks ideas through the pipeline with status, research_data, generated_article, generated_images
+- `ContentIdeaController` — 17 admin endpoints for full pipeline management
+- `ContentEngineService` — HTTP client to Content Engine FastAPI microservice at 127.0.0.1:8100
+- `TrendingTopicService` — aggregates trends from Google Trends, TikTok, YouTube, Google News
+- `useContentEngine.js` — Vue composable with 15+ API methods for the admin UI
+
+**Automation Endpoints (for external agents):**
+- `GET /api/automation/content-ideas/pending` — get next idea in `researching` status
+- `PUT /api/automation/content-ideas/{id}/complete` — mark idea as `article_ready` with generated content
+
+### Blog Pipeline (Legacy Endpoints)
+
+**Endpoints:**
+- `GET /api/automation/blog/trending-topic` — 4-source trend aggregation
 - `POST /api/automation/blog/save-draft` — saves article + queues image generation
 - `POST /api/automation/blog/image-webhook` — GeminiGen callback (public, no auth)
 - `GET /api/automation/blog/image-status/{postId}` — poll image job status
@@ -476,85 +572,74 @@ Effects:
 - vue-i18n 10 (multi-language)
 - anthropic/sdk PHP (chatbot backend)
 
-## Content Engine Integration
+## Content Pipeline (CLI-Based)
 
-Portfolio_v2 communicates with the **Content Engine Agents** system — an 8-agent AI content generation microservice at `D:\Projects\claude-plugin\content-engine-agents`.
+Article content generation uses **Claude Code CLI + plugins** on VPS, NOT HTTP microservice calls.
+Carousel/video content handled by Sparkfluence platform (separate project).
 
-### Architecture (Same VPS)
+### Architecture
 ```
-Portfolio_v2 (Laravel)              Content Engine (FastAPI, Python)
-https://alisadikinma.com            http://127.0.0.1:8100
-/var/www/Portfolio_v2/              /var/www/content-engine-agents/
-
-  POST /workflows ──────────────► Create workflow (carousel/blog/video)
-  GET  /workflows/{id} ─────────► Poll workflow status
-                                    │
-  ◄──── POST /api/automation/       │ Content Engine saves result
-        carousel/save-draft         │ back to Portfolio_v2
-                                    │
-  POST /social/post ─────────────► Publish to Instagram/TikTok
-```
-
-### How Portfolio_v2 Triggers Content Generation
-```php
-// From Laravel controller or admin action:
-$response = Http::withHeaders([
-    'x-api-key' => config('services.content_engine.api_key'),
-])->post('http://127.0.0.1:8100/workflows', [
-    'workflow_type' => 'carousel_rebrand',  // or: blog_article, video_social, video_promo
-    'input_data' => [
-        'topic' => 'AI Automation for Startups',
-        'language' => 'en',
-    ],
-]);
-
-$workflowId = $response->json('workflow_id');
-```
-
-### Available Workflow Types
-| Type | What It Does | Output |
-|------|-------------|--------|
-| `carousel_rebrand` | Research → Script → Image Gen | 5-slide carousel draft |
-| `blog_article` | Research → Write → Image Gen | SEO blog post (EN+ID) |
-| `video_social` | Research → Script → VEO 3.1 | 15-30s video (9:16) |
-| `video_promo` | Research → Script → Seedance 2.0 | 60-120s video (16:9) |
-
-### Environment Variables (Laravel .env)
-```env
-CONTENT_ENGINE_URL=http://127.0.0.1:8100
-CONTENT_ENGINE_API_KEY=your-strong-key
+Admin Panel (/admin/content-engine)
+       │
+  Add ideas (manual or Pull Trending)
+  Status: draft → researching → article_ready → generating_images → images_ready → completed
+       │
+  Gate 1: Review article text → Approve
+  Gate 2: Configure image gen (instructions + reference uploads) → Approve
+       │
+  ┌────▼────────────────────────────────────────────────────────┐
+  │  VPS: Claude Code CLI + article-content-writer plugin       │
+  │                                                            │
+  │  On-demand:  claude -p "/article-generate --idea 5"        │
+  │  Scheduled:  crontab */30 * * * * claude -p "/article-generate --auto" │
+  │                                                            │
+  │  Plugin reads:                                             │
+  │    .claude/article-writer.md  ← brand config (per-project) │
+  │    references/                ← writing framework, hooks    │
+  │                                                            │
+  │  Cron auto mode:                                           │
+  │    1. Check pending ideas → generate if found              │
+  │    2. No pending? → pull trending → auto-generate          │
+  └──────────────┬─────────────────────────────────────────────┘
+                 │
+  Save result → PUT /api/automation/content-ideas/{id}/complete
+  Or direct  → POST /api/automation/blog/save-draft
 ```
 
-### Content Engine Endpoints (from Portfolio_v2 perspective)
+### Admin UI: Content Engine Page (`ContentEngine.vue`)
+- **Spreadsheet-style idea management** with filters (pillar, status, priority, search)
+- **Pull Trending** — 5 sources (Google Trends, YouTube, TikTok, Google News, Instagram) with search + select all
+- **2-gate approval pipeline** — nothing auto-generates without user confirmation
+- **4 modals**: Trending Preview, Config (language + instructions), Article Preview, Image Config (with reference upload)
+
+### Content Idea Status Flow
 ```
-POST   http://127.0.0.1:8100/workflows            → Start generation
-GET    http://127.0.0.1:8100/workflows/{id}        → Check progress
-POST   http://127.0.0.1:8100/image-gen/generate    → Queue image job
-GET    http://127.0.0.1:8100/image-gen/status/{uuid} → Poll image status
-POST   http://127.0.0.1:8100/video-gen/generate    → Queue video job
-POST   http://127.0.0.1:8100/social/post           → Publish to social
-GET    http://127.0.0.1:8100/health                → Health check
+draft → researching → article_ready → generating_images → images_ready → completed
+                            ↑                                    ↑
+                      Gate 1: approve text              Gate 2: approve images
 ```
 
-### Content Engine Saves Back to Portfolio_v2
+### Automation Endpoints (for CLI agent)
 ```
-Content Engine → POST http://127.0.0.1:8080/api/automation/carousel/save-draft
-  Headers: { Authorization: "Bearer {PORTFOLIO_API_TOKEN}" }
-  Body: { title, slides[], images[], captions, hashtags }
-  → Creates CarouselDraft in Portfolio_v2 database
-  → Admin sees draft in dashboard → Approve/Reject
+GET  /api/automation/content-ideas/pending       → Get next idea to generate
+PUT  /api/automation/content-ideas/{id}/complete  → Save generated article + update status
+POST /api/automation/blog/save-draft             → Direct blog post save (fallback)
 ```
 
-### Full Documentation
-See `D:\Projects\claude-plugin\content-engine-agents\CLAUDE.md` for:
-- 8-agent architecture details
-- Knowledge files structure
-- GeminiGen API integration
-- Deployment & monitoring commands
+### Plugin: article-content-writer
+```
+Location: D:\Projects\claude-plugin\article-content-writer\
+Status:   Design complete, implementation pending
+Skills:   article-generate, article-research, article-validate
+Config:   Per-project via .claude/article-writer.md (brand-agnostic)
+```
+
+### Service Worker (Media Caching)
+`frontend/public/sw.js` — Caches videos and images via Cache API. Pre-caches hero videos on install, cache-first strategy for all media.
 
 ---
 
-**Last Updated:** April 12, 2026
+**Last Updated:** April 12, 2026 (CLI-based content pipeline, updated architecture)
 **Maintainer:** Ali Sadikin (ali.sadikincom85@gmail.com)
 **Environment:** Windows 11, D:\Projects\Portfolio_v2
 **PHP:** D:\xampp\php\php.exe (8.2.12) — use full path, not in system PATH

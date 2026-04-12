@@ -9,7 +9,7 @@
 
 > **Production-Ready** | **Security-Hardened** | **Performance-Optimized**
 
-Modern, scalable full-stack portfolio and CMS featuring RESTful API architecture, Vue 3 SPA frontend, comprehensive admin panel, automation API (n8n/Zapier), dynamic content management, and i18n support.
+Modern, scalable full-stack portfolio and CMS featuring RESTful API architecture, Vue 3 SPA frontend, comprehensive admin panel, automation API (n8n/Zapier), CLI-based AI content pipeline (Claude Code plugins), dynamic content management, and i18n support.
 
 ---
 
@@ -19,10 +19,10 @@ Modern, scalable full-stack portfolio and CMS featuring RESTful API architecture
 |--------|---------|
 | **Status** | Production Ready |
 | **Production URL** | https://alisadikinma.com |
-| **API Endpoints** | 120+ documented endpoints |
+| **API Endpoints** | 140+ documented endpoints |
 | **Performance** | <500ms cached loads (83% improvement) |
 | **Security Score** | 95/100 |
-| **Last Updated** | March 22, 2026 |
+| **Last Updated** | April 12, 2026 |
 
 ---
 
@@ -49,6 +49,11 @@ Modern, scalable full-stack portfolio and CMS featuring RESTful API architecture
 ├─────────────────────────────────────────────────────────┤
 │                AUTOMATION LAYER                         │
 │  n8n / Zapier / Make.com via REST API + Webhooks       │
+├─────────────────────────────────────────────────────────┤
+│              AI CONTENT PIPELINE                        │
+│  Claude Code CLI + article-content-writer plugin       │
+│  Article Pipeline: Ideas → Research → Images → Publish │
+│  On-demand + Scheduled (cron) via CLI                  │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -118,21 +123,29 @@ php artisan tinker
 
 ## Project Structure
 
-### Backend (17 Controllers, 16 Models)
+### Backend (25 Controllers, 21 Models, 3 Services)
 
 ```
 backend/
 ├── app/
 │   ├── Http/Controllers/Api/
-│   │   ├── Admin/DashboardController.php
+│   │   ├── Admin/
+│   │   │   ├── ContentIdeaController.php # Content Engine pipeline (17 routes)
+│   │   │   └── DashboardController.php
+│   │   ├── ActivityFeedController.php    # Public activity feed
 │   │   ├── AuthController.php
 │   │   ├── AutomationController.php      # n8n/Zapier API
 │   │   ├── AwardController.php
+│   │   ├── BlogPipelineController.php    # Blog pipeline automation
+│   │   ├── CarouselDraftController.php   # Carousel draft management
 │   │   ├── CategoryController.php
+│   │   ├── ChatbotController.php         # AI chatbot
 │   │   ├── ContactController.php
 │   │   ├── GalleryController.php
 │   │   ├── GalleryItemController.php     # Gallery items CRUD
+│   │   ├── GeoController.php            # GEO: llms.txt endpoints
 │   │   ├── MenuItemController.php        # Dynamic navbar
+│   │   ├── NewsletterController.php      # Newsletter subscribe
 │   │   ├── PageSectionController.php     # Homepage sections
 │   │   ├── PostController.php
 │   │   ├── ProjectController.php
@@ -142,48 +155,54 @@ backend/
 │   │   ├── SitemapController.php         # XML sitemap
 │   │   ├── TestimonialController.php
 │   │   └── TokenController.php           # API token management
+│   ├── Services/
+│   │   ├── ContentEngineService.php      # Content Engine health check + workflow proxy
+│   │   ├── ImageGenerationService.php    # GeminiGen integration
+│   │   └── TrendingTopicService.php      # Trend aggregation
 │   ├── Filament/                         # Filament 4.1 admin panels
-│   │   ├── Admin/
-│   │   └── Resources/ (Settings, Testimonials)
-│   ├── Models/ (16 models)
-│   │   ├── Award, Category, Contact, Gallery, GalleryItem
+│   ├── Models/ (21 models)
+│   │   ├── Award, CarouselDraft, CarouselSlide, Category, Contact
+│   │   ├── ContentIdea, Gallery, GalleryItem, ImageGenerationJob
 │   │   ├── MenuItem, Newsletter, PageSection
 │   │   ├── Post, PostTranslation, Project, ProjectTranslation
-│   │   ├── Service, Setting, Testimonial, User
+│   │   ├── Service, Setting, SocialAccount, Testimonial, User
 │   └── Traits/ (HasSeoFields)
-├── database/migrations/ (42 migrations)
-├── routes/api.php (120+ endpoints)
+├── database/migrations/ (48 migrations)
+├── routes/api.php (140+ endpoints)
 └── storage/app/uploads/
 ```
 
-### Frontend (36 views, 60+ components)
+### Frontend (39 views, 47+ components)
 
 ```
 frontend/src/
 ├── views/
-│   ├── Home, About, Projects, ProjectDetail, Awards
+│   ├── Home, About, Work, Projects, ProjectDetail, Awards
 │   ├── Blog, BlogDetail, BlogCategory, Gallery, Contact, NotFound
 │   ├── auth/Login.vue
-│   └── admin/ (22 views)
+│   └── admin/ (25 views)
 │       ├── Dashboard, Posts(List/Create/Edit), Projects(List/Create/Edit)
 │       ├── Awards(List/Create/Edit), Galleries, Testimonials(List/Create/Edit)
 │       ├── Contacts, AboutSettings, SettingsForm
 │       ├── MenuItemsList, PageSectionsManager
-│       └── Automation(Tokens/Logs/Docs)
-├── stores/ (14 Pinia stores)
-├── composables/ (20 composables)
-├── components/
+│       ├── Automation(Tokens/Logs/Docs)
+│       ├── CarouselDrafts(List/Detail)
+│       └── ContentEngine              # Content idea pipeline UI
+├── stores/ (15 Pinia stores)
+├── composables/ (29 composables)
+├── components/ (47+ components)
 │   ├── base/ (17 components: Button, Card, Modal, Input, Lightbox, Skeletons...)
 │   ├── admin/ (DragDropList, IconPicker, IconDisplay)
 │   ├── blog/ (RichTextEditor, ImageUploader, CategorySelect, BlogPostForm)
 │   ├── awards/, projects/, testimonials/
 │   ├── HeroSectionWOW, CTASection, TheNavigation, TheFooter
-└── router/index.js (50+ routes)
+├── public/sw.js                        # Service Worker for media caching
+└── router/index.js (48 routes)
 ```
 
 ---
 
-## API Overview (120+ Endpoints)
+## API Overview (140+ Endpoints)
 
 ### Public Routes
 ```
@@ -197,8 +216,11 @@ Testimonials: GET /api/testimonials, /api/testimonials/{id}
 Services:     GET /api/services, /api/services/{slug}
 Settings:     GET /api/settings, /api/settings/about, /api/settings/site
 Menu/Pages:   GET /api/menu-items, /api/page-sections
-SEO:          GET /api/sitemap.xml, /api/sitemap-index.xml
+SEO:          GET /api/sitemap.xml, /api/sitemap-index.xml, /api/llms.txt, /api/llms-full.txt
 Contact:      POST /api/contact (throttle: 3/15min)
+Chatbot:      POST /api/chatbot/ask (throttle: 10/min)
+Newsletter:   POST /api/newsletter/subscribe, DELETE /api/newsletter/unsubscribe
+Activity:     GET /api/activity-feed
 Health:       GET /api/health
 ```
 
@@ -217,6 +239,8 @@ Settings:     /api/admin/settings/about, /api/admin/settings/site (GET+PUT)
 Menu Items:   CRUD /api/admin/menu-items (+reorder)
 Page Sections:/api/admin/page-sections (list, update, reorder)
 Automation:   /api/admin/automation/tokens, /api/admin/automation/logs
+Carousels:    /api/admin/carousel-drafts (list, show, approve, reject, schedule)
+Content Eng:  /api/admin/content-engine/* (17 endpoints: ideas CRUD, trending, pipeline gates)
 ```
 
 ### Automation API (n8n/Zapier/Make.com)
@@ -226,6 +250,9 @@ Categories:   GET /api/automation/categories
 Images:       POST /api/automation/upload-image(s)
 Webhook:      POST /api/automation/webhook/published
 Duplicate:    POST /api/automation/posts/check-duplicate (public)
+Blog:         GET /api/automation/blog/trending-topic, POST /save-draft, POST /image-webhook
+Content:      GET /api/automation/content-ideas/pending, PUT /{id}/complete
+Carousels:    GET /api/automation/carousel/accounts, /drafts
 ```
 
 ### Response Format
@@ -266,6 +293,15 @@ Duplicate:    POST /api/automation/posts/check-duplicate (public)
 - Bulk post creation
 - Duplicate detection
 
+### AI Content Pipeline (CLI-Based)
+- AI-powered article pipeline: Ideas → Research → Article → Images → Publish
+- 2-gate approval system (article text review, then image review)
+- Trending topic aggregation from 5 sources (Google Trends, TikTok, YouTube, Google News, Instagram)
+- Spreadsheet-style admin UI for idea management
+- **Claude Code CLI + article-content-writer plugin** (NOT HTTP microservice)
+- On-demand (`claude -p "/article-generate --idea 5"`) + scheduled (cron every 30 min)
+- Plugin is brand-agnostic: reads `.claude/article-writer.md` per project
+
 ### Performance
 - TanStack Query caching (5-60min stale times per resource)
 - 83% faster repeat visits, 70% fewer API calls
@@ -274,9 +310,9 @@ Duplicate:    POST /api/automation/posts/check-duplicate (public)
 
 ---
 
-## Database (25+ Tables, 42 Migrations)
+## Database (30+ Tables, 48 Migrations)
 
-Core tables: users, posts, post_translations, categories, projects, project_translations, awards, award_gallery (pivot), galleries, gallery_items, services, testimonials, contacts, newsletters, settings, menu_items, page_sections, automation_logs, personal_access_tokens, cache, jobs
+Core tables: users, posts, post_translations, categories, projects, project_translations, awards, award_gallery (pivot), galleries, gallery_items, services, testimonials, contacts, newsletters, settings, menu_items, page_sections, automation_logs, personal_access_tokens, cache, jobs, image_generation_jobs, carousel_drafts, carousel_slides, social_accounts, content_ideas
 
 Key patterns:
 - SEO fields on posts, projects, categories (via migration additions)
@@ -363,16 +399,17 @@ Production runs on VPS with Nginx + SSL (Let's Encrypt) at alisadikinma.com.
 
 | Category | Value |
 |----------|-------|
-| Backend Controllers | 17 |
-| Backend Models | 16 |
-| API Endpoints | 120+ |
-| Database Tables | 25+ |
-| Database Migrations | 42 |
-| Frontend Views | 36 |
-| Frontend Components | 60+ |
-| Pinia Stores | 14 |
-| Composables | 20 |
-| Vue Routes | 50+ |
+| Backend Controllers | 25 |
+| Backend Models | 21 |
+| Backend Services | 3 |
+| API Endpoints | 140+ |
+| Database Tables | 30+ |
+| Database Migrations | 48 |
+| Frontend Views | 39 |
+| Frontend Components | 47+ |
+| Pinia Stores | 15 |
+| Composables | 29 |
+| Vue Routes | 48 |
 | Security Score | 95/100 |
 | Cache Hit Rate | 83% |
 | Cached Load Time | <500ms |
@@ -395,4 +432,4 @@ Contact: ali.sadikincom85@gmail.com | Location: Batam, Indonesia
 
 ---
 
-**Last Updated:** March 22, 2026 | **Version:** 2.0.0 | **Status:** Production Ready
+**Last Updated:** April 12, 2026 | **Version:** 2.1.0 | **Status:** Production Ready
