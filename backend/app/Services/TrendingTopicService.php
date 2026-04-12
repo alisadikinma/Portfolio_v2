@@ -283,10 +283,11 @@ class TrendingTopicService
     private function fetchGoogleNews(): array
     {
         $feeds = [
-            // English tech news
-            'https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRGRqTVhZU0FtVnVHZ0pWVXlnQVAB?hl=en&gl=US&ceid=US:en',
-            // Indonesian tech news
-            'https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRGRqTVhZU0FtbGtHZ0pKUkNnQVAB?hl=id&gl=ID&ceid=ID:id',
+            // AI-specific search feeds (not generic "Technology" topic)
+            'https://news.google.com/rss/search?q=artificial+intelligence+OR+AI+agents+OR+LLM+OR+ChatGPT+OR+Claude+AI+OR+Gemini+AI&hl=en&gl=US&ceid=US:en',
+            'https://news.google.com/rss/search?q=vibe+coding+OR+AI+automation+OR+AI+video+generation+OR+generative+AI&hl=en&gl=US&ceid=US:en',
+            // Indonesian AI news
+            'https://news.google.com/rss/search?q=kecerdasan+buatan+OR+AI+Indonesia+OR+ChatGPT+OR+otomatisasi+AI&hl=id&gl=ID&ceid=ID:id',
         ];
 
         $results = [];
@@ -349,14 +350,15 @@ class TrendingTopicService
         $seen = []; // Dedup by normalized title
 
         foreach ($trends as $trend) {
-            $text = strtolower($trend['title'] . ' ' . ($trend['description'] ?? ''));
+            $title = strtolower($trend['title']);
             $normalized = Str::slug($trend['title']);
 
             // Skip if we've seen a very similar title
             if (isset($seen[$normalized])) continue;
 
+            // Match against TITLE ONLY (descriptions are too noisy — contain ads, unrelated HTML)
             foreach ($this->techKeywords as $keyword) {
-                if (str_contains($text, $keyword)) {
+                if (str_contains($title, $keyword)) {
                     $trend['matched_keyword'] = $keyword;
                     $filtered[] = $trend;
                     $seen[$normalized] = true;
