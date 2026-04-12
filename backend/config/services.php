@@ -39,4 +39,9 @@ return [
         'api_key' => env('GEMINIGEN_API_KEY', ''),
     ],
 
+    'content_engine' => [
+        'url' => env('CONTENT_ENGINE_URL', 'http://127.0.0.1:8100'),
+        'api_key' => env('CONTENT_ENGINE_API_KEY', ''),
+    ],
+
 ];

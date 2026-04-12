@@ -476,9 +476,85 @@ Effects:
 - vue-i18n 10 (multi-language)
 - anthropic/sdk PHP (chatbot backend)
 
+## Content Engine Integration
+
+Portfolio_v2 communicates with the **Content Engine Agents** system — an 8-agent AI content generation microservice at `D:\Projects\claude-plugin\content-engine-agents`.
+
+### Architecture (Same VPS)
+```
+Portfolio_v2 (Laravel)              Content Engine (FastAPI, Python)
+https://alisadikinma.com            http://127.0.0.1:8100
+/var/www/Portfolio_v2/              /var/www/content-engine-agents/
+
+  POST /workflows ──────────────► Create workflow (carousel/blog/video)
+  GET  /workflows/{id} ─────────► Poll workflow status
+                                    │
+  ◄──── POST /api/automation/       │ Content Engine saves result
+        carousel/save-draft         │ back to Portfolio_v2
+                                    │
+  POST /social/post ─────────────► Publish to Instagram/TikTok
+```
+
+### How Portfolio_v2 Triggers Content Generation
+```php
+// From Laravel controller or admin action:
+$response = Http::withHeaders([
+    'x-api-key' => config('services.content_engine.api_key'),
+])->post('http://127.0.0.1:8100/workflows', [
+    'workflow_type' => 'carousel_rebrand',  // or: blog_article, video_social, video_promo
+    'input_data' => [
+        'topic' => 'AI Automation for Startups',
+        'language' => 'en',
+    ],
+]);
+
+$workflowId = $response->json('workflow_id');
+```
+
+### Available Workflow Types
+| Type | What It Does | Output |
+|------|-------------|--------|
+| `carousel_rebrand` | Research → Script → Image Gen | 5-slide carousel draft |
+| `blog_article` | Research → Write → Image Gen | SEO blog post (EN+ID) |
+| `video_social` | Research → Script → VEO 3.1 | 15-30s video (9:16) |
+| `video_promo` | Research → Script → Seedance 2.0 | 60-120s video (16:9) |
+
+### Environment Variables (Laravel .env)
+```env
+CONTENT_ENGINE_URL=http://127.0.0.1:8100
+CONTENT_ENGINE_API_KEY=your-strong-key
+```
+
+### Content Engine Endpoints (from Portfolio_v2 perspective)
+```
+POST   http://127.0.0.1:8100/workflows            → Start generation
+GET    http://127.0.0.1:8100/workflows/{id}        → Check progress
+POST   http://127.0.0.1:8100/image-gen/generate    → Queue image job
+GET    http://127.0.0.1:8100/image-gen/status/{uuid} → Poll image status
+POST   http://127.0.0.1:8100/video-gen/generate    → Queue video job
+POST   http://127.0.0.1:8100/social/post           → Publish to social
+GET    http://127.0.0.1:8100/health                → Health check
+```
+
+### Content Engine Saves Back to Portfolio_v2
+```
+Content Engine → POST http://127.0.0.1:8080/api/automation/carousel/save-draft
+  Headers: { Authorization: "Bearer {PORTFOLIO_API_TOKEN}" }
+  Body: { title, slides[], images[], captions, hashtags }
+  → Creates CarouselDraft in Portfolio_v2 database
+  → Admin sees draft in dashboard → Approve/Reject
+```
+
+### Full Documentation
+See `D:\Projects\claude-plugin\content-engine-agents\CLAUDE.md` for:
+- 8-agent architecture details
+- Knowledge files structure
+- GeminiGen API integration
+- Deployment & monitoring commands
+
 ---
 
-**Last Updated:** April 10, 2026
+**Last Updated:** April 12, 2026
 **Maintainer:** Ali Sadikin (ali.sadikincom85@gmail.com)
 **Environment:** Windows 11, D:\Projects\Portfolio_v2
 **PHP:** D:\xampp\php\php.exe (8.2.12) — use full path, not in system PATH

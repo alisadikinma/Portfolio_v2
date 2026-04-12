@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\GeoController;
 use App\Http\Controllers\Api\ActivityFeedController;
 use App\Http\Controllers\Api\NewsletterController;
 use App\Http\Controllers\Api\CarouselDraftController;
+use App\Http\Controllers\Api\Admin\ContentIdeaController;
 
 // ============================================
 // Authentication Routes
@@ -346,4 +347,30 @@ Route::middleware(['auth:sanctum'])->prefix('admin/carousel-drafts')->group(func
     Route::post('/{id}/reject', [CarouselDraftController::class, 'reject']);
     Route::post('/{id}/schedule', [CarouselDraftController::class, 'schedule']);
     Route::patch('/{id}/slides/{slideId}/status', [CarouselDraftController::class, 'updateSlideStatus']);
+});
+
+// Admin Content Engine Routes
+Route::middleware(['auth:sanctum'])->prefix('admin/content-engine')->group(function () {
+    // Health & workflows (Content Engine proxy)
+    Route::get('/health', [ContentIdeaController::class, 'healthCheck']);
+    Route::get('/workflows', [ContentIdeaController::class, 'listWorkflows']);
+    Route::get('/workflows/{id}', [ContentIdeaController::class, 'getWorkflowStatus']);
+
+    // Content Ideas CRUD
+    Route::get('/ideas', [ContentIdeaController::class, 'index']);
+    Route::post('/ideas', [ContentIdeaController::class, 'store']);
+    Route::put('/ideas/{id}', [ContentIdeaController::class, 'update']);
+    Route::delete('/ideas/{id}', [ContentIdeaController::class, 'destroy']);
+    Route::post('/ideas/{id}/archive', [ContentIdeaController::class, 'archive']);
+    Route::post('/ideas/{id}/restore', [ContentIdeaController::class, 'restore']);
+    Route::post('/ideas/{id}/revert', [ContentIdeaController::class, 'revertToDraft']);
+
+    // Trending topics
+    Route::get('/trending', [ContentIdeaController::class, 'pullTrending']);
+    Route::post('/trending/import', [ContentIdeaController::class, 'importTrending']);
+
+    // Pipeline actions
+    Route::post('/ideas/{id}/research', [ContentIdeaController::class, 'startResearch']);
+    Route::get('/ideas/{id}/research', [ContentIdeaController::class, 'getResearch']);
+    Route::post('/ideas/{id}/generate', [ContentIdeaController::class, 'approveGenerate']);
 });

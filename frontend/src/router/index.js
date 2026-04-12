@@ -408,6 +408,18 @@ const routes = [
     }
   },
 
+  // Content Engine
+  {
+    path: '/admin/content-engine',
+    name: 'admin-content-engine',
+    component: () => import('@/views/admin/ContentEngine.vue'),
+    meta: {
+      title: 'Content Engine - Admin',
+      requiresAuth: true,
+      layout: 'admin'
+    }
+  },
+
   {
     path: '/:pathMatch(.*)*',
     name: 'not-found',

@@ -403,6 +403,33 @@ class TrendingTopicService
         return false;
     }
 
+    /**
+     * Return all tech-filtered trending topics from all sources.
+     * Used by Content Command Center to let user pick topics.
+     */
+    public function getAllTrends(?string $source = null): array
+    {
+        $allTrends = [];
+
+        if (!$source || $source === 'google_trends') {
+            $allTrends = array_merge($allTrends, $this->fetchGoogleTrends());
+        }
+        if (!$source || $source === 'tiktok') {
+            $allTrends = array_merge($allTrends, $this->fetchTikTokTrending());
+        }
+        if (!$source || $source === 'youtube') {
+            $allTrends = array_merge($allTrends, $this->fetchYouTubeTrending());
+        }
+        if (!$source || $source === 'google_news') {
+            $allTrends = array_merge($allTrends, $this->fetchGoogleNews());
+        }
+
+        $techTrends = $this->filterTechTopics($allTrends);
+        usort($techTrends, fn($a, $b) => ($b['score'] ?? 0) <=> ($a['score'] ?? 0));
+
+        return $techTrends;
+    }
+
     public function suggestCategory(string $title): int
     {
         $text = strtolower($title);
