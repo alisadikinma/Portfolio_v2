@@ -64,7 +64,29 @@ export function useContentEngine() {
 
   const getResearch = (id) => request('get', `/admin/content-engine/ideas/${id}/research`)
 
-  const approveGenerate = (id) => request('post', `/admin/content-engine/ideas/${id}/generate`)
+  const approveArticle = async (id, data = {}) => {
+    return request('post', `/admin/content-engine/ideas/${id}/approve-article`, data)
+  }
+
+  const startImageGeneration = async (id, formData) => {
+    isLoading.value = true
+    error.value = null
+    try {
+      const response = await api.post(`/admin/content-engine/ideas/${id}/generate-images`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+      return { success: true, data: response.data.data }
+    } catch (err) {
+      error.value = err.response?.data?.message || 'Failed to start image generation'
+      return { success: false, error: error.value }
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  const approveAndPublish = async (id) => {
+    return request('post', `/admin/content-engine/ideas/${id}/publish`)
+  }
 
   const listWorkflows = () => request('get', '/admin/content-engine/workflows')
 
@@ -85,7 +107,9 @@ export function useContentEngine() {
     importTrending,
     startResearch,
     getResearch,
-    approveGenerate,
+    approveArticle,
+    startImageGeneration,
+    approveAndPublish,
     listWorkflows,
     getWorkflowStatus,
   }

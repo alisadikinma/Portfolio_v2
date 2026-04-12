@@ -24,6 +24,11 @@ class ContentIdea extends Model
         'research_data',
         'workflows',
         'source_data',
+        'result_post_id',
+        'generated_article',
+        'generated_images',
+        'image_instructions',
+        'image_references',
     ];
 
     protected $casts = [
@@ -33,6 +38,9 @@ class ContentIdea extends Model
         'research_data' => 'array',
         'workflows' => 'array',
         'source_data' => 'array',
+        'generated_article' => 'array',
+        'generated_images' => 'array',
+        'image_references' => 'array',
     ];
 
     /**

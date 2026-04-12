@@ -135,22 +135,25 @@
                     <svg class="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
                     Researching...
                   </span>
-                  <button v-else-if="idea.status === 'researched'" @click="openResearchModal(idea)" class="px-2.5 py-1 text-xs font-medium rounded bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:hover:bg-purple-900/50 transition-colors">
-                    Preview
+                  <button v-else-if="idea.status === 'article_ready'" @click="openResearchModal(idea)" class="px-2.5 py-1 text-xs font-medium rounded bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:hover:bg-purple-900/50 transition-colors">
+                    Preview Article
                   </button>
-                  <span v-else-if="idea.status === 'generating'" class="inline-flex items-center gap-1 px-2.5 py-1 text-xs text-yellow-600 dark:text-yellow-400">
+                  <span v-else-if="idea.status === 'generating_images'" class="inline-flex items-center gap-1 px-2.5 py-1 text-xs text-yellow-600 dark:text-yellow-400">
                     <svg class="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                    Generating...
+                    Generating images...
                   </span>
+                  <button v-else-if="idea.status === 'images_ready'" @click="openImagesPreview(idea)" class="px-2.5 py-1 text-xs font-medium rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 transition-colors">
+                    Preview Images
+                  </button>
                   <button v-else-if="idea.status === 'completed'" @click="viewDrafts(idea)" class="px-2.5 py-1 text-xs font-medium rounded bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50 transition-colors">
-                    View Drafts
+                    View
                   </button>
                   <button v-else-if="idea.status === 'archived'" @click="handleRestore(idea.id)" class="px-2.5 py-1 text-xs font-medium rounded bg-neutral-100 text-neutral-600 hover:bg-neutral-200 dark:bg-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-600 transition-colors">
                     Restore
                   </button>
 
-                  <!-- Common actions (hidden for generating) -->
-                  <template v-if="idea.status !== 'generating'">
+                  <!-- Common actions (hidden for generating_images) -->
+                  <template v-if="idea.status !== 'generating_images'">
                     <button @click="openEditModal(idea)" class="p-1.5 rounded text-neutral-400 hover:text-amber-600 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors" title="Edit">
                       <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z" /></svg>
                     </button>
@@ -253,7 +256,7 @@
             Select All
           </label>
         </div>
-        <div class="flex-1 overflow-y-auto space-y-2 min-h-0">
+        <div class="flex-1 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-2 min-h-0 content-start">
           <div v-if="trendingLoading" class="py-8 text-center text-neutral-500 dark:text-neutral-400">
             <svg class="animate-spin h-6 w-6 mx-auto mb-2 text-amber-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
             Loading trending topics...
@@ -286,15 +289,6 @@
         <p class="text-sm text-neutral-500 dark:text-neutral-400 mb-5">{{ currentIdea?.title }}</p>
         <div class="space-y-4">
           <div>
-            <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">Output Types</label>
-            <div class="space-y-2">
-              <label v-for="ot in outputTypeOptions" :key="ot.value" class="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" :value="ot.value" v-model="configOutputTypes" class="rounded border-neutral-300 text-amber-600 focus:ring-amber-500" />
-                <span class="text-sm text-neutral-700 dark:text-neutral-300">{{ ot.label }}</span>
-              </label>
-            </div>
-          </div>
-          <div>
             <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">Languages</label>
             <div class="flex gap-4">
               <label v-for="lang in languageOptions" :key="lang.value" class="flex items-center gap-2 cursor-pointer">
@@ -310,65 +304,104 @@
         </div>
         <div class="flex justify-end gap-2 mt-6">
           <button @click="showConfigModal = false" class="px-4 py-2 text-sm font-medium rounded-lg border border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors">Cancel</button>
-          <button @click="handleStartResearch" :disabled="!configOutputTypes.length || !configLanguages.length || isLoading" class="px-4 py-2 text-sm font-medium rounded-lg bg-amber-600 hover:bg-amber-700 text-white transition-colors disabled:opacity-50">
+          <button @click="handleStartResearch" :disabled="!configLanguages.length || isLoading" class="px-4 py-2 text-sm font-medium rounded-lg bg-amber-600 hover:bg-amber-700 text-white transition-colors disabled:opacity-50">
             Confirm &amp; Research &rarr;
           </button>
         </div>
       </div>
     </div>
 
-    <!-- Research Preview Modal -->
-    <div v-if="showResearchModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="showResearchModal = false">
-      <div class="bg-white dark:bg-neutral-800 rounded-xl shadow-xl max-w-lg w-full mx-4 p-6 max-h-[80vh] flex flex-col">
-        <h3 class="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">Research Preview</h3>
-        <div class="flex-1 overflow-y-auto space-y-4 min-h-0">
-          <!-- Editable topic -->
+    <!-- Article Preview Modal -->
+    <div v-if="showResearchModal && currentIdea?.status === 'article_ready'" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="showResearchModal = false">
+      <div class="bg-white dark:bg-neutral-800 rounded-xl shadow-xl max-w-4xl w-full mx-4 p-6 max-h-[85vh] flex flex-col">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Article Preview</h3>
+          <button @click="showResearchModal = false" class="text-neutral-400 hover:text-neutral-600">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <!-- Article content -->
+        <div class="flex-1 overflow-y-auto">
+          <h2 class="text-2xl font-bold text-neutral-900 dark:text-neutral-100 mb-4">
+            {{ currentIdea.generated_article?.title || currentIdea.title }}
+          </h2>
+          <div class="prose dark:prose-invert max-w-none text-sm" v-html="currentIdea.generated_article?.content || '<p class=\'text-neutral-400\'>Article content will appear here when generation completes...</p>'">
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex justify-between mt-4 pt-4 border-t border-neutral-200 dark:border-neutral-700">
+          <button @click="handleRevertToDraft" class="px-4 py-2 text-sm font-medium rounded-lg border border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700">
+            &larr; Back to Draft
+          </button>
+          <button @click="handleApproveArticle" :disabled="isLoading" class="px-4 py-2 text-sm font-medium rounded-lg bg-purple-600 hover:bg-purple-700 text-white transition-colors disabled:opacity-50">
+            Approve Text &amp; Continue to Images &rarr;
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Image Config Modal -->
+    <div v-if="showImageConfigModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="showImageConfigModal = false">
+      <div class="bg-white dark:bg-neutral-800 rounded-xl shadow-xl max-w-lg w-full mx-4 p-6">
+        <h3 class="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-1">Generate Images</h3>
+        <p class="text-sm text-neutral-500 dark:text-neutral-400 mb-5">{{ currentIdea?.title }}</p>
+
+        <div class="space-y-4">
           <div>
-            <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">Topic</label>
-            <input v-model="researchPreviewTopic" type="text" class="block w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 text-sm px-3 py-2 focus:ring-amber-500 focus:border-amber-500" />
-          </div>
-
-          <!-- Research data -->
-          <div v-if="researchData">
-            <div v-if="researchData.trending_score !== undefined" class="mb-3">
-              <span class="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">Trending Score</span>
-              <p class="text-lg font-bold text-amber-600 dark:text-amber-400">{{ researchData.trending_score }}</p>
-            </div>
-            <div v-if="researchData.hooks?.length" class="mb-3">
-              <span class="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">Hooks</span>
-              <ul class="mt-1 space-y-1">
-                <li v-for="(hook, i) in researchData.hooks" :key="i" class="text-sm text-neutral-700 dark:text-neutral-300 flex items-start gap-1.5">
-                  <span class="text-amber-500 mt-0.5 flex-shrink-0">&bull;</span>
-                  {{ hook }}
-                </li>
-              </ul>
-            </div>
-            <div v-if="researchData.angles?.length" class="mb-3">
-              <span class="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">Angles</span>
-              <ul class="mt-1 space-y-1">
-                <li v-for="(angle, i) in researchData.angles" :key="i" class="text-sm text-neutral-700 dark:text-neutral-300 flex items-start gap-1.5">
-                  <span class="text-amber-500 mt-0.5 flex-shrink-0">&bull;</span>
-                  {{ angle }}
-                </li>
-              </ul>
+            <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">Images to generate</label>
+            <div class="space-y-1 text-sm text-neutral-600 dark:text-neutral-400">
+              <p>&bull; Featured Image (hero banner, 16:9)</p>
+              <p>&bull; Body Images (in-article illustrations)</p>
             </div>
           </div>
 
-          <!-- Generation summary -->
-          <div v-if="currentIdea">
-            <span class="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">Will Generate</span>
-            <div class="mt-1 flex flex-wrap gap-1.5">
-              <span v-for="ot in (currentIdea.output_types || [])" :key="ot" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">{{ ot }}</span>
-              <span v-for="lang in (currentIdea.languages || [])" :key="lang" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">{{ lang }}</span>
+          <div>
+            <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">Style Instructions (optional)</label>
+            <textarea v-model="imageInstructions" rows="3" placeholder="e.g. Futuristic dark theme, minimal, neon accents..." class="block w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 text-sm px-3 py-2 focus:ring-amber-500 focus:border-amber-500 placeholder-neutral-400"></textarea>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">Reference Images (optional)</label>
+            <input type="file" ref="imageRefInput" multiple accept="image/*" @change="handleImageRefSelect" class="block w-full text-sm text-neutral-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-amber-50 file:text-amber-700 dark:file:bg-amber-900/20 dark:file:text-amber-400 hover:file:bg-amber-100" />
+            <div v-if="imageRefFiles.length" class="flex flex-wrap gap-2 mt-2">
+              <div v-for="(file, i) in imageRefFiles" :key="i" class="relative">
+                <img :src="imageRefPreviews[i]" class="w-16 h-16 object-cover rounded-lg border border-neutral-200 dark:border-neutral-600" />
+                <button @click="removeImageRef(i)" class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[10px] flex items-center justify-center">&times;</button>
+              </div>
             </div>
           </div>
         </div>
-        <div class="flex justify-between mt-6 pt-4 border-t border-neutral-200 dark:border-neutral-700">
-          <button @click="handleRevertToDraft" :disabled="isLoading" class="px-4 py-2 text-sm font-medium rounded-lg border border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors disabled:opacity-50">
-            &larr; Back to Draft
+
+        <div class="flex justify-end gap-2 mt-6">
+          <button @click="showImageConfigModal = false" class="px-4 py-2 text-sm font-medium rounded-lg border border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700">Cancel</button>
+          <button @click="handleStartImageGen" :disabled="isLoading" class="px-4 py-2 text-sm font-medium rounded-lg bg-amber-600 hover:bg-amber-700 text-white transition-colors disabled:opacity-50">
+            Generate Images &rarr;
           </button>
-          <button @click="handleApproveGenerate" :disabled="isLoading" class="px-4 py-2 text-sm font-medium rounded-lg bg-amber-600 hover:bg-amber-700 text-white transition-colors disabled:opacity-50">
-            Approve &amp; Generate
+        </div>
+      </div>
+    </div>
+
+    <!-- Images Preview Modal -->
+    <div v-if="showImagesPreviewModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="showImagesPreviewModal = false">
+      <div class="bg-white dark:bg-neutral-800 rounded-xl shadow-xl max-w-4xl w-full mx-4 p-6 max-h-[85vh] flex flex-col">
+        <h3 class="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">Generated Images</h3>
+
+        <div class="flex-1 overflow-y-auto">
+          <div v-if="currentIdea?.generated_images" class="grid grid-cols-2 gap-4">
+            <div v-for="(img, i) in (Array.isArray(currentIdea.generated_images) ? currentIdea.generated_images : [currentIdea.generated_images])" :key="i" class="rounded-lg overflow-hidden border border-neutral-200 dark:border-neutral-700">
+              <img :src="img.url || img" :alt="'Generated image ' + (i+1)" class="w-full h-48 object-cover" />
+              <p v-if="img.type" class="px-3 py-2 text-xs text-neutral-500 dark:text-neutral-400">{{ img.type }}</p>
+            </div>
+          </div>
+          <p v-else class="text-center py-8 text-neutral-400">No images generated yet.</p>
+        </div>
+
+        <div class="flex justify-between mt-4 pt-4 border-t border-neutral-200 dark:border-neutral-700">
+          <button @click="showImagesPreviewModal = false" class="px-4 py-2 text-sm font-medium rounded-lg border border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-300">Close</button>
+          <button @click="handleApproveAndPublish" :disabled="isLoading" class="px-4 py-2 text-sm font-medium rounded-lg bg-green-600 hover:bg-green-700 text-white transition-colors disabled:opacity-50">
+            Approve &amp; Publish &rarr;
           </button>
         </div>
       </div>
@@ -398,12 +431,14 @@ const {
   importTrending,
   startResearch,
   getResearch,
-  approveGenerate,
+  approveArticle,
+  startImageGeneration,
+  approveAndPublish,
   listWorkflows,
 } = useContentEngine()
 
 const pillars = ['Vibe Coding', 'AI Automation', 'AI Agents', 'AI Video & Image', 'General']
-const statuses = ['draft', 'researching', 'researched', 'generating', 'completed', 'archived']
+const statuses = ['draft', 'researching', 'article_ready', 'generating_images', 'images_ready', 'completed', 'archived']
 const trendingSources = [
   { label: 'All Sources', value: '' },
   { label: 'Google Trends', value: 'google_trends' },
@@ -411,12 +446,6 @@ const trendingSources = [
   { label: 'TikTok', value: 'tiktok' },
   { label: 'Google News', value: 'google_news' },
   { label: 'Instagram', value: 'instagram' },
-]
-const outputTypeOptions = [
-  { label: 'Blog Article', value: 'blog_article' },
-  { label: 'Instagram Carousel', value: 'carousel_rebrand' },
-  { label: 'Social Video', value: 'video_social' },
-  { label: 'Promo Video', value: 'video_promo' },
 ]
 const languageOptions = [
   { label: 'English', value: 'en' },
@@ -475,9 +504,18 @@ function toggleSelectAll() {
 }
 
 // Config modal
-const configOutputTypes = ref([])
 const configLanguages = ref([])
 const configInstructions = ref('')
+
+// Image config modal
+const showImageConfigModal = ref(false)
+const imageInstructions = ref('')
+const imageRefFiles = ref([])
+const imageRefPreviews = ref([])
+const imageRefInput = ref(null)
+
+// Images preview modal
+const showImagesPreviewModal = ref(false)
 
 // Research preview
 const researchData = ref(null)
@@ -488,8 +526,9 @@ function statusClass(status) {
   const map = {
     draft: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
     researching: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-    researched: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
-    generating: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+    article_ready: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
+    generating_images: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+    images_ready: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
     completed: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
     archived: 'bg-neutral-100 text-neutral-500 dark:bg-neutral-700 dark:text-neutral-400',
   }
@@ -507,7 +546,7 @@ function priorityClass(priority) {
 
 function formatStatus(s) {
   if (!s) return '-'
-  return s.charAt(0).toUpperCase() + s.slice(1)
+  return s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }
 
 function formatDate(d) {
@@ -653,7 +692,6 @@ async function handleImportTrending() {
 // Config modal (research)
 function openConfigModal(idea) {
   currentIdea.value = idea
-  configOutputTypes.value = []
   configLanguages.value = []
   configInstructions.value = ''
   showConfigModal.value = true
@@ -662,7 +700,6 @@ function openConfigModal(idea) {
 async function handleStartResearch() {
   if (!currentIdea.value) return
   const result = await startResearch(currentIdea.value.id, {
-    output_types: configOutputTypes.value,
     languages: configLanguages.value,
     instructions: configInstructions.value || undefined,
   })
@@ -705,22 +742,76 @@ async function handleRevertToDraft() {
   }
 }
 
-async function handleApproveGenerate() {
-  if (!currentIdea.value) return
-  if (researchPreviewTopic.value !== currentIdea.value.title) {
-    await updateIdea(currentIdea.value.id, { title: researchPreviewTopic.value })
-  }
-  const result = await approveGenerate(currentIdea.value.id)
+// Gate 1: Approve article text -> open image config
+async function handleApproveArticle() {
+  const result = await approveArticle(currentIdea.value.id)
   if (result.success) {
-    toast.success('Generation started')
+    toast.success('Article text approved!')
     showResearchModal.value = false
-    await refreshIdeas()
+    showImageConfigModal.value = true
   } else {
-    toast.error(result.error || 'Failed to start generation')
+    toast.error(result.error || 'Failed to approve article')
   }
 }
 
-// View drafts → navigate to posts
+// Image reference file handling
+function handleImageRefSelect(e) {
+  const files = Array.from(e.target.files)
+  imageRefFiles.value = [...imageRefFiles.value, ...files]
+  files.forEach(file => {
+    const reader = new FileReader()
+    reader.onload = (ev) => imageRefPreviews.value.push(ev.target.result)
+    reader.readAsDataURL(file)
+  })
+}
+
+function removeImageRef(index) {
+  imageRefFiles.value.splice(index, 1)
+  imageRefPreviews.value.splice(index, 1)
+}
+
+// Gate 2: Start image generation
+async function handleStartImageGen() {
+  const formData = new FormData()
+  if (imageInstructions.value) {
+    formData.append('image_instructions', imageInstructions.value)
+  }
+  imageRefFiles.value.forEach(file => {
+    formData.append('image_references[]', file)
+  })
+
+  const result = await startImageGeneration(currentIdea.value.id, formData)
+  if (result.success) {
+    toast.success('Image generation started!')
+    showImageConfigModal.value = false
+    imageInstructions.value = ''
+    imageRefFiles.value = []
+    imageRefPreviews.value = []
+    await refreshIdeas()
+  } else {
+    toast.error(result.error || 'Failed to start image generation')
+  }
+}
+
+// Open images preview
+function openImagesPreview(idea) {
+  currentIdea.value = idea
+  showImagesPreviewModal.value = true
+}
+
+// Approve and publish
+async function handleApproveAndPublish() {
+  const result = await approveAndPublish(currentIdea.value.id)
+  if (result.success) {
+    toast.success('Content published!')
+    showImagesPreviewModal.value = false
+    await refreshIdeas()
+  } else {
+    toast.error(result.error || 'Failed to publish')
+  }
+}
+
+// View drafts -> navigate to posts
 function viewDrafts(idea) {
   router.push({ path: '/admin/posts', query: { search: idea.title } })
 }

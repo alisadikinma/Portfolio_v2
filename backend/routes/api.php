@@ -319,6 +319,32 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
     // Blog Pipeline (Claude Scheduled Task integration)
     Route::get('/blog/trending-topic', [\App\Http\Controllers\Api\BlogPipelineController::class, 'trendingTopic']);
     Route::post('/blog/save-draft', [\App\Http\Controllers\Api\BlogPipelineController::class, 'saveDraft']);
+
+    // Content Ideas Pipeline (for Claude Remote Trigger agent)
+    Route::get('/content-ideas/pending', function () {
+        $idea = \App\Models\ContentIdea::where('status', 'researching')
+            ->orderBy('updated_at', 'asc')
+            ->first();
+
+        if (!$idea) {
+            return response()->json(['success' => false, 'message' => 'No pending ideas.'], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $idea,
+        ]);
+    });
+    Route::put('/content-ideas/{id}/complete', function (\Illuminate\Http\Request $request, $id) {
+        $idea = \App\Models\ContentIdea::findOrFail($id);
+        $idea->update([
+            'status' => 'article_ready',
+            'generated_article' => $request->input('generated_article'),
+            'research_data' => $request->input('research_data'),
+        ]);
+
+        return response()->json(['success' => true, 'data' => $idea->fresh()]);
+    });
     Route::get('/blog/image-status/{postId}', [\App\Http\Controllers\Api\BlogPipelineController::class, 'imageStatus']);
 
     // Carousel endpoints (protected)
@@ -369,8 +395,12 @@ Route::middleware(['auth:sanctum'])->prefix('admin/content-engine')->group(funct
     Route::get('/trending', [ContentIdeaController::class, 'pullTrending']);
     Route::post('/trending/import', [ContentIdeaController::class, 'importTrending']);
 
-    // Pipeline actions
+    // Pipeline: Gate 1 (Article)
     Route::post('/ideas/{id}/research', [ContentIdeaController::class, 'startResearch']);
     Route::get('/ideas/{id}/research', [ContentIdeaController::class, 'getResearch']);
-    Route::post('/ideas/{id}/generate', [ContentIdeaController::class, 'approveGenerate']);
+    Route::post('/ideas/{id}/approve-article', [ContentIdeaController::class, 'approveArticle']);
+
+    // Pipeline: Gate 2 (Images)
+    Route::post('/ideas/{id}/generate-images', [ContentIdeaController::class, 'startImageGeneration']);
+    Route::post('/ideas/{id}/publish', [ContentIdeaController::class, 'approveAndPublish']);
 });
