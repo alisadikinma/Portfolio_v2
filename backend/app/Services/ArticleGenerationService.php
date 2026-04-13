@@ -211,6 +211,11 @@ class ArticleGenerationService
         $pidFile = "/tmp/article-{$phase}-{$ideaId}.pid";
         $runScript = "/tmp/article-{$phase}-{$ideaId}.sh";
 
+        // Step 0: Clean old files to avoid permission conflicts between www-data and claudesn
+        Process::timeout(10)->run(
+            $this->sshCommand("rm -f {$promptFile} {$logFile} {$pidFile} {$runScript} 2>/dev/null; true")
+        );
+
         // Step 1: Write prompt to remote file
         $base64Prompt = base64_encode($claudePrompt);
         $writeResult = Process::timeout(15)->run(
