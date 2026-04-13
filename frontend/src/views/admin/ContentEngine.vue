@@ -380,33 +380,50 @@
           </div>
         </div>
 
-        <!-- Phase Groups -->
-        <div class="grid grid-cols-3 gap-2 mb-4">
-          <div
-            v-for="phase in pipelinePhases"
-            :key="phase.skill"
-            class="rounded-lg border px-3 py-2 transition-all"
-            :class="phaseClass(phase)"
-          >
-            <div class="flex items-center justify-between mb-1.5">
-              <span class="text-[10px] font-mono font-semibold uppercase tracking-wider" :class="phaseHeaderColor(phase)">{{ phase.name }}</span>
-              <span class="text-[9px] font-mono px-1.5 py-0.5 rounded" :class="phaseModelBadge(phase)">{{ phase.model }}</span>
-            </div>
-            <div class="flex flex-wrap gap-1">
-              <span
-                v-for="step in phase.steps"
-                :key="step.name"
-                class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium cursor-default"
-                :class="stepIndicatorClass(step)"
-                :title="`${step.label} @ ${step.pct}%`"
+        <!-- Pipeline Phase Table -->
+        <div class="mb-4 rounded-lg border border-neutral-700/50 overflow-hidden">
+          <table class="w-full text-xs">
+            <thead>
+              <tr class="bg-neutral-900/80 text-neutral-500 text-[10px] uppercase tracking-wider">
+                <th class="px-3 py-1.5 text-left font-medium">Phase</th>
+                <th class="px-3 py-1.5 text-left font-medium">Steps</th>
+                <th class="px-3 py-1.5 text-left font-medium">Skill</th>
+                <th class="px-3 py-1.5 text-left font-medium">Model</th>
+                <th class="px-3 py-1.5 text-right font-medium">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="phase in pipelinePhases"
+                :key="phase.skill"
+                class="border-t border-neutral-800 transition-colors"
+                :class="phaseRowClass(phase)"
               >
-                <svg v-if="stepIsDone(step)" class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
-                <svg v-else-if="stepIsActive(step)" class="animate-spin w-2.5 h-2.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                {{ step.label }}
-              </span>
-            </div>
-            <div class="text-[9px] font-mono text-neutral-500 mt-1">{{ phase.skill }} &middot; {{ phase.pctRange }}</div>
-          </div>
+                <td class="px-3 py-2 font-semibold text-[11px]" :class="phaseHeaderColor(phase)">{{ phase.name }}</td>
+                <td class="px-3 py-2">
+                  <div class="flex flex-wrap gap-1">
+                    <span
+                      v-for="step in phase.steps"
+                      :key="step.name"
+                      class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium"
+                      :class="stepIndicatorClass(step)"
+                    >
+                      <svg v-if="stepIsDone(step)" class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                      <svg v-else-if="stepIsActive(step)" class="animate-spin w-2.5 h-2.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                      {{ step.label }}
+                    </span>
+                  </div>
+                </td>
+                <td class="px-3 py-2 font-mono text-[10px] text-neutral-400">{{ phase.skill }}</td>
+                <td class="px-3 py-2">
+                  <span class="font-mono text-[10px] px-1.5 py-0.5 rounded" :class="phaseModelBadge(phase)">{{ phase.model }}</span>
+                </td>
+                <td class="px-3 py-2 text-right">
+                  <span class="font-mono text-[10px] font-medium" :class="phaseStatusColor(phase)">{{ phaseStatus(phase) }}</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
         <!-- Log Viewer -->
@@ -588,7 +605,7 @@ const pipelinePhases = [
   {
     name: 'Write',
     skill: '/article-write',
-    model: 'Opus',
+    model: 'Sonnet',
     pctRange: '35–85%',
     minPct: 35,
     maxPct: 85,
@@ -825,7 +842,7 @@ async function handleImportTrending() {
 // Config modal (research)
 function openConfigModal(idea) {
   currentIdea.value = idea
-  configLanguages.value = ['en', 'id']
+  configLanguages.value = ['id']
   configInstructions.value = ''
   showConfigModal.value = true
 }
@@ -1001,11 +1018,11 @@ function stepIndicatorClass(step) {
   return 'bg-neutral-100 text-neutral-400 dark:bg-neutral-700 dark:text-neutral-500'
 }
 
-function phaseClass(phase) {
+function phaseRowClass(phase) {
   const pct = progressData.value.progress_percentage || 0
-  if (pct >= phase.maxPct) return 'border-green-500/40 bg-green-950/20'
-  if (pct >= phase.minPct) return 'border-amber-500/60 bg-amber-950/20 shadow-[0_0_12px_-3px_rgba(245,158,11,0.15)]'
-  return 'border-neutral-700/50 bg-neutral-900/20'
+  if (pct >= phase.maxPct) return 'bg-green-950/10'
+  if (pct >= phase.minPct) return 'bg-amber-950/15'
+  return ''
 }
 
 function phaseHeaderColor(phase) {
@@ -1020,6 +1037,20 @@ function phaseModelBadge(phase) {
   if (pct >= phase.maxPct) return 'bg-green-900/40 text-green-400'
   if (pct >= phase.minPct) return 'bg-amber-900/40 text-amber-400'
   return 'bg-neutral-800 text-neutral-500'
+}
+
+function phaseStatus(phase) {
+  const pct = progressData.value.progress_percentage || 0
+  if (pct >= phase.maxPct) return '✓ Done'
+  if (pct >= phase.minPct) return `⏳ ${pct}%`
+  return '○ Wait'
+}
+
+function phaseStatusColor(phase) {
+  const pct = progressData.value.progress_percentage || 0
+  if (pct >= phase.maxPct) return 'text-green-400'
+  if (pct >= phase.minPct) return 'text-amber-400'
+  return 'text-neutral-600'
 }
 
 function openProgressModal(idea) {
