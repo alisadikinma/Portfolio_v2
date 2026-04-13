@@ -170,7 +170,7 @@ class ArticleGenerationService
 
         $modelFlag = $model ? "--model {$model}" : '';
         $refsFlag = $refsFile ? "--append-system-prompt-file {$refsFile}" : '';
-        $extraFlags = trim("{$modelFlag} {$refsFlag}");
+        $extraFlags = trim("{$modelFlag} {$refsFlag} --effort medium");
 
         if ($isWindows) {
             $sep = DIRECTORY_SEPARATOR;
@@ -224,7 +224,7 @@ class ArticleGenerationService
         // Step 2: Build runner script with model + refs flags
         $modelFlag = $model ? "--model {$model}" : '';
         $refsFlag = $refsFile ? "--append-system-prompt-file {$refsFile}" : '';
-        $extraFlags = trim("{$modelFlag} {$refsFlag}");
+        $extraFlags = trim("{$modelFlag} {$refsFlag} --effort medium");
 
         $scriptContent = base64_encode(implode("\n", [
             '#!/bin/bash',
