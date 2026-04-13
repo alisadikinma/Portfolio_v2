@@ -162,7 +162,8 @@ class ArticleGenerationService
     private function sshCommand(string $remoteCommand): string
     {
         $keyOption = $this->sshKey ? "-i {$this->sshKey}" : '';
-        return "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 {$keyOption} {$this->sshUser}@{$this->sshHost} \"{$remoteCommand}\"";
+        $escapedCommand = str_replace("'", "'\\''", $remoteCommand);
+        return "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 {$keyOption} {$this->sshUser}@{$this->sshHost} \"bash -lc '{$escapedCommand}'\"";
     }
 
     private function readPidFile(string $pidFile, string $driver): ?int
