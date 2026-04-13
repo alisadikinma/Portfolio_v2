@@ -1019,6 +1019,13 @@ async function pollProgress(ideaId) {
   const result = await getProgress(ideaId)
   if (result.success && result.data) {
     progressData.value = result.data
+    // Sync progress back to ideas list so the table row updates in real-time
+    const idx = ideas.value.findIndex(i => i.id === ideaId)
+    if (idx !== -1) {
+      ideas.value[idx].progress_percentage = result.data.progress_percentage
+      ideas.value[idx].current_step = result.data.current_step
+      ideas.value[idx].status = result.data.status || ideas.value[idx].status
+    }
     // Auto-scroll log to bottom
     if (logContainer.value) {
       setTimeout(() => {
