@@ -380,50 +380,38 @@
           </div>
         </div>
 
-        <!-- Pipeline Phase Table -->
-        <div class="mb-4 rounded-lg border border-neutral-700/50 overflow-hidden">
-          <table class="w-full text-xs">
-            <thead>
-              <tr class="bg-neutral-900/80 text-neutral-500 text-[10px] uppercase tracking-wider">
-                <th class="px-3 py-1.5 text-left font-medium">Phase</th>
-                <th class="px-3 py-1.5 text-left font-medium">Steps</th>
-                <th class="px-3 py-1.5 text-left font-medium">Skill</th>
-                <th class="px-3 py-1.5 text-left font-medium">Model</th>
-                <th class="px-3 py-1.5 text-right font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="phase in pipelinePhases"
-                :key="phase.skill"
-                class="border-t border-neutral-800 transition-colors"
-                :class="phaseRowClass(phase)"
+        <!-- Pipeline Phase Cards (always show all 3) -->
+        <div class="grid grid-cols-3 gap-2 mb-4">
+          <div
+            v-for="phase in pipelinePhases"
+            :key="phase.skill"
+            class="rounded-lg border px-3 py-2.5 transition-all"
+            :class="phaseCardClass(phase)"
+          >
+            <!-- Header: Phase name + Model badge + Status -->
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center gap-2">
+                <span class="text-[11px] font-bold uppercase tracking-wide" :class="phaseHeaderColor(phase)">{{ phase.name }}</span>
+                <span class="text-[9px] font-mono px-1.5 py-0.5 rounded" :class="phaseModelBadge(phase)">{{ phase.model }}</span>
+              </div>
+              <span class="text-[10px] font-mono font-medium" :class="phaseStatusColor(phase)">{{ phaseStatus(phase) }}</span>
+            </div>
+            <!-- Step chips -->
+            <div class="flex flex-wrap gap-1 mb-2">
+              <span
+                v-for="step in phase.steps"
+                :key="step.name"
+                class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium"
+                :class="stepIndicatorClass(step)"
               >
-                <td class="px-3 py-2 font-semibold text-[11px]" :class="phaseHeaderColor(phase)">{{ phase.name }}</td>
-                <td class="px-3 py-2">
-                  <div class="flex flex-wrap gap-1">
-                    <span
-                      v-for="step in phase.steps"
-                      :key="step.name"
-                      class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium"
-                      :class="stepIndicatorClass(step)"
-                    >
-                      <svg v-if="stepIsDone(step)" class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
-                      <svg v-else-if="stepIsActive(step)" class="animate-spin w-2.5 h-2.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                      {{ step.label }}
-                    </span>
-                  </div>
-                </td>
-                <td class="px-3 py-2 font-mono text-[10px] text-neutral-400">{{ phase.skill }}</td>
-                <td class="px-3 py-2">
-                  <span class="font-mono text-[10px] px-1.5 py-0.5 rounded" :class="phaseModelBadge(phase)">{{ phase.model }}</span>
-                </td>
-                <td class="px-3 py-2 text-right">
-                  <span class="font-mono text-[10px] font-medium" :class="phaseStatusColor(phase)">{{ phaseStatus(phase) }}</span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                <svg v-if="stepIsDone(step)" class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                <svg v-else-if="stepIsActive(step)" class="animate-spin w-2.5 h-2.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                {{ step.label }}
+              </span>
+            </div>
+            <!-- Footer: Skill + Pct range -->
+            <div class="text-[9px] font-mono text-neutral-500">{{ phase.skill }} · {{ phase.pctRange }}</div>
+          </div>
         </div>
 
         <!-- Log Viewer -->
@@ -1018,11 +1006,11 @@ function stepIndicatorClass(step) {
   return 'bg-neutral-100 text-neutral-400 dark:bg-neutral-700 dark:text-neutral-500'
 }
 
-function phaseRowClass(phase) {
+function phaseCardClass(phase) {
   const pct = progressData.value.progress_percentage || 0
-  if (pct >= phase.maxPct) return 'bg-green-950/10'
-  if (pct >= phase.minPct) return 'bg-amber-950/15'
-  return ''
+  if (pct >= phase.maxPct) return 'border-green-500/40 bg-green-950/10'
+  if (pct >= phase.minPct) return 'border-amber-500/50 bg-amber-950/10'
+  return 'border-neutral-700/40 bg-neutral-900/20'
 }
 
 function phaseHeaderColor(phase) {
