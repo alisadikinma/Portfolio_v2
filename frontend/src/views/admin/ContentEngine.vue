@@ -354,7 +354,7 @@
 
     <!-- Progress Modal -->
     <div v-if="showProgressModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="closeProgressModal">
-      <div class="bg-white dark:bg-neutral-800 rounded-xl shadow-xl max-w-2xl w-full mx-4 p-6 max-h-[80vh] flex flex-col">
+      <div class="bg-white dark:bg-neutral-800 rounded-xl shadow-xl max-w-4xl w-full mx-4 p-6 max-h-[90vh] flex flex-col">
         <div class="flex items-center justify-between mb-4">
           <div>
             <h3 class="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Article Generation Progress</h3>
@@ -385,12 +385,14 @@
           <span
             v-for="step in progressSteps"
             :key="step.name"
-            class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors"
+            class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-default"
             :class="stepIndicatorClass(step)"
+            :title="`${step.label} — ${step.skill} (${step.model}) @ ${step.pct}%`"
           >
             <svg v-if="stepIsDone(step)" class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
-            <svg v-else-if="stepIsCurrent(step)" class="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+            <svg v-else-if="stepIsActive(step)" class="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
             {{ step.label }}
+            <span v-if="stepIsActive(step)" class="text-[8px] opacity-70">{{ step.model }}</span>
           </span>
         </div>
 
@@ -418,7 +420,7 @@
             <span class="text-xs font-mono text-neutral-400">Generation Log</span>
             <span class="text-[10px] font-mono text-neutral-500">{{ (progressData.progress_log || []).length }} entries</span>
           </div>
-          <div ref="logContainer" class="overflow-y-auto flex-1 p-3 space-y-1 font-mono text-xs" style="max-height: 250px; scroll-behavior: smooth;">
+          <div ref="logContainer" class="overflow-y-auto flex-1 p-3 space-y-1 font-mono text-xs" style="max-height: 400px; scroll-behavior: smooth;">
             <div v-if="!(progressData.progress_log || []).length" class="text-neutral-500 py-4 text-center">Waiting for log entries...</div>
             <div
               v-for="(entry, i) in (progressData.progress_log || [])"
@@ -574,18 +576,19 @@ let progressPollInterval = null
 const logContainer = ref(null)
 
 const progressSteps = [
-  { name: 'input_collection', label: 'Input', pct: 5 },
-  { name: 'topic_research', label: 'Research', pct: 10 },
-  { name: 'framework_selection', label: 'Framework', pct: 15 },
-  { name: 'emotional_arc', label: 'Arc', pct: 20 },
-  { name: 'hook_generation', label: 'Hook', pct: 25 },
-  { name: 'outline_generation', label: 'Outline', pct: 35 },
-  { name: 'article_writing', label: 'Writing', pct: 70 },
-  { name: 'style_pass', label: 'Style', pct: 80 },
-  { name: 'image_prompts', label: 'Images', pct: 85 },
-  { name: 'virality_score', label: 'Virality', pct: 90 },
-  { name: 'quality_gate', label: 'Quality', pct: 95 },
-  { name: 'completed', label: 'Done', pct: 100 },
+  { name: 'input_collection', label: 'Input', pct: 5, skill: 'article-prep', model: 'Sonnet' },
+  { name: 'topic_research', label: 'Research', pct: 15, skill: 'article-prep', model: 'Sonnet' },
+  { name: 'strategy', label: 'Strategy', pct: 25, skill: 'article-prep', model: 'Sonnet' },
+  { name: 'outline', label: 'Outline', pct: 35, skill: 'article-prep', model: 'Sonnet' },
+  { name: 'writing_started', label: 'Writing', pct: 50, skill: 'article-write', model: 'Opus' },
+  { name: 'draft_complete', label: 'Draft', pct: 70, skill: 'article-write', model: 'Opus' },
+  { name: 'style_pass', label: 'Style', pct: 78, skill: 'article-write', model: 'Opus' },
+  { name: 'seo_pass', label: 'SEO', pct: 82, skill: 'article-write', model: 'Opus' },
+  { name: 'images_generated', label: 'Images', pct: 85, skill: 'article-write', model: 'Opus' },
+  { name: 'virality_scored', label: 'Virality', pct: 90, skill: 'article-score', model: 'Sonnet' },
+  { name: 'quality_scored', label: 'Quality', pct: 94, skill: 'article-score', model: 'Sonnet' },
+  { name: 'seo_scored', label: 'SEO Gate', pct: 97, skill: 'article-score', model: 'Sonnet' },
+  { name: 'completed', label: 'Done', pct: 100, skill: '-', model: '-' },
 ]
 
 // Active skill + model detection based on progress percentage
@@ -951,15 +954,25 @@ function formatStepName(step) {
     initializing: 'Initializing...',
     input_collection: 'Collecting input...',
     topic_research: 'Researching topic...',
+    research: 'Researching topic...',
     framework_selection: 'Selecting framework...',
+    strategy: 'Selecting strategy...',
     emotional_arc: 'Mapping emotional arc...',
     hook_generation: 'Generating hooks...',
     outline_generation: 'Creating outline...',
+    outline: 'Creating outline...',
+    writing_started: 'Writing Started',
     article_writing: 'Writing article...',
-    style_pass: 'Editing style...',
+    draft_complete: 'Draft Complete',
+    style_pass: 'Style Pass',
+    seo_pass: 'SEO Optimization',
     image_prompts: 'Generating image prompts...',
+    images_generated: 'Images Generated',
     virality_score: 'Scoring virality...',
+    virality_scored: 'Virality Scored',
     quality_gate: 'Quality gate check...',
+    quality_scored: 'Quality Scored',
+    seo_scored: 'SEO Scored',
     completed: 'Completed!',
     failed: 'Failed',
   }
@@ -975,13 +988,16 @@ function stepIsDone(step) {
   return progressData.value.progress_percentage > step.pct
 }
 
-function stepIsCurrent(step) {
-  return progressData.value.current_step === step.name
+function stepIsActive(step) {
+  const pct = progressData.value.progress_percentage || 0
+  const idx = progressSteps.findIndex(s => s.name === step.name)
+  const nextStep = progressSteps[idx + 1]
+  return pct >= step.pct && (!nextStep || pct < nextStep.pct)
 }
 
 function stepIndicatorClass(step) {
   if (stepIsDone(step)) return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-  if (stepIsCurrent(step)) return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 ring-1 ring-amber-400'
+  if (stepIsActive(step)) return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 ring-1 ring-amber-400 animate-pulse'
   return 'bg-neutral-100 text-neutral-400 dark:bg-neutral-700 dark:text-neutral-500'
 }
 
