@@ -70,7 +70,7 @@ class ArticleGenerationService
                 $result = Process::run("kill -0 {$pid} 2>/dev/null; echo $?");
                 return trim($result->output()) === '0';
             }
-            $result = Process::run($this->sshCommand("kill -0 {$pid} 2>/dev/null; echo \$?"));
+            $result = Process::run($this->sshCommand("'kill -0 {$pid} 2>/dev/null; echo \$?'"));
             return trim($result->output()) === '0';
         } catch (\Exception $e) {
             return false;
@@ -136,19 +136,45 @@ class ArticleGenerationService
 
     private function executeSSH(string $claudePrompt, int $ideaId): array
     {
+        $promptFile = "/tmp/article-gen-{$ideaId}-prompt.txt";
         $logFile = "/tmp/article-gen-{$ideaId}.log";
         $pidFile = "/tmp/article-gen-{$ideaId}.pid";
+        $runScript = "/tmp/article-gen-{$ideaId}.sh";
 
-        $remoteCommand = "source ~/.profile; nohup {$this->claudePath} -p \\\"{$claudePrompt}\\\" --dangerously-skip-permissions > {$logFile} 2>&1 & echo \\\$! > {$pidFile}";
-        $sshCmd = $this->sshCommand($remoteCommand);
+        // Step 1: Write prompt to remote file (avoids all escaping issues)
+        $base64Prompt = base64_encode($claudePrompt);
+        $writeResult = Process::timeout(15)->run(
+            $this->sshCommand("echo {$base64Prompt} | base64 -d > {$promptFile}")
+        );
 
-        $result = Process::timeout(30)->run($sshCmd);
+        if (!$writeResult->successful()) {
+            throw new \RuntimeException('Failed to write prompt file: ' . $writeResult->errorOutput());
+        }
+
+        // Step 2: Write a runner script that sources .profile and reads prompt from file
+        $scriptContent = base64_encode(implode("\n", [
+            '#!/bin/bash',
+            'source ~/.profile 2>/dev/null',
+            "prompt=\$(cat {$promptFile})",
+            "nohup {$this->claudePath} -p \"\$prompt\" --dangerously-skip-permissions > {$logFile} 2>&1 &",
+            "echo \$! > {$pidFile}",
+        ]));
+        $scriptResult = Process::timeout(15)->run(
+            $this->sshCommand("echo {$scriptContent} | base64 -d > {$runScript} && chmod +x {$runScript}")
+        );
+
+        if (!$scriptResult->successful()) {
+            throw new \RuntimeException('Failed to write run script: ' . $scriptResult->errorOutput());
+        }
+
+        // Step 3: Execute the script
+        $result = Process::timeout(30)->run($this->sshCommand($runScript));
 
         if (!$result->successful()) {
             throw new \RuntimeException('SSH execution failed: ' . $result->errorOutput());
         }
 
-        $pid = $this->readPidFile($pidFile, 'ssh');
+        $pid = $this->readPidFile($pidFile);
 
         Log::info('[ArticleGeneration] SSH process started', [
             'idea_id' => $ideaId,
@@ -162,18 +188,13 @@ class ArticleGenerationService
     private function sshCommand(string $remoteCommand): string
     {
         $keyOption = $this->sshKey ? "-i {$this->sshKey}" : '';
-        $escapedCommand = str_replace("'", "'\\''", $remoteCommand);
-        return "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 {$keyOption} {$this->sshUser}@{$this->sshHost} \"bash -lc '{$escapedCommand}'\"";
+        return "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 {$keyOption} {$this->sshUser}@{$this->sshHost} {$remoteCommand}";
     }
 
-    private function readPidFile(string $pidFile, string $driver): ?int
+    private function readPidFile(string $pidFile): ?int
     {
         try {
-            if ($driver === 'local') {
-                $result = Process::run("cat {$pidFile} 2>/dev/null");
-            } else {
-                $result = Process::run($this->sshCommand("cat {$pidFile} 2>/dev/null"));
-            }
+            $result = Process::run($this->sshCommand("cat {$pidFile} 2>/dev/null"));
             $pid = (int) trim($result->output());
             return $pid > 0 ? $pid : null;
         } catch (\Exception $e) {
