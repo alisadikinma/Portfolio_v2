@@ -477,6 +477,68 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
     });
     Route::get('/blog/image-status/{postId}', [\App\Http\Controllers\Api\BlogPipelineController::class, 'imageStatus']);
 
+    // Split pipeline endpoints — used by article-prep/write/score skills
+    Route::get('/content-ideas/{id}', function ($id) {
+        $idea = \App\Models\ContentIdea::find($id);
+        if (!$idea) {
+            return response()->json(['success' => false, 'message' => 'Idea not found.'], 404);
+        }
+        return response()->json(['success' => true, 'data' => $idea]);
+    });
+
+    Route::put('/content-ideas/{id}/save-prep', function (\Illuminate\Http\Request $request, $id) {
+        $idea = \App\Models\ContentIdea::find($id);
+        if (!$idea) {
+            return response()->json(['success' => false, 'message' => 'Idea not found.'], 404);
+        }
+
+        $existing = $idea->generated_article ?? [];
+        $existing['prep_data'] = $request->input('prep_data', []);
+        $idea->update(['generated_article' => $existing]);
+
+        return response()->json(['success' => true, 'message' => 'Prep data saved.']);
+    });
+
+    Route::put('/content-ideas/{id}/save-article', function (\Illuminate\Http\Request $request, $id) {
+        $idea = \App\Models\ContentIdea::find($id);
+        if (!$idea) {
+            return response()->json(['success' => false, 'message' => 'Idea not found.'], 404);
+        }
+
+        $existing = $idea->generated_article ?? [];
+        // Merge article data, preserving prep_data
+        $articleData = $request->except(['prep_data']);
+        $idea->update(['generated_article' => array_merge($existing, $articleData)]);
+
+        return response()->json(['success' => true, 'message' => 'Article data saved.']);
+    });
+
+    Route::post('/content-ideas/{id}/continue-pipeline', function ($id) {
+        $idea = \App\Models\ContentIdea::find($id);
+        if (!$idea) {
+            return response()->json(['success' => false, 'message' => 'Idea not found.'], 404);
+        }
+
+        $service = app(\App\Services\ArticleGenerationService::class);
+        $progress = $idea->progress_percentage ?? 0;
+
+        // Prep done (35%) → trigger write
+        if ($progress >= 35 && $progress < 85) {
+            $result = $service->triggerWrite($idea->id);
+            $idea->update(['process_pid' => $result['pid']]);
+            return response()->json(['success' => true, 'next_phase' => 'write', 'pid' => $result['pid']]);
+        }
+
+        // Write done (85%) → trigger score
+        if ($progress >= 85 && $progress < 100) {
+            $result = $service->triggerScore($idea->id);
+            $idea->update(['process_pid' => $result['pid']]);
+            return response()->json(['success' => true, 'next_phase' => 'score', 'pid' => $result['pid']]);
+        }
+
+        return response()->json(['success' => false, 'message' => 'No next phase to trigger.', 'progress' => $progress]);
+    });
+
     // Carousel endpoints (protected)
     Route::get('/carousel/accounts', [CarouselDraftController::class, 'listAccounts']);
     Route::get('/carousel/drafts', [CarouselDraftController::class, 'index']);

@@ -27,7 +27,8 @@ class ArticleGenerationService
     }
 
     /**
-     * Trigger article generation for a content idea.
+     * Trigger full article generation (single-skill fallback).
+     * Uses /article-gen skill — all steps in one session.
      *
      * @return array{success: bool, pid: int|null, error: string|null}
      */
@@ -37,21 +38,70 @@ class ArticleGenerationService
         $languages = implode(',', $config['languages'] ?? ['en']);
         $instructions = $config['instructions'] ?? '';
 
-        $claudePrompt = $this->buildClaudePrompt($ideaId, $topic, $languages, $instructions);
+        $prompt = $this->buildArticleGenPrompt($ideaId, $topic, $languages, $instructions);
 
-        try {
-            if ($this->driver === 'local') {
-                return $this->executeLocal($claudePrompt, $ideaId);
-            }
-            return $this->executeSSH($claudePrompt, $ideaId);
-        } catch (\Exception $e) {
-            Log::error('[ArticleGeneration] Trigger failed', [
-                'idea_id' => $ideaId,
-                'driver' => $this->driver,
-                'error' => $e->getMessage(),
-            ]);
-            return ['success' => false, 'pid' => null, 'error' => $e->getMessage()];
+        return $this->executePrompt($prompt, $ideaId, 'gen');
+    }
+
+    /**
+     * Trigger article prep (Steps 1-3: research, strategy, outline).
+     * Uses /article-prep skill on Sonnet with refs-prep.md.
+     *
+     * @return array{success: bool, pid: int|null, error: string|null}
+     */
+    public function triggerPrep(int $ideaId, array $config = []): array
+    {
+        $topic = $config['topic'] ?? '';
+        $languages = implode(',', $config['languages'] ?? ['en']);
+        $instructions = $config['instructions'] ?? '';
+        $keyword = $config['keyword'] ?? '';
+
+        $prompt = "/article-prep --idea-id {$ideaId} --api-url {$this->apiUrl} --api-token {$this->apiToken}";
+        $prompt .= ' --topic "' . addslashes($topic) . '"';
+        $prompt .= " --languages {$languages}";
+        if ($keyword) {
+            $prompt .= ' --keyword "' . addslashes($keyword) . '"';
         }
+        if ($instructions) {
+            $prompt .= ' --instructions "' . addslashes($instructions) . '"';
+        }
+
+        $model = config('services.article_generation.model_prep', 'sonnet');
+        $refsFile = config('services.article_generation.refs_prep', '');
+
+        return $this->executePrompt($prompt, $ideaId, 'prep', $model, $refsFile);
+    }
+
+    /**
+     * Trigger article writing (Step 4: write + polish + images).
+     * Uses /article-write skill on Opus with refs-write.md.
+     *
+     * @return array{success: bool, pid: int|null, error: string|null}
+     */
+    public function triggerWrite(int $ideaId): array
+    {
+        $prompt = "/article-write --idea-id {$ideaId} --api-url {$this->apiUrl} --api-token {$this->apiToken}";
+
+        $model = config('services.article_generation.model_write', 'opus');
+        $refsFile = config('services.article_generation.refs_write', '');
+
+        return $this->executePrompt($prompt, $ideaId, 'write', $model, $refsFile);
+    }
+
+    /**
+     * Trigger article scoring (Step 5: five gates + combined 100-point).
+     * Uses /article-score skill on Sonnet with refs-score.md.
+     *
+     * @return array{success: bool, pid: int|null, error: string|null}
+     */
+    public function triggerScore(int $ideaId): array
+    {
+        $prompt = "/article-score --idea-id {$ideaId} --api-url {$this->apiUrl} --api-token {$this->apiToken}";
+
+        $model = config('services.article_generation.model_score', 'sonnet');
+        $refsFile = config('services.article_generation.refs_score', '');
+
+        return $this->executePrompt($prompt, $ideaId, 'score', $model, $refsFile);
     }
 
     /**
@@ -77,71 +127,91 @@ class ArticleGenerationService
         }
     }
 
-    private function buildClaudePrompt(int $ideaId, string $topic, string $languages, string $instructions): string
+    /**
+     * Execute a prompt via SSH or local, with optional model and refs file.
+     *
+     * @return array{success: bool, pid: int|null, error: string|null}
+     */
+    private function executePrompt(string $prompt, int $ideaId, string $phase, string $model = '', string $refsFile = ''): array
     {
-        $escapedTopic = addslashes($topic);
-        $escapedInstructions = addslashes($instructions);
+        try {
+            if ($this->driver === 'local') {
+                return $this->executeLocal($prompt, $ideaId, $phase, $model, $refsFile);
+            }
+            return $this->executeSSH($prompt, $ideaId, $phase, $model, $refsFile);
+        } catch (\Exception $e) {
+            Log::error('[ArticleGeneration] Trigger failed', [
+                'idea_id' => $ideaId,
+                'phase' => $phase,
+                'driver' => $this->driver,
+                'error' => $e->getMessage(),
+            ]);
+            return ['success' => false, 'pid' => null, 'error' => $e->getMessage()];
+        }
+    }
 
+    private function buildArticleGenPrompt(int $ideaId, string $topic, string $languages, string $instructions): string
+    {
         $prompt = "/article-gen --idea-id {$ideaId} --api-url {$this->apiUrl} --api-token {$this->apiToken}";
-        $prompt .= " --topic \"{$escapedTopic}\"";
+        $prompt .= ' --topic "' . addslashes($topic) . '"';
         $prompt .= " --languages {$languages}";
-
-        if ($escapedInstructions) {
-            $prompt .= " --instructions \"{$escapedInstructions}\"";
+        if ($instructions) {
+            $prompt .= ' --instructions "' . addslashes($instructions) . '"';
         }
 
         return $prompt;
     }
 
-    private function executeLocal(string $claudePrompt, int $ideaId): array
+    private function executeLocal(string $claudePrompt, int $ideaId, string $phase = 'gen', string $model = '', string $refsFile = ''): array
     {
         $isWindows = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
         $tmpDir = $isWindows ? sys_get_temp_dir() : '/tmp';
-        $logFile = $tmpDir . DIRECTORY_SEPARATOR . "article-gen-{$ideaId}.log";
+        $logFile = $tmpDir . DIRECTORY_SEPARATOR . "article-{$phase}-{$ideaId}.log";
+
+        $modelFlag = $model ? "--model {$model}" : '';
+        $refsFlag = $refsFile ? "--append-system-prompt-file {$refsFile}" : '';
+        $extraFlags = trim("{$modelFlag} {$refsFlag}");
 
         if ($isWindows) {
-            // Windows: write prompt to file, then launch PowerShell script
-            // that reads it — avoids all cmd.exe escaping issues
             $sep = DIRECTORY_SEPARATOR;
-            $promptFile = "{$tmpDir}{$sep}article-gen-{$ideaId}-prompt.txt";
-            $runScript = "{$tmpDir}{$sep}article-gen-{$ideaId}.ps1";
+            $promptFile = "{$tmpDir}{$sep}article-{$phase}-{$ideaId}-prompt.txt";
+            $runScript = "{$tmpDir}{$sep}article-{$phase}-{$ideaId}.ps1";
             $errFile = "{$logFile}.err";
 
             file_put_contents($promptFile, $claudePrompt);
             file_put_contents($runScript, implode("\r\n", [
                 '$prompt = (Get-Content -Raw "' . $promptFile . '").Trim()',
-                '& "' . $this->claudePath . '" -p "$prompt" --dangerously-skip-permissions > "' . $logFile . '" 2> "' . $errFile . '"',
+                '& "' . $this->claudePath . '" -p "$prompt" ' . $extraFlags . ' --dangerously-skip-permissions > "' . $logFile . '" 2> "' . $errFile . '"',
             ]));
 
             $psLauncher = "\$p = Start-Process -FilePath 'powershell' -ArgumentList '-ExecutionPolicy Bypass -File \"" . $runScript . "\"' -WindowStyle Hidden -PassThru; Write-Output \$p.Id";
             $result = Process::timeout(30)->run(['powershell', '-Command', $psLauncher]);
             $pid = (int) trim($result->output());
         } else {
-            // Unix: nohup background process
-            $pidFile = "{$tmpDir}/article-gen-{$ideaId}.pid";
-            $command = "nohup {$this->claudePath} -p \"{$claudePrompt}\" --dangerously-skip-permissions > {$logFile} 2>&1 & echo \$! > {$pidFile}";
+            $pidFile = "{$tmpDir}/article-{$phase}-{$ideaId}.pid";
+            $command = "nohup {$this->claudePath} -p \"{$claudePrompt}\" {$extraFlags} --dangerously-skip-permissions > {$logFile} 2>&1 & echo \$! > {$pidFile}";
             Process::run($command);
-            $pid = $this->readPidFile($pidFile, 'local');
+            $pid = (int) trim(file_get_contents($pidFile));
         }
 
-        Log::info('[ArticleGeneration] Local process started', [
+        Log::info("[ArticleGeneration] Local {$phase} process started", [
             'idea_id' => $ideaId,
+            'phase' => $phase,
             'pid' => $pid,
-            'os' => $isWindows ? 'windows' : 'unix',
-            'log_file' => $logFile,
+            'model' => $model ?: 'default',
         ]);
 
         return ['success' => true, 'pid' => $pid > 0 ? $pid : null, 'error' => null];
     }
 
-    private function executeSSH(string $claudePrompt, int $ideaId): array
+    private function executeSSH(string $claudePrompt, int $ideaId, string $phase = 'gen', string $model = '', string $refsFile = ''): array
     {
-        $promptFile = "/tmp/article-gen-{$ideaId}-prompt.txt";
-        $logFile = "/tmp/article-gen-{$ideaId}.log";
-        $pidFile = "/tmp/article-gen-{$ideaId}.pid";
-        $runScript = "/tmp/article-gen-{$ideaId}.sh";
+        $promptFile = "/tmp/article-{$phase}-{$ideaId}-prompt.txt";
+        $logFile = "/tmp/article-{$phase}-{$ideaId}.log";
+        $pidFile = "/tmp/article-{$phase}-{$ideaId}.pid";
+        $runScript = "/tmp/article-{$phase}-{$ideaId}.sh";
 
-        // Step 1: Write prompt to remote file (avoids all escaping issues)
+        // Step 1: Write prompt to remote file
         $base64Prompt = base64_encode($claudePrompt);
         $writeResult = Process::timeout(15)->run(
             $this->sshCommand("echo {$base64Prompt} | base64 -d > {$promptFile}")
@@ -151,12 +221,16 @@ class ArticleGenerationService
             throw new \RuntimeException('Failed to write prompt file: ' . $writeResult->errorOutput());
         }
 
-        // Step 2: Write a runner script that sources .profile and reads prompt from file
+        // Step 2: Build runner script with model + refs flags
+        $modelFlag = $model ? "--model {$model}" : '';
+        $refsFlag = $refsFile ? "--append-system-prompt-file {$refsFile}" : '';
+        $extraFlags = trim("{$modelFlag} {$refsFlag}");
+
         $scriptContent = base64_encode(implode("\n", [
             '#!/bin/bash',
             'source ~/.profile 2>/dev/null',
             "prompt=\$(cat {$promptFile})",
-            "nohup {$this->claudePath} -p \"\$prompt\" --dangerously-skip-permissions > {$logFile} 2>&1 &",
+            "nohup {$this->claudePath} -p \"\$prompt\" {$extraFlags} --dangerously-skip-permissions > {$logFile} 2>&1 &",
             "echo \$! > {$pidFile}",
         ]));
         $scriptResult = Process::timeout(15)->run(
@@ -167,7 +241,7 @@ class ArticleGenerationService
             throw new \RuntimeException('Failed to write run script: ' . $scriptResult->errorOutput());
         }
 
-        // Step 3: Execute the script with login shell (sources .profile for OAuth token)
+        // Step 3: Execute the script
         $result = Process::timeout(30)->run($this->sshCommand("bash -l {$runScript}"));
 
         if (!$result->successful()) {
@@ -176,9 +250,12 @@ class ArticleGenerationService
 
         $pid = $this->readPidFile($pidFile);
 
-        Log::info('[ArticleGeneration] SSH process started', [
+        Log::info("[ArticleGeneration] SSH {$phase} process started", [
             'idea_id' => $ideaId,
+            'phase' => $phase,
             'pid' => $pid,
+            'model' => $model ?: 'default',
+            'refs_file' => $refsFile ?: 'none',
             'host' => $this->sshHost,
         ]);
 

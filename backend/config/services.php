@@ -60,6 +60,12 @@ return [
         'claude_path' => env('ARTICLE_GEN_CLAUDE_PATH', 'claude'),
         'api_url' => env('ARTICLE_GEN_API_URL', 'https://alisadikinma.com/api'),
         'api_token' => env('ARTICLE_GEN_API_TOKEN', ''),
+        'refs_prep' => env('ARTICLE_GEN_REFS_PREP', ''),
+        'refs_write' => env('ARTICLE_GEN_REFS_WRITE', ''),
+        'refs_score' => env('ARTICLE_GEN_REFS_SCORE', ''),
+        'model_prep' => env('ARTICLE_GEN_MODEL_PREP', 'sonnet'),
+        'model_write' => env('ARTICLE_GEN_MODEL_WRITE', 'opus'),
+        'model_score' => env('ARTICLE_GEN_MODEL_SCORE', 'sonnet'),
     ],
 
 ];

@@ -306,11 +306,22 @@ class ContentIdeaController extends Controller
             ]],
         ]);
 
-        $result = $this->articleGen->triggerGeneration($idea->id, [
-            'topic' => $idea->title,
-            'languages' => $validated['languages'],
-            'instructions' => $validated['instructions'] ?? '',
-        ]);
+        // Use split pipeline (prep→write→score) when refs are configured, else fallback to single /article-gen
+        $useSplitPipeline = !empty(config('services.article_generation.refs_prep'));
+
+        if ($useSplitPipeline) {
+            $result = $this->articleGen->triggerPrep($idea->id, [
+                'topic' => $idea->title,
+                'languages' => $validated['languages'],
+                'instructions' => $validated['instructions'] ?? '',
+            ]);
+        } else {
+            $result = $this->articleGen->triggerGeneration($idea->id, [
+                'topic' => $idea->title,
+                'languages' => $validated['languages'],
+                'instructions' => $validated['instructions'] ?? '',
+            ]);
+        }
 
         if ($result['success']) {
             $idea->update([
@@ -318,6 +329,7 @@ class ContentIdeaController extends Controller
                 'workflows' => [[
                     'type' => 'blog_article',
                     'driver' => 'claude_cli',
+                    'pipeline' => $useSplitPipeline ? 'split' : 'single',
                     'pid' => $result['pid'],
                     'status' => 'running',
                     'created_at' => now()->toISOString(),
@@ -339,7 +351,9 @@ class ContentIdeaController extends Controller
         return response()->json([
             'success' => true,
             'data' => $idea->fresh(),
-            'message' => $result['success'] ? 'Article generation started via CLI.' : 'Generation trigger failed, but idea is in researching state.',
+            'message' => $result['success']
+                ? ($useSplitPipeline ? 'Split pipeline started (prep → write → score).' : 'Article generation started via CLI.')
+                : 'Generation trigger failed, but idea is in researching state.',
         ]);
     }
 
