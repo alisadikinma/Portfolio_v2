@@ -139,7 +139,7 @@ class ArticleGenerationService
         $logFile = "/tmp/article-gen-{$ideaId}.log";
         $pidFile = "/tmp/article-gen-{$ideaId}.pid";
 
-        $remoteCommand = "nohup {$this->claudePath} -p \\\"{$claudePrompt}\\\" --dangerously-skip-permissions > {$logFile} 2>&1 & echo \\\$! > {$pidFile}";
+        $remoteCommand = "source ~/.profile; nohup {$this->claudePath} -p \\\"{$claudePrompt}\\\" --dangerously-skip-permissions > {$logFile} 2>&1 & echo \\\$! > {$pidFile}";
         $sshCmd = $this->sshCommand($remoteCommand);
 
         $result = Process::timeout(30)->run($sshCmd);
