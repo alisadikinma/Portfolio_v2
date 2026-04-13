@@ -989,15 +989,24 @@ function formatLogTime(timestamp) {
 }
 
 function stepIsDone(step) {
-  return progressData.value.progress_percentage > step.pct
+  const pct = progressData.value.progress_percentage || 0
+  const currentStep = progressData.value.current_step || ''
+  const currentIdx = progressSteps.findIndex(s => s.name === currentStep)
+  const stepIdx = progressSteps.findIndex(s => s.name === step.name)
+  // Done if current step is beyond this step
+  if (currentIdx > stepIdx) return true
+  // Also done if percentage exceeds this step's pct and current step is different
+  return pct > step.pct && currentStep !== step.name
 }
 
 function stepIsActive(step) {
   const pct = progressData.value.progress_percentage || 0
+  const currentStep = progressData.value.current_step || ''
   if (pct >= 100) return false
-  const idx = progressSteps.findIndex(s => s.name === step.name)
-  const nextStep = progressSteps[idx + 1]
-  return pct >= step.pct && (!nextStep || pct < nextStep.pct)
+  // Active only if this is the current step OR percentage matches but waiting for next phase
+  if (currentStep === step.name) return true
+  // Between phases: last step of prev phase shows as done, not active
+  return false
 }
 
 function stepIndicatorClass(step) {
