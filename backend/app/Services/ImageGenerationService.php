@@ -23,7 +23,7 @@ class ImageGenerationService
      * Returns the job UUID for tracking.
      */
     public function queue(
-        int $postId,
+        ?int $postId,
         string $prompt,
         string $type = 'hero',
         string $insertAfterHeading = null,

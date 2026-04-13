@@ -60,14 +60,19 @@ class ProcessPendingImages extends Command
                         'remote_url' => $remoteUrl,
                     ]);
 
-                    // Apply to post
-                    if ($job->type === 'hero' && $localUrl) {
-                        $job->post->update(['featured_image' => $localUrl]);
-                        $this->info("    Hero image set on post {$job->post_id}");
-                    } elseif ($job->type === 'inline' && $localUrl) {
-                        $this->insertInlineImage($job);
-                        $this->info("    Inline image inserted into post {$job->post_id}");
+                    // Apply to post (if linked to a blog post)
+                    if ($job->post_id) {
+                        if ($job->type === 'hero' && $localUrl) {
+                            $job->post->update(['featured_image' => $localUrl]);
+                            $this->info("    Hero image set on post {$job->post_id}");
+                        } elseif ($job->type === 'inline' && $localUrl) {
+                            $this->insertInlineImage($job);
+                            $this->info("    Inline image inserted into post {$job->post_id}");
+                        }
                     }
+
+                    // Sync to content_ideas (Content Engine pipeline)
+                    $this->syncToContentIdea($job, $localUrl);
 
                 } elseif ($status === 3) {
                     $job->update([
@@ -75,6 +80,9 @@ class ProcessPendingImages extends Command
                         'error_message' => $data['error_message'] ?? 'Generation failed',
                     ]);
                     $this->error("    FAILED: " . ($data['error_message'] ?? 'unknown'));
+
+                    // Sync failure to content_ideas
+                    $this->syncToContentIdea($job, null, true);
 
                 } else {
                     $this->line("    Still processing (status={$status})");
@@ -87,6 +95,56 @@ class ProcessPendingImages extends Command
 
         $this->info('Done.');
         return 0;
+    }
+
+    /**
+     * Sync completed/failed image back to content_ideas.generated_article.image_prompts[]
+     */
+    private function syncToContentIdea(ImageGenerationJob $job, ?string $imageUrl, bool $failed = false): void
+    {
+        // Find content idea that has this job UUID in its image_prompts
+        $ideas = \App\Models\ContentIdea::whereIn('status', ['generating_images', 'article_ready'])
+            ->whereNotNull('generated_article')
+            ->get();
+
+        foreach ($ideas as $idea) {
+            $article = $idea->generated_article;
+            $prompts = $article['image_prompts'] ?? [];
+            $updated = false;
+
+            foreach ($prompts as $i => $prompt) {
+                if (($prompt['job_uuid'] ?? null) === $job->uuid) {
+                    $prompts[$i]['status'] = $failed ? 'failed' : 'done';
+                    if ($imageUrl) {
+                        $prompts[$i]['generated_url'] = $imageUrl;
+                    }
+                    $updated = true;
+                    break;
+                }
+            }
+
+            if ($updated) {
+                $article['image_prompts'] = $prompts;
+                $idea->generated_article = $article;
+
+                // Check if all images are done → update status
+                $allDone = collect($prompts)->every(fn($p) => ($p['status'] ?? '') === 'done');
+                if ($allDone) {
+                    if ($idea->auto_mode) {
+                        // Auto mode: skip images_ready, go straight to completed
+                        $idea->status = 'completed';
+                        $this->info("    All images done + auto_mode — idea #{$idea->id} → completed (auto-published)");
+                    } else {
+                        $idea->status = 'images_ready';
+                        $this->info("    All images done — idea #{$idea->id} → images_ready");
+                    }
+                }
+
+                $idea->save();
+                $this->info("    Synced to content idea #{$idea->id}, segment {$i}");
+                return;
+            }
+        }
     }
 
     private function insertInlineImage(ImageGenerationJob $job): void

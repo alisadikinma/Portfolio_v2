@@ -366,21 +366,112 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
     });
 
     // Completion callback — called by CLI plugin when article is done
+    // Accepts BOTH old format (generated_article) and new format (article + seo_analysis + ...)
     Route::put('/content-ideas/{id}/complete', function (\Illuminate\Http\Request $request, $id) {
         $idea = \App\Models\ContentIdea::findOrFail($id);
-        $idea->update([
-            'status' => 'article_ready',
-            'generated_article' => $request->input('generated_article'),
-            'research_data' => $request->input('research_data'),
-            'progress_percentage' => 100,
-            'current_step' => 'completed',
-            'progress_log' => array_merge($idea->progress_log ?? [], [[
-                'timestamp' => now()->toISOString(),
-                'step' => 'completed',
-                'percentage' => 100,
-                'message' => 'Article generation completed successfully',
-            ]]),
-        ]);
+
+        // Detect schema: new plugin sends "article" key, old sends "generated_article"
+        if ($request->has('article')) {
+            // New schema from article-content-writer plugin v1.1+
+            $pluginArticle = $request->input('article', []);
+            $languages = $idea->languages ?? ['en'];
+
+            // Build nested-by-language generated_article
+            $generatedArticle = [];
+            foreach ($languages as $lang) {
+                $generatedArticle[$lang] = [
+                    'title' => $pluginArticle['title'] ?? $idea->title,
+                    'content' => $pluginArticle['content'] ?? '',
+                    'word_count' => $pluginArticle['word_count'] ?? 0,
+                ];
+            }
+
+            // Shared metadata
+            $generatedArticle['target_keyword'] = $pluginArticle['keyword'] ?? '';
+            $generatedArticle['framework'] = $pluginArticle['framework'] ?? '';
+            $generatedArticle['hook_type'] = $pluginArticle['hook_type'] ?? '';
+            $generatedArticle['hook_boost'] = $pluginArticle['hook_boost'] ?? '';
+            $generatedArticle['emotional_arc'] = $pluginArticle['emotional_arc'] ?? '';
+            $generatedArticle['citation_count'] = $pluginArticle['citation_count'] ?? 0;
+            $generatedArticle['image_count'] = $pluginArticle['image_count'] ?? 0;
+
+            // Scoring gates
+            $generatedArticle['seo_analysis'] = $request->input('seo_analysis');
+            $generatedArticle['quality_gate'] = $request->input('quality_gate');
+            $generatedArticle['virality_score'] = $request->input('virality_score');
+
+            // Backward-compat: flatten scores for quick access
+            $generatedArticle['quality_score'] = $request->input('quality_gate.score', 0);
+            $generatedArticle['virality_score_value'] = $request->input('virality_score.score', 0);
+            $generatedArticle['seo_score'] = $request->input('seo_analysis.score', 0);
+
+            // Image prompts
+            $generatedArticle['image_prompts'] = $request->input('image_prompts', []);
+
+            // Sources from research
+            $generatedArticle['sources'] = $request->input('research_data.sources', []);
+
+            $idea->update([
+                'status' => 'article_ready',
+                'generated_article' => $generatedArticle,
+                'research_data' => $request->input('research_data'),
+                'progress_percentage' => 100,
+                'current_step' => 'completed',
+                'progress_log' => array_merge($idea->progress_log ?? [], [[
+                    'timestamp' => now()->toISOString(),
+                    'step' => 'completed',
+                    'percentage' => 100,
+                    'message' => 'Article generation completed successfully',
+                ]]),
+            ]);
+        } else {
+            // Old schema: generated_article passed directly
+            $idea->update([
+                'status' => 'article_ready',
+                'generated_article' => $request->input('generated_article'),
+                'research_data' => $request->input('research_data'),
+                'progress_percentage' => 100,
+                'current_step' => 'completed',
+                'progress_log' => array_merge($idea->progress_log ?? [], [[
+                    'timestamp' => now()->toISOString(),
+                    'step' => 'completed',
+                    'percentage' => 100,
+                    'message' => 'Article generation completed successfully',
+                ]]),
+            ]);
+        }
+
+        // Auto mode: if enabled, auto-start image generation
+        $idea->refresh();
+        if ($idea->auto_mode && $idea->status === 'article_ready') {
+            $imageService = app(\App\Services\ImageGenerationService::class);
+            $article = $idea->generated_article ?? [];
+            $prompts = $article['image_prompts'] ?? [];
+
+            foreach ($prompts as $i => $prompt) {
+                $uuid = $imageService->queue(
+                    postId: null,
+                    prompt: $prompt['visual_direction'] ?? $prompt['prompt'] ?? '',
+                    type: ($prompt['type'] ?? 'inline') === 'cover' ? 'hero' : 'inline',
+                    insertAfterHeading: null,
+                    model: $prompt['model'] ?? 'nano-banana-2',
+                    aspectRatio: $prompt['aspect_ratio'] ?? '16:9',
+                    style: $prompt['style'] ?? 'Photorealistic'
+                );
+                if ($uuid) {
+                    $prompts[$i]['job_uuid'] = $uuid;
+                    $prompts[$i]['status'] = 'generating';
+                }
+            }
+
+            $article['image_prompts'] = $prompts;
+            $idea->update([
+                'status' => 'generating_images',
+                'generated_article' => $article,
+            ]);
+
+            \Illuminate\Support\Facades\Log::info("[AutoMode] Idea #{$idea->id}: auto-started image generation for " . count($prompts) . " images");
+        }
 
         return response()->json(['success' => true, 'data' => $idea->fresh()]);
     });
@@ -424,6 +515,7 @@ Route::middleware(['auth:sanctum'])->prefix('admin/content-engine')->group(funct
     // Content Ideas CRUD
     Route::get('/ideas', [ContentIdeaController::class, 'index']);
     Route::post('/ideas', [ContentIdeaController::class, 'store']);
+    Route::get('/ideas/{id}', [ContentIdeaController::class, 'show']);
     Route::put('/ideas/{id}', [ContentIdeaController::class, 'update']);
     Route::delete('/ideas/{id}', [ContentIdeaController::class, 'destroy']);
     Route::post('/ideas/{id}/archive', [ContentIdeaController::class, 'archive']);
@@ -439,8 +531,14 @@ Route::middleware(['auth:sanctum'])->prefix('admin/content-engine')->group(funct
     Route::get('/ideas/{id}/research', [ContentIdeaController::class, 'getResearch']);
     Route::get('/ideas/{id}/progress', [ContentIdeaController::class, 'getProgress']);
     Route::post('/ideas/{id}/approve-article', [ContentIdeaController::class, 'approveArticle']);
+    Route::post('/ideas/{id}/regenerate', [ContentIdeaController::class, 'regenerateArticle']);
 
     // Pipeline: Gate 2 (Images)
+    Route::put('/ideas/{id}/save-draft', [ContentIdeaController::class, 'saveDraft']);
     Route::post('/ideas/{id}/generate-images', [ContentIdeaController::class, 'startImageGeneration']);
+    Route::post('/ideas/{id}/generate-segment-image', [ContentIdeaController::class, 'generateSegmentImage']);
     Route::post('/ideas/{id}/publish', [ContentIdeaController::class, 'approveAndPublish']);
+
+    // Stock image search (Pexels + Unsplash proxy)
+    Route::get('/stock-images/search', [\App\Http\Controllers\Api\Admin\StockImageController::class, 'search']);
 });

@@ -39,6 +39,14 @@ return [
         'api_key' => env('GEMINIGEN_API_KEY', ''),
     ],
 
+    'pexels' => [
+        'api_key' => env('PEXELS_API_KEY', ''),
+    ],
+
+    'unsplash' => [
+        'access_key' => env('UNSPLASH_ACCESS_KEY', ''),
+    ],
+
     'content_engine' => [
         'url' => env('CONTENT_ENGINE_URL', 'http://127.0.0.1:8100'),
         'api_key' => env('CONTENT_ENGINE_API_KEY', ''),

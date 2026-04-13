@@ -81,9 +81,29 @@
       "Bash(nlm notebook:*)",
       "Bash(PYTHONUTF8=1 nlm notebook:*)",
       "Bash(npm run:*)",
-      "Bash(\"D:/xampp/php/php.exe\" artisan:*)"
+      "Bash(\"D:/xampp/php/php.exe\" artisan:*)",
+      "Bash(nlm alias:*)",
+      "Bash(export PYTHONIOENCODING=utf-8)",
+      "Bash(export PYTHONUTF8=1)",
+      "Bash(nlm source:*)",
+      "Bash(nlm research:*)",
+      "Bash(nlm studio:*)",
+      "Bash(python -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(f\\\\\"{a['type']}: {a['status']}\\\\\"\\) for a in data]\")",
+      "Bash(nlm download:*)",
+      "Read(//tmp/**)",
+      "Read(//d/tmp/**)",
+      "Bash(mkdir -p \"D:/Projects/claude-plugin/article-content-writer/references/sparkfluence\")",
+      "Bash(cp /tmp/writing-framework-raw.md \"D:/Projects/claude-plugin/article-content-writer/references/writing-framework.md\")",
+      "Read(//d/Projects/claude-plugin/article-content-writer/references/**)",
+      "Bash(python -c \"import sys,json; data=json.load\\(sys.stdin\\); print\\(data['value']['answer']\\)\")",
+      "Bash(where claude:*)",
+      "Read(//d/Projects/Portfolio_v2/backend/public/%SystemDrive%/**)"
     ],
     "deny": [],
-    "ask": []
+    "ask": [],
+    "additionalDirectories": [
+      "\\tmp",
+      "D:\\Projects\\claude-plugin\\article-content-writer"
+    ]
   }
 }

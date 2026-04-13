@@ -41,7 +41,8 @@ class ContentIdeaController extends Controller
             $query->where('title', 'like', '%' . $request->query('search') . '%');
         }
 
-        $ideas = $query->orderBy('created_at', 'desc')->get();
+        $perPage = min((int) $request->query('per_page', 15), 50);
+        $ideas = $query->orderBy('created_at', 'desc')->paginate($perPage);
 
         // Auto-sync: check workflow completion for in-progress ideas
         foreach ($ideas as $idea) {
@@ -52,7 +53,13 @@ class ContentIdeaController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $ideas,
+            'data' => $ideas->items(),
+            'meta' => [
+                'current_page' => $ideas->currentPage(),
+                'last_page' => $ideas->lastPage(),
+                'per_page' => $ideas->perPage(),
+                'total' => $ideas->total(),
+            ],
         ]);
     }
 
@@ -70,6 +77,8 @@ class ContentIdeaController extends Controller
             'niche' => 'nullable|string|max:100',
             'tags' => 'nullable|array',
             'languages' => 'nullable|array',
+            'auto_mode' => 'sometimes|boolean',
+            'scheduled_at' => 'nullable|date',
         ]);
 
         $validated['status'] = 'draft';
@@ -80,6 +89,22 @@ class ContentIdeaController extends Controller
             'data' => $idea,
             'message' => 'Content idea created successfully.',
         ], 201);
+    }
+
+    /**
+     * Show a single content idea by ID.
+     */
+    public function show($id): JsonResponse
+    {
+        $idea = ContentIdea::find($id);
+        if (!$idea) {
+            return response()->json(['success' => false, 'message' => 'Content idea not found.'], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $idea,
+        ]);
     }
 
     /**
@@ -104,6 +129,8 @@ class ContentIdeaController extends Controller
             'tags' => 'nullable|array',
             'languages' => 'nullable|array',
             'description' => 'nullable|string',
+            'auto_mode' => 'sometimes|boolean',
+            'scheduled_at' => 'nullable|date',
         ]);
 
         $idea->update($validated);
@@ -317,6 +344,81 @@ class ContentIdeaController extends Controller
     }
 
     /**
+     * Regenerate article — reset to researching and re-trigger CLI generation.
+     * Used when the user wants to re-run the improved plugin version.
+     */
+    public function regenerateArticle($id, Request $request): JsonResponse
+    {
+        $idea = ContentIdea::find($id);
+        if (!$idea) {
+            return response()->json(['success' => false, 'message' => 'Content idea not found.'], 404);
+        }
+
+        $allowedStatuses = ['article_ready', 'images_ready'];
+        // Also allow regeneration from failed researching state
+        if ($idea->status === 'researching' && $idea->current_step === 'failed') {
+            $allowedStatuses[] = 'researching';
+        }
+        if (!in_array($idea->status, $allowedStatuses)) {
+            return response()->json(['success' => false, 'message' => 'Can only regenerate from article_ready, images_ready, or failed state.'], 422);
+        }
+
+        $languages = $idea->languages ?? ['en'];
+        $instructions = $request->input('instructions', $idea->instructions);
+        $previousStatus = $idea->status;
+
+        // Trigger generation FIRST — only clear data after success
+        $result = $this->articleGen->triggerGeneration($idea->id, [
+            'topic' => $idea->title,
+            'languages' => $languages,
+            'instructions' => $instructions ?? '',
+        ]);
+
+        if ($result['success']) {
+            // Only wipe old article after trigger succeeds
+            $idea->update([
+                'generated_article' => null,
+                'generated_images' => null,
+                'image_instructions' => null,
+                'image_references' => null,
+                'status' => 'researching',
+                'progress_percentage' => 0,
+                'current_step' => 'initializing',
+                'instructions' => $instructions,
+                'process_pid' => $result['pid'],
+                'progress_log' => [[
+                    'timestamp' => now()->toISOString(),
+                    'step' => 'initializing',
+                    'percentage' => 0,
+                    'message' => 'Article regeneration triggered (improved plugin)',
+                ]],
+                'workflows' => [[
+                    'type' => 'blog_article',
+                    'driver' => 'claude_cli',
+                    'pid' => $result['pid'],
+                    'status' => 'running',
+                    'created_at' => now()->toISOString(),
+                    'regenerated' => true,
+                ]],
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'data' => $idea->fresh(),
+                'message' => 'Article regeneration started.',
+            ]);
+        }
+
+        // Trigger failed — preserve old article, stay in current status
+        Log::warning('[ContentIdea] Regeneration trigger failed: ' . ($result['error'] ?? 'Unknown'));
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to start regeneration: ' . ($result['error'] ?? 'Unknown error'),
+        ], 500);
+    }
+
+    /**
      * Get idea with generated article for preview.
      */
     public function getResearch($id): JsonResponse
@@ -433,6 +535,110 @@ class ContentIdeaController extends Controller
         return response()->json([
             'success' => true,
             'data' => $idea->fresh(),
+            'message' => 'Image generation started.',
+        ]);
+    }
+
+    /**
+     * Save draft — persist edits to generated_article without changing status.
+     */
+    public function saveDraft($id, Request $request): JsonResponse
+    {
+        $idea = ContentIdea::find($id);
+        if (!$idea) {
+            return response()->json(['success' => false, 'message' => 'Content idea not found.'], 404);
+        }
+
+        if ($request->has('generated_article')) {
+            $idea->generated_article = $request->input('generated_article');
+        }
+        $idea->save();
+
+        return response()->json([
+            'success' => true,
+            'data' => $idea->fresh(),
+            'message' => 'Draft saved.',
+        ]);
+    }
+
+    /**
+     * Generate a single image for a specific segment via GeminiGen.
+     */
+    public function generateSegmentImage($id, Request $request): JsonResponse
+    {
+        $idea = ContentIdea::find($id);
+        if (!$idea) {
+            return response()->json(['success' => false, 'message' => 'Content idea not found.'], 404);
+        }
+
+        $request->validate([
+            'segment_index' => 'required|integer|min:0',
+            'prompt' => 'required|string|max:2000',
+            'style' => 'required|string|max:100',
+            'model' => 'nullable|string|max:50',
+            'aspect_ratio' => 'nullable|string|max:10',
+            'reference_image_url' => 'nullable|url|max:2000',
+        ]);
+
+        $segmentIndex = $request->input('segment_index');
+        $model = $request->input('model', 'nano-banana-pro');
+        $aspectRatio = $request->input('aspect_ratio', '16:9');
+        $style = $request->input('style');
+        $prompt = $request->input('prompt');
+
+        // Update segment status to generating
+        $article = $idea->generated_article ?? [];
+        $imagePrompts = $article['image_prompts'] ?? [];
+        if (isset($imagePrompts[$segmentIndex])) {
+            $imagePrompts[$segmentIndex]['status'] = 'generating';
+            $imagePrompts[$segmentIndex]['reference_image_url'] = $request->input('reference_image_url');
+            $article['image_prompts'] = $imagePrompts;
+            $idea->generated_article = $article;
+        }
+
+        // Set status to generating_images if not already
+        if ($idea->status === 'article_ready') {
+            $idea->status = 'generating_images';
+        }
+        $idea->save();
+
+        // Call GeminiGen via ImageGenerationService
+        $imageService = app(\App\Services\ImageGenerationService::class);
+        $uuid = $imageService->queue(
+            postId: null, // No post yet — content engine pipeline
+            prompt: $prompt,
+            type: $segmentIndex === 0 ? 'hero' : 'inline',
+            insertAfterHeading: null,
+            model: $model,
+            aspectRatio: $aspectRatio,
+            style: $style
+        );
+
+        if (!$uuid) {
+            // Mark segment as failed
+            $imagePrompts[$segmentIndex]['status'] = 'failed';
+            $article['image_prompts'] = $imagePrompts;
+            $idea->generated_article = $article;
+            $idea->save();
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Image generation failed to start.',
+            ], 500);
+        }
+
+        // Store UUID in segment for tracking
+        $imagePrompts[$segmentIndex]['job_uuid'] = $uuid;
+        $article['image_prompts'] = $imagePrompts;
+        $idea->generated_article = $article;
+        $idea->save();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'uuid' => $uuid,
+                'segment_index' => $segmentIndex,
+            ],
             'message' => 'Image generation started.',
         ]);
     }

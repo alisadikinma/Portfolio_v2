@@ -11,10 +11,15 @@ import { useThemeStore } from './stores/theme'
 const app = createApp(App)
 const pinia = createPinia()
 
-// CRITICAL: Initialize theme BEFORE app mounts to prevent flash
+// CRITICAL: Initialize stores BEFORE app mounts
 app.use(pinia)
 const themeStore = useThemeStore()
 themeStore.initTheme()
+
+// Initialize auth from localStorage so new tabs inherit the session
+import { useAuthStore } from './stores/auth'
+const authStore = useAuthStore()
+authStore.initAuth()
 
 // Configure QueryClient with AGGRESSIVE cache policies
 const queryClient = new QueryClient({

@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 /* ============================================
    ULTRA PORTFOLIO — Ethereal Glass Design System

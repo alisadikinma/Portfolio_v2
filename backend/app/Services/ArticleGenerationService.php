@@ -60,7 +60,13 @@ class ArticleGenerationService
     public function isProcessRunning(int $pid): bool
     {
         try {
+            $isWindows = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
+
             if ($this->driver === 'local') {
+                if ($isWindows) {
+                    $result = Process::run(['powershell', '-Command', "Get-Process -Id {$pid} -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id"]);
+                    return trim($result->output()) === (string) $pid;
+                }
                 $result = Process::run("kill -0 {$pid} 2>/dev/null; echo $?");
                 return trim($result->output()) === '0';
             }
@@ -89,21 +95,43 @@ class ArticleGenerationService
 
     private function executeLocal(string $claudePrompt, int $ideaId): array
     {
-        $logFile = "/tmp/article-gen-{$ideaId}.log";
-        $pidFile = "/tmp/article-gen-{$ideaId}.pid";
+        $isWindows = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
+        $tmpDir = $isWindows ? sys_get_temp_dir() : '/tmp';
+        $logFile = $tmpDir . DIRECTORY_SEPARATOR . "article-gen-{$ideaId}.log";
 
-        $command = "nohup {$this->claudePath} -p \"{$claudePrompt}\" > {$logFile} 2>&1 & echo \$! > {$pidFile}";
-        Process::run($command);
+        if ($isWindows) {
+            // Windows: write prompt to file, then launch PowerShell script
+            // that reads it — avoids all cmd.exe escaping issues
+            $sep = DIRECTORY_SEPARATOR;
+            $promptFile = "{$tmpDir}{$sep}article-gen-{$ideaId}-prompt.txt";
+            $runScript = "{$tmpDir}{$sep}article-gen-{$ideaId}.ps1";
+            $errFile = "{$logFile}.err";
 
-        $pid = $this->readPidFile($pidFile, 'local');
+            file_put_contents($promptFile, $claudePrompt);
+            file_put_contents($runScript, implode("\r\n", [
+                '$prompt = (Get-Content -Raw "' . $promptFile . '").Trim()',
+                '& "' . $this->claudePath . '" -p "$prompt" --dangerously-skip-permissions > "' . $logFile . '" 2> "' . $errFile . '"',
+            ]));
+
+            $psLauncher = "\$p = Start-Process -FilePath 'powershell' -ArgumentList '-ExecutionPolicy Bypass -File \"" . $runScript . "\"' -WindowStyle Hidden -PassThru; Write-Output \$p.Id";
+            $result = Process::timeout(30)->run(['powershell', '-Command', $psLauncher]);
+            $pid = (int) trim($result->output());
+        } else {
+            // Unix: nohup background process
+            $pidFile = "{$tmpDir}/article-gen-{$ideaId}.pid";
+            $command = "nohup {$this->claudePath} -p \"{$claudePrompt}\" --dangerously-skip-permissions > {$logFile} 2>&1 & echo \$! > {$pidFile}";
+            Process::run($command);
+            $pid = $this->readPidFile($pidFile, 'local');
+        }
 
         Log::info('[ArticleGeneration] Local process started', [
             'idea_id' => $ideaId,
             'pid' => $pid,
+            'os' => $isWindows ? 'windows' : 'unix',
             'log_file' => $logFile,
         ]);
 
-        return ['success' => true, 'pid' => $pid, 'error' => null];
+        return ['success' => true, 'pid' => $pid > 0 ? $pid : null, 'error' => null];
     }
 
     private function executeSSH(string $claudePrompt, int $ideaId): array
@@ -111,7 +139,7 @@ class ArticleGenerationService
         $logFile = "/tmp/article-gen-{$ideaId}.log";
         $pidFile = "/tmp/article-gen-{$ideaId}.pid";
 
-        $remoteCommand = "nohup {$this->claudePath} -p \\\"{$claudePrompt}\\\" > {$logFile} 2>&1 & echo \\\$! > {$pidFile}";
+        $remoteCommand = "nohup {$this->claudePath} -p \\\"{$claudePrompt}\\\" --dangerously-skip-permissions > {$logFile} 2>&1 & echo \\\$! > {$pidFile}";
         $sshCmd = $this->sshCommand($remoteCommand);
 
         $result = Process::timeout(30)->run($sshCmd);

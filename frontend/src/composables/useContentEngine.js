@@ -32,12 +32,16 @@ export function useContentEngine() {
 
   const checkHealth = () => request('get', '/admin/content-engine/health')
 
+  const getIdea = (id) => request('get', `/admin/content-engine/ideas/${id}`)
+
   const listIdeas = (filters = {}) => {
     const params = {}
     if (filters.pillar) params.pillar = filters.pillar
     if (filters.status) params.status = filters.status
     if (filters.priority) params.priority = filters.priority
     if (filters.search) params.search = filters.search
+    if (filters.page) params.page = filters.page
+    if (filters.per_page) params.per_page = filters.per_page
     return request('get', '/admin/content-engine/ideas', null, params)
   }
 
@@ -66,8 +70,21 @@ export function useContentEngine() {
 
   const getProgress = (id) => request('get', `/admin/content-engine/ideas/${id}/progress`)
 
+  const saveDraft = (id, data) => request('put', `/admin/content-engine/ideas/${id}/save-draft`, data)
+
+  const generateSegmentImage = (id, segmentData) => request('post', `/admin/content-engine/ideas/${id}/generate-segment-image`, segmentData)
+
+  const searchStockImages = (query, options = {}) => {
+    const params = { q: query, ...options }
+    return request('get', '/admin/content-engine/stock-images/search', null, params)
+  }
+
   const approveArticle = async (id, data = {}) => {
     return request('post', `/admin/content-engine/ideas/${id}/approve-article`, data)
+  }
+
+  const regenerateArticle = async (id, data = {}) => {
+    return request('post', `/admin/content-engine/ideas/${id}/regenerate`, data)
   }
 
   const startImageGeneration = async (id, formData) => {
@@ -98,6 +115,7 @@ export function useContentEngine() {
     isLoading,
     error,
     checkHealth,
+    getIdea,
     listIdeas,
     createIdea,
     updateIdea,
@@ -110,7 +128,11 @@ export function useContentEngine() {
     startResearch,
     getResearch,
     getProgress,
+    saveDraft,
+    generateSegmentImage,
+    searchStockImages,
     approveArticle,
+    regenerateArticle,
     startImageGeneration,
     approveAndPublish,
     listWorkflows,

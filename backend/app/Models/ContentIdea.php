@@ -33,10 +33,14 @@ class ContentIdea extends Model
         'current_step',
         'progress_log',
         'process_pid',
+        'auto_mode',
+        'scheduled_at',
     ];
 
     protected $casts = [
         'tags' => 'array',
+        'auto_mode' => 'boolean',
+        'scheduled_at' => 'datetime',
         'languages' => 'array',
         'output_types' => 'array',
         'research_data' => 'array',

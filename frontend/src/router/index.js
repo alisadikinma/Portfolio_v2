@@ -419,6 +419,36 @@ const routes = [
       layout: 'admin'
     }
   },
+  {
+    path: '/admin/content-engine/:id/preview',
+    name: 'admin-content-engine-preview',
+    component: () => import('@/views/admin/ArticlePreview.vue'),
+    meta: {
+      title: 'Article Preview - Admin',
+      requiresAuth: true,
+      layout: 'admin'
+    }
+  },
+  {
+    path: '/admin/content-engine/:id/images',
+    name: 'admin-content-engine-images',
+    component: () => import('@/views/admin/ImageGeneration.vue'),
+    meta: {
+      title: 'Image Generation - Admin',
+      requiresAuth: true,
+      layout: 'admin'
+    }
+  },
+  {
+    path: '/admin/content-engine/:id/finalize',
+    name: 'admin-content-engine-finalize',
+    component: () => import('@/views/admin/ArticleFinalize.vue'),
+    meta: {
+      title: 'Finalize Article - Admin',
+      requiresAuth: true,
+      layout: 'admin'
+    }
+  },
 
   {
     path: '/:pathMatch(.*)*',
