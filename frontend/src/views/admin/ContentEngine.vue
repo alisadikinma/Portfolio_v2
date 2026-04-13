@@ -380,37 +380,32 @@
           </div>
         </div>
 
-        <!-- Step Indicators -->
-        <div class="flex flex-wrap gap-1.5 mb-4">
-          <span
-            v-for="step in progressSteps"
-            :key="step.name"
-            class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-default"
-            :class="stepIndicatorClass(step)"
-            :title="`${step.label} — ${step.skill} (${step.model}) @ ${step.pct}%`"
+        <!-- Phase Groups -->
+        <div class="grid grid-cols-3 gap-2 mb-4">
+          <div
+            v-for="phase in pipelinePhases"
+            :key="phase.skill"
+            class="rounded-lg border px-3 py-2 transition-all"
+            :class="phaseClass(phase)"
           >
-            <svg v-if="stepIsDone(step)" class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
-            <svg v-else-if="stepIsActive(step)" class="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-            {{ step.label }}
-            <span v-if="stepIsActive(step)" class="text-[8px] opacity-70">{{ step.model }}</span>
-          </span>
-        </div>
-
-        <!-- Active Skill + Model Info -->
-        <div class="flex items-center gap-3 mb-3 px-1">
-          <div class="flex items-center gap-1.5">
-            <span class="text-[10px] font-mono text-neutral-500 uppercase tracking-wider">Skill:</span>
-            <span class="text-xs font-mono font-medium" :class="activeSkillColor">{{ activeSkill }}</span>
-          </div>
-          <div class="w-px h-3 bg-neutral-700"></div>
-          <div class="flex items-center gap-1.5">
-            <span class="text-[10px] font-mono text-neutral-500 uppercase tracking-wider">Model:</span>
-            <span class="text-xs font-mono font-medium" :class="activeModelColor">{{ activeModel }}</span>
-          </div>
-          <div class="w-px h-3 bg-neutral-700"></div>
-          <div class="flex items-center gap-1.5">
-            <span class="text-[10px] font-mono text-neutral-500 uppercase tracking-wider">Pipeline:</span>
-            <span class="text-xs font-mono text-cyan-400">{{ progressIdea?.workflows?.[0]?.pipeline || 'single' }}</span>
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="text-[10px] font-mono font-semibold uppercase tracking-wider" :class="phaseHeaderColor(phase)">{{ phase.name }}</span>
+              <span class="text-[9px] font-mono px-1.5 py-0.5 rounded" :class="phaseModelBadge(phase)">{{ phase.model }}</span>
+            </div>
+            <div class="flex flex-wrap gap-1">
+              <span
+                v-for="step in phase.steps"
+                :key="step.name"
+                class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium cursor-default"
+                :class="stepIndicatorClass(step)"
+                :title="`${step.label} @ ${step.pct}%`"
+              >
+                <svg v-if="stepIsDone(step)" class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                <svg v-else-if="stepIsActive(step)" class="animate-spin w-2.5 h-2.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                {{ step.label }}
+              </span>
+            </div>
+            <div class="text-[9px] font-mono text-neutral-500 mt-1">{{ phase.skill }} &middot; {{ phase.pctRange }}</div>
           </div>
         </div>
 
@@ -438,9 +433,9 @@
         <!-- Status Footer -->
         <div class="flex items-center justify-between mt-4 pt-3 border-t border-neutral-200 dark:border-neutral-700">
           <div class="flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full" :class="progressData.process_alive !== false ? 'bg-green-500 animate-pulse' : 'bg-red-500'"></span>
-            <span class="text-xs text-neutral-500 dark:text-neutral-400">
-              {{ progressData.process_alive !== false ? 'Process running' : 'Process stopped' }}
+            <span class="w-2 h-2 rounded-full" :class="progressData.progress_percentage >= 100 ? 'bg-green-500' : progressData.process_alive !== false ? 'bg-green-500 animate-pulse' : 'bg-red-500'"></span>
+            <span class="text-xs" :class="progressData.progress_percentage >= 100 ? 'text-green-400 font-medium' : 'text-neutral-500 dark:text-neutral-400'">
+              {{ progressData.progress_percentage >= 100 ? 'Completed' : progressData.process_alive !== false ? 'Process running' : 'Process stopped' }}
             </span>
           </div>
           <button @click="closeProgressModal" class="px-4 py-2 text-sm font-medium rounded-lg border border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors">
@@ -575,49 +570,53 @@ const progressData = ref({
 let progressPollInterval = null
 const logContainer = ref(null)
 
-const progressSteps = [
-  { name: 'input_collection', label: 'Input', pct: 5, skill: 'article-prep', model: 'Sonnet' },
-  { name: 'topic_research', label: 'Research', pct: 15, skill: 'article-prep', model: 'Sonnet' },
-  { name: 'strategy', label: 'Strategy', pct: 25, skill: 'article-prep', model: 'Sonnet' },
-  { name: 'outline', label: 'Outline', pct: 35, skill: 'article-prep', model: 'Sonnet' },
-  { name: 'writing_started', label: 'Writing', pct: 50, skill: 'article-write', model: 'Opus' },
-  { name: 'draft_complete', label: 'Draft', pct: 70, skill: 'article-write', model: 'Opus' },
-  { name: 'style_pass', label: 'Style', pct: 78, skill: 'article-write', model: 'Opus' },
-  { name: 'seo_pass', label: 'SEO', pct: 82, skill: 'article-write', model: 'Opus' },
-  { name: 'images_generated', label: 'Images', pct: 85, skill: 'article-write', model: 'Opus' },
-  { name: 'virality_scored', label: 'Virality', pct: 90, skill: 'article-score', model: 'Sonnet' },
-  { name: 'quality_scored', label: 'Quality', pct: 94, skill: 'article-score', model: 'Sonnet' },
-  { name: 'seo_scored', label: 'SEO Gate', pct: 97, skill: 'article-score', model: 'Sonnet' },
-  { name: 'completed', label: 'Done', pct: 100, skill: '-', model: '-' },
+const pipelinePhases = [
+  {
+    name: 'Prep',
+    skill: '/article-prep',
+    model: 'Sonnet',
+    pctRange: '0–35%',
+    minPct: 0,
+    maxPct: 35,
+    steps: [
+      { name: 'input_collection', label: 'Input', pct: 5 },
+      { name: 'research', label: 'Research', pct: 15 },
+      { name: 'strategy', label: 'Strategy', pct: 25 },
+      { name: 'outline', label: 'Outline', pct: 35 },
+    ],
+  },
+  {
+    name: 'Write',
+    skill: '/article-write',
+    model: 'Opus',
+    pctRange: '35–85%',
+    minPct: 35,
+    maxPct: 85,
+    steps: [
+      { name: 'writing_started', label: 'Draft', pct: 50 },
+      { name: 'draft_complete', label: 'Polish', pct: 70 },
+      { name: 'style_pass', label: 'Style', pct: 78 },
+      { name: 'seo_pass', label: 'SEO', pct: 85 },
+    ],
+  },
+  {
+    name: 'Score',
+    skill: '/article-score',
+    model: 'Sonnet',
+    pctRange: '85–100%',
+    minPct: 85,
+    maxPct: 100,
+    steps: [
+      { name: 'virality_scored', label: 'Virality', pct: 90 },
+      { name: 'quality_scored', label: 'Quality', pct: 94 },
+      { name: 'seo_scored', label: 'SEO Gate', pct: 97 },
+      { name: 'completed', label: 'Done', pct: 100 },
+    ],
+  },
 ]
 
-// Active skill + model detection based on progress percentage
-const activeSkill = computed(() => {
-  const pct = progressData.value.progress_percentage || 0
-  if (pct <= 35) return '/article-prep'
-  if (pct <= 85) return '/article-write'
-  if (pct < 100) return '/article-score'
-  return 'completed'
-})
-const activeModel = computed(() => {
-  const pct = progressData.value.progress_percentage || 0
-  if (pct <= 35) return 'Sonnet 4.6'
-  if (pct <= 85) return 'Opus 4.6'
-  if (pct < 100) return 'Sonnet 4.6'
-  return '-'
-})
-const activeSkillColor = computed(() => {
-  const pct = progressData.value.progress_percentage || 0
-  if (pct <= 35) return 'text-blue-400'
-  if (pct <= 85) return 'text-purple-400'
-  return 'text-blue-400'
-})
-const activeModelColor = computed(() => {
-  const pct = progressData.value.progress_percentage || 0
-  if (pct <= 35) return 'text-emerald-400'
-  if (pct <= 85) return 'text-amber-400'
-  return 'text-emerald-400'
-})
+// Flatten for backward compat
+const progressSteps = pipelinePhases.flatMap(p => p.steps)
 
 // Research preview
 const researchData = ref(null)
@@ -990,6 +989,7 @@ function stepIsDone(step) {
 
 function stepIsActive(step) {
   const pct = progressData.value.progress_percentage || 0
+  if (pct >= 100) return false
   const idx = progressSteps.findIndex(s => s.name === step.name)
   const nextStep = progressSteps[idx + 1]
   return pct >= step.pct && (!nextStep || pct < nextStep.pct)
@@ -999,6 +999,27 @@ function stepIndicatorClass(step) {
   if (stepIsDone(step)) return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
   if (stepIsActive(step)) return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 ring-1 ring-amber-400 animate-pulse'
   return 'bg-neutral-100 text-neutral-400 dark:bg-neutral-700 dark:text-neutral-500'
+}
+
+function phaseClass(phase) {
+  const pct = progressData.value.progress_percentage || 0
+  if (pct >= phase.maxPct) return 'border-green-500/40 bg-green-950/20'
+  if (pct >= phase.minPct) return 'border-amber-500/60 bg-amber-950/20 shadow-[0_0_12px_-3px_rgba(245,158,11,0.15)]'
+  return 'border-neutral-700/50 bg-neutral-900/20'
+}
+
+function phaseHeaderColor(phase) {
+  const pct = progressData.value.progress_percentage || 0
+  if (pct >= phase.maxPct) return 'text-green-400'
+  if (pct >= phase.minPct) return 'text-amber-400'
+  return 'text-neutral-500'
+}
+
+function phaseModelBadge(phase) {
+  const pct = progressData.value.progress_percentage || 0
+  if (pct >= phase.maxPct) return 'bg-green-900/40 text-green-400'
+  if (pct >= phase.minPct) return 'bg-amber-900/40 text-amber-400'
+  return 'bg-neutral-800 text-neutral-500'
 }
 
 function openProgressModal(idea) {
@@ -1048,8 +1069,9 @@ async function pollProgress(ideaId) {
         logContainer.value.scrollTop = logContainer.value.scrollHeight
       }, 50)
     }
-    // Auto-close and refresh when completed
+    // Mark as done and refresh when completed
     if (result.data.status === 'article_ready' || result.data.current_step === 'completed') {
+      progressData.value.process_alive = false
       stopProgressPolling()
       await refreshIdeas()
     }
