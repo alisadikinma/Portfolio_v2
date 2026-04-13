@@ -167,8 +167,8 @@ class ArticleGenerationService
             throw new \RuntimeException('Failed to write run script: ' . $scriptResult->errorOutput());
         }
 
-        // Step 3: Execute the script
-        $result = Process::timeout(30)->run($this->sshCommand($runScript));
+        // Step 3: Execute the script with login shell (sources .profile for OAuth token)
+        $result = Process::timeout(30)->run($this->sshCommand("bash -l {$runScript}"));
 
         if (!$result->successful()) {
             throw new \RuntimeException('SSH execution failed: ' . $result->errorOutput());
