@@ -335,16 +335,16 @@ async function handleApprove() {
             <span v-if="seoScoreVal !== null" :class="['inline-flex items-center gap-1 px-2.5 py-1 rounded-full', scoreColor(seoScoreVal, seoMax)]">
               SEO {{ seoScoreVal }}/{{ seoMax }}
             </span>
-            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-neutral-100 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300">
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-neutral-300 dark:border-neutral-600 text-neutral-500 dark:text-neutral-400">
               {{ currentContent.wordCount?.toLocaleString() || '—' }} words
             </span>
-            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-neutral-100 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300">
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-cyan-400/40 text-cyan-600 dark:border-cyan-500/30 dark:text-cyan-400">
               {{ article.framework }}
             </span>
-            <span v-if="article.hook_boost" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-neutral-100 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300">
+            <span v-if="article.hook_boost" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-purple-400/40 text-purple-600 dark:border-purple-500/30 dark:text-purple-400">
               {{ article.hook_type }} {{ article.hook_boost }}
             </span>
-            <span v-else class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-neutral-100 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300">
+            <span v-else class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-purple-400/40 text-purple-600 dark:border-purple-500/30 dark:text-purple-400">
               {{ article.hook_type }}
             </span>
           </div>
