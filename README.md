@@ -50,11 +50,11 @@ Modern, scalable full-stack portfolio and CMS featuring RESTful API architecture
 │                AUTOMATION LAYER                         │
 │  n8n / Zapier / Make.com via REST API + Webhooks       │
 ├─────────────────────────────────────────────────────────┤
-│              AI CONTENT PIPELINE                        │
+│              AI CONTENT PIPELINE (v2.0.0)                │
 │  Claude Code CLI + article-content-writer plugin       │
-│  Trigger: Laravel SSH → VPS → claude -p "/article-gen" │
-│  Progress: 11-step callbacks → real-time admin modal   │
-│  Pipeline: Ideas → Research → Article → Images → Pub   │
+│  Split: prep(Sonnet) → write(Opus) → score(Sonnet)    │
+│  System prompt injection (--append-system-prompt-file)  │
+│  5 gates + combined 100-point scoring, ~6-8 min/article│
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -295,17 +295,21 @@ Carousels:    GET /api/automation/carousel/accounts, /drafts
 - Bulk post creation
 - Duplicate detection
 
-### AI Content Pipeline (CLI-Based)
+### AI Content Pipeline (v2.0.0, Split Pipeline)
 - AI-powered article pipeline: Ideas → Research → Article → Images → Publish
 - 2-gate approval system (article text review, then image review)
 - Trending topic aggregation from 5 sources (Google Trends, TikTok, YouTube, Google News, Instagram)
 - Spreadsheet-style admin UI for idea management
-- **Claude Code CLI + article-content-writer plugin** triggered via SSH to VPS
-- `ArticleGenerationService` handles SSH/local exec with configurable driver
-- **Real-time progress tracking**: 11-step progress callbacks, progress modal with bar + step indicators + streaming log
-- On-demand (`claude -p "/article-gen --idea-id 5 --api-url ..."`) + scheduled (cron every 30 min)
-- Plugin pipeline mode: auto-proceed through all steps, report progress via API callbacks
-- Local testing via `php artisan article:simulate {ideaId}`
+- **Split pipeline with model switching:** prep (Sonnet) → write (Opus) → score (Sonnet)
+- **System prompt injection** via `--append-system-prompt-file` — zero Read tool calls, refs pre-compiled
+- `ArticleGenerationService` with `triggerPrep()` / `triggerWrite()` / `triggerScore()` + `triggerGeneration()` fallback
+- **5 scoring gates:** Quality (7/10) + Virality (3/5) + SEO (4/6) + AI Humanization (20pt) + GEO (5pt)
+- **Combined 100-point weighted scoring** (min 70 to publish, 5 bands)
+- 20 hard rules (incl. 107-word AI replacement system, 36 AI pattern categories, GEO/AEO formatting)
+- 12 content templates with auto-selection
+- **Real-time progress tracking**: progress callbacks at each step, progress modal with bar + step indicators + streaming log
+- Auto-continuation via `continue-pipeline` endpoint (prep→write→score chained automatically)
+- **~6-8 minutes** per article (down from ~15 min single-session)
 
 ### Performance
 - TanStack Query caching (5-60min stale times per resource)

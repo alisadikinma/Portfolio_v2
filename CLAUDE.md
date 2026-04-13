@@ -582,7 +582,7 @@ Effects:
 Article content generation uses **Claude Code CLI + plugins** on VPS, NOT HTTP microservice calls.
 Carousel/video content handled by Sparkfluence platform (separate project).
 
-### Architecture
+### Architecture — Split Pipeline (v2.0.0)
 ```
 Admin Panel (/admin/content-engine)
        │
@@ -592,32 +592,38 @@ Admin Panel (/admin/content-engine)
   Gate 1: Configure (languages + instructions) → Start Research
   Gate 2: Configure image gen (instructions + reference uploads) → Approve
        │
-  ┌────▼────────────────────────────────────────────────────────┐
-  │  Laravel Backend (ArticleGenerationService)                 │
-  │    SSH → VPS (production) or local exec (development)       │
-  │                                                            │
-  │  VPS: Claude Code CLI + article-content-writer plugin       │
-  │                                                            │
-  │  On-demand:                                                │
-  │    claude -p "/article-gen --idea-id 5 --api-url https://..."│
-  │  Scheduled:                                                │
-  │    crontab */30 * * * * claude -p "/article-gen --auto"     │
-  │                                                            │
-  │  Plugin pipeline mode (11 steps):                          │
-  │    Step 0-1: Input + Research (10%)                        │
-  │    Step 2-5: Framework + Arc + Hook + Outline (35%)        │
-  │    Step 6-7: Article Writing + Style Pass (80%)            │
-  │    Step 8-10: Images + Virality + Quality (95%)            │
-  │    Step 11: Complete (100%)                                │
-  │                                                            │
-  │  Each step → callback:                                     │
-  │    PUT /api/automation/content-ideas/{id}/progress          │
-  │    { step, percentage, message }                           │
-  │                                                            │
-  │  On complete:                                              │
-  │    PUT /api/automation/content-ideas/{id}/complete          │
-  │    { generated_article: {title, content, scores, ...} }    │
-  └──────────────┬─────────────────────────────────────────────┘
+  ┌────▼─────────────────────────────────────────────────────────────┐
+  │  Laravel Backend (ArticleGenerationService)                      │
+  │    SSH → claudesn@localhost (VPS) with file-based prompt         │
+  │                                                                  │
+  │  Split Pipeline (3 CLI calls, model switching):                  │
+  │                                                                  │
+  │  Step 1-3: claude -p "/article-prep ..."                         │
+  │    --model sonnet                                                │
+  │    --append-system-prompt-file refs-prep.md                      │
+  │    → Progress: 5%, 15%, 25%, 35%                                 │
+  │    → save-prep → continue-pipeline                               │
+  │    → ~2-3 min                                                    │
+  │                                                                  │
+  │  Step 4: claude -p "/article-write ..."                          │
+  │    --model opus                                                  │
+  │    --append-system-prompt-file refs-write.md                     │
+  │    → Progress: 50%, 70%, 78%, 82%, 85%                           │
+  │    → save-article → continue-pipeline                            │
+  │    → ~3-4 min                                                    │
+  │                                                                  │
+  │  Step 5: claude -p "/article-score ..."                          │
+  │    --model sonnet                                                │
+  │    --append-system-prompt-file refs-score.md                     │
+  │    → Progress: 90%, 94%, 97%, 100%                               │
+  │    → completion callback (5 gates + combined 100-point)          │
+  │    → ~1 min                                                      │
+  │                                                                  │
+  │  Fallback: claude -p "/article-gen ..." (single-session, all     │
+  │    steps in one call — used when refs not configured)             │
+  │                                                                  │
+  │  Total: ~6-8 min (vs ~15 min single-session)                     │
+  └──────────────┬───────────────────────────────────────────────────┘
                  │
   Frontend polls GET /ideas/{id}/progress every 3 seconds
   Progress Modal: progress bar + step indicators + streaming log
@@ -639,42 +645,68 @@ draft → researching → article_ready → generating_images → images_ready �
 
 ### Automation Endpoints (for CLI plugin callbacks)
 ```
-GET  /api/automation/content-ideas/pending       → Get next idea to generate
-PUT  /api/automation/content-ideas/{id}/progress  → Report step progress (percentage + message)
-PUT  /api/automation/content-ideas/{id}/complete  → Save generated article + update status
-POST /api/automation/blog/save-draft             → Direct blog post save (fallback)
+GET  /api/automation/content-ideas/pending              → Get next idea to generate
+GET  /api/automation/content-ideas/{id}                  → Get full idea data (for article-write/score to read prep data)
+PUT  /api/automation/content-ideas/{id}/progress         → Report step progress (percentage + message)
+PUT  /api/automation/content-ideas/{id}/save-prep        → Save prep data (research + strategy + outline)
+PUT  /api/automation/content-ideas/{id}/save-article     → Save article data (merge with prep data)
+POST /api/automation/content-ideas/{id}/continue-pipeline → Trigger next phase (prep→write→score)
+PUT  /api/automation/content-ideas/{id}/complete          → Save completed article + all 5 scores
+POST /api/automation/blog/save-draft                     → Direct blog post save (fallback)
 ```
 
-### Plugin: article-content-writer
+### Plugin: article-content-writer (v2.0.0)
 ```
 Location: D:\Projects\claude-plugin\article-content-writer\
-Status:   Integrated with Portfolio backend (pipeline mode)
-Skills:   article-gen (11-step pipeline + API callbacks), article-brief, article-validate
-Config:   Per-project via .claude/article-writer.md (brand-agnostic)
+Status:   Integrated with Portfolio backend (split pipeline mode)
+Version:  2.0.0
 
-Pipeline mode flags:
-  --idea-id {id}      Content idea ID in Portfolio database
-  --api-url {url}     Base API URL for callbacks
-  --api-token {token} Bearer token for authentication
-  --topic "{topic}"   Article topic
-  --languages en,id   Output languages
+Skills (7):
+  article-gen       All-in-one 5-step pipeline (interactive + pipeline fallback)
+  article-prep      Pipeline-only Steps 1-3 (Sonnet) — research, strategy, outline
+  article-write     Pipeline-only Step 4 (Opus) — write, polish, images
+  article-score     Pipeline-only Step 5 (Sonnet) — 5 gates + combined 100-point
+  article-brief     Brainstorm + outline planning
+  article-validate  Score existing article against 5 gates
+  article-seo       Standalone SEO + GEO analysis
 
-Pipeline mode behavior:
-  - Skip interactive confirmations (auto-proceed)
-  - Report progress at each step via PUT /automation/content-ideas/{id}/progress
-  - Send completed article via PUT /automation/content-ideas/{id}/complete
-  - Auto-select recommended framework, primary hook, etc.
+Agent:
+  article-writer    Self-contained subagent for batch production
+
+Scoring (5 gates, combined 100-point):
+  Quality Gate      10-point (min 7/10, weight x3 = 30 pts)
+  Virality Score    5-point  (min 3/5,  weight x4 = 20 pts)
+  SEO Score         6-point  (min 4/6,  weight x2.5 = 15 pts)
+  AI Humanization   20-point deduction (weight x1 = 20 pts)
+  GEO/AEO Score     5-point  (weight x3 = 15 pts)
+  Combined minimum: 70/100 to publish
+
+Hard Rules: 20 (incl. AI Humanization 107-word system, GEO formatting)
+
+Compiled reference files (injected via --append-system-prompt-file):
+  refs-prep.md   55 KB — global-config, frameworks, hooks, arcs, templates
+  refs-write.md  68 KB — global-config, style-guide, retention, images, SEO
+  refs-score.md  58 KB — virality, quality-gate, SEO, style-guide
 ```
 
 ### Article Generation Environment Variables
 ```env
+# Core config
 ARTICLE_GEN_DRIVER=ssh              # 'ssh' (production) or 'local' (development)
-ARTICLE_GEN_SSH_HOST=your-vps-ip    # VPS IP address
-ARTICLE_GEN_SSH_USER=root           # SSH user
-ARTICLE_GEN_SSH_KEY=/path/to/key    # SSH private key path
+ARTICLE_GEN_SSH_HOST=localhost       # VPS (localhost for same-server SSH)
+ARTICLE_GEN_SSH_USER=claudesn       # SSH user with Claude CLI auth
+ARTICLE_GEN_SSH_KEY=/var/www/.ssh/id_ed25519  # SSH private key
 ARTICLE_GEN_CLAUDE_PATH=claude      # Path to claude CLI binary on VPS
 ARTICLE_GEN_API_URL=https://alisadikinma.com/api  # Callback URL for plugin
 ARTICLE_GEN_API_TOKEN=your-token    # Bearer token (from admin Automation Tokens)
+
+# Split pipeline — per-phase model + compiled reference files
+ARTICLE_GEN_REFS_PREP=/home/claudesn/refs-prep.md
+ARTICLE_GEN_REFS_WRITE=/home/claudesn/refs-write.md
+ARTICLE_GEN_REFS_SCORE=/home/claudesn/refs-score.md
+ARTICLE_GEN_MODEL_PREP=sonnet       # Sonnet for research/strategy/outline
+ARTICLE_GEN_MODEL_WRITE=opus        # Opus for creative writing
+ARTICLE_GEN_MODEL_SCORE=sonnet      # Sonnet for scoring/evaluation
 ```
 
 ### Service Worker (Media Caching)
@@ -682,7 +714,7 @@ ARTICLE_GEN_API_TOKEN=your-token    # Bearer token (from admin Automation Tokens
 
 ---
 
-**Last Updated:** April 13, 2026 (CLI + SSH article generation with real-time progress tracking)
+**Last Updated:** April 13, 2026 (Split pipeline v2.0.0 — Sonnet/Opus model switching + system prompt injection + 5 scoring gates)
 **Maintainer:** Ali Sadikin (ali.sadikincom85@gmail.com)
 **Environment:** Windows 11, D:\Projects\Portfolio_v2
 **PHP:** D:\xampp\php\php.exe (8.2.12) — use full path, not in system PATH

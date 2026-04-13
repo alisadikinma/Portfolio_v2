@@ -394,13 +394,31 @@
           </span>
         </div>
 
+        <!-- Active Skill + Model Info -->
+        <div class="flex items-center gap-3 mb-3 px-1">
+          <div class="flex items-center gap-1.5">
+            <span class="text-[10px] font-mono text-neutral-500 uppercase tracking-wider">Skill:</span>
+            <span class="text-xs font-mono font-medium" :class="activeSkillColor">{{ activeSkill }}</span>
+          </div>
+          <div class="w-px h-3 bg-neutral-700"></div>
+          <div class="flex items-center gap-1.5">
+            <span class="text-[10px] font-mono text-neutral-500 uppercase tracking-wider">Model:</span>
+            <span class="text-xs font-mono font-medium" :class="activeModelColor">{{ activeModel }}</span>
+          </div>
+          <div class="w-px h-3 bg-neutral-700"></div>
+          <div class="flex items-center gap-1.5">
+            <span class="text-[10px] font-mono text-neutral-500 uppercase tracking-wider">Pipeline:</span>
+            <span class="text-xs font-mono text-cyan-400">{{ progressIdea?.workflows?.[0]?.pipeline || 'single' }}</span>
+          </div>
+        </div>
+
         <!-- Log Viewer -->
-        <div class="flex-1 min-h-0 bg-neutral-950 rounded-lg overflow-hidden">
-          <div class="px-3 py-2 bg-neutral-900 border-b border-neutral-800 flex items-center justify-between">
+        <div class="flex-1 min-h-0 bg-neutral-950 rounded-lg overflow-hidden flex flex-col">
+          <div class="px-3 py-2 bg-neutral-900 border-b border-neutral-800 flex items-center justify-between shrink-0">
             <span class="text-xs font-mono text-neutral-400">Generation Log</span>
             <span class="text-[10px] font-mono text-neutral-500">{{ (progressData.progress_log || []).length }} entries</span>
           </div>
-          <div ref="logContainer" class="overflow-y-auto max-h-[300px] p-3 space-y-1 font-mono text-xs">
+          <div ref="logContainer" class="overflow-y-auto flex-1 p-3 space-y-1 font-mono text-xs" style="max-height: 250px; scroll-behavior: smooth;">
             <div v-if="!(progressData.progress_log || []).length" class="text-neutral-500 py-4 text-center">Waiting for log entries...</div>
             <div
               v-for="(entry, i) in (progressData.progress_log || [])"
@@ -410,7 +428,7 @@
             >
               <span class="text-neutral-600 shrink-0">{{ formatLogTime(entry.timestamp) }}</span>
               <span :class="entry.step === 'failed' ? 'text-red-400' : entry.step === 'completed' ? 'text-green-400' : 'text-amber-400'" class="shrink-0">[{{ entry.step }}]</span>
-              <span class="text-neutral-300">{{ entry.message }}</span>
+              <span class="text-neutral-300 break-words">{{ entry.message }}</span>
             </div>
           </div>
         </div>
@@ -569,6 +587,34 @@ const progressSteps = [
   { name: 'quality_gate', label: 'Quality', pct: 95 },
   { name: 'completed', label: 'Done', pct: 100 },
 ]
+
+// Active skill + model detection based on progress percentage
+const activeSkill = computed(() => {
+  const pct = progressData.value.progress_percentage || 0
+  if (pct <= 35) return '/article-prep'
+  if (pct <= 85) return '/article-write'
+  if (pct < 100) return '/article-score'
+  return 'completed'
+})
+const activeModel = computed(() => {
+  const pct = progressData.value.progress_percentage || 0
+  if (pct <= 35) return 'Sonnet 4.6'
+  if (pct <= 85) return 'Opus 4.6'
+  if (pct < 100) return 'Sonnet 4.6'
+  return '-'
+})
+const activeSkillColor = computed(() => {
+  const pct = progressData.value.progress_percentage || 0
+  if (pct <= 35) return 'text-blue-400'
+  if (pct <= 85) return 'text-purple-400'
+  return 'text-blue-400'
+})
+const activeModelColor = computed(() => {
+  const pct = progressData.value.progress_percentage || 0
+  if (pct <= 35) return 'text-emerald-400'
+  if (pct <= 85) return 'text-amber-400'
+  return 'text-emerald-400'
+})
 
 // Research preview
 const researchData = ref(null)
@@ -777,7 +823,7 @@ async function handleImportTrending() {
 // Config modal (research)
 function openConfigModal(idea) {
   currentIdea.value = idea
-  configLanguages.value = []
+  configLanguages.value = ['en', 'id']
   configInstructions.value = ''
   showConfigModal.value = true
 }
