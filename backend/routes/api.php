@@ -370,6 +370,17 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
     Route::put('/content-ideas/{id}/complete', function (\Illuminate\Http\Request $request, $id) {
         $idea = \App\Models\ContentIdea::findOrFail($id);
 
+        \Illuminate\Support\Facades\Log::info('[ContentIdea] /complete called', [
+            'idea_id' => $id,
+            'has_article' => $request->has('article'),
+            'has_generated_article' => $request->has('generated_article'),
+            'article_keys' => $request->has('article') ? array_keys($request->input('article', [])) : [],
+            'article_title' => $request->input('article.title', 'MISSING'),
+            'article_content_len' => strlen($request->input('article.content', '')),
+            'top_level_keys' => array_keys($request->all()),
+            'content_length' => $request->header('Content-Length'),
+        ]);
+
         // Detect schema: new plugin sends "article" key, old sends "generated_article"
         if ($request->has('article')) {
             // New schema from article-content-writer plugin v1.1+
