@@ -618,6 +618,7 @@ class ContentIdeaController extends Controller
 
         // Call GeminiGen via ImageGenerationService
         $imageService = app(\App\Services\ImageGenerationService::class);
+        $referenceImageUrl = $request->input('reference_image_url');
         $uuid = $imageService->queue(
             postId: null, // No post yet — content engine pipeline
             prompt: $prompt,
@@ -625,7 +626,8 @@ class ContentIdeaController extends Controller
             insertAfterHeading: null,
             model: $model,
             aspectRatio: $aspectRatio,
-            style: $style
+            style: $style,
+            referenceImageUrl: $referenceImageUrl
         );
 
         if (!$uuid) {

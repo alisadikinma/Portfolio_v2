@@ -29,7 +29,8 @@ class ImageGenerationService
         string $insertAfterHeading = null,
         string $model = 'imagen-pro',
         string $aspectRatio = '16:9',
-        string $style = 'Photorealistic'
+        string $style = 'Photorealistic',
+        ?string $referenceImageUrl = null
     ): ?string {
         if (empty($this->apiKey)) {
             Log::error('[ImageGen] GEMINIGEN_API_KEY not configured.');
@@ -37,15 +38,28 @@ class ImageGenerationService
         }
 
         try {
+            // Append identity preservation instruction when reference image is provided
+            $finalPrompt = $prompt;
+            if ($referenceImageUrl) {
+                $finalPrompt .= '. Maintain exact facial identity, appearance, and features from the provided reference image.';
+            }
+
+            $multipart = [
+                ['name' => 'prompt', 'contents' => $finalPrompt],
+                ['name' => 'model', 'contents' => $model],
+                ['name' => 'aspect_ratio', 'contents' => $aspectRatio],
+                ['name' => 'style', 'contents' => $style],
+            ];
+
+            // Send reference image as file_urls for GeminiGen
+            if ($referenceImageUrl) {
+                $multipart[] = ['name' => 'file_urls', 'contents' => json_encode([$referenceImageUrl])];
+            }
+
             $response = Http::timeout(30)
                 ->withHeaders(['x-api-key' => $this->apiKey])
                 ->asMultipart()
-                ->post("{$this->baseUrl}/generate_image", [
-                    ['name' => 'prompt', 'contents' => $prompt],
-                    ['name' => 'model', 'contents' => $model],
-                    ['name' => 'aspect_ratio', 'contents' => $aspectRatio],
-                    ['name' => 'style', 'contents' => $style],
-                ]);
+                ->post("{$this->baseUrl}/generate_image", $multipart);
 
             if (!$response->successful()) {
                 Log::error("[ImageGen] API error: HTTP {$response->status()} — {$response->body()}");
