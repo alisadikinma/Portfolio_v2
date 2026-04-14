@@ -618,6 +618,21 @@ const pipelinePhases = [
       { name: 'completed', label: 'Done', pct: 100 },
     ],
   },
+  {
+    name: 'Images',
+    skill: '/article-images',
+    model: 'Sonnet',
+    pctRange: 'Gate 2',
+    minPct: 0,
+    maxPct: 100,
+    gate: 'images',
+    steps: [
+      { name: 'reading_blueprint', label: 'Reading', pct: 10 },
+      { name: 'authoring_image_prompts', label: 'Authoring', pct: 40 },
+      { name: 'prompts_saved', label: 'Saved', pct: 80 },
+      { name: 'gemini_gen', label: 'GeminiGen', pct: 100 },
+    ],
+  },
 ]
 
 // Flatten for backward compat
@@ -972,6 +987,10 @@ function formatStepName(step) {
     seo_pass: 'SEO Optimization',
     image_prompts: 'Generating image prompts...',
     images_generated: 'Images Generated',
+    reading_blueprint: 'Reading image blueprint...',
+    authoring_image_prompts: 'Authoring cinematic prompts...',
+    prompts_saved: 'Image prompts saved',
+    gemini_gen: 'Generating images via GeminiGen...',
     virality_score: 'Scoring virality...',
     virality_scored: 'Virality Scored',
     quality_gate: 'Quality gate check...',

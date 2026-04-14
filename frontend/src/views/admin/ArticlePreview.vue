@@ -249,6 +249,28 @@ const qualityGate = computed(() => article.value?.quality_gate ?? null)
 const viralityGate = computed(() => (typeof article.value?.virality_score === 'object' ? article.value.virality_score : null))
 const serverSeo = computed(() => article.value?.seo_analysis ?? null)
 
+// Image plan (split-phase Gate 2): reads outline blueprint, shows concepts
+// scheduled for cinematic prompt authoring before images are generated.
+const imagePlan = computed(() => {
+  const outline = article.value?.prep_data?.outline
+  const sections = outline?.sections || []
+  const items = []
+  const title = article.value?.title || idea.value?.title
+  if (title) {
+    items.push({ key: 'cover', label: 'Cover', concept: `Hero visual for "${title}"` })
+  }
+  for (const s of sections) {
+    if (s && s.image_concept) {
+      items.push({
+        key: `section-${s.position}`,
+        label: s.title || `Section #${s.position}`,
+        concept: s.image_concept,
+      })
+    }
+  }
+  return { count: items.length, items }
+})
+
 function scoreColor(score, max) {
   const ratio = score / max
   if (ratio >= 0.7) return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
@@ -411,6 +433,21 @@ async function handleApprove() {
               <template v-else>Approve &amp; Continue</template>
             </button>
           </div>
+        </div>
+      </div>
+
+      <!-- Image Plan Summary (split-phase Gate 2 blueprint) -->
+      <div v-if="imagePlan.count > 0" class="max-w-3xl mx-auto px-4 sm:px-6 pt-6">
+        <div class="p-3 rounded-lg bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700">
+          <div class="flex items-center gap-2 text-sm font-medium text-neutral-800 dark:text-neutral-200">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z"/></svg>
+            {{ imagePlan.count }} image{{ imagePlan.count === 1 ? '' : 's' }} planned
+          </div>
+          <ul class="mt-2 text-sm text-neutral-600 dark:text-neutral-400 space-y-1">
+            <li v-for="item in imagePlan.items" :key="item.key">
+              <strong class="text-neutral-700 dark:text-neutral-300">{{ item.label }}:</strong> {{ item.concept }}
+            </li>
+          </ul>
         </div>
       </div>
 

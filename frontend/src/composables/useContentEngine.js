@@ -107,6 +107,15 @@ export function useContentEngine() {
     return request('post', `/admin/content-engine/ideas/${id}/publish`)
   }
 
+  const updateImageConcept = (id, sectionPosition, imageConcept) =>
+    request('put', `/admin/content-engine/ideas/${id}/update-image-concept`, {
+      section_position: sectionPosition,
+      image_concept: imageConcept,
+    })
+
+  const regenerateImagePrompts = (id, sections = []) =>
+    request('post', `/admin/content-engine/ideas/${id}/regenerate-image-prompts`, { sections })
+
   const listWorkflows = () => request('get', '/admin/content-engine/workflows')
 
   const getWorkflowStatus = (id) => request('get', `/admin/content-engine/workflows/${id}`)
@@ -135,6 +144,8 @@ export function useContentEngine() {
     regenerateArticle,
     startImageGeneration,
     approveAndPublish,
+    updateImageConcept,
+    regenerateImagePrompts,
     listWorkflows,
     getWorkflowStatus,
   }
