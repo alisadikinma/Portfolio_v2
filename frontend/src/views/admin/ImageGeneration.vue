@@ -5,6 +5,7 @@ import { useContentEngine } from '@/composables/useContentEngine'
 import { useToast } from '@/composables/useToast'
 import PipelineStepBar from '@/components/admin/PipelineStepBar.vue'
 import StockImageSearch from '@/components/admin/StockImageSearch.vue'
+import ImageConfigModal from '@/components/admin/ImageConfigModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -15,6 +16,7 @@ const idea = ref(null)
 const loadError = ref(null)
 const segments = ref([])
 const generatingAll = ref(false)
+const configSegment = ref(null) // segment being configured in modal
 let saveTimeout = null
 let pollInterval = null
 
@@ -53,6 +55,9 @@ function initSegments() {
     model: img.model || 'nano-banana-2',
     aspect_ratio: img.aspect_ratio || '16:9',
     reference_image_url: img.reference_image_url || '',
+    face_refs: img.face_refs || [],
+    style_refs: img.style_refs || [],
+    additional_notes: img.additional_notes || '',
     generated_url: img.generated_url || '',
     status: img.status || 'pending',
     label: img.type === 'cover' ? 'COVER' : `BODY-${i}`,
@@ -86,7 +91,11 @@ async function persistDraft() {
     resolution: seg.resolution || '1K',
     placement: seg.placement,
     suggested_position: seg.suggested_position,
+    insert_after_heading: seg.insert_after_heading,
     reference_image_url: seg.reference_image_url,
+    face_refs: seg.face_refs || [],
+    style_refs: seg.style_refs || [],
+    additional_notes: seg.additional_notes || '',
     generated_url: seg.generated_url,
     status: seg.status,
     job_uuid: seg.job_uuid,
@@ -117,7 +126,9 @@ async function generateSingle(segIndex) {
     style: seg.style,
     model: seg.model,
     aspect_ratio: seg.aspect_ratio,
-    reference_image_url: seg.reference_image_url || null,
+    face_refs: seg.face_refs || [],
+    style_refs: seg.style_refs || [],
+    additional_notes: seg.additional_notes || '',
   })
 
   if (result.success) {
@@ -161,6 +172,27 @@ const articleTitle = computed(() => {
   const a = idea.value?.generated_article
   return a?.en?.title || a?.title || idea.value?.title || ''
 })
+
+// ── Config modal apply ──
+function openConfig(seg) {
+  configSegment.value = seg
+}
+
+function handleConfigApply(options) {
+  const seg = configSegment.value
+  if (!seg) return
+
+  seg.face_refs = options.faceRefs
+  seg.style_refs = options.styleRefs
+  seg.additional_notes = options.additionalNotes
+  seg.model = options.model
+  seg.style = options.style
+  configSegment.value = null
+
+  // Auto-generate after applying config
+  generateSingle(seg.index)
+  scheduleAutoSave()
+}
 
 // ── Approve & continue ──
 async function handleApprove() {
@@ -232,15 +264,20 @@ async function handleApprove() {
                 <p v-if="seg.concept" class="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5 line-clamp-1">{{ seg.concept }}</p>
               </div>
             </div>
-            <span :class="[
-              'text-[11px] font-medium px-2.5 py-1 rounded-full',
-              seg.status === 'done' ? 'bg-green-500/10 text-green-600 dark:text-green-400' :
-              seg.status === 'generating' ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' :
-              seg.status === 'failed' ? 'bg-red-500/10 text-red-600 dark:text-red-400' :
-              'bg-neutral-500/10 text-neutral-500 dark:text-neutral-400'
-            ]">
-              {{ seg.status === 'done' ? 'Generated' : seg.status === 'generating' ? 'Generating...' : seg.status === 'failed' ? 'Failed' : 'Pending' }}
-            </span>
+            <div class="flex items-center gap-2">
+              <button @click="openConfig(seg)" class="w-7 h-7 flex items-center justify-center rounded-lg text-neutral-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors" title="Configure references & settings">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+              </button>
+              <span :class="[
+                'text-[11px] font-medium px-2.5 py-1 rounded-full',
+                seg.status === 'done' ? 'bg-green-500/10 text-green-600 dark:text-green-400' :
+                seg.status === 'generating' ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' :
+                seg.status === 'failed' ? 'bg-red-500/10 text-red-600 dark:text-red-400' :
+                'bg-neutral-500/10 text-neutral-500 dark:text-neutral-400'
+              ]">
+                {{ seg.status === 'done' ? 'Generated' : seg.status === 'generating' ? 'Generating...' : seg.status === 'failed' ? 'Failed' : 'Pending' }}
+              </span>
+            </div>
           </div>
 
           <div class="border-t border-neutral-100 dark:border-neutral-700/40"></div>
@@ -359,5 +396,13 @@ async function handleApprove() {
         </div>
       </div>
     </template>
+
+    <!-- Config Modal -->
+    <ImageConfigModal
+      :visible="!!configSegment"
+      :segment="configSegment"
+      @apply="handleConfigApply"
+      @close="configSegment = null"
+    />
   </div>
 </template>

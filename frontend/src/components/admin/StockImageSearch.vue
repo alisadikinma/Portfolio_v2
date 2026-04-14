@@ -5,8 +5,9 @@ import api from '@/services/api'
 const props = defineProps({
   modelValue: { type: String, default: '' },
   orientation: { type: String, default: 'landscape' },
+  multiple: { type: Boolean, default: false },
 })
-const emit = defineEmits(['update:modelValue'])
+const emit = defineEmits(['update:modelValue', 'select'])
 
 const searchQuery = ref('')
 const results = ref([])
@@ -73,7 +74,11 @@ async function handleSearch() {
 }
 
 function selectImage(url) {
-  emit('update:modelValue', url)
+  if (props.multiple) {
+    emit('select', url)
+  } else {
+    emit('update:modelValue', url)
+  }
 }
 
 function removeSelected() {
@@ -101,14 +106,14 @@ function handlePasteUrl() {
   <div class="space-y-3">
     <label class="block text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Reference Image</label>
 
-    <!-- Selected reference preview -->
-    <div v-if="modelValue" class="flex items-start gap-3">
+    <!-- Selected reference preview (single mode only) -->
+    <div v-if="modelValue && !multiple" class="flex items-start gap-3">
       <img :src="modelValue" alt="Reference" class="w-20 h-14 object-cover rounded-lg border border-neutral-200 dark:border-neutral-700" />
       <button @click="removeSelected" class="text-xs text-red-500 hover:text-red-600 mt-1">Remove</button>
     </div>
 
-    <!-- Search + actions -->
-    <div v-if="!modelValue" class="space-y-2">
+    <!-- Search + actions (always visible in multi mode) -->
+    <div v-if="!modelValue || multiple" class="space-y-2">
       <!-- Search bar -->
       <div class="flex gap-2">
         <input
