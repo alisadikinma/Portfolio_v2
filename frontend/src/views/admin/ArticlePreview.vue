@@ -13,7 +13,7 @@ const toast = useToast()
 // ── State ──
 const idea = ref(null)
 const loadError = ref(null)
-const activeLang = ref('en')
+const activeLang = ref('id')
 const editedTitles = ref({ en: '', id: '' })
 const targetKeyword = ref('')
 const showSeoPanel = ref(false)
@@ -38,6 +38,11 @@ onMounted(async () => {
 function initFromArticle() {
   const article = idea.value?.generated_article
   if (!article) return
+
+  // Auto-detect active language: pick first language that has content
+  if (article.id?.content) activeLang.value = 'id'
+  else if (article.en?.content) activeLang.value = 'en'
+  else if (article.content) activeLang.value = 'en'
 
   // Initialize editable titles from nested or flat format
   const en = getArticleContent(article, 'en')

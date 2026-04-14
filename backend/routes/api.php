@@ -375,41 +375,69 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
             // New schema from article-content-writer plugin v1.1+
             $pluginArticle = $request->input('article', []);
             $languages = $idea->languages ?? ['en'];
+            $existing = $idea->generated_article ?? [];
 
-            // Build nested-by-language generated_article
+            // Build nested-by-language generated_article, preserving existing content
+            // if the completion callback didn't include article body (e.g., score-only callback)
             $generatedArticle = [];
             foreach ($languages as $lang) {
+                $existingLang = $existing[$lang] ?? [];
+                $existingFlat = [
+                    'title' => $existing['title'] ?? '',
+                    'content' => $existing['content'] ?? '',
+                    'word_count' => $existing['word_count'] ?? 0,
+                ];
+
                 $generatedArticle[$lang] = [
-                    'title' => $pluginArticle['title'] ?? $idea->title,
-                    'content' => $pluginArticle['content'] ?? '',
-                    'word_count' => $pluginArticle['word_count'] ?? 0,
+                    'title' => $pluginArticle['title']
+                        ?? (is_array($existingLang) ? ($existingLang['title'] ?? null) : null)
+                        ?? $existingFlat['title']
+                        ?? $idea->title,
+                    'content' => $pluginArticle['content']
+                        ?? (is_array($existingLang) ? ($existingLang['content'] ?? null) : null)
+                        ?? $existingFlat['content']
+                        ?? '',
+                    'word_count' => $pluginArticle['word_count']
+                        ?? (is_array($existingLang) ? ($existingLang['word_count'] ?? null) : null)
+                        ?? $existingFlat['word_count']
+                        ?? 0,
                 ];
             }
 
-            // Shared metadata
-            $generatedArticle['target_keyword'] = $pluginArticle['keyword'] ?? '';
-            $generatedArticle['framework'] = $pluginArticle['framework'] ?? '';
-            $generatedArticle['hook_type'] = $pluginArticle['hook_type'] ?? '';
-            $generatedArticle['hook_boost'] = $pluginArticle['hook_boost'] ?? '';
-            $generatedArticle['emotional_arc'] = $pluginArticle['emotional_arc'] ?? '';
-            $generatedArticle['citation_count'] = $pluginArticle['citation_count'] ?? 0;
-            $generatedArticle['image_count'] = $pluginArticle['image_count'] ?? 0;
+            // Shared metadata (prefer incoming, fall back to existing)
+            $generatedArticle['target_keyword'] = $pluginArticle['keyword'] ?? $existing['target_keyword'] ?? $existing['keyword'] ?? '';
+            $generatedArticle['framework'] = $pluginArticle['framework'] ?? $existing['framework'] ?? '';
+            $generatedArticle['hook_type'] = $pluginArticle['hook_type'] ?? $existing['hook_type'] ?? '';
+            $generatedArticle['hook_boost'] = $pluginArticle['hook_boost'] ?? $existing['hook_boost'] ?? '';
+            $generatedArticle['emotional_arc'] = $pluginArticle['emotional_arc'] ?? $existing['emotional_arc'] ?? '';
+            $generatedArticle['citation_count'] = $pluginArticle['citation_count'] ?? $existing['citation_count'] ?? 0;
+            $generatedArticle['image_count'] = $pluginArticle['image_count'] ?? $existing['image_count'] ?? 0;
 
             // Scoring gates
             $generatedArticle['seo_analysis'] = $request->input('seo_analysis');
             $generatedArticle['quality_gate'] = $request->input('quality_gate');
             $generatedArticle['virality_score'] = $request->input('virality_score');
 
+            // AI Humanization + GEO scores (from article-score)
+            $generatedArticle['ai_humanization'] = $request->input('ai_humanization');
+            $generatedArticle['geo_score'] = $request->input('geo_score');
+            $generatedArticle['combined_score'] = $request->input('combined_score');
+
             // Backward-compat: flatten scores for quick access
             $generatedArticle['quality_score'] = $request->input('quality_gate.score', 0);
             $generatedArticle['virality_score_value'] = $request->input('virality_score.score', 0);
             $generatedArticle['seo_score'] = $request->input('seo_analysis.score', 0);
 
-            // Image prompts
-            $generatedArticle['image_prompts'] = $request->input('image_prompts', []);
+            // Image prompts (prefer incoming, fall back to existing from save-article)
+            $generatedArticle['image_prompts'] = $request->input('image_prompts', $existing['image_prompts'] ?? []);
 
             // Sources from research
-            $generatedArticle['sources'] = $request->input('research_data.sources', []);
+            $generatedArticle['sources'] = $request->input('research_data.sources', $existing['sources'] ?? []);
+
+            // Preserve prep_data if it existed
+            if (isset($existing['prep_data'])) {
+                $generatedArticle['prep_data'] = $existing['prep_data'];
+            }
 
             $idea->update([
                 'status' => 'article_ready',
