@@ -72,6 +72,9 @@ function parseBlockElements(html) {
 
 /** Determine image position in content blocks */
 function resolveImagePosition(img, index, totalImages, blocks) {
+  // Cover image always goes at the top
+  if (img.type === 'cover') return 0
+
   // Priority 1: explicit suggested_position from plugin
   if (typeof img.suggested_position === 'number') return img.suggested_position
 
