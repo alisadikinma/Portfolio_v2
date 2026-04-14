@@ -97,13 +97,20 @@
       "Read(//d/Projects/claude-plugin/article-content-writer/references/**)",
       "Bash(python -c \"import sys,json; data=json.load\\(sys.stdin\\); print\\(data['value']['answer']\\)\")",
       "Bash(where claude:*)",
-      "Read(//d/Projects/Portfolio_v2/backend/public/%SystemDrive%/**)"
+      "Read(//d/Projects/Portfolio_v2/backend/public/%SystemDrive%/**)",
+      "mcp__ssh-prod-vps__exec",
+      "mcp__ssh-prod-vps__sudo-exec",
+      "Bash(claude plugin:*)",
+      "Bash(claude plugins:*)",
+      "Read(//d/Projects/sparkfluence_platform/src/components/studio/panels/**)",
+      "Read(//d/Projects/sparkfluence_platform/src/**)"
     ],
     "deny": [],
     "ask": [],
     "additionalDirectories": [
       "\\tmp",
-      "D:\\Projects\\claude-plugin\\article-content-writer"
+      "D:\\Projects\\claude-plugin\\article-content-writer",
+      "C:\\Users\\alisa\\.claude\\plugins\\marketplaces\\alisadikinma-ai-content-suite\\.claude-plugin"
     ]
   }
 }
