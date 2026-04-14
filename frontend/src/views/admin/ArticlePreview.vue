@@ -696,56 +696,6 @@ async function handleApprove() {
         </div>
       </div>
 
-      <!-- Regenerate Confirmation Modal -->
-      <Teleport to="body">
-        <div v-if="showRegenConfirm" class="fixed inset-0 z-[60] flex items-center justify-center">
-          <div @click="showRegenConfirm = false" class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
-          <div class="relative w-full max-w-md mx-4 bg-white dark:bg-neutral-800 rounded-xl shadow-2xl border border-neutral-200 dark:border-neutral-700">
-            <div class="p-6">
-              <!-- Header -->
-              <div class="flex items-center gap-3 mb-4">
-                <div class="w-10 h-10 rounded-full bg-cyan-100 dark:bg-cyan-900/30 flex items-center justify-center shrink-0">
-                  <svg class="w-5 h-5 text-cyan-600 dark:text-cyan-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182M20.016 4.657v4.992"/></svg>
-                </div>
-                <div>
-                  <h3 class="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Regenerate Article</h3>
-                  <p class="text-sm text-neutral-500 dark:text-neutral-400">Re-run with improved plugin version</p>
-                </div>
-              </div>
-
-              <!-- Warning -->
-              <div class="mb-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-                <p class="text-sm text-amber-800 dark:text-amber-300">This will discard the current article and start a fresh generation. The process may take several minutes.</p>
-              </div>
-
-              <!-- Additional Instructions -->
-              <div class="mb-5">
-                <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">Additional Instructions (optional)</label>
-                <textarea
-                  v-model="regenInstructions"
-                  rows="4"
-                  class="w-full px-3 py-2 text-sm rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 focus:ring-cyan-500 focus:border-cyan-500 placeholder-neutral-400 resize-none"
-                  placeholder="e.g. Make the content deeper with real examples and data. Avoid generic listicles. Add expert insights and actionable takeaways..."
-                ></textarea>
-                <p class="mt-1 text-xs text-neutral-400 dark:text-neutral-500">Guide the AI to improve content quality, depth, or focus areas.</p>
-              </div>
-
-              <!-- Actions -->
-              <div class="flex items-center justify-end gap-3">
-                <button @click="showRegenConfirm = false" :disabled="regenerating" class="px-4 py-2 text-sm font-medium rounded-lg border border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors disabled:opacity-50">
-                  Cancel
-                </button>
-                <button @click="handleRegenerate" :disabled="regenerating" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white transition-colors disabled:opacity-50">
-                  <svg v-if="regenerating" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
-                  <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182M20.016 4.657v4.992"/></svg>
-                  {{ regenerating ? 'Starting...' : 'Regenerate Article' }}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </Teleport>
-
       <!-- SEO Panel Overlay (click to close) -->
       <div v-if="showSeoPanel" @click="showSeoPanel = false" class="fixed inset-0 bg-black/20 z-40"></div>
 
@@ -771,10 +721,58 @@ async function handleApprove() {
       <div class="text-center max-w-md">
         <p class="text-neutral-600 dark:text-neutral-400 font-medium mb-2">No article content yet</p>
         <p class="text-sm text-neutral-500 dark:text-neutral-400">This idea hasn't been through article generation yet.</p>
-        <button @click="$router.push({ name: 'admin-content-engine' })" class="mt-4 px-4 py-2 text-sm rounded-lg bg-amber-600 text-white hover:bg-amber-700">
-          Back to Content Engine
-        </button>
+        <div class="flex items-center justify-center gap-3 mt-4">
+          <button @click="$router.push({ name: 'admin-content-engine' })" class="px-4 py-2 text-sm rounded-lg border border-neutral-300 dark:border-neutral-600 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700">
+            Back to Content Engine
+          </button>
+          <button @click="showRegenConfirm = true" class="px-4 py-2 text-sm rounded-lg bg-amber-600 text-white hover:bg-amber-700">
+            Regenerate Article
+          </button>
+        </div>
       </div>
     </div>
+
+    <!-- Regenerate Confirmation Modal (accessible from both article view and empty state) -->
+    <Teleport to="body">
+      <div v-if="showRegenConfirm" class="fixed inset-0 z-[60] flex items-center justify-center">
+        <div @click="showRegenConfirm = false" class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+        <div class="relative w-full max-w-md mx-4 bg-white dark:bg-neutral-800 rounded-xl shadow-2xl border border-neutral-200 dark:border-neutral-700">
+          <div class="p-6">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-10 h-10 rounded-full bg-cyan-100 dark:bg-cyan-900/30 flex items-center justify-center shrink-0">
+                <svg class="w-5 h-5 text-cyan-600 dark:text-cyan-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182M20.016 4.657v4.992"/></svg>
+              </div>
+              <div>
+                <h3 class="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Regenerate Article</h3>
+                <p class="text-sm text-neutral-500 dark:text-neutral-400">Re-run with improved plugin version</p>
+              </div>
+            </div>
+            <div class="mb-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+              <p class="text-sm text-amber-800 dark:text-amber-300">This will discard the current article and start a fresh generation. The process may take several minutes.</p>
+            </div>
+            <div class="mb-5">
+              <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">Additional Instructions (optional)</label>
+              <textarea
+                v-model="regenInstructions"
+                rows="4"
+                class="w-full px-3 py-2 text-sm rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 focus:ring-cyan-500 focus:border-cyan-500 placeholder-neutral-400 resize-none"
+                placeholder="e.g. Make the content deeper with real examples and data. Avoid generic listicles. Add expert insights and actionable takeaways..."
+              ></textarea>
+              <p class="mt-1 text-xs text-neutral-400 dark:text-neutral-500">Guide the AI to improve content quality, depth, or focus areas.</p>
+            </div>
+            <div class="flex items-center justify-end gap-3">
+              <button @click="showRegenConfirm = false" :disabled="regenerating" class="px-4 py-2 text-sm font-medium rounded-lg border border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors disabled:opacity-50">
+                Cancel
+              </button>
+              <button @click="handleRegenerate" :disabled="regenerating" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white transition-colors disabled:opacity-50">
+                <svg v-if="regenerating" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182M20.016 4.657v4.992"/></svg>
+                {{ regenerating ? 'Starting...' : 'Regenerate Article' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
