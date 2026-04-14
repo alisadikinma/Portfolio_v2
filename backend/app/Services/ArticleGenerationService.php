@@ -105,6 +105,29 @@ class ArticleGenerationService
     }
 
     /**
+     * Trigger Gate 2 image prompt authoring.
+     * Uses /article-images skill on Sonnet with refs-images.md.
+     *
+     * @param int $ideaId
+     * @param string $idempotencyKey UUID to dedupe retries
+     * @param int[] $onlySections Outline positions to regenerate; empty = all
+     * @return array{success: bool, pid: int|null, error: string|null}
+     */
+    public function triggerImages(int $ideaId, string $idempotencyKey, array $onlySections = []): array
+    {
+        $prompt = "/article-images --idea-id {$ideaId} --api-url {$this->apiUrl} --api-token {$this->apiToken}";
+        $prompt .= " --idempotency-key {$idempotencyKey}";
+        if (!empty($onlySections)) {
+            $prompt .= ' --only-sections ' . implode(',', $onlySections);
+        }
+
+        $model = config('services.article_generation.model_images', 'sonnet');
+        $refsFile = config('services.article_generation.refs_images', '');
+
+        return $this->executePrompt($prompt, $ideaId, 'images', $model, $refsFile);
+    }
+
+    /**
      * Check if a process is still running.
      */
     public function isProcessRunning(int $pid): bool

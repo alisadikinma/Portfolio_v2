@@ -552,13 +552,65 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
         return response()->json(['success' => true, 'message' => 'Article data saved.']);
     });
 
-    Route::post('/content-ideas/{id}/continue-pipeline', function ($id) {
+    Route::post('/content-ideas/{id}/continue-pipeline', function (\Illuminate\Http\Request $request, $id) {
         $idea = \App\Models\ContentIdea::find($id);
         if (!$idea) {
             return response()->json(['success' => false, 'message' => 'Idea not found.'], 404);
         }
 
         $service = app(\App\Services\ArticleGenerationService::class);
+
+        // Explicit phase handoff: article-images → GeminiGen (Gate 2 split flow)
+        $phase = $request->input('phase');
+        if ($phase === 'images') {
+            $article = $idea->generated_article ?? [];
+            if (empty(data_get($article, 'image_prompts'))) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot continue to GeminiGen: no image_prompts saved yet.',
+                ], 409);
+            }
+
+            $imageService = app(\App\Services\ImageGenerationService::class);
+            $prompts = data_get($article, 'image_prompts', []);
+            $queuedJobs = [];
+
+            foreach ($prompts as $index => $item) {
+                $uuid = $imageService->queue(
+                    postId: null,
+                    prompt: $item['prompt'] ?? '',
+                    type: ($item['type'] ?? 'inline') === 'cover' ? 'hero' : 'inline',
+                    insertAfterHeading: $item['insert_after_heading'] ?? null,
+                    model: $item['model'] ?? 'nano-banana-2',
+                    aspectRatio: $item['aspect_ratio'] ?? '16:9',
+                    style: $item['style'] ?? 'Cinematic',
+                    faceRefs: $item['face_refs'] ?? [],
+                    styleRefs: $item['style_refs'] ?? [],
+                    additionalNotes: $item['additional_notes'] ?? ''
+                );
+
+                if ($uuid) {
+                    $prompts[$index]['job_uuid'] = $uuid;
+                    $prompts[$index]['status'] = 'generating';
+                    $queuedJobs[] = $uuid;
+                }
+            }
+
+            $article['image_prompts'] = $prompts;
+            $idea->update([
+                'generated_article' => $article,
+                'status' => 'generating_images',
+                'progress_percentage' => 30,
+                'current_step' => 'gemini_gen',
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'next_phase' => 'gemini_gen',
+                'queued' => count($queuedJobs),
+            ]);
+        }
+
         $progress = $idea->progress_percentage ?? 0;
 
         // Prep done (35%) → trigger write
@@ -577,6 +629,9 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
 
         return response()->json(['success' => false, 'message' => 'No next phase to trigger.', 'progress' => $progress]);
     });
+
+    // Gate 2 split flow: /article-images skill saves authored prompts
+    Route::put('/content-ideas/{id}/save-image-prompts', [ContentIdeaController::class, 'saveImagePrompts']);
 
     // Carousel endpoints (protected)
     Route::get('/carousel/accounts', [CarouselDraftController::class, 'listAccounts']);
@@ -639,6 +694,10 @@ Route::middleware(['auth:sanctum'])->prefix('admin/content-engine')->group(funct
     Route::post('/ideas/{id}/generate-images', [ContentIdeaController::class, 'startImageGeneration']);
     Route::post('/ideas/{id}/generate-segment-image', [ContentIdeaController::class, 'generateSegmentImage']);
     Route::post('/ideas/{id}/publish', [ContentIdeaController::class, 'approveAndPublish']);
+
+    // Pipeline: Gate 2 split flow — per-section concept editing + prompt regeneration
+    Route::put('/ideas/{id}/update-image-concept', [ContentIdeaController::class, 'updateImageConcept']);
+    Route::post('/ideas/{id}/regenerate-image-prompts', [ContentIdeaController::class, 'regenerateImagePrompts']);
 
     // Stock image search (Pexels + Unsplash proxy)
     Route::get('/stock-images/search', [\App\Http\Controllers\Api\Admin\StockImageController::class, 'search']);

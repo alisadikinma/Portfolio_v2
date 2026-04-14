@@ -11,6 +11,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class ContentIdeaController extends Controller
 {
@@ -521,9 +522,34 @@ class ContentIdeaController extends Controller
         $idea->status = 'generating_images';
         $idea->save();
 
-        // Trigger image generation via Content Engine
+        // Gate 2 split-phase flow: when flag is on and no prompts exist yet,
+        // invoke /article-images skill to author cinematic prompts before GeminiGen.
+        $article = $idea->generated_article ?? [];
+        if (
+            config('services.article_generation.use_images_phase')
+            && empty(data_get($article, 'image_prompts'))
+        ) {
+            $idempotencyKey = Str::uuid()->toString();
+            $result = $this->articleGen->triggerImages($idea->id, $idempotencyKey);
+            $idea->update([
+                'process_pid' => $result['pid'] ?? null,
+                'current_step' => 'authoring_image_prompts',
+                'progress_percentage' => 5,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'mode' => 'authoring_prompts',
+                    'idempotency_key' => $idempotencyKey,
+                    'pid' => $result['pid'] ?? null,
+                ],
+                'message' => 'Authoring image prompts via article-images skill.',
+            ]);
+        }
+
+        // Legacy flow: trigger image generation via Content Engine
         try {
-            $article = $idea->generated_article ?? [];
             $result = $this->engine->createWorkflow('image_generation', [
                 'topic' => $idea->title,
                 'article_title' => $article['title'] ?? $idea->title,
@@ -817,5 +843,137 @@ class ContentIdeaController extends Controller
                 ]);
             }
         }
+    }
+
+    // ========================================================================
+    // GATE 2: IMAGE PROMPT AUTHORING (split phase)
+    // ========================================================================
+
+    /**
+     * Automation callback: /article-images skill saves authored image_prompts[].
+     * Merges into generated_article without touching article body or scores.
+     */
+    public function saveImagePrompts($id, Request $request): JsonResponse
+    {
+        $request->validate([
+            'image_prompts' => 'required|array|min:1',
+            'image_prompts.*.type' => 'required|string|in:cover,inline',
+            'image_prompts.*.concept' => 'required|string',
+            'image_prompts.*.prompt' => 'required|string',
+            'image_prompts.*.insert_after_heading' => 'nullable|string',
+            'idempotency_key' => 'nullable|string',
+        ]);
+
+        $idea = ContentIdea::find($id);
+        if (!$idea) {
+            return response()->json(['success' => false, 'message' => 'Content idea not found.'], 404);
+        }
+
+        $article = $idea->generated_article ?? [];
+        $article['image_prompts'] = $request->input('image_prompts');
+        $idea->update(['generated_article' => $article]);
+
+        return response()->json([
+            'success' => true,
+            'data' => ['image_prompts_count' => count($article['image_prompts'])],
+            'message' => 'Image prompts saved.',
+        ]);
+    }
+
+    /**
+     * Admin: update a single section's image_concept before regeneration.
+     */
+    public function updateImageConcept($id, Request $request): JsonResponse
+    {
+        $request->validate([
+            'section_position' => 'required|integer',
+            'image_concept' => 'nullable|string',
+        ]);
+
+        $idea = ContentIdea::find($id);
+        if (!$idea) {
+            return response()->json(['success' => false, 'message' => 'Content idea not found.'], 404);
+        }
+
+        $article = $idea->generated_article ?? [];
+        $sections = data_get($article, 'prep_data.outline.sections', []);
+        if (empty($sections)) {
+            return response()->json(['success' => false, 'message' => 'Outline not available for this idea.'], 409);
+        }
+
+        $targetPosition = $request->input('section_position');
+        $newConcept = $request->input('image_concept');
+        $found = false;
+        foreach ($sections as $idx => $section) {
+            if ((int) ($section['position'] ?? -1) === (int) $targetPosition) {
+                $sections[$idx]['image_concept'] = $newConcept;
+                $found = true;
+                break;
+            }
+        }
+
+        if (!$found) {
+            return response()->json([
+                'success' => false,
+                'message' => "Section position {$targetPosition} not found in outline.",
+            ], 404);
+        }
+
+        data_set($article, 'prep_data.outline.sections', $sections);
+        $idea->update(['generated_article' => $article]);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'updated_position' => (int) $targetPosition,
+                'new_concept' => $newConcept,
+            ],
+            'message' => 'Image concept updated.',
+        ]);
+    }
+
+    /**
+     * Admin: regenerate image prompts for all or a filtered list of sections.
+     * Triggers /article-images skill with optional only-sections filter.
+     */
+    public function regenerateImagePrompts($id, Request $request): JsonResponse
+    {
+        $request->validate([
+            'sections' => 'nullable|array',
+            'sections.*' => 'integer',
+        ]);
+
+        $idea = ContentIdea::find($id);
+        if (!$idea) {
+            return response()->json(['success' => false, 'message' => 'Content idea not found.'], 404);
+        }
+
+        if (!in_array($idea->status, ['article_ready', 'images_ready', 'generating_images'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Regenerate requires article_ready, images_ready, or generating_images status.',
+            ], 409);
+        }
+
+        $onlySections = $request->input('sections', []);
+        $idempotencyKey = Str::uuid()->toString();
+        $result = $this->articleGen->triggerImages($idea->id, $idempotencyKey, $onlySections);
+
+        $idea->update([
+            'process_pid' => $result['pid'] ?? null,
+            'current_step' => 'authoring_image_prompts',
+            'progress_percentage' => 0,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'job_id' => $idempotencyKey,
+                'pid' => $result['pid'] ?? null,
+                'scope' => empty($onlySections) ? 'all' : 'filtered',
+                'sections' => $onlySections,
+            ],
+            'message' => 'Image prompt regeneration triggered.',
+        ]);
     }
 }

@@ -63,9 +63,12 @@ return [
         'refs_prep' => env('ARTICLE_GEN_REFS_PREP', ''),
         'refs_write' => env('ARTICLE_GEN_REFS_WRITE', ''),
         'refs_score' => env('ARTICLE_GEN_REFS_SCORE', ''),
+        'refs_images' => env('ARTICLE_GEN_REFS_IMAGES', ''),
         'model_prep' => env('ARTICLE_GEN_MODEL_PREP', 'sonnet'),
-        'model_write' => env('ARTICLE_GEN_MODEL_WRITE', 'opus'),
+        'model_write' => env('ARTICLE_GEN_MODEL_WRITE', 'sonnet'),
         'model_score' => env('ARTICLE_GEN_MODEL_SCORE', 'sonnet'),
+        'model_images' => env('ARTICLE_GEN_MODEL_IMAGES', 'sonnet'),
+        'use_images_phase' => env('ARTICLE_GEN_USE_IMAGES_PHASE', false),
     ],
 
 ];
