@@ -281,7 +281,7 @@
 
     <!-- Trending Preview Modal -->
     <div v-if="showTrendingModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="showTrendingModal = false">
-      <div class="bg-white dark:bg-neutral-800 rounded-xl shadow-xl max-w-lg w-full mx-4 p-6 max-h-[80vh] flex flex-col">
+      <div class="bg-white dark:bg-neutral-800 rounded-xl shadow-xl max-w-7xl w-full mx-4 p-6 max-h-[85vh] flex flex-col">
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Trending Topics</h3>
           <select v-model="trendingSourceFilter" @change="filterTrendingTopics" class="rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 text-xs px-2 py-1 focus:ring-amber-500 focus:border-amber-500">
@@ -297,13 +297,13 @@
             Select All
           </label>
         </div>
-        <div class="flex-1 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-2 min-h-0 content-start">
+        <div class="flex-1 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 min-h-0 content-start">
           <div v-if="trendingLoading" class="py-8 text-center text-neutral-500 dark:text-neutral-400">
             <svg class="animate-spin h-6 w-6 mx-auto mb-2 text-amber-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
             Loading trending topics...
           </div>
           <div v-else-if="!filteredTrending.length" class="py-8 text-center text-neutral-500 dark:text-neutral-400">No trending topics found.</div>
-          <label v-for="topic in filteredTrending" :key="topic.title || topic.topic" class="flex items-start gap-3 p-3 rounded-lg border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-700/30 cursor-pointer transition-colors">
+          <label v-for="topic in pagedTrending" :key="topic.title || topic.topic" class="flex items-start gap-3 p-3 rounded-lg border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-700/30 cursor-pointer transition-colors">
             <input type="checkbox" :value="topic" v-model="selectedTrending" class="mt-0.5 rounded border-neutral-300 text-amber-600 focus:ring-amber-500" />
             <div class="flex-1 min-w-0">
               <p class="text-sm font-medium text-neutral-900 dark:text-neutral-100">{{ topic.title || topic.topic }}</p>
@@ -311,12 +311,43 @@
             </div>
           </label>
         </div>
+        <div v-if="filteredTrending.length > perPage" class="flex items-center justify-between mt-3 pt-3 border-t border-neutral-100 dark:border-neutral-700/50">
+          <span class="text-xs text-neutral-500 dark:text-neutral-400">
+            Showing {{ pageRangeLabel }}
+          </span>
+          <div class="flex items-center gap-1">
+            <button
+              @click="currentPage = Math.max(1, currentPage - 1)"
+              :disabled="currentPage === 1"
+              class="px-2 py-1 text-xs rounded border border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              &lsaquo; Prev
+            </button>
+            <span class="px-2 text-xs text-neutral-600 dark:text-neutral-400">
+              Page {{ currentPage }} of {{ totalPages }}
+            </span>
+            <button
+              @click="currentPage = Math.min(totalPages, currentPage + 1)"
+              :disabled="currentPage === totalPages"
+              class="px-2 py-1 text-xs rounded border border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Next &rsaquo;
+            </button>
+          </div>
+        </div>
         <div class="flex items-center justify-between mt-4 pt-4 border-t border-neutral-200 dark:border-neutral-700">
-          <span class="text-xs text-neutral-500 dark:text-neutral-400">{{ selectedTrending.length }} selected</span>
+          <div class="flex flex-col text-xs">
+            <span class="text-neutral-700 dark:text-neutral-300 font-medium">
+              {{ visibleSelectedCount }} in view selected
+            </span>
+            <span v-if="totalSelectedCount !== visibleSelectedCount" class="text-neutral-500 dark:text-neutral-400">
+              {{ totalSelectedCount }} total across all filters
+            </span>
+          </div>
           <div class="flex gap-2">
             <button @click="showTrendingModal = false" class="px-4 py-2 text-sm font-medium rounded-lg border border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors">Cancel</button>
-            <button @click="handleImportTrending" :disabled="!selectedTrending.length || isLoading" class="px-4 py-2 text-sm font-medium rounded-lg bg-amber-600 hover:bg-amber-700 text-white transition-colors disabled:opacity-50">
-              Add {{ selectedTrending.length }} to Ideas List &rarr;
+            <button @click="handleImportTrending" :disabled="!totalSelectedCount || isLoading" class="px-4 py-2 text-sm font-medium rounded-lg bg-amber-600 hover:bg-amber-700 text-white transition-colors disabled:opacity-50">
+              Add {{ totalSelectedCount }} to Ideas List &rarr;
             </button>
           </div>
         </div>
@@ -454,7 +485,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useContentEngine } from '@/composables/useContentEngine'
 import { useToast } from '@/composables/useToast'
@@ -530,6 +561,8 @@ const trendingTopics = ref([])
 const selectedTrending = ref([])
 const trendingSourceFilter = ref('')
 const trendingSearch = ref('')
+const currentPage = ref(1)
+const perPage = 24
 const filteredTrending = computed(() => {
   let results = trendingTopics.value
   if (trendingSourceFilter.value) {
@@ -542,6 +575,24 @@ const filteredTrending = computed(() => {
   return results
 })
 const allFilteredSelected = computed(() => filteredTrending.value.length > 0 && filteredTrending.value.every(t => selectedTrending.value.includes(t)))
+const visibleSelectedCount = computed(() =>
+  filteredTrending.value.filter(t => selectedTrending.value.includes(t)).length
+)
+const totalSelectedCount = computed(() => selectedTrending.value.length)
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil(filteredTrending.value.length / perPage))
+)
+const pagedTrending = computed(() => {
+  const start = (currentPage.value - 1) * perPage
+  return filteredTrending.value.slice(start, start + perPage)
+})
+const pageRangeLabel = computed(() => {
+  if (filteredTrending.value.length === 0) return '0 of 0'
+  const start = (currentPage.value - 1) * perPage + 1
+  const end = Math.min(currentPage.value * perPage, filteredTrending.value.length)
+  return `${start}-${end} of ${filteredTrending.value.length}`
+})
+watch([trendingSearch, trendingSourceFilter], () => { currentPage.value = 1 })
 function toggleSelectAll() {
   if (allFilteredSelected.value) {
     selectedTrending.value = selectedTrending.value.filter(t => !filteredTrending.value.includes(t))
@@ -809,6 +860,7 @@ async function openTrendingModal(source) {
   trendingSourceFilter.value = source || ''
   trendingSearch.value = ''
   selectedTrending.value = []
+  currentPage.value = 1
   showTrendingModal.value = true
   trendingLoading.value = true
   const result = await pullTrending(source)
@@ -836,6 +888,7 @@ async function handleImportTrending() {
   if (result.success) {
     toast.success(`Imported ${result.data?.imported || topics.length} topics`)
     showTrendingModal.value = false
+    currentPage.value = 1
     await refreshIdeas()
   } else {
     toast.error(result.error || 'Failed to import topics')
