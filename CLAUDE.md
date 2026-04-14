@@ -368,6 +368,11 @@ The `ContentIdeaController` orchestrates the full pipeline through the admin UI 
 - `GET /api/automation/content-ideas/pending` — get next idea in `researching` status
 - `PUT /api/automation/content-ideas/{id}/progress` — progress callback (step, percentage, message)
 - `PUT /api/automation/content-ideas/{id}/complete` — mark as `article_ready` with generated article
+- `PUT /api/automation/content-ideas/{id}/save-image-prompts` — Gate 2 split flow: /article-images persists authored prompts
+
+**Admin Endpoints (Gate 2 split flow):**
+- `PUT /api/admin/content-engine/ideas/{id}/update-image-concept` — user edits per-section image_concept
+- `POST /api/admin/content-engine/ideas/{id}/regenerate-image-prompts` — triggers /article-images (all or `{sections:[...]}` filtered)
 
 ### Blog Pipeline (Legacy Endpoints)
 
@@ -596,7 +601,7 @@ Admin Panel (/admin/content-engine)
   │  Laravel Backend (ArticleGenerationService)                      │
   │    SSH → claudesn@localhost (VPS) with file-based prompt         │
   │                                                                  │
-  │  Split Pipeline (3 CLI calls, model switching):                  │
+  │  Split Pipeline (4 CLI calls, uniform Sonnet):                   │
   │                                                                  │
   │  Step 1-3: claude -p "/article-prep ..."                         │
   │    --model sonnet                                                │
@@ -606,7 +611,7 @@ Admin Panel (/admin/content-engine)
   │    → ~2-3 min                                                    │
   │                                                                  │
   │  Step 4: claude -p "/article-write ..."                          │
-  │    --model opus                                                  │
+  │    --model sonnet                                                │
   │    --append-system-prompt-file refs-write.md                     │
   │    → Progress: 50%, 70%, 78%, 82%, 85%                           │
   │    → save-article → continue-pipeline                            │
@@ -619,10 +624,23 @@ Admin Panel (/admin/content-engine)
   │    → completion callback (5 gates + combined 100-point)          │
   │    → ~1 min                                                      │
   │                                                                  │
+  │  [Gate 1 user approval of article text]                          │
+  │                                                                  │
+  │  Gate 2: claude -p "/article-images ..."                         │
+  │    --model sonnet                                                │
+  │    --append-system-prompt-file refs-images.md                    │
+  │    → Reads outline.sections[].image_concept blueprint            │
+  │    → Expands each into 300-500 word cinematic prompt             │
+  │      (8-element WOW + 5-paragraph structure)                     │
+  │    → save-image-prompts → continue-pipeline(phase=images)        │
+  │    → Backend → ImageGenerationService → GeminiGen                │
+  │    → Gated by ARTICLE_GEN_USE_IMAGES_PHASE (default false)       │
+  │    → ~1-2 min                                                    │
+  │                                                                  │
   │  Fallback: claude -p "/article-gen ..." (single-session, all     │
   │    steps in one call — used when refs not configured)             │
   │                                                                  │
-  │  Total: ~6-8 min (vs ~15 min single-session)                     │
+  │  Total: ~7-10 min (vs ~15 min single-session)                    │
   └──────────────┬───────────────────────────────────────────────────┘
                  │
   Frontend polls GET /ideas/{id}/progress every 3 seconds
@@ -646,13 +664,20 @@ draft → researching → article_ready → generating_images → images_ready �
 ### Automation Endpoints (for CLI plugin callbacks)
 ```
 GET  /api/automation/content-ideas/pending              → Get next idea to generate
-GET  /api/automation/content-ideas/{id}                  → Get full idea data (for article-write/score to read prep data)
+GET  /api/automation/content-ideas/{id}                  → Get full idea data (for article-write/score/images to read prep data)
 PUT  /api/automation/content-ideas/{id}/progress         → Report step progress (percentage + message)
 PUT  /api/automation/content-ideas/{id}/save-prep        → Save prep data (research + strategy + outline)
 PUT  /api/automation/content-ideas/{id}/save-article     → Save article data (merge with prep data)
-POST /api/automation/content-ideas/{id}/continue-pipeline → Trigger next phase (prep→write→score)
+PUT  /api/automation/content-ideas/{id}/save-image-prompts → Gate 2: persist /article-images authored prompts
+POST /api/automation/content-ideas/{id}/continue-pipeline → Trigger next phase (prep→write→score, or phase=images → GeminiGen)
 PUT  /api/automation/content-ideas/{id}/complete          → Save completed article + all 5 scores
 POST /api/automation/blog/save-draft                     → Direct blog post save (fallback)
+```
+
+### Admin Endpoints (Gate 2 split flow)
+```
+PUT  /api/admin/content-engine/ideas/{id}/update-image-concept      → Edit per-section image_concept
+POST /api/admin/content-engine/ideas/{id}/regenerate-image-prompts  → Trigger /article-images (all or {sections:[...]})
 ```
 
 ### Plugin: article-content-writer (v2.0.0)
@@ -661,11 +686,12 @@ Location: D:\Projects\claude-plugin\article-content-writer\
 Status:   Integrated with Portfolio backend (split pipeline mode)
 Version:  2.0.0
 
-Skills (7):
+Skills (8):
   article-gen       All-in-one 5-step pipeline (interactive + pipeline fallback)
   article-prep      Pipeline-only Steps 1-3 (Sonnet) — research, strategy, outline
-  article-write     Pipeline-only Step 4 (Opus) — write, polish, images
+  article-write     Pipeline-only Step 4 (Sonnet) — write, polish (image prompts deferred to Gate 2)
   article-score     Pipeline-only Step 5 (Sonnet) — 5 gates + combined 100-point
+  article-images    Pipeline-only Gate 2 (Sonnet) — expand outline image_concept into 300-500w cinematic prompts
   article-brief     Brainstorm + outline planning
   article-validate  Score existing article against 5 gates
   article-seo       Standalone SEO + GEO analysis
@@ -684,9 +710,10 @@ Scoring (5 gates, combined 100-point):
 Hard Rules: 20 (incl. AI Humanization 107-word system, GEO formatting)
 
 Compiled reference files (injected via --append-system-prompt-file):
-  refs-prep.md   55 KB — global-config, frameworks, hooks, arcs, templates
-  refs-write.md  68 KB — global-config, style-guide, retention, images, SEO
-  refs-score.md  58 KB — virality, quality-gate, SEO, style-guide
+  refs-prep.md   ~59 KB — global-config, frameworks, hooks, arcs, templates
+  refs-write.md  ~49 KB — global-config (trimmed), style-guide, retention, SEO (no image bloat)
+  refs-score.md  ~52 KB — virality, quality-gate, SEO, style-guide
+  refs-images.md ~38 KB — global-config (§11+§16 only), image-prompt-guide, cinematography-lut
 ```
 
 ### Article Generation Environment Variables
@@ -704,9 +731,14 @@ ARTICLE_GEN_API_TOKEN=your-token    # Bearer token (from admin Automation Tokens
 ARTICLE_GEN_REFS_PREP=/home/claudesn/refs-prep.md
 ARTICLE_GEN_REFS_WRITE=/home/claudesn/refs-write.md
 ARTICLE_GEN_REFS_SCORE=/home/claudesn/refs-score.md
+ARTICLE_GEN_REFS_IMAGES=/home/claudesn/refs-images.md
 ARTICLE_GEN_MODEL_PREP=sonnet       # Sonnet for research/strategy/outline
-ARTICLE_GEN_MODEL_WRITE=opus        # Opus for creative writing
+ARTICLE_GEN_MODEL_WRITE=sonnet      # Sonnet for writing (uniform across phases)
 ARTICLE_GEN_MODEL_SCORE=sonnet      # Sonnet for scoring/evaluation
+ARTICLE_GEN_MODEL_IMAGES=sonnet     # Sonnet for cinematic image prompt authoring
+
+# Gate 2 Image Phase Split — feature flag (default false for safe rollout)
+ARTICLE_GEN_USE_IMAGES_PHASE=false
 ```
 
 ### Service Worker (Media Caching)
@@ -714,7 +746,7 @@ ARTICLE_GEN_MODEL_SCORE=sonnet      # Sonnet for scoring/evaluation
 
 ---
 
-**Last Updated:** April 13, 2026 (Split pipeline v2.0.0 — Sonnet/Opus model switching + system prompt injection + 5 scoring gates)
+**Last Updated:** April 15, 2026 (Image phase split — Gate 2 article-images skill + per-section concept editor + feature-flagged rollout)
 **Maintainer:** Ali Sadikin (ali.sadikincom85@gmail.com)
 **Environment:** Windows 11, D:\Projects\Portfolio_v2
 **PHP:** D:\xampp\php\php.exe (8.2.12) — use full path, not in system PATH
