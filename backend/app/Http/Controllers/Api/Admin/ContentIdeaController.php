@@ -591,21 +591,30 @@ class ContentIdeaController extends Controller
             'style' => 'required|string|max:100',
             'model' => 'nullable|string|max:50',
             'aspect_ratio' => 'nullable|string|max:10',
-            'reference_image_url' => 'nullable|url|max:2000',
+            'face_refs' => 'nullable|array',
+            'face_refs.*' => 'string|max:2000',
+            'style_refs' => 'nullable|array',
+            'style_refs.*' => 'string|max:2000',
+            'additional_notes' => 'nullable|string|max:1000',
         ]);
 
         $segmentIndex = $request->input('segment_index');
-        $model = $request->input('model', 'nano-banana-pro');
+        $model = $request->input('model', 'nano-banana-2');
         $aspectRatio = $request->input('aspect_ratio', '16:9');
         $style = $request->input('style');
         $prompt = $request->input('prompt');
+        $faceRefs = $request->input('face_refs', []);
+        $styleRefs = $request->input('style_refs', []);
+        $additionalNotes = $request->input('additional_notes', '');
 
-        // Update segment status to generating
+        // Update segment status and save reference data
         $article = $idea->generated_article ?? [];
         $imagePrompts = $article['image_prompts'] ?? [];
         if (isset($imagePrompts[$segmentIndex])) {
             $imagePrompts[$segmentIndex]['status'] = 'generating';
-            $imagePrompts[$segmentIndex]['reference_image_url'] = $request->input('reference_image_url');
+            $imagePrompts[$segmentIndex]['face_refs'] = $faceRefs;
+            $imagePrompts[$segmentIndex]['style_refs'] = $styleRefs;
+            $imagePrompts[$segmentIndex]['additional_notes'] = $additionalNotes;
             $article['image_prompts'] = $imagePrompts;
             $idea->generated_article = $article;
         }
@@ -618,16 +627,17 @@ class ContentIdeaController extends Controller
 
         // Call GeminiGen via ImageGenerationService
         $imageService = app(\App\Services\ImageGenerationService::class);
-        $referenceImageUrl = $request->input('reference_image_url');
         $uuid = $imageService->queue(
-            postId: null, // No post yet — content engine pipeline
+            postId: null,
             prompt: $prompt,
             type: $segmentIndex === 0 ? 'hero' : 'inline',
             insertAfterHeading: null,
             model: $model,
             aspectRatio: $aspectRatio,
             style: $style,
-            referenceImageUrl: $referenceImageUrl
+            faceRefs: $faceRefs,
+            styleRefs: $styleRefs,
+            additionalNotes: $additionalNotes
         );
 
         if (!$uuid) {

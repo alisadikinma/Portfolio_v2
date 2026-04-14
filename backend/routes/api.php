@@ -642,4 +642,18 @@ Route::middleware(['auth:sanctum'])->prefix('admin/content-engine')->group(funct
 
     // Stock image search (Pexels + Unsplash proxy)
     Route::get('/stock-images/search', [\App\Http\Controllers\Api\Admin\StockImageController::class, 'search']);
+
+    // Reference image upload for image generation
+    Route::post('/upload-reference', function (\Illuminate\Http\Request $request) {
+        $request->validate([
+            'file' => 'required|image|max:10240',
+        ]);
+
+        $path = $request->file('file')->store('content-engine/references', 'public');
+
+        return response()->json([
+            'success' => true,
+            'data' => ['url' => url('/storage/' . $path)],
+        ]);
+    });
 });

@@ -27,10 +27,12 @@ class ImageGenerationService
         string $prompt,
         string $type = 'hero',
         string $insertAfterHeading = null,
-        string $model = 'imagen-pro',
+        string $model = 'nano-banana-2',
         string $aspectRatio = '16:9',
         string $style = 'Photorealistic',
-        ?string $referenceImageUrl = null
+        array $faceRefs = [],
+        array $styleRefs = [],
+        string $additionalNotes = ''
     ): ?string {
         if (empty($this->apiKey)) {
             Log::error('[ImageGen] GEMINIGEN_API_KEY not configured.');
@@ -38,10 +40,19 @@ class ImageGenerationService
         }
 
         try {
-            // Append identity preservation instruction when reference image is provided
+            // Build enhanced prompt with additional notes and reference instructions
             $finalPrompt = $prompt;
-            if ($referenceImageUrl) {
-                $finalPrompt .= '. Maintain exact facial identity, appearance, and features from the provided reference image.';
+
+            if ($additionalNotes) {
+                $finalPrompt .= '. ' . trim($additionalNotes);
+            }
+
+            if (!empty($faceRefs)) {
+                $finalPrompt .= '. Maintain exact facial identity, appearance, and features from the provided face reference image(s).';
+            }
+
+            if (!empty($styleRefs)) {
+                $finalPrompt .= '. Maintain visual consistency with the provided reference image(s) for environment, style, and composition.';
             }
 
             $multipart = [
@@ -51,9 +62,10 @@ class ImageGenerationService
                 ['name' => 'style', 'contents' => $style],
             ];
 
-            // Send reference image as file_urls for GeminiGen
-            if ($referenceImageUrl) {
-                $multipart[] = ['name' => 'file_urls', 'contents' => json_encode([$referenceImageUrl])];
+            // Merge all reference URLs and send as file_urls to GeminiGen
+            $allRefs = array_merge($faceRefs, $styleRefs);
+            if (!empty($allRefs)) {
+                $multipart[] = ['name' => 'file_urls', 'contents' => json_encode($allRefs)];
             }
 
             $response = Http::timeout(30)
