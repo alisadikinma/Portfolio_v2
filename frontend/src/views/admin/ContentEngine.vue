@@ -27,8 +27,17 @@
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
           </button>
           <div v-if="trendingDropdownOpen" class="absolute right-0 mt-1 w-48 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg shadow-lg z-20">
-            <button v-for="src in trendingSources" :key="src.value" @click="openTrendingModal(src.value)" class="block w-full text-left px-4 py-2 text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 first:rounded-t-lg last:rounded-b-lg">
-              {{ src.label }}
+            <button
+              v-for="src in trendingSources"
+              :key="src.value"
+              :disabled="src.disabled"
+              @click="!src.disabled && openTrendingModal(src.value)"
+              class="flex w-full items-center justify-between text-left px-4 py-2 text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 first:rounded-t-lg last:rounded-b-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+            >
+              <span>{{ src.label }}</span>
+              <span v-if="src.badge" class="ml-2 inline-block px-1.5 py-0.5 text-[10px] font-medium rounded bg-neutral-200 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-400">
+                {{ src.badge }}
+              </span>
             </button>
           </div>
         </div>
@@ -98,35 +107,104 @@
       </div>
     </div>
 
+    <!-- Bulk Action Bar (sticky when any row selected) -->
+    <div
+      v-if="selectedIdeaIds.length"
+      class="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 p-3 mb-3 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700/50 rounded-lg shadow-sm"
+    >
+      <span class="text-sm font-medium text-amber-800 dark:text-amber-300">
+        {{ selectedIdeaIds.length }} selected
+      </span>
+      <div class="flex flex-wrap gap-2">
+        <button
+          @click="bulkStartResearch"
+          :disabled="bulkProcessing"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-600 hover:bg-amber-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" /></svg>
+          Start Research
+        </button>
+        <button
+          @click="bulkArchive"
+          :disabled="bulkProcessing"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" /></svg>
+          Archive
+        </button>
+        <button
+          @click="bulkRevert"
+          :disabled="bulkProcessing"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" /></svg>
+          Revert to Draft
+        </button>
+        <button
+          @click="bulkDelete"
+          :disabled="bulkProcessing"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166M18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></svg>
+          Delete
+        </button>
+        <button
+          @click="selectedIdeaIds = []"
+          class="px-3 py-1.5 text-xs font-medium rounded-lg text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors"
+        >
+          Clear
+        </button>
+      </div>
+    </div>
+
     <!-- Ideas Table -->
     <div class="bg-white dark:bg-neutral-800 rounded-xl shadow-sm border border-neutral-200 dark:border-neutral-700 overflow-hidden">
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead>
             <tr class="bg-neutral-50 dark:bg-neutral-700/50 text-left">
+              <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400 w-10">
+                <input
+                  type="checkbox"
+                  :checked="allPageSelected"
+                  @change="togglePageSelection"
+                  class="rounded border-neutral-300 text-amber-600 focus:ring-amber-500"
+                  :aria-label="allPageSelected ? 'Deselect all on page' : 'Select all on page'"
+                />
+              </th>
               <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400 w-10">#</th>
               <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400">Topic</th>
               <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400">Pillar</th>
               <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400">Priority</th>
               <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400">Status</th>
               <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400">Source</th>
+              <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400">Published</th>
               <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400 text-center w-16">Auto</th>
               <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400 text-right">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-neutral-100 dark:divide-neutral-700">
             <tr v-if="isLoading && !ideas.length">
-              <td colspan="8" class="px-4 py-12 text-center text-neutral-500 dark:text-neutral-400">
+              <td colspan="10" class="px-4 py-12 text-center text-neutral-500 dark:text-neutral-400">
                 <svg class="animate-spin h-6 w-6 mx-auto mb-2 text-amber-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
                 Loading ideas...
               </td>
             </tr>
             <tr v-else-if="!ideas.length">
-              <td colspan="8" class="px-4 py-12 text-center text-neutral-500 dark:text-neutral-400">
+              <td colspan="10" class="px-4 py-12 text-center text-neutral-500 dark:text-neutral-400">
                 No ideas found. Click "Add Idea" or "Pull Trending" to get started.
               </td>
             </tr>
-            <tr v-for="(idea, idx) in ideas" :key="idea.id" class="hover:bg-neutral-50 dark:hover:bg-neutral-700/30 transition-colors">
+            <tr v-for="(idea, idx) in ideas" :key="idea.id" class="hover:bg-neutral-50 dark:hover:bg-neutral-700/30 transition-colors" :class="{ 'bg-amber-50/50 dark:bg-amber-900/10': selectedIdeaIds.includes(idea.id) }">
+              <td class="px-4 py-3">
+                <input
+                  type="checkbox"
+                  :value="idea.id"
+                  v-model="selectedIdeaIds"
+                  class="rounded border-neutral-300 text-amber-600 focus:ring-amber-500"
+                  :aria-label="`Select idea ${idea.title}`"
+                />
+              </td>
               <td class="px-4 py-3 text-neutral-400 dark:text-neutral-500">{{ idx + 1 }}</td>
               <td class="px-4 py-3 text-neutral-900 dark:text-neutral-100 font-medium max-w-xs truncate">{{ idea.title }}</td>
               <td class="px-4 py-3 text-neutral-600 dark:text-neutral-300 text-xs">{{ idea.pillar || '-' }}</td>
@@ -137,6 +215,16 @@
                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium" :class="statusClass(idea.status)">{{ formatStatus(idea.status) }}</span>
               </td>
               <td class="px-4 py-3 text-neutral-500 dark:text-neutral-400 text-xs">{{ idea.source || 'manual' }}</td>
+              <td class="px-4 py-3 text-xs text-neutral-500 dark:text-neutral-400">
+                <span
+                  v-if="formatPubDateRelative(idea.source_data?.pub_date)"
+                  :title="formatPubDateAbsolute(idea.source_data?.pub_date)"
+                  class="cursor-help"
+                >
+                  {{ formatPubDateRelative(idea.source_data?.pub_date) }}
+                </span>
+                <span v-else>—</span>
+              </td>
               <td class="px-4 py-3 text-center">
                 <button @click="toggleAutoMode(idea)" :class="['w-8 h-5 rounded-full relative transition-colors', idea.auto_mode ? 'bg-amber-500' : 'bg-neutral-300 dark:bg-neutral-600']">
                   <span :class="['absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform', idea.auto_mode ? 'translate-x-3.5' : 'translate-x-0.5']"></span>
@@ -144,29 +232,31 @@
               </td>
               <td class="px-4 py-3">
                 <div class="flex items-center justify-end gap-1">
-                  <!-- Status-specific action -->
-                  <button v-if="idea.status === 'draft'" @click="openConfigModal(idea)" class="px-2.5 py-1 text-xs font-medium rounded bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50 transition-colors">
-                    Next &rarr;
-                  </button>
-                  <button v-else-if="idea.status === 'researching'" @click="openProgressModal(idea)" class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 transition-colors">
-                    <svg class="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                    {{ idea.progress_percentage || 0 }}% — View Progress
-                  </button>
-                  <button v-else-if="idea.status === 'article_ready'" @click="openResearchModal(idea)" class="px-2.5 py-1 text-xs font-medium rounded bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:hover:bg-purple-900/50 transition-colors">
-                    Preview Article
-                  </button>
-                  <button v-else-if="idea.status === 'generating_images'" @click="openProgressModal(idea)" class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded bg-yellow-100 text-yellow-700 hover:bg-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:hover:bg-yellow-900/50 transition-colors">
-                    <svg class="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                    {{ idea.progress_percentage || 0 }}% — View Progress
-                  </button>
-                  <button v-else-if="idea.status === 'images_ready'" @click="openResearchModal(idea)" class="px-2.5 py-1 text-xs font-medium rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 transition-colors">
-                    Finalize
-                  </button>
-                  <button v-else-if="idea.status === 'completed'" @click="openResearchModal(idea)" class="px-2.5 py-1 text-xs font-medium rounded bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50 transition-colors">
-                    View
-                  </button>
-                  <button v-else-if="idea.status === 'archived'" @click="handleRestore(idea.id)" class="px-2.5 py-1 text-xs font-medium rounded bg-neutral-100 text-neutral-600 hover:bg-neutral-200 dark:bg-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-600 transition-colors">
-                    Restore
+                  <!-- Status-aware action icon (replaces 7 colored text buttons) -->
+                  <button
+                    @click="triggerNextAction(idea)"
+                    :title="nextActionLabel(idea)"
+                    class="p-1.5 rounded text-neutral-400 hover:text-amber-600 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
+                  >
+                    <svg
+                      v-if="['researching', 'generating_images'].includes(idea.status)"
+                      class="w-4 h-4 animate-spin text-amber-600"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    <svg
+                      v-else
+                      class="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.8"
+                      viewBox="0 0 24 24"
+                    >
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
+                    </svg>
                   </button>
 
                   <!-- Common actions (hidden for generating_images) -->
@@ -286,7 +376,9 @@
           <h3 class="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Trending Topics</h3>
           <select v-model="trendingSourceFilter" @change="filterTrendingTopics" class="rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 text-xs px-2 py-1 focus:ring-amber-500 focus:border-amber-500">
             <option value="">All Sources</option>
-            <option v-for="src in trendingSources" :key="src.value" :value="src.value">{{ src.label }}</option>
+            <option v-for="src in trendingSources.filter(s => s.value)" :key="src.value" :value="src.value" :disabled="src.disabled">
+              {{ src.label }}{{ src.badge ? ` (${src.badge})` : '' }}
+            </option>
           </select>
         </div>
         <!-- Search + Select All -->
@@ -519,11 +611,10 @@ const pillars = ['Vibe Coding', 'AI Automation', 'AI Agents', 'AI Video & Image'
 const statuses = ['draft', 'researching', 'article_ready', 'generating_images', 'images_ready', 'completed', 'archived']
 const trendingSources = [
   { label: 'All Sources', value: '' },
-  { label: 'Google Trends', value: 'google_trends' },
-  { label: 'YouTube', value: 'youtube' },
-  { label: 'TikTok', value: 'tiktok' },
   { label: 'Google News', value: 'google_news' },
-  { label: 'Instagram', value: 'instagram' },
+  { label: 'Google Trends', value: 'google_trends' },
+  { label: 'YouTube', value: 'youtube', disabled: true, badge: 'Coming soon' },
+  { label: 'TikTok', value: 'tiktok', disabled: true, badge: 'Coming soon' },
 ]
 const languageOptions = [
   { label: 'English', value: 'en' },
@@ -534,6 +625,23 @@ const languageOptions = [
 const health = ref(null)
 const healthOnline = ref(false)
 const ideas = ref([])
+const selectedIdeaIds = ref([])
+const bulkProcessing = ref(false)
+const allPageSelected = computed(() =>
+  ideas.value.length > 0 && ideas.value.every(i => selectedIdeaIds.value.includes(i.id))
+)
+const somePageSelected = computed(() =>
+  selectedIdeaIds.value.length > 0 && !allPageSelected.value
+)
+function togglePageSelection() {
+  const pageIds = ideas.value.map(i => i.id)
+  if (allPageSelected.value) {
+    selectedIdeaIds.value = selectedIdeaIds.value.filter(id => !pageIds.includes(id))
+  } else {
+    const newIds = pageIds.filter(id => !selectedIdeaIds.value.includes(id))
+    selectedIdeaIds.value = [...selectedIdeaIds.value, ...newIds]
+  }
+}
 const workflows = ref([])
 const filters = reactive({ pillar: '', status: '', priority: '', search: '' })
 const pagination = ref({ current_page: 1, last_page: 1, per_page: 15, total: 0 })
@@ -593,6 +701,9 @@ const pageRangeLabel = computed(() => {
   return `${start}-${end} of ${filteredTrending.value.length}`
 })
 watch([trendingSearch, trendingSourceFilter], () => { currentPage.value = 1 })
+watch([() => filters.pillar, () => filters.status, () => filters.priority, () => filters.search], () => {
+  selectedIdeaIds.value = []
+})
 function toggleSelectAll() {
   if (allFilteredSelected.value) {
     selectedTrending.value = selectedTrending.value.filter(t => !filteredTrending.value.includes(t))
@@ -726,6 +837,25 @@ function formatDate(d) {
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
+function formatPubDateRelative(iso) {
+  if (!iso) return null
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return null
+  const diff = (Date.now() - d.getTime()) / 1000
+  if (diff < 60) return 'just now'
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
+  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function formatPubDateAbsolute(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  return d.toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
 function debounceSearch() {
   if (searchTimeout) clearTimeout(searchTimeout)
   searchTimeout = setTimeout(() => { pagination.value.current_page = 1; refreshIdeas() }, 400)
@@ -852,6 +982,104 @@ async function handleRestore(id) {
   } else {
     toast.error(result.error || 'Failed to restore idea')
   }
+}
+
+// Status-aware per-row action dispatcher (powers the unified Play icon button)
+function nextActionLabel(idea) {
+  const map = {
+    draft: 'Start Research',
+    researching: 'View Progress',
+    article_ready: 'Preview Article',
+    generating_images: 'View Progress',
+    images_ready: 'Finalize',
+    completed: 'View',
+    archived: 'Restore',
+  }
+  return map[idea.status] || 'Next'
+}
+
+function triggerNextAction(idea) {
+  if (idea.status === 'draft') return openConfigModal(idea)
+  if (idea.status === 'researching' || idea.status === 'generating_images') return openProgressModal(idea)
+  if (idea.status === 'article_ready' || idea.status === 'images_ready' || idea.status === 'completed') return openResearchModal(idea)
+  if (idea.status === 'archived') return handleRestore(idea.id)
+}
+
+// Bulk actions — reuse existing per-ID composable methods via chunked Promise.all
+async function runChunked(ids, chunkSize, perIdFn) {
+  const results = { success: 0, failed: 0 }
+  for (let i = 0; i < ids.length; i += chunkSize) {
+    const chunk = ids.slice(i, i + chunkSize)
+    const outcomes = await Promise.all(chunk.map(async (id) => {
+      try {
+        const r = await perIdFn(id)
+        return r?.success ? 'success' : 'failed'
+      } catch {
+        return 'failed'
+      }
+    }))
+    outcomes.forEach(o => { results[o] = (results[o] || 0) + 1 })
+  }
+  return results
+}
+
+async function bulkDelete() {
+  if (!confirm(`Delete ${selectedIdeaIds.value.length} idea(s)? This cannot be undone.`)) return
+  bulkProcessing.value = true
+  const ids = [...selectedIdeaIds.value]
+  const r = await runChunked(ids, 10, (id) => deleteIdea(id))
+  bulkProcessing.value = false
+  toast.success(`Deleted ${r.success} / ${ids.length}${r.failed ? ` (${r.failed} failed)` : ''}`)
+  selectedIdeaIds.value = []
+  await refreshIdeas()
+}
+
+async function bulkStartResearch() {
+  const selected = ideas.value.filter(i => selectedIdeaIds.value.includes(i.id))
+  const targets = selected.filter(i => i.status === 'draft')
+  const skipped = selected.length - targets.length
+  if (targets.length === 0) {
+    toast.warning ? toast.warning('No draft ideas in selection.') : toast.error('No draft ideas in selection.')
+    return
+  }
+  if (!confirm(`Start research for ${targets.length} idea(s)?${skipped ? ` (${skipped} non-draft skipped)` : ''}`)) return
+  bulkProcessing.value = true
+  const ids = targets.map(i => i.id)
+  const config = { languages: ['id', 'en'], instructions: '' }
+  const r = await runChunked(ids, 3, (id) => startResearch(id, config))
+  bulkProcessing.value = false
+  toast.success(`Started ${r.success} / ${ids.length}${r.failed ? ` (${r.failed} failed)` : ''}${skipped ? `, ${skipped} skipped` : ''}`)
+  selectedIdeaIds.value = []
+  await refreshIdeas()
+}
+
+async function bulkArchive() {
+  const selected = ideas.value.filter(i => selectedIdeaIds.value.includes(i.id))
+  const targets = selected.filter(i => i.status !== 'archived')
+  const skipped = selected.length - targets.length
+  if (targets.length === 0) {
+    toast.warning ? toast.warning('All selected ideas are already archived.') : toast.error('All selected ideas are already archived.')
+    return
+  }
+  if (!confirm(`Archive ${targets.length} idea(s)?${skipped ? ` (${skipped} already archived)` : ''}`)) return
+  bulkProcessing.value = true
+  const ids = targets.map(i => i.id)
+  const r = await runChunked(ids, 10, (id) => archiveIdea(id))
+  bulkProcessing.value = false
+  toast.success(`Archived ${r.success} / ${ids.length}${r.failed ? ` (${r.failed} failed)` : ''}`)
+  selectedIdeaIds.value = []
+  await refreshIdeas()
+}
+
+async function bulkRevert() {
+  if (!confirm(`Revert ${selectedIdeaIds.value.length} idea(s) to draft? Generated content will be cleared.`)) return
+  bulkProcessing.value = true
+  const ids = [...selectedIdeaIds.value]
+  const r = await runChunked(ids, 10, (id) => revertToDraft(id))
+  bulkProcessing.value = false
+  toast.success(`Reverted ${r.success} / ${ids.length}${r.failed ? ` (${r.failed} failed)` : ''}`)
+  selectedIdeaIds.value = []
+  await refreshIdeas()
 }
 
 // Trending

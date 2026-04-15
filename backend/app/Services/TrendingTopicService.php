@@ -109,32 +109,74 @@ class TrendingTopicService
 
     private function fetchGoogleTrends(): array
     {
-        $sources = [
-            ['url' => 'https://trends.google.com/trending/rss?geo=US', 'country' => 'US'],
-            ['url' => 'https://trends.google.com/trending/rss?geo=ID', 'country' => 'ID'],
+        // Google deprecated the /trending/rss feed in late 2024.
+        // This uses the internal /trends/api/dailytrends JSON endpoint
+        // (stable since ~2019). Response prefixed with )]}' for anti-hijack —
+        // must strip before json_decode.
+        $regions = [
+            ['geo' => 'US', 'hl' => 'en-US'],
+            ['geo' => 'ID', 'hl' => 'id'],
         ];
 
         $results = [];
 
-        foreach ($sources as $source) {
+        foreach ($regions as $region) {
             try {
-                $response = Http::timeout(10)->get($source['url']);
-                if (!$response->successful()) continue;
+                $response = Http::timeout(10)
+                    ->withHeaders(['Accept' => 'application/json'])
+                    ->get('https://trends.google.com/trends/api/dailytrends', [
+                        'hl' => $region['hl'],
+                        'tz' => -480,
+                        'geo' => $region['geo'],
+                        'ns' => 15,
+                    ]);
 
-                $items = $this->parseRss($response->body());
-                foreach ($items as &$item) {
-                    $item['source'] = 'google_trends';
-                    $item['country'] = $source['country'];
-                    $item['score'] = 70; // Base score for Google Trends
+                if (!$response->successful()) {
+                    Log::warning("[TrendingTopic] Google Trends {$region['geo']}: HTTP {$response->status()}");
+                    continue;
                 }
-                $results = array_merge($results, $items);
+
+                $body = preg_replace('/^\)\]\}\',?\s*/', '', $response->body());
+                $data = json_decode($body, true);
+                if (!is_array($data)) {
+                    Log::warning("[TrendingTopic] Google Trends {$region['geo']}: malformed JSON");
+                    continue;
+                }
+
+                $days = data_get($data, 'default.trendingSearchesDays', []);
+                foreach ($days as $day) {
+                    $pubDate = $this->parseGoogleTrendsDate($day['date'] ?? null);
+                    foreach ($day['trendingSearches'] ?? [] as $search) {
+                        $title = data_get($search, 'title.query');
+                        if (empty($title)) continue;
+
+                        $results[] = [
+                            'title' => $title,
+                            'description' => trim(data_get($search, 'formattedTraffic', '') . ' searches'),
+                            'source' => 'google_trends',
+                            'country' => $region['geo'],
+                            'score' => 70,
+                            'pub_date' => $pubDate,
+                        ];
+                    }
+                }
             } catch (\Exception $e) {
-                Log::warning("[TrendingTopic] Google Trends {$source['country']}: {$e->getMessage()}");
+                Log::warning("[TrendingTopic] Google Trends {$region['geo']}: {$e->getMessage()}");
             }
         }
 
         Log::info("[TrendingTopic] Google Trends: " . count($results) . " items");
         return $results;
+    }
+
+    private function parseGoogleTrendsDate(?string $yyyymmdd): ?string
+    {
+        if (!$yyyymmdd || strlen($yyyymmdd) !== 8) return null;
+        try {
+            return \Carbon\Carbon::createFromFormat('Ymd', $yyyymmdd)->toIso8601String();
+        } catch (\Exception $e) {
+            return null;
+        }
     }
 
     // ========================================================================
