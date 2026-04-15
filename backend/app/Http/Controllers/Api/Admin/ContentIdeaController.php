@@ -631,9 +631,10 @@ class ContentIdeaController extends Controller
         $aspectRatio = $request->input('aspect_ratio', '16:9');
         $style = $request->input('style');
         $prompt = $request->input('prompt');
-        $faceRefs = $request->input('face_refs', []);
-        $styleRefs = $request->input('style_refs', []);
-        $additionalNotes = $request->input('additional_notes', '');
+        $faceRefs = $request->input('face_refs') ?? [];
+        $styleRefs = $request->input('style_refs') ?? [];
+        // ConvertEmptyStringsToNull middleware turns '' into null — coerce back for type-safety
+        $additionalNotes = $request->input('additional_notes') ?? '';
 
         // Update segment status and save reference data
         $article = $idea->generated_article ?? [];
