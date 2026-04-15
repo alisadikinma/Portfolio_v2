@@ -990,7 +990,7 @@ function nextActionLabel(idea) {
     draft: 'Start Research',
     researching: 'View Progress',
     article_ready: 'Preview Article',
-    generating_images: 'View Progress',
+    generating_images: 'View Image Generation',
     images_ready: 'Finalize',
     completed: 'View',
     archived: 'Restore',
@@ -1000,8 +1000,11 @@ function nextActionLabel(idea) {
 
 function triggerNextAction(idea) {
   if (idea.status === 'draft') return openConfigModal(idea)
-  if (idea.status === 'researching' || idea.status === 'generating_images') return openProgressModal(idea)
-  if (idea.status === 'article_ready' || idea.status === 'images_ready' || idea.status === 'completed') return openResearchModal(idea)
+  if (idea.status === 'researching') return openProgressModal(idea)
+  if (idea.status === 'generating_images' || idea.status === 'images_ready') {
+    return router.push({ name: 'admin-content-engine-images', params: { id: idea.id } })
+  }
+  if (idea.status === 'article_ready' || idea.status === 'completed') return openResearchModal(idea)
   if (idea.status === 'archived') return handleRestore(idea.id)
 }
 
