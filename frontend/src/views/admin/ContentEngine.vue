@@ -477,7 +477,7 @@
 
     <!-- Progress Modal -->
     <div v-if="showProgressModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="closeProgressModal">
-      <div class="bg-white dark:bg-neutral-800 rounded-xl shadow-xl max-w-4xl w-full mx-4 p-6 max-h-[90vh] flex flex-col">
+      <div class="bg-white dark:bg-neutral-800 rounded-xl shadow-xl max-w-6xl w-full mx-4 p-6 max-h-[90vh] flex flex-col">
         <div class="flex items-center justify-between mb-4">
           <div>
             <h3 class="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Article Generation Progress</h3>
@@ -503,12 +503,12 @@
           </div>
         </div>
 
-        <!-- Pipeline Phase Cards (always show all 3) -->
-        <div class="grid grid-cols-3 gap-2 mb-4">
+        <!-- Pipeline Phase Cards — horizontal scroll, single row -->
+        <div class="flex gap-2 mb-4 overflow-x-auto pb-1 snap-x snap-mandatory">
           <div
             v-for="phase in pipelinePhases"
             :key="phase.skill"
-            class="rounded-lg border px-3 py-2.5 transition-all"
+            class="rounded-lg border px-3 py-2.5 transition-all flex-shrink-0 w-64 snap-start"
             :class="phaseCardClass(phase)"
           >
             <!-- Header: Phase name + Model badge + Status -->
