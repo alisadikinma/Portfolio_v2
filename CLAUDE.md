@@ -369,6 +369,10 @@ The `ContentIdeaController` orchestrates the full pipeline through the admin UI 
 - `PUT /api/automation/content-ideas/{id}/progress` — progress callback (step, percentage, message)
 - `PUT /api/automation/content-ideas/{id}/complete` — mark as `article_ready` with generated article
 - `PUT /api/automation/content-ideas/{id}/save-image-prompts` — Gate 2 split flow: /article-images persists authored prompts
+- `GET /api/automation/posts/{id}/for-translation` — Finalize: /article-translate reads primary-language Post
+- `PUT /api/automation/posts/{id}/save-translation` — Finalize: /article-translate persists post_translations.{en} row
+- `POST /api/automation/posts/{id}/translation-complete` — Finalize: flips `translation_pending=false`
+- `PUT /api/automation/posts/{id}/progress` — Finalize: /article-translate progress callback
 
 **Admin Endpoints (Gate 2 split flow):**
 - `PUT /api/admin/content-engine/ideas/{id}/update-image-concept` — user edits per-section image_concept
@@ -637,10 +641,25 @@ Admin Panel (/admin/content-engine)
   │    → Gated by ARTICLE_GEN_USE_IMAGES_PHASE (default false)       │
   │    → ~1-2 min                                                    │
   │                                                                  │
+  │  [Gate 2 user approval of images → Approve & Publish]            │
+  │                                                                  │
+  │  Finalize: Backend creates Post + primary post_translations row  │
+  │    Then optionally: claude -p "/article-translate ..."           │
+  │      --model sonnet                                              │
+  │      --append-system-prompt-file refs-translate.md               │
+  │      → Reads post primary translation (ID)                       │
+  │      → Translates title + content + meta + alt text → EN         │
+  │      → save-translation → post_translations.en row created       │
+  │      → translation-complete → translation_pending=false          │
+  │      → Gated by ARTICLE_GEN_USE_TRANSLATE_PHASE (default false)  │
+  │      → On failure: ProcessPendingTranslations cron retries       │
+  │        every 5min up to 3 attempts                               │
+  │      → ~30-60 sec                                                │
+  │                                                                  │
   │  Fallback: claude -p "/article-gen ..." (single-session, all     │
   │    steps in one call — used when refs not configured)             │
   │                                                                  │
-  │  Total: ~7-10 min (vs ~15 min single-session)                    │
+  │  Total: ~8-11 min (vs ~15 min single-session)                    │
   └──────────────┬───────────────────────────────────────────────────┘
                  │
   Frontend polls GET /ideas/{id}/progress every 3 seconds
@@ -686,12 +705,13 @@ Location: D:\Projects\claude-plugin\article-content-writer\
 Status:   Integrated with Portfolio backend (split pipeline mode)
 Version:  2.0.0
 
-Skills (8):
+Skills (9):
   article-gen       All-in-one 5-step pipeline (interactive + pipeline fallback)
   article-prep      Pipeline-only Steps 1-3 (Sonnet) — research, strategy, outline
   article-write     Pipeline-only Step 4 (Sonnet) — write, polish (image prompts deferred to Gate 2)
   article-score     Pipeline-only Step 5 (Sonnet) — 5 gates + combined 100-point
   article-images    Pipeline-only Gate 2 (Sonnet) — expand outline image_concept into 300-500w cinematic prompts
+  article-translate Pipeline-only Finalize (Sonnet) — Indonesian → English translation of published Post
   article-brief     Brainstorm + outline planning
   article-validate  Score existing article against 5 gates
   article-seo       Standalone SEO + GEO analysis
@@ -710,10 +730,11 @@ Scoring (5 gates, combined 100-point):
 Hard Rules: 20 (incl. AI Humanization 107-word system, GEO formatting)
 
 Compiled reference files (injected via --append-system-prompt-file):
-  refs-prep.md   ~59 KB — global-config, frameworks, hooks, arcs, templates
-  refs-write.md  ~49 KB — global-config (trimmed), style-guide, retention, SEO (no image bloat)
-  refs-score.md  ~52 KB — virality, quality-gate, SEO, style-guide
-  refs-images.md ~38 KB — global-config (§11+§16 only), image-prompt-guide, cinematography-lut
+  refs-prep.md      ~59 KB — global-config, frameworks, hooks, arcs, templates
+  refs-write.md     ~49 KB — global-config (trimmed), style-guide, retention, SEO (no image bloat)
+  refs-score.md     ~52 KB — virality, quality-gate, SEO, style-guide
+  refs-images.md    ~38 KB — global-config (§11+§16 only), image-prompt-guide, cinematography-lut
+  refs-translate.md  ~7 KB — translation-guidelines (HTML preservation, tone, SEO meta, bucket brigades)
 ```
 
 ### Article Generation Environment Variables
@@ -732,13 +753,16 @@ ARTICLE_GEN_REFS_PREP=/home/claudesn/refs-prep.md
 ARTICLE_GEN_REFS_WRITE=/home/claudesn/refs-write.md
 ARTICLE_GEN_REFS_SCORE=/home/claudesn/refs-score.md
 ARTICLE_GEN_REFS_IMAGES=/home/claudesn/refs-images.md
+ARTICLE_GEN_REFS_TRANSLATE=/home/claudesn/refs-translate.md
 ARTICLE_GEN_MODEL_PREP=sonnet       # Sonnet for research/strategy/outline
 ARTICLE_GEN_MODEL_WRITE=sonnet      # Sonnet for writing (uniform across phases)
 ARTICLE_GEN_MODEL_SCORE=sonnet      # Sonnet for scoring/evaluation
 ARTICLE_GEN_MODEL_IMAGES=sonnet     # Sonnet for cinematic image prompt authoring
+ARTICLE_GEN_MODEL_TRANSLATE=sonnet  # Sonnet for ID→EN translation
 
-# Gate 2 Image Phase Split — feature flag (default false for safe rollout)
+# Feature flags (default false for safe rollout)
 ARTICLE_GEN_USE_IMAGES_PHASE=false
+ARTICLE_GEN_USE_TRANSLATE_PHASE=false
 ```
 
 ### Service Worker (Media Caching)
@@ -746,7 +770,7 @@ ARTICLE_GEN_USE_IMAGES_PHASE=false
 
 ---
 
-**Last Updated:** April 15, 2026 (Image phase split — Gate 2 article-images skill + per-section concept editor + feature-flagged rollout)
+**Last Updated:** April 15, 2026 (Translation pipeline — finalize-stage ID→EN via article-translate skill + post-creation flow + retry cron; feature-flagged)
 **Maintainer:** Ali Sadikin (ali.sadikincom85@gmail.com)
 **Environment:** Windows 11, D:\Projects\Portfolio_v2
 **PHP:** D:\xampp\php\php.exe (8.2.12) — use full path, not in system PATH
