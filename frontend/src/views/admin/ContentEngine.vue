@@ -898,7 +898,7 @@ async function handleImportTrending() {
 // Config modal (research)
 function openConfigModal(idea) {
   currentIdea.value = idea
-  configLanguages.value = ['id']
+  configLanguages.value = ['id', 'en']
   configInstructions.value = ''
   showConfigModal.value = true
 }

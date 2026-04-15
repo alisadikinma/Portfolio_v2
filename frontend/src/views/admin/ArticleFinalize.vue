@@ -92,7 +92,11 @@ async function handlePublish() {
   publishing.value = false
 
   if (result.success) {
-    toast.success('Article published to blog!')
+    if (result.data?.translation_pending) {
+      toast.success('Published — English translation in progress (auto-retry)')
+    } else {
+      toast.success('Article published to blog!')
+    }
     router.push({ name: 'admin-content-engine' })
   } else {
     toast.error(result.error || 'Failed to publish')
