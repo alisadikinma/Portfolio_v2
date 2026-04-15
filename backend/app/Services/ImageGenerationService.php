@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\ContentIdea;
 use App\Models\ImageGenerationJob;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -159,14 +160,17 @@ class ImageGenerationService
                 'remote_url' => $remoteUrl,
             ]);
 
-            // Apply to post
-            if ($job->type === 'hero' && $localUrl) {
+            // Apply to post (legacy blog pipeline — only when job.post_id is set)
+            if ($job->post_id && $job->type === 'hero' && $localUrl) {
                 $job->post->update(['featured_image' => $localUrl]);
                 Log::info("[ImageGen] Webhook: hero image set for post {$job->post_id}");
-            } elseif ($job->type === 'inline' && $localUrl) {
+            } elseif ($job->post_id && $job->type === 'inline' && $localUrl) {
                 $this->insertInlineImage($job);
                 Log::info("[ImageGen] Webhook: inline image inserted for post {$job->post_id}");
             }
+
+            // Content Engine: update matching image_prompts[] segment in content_ideas
+            $this->updateContentIdeaSegment($uuid, 'done', $localUrl);
 
             return true;
 
@@ -176,10 +180,66 @@ class ImageGenerationService
                 'error_message' => $data['error_message'] ?? 'Unknown error',
             ]);
             Log::error("[ImageGen] Webhook: failed for UUID {$uuid} — " . ($data['error_message'] ?? ''));
+
+            // Content Engine: mark the segment as failed
+            $this->updateContentIdeaSegment($uuid, 'failed', null, $data['error_message'] ?? 'Unknown error');
+
             return false;
         }
 
         return false;
+    }
+
+    /**
+     * Find the content_idea whose image_prompts[] contains the given job UUID
+     * and update that segment's status + generated_url.
+     * No-op if no matching idea (legacy blog pipeline).
+     */
+    private function updateContentIdeaSegment(string $uuid, string $status, ?string $imageUrl = null, ?string $errorMessage = null): void
+    {
+        // Narrow scan: only ideas currently in image-gen-relevant statuses
+        $ideas = ContentIdea::whereIn('status', ['article_ready', 'generating_images', 'images_ready'])
+            ->orderByDesc('updated_at')
+            ->limit(50)
+            ->get();
+
+        foreach ($ideas as $idea) {
+            $article = $idea->generated_article ?? [];
+            $prompts = $article['image_prompts'] ?? [];
+            $matched = false;
+
+            foreach ($prompts as $i => $p) {
+                if (($p['job_uuid'] ?? null) === $uuid) {
+                    $prompts[$i]['status'] = $status;
+                    if ($imageUrl !== null) {
+                        $prompts[$i]['generated_url'] = $imageUrl;
+                    }
+                    if ($errorMessage !== null) {
+                        $prompts[$i]['error'] = $errorMessage;
+                    }
+                    $matched = true;
+                    break;
+                }
+            }
+
+            if ($matched) {
+                $article['image_prompts'] = $prompts;
+                $idea->update(['generated_article' => $article]);
+
+                // Auto-advance status: all segments done → images_ready
+                $allDone = collect($prompts)->every(fn ($p) => in_array($p['status'] ?? '', ['done', 'failed']));
+                $anyDone = collect($prompts)->contains(fn ($p) => ($p['status'] ?? '') === 'done');
+                if ($allDone && $anyDone && $idea->status === 'generating_images') {
+                    $idea->update(['status' => 'images_ready']);
+                    Log::info("[ImageGen] Content idea {$idea->id} → images_ready (all segments done)");
+                }
+
+                Log::info("[ImageGen] Webhook: updated segment for idea {$idea->id} uuid={$uuid} status={$status}");
+                return;
+            }
+        }
+
+        Log::info("[ImageGen] Webhook: no matching content_idea segment for UUID {$uuid} (ok if legacy blog post)");
     }
 
     /**
