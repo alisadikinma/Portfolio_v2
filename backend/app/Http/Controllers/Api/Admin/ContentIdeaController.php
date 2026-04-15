@@ -631,8 +631,10 @@ class ContentIdeaController extends Controller
         $aspectRatio = $request->input('aspect_ratio', '16:9');
         $style = $request->input('style');
         $prompt = $request->input('prompt');
-        $faceRefs = $request->input('face_refs') ?? [];
-        $styleRefs = $request->input('style_refs') ?? [];
+        // Strip browser-only blob: URLs — GeminiGen can't fetch them (400 FILE_DOWNLOAD_FAILED)
+        $isUsableRef = fn ($u) => is_string($u) && $u !== '' && !str_starts_with($u, 'blob:');
+        $faceRefs = array_values(array_filter((array) ($request->input('face_refs') ?? []), $isUsableRef));
+        $styleRefs = array_values(array_filter((array) ($request->input('style_refs') ?? []), $isUsableRef));
         // ConvertEmptyStringsToNull middleware turns '' into null — coerce back for type-safety
         $additionalNotes = $request->input('additional_notes') ?? '';
 

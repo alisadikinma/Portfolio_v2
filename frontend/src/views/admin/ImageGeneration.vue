@@ -54,6 +54,9 @@ function initSegments() {
     if (s === 'generating' && !img.job_uuid) return 'failed'
     return s
   }
+  // Strip browser-only blob: URLs — GeminiGen can't fetch them (400 FILE_DOWNLOAD_FAILED).
+  // These get saved into face_refs/style_refs when file upload failed in earlier versions.
+  const isUsableRef = (u) => typeof u === 'string' && u.length > 0 && !u.startsWith('blob:')
 
   segments.value = article.image_prompts.map((img, i) => ({
     ...img,
@@ -63,8 +66,8 @@ function initSegments() {
     model: img.model || 'nano-banana-2',
     aspect_ratio: img.aspect_ratio || '16:9',
     reference_image_url: img.reference_image_url || '',
-    face_refs: img.face_refs || [],
-    style_refs: img.style_refs || [],
+    face_refs: (img.face_refs || []).filter(isUsableRef),
+    style_refs: (img.style_refs || []).filter(isUsableRef),
     additional_notes: img.additional_notes || '',
     generated_url: img.generated_url || '',
     status: normalizeStatus(img),
