@@ -280,15 +280,38 @@ class ImageGenerationService
     public function downloadAndStore(string $imageUrl): ?string
     {
         try {
-            $imageData = Http::timeout(30)->get($imageUrl)->body();
-            $filename = 'blog-images/' . time() . '_' . uniqid() . '.jpg';
-            Storage::disk('public')->put($filename, $imageData);
+            $response = Http::timeout(30)->get($imageUrl);
 
-            // Return full URL so images work from both backend and frontend
+            if (!$response->successful()) {
+                Log::error("[ImageGen] Download HTTP {$response->status()} from {$imageUrl}");
+                return $imageUrl;
+            }
+
+            $imageData = $response->body();
+            if (empty($imageData) || strlen($imageData) < 1024) {
+                Log::error("[ImageGen] Download empty/tiny body ({" . strlen($imageData) . "} bytes) from {$imageUrl}");
+                return $imageUrl;
+            }
+
+            $filename = 'blog-images/' . time() . '_' . uniqid() . '.jpg';
+            $written = Storage::disk('public')->put($filename, $imageData);
+
+            if (!$written) {
+                Log::error("[ImageGen] Storage::put() returned false for {$filename} — check perms on storage/app/public/blog-images");
+                return $imageUrl;
+            }
+
+            // Double-check file actually landed on disk
+            if (!Storage::disk('public')->exists($filename)) {
+                Log::error("[ImageGen] File missing after put() — {$filename}");
+                return $imageUrl;
+            }
+
+            Log::info("[ImageGen] Stored {$filename} (" . strlen($imageData) . " bytes)");
             return url('/storage/' . $filename);
         } catch (\Exception $e) {
-            Log::error("[ImageGen] Download failed: {$e->getMessage()}");
-            return $imageUrl; // Fallback: use remote URL
+            Log::error("[ImageGen] Download exception: {$e->getMessage()}");
+            return $imageUrl;
         }
     }
 }
