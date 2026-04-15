@@ -7,15 +7,32 @@
         class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black"
         @click.self="$emit('close')"
       >
-        <!-- Close Button -->
-        <button
-          @click="$emit('close')"
-          class="absolute top-6 right-6 p-4 bg-white/10 hover:bg-white/20 rounded-full transition-all duration-300 backdrop-blur-md z-10 group"
-        >
-          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
+        <!-- Top-right controls -->
+        <div class="absolute top-6 right-6 flex items-center gap-2 z-10">
+          <a
+            v-if="currentImage"
+            :href="currentImage"
+            :download="downloadFilename || true"
+            target="_blank"
+            rel="noopener"
+            class="p-4 bg-white/10 hover:bg-white/20 rounded-full transition-all duration-300 backdrop-blur-md"
+            title="Download"
+            @click.stop
+          >
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"></path>
+            </svg>
+          </a>
+          <button
+            @click="$emit('close')"
+            class="p-4 bg-white/10 hover:bg-white/20 rounded-full transition-all duration-300 backdrop-blur-md group"
+            title="Close"
+          >
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
 
         <!-- Previous Button -->
         <button
@@ -85,6 +102,10 @@ const props = defineProps({
   totalItems: {
     type: Number,
     required: true
+  },
+  downloadFilename: {
+    type: String,
+    default: ''
   }
 })
 

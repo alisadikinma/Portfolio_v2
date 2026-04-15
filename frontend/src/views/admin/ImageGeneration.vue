@@ -5,6 +5,7 @@ import { useContentEngine } from '@/composables/useContentEngine'
 import { useToast } from '@/composables/useToast'
 import PipelineStepBar from '@/components/admin/PipelineStepBar.vue'
 import ImageConfigModal from '@/components/admin/ImageConfigModal.vue'
+import BaseLightbox from '@/components/base/BaseLightbox.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -16,6 +17,26 @@ const loadError = ref(null)
 const segments = ref([])
 const generatingAll = ref(false)
 const configSegment = ref(null) // segment being configured in modal
+const lightboxIndex = ref(-1)
+const generatedSegments = computed(() => segments.value.filter(s => s.status === 'done' && s.generated_url))
+const lightboxImage = computed(() => generatedSegments.value[lightboxIndex.value]?.generated_url || '')
+const lightboxTitle = computed(() => {
+  const s = generatedSegments.value[lightboxIndex.value]
+  return s ? `${s.label} — ${s.concept || s.visual_direction || ''}`.trim() : ''
+})
+const lightboxFilename = computed(() => {
+  const s = generatedSegments.value[lightboxIndex.value]
+  if (!s) return ''
+  const slug = (s.label || 'image').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+  return `${slug}.jpg`
+})
+function openLightbox(seg) {
+  const idx = generatedSegments.value.findIndex(s => s.index === seg.index)
+  if (idx >= 0) lightboxIndex.value = idx
+}
+function closeLightbox() { lightboxIndex.value = -1 }
+function lightboxPrev() { if (lightboxIndex.value > 0) lightboxIndex.value-- }
+function lightboxNext() { if (lightboxIndex.value < generatedSegments.value.length - 1) lightboxIndex.value++ }
 let saveTimeout = null
 let pollInterval = null
 
@@ -331,7 +352,14 @@ async function handleApprove() {
             <div class="lg:col-span-2 p-5 lg:border-l border-t lg:border-t-0 border-neutral-100 dark:border-neutral-700/40 flex flex-col">
               <div :class="['relative rounded-2xl overflow-hidden bg-neutral-100 dark:bg-neutral-900/60 border border-neutral-200/60 dark:border-neutral-700/40 flex-1 min-h-[200px]', seg.aspect_ratio === '16:9' ? 'aspect-video' : seg.aspect_ratio === '1:1' ? 'aspect-square' : seg.aspect_ratio === '9:16' ? 'aspect-[9/16] max-h-80' : 'aspect-[4/3]']">
                 <!-- Generated image -->
-                <img v-if="seg.generated_url && seg.status === 'done'" :src="seg.generated_url" :alt="seg.concept" class="w-full h-full object-cover" />
+                <img
+                  v-if="seg.generated_url && seg.status === 'done'"
+                  :src="seg.generated_url"
+                  :alt="seg.concept"
+                  class="w-full h-full object-cover cursor-zoom-in transition-opacity hover:opacity-90"
+                  @click="openLightbox(seg)"
+                  title="Click to expand"
+                />
 
                 <!-- Generating -->
                 <div v-else-if="seg.status === 'generating'" class="absolute inset-0 flex flex-col items-center justify-center gap-3">
@@ -398,6 +426,19 @@ async function handleApprove() {
       :segment="configSegment"
       @apply="handleConfigApply"
       @close="configSegment = null"
+    />
+
+    <!-- Image Lightbox -->
+    <BaseLightbox
+      :show="lightboxIndex >= 0"
+      :current-image="lightboxImage"
+      :current-title="lightboxTitle"
+      :current-index="lightboxIndex"
+      :total-items="generatedSegments.length"
+      :download-filename="lightboxFilename"
+      @close="closeLightbox"
+      @prev="lightboxPrev"
+      @next="lightboxNext"
     />
   </div>
 </template>
