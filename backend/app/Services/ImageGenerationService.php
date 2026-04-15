@@ -71,10 +71,16 @@ class ImageGenerationService
             $multipart[] = ['name' => 'webhook_url', 'contents' => $webhookUrl];
             $multipart[] = ['name' => 'callback_url', 'contents' => $webhookUrl];
 
-            // Merge all reference URLs and send as file_urls to GeminiGen
-            $allRefs = array_merge($faceRefs, $styleRefs);
-            if (!empty($allRefs)) {
-                $multipart[] = ['name' => 'file_urls', 'contents' => json_encode($allRefs)];
+            // Merge all reference URLs and send as file_urls to GeminiGen.
+            // GeminiGen expects EACH url as its own multipart entry (or single plain string),
+            // NOT a JSON-encoded array. Sending json_encode(array) makes GeminiGen try to
+            // fetch the literal '["https://..."]' string and fail with FILE_DOWNLOAD_FAILED.
+            $allRefs = array_values(array_filter(
+                array_merge($faceRefs, $styleRefs),
+                fn ($u) => is_string($u) && $u !== '' && !str_starts_with($u, 'blob:')
+            ));
+            foreach ($allRefs as $refUrl) {
+                $multipart[] = ['name' => 'file_urls', 'contents' => $refUrl];
             }
 
             $response = Http::timeout(30)
