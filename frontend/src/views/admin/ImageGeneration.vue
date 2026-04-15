@@ -4,7 +4,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { useContentEngine } from '@/composables/useContentEngine'
 import { useToast } from '@/composables/useToast'
 import PipelineStepBar from '@/components/admin/PipelineStepBar.vue'
-import StockImageSearch from '@/components/admin/StockImageSearch.vue'
 import ImageConfigModal from '@/components/admin/ImageConfigModal.vue'
 
 const route = useRoute()
@@ -314,22 +313,6 @@ async function handleApprove() {
                 </div>
               </div>
 
-              <!-- Reference image (collapsible) -->
-              <details class="group">
-                <summary class="flex items-center gap-2 cursor-pointer text-xs text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300 transition-colors select-none">
-                  <svg class="w-3.5 h-3.5 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-                  <span class="font-medium">Reference Image</span>
-                  <span class="text-neutral-400">(optional)</span>
-                  <span v-if="seg.reference_image_url" class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                </summary>
-                <div class="mt-3 pl-5">
-                  <StockImageSearch
-                    v-model="seg.reference_image_url"
-                    :orientation="seg.aspect_ratio === '9:16' ? 'portrait' : 'landscape'"
-                    @update:model-value="scheduleAutoSave"
-                  />
-                </div>
-              </details>
             </div>
 
             <!-- Right: Image preview (2 cols) -->
