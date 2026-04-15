@@ -63,6 +63,14 @@ class ImageGenerationService
                 ['name' => 'style', 'contents' => $style],
             ];
 
+            // Webhook URL so GeminiGen can notify us on completion/failure.
+            // Harmless if GeminiGen ignores the param (poll fallback still works).
+            $apiUrl = config('services.article_generation.api_url', config('app.url'));
+            $webhookUrl = rtrim($apiUrl, '/') . '/automation/blog/image-webhook';
+            $multipart[] = ['name' => 'webhook', 'contents' => $webhookUrl];
+            $multipart[] = ['name' => 'webhook_url', 'contents' => $webhookUrl];
+            $multipart[] = ['name' => 'callback_url', 'contents' => $webhookUrl];
+
             // Merge all reference URLs and send as file_urls to GeminiGen
             $allRefs = array_merge($faceRefs, $styleRefs);
             if (!empty($allRefs)) {
