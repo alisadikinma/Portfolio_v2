@@ -361,7 +361,7 @@ The `ContentIdeaController` orchestrates the full pipeline through the admin UI 
 - `ContentIdeaController` — 18 admin endpoints for full pipeline management (incl. progress tracking)
 - `ArticleGenerationService` — SSH/local exec to trigger Claude Code CLI on VPS
 - `ContentEngineService` — Legacy HTTP client (kept for backward compatibility)
-- `TrendingTopicService` — aggregates trends from Google Trends, TikTok, YouTube, Google News
+- `TrendingTopicService` — aggregates trends from Google News (RSS, working) + Google Trends (dailytrends JSON API, working). TikTok/YouTube scrapers exist but disabled in UI (brittle). Instagram not implemented.
 - `useContentEngine.js` — Vue composable with 16+ API methods (incl. getProgress)
 
 **Automation Endpoints (for CLI plugin callbacks):**
@@ -668,10 +668,13 @@ Admin Panel (/admin/content-engine)
 
 ### Admin UI: Content Engine Page (`ContentEngine.vue`)
 - **Spreadsheet-style idea management** with filters (pillar, status, priority, search)
-- **Pull Trending** — 5 sources (Google Trends, YouTube, TikTok, Google News, Instagram) with search + select all
+- **Bulk selection** — checkbox column + sticky bulk bar with 4 actions (Start Research, Archive, Revert to Draft, Delete) using chunked `Promise.all` (3 concurrent for SSH-heavy Start Research, 10 for others)
+- **Published column** — relative "Xh ago / Xd ago" with absolute datetime tooltip, sourced from `content_ideas.source_data.pub_date` JSON
+- **Status-aware Play ▶ icon** per row — single icon button replaces 7 status-specific text buttons, tooltip changes per status (Start Research / View Progress / Preview Article / Finalize / View / Restore)
+- **Pull Trending** — 2 working sources (Google News + Google Trends); YouTube + TikTok disabled with "Coming soon" badge; Instagram removed (no backend)
 - **2-gate approval pipeline** — nothing auto-generates without user confirmation
-- **5 modals**: Trending Preview, Config (language + instructions), **Progress Modal** (progress bar + step indicators + streaming log), Article Preview, Image Config (with reference upload)
-- **Real-time progress tracking** — clickable "View Progress" button on researching ideas, polls every 3 seconds
+- **5 modals**: Trending Preview (wide 4-col grid, pagination), Config (language + instructions), **Progress Modal** (progress bar + step indicators + streaming log), Article Preview, Image Config (with reference upload)
+- **Real-time progress tracking** — polls every 3 seconds during `researching` / `generating_images` status
 
 ### Content Idea Status Flow
 ```
@@ -770,7 +773,7 @@ ARTICLE_GEN_USE_TRANSLATE_PHASE=false
 
 ---
 
-**Last Updated:** April 15, 2026 (Translation pipeline — finalize-stage ID→EN via article-translate skill + post-creation flow + retry cron; feature-flagged)
+**Last Updated:** April 15, 2026 (Content Engine table — published column, bulk actions, Play icon unification, Google Trends scraper fix)
 **Maintainer:** Ali Sadikin (ali.sadikincom85@gmail.com)
 **Environment:** Windows 11, D:\Projects\Portfolio_v2
 **PHP:** D:\xampp\php\php.exe (8.2.12) — use full path, not in system PATH
