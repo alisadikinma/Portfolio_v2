@@ -46,6 +46,15 @@ function initSegments() {
   const article = idea.value?.generated_article
   if (!article?.image_prompts) return
 
+  // Normalize stuck segments: if status='generating' but no job_uuid, the previous
+  // queue attempt died mid-request (network, timeout, or backend exception).
+  // Treat as 'failed' so user can click Retry instead of staring at a spinner.
+  const normalizeStatus = (img) => {
+    const s = img.status || 'pending'
+    if (s === 'generating' && !img.job_uuid) return 'failed'
+    return s
+  }
+
   segments.value = article.image_prompts.map((img, i) => ({
     ...img,
     index: i,
@@ -58,7 +67,7 @@ function initSegments() {
     style_refs: img.style_refs || [],
     additional_notes: img.additional_notes || '',
     generated_url: img.generated_url || '',
-    status: img.status || 'pending',
+    status: normalizeStatus(img),
     label: img.type === 'cover' ? 'COVER' : `BODY-${i}`,
   }))
 }
