@@ -128,6 +128,27 @@ class ArticleGenerationService
     }
 
     /**
+     * Trigger finalize-stage Indonesian → English translation.
+     * Uses /article-translate skill on Sonnet with refs-translate.md.
+     *
+     * @param int $postId Published Post ID (not content_idea_id)
+     * @param string $idempotencyKey UUID to dedupe retries
+     * @param string $targetLocale Target locale code (default 'en')
+     * @return array{success: bool, pid: int|null, error: string|null}
+     */
+    public function triggerTranslate(int $postId, string $idempotencyKey, string $targetLocale = 'en'): array
+    {
+        $prompt = "/article-translate --post-id {$postId} --api-url {$this->apiUrl} --api-token {$this->apiToken}";
+        $prompt .= " --idempotency-key {$idempotencyKey}";
+        $prompt .= " --target-locale {$targetLocale}";
+
+        $model = config('services.article_generation.model_translate', 'sonnet');
+        $refsFile = config('services.article_generation.refs_translate', '');
+
+        return $this->executePrompt($prompt, $postId, 'translate', $model, $refsFile);
+    }
+
+    /**
      * Check if a process is still running.
      */
     public function isProcessRunning(int $pid): bool

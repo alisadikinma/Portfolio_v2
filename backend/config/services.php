@@ -64,11 +64,14 @@ return [
         'refs_write' => env('ARTICLE_GEN_REFS_WRITE', ''),
         'refs_score' => env('ARTICLE_GEN_REFS_SCORE', ''),
         'refs_images' => env('ARTICLE_GEN_REFS_IMAGES', ''),
+        'refs_translate' => env('ARTICLE_GEN_REFS_TRANSLATE', ''),
         'model_prep' => env('ARTICLE_GEN_MODEL_PREP', 'sonnet'),
         'model_write' => env('ARTICLE_GEN_MODEL_WRITE', 'sonnet'),
         'model_score' => env('ARTICLE_GEN_MODEL_SCORE', 'sonnet'),
         'model_images' => env('ARTICLE_GEN_MODEL_IMAGES', 'sonnet'),
+        'model_translate' => env('ARTICLE_GEN_MODEL_TRANSLATE', 'sonnet'),
         'use_images_phase' => env('ARTICLE_GEN_USE_IMAGES_PHASE', false),
+        'use_translate_phase' => env('ARTICLE_GEN_USE_TRANSLATE_PHASE', false),
     ],
 
 ];

@@ -31,6 +31,11 @@ class Post extends Model
         'faq_schema',
         'seo_score',
         'index_follow',
+        // Content Engine origin + translation tracking
+        'source_idea_id',
+        'translation_pending',
+        'translation_attempts',
+        'last_translation_attempt',
     ];
 
     protected $casts = [
@@ -41,6 +46,8 @@ class Post extends Model
         'schema_markup' => 'array',
         'faq_schema' => 'array',
         'index_follow' => 'boolean',
+        'translation_pending' => 'boolean',
+        'last_translation_attempt' => 'datetime',
     ];
 
     /**

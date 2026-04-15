@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\ContentIdea;
+use App\Models\Post;
+use App\Models\PostTranslation;
 use App\Services\ArticleGenerationService;
 use App\Services\ContentEngineService;
 use App\Services\TrendingTopicService;
@@ -709,13 +711,287 @@ class ContentIdeaController extends Controller
             return response()->json(['success' => false, 'message' => 'Cannot publish in current status.'], 422);
         }
 
-        $idea->update(['status' => 'completed']);
+        $article = $idea->generated_article ?? [];
+        $primaryLang = $article['language'] ?? 'id';
+        $title = $article['title'] ?? $idea->title;
+        $content = $article['content'] ?? '';
+        $excerpt = $article['excerpt'] ?? null;
+        $featuredImage = data_get($idea->generated_images, '0.url')
+            ?? data_get($idea->generated_images, '0')
+            ?? null;
+
+        // Resolve category_id: idea.niche → Category lookup, fallback to first category
+        $categoryId = null;
+        if (!empty($idea->niche)) {
+            $category = \App\Models\Category::where('slug', Str::slug($idea->niche))
+                ->orWhere('name', $idea->niche)
+                ->first();
+            $categoryId = $category?->id;
+        }
+        if (!$categoryId) {
+            $categoryId = \App\Models\Category::orderBy('id')->value('id');
+        }
+        if (!$categoryId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No category available. Create at least one category before publishing.',
+            ], 409);
+        }
+
+        // Build unique slug: append short idea id if slug collides
+        $baseSlug = Str::slug($title);
+        $uniqueSlug = $baseSlug;
+        $existing = Post::where('slug', $uniqueSlug)->where('source_idea_id', '!=', $idea->id)->first();
+        if ($existing) {
+            $uniqueSlug = $baseSlug . '-' . $idea->id;
+        }
+
+        // UPSERT Post (primary fields mirror primary-language translation)
+        $post = Post::updateOrCreate(
+            ['source_idea_id' => $idea->id],
+            [
+                'category_id' => $categoryId,
+                'title' => $title,
+                'slug' => $uniqueSlug,
+                'content' => $content,
+                'excerpt' => $excerpt,
+                'featured_image' => $featuredImage,
+                'published' => true,
+                'published_at' => now(),
+                'seo_score' => data_get($article, 'seo_analysis.score'),
+                'schema_markup' => data_get($article, 'schema_markup'),
+                'faq_schema' => data_get($article, 'faq_schema'),
+                'og_image' => data_get($article, 'og_image') ?? $featuredImage,
+                'translation_pending' => false,
+                'translation_attempts' => 0,
+            ]
+        );
+
+        // UPSERT primary-language translation
+        PostTranslation::updateOrCreate(
+            ['post_id' => $post->id, 'language' => $primaryLang],
+            [
+                'title' => $title,
+                'slug' => $uniqueSlug,
+                'excerpt' => $excerpt,
+                'content' => $content,
+                'meta_title' => data_get($article, 'meta_title'),
+                'meta_description' => data_get($article, 'meta_description'),
+                'og_title' => data_get($article, 'og_title'),
+                'og_description' => data_get($article, 'og_description'),
+                'ai_summary' => data_get($article, 'ai_summary'),
+            ]
+        );
+
+        // Gate the translate phase behind feature flag
+        $translationPending = false;
+        $targetLocales = array_values(array_diff($idea->languages ?? [$primaryLang], [$primaryLang]));
+
+        if (
+            config('services.article_generation.use_translate_phase')
+            && !empty($targetLocales)
+        ) {
+            $targetLocale = $targetLocales[0];
+            $idempotencyKey = (string) Str::uuid();
+            $result = $this->articleGen->triggerTranslate($post->id, $idempotencyKey, $targetLocale);
+
+            $post->update([
+                'translation_pending' => true,
+                'translation_attempts' => 1,
+                'last_translation_attempt' => now(),
+            ]);
+            $translationPending = true;
+
+            Log::info('[ContentIdea] Translation triggered', [
+                'idea_id' => $idea->id,
+                'post_id' => $post->id,
+                'target_locale' => $targetLocale,
+                'pid' => $result['pid'] ?? null,
+            ]);
+        }
+
+        $idea->update([
+            'status' => 'completed',
+            'result_post_id' => $post->id,
+        ]);
 
         return response()->json([
             'success' => true,
-            'data' => $idea->fresh(),
-            'message' => 'Content approved and published.',
+            'data' => [
+                'idea' => $idea->fresh(),
+                'published_post_id' => $post->id,
+                'translation_pending' => $translationPending,
+            ],
+            'message' => $translationPending
+                ? 'Published — English translation in progress.'
+                : 'Published.',
         ]);
+    }
+
+    // ========================================================================
+    // FINALIZE: Translation Phase (post-publish)
+    // ========================================================================
+
+    /**
+     * Automation: return primary-language post data for translation skill.
+     */
+    public function getPostForTranslation($id): JsonResponse
+    {
+        $post = Post::with('translations')->find($id);
+        if (!$post) {
+            return response()->json(['success' => false, 'message' => 'Post not found.'], 404);
+        }
+
+        $primary = $post->translations->first();
+        if (!$primary) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Post has no primary translation to translate from.',
+            ], 409);
+        }
+
+        // Extract image alt map from content HTML
+        $imageAltMap = [];
+        if ($primary->content) {
+            preg_match_all('/<img[^>]+src=["\']([^"\']+)["\'][^>]*>/i', $primary->content, $matches, PREG_SET_ORDER);
+            foreach ($matches as $match) {
+                $srcUrl = $match[1];
+                $altMatch = [];
+                preg_match('/alt=["\']([^"\']*)["\']/i', $match[0], $altMatch);
+                $imageAltMap[$srcUrl] = $altMatch[1] ?? '';
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'post_id' => $post->id,
+                'primary_language' => $primary->language,
+                'title' => $primary->title,
+                'slug' => $primary->slug,
+                'content' => $primary->content,
+                'excerpt' => $primary->excerpt,
+                'meta_title' => $primary->meta_title,
+                'meta_description' => $primary->meta_description,
+                'og_title' => $primary->og_title,
+                'og_description' => $primary->og_description,
+                'ai_summary' => $primary->ai_summary,
+                'image_alt_map' => $imageAltMap,
+            ],
+        ]);
+    }
+
+    /**
+     * Automation: save translated post_translations row.
+     */
+    public function saveTranslation($id, Request $request): JsonResponse
+    {
+        $request->validate([
+            'target_locale' => 'required|string|in:en,id',
+            'translation.title' => 'required|string|max:255',
+            'translation.slug' => 'required|string|max:255',
+            'translation.content' => 'required|string',
+            'translation.meta_title' => 'nullable|string|max:70',
+            'translation.meta_description' => 'nullable|string|max:170',
+            'translation.og_title' => 'nullable|string|max:100',
+            'translation.og_description' => 'nullable|string|max:200',
+            'translation.excerpt' => 'nullable|string|max:500',
+            'translation.ai_summary' => 'nullable|string',
+            'translation.image_alt_map' => 'nullable|array',
+        ]);
+
+        $post = Post::find($id);
+        if (!$post) {
+            return response()->json(['success' => false, 'message' => 'Post not found.'], 404);
+        }
+
+        $t = $request->input('translation');
+        $locale = $request->input('target_locale');
+        $translatedContent = $t['content'];
+
+        // Rewrite <img alt="..."> in translated content if image_alt_map provided
+        if (!empty($t['image_alt_map']) && is_array($t['image_alt_map'])) {
+            foreach ($t['image_alt_map'] as $srcUrl => $newAlt) {
+                $pattern = '/(<img[^>]+src=["\']' . preg_quote($srcUrl, '/') . '["\'][^>]*?)alt=["\'][^"\']*["\']/i';
+                $replacement = '$1alt="' . addslashes($newAlt) . '"';
+                $result = preg_replace($pattern, $replacement, $translatedContent);
+                if ($result !== null) {
+                    $translatedContent = $result;
+                }
+            }
+        }
+
+        $pt = PostTranslation::updateOrCreate(
+            ['post_id' => $post->id, 'language' => $locale],
+            [
+                'title' => $t['title'],
+                'slug' => $t['slug'],
+                'excerpt' => $t['excerpt'] ?? null,
+                'content' => $translatedContent,
+                'meta_title' => $t['meta_title'] ?? null,
+                'meta_description' => $t['meta_description'] ?? null,
+                'og_title' => $t['og_title'] ?? null,
+                'og_description' => $t['og_description'] ?? null,
+                'ai_summary' => $t['ai_summary'] ?? null,
+            ]
+        );
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'post_id' => $post->id,
+                'language' => $locale,
+                'translation_id' => $pt->id,
+            ],
+            'message' => 'Translation saved.',
+        ]);
+    }
+
+    /**
+     * Automation: mark post translation complete (flips translation_pending=false).
+     */
+    public function markTranslationComplete($id, Request $request): JsonResponse
+    {
+        $post = Post::find($id);
+        if (!$post) {
+            return response()->json(['success' => false, 'message' => 'Post not found.'], 404);
+        }
+
+        $post->update([
+            'translation_pending' => false,
+            'last_translation_attempt' => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'post_id' => $post->id,
+                'translation_pending' => false,
+            ],
+        ]);
+    }
+
+    /**
+     * Automation: progress callback from /article-translate skill.
+     * Lightweight — just logs. Post-level progress does not need DB persistence
+     * (translation is synchronous-ish from user perspective).
+     */
+    public function postProgress($id, Request $request): JsonResponse
+    {
+        $request->validate([
+            'step' => 'required|string|max:100',
+            'percentage' => 'required|integer|min:0|max:100',
+            'message' => 'nullable|string|max:500',
+        ]);
+
+        Log::info('[Post translate] progress', [
+            'post_id' => $id,
+            'step' => $request->input('step'),
+            'percentage' => $request->input('percentage'),
+            'message' => $request->input('message'),
+        ]);
+
+        return response()->json(['success' => true]);
     }
 
     // ========================================================================

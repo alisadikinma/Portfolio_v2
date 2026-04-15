@@ -633,6 +633,12 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
     // Gate 2 split flow: /article-images skill saves authored prompts
     Route::put('/content-ideas/{id}/save-image-prompts', [ContentIdeaController::class, 'saveImagePrompts']);
 
+    // Finalize: /article-translate skill endpoints (post-level, not idea-level)
+    Route::get('/posts/{id}/for-translation', [ContentIdeaController::class, 'getPostForTranslation']);
+    Route::put('/posts/{id}/save-translation', [ContentIdeaController::class, 'saveTranslation']);
+    Route::post('/posts/{id}/translation-complete', [ContentIdeaController::class, 'markTranslationComplete']);
+    Route::put('/posts/{id}/progress', [ContentIdeaController::class, 'postProgress']);
+
     // Carousel endpoints (protected)
     Route::get('/carousel/accounts', [CarouselDraftController::class, 'listAccounts']);
     Route::get('/carousel/drafts', [CarouselDraftController::class, 'index']);
