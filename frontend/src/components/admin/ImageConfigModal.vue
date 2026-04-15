@@ -1,6 +1,11 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
 import StockImageSearch from './StockImageSearch.vue'
+import api from '@/services/api'
+import { useToast } from '@/composables/useToast'
+
+const toast = useToast()
+const uploading = ref(false)
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -26,11 +31,13 @@ const styleOptions = ['Photorealistic', 'Cinematic', 'Portrait Cinematic', 'Mini
 const maxRefs = 3
 
 // ── Reset when modal opens with new segment ──
+// Filter out any stale blob: URLs (browser-only, can't be downloaded by GeminiGen)
+const isUsableRef = (u) => typeof u === 'string' && u.length > 0 && !u.startsWith('blob:')
 watch(() => [props.visible, props.segment?.index], ([vis]) => {
   if (vis && props.segment) {
     additionalNotes.value = props.segment.additional_notes || ''
-    faceRefs.value = [...(props.segment.face_refs || [])]
-    styleRefs.value = [...(props.segment.style_refs || [])]
+    faceRefs.value = (props.segment.face_refs || []).filter(isUsableRef)
+    styleRefs.value = (props.segment.style_refs || []).filter(isUsableRef)
     selectedModel.value = props.segment.model || 'nano-banana-2'
     selectedStyle.value = props.segment.style || 'Photorealistic'
     facePasteUrl.value = ''
@@ -42,14 +49,32 @@ const segLabel = computed(() => props.segment?.label || 'Image')
 const segConcept = computed(() => props.segment?.concept || '')
 
 // ── Face ref handlers ──
-function handleFaceFileUpload(e) {
-  const files = e.target.files
-  if (!files?.length) return
-  for (const file of files) {
-    if (faceRefs.value.length >= maxRefs) break
-    faceRefs.value.push(URL.createObjectURL(file))
+async function handleFaceFileUpload(e) {
+  const files = Array.from(e.target.files || [])
+  if (!files.length) return
+
+  uploading.value = true
+  try {
+    for (const file of files) {
+      if (faceRefs.value.length >= maxRefs) break
+      const formData = new FormData()
+      formData.append('file', file)
+      const { data } = await api.post('/admin/content-engine/upload-reference', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      const url = data?.data?.url
+      if (url) {
+        faceRefs.value.push(url)
+      } else {
+        toast.error('Upload failed — no URL returned')
+      }
+    }
+  } catch (err) {
+    toast.error(err.response?.data?.message || 'Failed to upload face reference')
+  } finally {
+    uploading.value = false
+    if (faceFileInput.value) faceFileInput.value.value = ''
   }
-  if (faceFileInput.value) faceFileInput.value.value = ''
 }
 
 function handleFacePaste() {
@@ -145,10 +170,11 @@ function handleApply() {
 
                 <!-- Upload/paste actions -->
                 <div v-if="faceRefs.length < maxRefs" class="flex items-center gap-2">
-                  <button @click="faceFileInput?.click()" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-neutral-300 dark:border-neutral-600 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors">
+                  <button @click="faceFileInput?.click()" :disabled="uploading" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-neutral-300 dark:border-neutral-600 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                     <span class="inline-flex items-center gap-1">
-                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
-                      Upload
+                      <svg v-if="uploading" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                      <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
+                      {{ uploading ? 'Uploading...' : 'Upload' }}
                     </span>
                   </button>
                   <button @click="showFacePaste = !showFacePaste" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-neutral-300 dark:border-neutral-600 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors">
