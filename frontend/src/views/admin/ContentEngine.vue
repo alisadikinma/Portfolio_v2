@@ -1288,14 +1288,37 @@ function formatLogTime(timestamp) {
   return new Date(timestamp).toLocaleTimeString('en-US', { hour12: false })
 }
 
+// Gate 2 (Images) steps — these only progress during status 'generating_images'
+const IMAGE_PHASE_STEPS = ['reading_blueprint', 'authoring_image_prompts', 'prompts_saved', 'gemini_gen']
+
+function isImagesPhase(phase) {
+  return phase?.gate === 'images'
+}
+
+function isInImagesGate() {
+  const s = progressIdea.value?.status
+  const step = progressData.value.current_step || ''
+  return s === 'generating_images' || IMAGE_PHASE_STEPS.includes(step)
+}
+
 function stepIsDone(step) {
   const pct = progressData.value.progress_percentage || 0
   const currentStep = progressData.value.current_step || ''
+  const isImageStep = IMAGE_PHASE_STEPS.includes(step.name)
+
+  // Image steps only evaluate while we're in the Images gate
+  if (isImageStep) {
+    if (!isInImagesGate()) return false
+    const currentIdx = IMAGE_PHASE_STEPS.indexOf(currentStep)
+    const stepIdx = IMAGE_PHASE_STEPS.indexOf(step.name)
+    if (currentIdx > stepIdx) return true
+    return pct > step.pct && currentStep !== step.name
+  }
+
+  // Non-image steps: original global-progress logic
   const currentIdx = progressSteps.findIndex(s => s.name === currentStep)
   const stepIdx = progressSteps.findIndex(s => s.name === step.name)
-  // Done if current step is beyond this step
   if (currentIdx > stepIdx) return true
-  // Also done if percentage exceeds this step's pct and current step is different
   return pct > step.pct && currentStep !== step.name
 }
 
@@ -1315,38 +1338,56 @@ function stepIndicatorClass(step) {
   return 'bg-neutral-100 text-neutral-400 dark:bg-neutral-700 dark:text-neutral-500'
 }
 
-function phaseCardClass(phase) {
+// Resolve a phase's current state: 'done' | 'active' | 'wait'
+function phaseState(phase) {
   const pct = progressData.value.progress_percentage || 0
-  if (pct >= phase.maxPct) return 'border-green-500/40 bg-green-950/10'
-  if (pct >= phase.minPct) return 'border-amber-500/50 bg-amber-950/10'
+  const ideaStatus = progressIdea.value?.status
+
+  if (isImagesPhase(phase)) {
+    // Images is Gate 2 — only progresses when status === 'generating_images' or later
+    if (['completed', 'images_ready'].includes(ideaStatus)) return 'done'
+    if (ideaStatus === 'generating_images' || isInImagesGate()) return 'active'
+    return 'wait'
+  }
+
+  if (pct >= phase.maxPct) return 'done'
+  if (pct >= phase.minPct) return 'active'
+  return 'wait'
+}
+
+function phaseCardClass(phase) {
+  const s = phaseState(phase)
+  if (s === 'done') return 'border-green-500/40 bg-green-950/10'
+  if (s === 'active') return 'border-amber-500/50 bg-amber-950/10'
   return 'border-neutral-700/40 bg-neutral-900/20'
 }
 
 function phaseHeaderColor(phase) {
-  const pct = progressData.value.progress_percentage || 0
-  if (pct >= phase.maxPct) return 'text-green-400'
-  if (pct >= phase.minPct) return 'text-amber-400'
+  const s = phaseState(phase)
+  if (s === 'done') return 'text-green-400'
+  if (s === 'active') return 'text-amber-400'
   return 'text-neutral-500'
 }
 
 function phaseModelBadge(phase) {
-  const pct = progressData.value.progress_percentage || 0
-  if (pct >= phase.maxPct) return 'bg-green-900/40 text-green-400'
-  if (pct >= phase.minPct) return 'bg-amber-900/40 text-amber-400'
+  const s = phaseState(phase)
+  if (s === 'done') return 'bg-green-900/40 text-green-400'
+  if (s === 'active') return 'bg-amber-900/40 text-amber-400'
   return 'bg-neutral-800 text-neutral-500'
 }
 
 function phaseStatus(phase) {
+  const s = phaseState(phase)
   const pct = progressData.value.progress_percentage || 0
-  if (pct >= phase.maxPct) return '✓ Done'
-  if (pct >= phase.minPct) return `⏳ ${pct}%`
+  if (s === 'done') return '✓ Done'
+  if (s === 'active') return isImagesPhase(phase) ? '⏳ Active' : `⏳ ${pct}%`
   return '○ Wait'
 }
 
 function phaseStatusColor(phase) {
-  const pct = progressData.value.progress_percentage || 0
-  if (pct >= phase.maxPct) return 'text-green-400'
-  if (pct >= phase.minPct) return 'text-amber-400'
+  const s = phaseState(phase)
+  if (s === 'done') return 'text-green-400'
+  if (s === 'active') return 'text-amber-400'
   return 'text-neutral-600'
 }
 
