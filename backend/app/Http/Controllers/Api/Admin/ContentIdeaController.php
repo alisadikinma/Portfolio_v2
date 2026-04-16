@@ -773,12 +773,44 @@ class ContentIdeaController extends Controller
         }
 
         $article = $idea->generated_article ?? [];
+
+        // Compact variations to selected-only and collect non-selected URLs for
+        // file cleanup after Post is successfully created. This is the actual
+        // cleanup gate — previously done prematurely at Approve & Continue in
+        // the frontend Images step. See docs/plans/2026-04-17-content-engine-preview-4bugs-plan.md
+        $imagePrompts = $article['image_prompts'] ?? [];
+        $urlsToDelete = [];
+        foreach ($imagePrompts as $i => $prompt) {
+            $variations = $prompt['variations'] ?? [];
+            if (empty($variations)) continue;
+
+            $selectedIdx = $prompt['selected_variation'] ?? 0;
+            $selectedVar = $variations[$selectedIdx] ?? $variations[0] ?? null;
+            $selectedUrl = $selectedVar['url'] ?? ($prompt['generated_url'] ?? null);
+
+            foreach ($variations as $vi => $v) {
+                if ($vi !== $selectedIdx && !empty($v['url']) && $v['url'] !== $selectedUrl) {
+                    $urlsToDelete[] = $v['url'];
+                }
+            }
+
+            if ($selectedVar) {
+                $imagePrompts[$i]['variations'] = [$selectedVar];
+                $imagePrompts[$i]['selected_variation'] = 0;
+                $imagePrompts[$i]['generated_url'] = $selectedUrl;
+            }
+        }
+        $article['image_prompts'] = $imagePrompts;
+        $idea->generated_article = $article;
+        $idea->save();
+
         $primaryLang = $article['language'] ?? 'id';
         $title = $article['title'] ?? $idea->title;
         $content = $article['content'] ?? '';
         $excerpt = $article['excerpt'] ?? null;
         $featuredImage = data_get($idea->generated_images, '0.url')
             ?? data_get($idea->generated_images, '0')
+            ?? data_get($imagePrompts, '0.generated_url')
             ?? null;
 
         // Resolve category_id: idea.niche → Category lookup, fallback to first category
@@ -840,6 +872,38 @@ class ContentIdeaController extends Controller
                 'ai_summary' => data_get($article, 'ai_summary'),
             ]
         );
+
+        // Delete non-selected variation files from storage. Runs after the Post
+        // is safely written so a mid-flight failure doesn't orphan the selected
+        // variant. Failures here are logged but non-fatal — the post is already
+        // created and the orphaned files are recoverable via a sweep job.
+        if (!empty($urlsToDelete)) {
+            $storageBase = url('/storage/');
+            $deleted = 0;
+            foreach ($urlsToDelete as $imageUrl) {
+                if (!str_starts_with($imageUrl, $storageBase)) continue;
+                $relativePath = str_replace($storageBase . '/', '', $imageUrl);
+                try {
+                    if (Storage::disk('public')->exists($relativePath)) {
+                        Storage::disk('public')->delete($relativePath);
+                        $deleted++;
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('[ContentIdea] Failed to delete variation file', [
+                        'path' => $relativePath,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+            if ($deleted > 0) {
+                Log::info('[ContentIdea] Cleaned up variation files on publish', [
+                    'idea_id' => $idea->id,
+                    'post_id' => $post->id,
+                    'deleted_count' => $deleted,
+                    'requested_count' => count($urlsToDelete),
+                ]);
+            }
+        }
 
         // Gate the translate phase behind feature flag
         $translationPending = false;
