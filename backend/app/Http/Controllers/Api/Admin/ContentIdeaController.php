@@ -807,15 +807,12 @@ class ContentIdeaController extends Controller
             $uniqueSlug = $baseSlug . '-' . $idea->id;
         }
 
-        // UPSERT Post (primary fields mirror primary-language translation)
+        // UPSERT Post — title/content/excerpt live in post_translations, NOT posts table
         $post = Post::updateOrCreate(
             ['source_idea_id' => $idea->id],
             [
                 'category_id' => $categoryId,
-                'title' => $title,
                 'slug' => $uniqueSlug,
-                'content' => $content,
-                'excerpt' => $excerpt,
                 'featured_image' => $featuredImage,
                 'published' => true,
                 'published_at' => now(),
