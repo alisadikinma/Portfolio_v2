@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useContentEngine } from '@/composables/useContentEngine'
 import { useToast } from '@/composables/useToast'
 import PipelineStepBar from '@/components/admin/PipelineStepBar.vue'
+import { parseBlockElements, resolveImagePosition } from '@/utils/imagePositioning'
 
 const route = useRoute()
 const router = useRouter()
@@ -12,7 +13,7 @@ const toast = useToast()
 
 const idea = ref(null)
 const loadError = ref(null)
-const activeLang = ref('en')
+const activeLang = ref('id')
 const publishing = ref(false)
 
 onMounted(async () => {
@@ -20,6 +21,11 @@ onMounted(async () => {
   const result = await getIdea(id)
   if (result.success && result.data) {
     idea.value = result.data
+    // Prefer 'id' if available, fall back to 'en' if only English exists
+    const art = result.data?.generated_article
+    if (!art?.id?.content && art?.en?.content) {
+      activeLang.value = 'en'
+    }
   } else {
     loadError.value = result.error || 'Failed to load content idea'
   }
@@ -52,29 +58,35 @@ const imagePrompts = computed(() => article.value?.image_prompts || [])
 const contentWithImages = computed(() => {
   const html = currentContent.value.content || ''
   if (!html) return ''
+
+  // Parse to DOM once for link-target mutation + block extraction
   const parser = new DOMParser()
   const doc = parser.parseFromString(`<div>${html}</div>`, 'text/html')
-
-  // Make links open in new tab
   doc.querySelectorAll('a').forEach(a => {
     a.setAttribute('target', '_blank')
     a.setAttribute('rel', 'noopener noreferrer')
   })
+  const childElements = Array.from(doc.body.firstChild?.children || [])
+  const blocks = childElements.map(el => el.outerHTML)
 
-  const children = Array.from(doc.body.firstChild?.children || [])
-  const blocks = children.map(el => el.outerHTML)
+  // Resolve each body image's position using the same logic Article step uses.
+  // Filter to body images only (cover renders separately) with a generated URL.
+  const bodyImages = imagePrompts.value.filter(img => img.generated_url && img.type !== 'cover')
+  const totalBody = bodyImages.length
 
-  // Insert images at their suggested positions
-  const sortedImages = [...imagePrompts.value]
-    .filter(img => img.generated_url && img.type !== 'cover')
-    .sort((a, b) => (b.suggested_position || 0) - (a.suggested_position || 0))
+  const positioned = bodyImages.map((img, i) => {
+    const origIndex = imagePrompts.value.indexOf(img)
+    const pos = resolveImagePosition(img, origIndex, totalBody, childElements)
+    return { img, pos }
+  })
 
-  for (const img of sortedImages) {
-    const pos = img.suggested_position ?? 0
+  // Splice in descending position order to keep indices stable
+  positioned.sort((a, b) => b.pos - a.pos)
+
+  for (const { img, pos } of positioned) {
     const imgHtml = `<figure class="my-8 not-prose"><img src="${img.generated_url}" alt="${img.concept || ''}" class="w-full rounded-xl" loading="lazy" /><figcaption class="text-sm text-neutral-500 dark:text-neutral-400 mt-2 text-center">${img.concept || ''}</figcaption></figure>`
-    if (pos >= 0 && pos <= blocks.length) {
-      blocks.splice(pos, 0, imgHtml)
-    }
+    const safePos = Math.max(0, Math.min(pos, blocks.length))
+    blocks.splice(safePos, 0, imgHtml)
   }
 
   return blocks.join('\n')
@@ -84,6 +96,10 @@ const coverImage = computed(() => {
   const cover = imagePrompts.value.find(img => img.type === 'cover')
   return cover?.generated_url || ''
 })
+
+const isUntranslated = computed(() =>
+  activeLang.value === 'en' && !article.value?.en?.content
+)
 
 async function handlePublish() {
   if (!idea.value) return
@@ -144,19 +160,33 @@ async function handlePublish() {
 
       <!-- WYSIWYG Article -->
       <div class="max-w-3xl mx-auto px-4 sm:px-6 py-6">
-        <!-- Cover Image -->
-        <div v-if="coverImage" class="mb-8 rounded-xl overflow-hidden">
-          <img :src="coverImage" :alt="currentContent.title" class="w-full aspect-video object-cover" />
+        <!-- Untranslated notice (English tab, no EN content yet) -->
+        <div v-if="isUntranslated" class="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-5 flex items-start gap-3">
+          <svg class="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/>
+          </svg>
+          <div class="text-sm text-amber-800 dark:text-amber-300">
+            <p class="font-medium">Belum diterjemahkan.</p>
+            <p class="mt-1">Terjemahan otomatis ke bahasa Inggris akan berjalan saat Anda klik <strong>Publish to Blog</strong>.</p>
+          </div>
         </div>
 
-        <!-- Title -->
-        <h1 class="text-3xl font-bold text-neutral-900 dark:text-neutral-100 mb-8">
-          {{ currentContent.title }}
-        </h1>
+        <!-- Translated content -->
+        <template v-else>
+          <!-- Cover Image -->
+          <div v-if="coverImage" class="mb-8 rounded-xl overflow-hidden">
+            <img :src="coverImage" :alt="currentContent.title" class="w-full aspect-video object-cover" />
+          </div>
 
-        <!-- Article body with images -->
-        <div class="prose dark:prose-invert prose-lg max-w-none prose-headings:font-bold prose-a:text-cyan-600 dark:prose-a:text-cyan-400 prose-blockquote:border-l-amber-500" v-html="contentWithImages">
-        </div>
+          <!-- Title -->
+          <h1 class="text-3xl font-bold text-neutral-900 dark:text-neutral-100 mb-8">
+            {{ currentContent.title }}
+          </h1>
+
+          <!-- Article body with images -->
+          <div class="prose dark:prose-invert prose-lg max-w-none prose-headings:font-bold prose-a:text-cyan-600 dark:prose-a:text-cyan-400 prose-blockquote:border-l-amber-500" v-html="contentWithImages">
+          </div>
+        </template>
       </div>
 
       <!-- Bottom Bar -->
