@@ -643,6 +643,8 @@ class ContentIdeaController extends Controller
         $imagePrompts = $article['image_prompts'] ?? [];
         if (isset($imagePrompts[$segmentIndex])) {
             $imagePrompts[$segmentIndex]['status'] = 'generating';
+            $imagePrompts[$segmentIndex]['generated_url'] = '';  // clear stale image
+            $imagePrompts[$segmentIndex]['job_uuid'] = null;     // will be set after queue()
             $imagePrompts[$segmentIndex]['face_refs'] = $faceRefs;
             $imagePrompts[$segmentIndex]['style_refs'] = $styleRefs;
             $imagePrompts[$segmentIndex]['additional_notes'] = $additionalNotes;
