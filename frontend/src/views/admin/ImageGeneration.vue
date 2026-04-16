@@ -145,28 +145,33 @@ function scheduleAutoSave() {
 async function persistDraft() {
   if (!idea.value) return
   const article = { ...idea.value.generated_article }
-  article.image_prompts = segments.value.map(seg => ({
-    type: seg.type,
-    section: seg.section,
-    concept: seg.concept,
-    prompt: getPrompt(seg),
-    visual_direction: seg.visual_direction,
-    visual_direction_original: seg.visual_direction_original,
-    style: seg.style,
-    model: seg.model,
-    aspect_ratio: seg.aspect_ratio,
-    resolution: seg.resolution || '1K',
-    placement: seg.placement,
-    suggested_position: seg.suggested_position,
-    insert_after_heading: seg.insert_after_heading,
-    reference_image_url: seg.reference_image_url,
-    face_refs: seg.face_refs || [],
-    style_refs: seg.style_refs || [],
-    additional_notes: seg.additional_notes || '',
-    generated_url: seg.generated_url,
-    status: seg.status,
-    job_uuid: seg.job_uuid,
-  }))
+  // Merge user-editable fields only — DO NOT send generated_url, status, job_uuid.
+  // Those are managed by generateSegmentImage controller + GeminiGen webhook.
+  // Sending them here races with the webhook and can overwrite completed results.
+  const existingPrompts = idea.value.generated_article?.image_prompts || []
+  article.image_prompts = segments.value.map((seg, i) => {
+    const existing = existingPrompts[i] || {}
+    return {
+      ...existing,  // preserve backend-managed fields (status, job_uuid, generated_url)
+      type: seg.type,
+      section: seg.section,
+      concept: seg.concept,
+      prompt: getPrompt(seg),
+      visual_direction: seg.visual_direction,
+      visual_direction_original: seg.visual_direction_original,
+      style: seg.style,
+      model: seg.model,
+      aspect_ratio: seg.aspect_ratio,
+      resolution: seg.resolution || '1K',
+      placement: seg.placement,
+      suggested_position: seg.suggested_position,
+      insert_after_heading: seg.insert_after_heading,
+      reference_image_url: seg.reference_image_url,
+      face_refs: seg.face_refs || [],
+      style_refs: seg.style_refs || [],
+      additional_notes: seg.additional_notes || '',
+    }
+  })
   await saveDraft(idea.value.id, { generated_article: article })
 }
 
@@ -183,6 +188,10 @@ async function handleGenerateAll() {
 async function generateSingle(segIndex) {
   const seg = segments.value[segIndex]
   if (!seg) return
+
+  // Cancel any pending auto-save to prevent it from overwriting the job_uuid
+  // that generateSegmentImage is about to set in the backend
+  if (saveTimeout) { clearTimeout(saveTimeout); saveTimeout = null }
 
   seg.status = 'generating'
   seg.generated_url = ''  // clear stale image so polling doesn't short-circuit
