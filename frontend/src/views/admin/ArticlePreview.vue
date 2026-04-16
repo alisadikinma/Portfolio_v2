@@ -86,6 +86,10 @@ function getArticleContent(article, lang) {
 // ── Computed ──
 const article = computed(() => idea.value?.generated_article || null)
 
+const isUntranslated = computed(() =>
+  activeLang.value === 'en' && !article.value?.en?.content
+)
+
 const availableLanguages = computed(() => {
   if (!article.value) return ['en']
   const langs = []
@@ -279,6 +283,17 @@ async function handleRegenerate() {
 
 async function handleApprove() {
   if (!idea.value) return
+
+  // If the pipeline has already advanced past article_ready, skip the
+  // approve API call (it would 422) and just route forward. User can still
+  // use the step bar to navigate manually if they prefer.
+  const status = idea.value.status
+  if (status && status !== 'article_ready') {
+    const nextRoute = status === 'completed' ? 'finalize' : 'images'
+    router.push(`/admin/content-engine/${idea.value.id}/${nextRoute}`)
+    return
+  }
+
   approving.value = true
 
   // Build updated generated_article with edited titles + image positions
@@ -430,6 +445,7 @@ async function handleApprove() {
         </div>
       </div>
 
+      <template v-if="!isUntranslated">
       <!-- Title Editor -->
       <div class="max-w-3xl mx-auto px-4 sm:px-6 pt-6 pb-2">
         <input
@@ -538,6 +554,20 @@ async function handleApprove() {
                 Image {{ imageMarkers.indexOf(marker) + 1 }} of {{ activeMarkers.length }}
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+      </template>
+
+      <!-- Untranslated notice (English tab, no EN content yet) -->
+      <div v-else class="max-w-3xl mx-auto px-4 sm:px-6 pt-6 pb-2">
+        <div class="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-5 flex items-start gap-3">
+          <svg class="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/>
+          </svg>
+          <div class="text-sm text-amber-800 dark:text-amber-300">
+            <p class="font-medium">Belum diterjemahkan.</p>
+            <p class="mt-1">Terjemahan otomatis ke bahasa Inggris akan berjalan saat Anda klik <strong>Publish to Blog</strong> di tahap Finalize.</p>
           </div>
         </div>
       </div>
