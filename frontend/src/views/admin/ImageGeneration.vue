@@ -6,10 +6,11 @@ import { useToast } from '@/composables/useToast'
 import PipelineStepBar from '@/components/admin/PipelineStepBar.vue'
 import ImageConfigModal from '@/components/admin/ImageConfigModal.vue'
 import BaseLightbox from '@/components/base/BaseLightbox.vue'
+import StockImageSearch from '@/components/admin/StockImageSearch.vue'
 
 const route = useRoute()
 const router = useRouter()
-const { getIdea, saveDraft, generateSegmentImage, rewriteSegmentVd, isLoading } = useContentEngine()
+const { getIdea, saveDraft, generateSegmentImage, rewriteSegmentVd, resumeImagePipeline, downloadStockImage, cleanupVariationImages, isLoading } = useContentEngine()
 const toast = useToast()
 
 const idea = ref(null)
@@ -68,7 +69,8 @@ function hasSegmentConfig(seg) {
   if (!seg) return false
   const faces = (seg.face_refs || []).filter(u => u && !u.startsWith('blob:'))
   const styles = (seg.style_refs || []).filter(u => u && !u.startsWith('blob:'))
-  return faces.length > 0 || styles.length > 0 || (seg.additional_notes || '').trim().length > 0
+  const brands = (seg.brand_refs || []).filter(r => (r?.url || r) && !(r?.url || r).startsWith('blob:'))
+  return faces.length > 0 || styles.length > 0 || brands.length > 0 || (seg.additional_notes || '').trim().length > 0
 }
 let saveTimeout = null
 let pollInterval = null
@@ -95,6 +97,21 @@ onUnmounted(() => {
   if (saveTimeout) clearTimeout(saveTimeout)
   if (pollInterval) clearInterval(pollInterval)
 })
+
+// ── Brand manifest mapping ──
+function mapManifestToSegment(manifest, img, segIndex) {
+  if (!manifest || !Array.isArray(manifest)) return []
+  const segLabel = img.type === 'cover' ? 'cover' : `inline-${segIndex}`
+  return manifest.filter(item => {
+    const usedIn = item.used_in || []
+    // Match if used_in references this segment's label/index, or is global (empty)
+    return usedIn.length === 0 || usedIn.some(u =>
+      u === segLabel || u === `segment-${segIndex}` || u === String(segIndex)
+    )
+  })
+}
+
+const isAwaitingBrand = computed(() => idea.value?.status === 'awaiting_brand_images')
 
 function initSegments() {
   const article = idea.value?.generated_article
@@ -137,6 +154,8 @@ function initSegments() {
       reference_image_url: img.reference_image_url || '',
       face_refs: (img.face_refs || []).filter(isUsableRef),
       style_refs: (img.style_refs || []).filter(isUsableRef),
+      brand_refs: (img.brand_refs || []).filter(isUsableRef),
+      brand_manifest_items: mapManifestToSegment(article.brand_manifest, img, i),
       additional_notes: img.additional_notes || '',
       variations,
       selected_variation: selectedVar,
@@ -186,6 +205,7 @@ async function persistDraft() {
       reference_image_url: seg.reference_image_url,
       face_refs: seg.face_refs || [],
       style_refs: seg.style_refs || [],
+      brand_refs: seg.brand_refs || [],
       additional_notes: seg.additional_notes || '',
       selected_variation: seg.selected_variation ?? 0,
     }
@@ -227,6 +247,7 @@ async function generateSingle(segIndex) {
     aspect_ratio: seg.aspect_ratio,
     face_refs: seg.face_refs || [],
     style_refs: seg.style_refs || [],
+    brand_refs: seg.brand_refs || [],
     additional_notes: seg.additional_notes || '',
   })
 
@@ -250,6 +271,43 @@ function selectVariation(seg, varIdx) {
   if (!seg.variations?.[varIdx] || seg.variations[varIdx].status !== 'done') return
   seg.selected_variation = varIdx
   seg.generated_url = seg.variations[varIdx].url
+  scheduleAutoSave()
+}
+
+// ── Stock image as variation ──
+const stockSearchSegIndex = ref(-1) // which segment is showing stock search
+const stockDownloading = ref(false)
+
+function openStockSearch(segIndex) {
+  stockSearchSegIndex.value = segIndex
+}
+
+function closeStockSearch() {
+  stockSearchSegIndex.value = -1
+}
+
+async function handleStockImageSelect(imageUrl, segIndex) {
+  const seg = segments.value[segIndex]
+  if (!seg || (seg.variations || []).length >= 3) return
+
+  stockDownloading.value = true
+  const result = await downloadStockImage(imageUrl)
+  stockDownloading.value = false
+
+  if (!result.success || !result.data?.url) {
+    toast.error(result.error || 'Failed to download stock image')
+    return
+  }
+
+  const localUrl = result.data.url
+  if (!seg.variations) seg.variations = []
+  const varIdx = seg.variations.length
+  seg.variations.push({ url: localUrl, job_uuid: null, status: 'done', source: 'stock' })
+  seg.selected_variation = varIdx
+  seg.generated_url = localUrl
+  seg.status = 'done'
+  stockSearchSegIndex.value = -1
+  toast.success('Stock image added as variation')
   scheduleAutoSave()
 }
 
@@ -328,6 +386,7 @@ async function handleConfigApply(options) {
 
   seg.face_refs = options.faceRefs
   seg.style_refs = options.styleRefs
+  seg.brand_refs = options.brandRefs || []
   seg.additional_notes = options.additionalNotes
   seg.model = options.model
   seg.style = options.style
@@ -363,23 +422,52 @@ async function handleConfigApply(options) {
   toast.success('Configuration applied')
 }
 
+// ── Resume pipeline (after brand image upload) ──
+async function handleResumePipeline() {
+  if (!idea.value) return
+  await persistDraft()
+  const result = await resumeImagePipeline(idea.value.id)
+  if (result.success) {
+    toast.success('Pipeline resumed — generating image prompts')
+    idea.value.status = 'generating_images'
+  } else {
+    toast.error(result.error || 'Failed to resume pipeline')
+  }
+}
+
 // ── Approve & continue ──
 async function handleApprove() {
   await persistDraft()
-  // On approve, keep only the selected variation and set it as generated_url
+
+  // Collect non-selected variation URLs for cleanup
+  const urlsToDelete = []
   const article = { ...idea.value.generated_article }
   article.image_prompts = segments.value.map(seg => {
     const selectedIdx = seg.selected_variation ?? 0
     const selectedVar = (seg.variations || [])[selectedIdx]
+    const selectedUrl = selectedVar?.url || seg.generated_url
+
+    // Mark non-selected variation files for deletion
+    for (const [vi, v] of (seg.variations || []).entries()) {
+      if (vi !== selectedIdx && v.url && v.url !== selectedUrl) {
+        urlsToDelete.push(v.url)
+      }
+    }
+
     return {
       ...seg,
       prompt: getPrompt(seg),
-      generated_url: selectedVar?.url || seg.generated_url,
-      variations: seg.variations, // keep for reference
-      selected_variation: selectedIdx,
+      generated_url: selectedUrl,
+      variations: [selectedVar || { url: selectedUrl, status: 'done' }],
+      selected_variation: 0,
     }
   })
   await saveDraft(idea.value.id, { generated_article: article })
+
+  // Cleanup non-selected files from storage
+  if (urlsToDelete.length > 0) {
+    await cleanupVariationImages(urlsToDelete)
+  }
 
   router.push(`/admin/content-engine/${idea.value.id}/finalize`)
 }
@@ -420,6 +508,24 @@ async function handleApprove() {
             <svg v-if="!generatingAll" class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
             <svg v-else class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
             {{ generatingAll ? 'Generating...' : allDone ? 'All Generated' : 'Generate All' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Awaiting Brand Images Banner -->
+      <div v-if="isAwaitingBrand" class="max-w-5xl mx-auto px-4 sm:px-6 pt-4">
+        <div class="flex items-center justify-between gap-4 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center flex-shrink-0">
+              <svg class="w-4 h-4 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
+            </div>
+            <div>
+              <p class="text-sm font-medium text-amber-800 dark:text-amber-300">Brand images needed</p>
+              <p class="text-xs text-amber-600 dark:text-amber-400">Upload required brand/product images in each segment's config, then click Resume.</p>
+            </div>
+          </div>
+          <button @click="handleResumePipeline" :disabled="isLoading" class="px-4 py-2 text-xs font-medium rounded-lg bg-amber-600 hover:bg-amber-700 text-white transition-colors disabled:opacity-50 flex-shrink-0">
+            Resume Pipeline
           </button>
         </div>
       </div>
@@ -517,6 +623,16 @@ async function handleApprove() {
                   />
                 </template>
 
+                <template v-for="(ref, i) in (seg.brand_refs || [])" :key="'brand-' + i">
+                  <img
+                    v-if="(ref?.url || ref) && !(ref?.url || ref).startsWith('blob:')"
+                    :src="ref?.url || ref"
+                    :title="`Brand: ${ref?.filename || 'reference ' + (i + 1)} — click to preview`"
+                    class="w-8 h-8 rounded object-cover border border-blue-200 dark:border-blue-700 cursor-pointer hover:ring-2 hover:ring-blue-400 transition"
+                    @click="previewConfigImage(ref?.url || ref, `Brand: ${ref?.filename || 'reference ' + (i + 1)}`)"
+                  />
+                </template>
+
                 <span
                   v-if="(seg.additional_notes || '').trim()"
                   :title="seg.additional_notes"
@@ -541,6 +657,27 @@ async function handleApprove() {
             <div class="lg:col-span-2 p-5 lg:border-l border-t lg:border-t-0 border-neutral-100 dark:border-neutral-700/40 flex flex-col">
               <!-- Main preview -->
               <div :class="['relative rounded-2xl overflow-hidden bg-neutral-100 dark:bg-neutral-900/60 border border-neutral-200/60 dark:border-neutral-700/40 flex-1 min-h-[200px]', seg.aspect_ratio === '16:9' ? 'aspect-video' : seg.aspect_ratio === '1:1' ? 'aspect-square' : seg.aspect_ratio === '9:16' ? 'aspect-[9/16] max-h-80' : 'aspect-[4/3]']">
+                <!-- Stock search overlay (covers preview when adding stock to existing segment) -->
+                <div v-if="stockSearchSegIndex === seg.index && seg.generated_url" class="absolute inset-0 bg-white dark:bg-neutral-900 z-10 overflow-y-auto p-3">
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-medium text-neutral-600 dark:text-neutral-300">Search Stock Images</span>
+                    <button @click="closeStockSearch" class="w-6 h-6 rounded-full flex items-center justify-center text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-800">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                  </div>
+                  <StockImageSearch
+                    :model-value="''"
+                    :orientation="seg.aspect_ratio === '9:16' ? 'portrait' : 'landscape'"
+                    @select="(url) => handleStockImageSelect(url, seg.index)"
+                  />
+                  <div v-if="stockDownloading" class="absolute inset-0 bg-white/80 dark:bg-neutral-900/80 flex items-center justify-center z-20">
+                    <div class="text-center">
+                      <div class="w-8 h-8 mx-auto rounded-full border-2 border-transparent border-t-amber-500 animate-spin mb-2"></div>
+                      <span class="text-xs text-neutral-500">Downloading...</span>
+                    </div>
+                  </div>
+                </div>
+
                 <!-- Selected image (show even while another variation is generating) -->
                 <template v-if="seg.generated_url">
                   <img
@@ -575,16 +712,45 @@ async function handleApprove() {
                   <button @click="generateSingle(seg.index)" class="text-xs text-amber-500 hover:text-amber-400 font-medium">Retry</button>
                 </div>
 
-                <!-- Pending (no variations yet) -->
-                <div v-else class="absolute inset-0 flex flex-col items-center justify-center gap-4">
-                  <div class="w-16 h-16 rounded-2xl bg-neutral-200/50 dark:bg-neutral-800/50 flex items-center justify-center">
-                    <svg class="w-7 h-7 text-neutral-300 dark:text-neutral-600" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z" />
-                    </svg>
+                <!-- Pending (no variations yet) — show inline stock search OR action buttons -->
+                <div v-else class="absolute inset-0 flex flex-col items-center justify-center">
+                  <!-- Inline stock search overlay -->
+                  <div v-if="stockSearchSegIndex === seg.index" class="absolute inset-0 bg-white dark:bg-neutral-900 z-10 overflow-y-auto p-3">
+                    <div class="flex items-center justify-between mb-2">
+                      <span class="text-xs font-medium text-neutral-600 dark:text-neutral-300">Search Stock Images</span>
+                      <button @click="closeStockSearch" class="w-6 h-6 rounded-full flex items-center justify-center text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-800">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                      </button>
+                    </div>
+                    <StockImageSearch
+                      :model-value="''"
+                      :orientation="seg.aspect_ratio === '9:16' ? 'portrait' : 'landscape'"
+                      @select="(url) => handleStockImageSelect(url, seg.index)"
+                    />
+                    <div v-if="stockDownloading" class="absolute inset-0 bg-white/80 dark:bg-neutral-900/80 flex items-center justify-center z-20">
+                      <div class="text-center">
+                        <div class="w-8 h-8 mx-auto rounded-full border-2 border-transparent border-t-amber-500 animate-spin mb-2"></div>
+                        <span class="text-xs text-neutral-500">Downloading...</span>
+                      </div>
+                    </div>
                   </div>
-                  <button @click="generateSingle(seg.index)" class="px-4 py-2 text-xs font-medium rounded-xl bg-amber-600 hover:bg-amber-700 text-white transition-colors active:scale-[0.98]">
-                    Generate Image
-                  </button>
+
+                  <!-- Action buttons -->
+                  <template v-else>
+                    <div class="w-16 h-16 rounded-2xl bg-neutral-200/50 dark:bg-neutral-800/50 flex items-center justify-center mb-4">
+                      <svg class="w-7 h-7 text-neutral-300 dark:text-neutral-600" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z" />
+                      </svg>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <button @click="generateSingle(seg.index)" class="px-4 py-2 text-xs font-medium rounded-xl bg-amber-600 hover:bg-amber-700 text-white transition-colors active:scale-[0.98]">
+                        Generate Image
+                      </button>
+                      <button @click="openStockSearch(seg.index)" class="px-4 py-2 text-xs font-medium rounded-xl border border-neutral-300 dark:border-neutral-600 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors active:scale-[0.98]">
+                        Use Stock Image
+                      </button>
+                    </div>
+                  </template>
                 </div>
               </div>
 
@@ -616,17 +782,33 @@ async function handleApprove() {
                     'absolute top-0.5 left-0.5 w-4 h-4 rounded text-[9px] font-bold flex items-center justify-center',
                     vi === (seg.selected_variation ?? 0) ? 'bg-green-500 text-white' : 'bg-black/50 text-white'
                   ]">{{ vi + 1 }}</span>
+                  <!-- Stock badge -->
+                  <span v-if="v.source === 'stock'" class="absolute bottom-0.5 right-0.5 px-1 py-px text-[7px] font-bold uppercase rounded bg-blue-500/80 text-white leading-none">S</span>
                 </button>
 
-                <!-- Add variation button (if < 3 and not generating) -->
-                <button
+                <!-- Add variation: dropdown with Generate / Stock options -->
+                <div
                   v-if="(seg.variations || []).length < 3 && !(seg.variations || []).some(v => v.status === 'generating')"
-                  @click="generateSingle(seg.index)"
-                  class="w-16 h-12 rounded-lg border-2 border-dashed border-neutral-300 dark:border-neutral-600 flex items-center justify-center hover:border-amber-400 hover:bg-amber-500/5 transition-colors cursor-pointer flex-shrink-0"
-                  title="Add another variation"
+                  class="relative flex-shrink-0 group/add"
                 >
-                  <svg class="w-5 h-5 text-neutral-400 dark:text-neutral-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
-                </button>
+                  <button
+                    class="w-16 h-12 rounded-lg border-2 border-dashed border-neutral-300 dark:border-neutral-600 flex items-center justify-center hover:border-amber-400 hover:bg-amber-500/5 transition-colors cursor-pointer"
+                    title="Add another variation"
+                  >
+                    <svg class="w-5 h-5 text-neutral-400 dark:text-neutral-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                  </button>
+                  <!-- Dropdown -->
+                  <div class="absolute top-full left-0 mt-1 w-36 rounded-lg bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 shadow-lg opacity-0 invisible group-hover/add:opacity-100 group-hover/add:visible transition-all z-20">
+                    <button @click="generateSingle(seg.index)" class="w-full px-3 py-2 text-left text-xs text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 rounded-t-lg flex items-center gap-2">
+                      <svg class="w-3.5 h-3.5 text-amber-500" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                      Generate AI
+                    </button>
+                    <button @click="openStockSearch(seg.index)" class="w-full px-3 py-2 text-left text-xs text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 rounded-b-lg flex items-center gap-2">
+                      <svg class="w-3.5 h-3.5 text-blue-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z"/></svg>
+                      Stock Image
+                    </button>
+                  </div>
+                </div>
 
                 <span class="text-[10px] text-neutral-400 ml-1">Click to select</span>
               </div>

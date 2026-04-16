@@ -623,6 +623,8 @@ class ContentIdeaController extends Controller
             'face_refs.*' => 'string|max:2000',
             'style_refs' => 'nullable|array',
             'style_refs.*' => 'string|max:2000',
+            'brand_refs' => 'nullable|array',
+            'brand_refs.*' => 'string|max:2000',
             'additional_notes' => 'nullable|string|max:1000',
         ]);
 
@@ -635,6 +637,19 @@ class ContentIdeaController extends Controller
         $isUsableRef = fn ($u) => is_string($u) && $u !== '' && !str_starts_with($u, 'blob:');
         $faceRefs = array_values(array_filter((array) ($request->input('face_refs') ?? []), $isUsableRef));
         $styleRefs = array_values(array_filter((array) ($request->input('style_refs') ?? []), $isUsableRef));
+        // brand_refs can be {filename, url} objects or flat URL strings
+        $rawBrandRefs = (array) ($request->input('brand_refs') ?? []);
+        $brandRefUrls = [];
+        $brandRefObjects = [];
+        foreach ($rawBrandRefs as $ref) {
+            if (is_array($ref) && !empty($ref['url']) && $isUsableRef($ref['url'])) {
+                $brandRefUrls[] = $ref['url'];
+                $brandRefObjects[] = $ref;
+            } elseif (is_string($ref) && $isUsableRef($ref)) {
+                $brandRefUrls[] = $ref;
+                $brandRefObjects[] = ['filename' => '', 'url' => $ref];
+            }
+        }
         // ConvertEmptyStringsToNull middleware turns '' into null — coerce back for type-safety
         $additionalNotes = $request->input('additional_notes') ?? '';
 
@@ -644,6 +659,7 @@ class ContentIdeaController extends Controller
         if (isset($imagePrompts[$segmentIndex])) {
             $imagePrompts[$segmentIndex]['face_refs'] = $faceRefs;
             $imagePrompts[$segmentIndex]['style_refs'] = $styleRefs;
+            $imagePrompts[$segmentIndex]['brand_refs'] = $brandRefObjects;
             $imagePrompts[$segmentIndex]['additional_notes'] = $additionalNotes;
 
             // Initialize variations array if not present
@@ -698,7 +714,7 @@ class ContentIdeaController extends Controller
             model: $model,
             aspectRatio: $aspectRatio,
             style: $style,
-            faceRefs: $faceRefs,
+            faceRefs: array_merge($faceRefs, $brandRefUrls),
             styleRefs: $styleRefs,
             additionalNotes: $additionalNotes
         );

@@ -17,6 +17,7 @@ const emit = defineEmits(['apply', 'close'])
 const additionalNotes = ref('')
 const faceRefs = ref([])
 const styleRefs = ref([])
+const brandRefs = ref([])  // brand/product images from manifest
 const selectedModel = ref('nano-banana-2')
 const selectedStyle = ref('Photorealistic')
 
@@ -24,6 +25,10 @@ const selectedStyle = ref('Photorealistic')
 const faceFileInput = ref(null)
 const facePasteUrl = ref('')
 const showFacePaste = ref(false)
+
+// ── Brand ref upload ──
+const brandFileInput = ref(null)
+const brandUploading = ref(false)
 
 // ── Options ──
 const modelOptions = ['nano-banana-2', 'nano-banana-pro', 'imagen-4']
@@ -38,6 +43,11 @@ watch(() => [props.visible, props.segment?.index], ([vis]) => {
     additionalNotes.value = props.segment.additional_notes || ''
     faceRefs.value = (props.segment.face_refs || []).filter(isUsableRef)
     styleRefs.value = (props.segment.style_refs || []).filter(isUsableRef)
+    // brand_refs are {filename, url} objects — normalize legacy flat URLs
+    brandRefs.value = (props.segment.brand_refs || []).map(ref => {
+      if (typeof ref === 'string') return { filename: '', url: ref }
+      return ref
+    }).filter(ref => ref.url && !ref.url.startsWith('blob:'))
     selectedModel.value = props.segment.model || 'nano-banana-2'
     selectedStyle.value = props.segment.style || 'Photorealistic'
     facePasteUrl.value = ''
@@ -101,12 +111,53 @@ function removeStyleRef(index) {
   styleRefs.value.splice(index, 1)
 }
 
+// ── Brand ref handlers ──
+const brandManifestItems = computed(() => props.segment?.brand_manifest_items || [])
+
+async function handleBrandFileUpload(e, manifestIndex) {
+  const file = e.target.files?.[0]
+  if (!file) return
+
+  brandUploading.value = true
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    const { data } = await api.post('/admin/content-engine/upload-reference', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    const url = data?.data?.url
+    if (url) {
+      // Map to manifest filename if uploading for a manifest entry
+      const manifestItem = manifestIndex !== undefined ? brandManifestItems.value[manifestIndex] : null
+      const entry = { filename: manifestItem?.filename || file.name, url }
+      // Replace at manifest index position, or append
+      if (manifestIndex !== undefined && manifestIndex < brandRefs.value.length) {
+        brandRefs.value[manifestIndex] = entry
+      } else {
+        brandRefs.value.push(entry)
+      }
+    } else {
+      toast.error('Upload failed — no URL returned')
+    }
+  } catch (err) {
+    toast.error(err.response?.data?.message || 'Failed to upload brand reference')
+  } finally {
+    brandUploading.value = false
+    if (brandFileInput.value) brandFileInput.value.value = ''
+  }
+}
+
+function removeBrandRef(index) {
+  brandRefs.value.splice(index, 1)
+}
+
 // ── Apply ──
 function handleApply() {
   emit('apply', {
     additionalNotes: additionalNotes.value,
     faceRefs: [...faceRefs.value],
     styleRefs: [...styleRefs.value],
+    brandRefs: [...brandRefs.value],
     model: selectedModel.value,
     style: selectedStyle.value,
   })
@@ -248,6 +299,65 @@ function handleApply() {
                 />
               </div>
               <p v-else class="text-[10px] text-amber-500">Max {{ maxRefs }} style references</p>
+
+              <!-- Brand / Product References (from manifest) -->
+              <div v-if="brandManifestItems.length > 0 || brandRefs.length > 0" class="pt-4 mt-4 border-t border-neutral-200 dark:border-neutral-700">
+                <label class="block text-[11px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider mb-1">
+                  <span class="inline-flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z"/><path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z"/></svg>
+                    Brand / Product References
+                  </span>
+                </label>
+                <p class="text-[10px] text-neutral-400 dark:text-neutral-500 mb-2">Upload brand logos, product screenshots for accurate rendering</p>
+
+                <!-- Manifest checklist -->
+                <div v-if="brandManifestItems.length > 0" class="space-y-2 mb-3">
+                  <div v-for="(item, mi) in brandManifestItems" :key="'bm-' + mi" class="flex items-start gap-3 p-2.5 rounded-lg border" :class="brandRefs[mi]?.url ? 'border-green-200 dark:border-green-800/40 bg-green-50/50 dark:bg-green-900/10' : item.required ? 'border-amber-200 dark:border-amber-800/40 bg-amber-50/50 dark:bg-amber-900/10' : 'border-neutral-200 dark:border-neutral-700 bg-neutral-50/50 dark:bg-neutral-900/20'">
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center gap-2">
+                        <span class="text-xs font-medium text-neutral-700 dark:text-neutral-300 truncate">{{ item.filename }}</span>
+                        <span :class="item.required ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' : 'bg-neutral-500/10 text-neutral-500 border-neutral-500/20'" class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border">{{ item.required ? 'Wajib' : 'Opsional' }}</span>
+                      </div>
+                      <p class="text-[10px] text-neutral-500 dark:text-neutral-400 mt-0.5">{{ item.description }}</p>
+                    </div>
+                    <!-- Upload state -->
+                    <div class="flex-shrink-0">
+                      <div v-if="brandRefs[mi]?.url" class="flex items-center gap-1.5">
+                        <img :src="brandRefs[mi].url" class="w-10 h-10 object-cover rounded border border-green-300 dark:border-green-700" />
+                        <button @click="removeBrandRef(mi)" class="w-5 h-5 rounded-full bg-red-500/80 text-white flex items-center justify-center hover:bg-red-600" title="Remove">
+                          <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                      </div>
+                      <label v-else class="cursor-pointer px-3 py-1.5 text-xs font-medium rounded-lg border border-neutral-300 dark:border-neutral-600 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors inline-flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
+                        Upload
+                        <input type="file" accept="image/*" class="hidden" @change="(e) => handleBrandFileUpload(e, mi)" />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Manual brand ref upload (when no manifest, or additional) -->
+                <div v-if="brandRefs.length > 0 && brandManifestItems.length === 0" class="flex flex-wrap gap-2 mb-2">
+                  <div v-for="(ref, i) in brandRefs" :key="'brand-' + i" class="relative group">
+                    <img :src="ref.url || ref" class="w-16 h-12 object-cover rounded-lg border border-neutral-200 dark:border-neutral-700" />
+                    <button @click="removeBrandRef(i)" class="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                  </div>
+                </div>
+                <div v-if="brandRefs.length < maxRefs && brandManifestItems.length === 0">
+                  <label class="cursor-pointer px-3 py-1.5 text-xs font-medium rounded-lg border border-neutral-300 dark:border-neutral-600 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors inline-flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                    Add Brand Image
+                    <input ref="brandFileInput" type="file" accept="image/*" class="hidden" @change="(e) => handleBrandFileUpload(e)" />
+                  </label>
+                </div>
+
+                <div v-if="brandRefs.length > 0" class="mt-2 px-2.5 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/40">
+                  <p class="text-[10px] text-blue-700 dark:text-blue-400">Brand images sent as file_urls for accurate logo/product rendering</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>

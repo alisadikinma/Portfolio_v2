@@ -356,11 +356,25 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
             'message' => $request->input('message'),
         ];
 
-        $idea->update([
+        $updateData = [
             'progress_percentage' => $request->input('percentage'),
             'current_step' => $request->input('step'),
             'progress_log' => array_merge($idea->progress_log ?? [], [$logEntry]),
-        ]);
+        ];
+
+        // Handle brand manifest from article-images skill
+        if ($request->input('step') === 'manifest_needed' && $request->has('manifest')) {
+            $article = $idea->generated_article ?? [];
+            $article['brand_manifest'] = $request->input('manifest');
+            $updateData['generated_article'] = $article;
+
+            // In automation mode (auto_mode), skip blocking — all items optional
+            if (!$idea->auto_mode) {
+                $updateData['status'] = 'awaiting_brand_images';
+            }
+        }
+
+        $idea->update($updateData);
 
         return response()->json(['success' => true, 'data' => $logEntry]);
     });
@@ -611,6 +625,22 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
             ]);
         }
 
+        // Images resume — user uploaded brand refs, resume article-images skill
+        if ($request->input('phase') === 'images_resume') {
+            $idea->update([
+                'status' => 'generating_images',
+                'current_step' => 'authoring_image_prompts',
+                'progress_percentage' => 5,
+            ]);
+            $idempotencyKey = \Illuminate\Support\Str::uuid()->toString();
+            $result = $service->triggerImages($idea->id, $idempotencyKey);
+            return response()->json([
+                'success' => true,
+                'next_phase' => 'images_resume',
+                'pid' => $result['pid'] ?? null,
+            ]);
+        }
+
         $progress = $idea->progress_percentage ?? 0;
 
         // Prep done (35%) → trigger write
@@ -720,6 +750,62 @@ Route::middleware(['auth:sanctum'])->prefix('admin/content-engine')->group(funct
         return response()->json([
             'success' => true,
             'data' => ['url' => url('/storage/' . $path)],
+        ]);
+    });
+
+    // Download stock image to local storage (Pexels/Unsplash → /storage/blog-images/)
+    Route::post('/download-stock-image', function (\Illuminate\Http\Request $request) {
+        $request->validate([
+            'url' => 'required|url|max:2000',
+        ]);
+
+        $sourceUrl = $request->input('url');
+        try {
+            $imageData = \Illuminate\Support\Facades\Http::timeout(30)->get($sourceUrl)->body();
+            if (empty($imageData)) {
+                return response()->json(['success' => false, 'message' => 'Empty response from image URL.'], 422);
+            }
+
+            $ext = pathinfo(parse_url($sourceUrl, PHP_URL_PATH), PATHINFO_EXTENSION) ?: 'jpg';
+            $ext = preg_replace('/[^a-zA-Z0-9]/', '', $ext);
+            $filename = 'stock-' . uniqid() . '.' . $ext;
+            $path = 'blog-images/' . $filename;
+
+            \Illuminate\Support\Facades\Storage::disk('public')->put($path, $imageData);
+
+            return response()->json([
+                'success' => true,
+                'data' => ['url' => url('/storage/' . $path)],
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to download stock image: ' . $e->getMessage(),
+            ], 500);
+        }
+    });
+
+    // Cleanup non-selected variation images from storage
+    Route::post('/cleanup-variation-images', function (\Illuminate\Http\Request $request) {
+        $request->validate([
+            'urls_to_delete' => 'required|array|min:1',
+            'urls_to_delete.*' => 'string|max:2000',
+        ]);
+
+        $deleted = 0;
+        $storageBase = url('/storage/');
+        foreach ($request->input('urls_to_delete') as $imageUrl) {
+            if (!str_starts_with($imageUrl, $storageBase)) continue;
+            $relativePath = str_replace($storageBase . '/', '', $imageUrl);
+            if (\Illuminate\Support\Facades\Storage::disk('public')->exists($relativePath)) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($relativePath);
+                $deleted++;
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => ['deleted' => $deleted],
         ]);
     });
 });

@@ -122,6 +122,15 @@ export function useContentEngine() {
   const regenerateImagePrompts = (id, sections = []) =>
     request('post', `/admin/content-engine/ideas/${id}/regenerate-image-prompts`, { sections })
 
+  const resumeImagePipeline = (id) =>
+    request('post', `/automation/content-ideas/${id}/continue-pipeline`, { phase: 'images_resume' })
+
+  const downloadStockImage = (url) =>
+    request('post', '/admin/content-engine/download-stock-image', { url })
+
+  const cleanupVariationImages = (urlsToDelete) =>
+    request('post', '/admin/content-engine/cleanup-variation-images', { urls_to_delete: urlsToDelete })
+
   const listWorkflows = () => request('get', '/admin/content-engine/workflows')
 
   const getWorkflowStatus = (id) => request('get', `/admin/content-engine/workflows/${id}`)
@@ -153,6 +162,9 @@ export function useContentEngine() {
     approveAndPublish,
     updateImageConcept,
     regenerateImagePrompts,
+    resumeImagePipeline,
+    downloadStockImage,
+    cleanupVariationImages,
     listWorkflows,
     getWorkflowStatus,
   }
