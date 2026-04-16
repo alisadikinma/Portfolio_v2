@@ -699,6 +699,7 @@ Route::middleware(['auth:sanctum'])->prefix('admin/content-engine')->group(funct
     Route::put('/ideas/{id}/save-draft', [ContentIdeaController::class, 'saveDraft']);
     Route::post('/ideas/{id}/generate-images', [ContentIdeaController::class, 'startImageGeneration']);
     Route::post('/ideas/{id}/generate-segment-image', [ContentIdeaController::class, 'generateSegmentImage']);
+    Route::post('/ideas/{id}/rewrite-vd', [ContentIdeaController::class, 'rewriteSegmentVd']);
     Route::post('/ideas/{id}/publish', [ContentIdeaController::class, 'approveAndPublish']);
 
     // Pipeline: Gate 2 split flow — per-section concept editing + prompt regeneration

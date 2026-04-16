@@ -9,7 +9,7 @@ import BaseLightbox from '@/components/base/BaseLightbox.vue'
 
 const route = useRoute()
 const router = useRouter()
-const { getIdea, saveDraft, generateSegmentImage, isLoading } = useContentEngine()
+const { getIdea, saveDraft, generateSegmentImage, rewriteSegmentVd, isLoading } = useContentEngine()
 const toast = useToast()
 
 const idea = ref(null)
@@ -18,25 +18,58 @@ const segments = ref([])
 const generatingAll = ref(false)
 const configSegment = ref(null) // segment being configured in modal
 const lightboxIndex = ref(-1)
+const adHocPreview = ref(null) // { url, title } — for chip clicks (face/style refs)
 const generatedSegments = computed(() => segments.value.filter(s => s.status === 'done' && s.generated_url))
-const lightboxImage = computed(() => generatedSegments.value[lightboxIndex.value]?.generated_url || '')
+const lightboxImage = computed(() => {
+  if (adHocPreview.value) return adHocPreview.value.url
+  return generatedSegments.value[lightboxIndex.value]?.generated_url || ''
+})
 const lightboxTitle = computed(() => {
+  if (adHocPreview.value) return adHocPreview.value.title
   const s = generatedSegments.value[lightboxIndex.value]
   return s ? `${s.label} — ${s.concept || s.visual_direction || ''}`.trim() : ''
 })
 const lightboxFilename = computed(() => {
+  if (adHocPreview.value) {
+    const name = adHocPreview.value.url.split('/').pop() || 'reference.jpg'
+    return name.split('?')[0]
+  }
   const s = generatedSegments.value[lightboxIndex.value]
   if (!s) return ''
   const slug = (s.label || 'image').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
   return `${slug}.jpg`
 })
+const lightboxOpen = computed(() => adHocPreview.value !== null || lightboxIndex.value >= 0)
+const lightboxTotal = computed(() => (adHocPreview.value ? 1 : generatedSegments.value.length))
+const lightboxCurrentIdx = computed(() => (adHocPreview.value ? 0 : lightboxIndex.value))
+
 function openLightbox(seg) {
+  adHocPreview.value = null
   const idx = generatedSegments.value.findIndex(s => s.index === seg.index)
   if (idx >= 0) lightboxIndex.value = idx
 }
-function closeLightbox() { lightboxIndex.value = -1 }
-function lightboxPrev() { if (lightboxIndex.value > 0) lightboxIndex.value-- }
-function lightboxNext() { if (lightboxIndex.value < generatedSegments.value.length - 1) lightboxIndex.value++ }
+function previewConfigImage(url, title = 'Reference image') {
+  if (!url || url.startsWith('blob:')) return
+  adHocPreview.value = { url, title }
+}
+function closeLightbox() {
+  lightboxIndex.value = -1
+  adHocPreview.value = null
+}
+function lightboxPrev() {
+  if (adHocPreview.value) return
+  if (lightboxIndex.value > 0) lightboxIndex.value--
+}
+function lightboxNext() {
+  if (adHocPreview.value) return
+  if (lightboxIndex.value < generatedSegments.value.length - 1) lightboxIndex.value++
+}
+function hasSegmentConfig(seg) {
+  if (!seg) return false
+  const faces = (seg.face_refs || []).filter(u => u && !u.startsWith('blob:'))
+  const styles = (seg.style_refs || []).filter(u => u && !u.startsWith('blob:'))
+  return faces.length > 0 || styles.length > 0 || (seg.additional_notes || '').trim().length > 0
+}
 let saveTimeout = null
 let pollInterval = null
 
@@ -83,6 +116,7 @@ function initSegments() {
     ...img,
     index: i,
     visual_direction: img.visual_direction || img.prompt || '',
+    visual_direction_original: img.visual_direction_original || '',
     style: img.style || 'Photorealistic',
     model: img.model || 'nano-banana-2',
     aspect_ratio: img.aspect_ratio || '16:9',
@@ -117,6 +151,7 @@ async function persistDraft() {
     concept: seg.concept,
     prompt: getPrompt(seg),
     visual_direction: seg.visual_direction,
+    visual_direction_original: seg.visual_direction_original,
     style: seg.style,
     model: seg.model,
     aspect_ratio: seg.aspect_ratio,
@@ -210,9 +245,12 @@ function openConfig(seg) {
   configSegment.value = seg
 }
 
-function handleConfigApply(options) {
+async function handleConfigApply(options) {
   const seg = configSegment.value
   if (!seg) return
+
+  const prevFaceRefs = (seg.face_refs || []).slice()
+  const newFaceRefs = (options.faceRefs || []).filter(u => u && !u.startsWith('blob:'))
 
   seg.face_refs = options.faceRefs
   seg.style_refs = options.styleRefs
@@ -221,9 +259,33 @@ function handleConfigApply(options) {
   seg.style = options.style
   configSegment.value = null
 
-  // Auto-generate after applying config
-  generateSingle(seg.index)
+  // If a face ref is present AND it changed since last generation, rewrite VD
+  // to match the reference's actual appearance BEFORE generating. This avoids
+  // demographic contradiction (e.g. VD says "young woman" but ref is an older
+  // man — GeminiGen follows text over the reference image when they conflict).
+  const faceRefChanged =
+    newFaceRefs.length > 0 &&
+    (newFaceRefs.length !== prevFaceRefs.length ||
+      newFaceRefs.some((u, i) => u !== prevFaceRefs[i]))
+
+  if (faceRefChanged) {
+    const prevStatus = seg.status
+    seg.status = 'rewriting_vd'
+    toast.success('Rewriting visual direction for face reference...')
+    const rewriteResult = await rewriteSegmentVd(idea.value.id, seg.index, newFaceRefs[0])
+    if (rewriteResult.success && rewriteResult.data?.new_vd) {
+      if (!seg.visual_direction_original) {
+        seg.visual_direction_original = rewriteResult.data.original_vd
+      }
+      seg.visual_direction = rewriteResult.data.new_vd
+    } else {
+      seg.status = prevStatus
+      toast.error(rewriteResult.error || 'Visual direction rewrite failed — generating with original VD')
+    }
+  }
+
   scheduleAutoSave()
+  generateSingle(seg.index)
 }
 
 // ── Approve & continue ──
@@ -303,11 +365,11 @@ async function handleApprove() {
               <span :class="[
                 'text-[11px] font-medium px-2.5 py-1 rounded-full',
                 seg.status === 'done' ? 'bg-green-500/10 text-green-600 dark:text-green-400' :
-                seg.status === 'generating' ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' :
+                seg.status === 'generating' || seg.status === 'rewriting_vd' ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' :
                 seg.status === 'failed' ? 'bg-red-500/10 text-red-600 dark:text-red-400' :
                 'bg-neutral-500/10 text-neutral-500 dark:text-neutral-400'
               ]">
-                {{ seg.status === 'done' ? 'Generated' : seg.status === 'generating' ? 'Generating...' : seg.status === 'failed' ? 'Failed' : 'Pending' }}
+                {{ seg.status === 'done' ? 'Generated' : seg.status === 'rewriting_vd' ? 'Rewriting VD...' : seg.status === 'generating' ? 'Generating...' : seg.status === 'failed' ? 'Failed' : 'Pending' }}
               </span>
             </div>
           </div>
@@ -346,6 +408,51 @@ async function handleApprove() {
                 </div>
               </div>
 
+              <!-- Applied-config chips (face refs, style refs, notes) -->
+              <div
+                v-if="hasSegmentConfig(seg)"
+                class="flex flex-wrap items-center gap-2 pt-3 mt-1 border-t border-neutral-100 dark:border-neutral-700/40"
+              >
+                <span class="text-[10px] text-neutral-400 uppercase tracking-wider">Config</span>
+
+                <template v-for="(url, i) in (seg.face_refs || [])" :key="'face-' + i">
+                  <img
+                    v-if="url && !url.startsWith('blob:')"
+                    :src="url"
+                    :title="`Face reference ${i + 1} — click to preview`"
+                    class="w-6 h-6 rounded-full object-cover border border-neutral-200 dark:border-neutral-700 cursor-pointer hover:ring-2 hover:ring-amber-400 transition"
+                    @click="previewConfigImage(url, `Face reference ${i + 1}`)"
+                  />
+                </template>
+
+                <template v-for="(url, i) in (seg.style_refs || [])" :key="'style-' + i">
+                  <img
+                    v-if="url && !url.startsWith('blob:')"
+                    :src="url"
+                    :title="`Style reference ${i + 1} — click to preview`"
+                    class="w-10 h-7 rounded object-cover border border-neutral-200 dark:border-neutral-700 cursor-pointer hover:ring-2 hover:ring-amber-400 transition"
+                    @click="previewConfigImage(url, `Style reference ${i + 1}`)"
+                  />
+                </template>
+
+                <span
+                  v-if="(seg.additional_notes || '').trim()"
+                  :title="seg.additional_notes"
+                  class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] rounded-full bg-neutral-100 dark:bg-neutral-900/50 text-neutral-600 dark:text-neutral-400 border border-neutral-200/60 dark:border-neutral-700/40 cursor-help"
+                >
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m-7-8h8a2 2 0 012 2v10a2 2 0 01-2 2H8a2 2 0 01-2-2V6a2 2 0 012-2z"/></svg>
+                  Notes
+                </span>
+
+                <span
+                  v-if="seg.visual_direction_original"
+                  title="Visual Direction was auto-rewritten to match the face reference"
+                  class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                >
+                  VD rewritten
+                </span>
+              </div>
+
             </div>
 
             <!-- Right: Image preview (2 cols) -->
@@ -361,13 +468,13 @@ async function handleApprove() {
                   title="Click to expand"
                 />
 
-                <!-- Generating -->
-                <div v-else-if="seg.status === 'generating'" class="absolute inset-0 flex flex-col items-center justify-center gap-3">
+                <!-- Generating / Rewriting VD -->
+                <div v-else-if="seg.status === 'generating' || seg.status === 'rewriting_vd'" class="absolute inset-0 flex flex-col items-center justify-center gap-3">
                   <div class="relative">
                     <div class="w-12 h-12 rounded-full border-2 border-amber-500/20"></div>
                     <div class="absolute inset-0 w-12 h-12 rounded-full border-2 border-transparent border-t-amber-500 animate-spin"></div>
                   </div>
-                  <span class="text-xs text-neutral-400 dark:text-neutral-500">Generating image...</span>
+                  <span class="text-xs text-neutral-400 dark:text-neutral-500">{{ seg.status === 'rewriting_vd' ? 'Rewriting visual direction...' : 'Generating image...' }}</span>
                 </div>
 
                 <!-- Failed -->
@@ -430,11 +537,11 @@ async function handleApprove() {
 
     <!-- Image Lightbox -->
     <BaseLightbox
-      :show="lightboxIndex >= 0"
+      :show="lightboxOpen"
       :current-image="lightboxImage"
       :current-title="lightboxTitle"
-      :current-index="lightboxIndex"
-      :total-items="generatedSegments.length"
+      :current-index="lightboxCurrentIdx"
+      :total-items="lightboxTotal"
       :download-filename="lightboxFilename"
       @close="closeLightbox"
       @prev="lightboxPrev"

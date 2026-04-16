@@ -95,7 +95,7 @@ app/Models/
 **Services:**
 ```
 app/Services/
-├── ArticleGenerationService.php # SSH/local exec to trigger Claude CLI on VPS
+├── ArticleGenerationService.php # SSH/local exec to trigger Claude CLI on VPS (async pipeline phases + sync VD rewrite)
 ├── ContentEngineService.php     # Legacy HTTP client (kept for health check proxy)
 ├── ImageGenerationService.php   # GeminiGen image generation
 └── TrendingTopicService.php     # 4-source trend aggregation (Google Trends, TikTok, YouTube, Google News)
@@ -298,7 +298,7 @@ DELETE /api/newsletter/unsubscribe
 /api/admin/content-engine/* (see Content Engine section below)
 ```
 
-### Admin Content Engine Routes (auth:sanctum, 18 endpoints)
+### Admin Content Engine Routes (auth:sanctum, 19 endpoints)
 ```
 GET    /api/admin/content-engine/health              # CLI system health check
 GET    /api/admin/content-engine/workflows            # List workflows from DB
@@ -317,6 +317,7 @@ GET    /api/admin/content-engine/ideas/{id}/research          # Get research sta
 GET    /api/admin/content-engine/ideas/{id}/progress          # Real-time progress (percentage + log)
 POST   /api/admin/content-engine/ideas/{id}/approve-article   # Gate 1: Approve article text
 POST   /api/admin/content-engine/ideas/{id}/generate-images   # Gate 2: Start image generation
+POST   /api/admin/content-engine/ideas/{id}/rewrite-vd        # Gate 2: Rewrite VD to match face reference (sync Sonnet)
 POST   /api/admin/content-engine/ideas/{id}/publish           # Gate 2: Approve images & publish
 ```
 
@@ -377,6 +378,7 @@ The `ContentIdeaController` orchestrates the full pipeline through the admin UI 
 **Admin Endpoints (Gate 2 split flow):**
 - `PUT /api/admin/content-engine/ideas/{id}/update-image-concept` — user edits per-section image_concept
 - `POST /api/admin/content-engine/ideas/{id}/regenerate-image-prompts` — triggers /article-images (all or `{sections:[...]}` filtered)
+- `POST /api/admin/content-engine/ideas/{id}/rewrite-vd` — sync Sonnet rewrite of VD to match face reference
 
 ### Blog Pipeline (Legacy Endpoints)
 
@@ -700,7 +702,22 @@ POST /api/automation/blog/save-draft                     → Direct blog post sa
 ```
 PUT  /api/admin/content-engine/ideas/{id}/update-image-concept      → Edit per-section image_concept
 POST /api/admin/content-engine/ideas/{id}/regenerate-image-prompts  → Trigger /article-images (all or {sections:[...]})
+POST /api/admin/content-engine/ideas/{id}/rewrite-vd               → Sync Sonnet: rewrite VD to match face reference
 ```
+
+### Face-Aware Visual Direction Rewrite (Gate 2)
+
+When a face reference is uploaded in the Image Config modal, clicking "Apply & Generate"
+auto-rewrites the segment's Visual Direction via a synchronous Claude Sonnet call before
+dispatching to GeminiGen. This prevents demographic contradiction between VD text
+(e.g. "young woman") and the actual reference image (e.g. bald older man).
+
+- Trigger: `ImageGeneration.vue::handleConfigApply` — detects new/changed `face_refs`
+- Backend: `ArticleGenerationService::rewriteVisualDirectionForFace` (sync SSH, ~10-20s)
+- Endpoint: `POST /admin/content-engine/ideas/{id}/rewrite-vd`
+- Persistence: overwrites `image_prompts[i].visual_direction`, preserves original as `visual_direction_original`
+- Fallback: on rewrite failure, error toast + generate with original VD (no hard block)
+- Chips: face/style ref thumbnails + notes icon visible on segment cards below Style/Model/Ratio pills
 
 ### Plugin: article-content-writer (v2.0.0)
 ```
@@ -762,6 +779,7 @@ ARTICLE_GEN_MODEL_WRITE=sonnet      # Sonnet for writing (uniform across phases)
 ARTICLE_GEN_MODEL_SCORE=sonnet      # Sonnet for scoring/evaluation
 ARTICLE_GEN_MODEL_IMAGES=sonnet     # Sonnet for cinematic image prompt authoring
 ARTICLE_GEN_MODEL_TRANSLATE=sonnet  # Sonnet for ID→EN translation
+ARTICLE_GEN_MODEL_VD_REWRITE=sonnet # Sonnet for face-aware Visual Direction rewrite (sync, Gate 2)
 
 # Feature flags (default false for safe rollout)
 ARTICLE_GEN_USE_IMAGES_PHASE=false
@@ -773,7 +791,7 @@ ARTICLE_GEN_USE_TRANSLATE_PHASE=false
 
 ---
 
-**Last Updated:** April 15, 2026 (Content Engine table — published column, bulk actions, Play icon unification, Google Trends scraper fix)
+**Last Updated:** April 16, 2026 (Image Gen — face-aware VD rewrite via sync Sonnet, segment config chips UI)
 **Maintainer:** Ali Sadikin (ali.sadikincom85@gmail.com)
 **Environment:** Windows 11, D:\Projects\Portfolio_v2
 **PHP:** D:\xampp\php\php.exe (8.2.12) — use full path, not in system PATH

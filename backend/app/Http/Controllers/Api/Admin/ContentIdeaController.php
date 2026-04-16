@@ -1212,6 +1212,92 @@ class ContentIdeaController extends Controller
     }
 
     /**
+     * Rewrite a single segment's Visual Direction so it matches the uploaded
+     * face reference. Called from the frontend Apply & Generate flow when a
+     * face_ref is present — prevents demographic contradiction between VD
+     * text and the reference image (e.g. VD says "young woman" but ref is
+     * a bald older man, which GeminiGen resolves toward the text).
+     */
+    public function rewriteSegmentVd($id, Request $request): JsonResponse
+    {
+        $request->validate([
+            'segment_index' => 'required|integer|min:0',
+            'face_ref_url' => 'required|string|max:2000',
+        ]);
+
+        $idea = ContentIdea::find($id);
+        if (!$idea) {
+            return response()->json(['success' => false, 'message' => 'Content idea not found.'], 404);
+        }
+
+        $segmentIndex = (int) $request->input('segment_index');
+        $faceRefUrl = (string) $request->input('face_ref_url');
+
+        if (str_starts_with($faceRefUrl, 'blob:')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Face reference URL must be a persisted storage URL, not a browser blob.',
+            ], 422);
+        }
+
+        $article = $idea->generated_article ?? [];
+        $imagePrompts = $article['image_prompts'] ?? [];
+        if (!isset($imagePrompts[$segmentIndex])) {
+            return response()->json([
+                'success' => false,
+                'message' => "Segment index {$segmentIndex} not found.",
+            ], 404);
+        }
+
+        $segment = $imagePrompts[$segmentIndex];
+        $originalVd = (string) ($segment['visual_direction'] ?? $segment['prompt'] ?? '');
+        if (trim($originalVd) === '') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Segment has no visual direction to rewrite.',
+            ], 422);
+        }
+
+        $segmentContext = [
+            'label' => $segment['type'] === 'cover' ? 'COVER' : ('BODY-' . $segmentIndex),
+            'concept' => (string) ($segment['concept'] ?? ''),
+            'style' => (string) ($segment['style'] ?? ''),
+        ];
+
+        $result = $this->articleGen->rewriteVisualDirectionForFace($originalVd, $faceRefUrl, $segmentContext);
+
+        if (!$result['success']) {
+            Log::warning('[ContentIdea] VD rewrite failed', [
+                'idea_id' => $idea->id,
+                'segment_index' => $segmentIndex,
+                'error' => $result['error'],
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to rewrite Visual Direction: ' . ($result['error'] ?? 'Unknown error'),
+            ], 502);
+        }
+
+        if (empty($imagePrompts[$segmentIndex]['visual_direction_original'])) {
+            $imagePrompts[$segmentIndex]['visual_direction_original'] = $originalVd;
+        }
+        $imagePrompts[$segmentIndex]['visual_direction'] = $result['rewritten_vd'];
+        $article['image_prompts'] = $imagePrompts;
+        $idea->generated_article = $article;
+        $idea->save();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'segment_index' => $segmentIndex,
+                'original_vd' => $originalVd,
+                'new_vd' => $result['rewritten_vd'],
+            ],
+            'message' => 'Visual Direction rewritten to match face reference.',
+        ]);
+    }
+
+    /**
      * Admin: regenerate image prompts for all or a filtered list of sections.
      * Triggers /article-images skill with optional only-sections filter.
      */

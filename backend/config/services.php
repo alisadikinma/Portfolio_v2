@@ -70,6 +70,7 @@ return [
         'model_score' => env('ARTICLE_GEN_MODEL_SCORE', 'sonnet'),
         'model_images' => env('ARTICLE_GEN_MODEL_IMAGES', 'sonnet'),
         'model_translate' => env('ARTICLE_GEN_MODEL_TRANSLATE', 'sonnet'),
+        'model_vd_rewrite' => env('ARTICLE_GEN_MODEL_VD_REWRITE', 'sonnet'),
         'use_images_phase' => env('ARTICLE_GEN_USE_IMAGES_PHASE', false),
         'use_translate_phase' => env('ARTICLE_GEN_USE_TRANSLATE_PHASE', false),
     ],

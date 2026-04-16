@@ -149,6 +149,170 @@ class ArticleGenerationService
     }
 
     /**
+     * Rewrite a Visual Direction paragraph so it matches the person in a face
+     * reference image. Keeps scene, setting, lighting, mood intact; only
+     * updates age / gender / hair / attire / appearance to match the reference.
+     *
+     * Synchronous — waits for Claude CLI to return the rewritten paragraph.
+     * Typical latency: ~10-20s.
+     *
+     * @param string $originalVd       Original Visual Direction text
+     * @param string $faceRefUrl       Public URL of the face reference image
+     * @param array  $segmentContext   Optional segment metadata (label, concept, style)
+     * @return array{success: bool, rewritten_vd: string|null, error: string|null}
+     */
+    public function rewriteVisualDirectionForFace(
+        string $originalVd,
+        string $faceRefUrl,
+        array $segmentContext = []
+    ): array {
+        if (trim($originalVd) === '' || trim($faceRefUrl) === '') {
+            return ['success' => false, 'rewritten_vd' => null, 'error' => 'Missing original VD or face reference URL'];
+        }
+
+        $prompt = $this->buildVdRewritePrompt($originalVd, $faceRefUrl, $segmentContext);
+        $model = config('services.article_generation.model_vd_rewrite', 'sonnet');
+
+        try {
+            $result = $this->executeSyncPrompt($prompt, 'vd-rewrite', $model);
+        } catch (\Exception $e) {
+            Log::error('[ArticleGeneration] VD rewrite failed', [
+                'error' => $e->getMessage(),
+                'face_ref' => $faceRefUrl,
+            ]);
+            return ['success' => false, 'rewritten_vd' => null, 'error' => $e->getMessage()];
+        }
+
+        if (!$result['success']) {
+            return ['success' => false, 'rewritten_vd' => null, 'error' => $result['error']];
+        }
+
+        $rewritten = $this->parseVdRewriteOutput($result['output']);
+        if ($rewritten === null || $rewritten === '') {
+            return ['success' => false, 'rewritten_vd' => null, 'error' => 'Empty rewrite output'];
+        }
+
+        Log::info('[ArticleGeneration] VD rewritten for face ref', [
+            'face_ref' => $faceRefUrl,
+            'original_len' => strlen($originalVd),
+            'rewritten_len' => strlen($rewritten),
+        ]);
+
+        return ['success' => true, 'rewritten_vd' => $rewritten, 'error' => null];
+    }
+
+    /**
+     * Build the 1-shot prompt for Visual Direction rewrite.
+     */
+    private function buildVdRewritePrompt(string $originalVd, string $faceRefUrl, array $segmentContext): string
+    {
+        $contextLine = '';
+        if (!empty($segmentContext['label']) || !empty($segmentContext['concept'])) {
+            $label = $segmentContext['label'] ?? '';
+            $concept = $segmentContext['concept'] ?? '';
+            $contextLine = "Segment: {$label} — {$concept}\n";
+        }
+
+        return <<<PROMPT
+You are rewriting a Visual Direction so it matches the person shown in a reference image.
+
+Instructions:
+- Fetch and inspect the reference image at the URL below.
+- Keep the scene, setting, lighting, mood, camera angle, and composition intact.
+- Only update age, gender, hair, facial features, attire, and general appearance to match the reference person.
+- Output ONLY the rewritten Visual Direction paragraph.
+- No preamble, no explanation, no quotes, no markdown, no labels.
+
+{$contextLine}Reference image URL: {$faceRefUrl}
+
+Original Visual Direction:
+{$originalVd}
+
+Rewritten Visual Direction:
+PROMPT;
+    }
+
+    /**
+     * Parse Claude CLI output for the rewritten VD. Strips stray quotes,
+     * markdown fences, leading labels, and extra whitespace.
+     */
+    private function parseVdRewriteOutput(string $raw): ?string
+    {
+        $text = trim($raw);
+        if ($text === '') {
+            return null;
+        }
+
+        $text = preg_replace('/^```[a-zA-Z]*\s*/', '', $text);
+        $text = preg_replace('/\s*```$/', '', $text);
+        $text = preg_replace('/^(rewritten visual direction:|visual direction:|output:)\s*/i', '', $text);
+
+        $text = trim($text);
+        if (strlen($text) >= 2) {
+            $first = $text[0];
+            $last = substr($text, -1);
+            if (($first === '"' && $last === '"') || ($first === "'" && $last === "'")) {
+                $text = substr($text, 1, -1);
+            }
+        }
+
+        return trim($text);
+    }
+
+    /**
+     * Synchronous prompt execution — waits for stdout and returns it.
+     * Used by VD rewrite (not the background pipeline phases).
+     *
+     * @return array{success: bool, output: string, error: string|null}
+     */
+    private function executeSyncPrompt(string $claudePrompt, string $phase, string $model = ''): array
+    {
+        $modelFlag = $model ? "--model {$model}" : '';
+        $extraFlags = trim("{$modelFlag} --effort medium");
+
+        if ($this->driver === 'local') {
+            $isWindows = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
+            if ($isWindows) {
+                $tmpDir = sys_get_temp_dir();
+                $sep = DIRECTORY_SEPARATOR;
+                $promptFile = "{$tmpDir}{$sep}article-{$phase}-sync-" . uniqid() . '.txt';
+                file_put_contents($promptFile, $claudePrompt);
+                $cmd = "& \"{$this->claudePath}\" -p (Get-Content -Raw \"{$promptFile}\") {$extraFlags} --dangerously-skip-permissions";
+                $result = Process::timeout(180)->run(['powershell', '-Command', $cmd]);
+                @unlink($promptFile);
+            } else {
+                $result = Process::timeout(180)->run([
+                    'bash', '-lc',
+                    "{$this->claudePath} -p " . escapeshellarg($claudePrompt) . " {$extraFlags} --dangerously-skip-permissions",
+                ]);
+            }
+        } else {
+            $promptFile = "/tmp/article-{$phase}-sync-" . uniqid() . '.txt';
+            $base64Prompt = base64_encode($claudePrompt);
+
+            $writeResult = Process::timeout(15)->run(
+                $this->sshCommand("echo {$base64Prompt} | base64 -d > {$promptFile}")
+            );
+            if (!$writeResult->successful()) {
+                return ['success' => false, 'output' => '', 'error' => 'Failed to write prompt file: ' . $writeResult->errorOutput()];
+            }
+
+            $remoteCmd = "bash -lc 'source ~/.profile 2>/dev/null; {$this->claudePath} -p \"\$(cat {$promptFile})\" {$extraFlags} --dangerously-skip-permissions; rm -f {$promptFile}'";
+            $result = Process::timeout(180)->run($this->sshCommand(escapeshellarg($remoteCmd)));
+        }
+
+        if (!$result->successful()) {
+            return [
+                'success' => false,
+                'output' => '',
+                'error' => 'Sync execution failed: ' . ($result->errorOutput() ?: 'exit code ' . $result->exitCode()),
+            ];
+        }
+
+        return ['success' => true, 'output' => $result->output(), 'error' => null];
+    }
+
+    /**
      * Check if a process is still running.
      */
     public function isProcessRunning(int $pid): bool

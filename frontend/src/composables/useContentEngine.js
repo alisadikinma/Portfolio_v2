@@ -74,6 +74,12 @@ export function useContentEngine() {
 
   const generateSegmentImage = (id, segmentData) => request('post', `/admin/content-engine/ideas/${id}/generate-segment-image`, segmentData)
 
+  const rewriteSegmentVd = (id, segmentIndex, faceRefUrl) =>
+    request('post', `/admin/content-engine/ideas/${id}/rewrite-vd`, {
+      segment_index: segmentIndex,
+      face_ref_url: faceRefUrl,
+    })
+
   const searchStockImages = (query, options = {}) => {
     const params = { q: query, ...options }
     return request('get', '/admin/content-engine/stock-images/search', null, params)
@@ -139,6 +145,7 @@ export function useContentEngine() {
     getProgress,
     saveDraft,
     generateSegmentImage,
+    rewriteSegmentVd,
     searchStockImages,
     approveArticle,
     regenerateArticle,
