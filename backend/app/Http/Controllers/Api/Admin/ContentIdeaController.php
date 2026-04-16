@@ -808,8 +808,11 @@ class ContentIdeaController extends Controller
         $title = $article['title'] ?? $idea->title;
         $content = $article['content'] ?? '';
         $excerpt = $article['excerpt'] ?? null;
+        // Prefer explicit cover-type prompt; fall back to index 0 for legacy prompts.
+        $coverPrompt = collect($imagePrompts)->firstWhere('type', 'cover');
         $featuredImage = data_get($idea->generated_images, '0.url')
             ?? data_get($idea->generated_images, '0')
+            ?? data_get($coverPrompt, 'generated_url')
             ?? data_get($imagePrompts, '0.generated_url')
             ?? null;
 

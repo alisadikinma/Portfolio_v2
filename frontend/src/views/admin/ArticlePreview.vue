@@ -8,7 +8,7 @@ import { parseBlockElements, resolveImagePosition } from '@/utils/imagePositioni
 
 const route = useRoute()
 const router = useRouter()
-const { getIdea, approveArticle, regenerateArticle, isLoading } = useContentEngine()
+const { getIdea, approveArticle, saveDraft, regenerateArticle, isLoading } = useContentEngine()
 const toast = useToast()
 
 // ── State ──
@@ -281,48 +281,58 @@ async function handleRegenerate() {
   }
 }
 
-async function handleApprove() {
-  if (!idea.value) return
+function buildUpdatedArticle() {
+  const updated = { ...article.value }
 
-  // If the pipeline has already advanced past article_ready, skip the
-  // approve API call (it would 422) and just route forward. Only handle
-  // statuses that actually belong to Images/Finalize steps — earlier or
-  // abnormal statuses (draft, researching, archived) fall through to the
-  // approve flow and let the backend 422 surface naturally.
-  const status = idea.value.status
-  if (['generating_images', 'images_ready'].includes(status)) {
-    router.push(`/admin/content-engine/${idea.value.id}/images`)
-    return
-  }
-  if (status === 'completed') {
-    router.push(`/admin/content-engine/${idea.value.id}/finalize`)
-    return
-  }
-
-  approving.value = true
-
-  // Build updated generated_article with edited titles + image positions
-  const updatedArticle = { ...article.value }
-
-  // Update titles per language
   for (const lang of availableLanguages.value) {
-    if (updatedArticle[lang]) {
-      updatedArticle[lang] = { ...updatedArticle[lang], title: editedTitles.value[lang] }
-    } else if (lang === 'en' && updatedArticle.title) {
-      updatedArticle.title = editedTitles.value.en
+    if (updated[lang]) {
+      updated[lang] = { ...updated[lang], title: editedTitles.value[lang] }
+    } else if (lang === 'en' && updated.title) {
+      updated.title = editedTitles.value.en
     }
   }
 
-  // Update target keyword
-  updatedArticle.target_keyword = targetKeyword.value
+  updated.target_keyword = targetKeyword.value
 
-  // Update image positions
-  updatedArticle.image_prompts = imageMarkers.value
+  updated.image_prompts = imageMarkers.value
     .filter(m => !m.removed)
     .map(m => {
       const { removed, ...rest } = m
       return rest
     })
+
+  return updated
+}
+
+async function handleApprove() {
+  if (!idea.value) return
+
+  const updatedArticle = buildUpdatedArticle()
+  const status = idea.value.status
+
+  // If the pipeline has already advanced past article_ready, skip the
+  // approve API call (it would 422) but still persist user edits via
+  // saveDraft so their title/keyword/marker changes aren't silently lost
+  // on forward navigation. Only handle statuses that belong to
+  // Images/Finalize steps — earlier or abnormal statuses (draft,
+  // researching, archived) fall through to the normal approve flow and
+  // let the backend 422 surface naturally.
+  if (['generating_images', 'images_ready'].includes(status)) {
+    approving.value = true
+    await saveDraft(idea.value.id, { generated_article: updatedArticle })
+    approving.value = false
+    router.push(`/admin/content-engine/${idea.value.id}/images`)
+    return
+  }
+  if (status === 'completed') {
+    approving.value = true
+    await saveDraft(idea.value.id, { generated_article: updatedArticle })
+    approving.value = false
+    router.push(`/admin/content-engine/${idea.value.id}/finalize`)
+    return
+  }
+
+  approving.value = true
 
   const result = await approveArticle(idea.value.id, {
     generated_article: updatedArticle,
