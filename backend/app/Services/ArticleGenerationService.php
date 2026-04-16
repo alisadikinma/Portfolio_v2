@@ -170,11 +170,11 @@ class ArticleGenerationService
             return ['success' => false, 'rewritten_vd' => null, 'error' => 'Missing original VD or face reference URL'];
         }
 
-        $prompt = $this->buildVdRewritePrompt($originalVd, $faceRefUrl, $segmentContext);
+        $prompt = $this->buildVdRewritePrompt($originalVd, $segmentContext);
         $model = config('services.article_generation.model_vd_rewrite', 'sonnet');
 
         try {
-            $result = $this->executeSyncPrompt($prompt, 'vd-rewrite', $model);
+            $result = $this->executeSyncPrompt($prompt, 'vd-rewrite', $model, $faceRefUrl);
         } catch (\Exception $e) {
             Log::error('[ArticleGeneration] VD rewrite failed', [
                 'error' => $e->getMessage(),
@@ -204,7 +204,7 @@ class ArticleGenerationService
     /**
      * Build the 1-shot prompt for Visual Direction rewrite.
      */
-    private function buildVdRewritePrompt(string $originalVd, string $faceRefUrl, array $segmentContext): string
+    private function buildVdRewritePrompt(string $originalVd, array $segmentContext): string
     {
         $contextLine = '';
         if (!empty($segmentContext['label']) || !empty($segmentContext['concept'])) {
@@ -214,18 +214,16 @@ class ArticleGenerationService
         }
 
         return <<<PROMPT
-You are rewriting a Visual Direction so it matches the person shown in a reference image.
+You are rewriting a Visual Direction so it matches the person shown in the attached reference image.
 
 Instructions:
-- Fetch and inspect the reference image at the URL below.
-- Keep the scene, setting, lighting, mood, camera angle, and composition intact.
+- Look at the attached reference image carefully. Note the person's age, gender, ethnicity, hair, facial features, build, and attire.
+- Keep the scene, setting, lighting, mood, camera angle, and composition from the original VD intact.
 - Only update age, gender, hair, facial features, attire, and general appearance to match the reference person.
 - Output ONLY the rewritten Visual Direction paragraph.
 - No preamble, no explanation, no quotes, no markdown, no labels.
 
-{$contextLine}Reference image URL: {$faceRefUrl}
-
-Original Visual Direction:
+{$contextLine}Original Visual Direction:
 {$originalVd}
 
 Rewritten Visual Direction:
@@ -265,10 +263,11 @@ PROMPT;
      *
      * @return array{success: bool, output: string, error: string|null}
      */
-    private function executeSyncPrompt(string $claudePrompt, string $phase, string $model = ''): array
+    private function executeSyncPrompt(string $claudePrompt, string $phase, string $model = '', string $imageUrl = ''): array
     {
         $modelFlag = $model ? "--model {$model}" : '';
-        $extraFlags = trim("{$modelFlag} --effort medium");
+        $imageFlag = $imageUrl ? "--image {$imageUrl}" : '';
+        $extraFlags = trim("{$modelFlag} {$imageFlag} --effort medium");
 
         if ($this->driver === 'local') {
             $isWindows = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
