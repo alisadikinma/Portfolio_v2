@@ -285,12 +285,17 @@ async function handleApprove() {
   if (!idea.value) return
 
   // If the pipeline has already advanced past article_ready, skip the
-  // approve API call (it would 422) and just route forward. User can still
-  // use the step bar to navigate manually if they prefer.
+  // approve API call (it would 422) and just route forward. Only handle
+  // statuses that actually belong to Images/Finalize steps — earlier or
+  // abnormal statuses (draft, researching, archived) fall through to the
+  // approve flow and let the backend 422 surface naturally.
   const status = idea.value.status
-  if (status && status !== 'article_ready') {
-    const nextRoute = status === 'completed' ? 'finalize' : 'images'
-    router.push(`/admin/content-engine/${idea.value.id}/${nextRoute}`)
+  if (['generating_images', 'images_ready'].includes(status)) {
+    router.push(`/admin/content-engine/${idea.value.id}/images`)
+    return
+  }
+  if (status === 'completed') {
+    router.push(`/admin/content-engine/${idea.value.id}/finalize`)
     return
   }
 
