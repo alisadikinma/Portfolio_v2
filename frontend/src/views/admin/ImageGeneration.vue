@@ -186,9 +186,11 @@ async function persistDraft() {
   // Sending them here races with the webhook and can overwrite completed results.
   const existingPrompts = idea.value.generated_article?.image_prompts || []
   article.image_prompts = segments.value.map((seg, i) => {
-    const existing = existingPrompts[i] || {}
+    // Destructure OUT webhook-managed fields so auto-save can't overwrite them with stale data.
+    // Backend retains whatever the webhook/controller last set for these fields.
+    const { variations, status, job_uuid, generated_url, error, ...safeExisting } = existingPrompts[i] || {}
     return {
-      ...existing,  // preserve backend-managed fields (status, job_uuid, generated_url)
+      ...safeExisting,
       type: seg.type,
       section: seg.section,
       concept: seg.concept,
