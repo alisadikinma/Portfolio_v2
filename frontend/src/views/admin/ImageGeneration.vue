@@ -286,7 +286,7 @@ async function handleConfigApply(options) {
   }
 
   scheduleAutoSave()
-  generateSingle(seg.index)
+  toast.success('Configuration applied')
 }
 
 // ── Approve & continue ──

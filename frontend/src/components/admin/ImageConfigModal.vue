@@ -258,8 +258,8 @@ function handleApply() {
             Cancel
           </button>
           <button @click="handleApply" class="inline-flex items-center gap-2 px-5 py-2 text-sm font-medium rounded-lg bg-amber-600 hover:bg-amber-700 text-white transition-colors">
-            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-            Apply &amp; Generate
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/></svg>
+            Apply Configuration
           </button>
         </div>
       </div>
