@@ -263,12 +263,13 @@ async function handleConfigApply(options) {
   // to match the reference's actual appearance BEFORE generating. This avoids
   // demographic contradiction (e.g. VD says "young woman" but ref is an older
   // man — GeminiGen follows text over the reference image when they conflict).
-  const faceRefChanged =
-    newFaceRefs.length > 0 &&
-    (newFaceRefs.length !== prevFaceRefs.length ||
-      newFaceRefs.some((u, i) => u !== prevFaceRefs[i]))
+  const faceRefsChanged =
+    newFaceRefs.length !== prevFaceRefs.length ||
+    newFaceRefs.some((u, i) => u !== prevFaceRefs[i])
+  const needsVdRewrite =
+    newFaceRefs.length > 0 && (faceRefsChanged || !seg.visual_direction_original)
 
-  if (faceRefChanged) {
+  if (needsVdRewrite) {
     const prevStatus = seg.status
     seg.status = 'rewriting_vd'
     toast.success('Rewriting visual direction for face reference...')
