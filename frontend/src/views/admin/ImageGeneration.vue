@@ -10,7 +10,7 @@ import StockImageSearch from '@/components/admin/StockImageSearch.vue'
 
 const route = useRoute()
 const router = useRouter()
-const { getIdea, saveDraft, generateSegmentImage, rewriteSegmentVd, resumeImagePipeline, downloadStockImage, cleanupVariationImages, isLoading } = useContentEngine()
+const { getIdea, saveDraft, generateSegmentImage, rewriteSegmentVd, resumeImagePipeline, downloadStockImage, isLoading } = useContentEngine()
 const toast = useToast()
 
 const idea = ref(null)
@@ -438,39 +438,12 @@ async function handleResumePipeline() {
 }
 
 // ── Approve & continue ──
+// Intentionally does NOT compact variations or delete files — that cleanup runs
+// server-side in approveAndPublish at the final Publish step. This way, users can
+// navigate back from Finalize to re-review/change their selection without losing
+// the other variations.
 async function handleApprove() {
   await persistDraft()
-
-  // Collect non-selected variation URLs for cleanup
-  const urlsToDelete = []
-  const article = { ...idea.value.generated_article }
-  article.image_prompts = segments.value.map(seg => {
-    const selectedIdx = seg.selected_variation ?? 0
-    const selectedVar = (seg.variations || [])[selectedIdx]
-    const selectedUrl = selectedVar?.url || seg.generated_url
-
-    // Mark non-selected variation files for deletion
-    for (const [vi, v] of (seg.variations || []).entries()) {
-      if (vi !== selectedIdx && v.url && v.url !== selectedUrl) {
-        urlsToDelete.push(v.url)
-      }
-    }
-
-    return {
-      ...seg,
-      prompt: getPrompt(seg),
-      generated_url: selectedUrl,
-      variations: [selectedVar || { url: selectedUrl, status: 'done' }],
-      selected_variation: 0,
-    }
-  })
-  await saveDraft(idea.value.id, { generated_article: article })
-
-  // Cleanup non-selected files from storage
-  if (urlsToDelete.length > 0) {
-    await cleanupVariationImages(urlsToDelete)
-  }
-
   router.push(`/admin/content-engine/${idea.value.id}/finalize`)
 }
 </script>
