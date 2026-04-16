@@ -705,6 +705,24 @@ POST /api/admin/content-engine/ideas/{id}/regenerate-image-prompts  → Trigger 
 POST /api/admin/content-engine/ideas/{id}/rewrite-vd               → Sync Sonnet: rewrite VD to match face reference
 ```
 
+### Shared Image Positioning Helper
+
+`frontend/src/utils/imagePositioning.js` — pure ES module used by both
+`ArticlePreview.vue` (Step 1) and `ArticleFinalize.vue` (Step 3) so body
+images render at identical positions in both views. Resolves placement
+from plugin's `insert_after_heading` + `suggested_position` hints with
+even-distribute fallback. Smoke test at `imagePositioning.test.mjs`.
+
+### Variation Cleanup Timing
+
+Image variants (`image_prompts[].variations[]`, max 3 per segment) are
+preserved through Step 2 and Step 3 so users can navigate back and
+reselect. Compaction to the selected variant and deletion of non-selected
+files runs server-side **only** at final Publish time, inside
+`ContentIdeaController::approveAndPublish` (after Post + PostTranslation
+are written). The `/cleanup-variation-images` route still exists but is
+no longer called from the frontend.
+
 ### Face-Aware Visual Direction Rewrite (Gate 2)
 
 When a face reference is uploaded in the Image Config modal, clicking "Apply & Generate"
@@ -791,7 +809,7 @@ ARTICLE_GEN_USE_TRANSLATE_PHASE=false
 
 ---
 
-**Last Updated:** April 16, 2026 (Image Gen — face-aware VD rewrite via sync Sonnet, segment config chips UI)
+**Last Updated:** April 17, 2026 (Content Engine preview fixes — shared image positioning helper, id default tab + untranslated banner, variation cleanup moved to server-side approveAndPublish)
 **Maintainer:** Ali Sadikin (ali.sadikincom85@gmail.com)
 **Environment:** Windows 11, D:\Projects\Portfolio_v2
 **PHP:** D:\xampp\php\php.exe (8.2.12) — use full path, not in system PATH
