@@ -185,6 +185,8 @@ async function generateSingle(segIndex) {
   if (!seg) return
 
   seg.status = 'generating'
+  seg.generated_url = ''  // clear stale image so polling doesn't short-circuit
+  seg.job_uuid = null
   const prompt = getPrompt(seg)
 
   const result = await generateSegmentImage(idea.value.id, {
@@ -220,12 +222,16 @@ function startPolling() {
     const updatedPrompts = result.data.generated_article?.image_prompts || []
     for (let i = 0; i < updatedPrompts.length && i < segments.value.length; i++) {
       const updated = updatedPrompts[i]
-      if (updated.generated_url && segments.value[i].status === 'generating') {
-        segments.value[i].generated_url = updated.generated_url
-        segments.value[i].status = 'done'
+      const seg = segments.value[i]
+      if (seg.status !== 'generating') continue
+      // Match by job_uuid to ensure we're seeing the CURRENT job's result, not a stale one
+      const uuidMatch = seg.job_uuid && updated.job_uuid === seg.job_uuid
+      if (uuidMatch && updated.generated_url && updated.status === 'done') {
+        seg.generated_url = updated.generated_url
+        seg.status = 'done'
       }
-      if (updated.status === 'failed' && segments.value[i].status === 'generating') {
-        segments.value[i].status = 'failed'
+      if (uuidMatch && updated.status === 'failed') {
+        seg.status = 'failed'
       }
     }
   }, 5000)
