@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useContentEngine } from '@/composables/useContentEngine'
 import { useToast } from '@/composables/useToast'
 import PipelineStepBar from '@/components/admin/PipelineStepBar.vue'
-import { parseBlockElements, resolveImagePosition } from '@/utils/imagePositioning'
+import { resolveImagePosition } from '@/utils/imagePositioning'
 
 const route = useRoute()
 const router = useRouter()
@@ -71,12 +71,14 @@ const contentWithImages = computed(() => {
 
   // Resolve each body image's position using the same logic Article step uses.
   // Filter to body images only (cover renders separately) with a generated URL.
+  // Pass the full imagePrompts length (not filtered count) so the even-distribute
+  // fallback produces positions identical to ArticlePreview's initFromArticle.
   const bodyImages = imagePrompts.value.filter(img => img.generated_url && img.type !== 'cover')
-  const totalBody = bodyImages.length
+  const totalAll = imagePrompts.value.length
 
-  const positioned = bodyImages.map((img, i) => {
+  const positioned = bodyImages.map(img => {
     const origIndex = imagePrompts.value.indexOf(img)
-    const pos = resolveImagePosition(img, origIndex, totalBody, childElements)
+    const pos = resolveImagePosition(img, origIndex, totalAll, childElements)
     return { img, pos }
   })
 
@@ -100,6 +102,8 @@ const coverImage = computed(() => {
 const isUntranslated = computed(() =>
   activeLang.value === 'en' && !article.value?.en?.content
 )
+
+const hasActiveContent = computed(() => !!currentContent.value.content)
 
 async function handlePublish() {
   if (!idea.value) return
@@ -162,13 +166,18 @@ async function handlePublish() {
       <div class="max-w-3xl mx-auto px-4 sm:px-6 py-6">
         <!-- Untranslated notice (English tab, no EN content yet) -->
         <div v-if="isUntranslated" class="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-5 flex items-start gap-3">
-          <svg class="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <svg class="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/>
           </svg>
           <div class="text-sm text-amber-800 dark:text-amber-300">
             <p class="font-medium">Belum diterjemahkan.</p>
             <p class="mt-1">Terjemahan otomatis ke bahasa Inggris akan berjalan saat Anda klik <strong>Publish to Blog</strong>.</p>
           </div>
+        </div>
+
+        <!-- Empty-content fallback (e.g. ID tab with no Indonesian content) -->
+        <div v-else-if="!hasActiveContent" class="rounded-lg bg-neutral-100 dark:bg-neutral-800/50 border border-neutral-200 dark:border-neutral-700 p-5 text-sm text-neutral-600 dark:text-neutral-400">
+          Konten untuk bahasa ini belum tersedia.
         </div>
 
         <!-- Translated content -->
