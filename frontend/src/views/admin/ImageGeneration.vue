@@ -100,34 +100,51 @@ function initSegments() {
   const article = idea.value?.generated_article
   if (!article?.image_prompts) return
 
-  // Normalize stuck segments: if status='generating' but no job_uuid, the previous
-  // queue attempt died mid-request (network, timeout, or backend exception).
-  // Treat as 'failed' so user can click Retry instead of staring at a spinner.
-  const normalizeStatus = (img) => {
-    const s = img.status || 'pending'
-    if (s === 'generating' && !img.job_uuid) return 'failed'
-    return s
-  }
-  // Strip browser-only blob: URLs — GeminiGen can't fetch them (400 FILE_DOWNLOAD_FAILED).
-  // These get saved into face_refs/style_refs when file upload failed in earlier versions.
   const isUsableRef = (u) => typeof u === 'string' && u.length > 0 && !u.startsWith('blob:')
 
-  segments.value = article.image_prompts.map((img, i) => ({
-    ...img,
-    index: i,
-    visual_direction: img.visual_direction || img.prompt || '',
-    visual_direction_original: img.visual_direction_original || '',
-    style: img.style || 'Photorealistic',
-    model: img.model || 'nano-banana-2',
-    aspect_ratio: img.aspect_ratio || '16:9',
-    reference_image_url: img.reference_image_url || '',
-    face_refs: (img.face_refs || []).filter(isUsableRef),
-    style_refs: (img.style_refs || []).filter(isUsableRef),
-    additional_notes: img.additional_notes || '',
-    generated_url: img.generated_url || '',
-    status: normalizeStatus(img),
-    label: img.type === 'cover' ? 'COVER' : `BODY-${i}`,
-  }))
+  segments.value = article.image_prompts.map((img, i) => {
+    // Migrate legacy flat generated_url to variations[]
+    let variations = img.variations || []
+    if (variations.length === 0 && img.generated_url) {
+      variations = [{ url: img.generated_url, job_uuid: img.job_uuid || null, status: 'done' }]
+    }
+
+    // Normalize stuck variations
+    variations = variations.map(v => {
+      if (v.status === 'generating' && !v.job_uuid) return { ...v, status: 'failed' }
+      return v
+    })
+
+    const selectedVar = img.selected_variation ?? 0
+    const activeVar = variations[selectedVar]
+    const hasAnyDone = variations.some(v => v.status === 'done' && v.url)
+    const anyGenerating = variations.some(v => v.status === 'generating')
+
+    // Segment-level status: generating if any variation is generating, done if any done, else pending
+    let segStatus = img.status || 'pending'
+    if (anyGenerating) segStatus = 'generating'
+    else if (hasAnyDone) segStatus = 'done'
+    else if (segStatus === 'generating' && !img.job_uuid) segStatus = 'failed'
+
+    return {
+      ...img,
+      index: i,
+      visual_direction: img.visual_direction || img.prompt || '',
+      visual_direction_original: img.visual_direction_original || '',
+      style: img.style || 'Photorealistic',
+      model: img.model || 'nano-banana-2',
+      aspect_ratio: img.aspect_ratio || '16:9',
+      reference_image_url: img.reference_image_url || '',
+      face_refs: (img.face_refs || []).filter(isUsableRef),
+      style_refs: (img.style_refs || []).filter(isUsableRef),
+      additional_notes: img.additional_notes || '',
+      variations,
+      selected_variation: selectedVar,
+      generated_url: activeVar?.url || '',
+      status: segStatus,
+      label: img.type === 'cover' ? 'COVER' : `BODY-${i}`,
+    }
+  })
 }
 
 function getPrompt(seg) {
@@ -170,6 +187,7 @@ async function persistDraft() {
       face_refs: seg.face_refs || [],
       style_refs: seg.style_refs || [],
       additional_notes: seg.additional_notes || '',
+      selected_variation: seg.selected_variation ?? 0,
     }
   })
   await saveDraft(idea.value.id, { generated_article: article })
@@ -189,13 +207,16 @@ async function generateSingle(segIndex) {
   const seg = segments.value[segIndex]
   if (!seg) return
 
+  // Enforce max 3 variations
+  if ((seg.variations || []).length >= 3) {
+    toast.error('Maximum 3 variations per segment')
+    return
+  }
+
   // Cancel any pending auto-save to prevent it from overwriting the job_uuid
-  // that generateSegmentImage is about to set in the backend
   if (saveTimeout) { clearTimeout(saveTimeout); saveTimeout = null }
 
   seg.status = 'generating'
-  seg.generated_url = ''  // clear stale image so polling doesn't short-circuit
-  seg.job_uuid = null
   const prompt = getPrompt(seg)
 
   const result = await generateSegmentImage(idea.value.id, {
@@ -210,12 +231,26 @@ async function generateSingle(segIndex) {
   })
 
   if (result.success) {
-    seg.job_uuid = result.data?.uuid
-    toast.success(`Image ${segIndex + 1} generation started`)
+    const uuid = result.data?.uuid
+    const varIdx = result.data?.variation_index ?? (seg.variations || []).length
+    // Append the new variation slot locally
+    if (!seg.variations) seg.variations = []
+    seg.variations.push({ url: null, job_uuid: uuid, status: 'generating' })
+    seg.job_uuid = uuid
+    toast.success(`Image variation ${varIdx + 1} generation started`)
   } else {
-    seg.status = 'failed'
+    // Revert status if no variations are generating
+    const anyGenerating = (seg.variations || []).some(v => v.status === 'generating')
+    seg.status = anyGenerating ? 'generating' : (seg.variations?.length ? 'done' : 'failed')
     toast.error(result.error || `Failed to generate image ${segIndex + 1}`)
   }
+}
+
+function selectVariation(seg, varIdx) {
+  if (!seg.variations?.[varIdx] || seg.variations[varIdx].status !== 'done') return
+  seg.selected_variation = varIdx
+  seg.generated_url = seg.variations[varIdx].url
+  scheduleAutoSave()
 }
 
 // ── Poll for generation completion ──
@@ -232,15 +267,39 @@ function startPolling() {
     for (let i = 0; i < updatedPrompts.length && i < segments.value.length; i++) {
       const updated = updatedPrompts[i]
       const seg = segments.value[i]
-      if (seg.status !== 'generating') continue
-      // Match by job_uuid to ensure we're seeing the CURRENT job's result, not a stale one
-      const uuidMatch = seg.job_uuid && updated.job_uuid === seg.job_uuid
-      if (uuidMatch && updated.generated_url && updated.status === 'done') {
-        seg.generated_url = updated.generated_url
-        seg.status = 'done'
+      const updatedVars = updated.variations || []
+
+      // Sync each variation's status from backend
+      for (const uv of updatedVars) {
+        if (!uv.job_uuid) continue
+        const localVar = (seg.variations || []).find(v => v.job_uuid === uv.job_uuid)
+        if (!localVar || localVar.status !== 'generating') continue
+        if (uv.status === 'done' && uv.url) {
+          localVar.url = uv.url
+          localVar.status = 'done'
+        } else if (uv.status === 'failed') {
+          localVar.status = 'failed'
+        }
       }
-      if (uuidMatch && updated.status === 'failed') {
-        seg.status = 'failed'
+
+      // Update segment-level status
+      const anyGenerating = (seg.variations || []).some(v => v.status === 'generating')
+      const anyDone = (seg.variations || []).some(v => v.status === 'done' && v.url)
+      if (anyGenerating) {
+        seg.status = 'generating'
+      } else if (anyDone) {
+        seg.status = 'done'
+        // Set generated_url to selected variation
+        const selected = seg.variations[seg.selected_variation ?? 0]
+        if (selected?.url) seg.generated_url = selected.url
+        // Auto-select first done if selected is empty
+        if (!seg.generated_url) {
+          const firstDone = seg.variations.findIndex(v => v.status === 'done' && v.url)
+          if (firstDone >= 0) {
+            seg.selected_variation = firstDone
+            seg.generated_url = seg.variations[firstDone].url
+          }
+        }
       }
     }
   }, 5000)
@@ -307,12 +366,19 @@ async function handleConfigApply(options) {
 // ── Approve & continue ──
 async function handleApprove() {
   await persistDraft()
-  // Update status to images_ready
+  // On approve, keep only the selected variation and set it as generated_url
   const article = { ...idea.value.generated_article }
-  article.image_prompts = segments.value.map(seg => ({
-    ...seg,
-    prompt: getPrompt(seg),
-  }))
+  article.image_prompts = segments.value.map(seg => {
+    const selectedIdx = seg.selected_variation ?? 0
+    const selectedVar = (seg.variations || [])[selectedIdx]
+    return {
+      ...seg,
+      prompt: getPrompt(seg),
+      generated_url: selectedVar?.url || seg.generated_url,
+      variations: seg.variations, // keep for reference
+      selected_variation: selectedIdx,
+    }
+  })
   await saveDraft(idea.value.id, { generated_article: article })
 
   router.push(`/admin/content-engine/${idea.value.id}/finalize`)
@@ -471,20 +537,27 @@ async function handleApprove() {
 
             </div>
 
-            <!-- Right: Image preview (2 cols) -->
+            <!-- Right: Image preview + variations (2 cols) -->
             <div class="lg:col-span-2 p-5 lg:border-l border-t lg:border-t-0 border-neutral-100 dark:border-neutral-700/40 flex flex-col">
+              <!-- Main preview -->
               <div :class="['relative rounded-2xl overflow-hidden bg-neutral-100 dark:bg-neutral-900/60 border border-neutral-200/60 dark:border-neutral-700/40 flex-1 min-h-[200px]', seg.aspect_ratio === '16:9' ? 'aspect-video' : seg.aspect_ratio === '1:1' ? 'aspect-square' : seg.aspect_ratio === '9:16' ? 'aspect-[9/16] max-h-80' : 'aspect-[4/3]']">
-                <!-- Generated image -->
-                <img
-                  v-if="seg.generated_url && seg.status === 'done'"
-                  :src="seg.generated_url"
-                  :alt="seg.concept"
-                  class="w-full h-full object-cover cursor-zoom-in transition-opacity hover:opacity-90"
-                  @click="openLightbox(seg)"
-                  title="Click to expand"
-                />
+                <!-- Selected image (show even while another variation is generating) -->
+                <template v-if="seg.generated_url">
+                  <img
+                    :src="seg.generated_url"
+                    :alt="seg.concept"
+                    class="w-full h-full object-cover cursor-zoom-in transition-opacity hover:opacity-90"
+                    @click="openLightbox(seg)"
+                    title="Click to expand"
+                  />
+                  <!-- Selected badge -->
+                  <span v-if="(seg.variations || []).length > 1" class="absolute top-2 right-2 inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full bg-green-500/90 text-white shadow">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/></svg>
+                    Selected
+                  </span>
+                </template>
 
-                <!-- Generating / Rewriting VD -->
+                <!-- Generating / Rewriting VD (only when no image to show yet) -->
                 <div v-else-if="seg.status === 'generating' || seg.status === 'rewriting_vd'" class="absolute inset-0 flex flex-col items-center justify-center gap-3">
                   <div class="relative">
                     <div class="w-12 h-12 rounded-full border-2 border-amber-500/20"></div>
@@ -502,7 +575,7 @@ async function handleApprove() {
                   <button @click="generateSingle(seg.index)" class="text-xs text-amber-500 hover:text-amber-400 font-medium">Retry</button>
                 </div>
 
-                <!-- Pending -->
+                <!-- Pending (no variations yet) -->
                 <div v-else class="absolute inset-0 flex flex-col items-center justify-center gap-4">
                   <div class="w-16 h-16 rounded-2xl bg-neutral-200/50 dark:bg-neutral-800/50 flex items-center justify-center">
                     <svg class="w-7 h-7 text-neutral-300 dark:text-neutral-600" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
@@ -515,15 +588,48 @@ async function handleApprove() {
                 </div>
               </div>
 
-              <!-- Regenerate (shown only when image exists) -->
-              <button
-                v-if="seg.status === 'done'"
-                @click="generateSingle(seg.index)"
-                class="mt-3 w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl border border-neutral-200 dark:border-neutral-700/60 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors active:scale-[0.98]"
-              >
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182"/></svg>
-                Regenerate
-              </button>
+              <!-- Variation thumbnails strip (max 3 slots) -->
+              <div v-if="(seg.variations || []).length > 0" class="mt-3 flex items-center gap-2">
+                <!-- Existing variations -->
+                <button
+                  v-for="(v, vi) in (seg.variations || [])"
+                  :key="'var-' + vi"
+                  @click="v.status === 'done' && selectVariation(seg, vi)"
+                  :class="[
+                    'relative w-16 h-12 rounded-lg overflow-hidden border-2 transition-all flex-shrink-0',
+                    vi === (seg.selected_variation ?? 0)
+                      ? 'border-green-500 ring-1 ring-green-500/30'
+                      : 'border-neutral-200 dark:border-neutral-700 hover:border-amber-400',
+                    v.status === 'done' ? 'cursor-pointer' : 'cursor-default'
+                  ]"
+                  :title="v.status === 'done' ? `Variation ${vi + 1} — click to select` : v.status === 'generating' ? 'Generating...' : 'Failed'"
+                >
+                  <img v-if="v.url && v.status === 'done'" :src="v.url" class="w-full h-full object-cover" />
+                  <div v-else-if="v.status === 'generating'" class="w-full h-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center">
+                    <div class="w-5 h-5 rounded-full border-2 border-transparent border-t-amber-500 animate-spin"></div>
+                  </div>
+                  <div v-else class="w-full h-full bg-red-500/5 flex items-center justify-center">
+                    <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                  </div>
+                  <!-- Index badge -->
+                  <span :class="[
+                    'absolute top-0.5 left-0.5 w-4 h-4 rounded text-[9px] font-bold flex items-center justify-center',
+                    vi === (seg.selected_variation ?? 0) ? 'bg-green-500 text-white' : 'bg-black/50 text-white'
+                  ]">{{ vi + 1 }}</span>
+                </button>
+
+                <!-- Add variation button (if < 3 and not generating) -->
+                <button
+                  v-if="(seg.variations || []).length < 3 && !(seg.variations || []).some(v => v.status === 'generating')"
+                  @click="generateSingle(seg.index)"
+                  class="w-16 h-12 rounded-lg border-2 border-dashed border-neutral-300 dark:border-neutral-600 flex items-center justify-center hover:border-amber-400 hover:bg-amber-500/5 transition-colors cursor-pointer flex-shrink-0"
+                  title="Add another variation"
+                >
+                  <svg class="w-5 h-5 text-neutral-400 dark:text-neutral-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                </button>
+
+                <span class="text-[10px] text-neutral-400 ml-1">Click to select</span>
+              </div>
             </div>
           </div>
         </div>

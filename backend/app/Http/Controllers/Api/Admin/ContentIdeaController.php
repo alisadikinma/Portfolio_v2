@@ -638,16 +638,46 @@ class ContentIdeaController extends Controller
         // ConvertEmptyStringsToNull middleware turns '' into null — coerce back for type-safety
         $additionalNotes = $request->input('additional_notes') ?? '';
 
-        // Update segment status and save reference data
+        // Update segment reference data
         $article = $idea->generated_article ?? [];
         $imagePrompts = $article['image_prompts'] ?? [];
         if (isset($imagePrompts[$segmentIndex])) {
-            $imagePrompts[$segmentIndex]['status'] = 'generating';
-            $imagePrompts[$segmentIndex]['generated_url'] = '';  // clear stale image
-            $imagePrompts[$segmentIndex]['job_uuid'] = null;     // will be set after queue()
             $imagePrompts[$segmentIndex]['face_refs'] = $faceRefs;
             $imagePrompts[$segmentIndex]['style_refs'] = $styleRefs;
             $imagePrompts[$segmentIndex]['additional_notes'] = $additionalNotes;
+
+            // Initialize variations array if not present
+            if (!isset($imagePrompts[$segmentIndex]['variations'])) {
+                // Migrate legacy flat generated_url into variations[0]
+                $legacyUrl = $imagePrompts[$segmentIndex]['generated_url'] ?? null;
+                $legacyUuid = $imagePrompts[$segmentIndex]['job_uuid'] ?? null;
+                if ($legacyUrl) {
+                    $imagePrompts[$segmentIndex]['variations'] = [[
+                        'url' => $legacyUrl,
+                        'job_uuid' => $legacyUuid,
+                        'status' => 'done',
+                    ]];
+                    $imagePrompts[$segmentIndex]['selected_variation'] = 0;
+                } else {
+                    $imagePrompts[$segmentIndex]['variations'] = [];
+                    $imagePrompts[$segmentIndex]['selected_variation'] = 0;
+                }
+            }
+
+            // Enforce max 3 variations
+            $variations = $imagePrompts[$segmentIndex]['variations'];
+            if (count($variations) >= 3) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Maximum 3 variations per segment.',
+                ], 422);
+            }
+
+            // Append a new variation slot
+            $variationIndex = count($variations);
+            $variations[] = ['url' => null, 'job_uuid' => null, 'status' => 'generating'];
+            $imagePrompts[$segmentIndex]['variations'] = $variations;
+            $imagePrompts[$segmentIndex]['status'] = 'generating';
             $article['image_prompts'] = $imagePrompts;
             $idea->generated_article = $article;
         }
@@ -674,8 +704,14 @@ class ContentIdeaController extends Controller
         );
 
         if (!$uuid) {
-            // Mark segment as failed
-            $imagePrompts[$segmentIndex]['status'] = 'failed';
+            // Remove the pending variation slot
+            $imagePrompts = $article['image_prompts'];
+            array_pop($imagePrompts[$segmentIndex]['variations']);
+            if (empty($imagePrompts[$segmentIndex]['variations'])) {
+                $imagePrompts[$segmentIndex]['status'] = 'pending';
+            } else {
+                $imagePrompts[$segmentIndex]['status'] = 'done';
+            }
             $article['image_prompts'] = $imagePrompts;
             $idea->generated_article = $article;
             $idea->save();
@@ -686,7 +722,10 @@ class ContentIdeaController extends Controller
             ], 500);
         }
 
-        // Store UUID in segment for tracking
+        // Store UUID in the new variation slot
+        $imagePrompts = $article['image_prompts'];
+        $imagePrompts[$segmentIndex]['variations'][$variationIndex]['job_uuid'] = $uuid;
+        // Also set flat job_uuid for backward compat with polling
         $imagePrompts[$segmentIndex]['job_uuid'] = $uuid;
         $article['image_prompts'] = $imagePrompts;
         $idea->generated_article = $article;
@@ -697,6 +736,7 @@ class ContentIdeaController extends Controller
             'data' => [
                 'uuid' => $uuid,
                 'segment_index' => $segmentIndex,
+                'variation_index' => $variationIndex,
             ],
             'message' => 'Image generation started.',
         ]);

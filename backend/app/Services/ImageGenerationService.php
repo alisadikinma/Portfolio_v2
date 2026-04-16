@@ -223,6 +223,34 @@ class ImageGenerationService
             $matched = false;
 
             foreach ($prompts as $i => $p) {
+                // Search within variations[] array first (new multi-choice model)
+                $variations = $p['variations'] ?? [];
+                foreach ($variations as $vi => $v) {
+                    if (($v['job_uuid'] ?? null) === $uuid) {
+                        $prompts[$i]['variations'][$vi]['status'] = $status;
+                        if ($imageUrl !== null) {
+                            $prompts[$i]['variations'][$vi]['url'] = $imageUrl;
+                        }
+                        if ($errorMessage !== null) {
+                            $prompts[$i]['variations'][$vi]['error'] = $errorMessage;
+                        }
+
+                        // Update flat fields for backward compat + polling
+                        $prompts[$i]['job_uuid'] = $uuid;
+                        if ($imageUrl !== null) {
+                            $prompts[$i]['generated_url'] = $imageUrl;
+                        }
+
+                        // Segment status: 'done' if no variation is still generating, else keep 'generating'
+                        $anyGenerating = collect($prompts[$i]['variations'])->contains(fn ($v) => ($v['status'] ?? '') === 'generating');
+                        $prompts[$i]['status'] = $anyGenerating ? 'generating' : $status;
+
+                        $matched = true;
+                        break 2;
+                    }
+                }
+
+                // Fallback: legacy flat job_uuid match (for segments without variations[])
                 if (($p['job_uuid'] ?? null) === $uuid) {
                     $prompts[$i]['status'] = $status;
                     if ($imageUrl !== null) {
