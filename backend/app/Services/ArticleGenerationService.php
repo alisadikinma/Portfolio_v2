@@ -170,11 +170,20 @@ class ArticleGenerationService
             return ['success' => false, 'rewritten_vd' => null, 'error' => 'Missing original VD or face reference URL'];
         }
 
-        $prompt = $this->buildVdRewritePrompt($originalVd, $segmentContext);
         $model = config('services.article_generation.model_vd_rewrite', 'sonnet');
 
         try {
-            $result = $this->executeSyncPrompt($prompt, 'vd-rewrite', $model, $faceRefUrl);
+            // Download face ref to a temp file so Claude CLI can read it as an image
+            $tempImagePath = $this->downloadFaceRefToTemp($faceRefUrl);
+            if (!$tempImagePath) {
+                return ['success' => false, 'rewritten_vd' => null, 'error' => 'Failed to download face reference image'];
+            }
+
+            $prompt = $this->buildVdRewritePrompt($originalVd, $tempImagePath, $segmentContext);
+            $result = $this->executeSyncPrompt($prompt, 'vd-rewrite', $model);
+
+            // Clean up temp image
+            $this->cleanupTempFile($tempImagePath);
         } catch (\Exception $e) {
             Log::error('[ArticleGeneration] VD rewrite failed', [
                 'error' => $e->getMessage(),
@@ -202,9 +211,67 @@ class ArticleGenerationService
     }
 
     /**
-     * Build the 1-shot prompt for Visual Direction rewrite.
+     * Download a face reference image to a temp file.
+     * For SSH driver: downloads on the remote VPS.
+     * For local driver: downloads locally.
+     *
+     * @return string|null Absolute path to temp file, or null on failure.
      */
-    private function buildVdRewritePrompt(string $originalVd, array $segmentContext): string
+    private function downloadFaceRefToTemp(string $url): ?string
+    {
+        $ext = pathinfo(parse_url($url, PHP_URL_PATH), PATHINFO_EXTENSION) ?: 'jpg';
+        $filename = 'face-ref-' . uniqid() . '.' . $ext;
+
+        if ($this->driver === 'local') {
+            $tmpPath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . $filename;
+            $imageData = @file_get_contents($url);
+            if ($imageData === false) {
+                Log::error('[ArticleGeneration] Failed to download face ref locally', ['url' => $url]);
+                return null;
+            }
+            file_put_contents($tmpPath, $imageData);
+            return $tmpPath;
+        }
+
+        // SSH: download on the remote server
+        $remotePath = "/tmp/{$filename}";
+        $result = Process::timeout(30)->run(
+            $this->sshCommand("curl -sL -o {$remotePath} " . escapeshellarg($url) . " && test -s {$remotePath} && echo OK")
+        );
+
+        if (!str_contains(trim($result->output()), 'OK')) {
+            Log::error('[ArticleGeneration] Failed to download face ref on VPS', [
+                'url' => $url,
+                'output' => $result->output(),
+                'error' => $result->errorOutput(),
+            ]);
+            return null;
+        }
+
+        return $remotePath;
+    }
+
+    /**
+     * Clean up a temp file (local or remote).
+     */
+    private function cleanupTempFile(string $path): void
+    {
+        try {
+            if ($this->driver === 'local') {
+                @unlink($path);
+            } else {
+                Process::timeout(10)->run($this->sshCommand("rm -f " . escapeshellarg($path) . " 2>/dev/null; true"));
+            }
+        } catch (\Exception $e) {
+            // Non-critical — temp files will be cleaned by OS
+        }
+    }
+
+    /**
+     * Build the 1-shot prompt for Visual Direction rewrite.
+     * References a local image file path that Claude CLI can read.
+     */
+    private function buildVdRewritePrompt(string $originalVd, string $imagePath, array $segmentContext): string
     {
         $contextLine = '';
         if (!empty($segmentContext['label']) || !empty($segmentContext['concept'])) {
@@ -214,12 +281,14 @@ class ArticleGenerationService
         }
 
         return <<<PROMPT
-You are rewriting a Visual Direction so it matches the person shown in the attached reference image.
+You are rewriting a Visual Direction so it matches the person shown in a face reference image.
+
+IMPORTANT: First, read the image file at this path: {$imagePath}
+Look at the person carefully. Note their age, gender, ethnicity, hair style, facial features, build, and clothing.
 
 Instructions:
-- Look at the attached reference image carefully. Note the person's age, gender, ethnicity, hair, facial features, build, and attire.
 - Keep the scene, setting, lighting, mood, camera angle, and composition from the original VD intact.
-- Only update age, gender, hair, facial features, attire, and general appearance to match the reference person.
+- Only update age, gender, hair, facial features, attire, and general appearance to match the person in the reference image.
 - Output ONLY the rewritten Visual Direction paragraph.
 - No preamble, no explanation, no quotes, no markdown, no labels.
 
@@ -263,11 +332,10 @@ PROMPT;
      *
      * @return array{success: bool, output: string, error: string|null}
      */
-    private function executeSyncPrompt(string $claudePrompt, string $phase, string $model = '', string $imageUrl = ''): array
+    private function executeSyncPrompt(string $claudePrompt, string $phase, string $model = ''): array
     {
         $modelFlag = $model ? "--model {$model}" : '';
-        $imageFlag = $imageUrl ? "--image {$imageUrl}" : '';
-        $extraFlags = trim("{$modelFlag} {$imageFlag} --effort medium");
+        $extraFlags = trim("{$modelFlag} --effort medium");
 
         if ($this->driver === 'local') {
             $isWindows = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
@@ -296,7 +364,7 @@ PROMPT;
                 return ['success' => false, 'output' => '', 'error' => 'Failed to write prompt file: ' . $writeResult->errorOutput()];
             }
 
-            $remoteCmd = "bash -lc 'source ~/.profile 2>/dev/null; {$this->claudePath} -p \"\$(cat {$promptFile})\" {$extraFlags} --dangerously-skip-permissions; rm -f {$promptFile}'";
+            $remoteCmd = "bash -lc 'source ~/.profile 2>/dev/null; {$this->claudePath} -p \"\$(cat {$promptFile})\" {$extraFlags} --dangerously-skip-permissions; rm -f {$promptFile} 2>/dev/null || true'";
             $result = Process::timeout(180)->run($this->sshCommand(escapeshellarg($remoteCmd)));
         }
 
