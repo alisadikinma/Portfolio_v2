@@ -80,15 +80,14 @@ export function useContentEngine() {
       face_ref_url: faceRefUrl,
     })
 
-  // Translation runs SSH → Claude CLI; backend has a 180s process timeout.
-  // The default axios timeout of 30s would abort long runs early, so override
-  // to 200s to give the full backend budget plus a small cushion.
+  // Translation runs SSH → Claude CLI; backend timeout is 300s (matches
+  // nginx fastcgi_read_timeout). Frontend waits 320s for headroom.
   const translateArticle = (id) => request(
     'post',
     `/admin/content-engine/ideas/${id}/translate-article`,
     null,
     null,
-    { timeout: 200000 }
+    { timeout: 320000 }
   )
 
   const searchStockImages = (query, options = {}) => {

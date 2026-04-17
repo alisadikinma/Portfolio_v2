@@ -432,7 +432,12 @@ PROMPT;
     private function executeSyncPrompt(string $claudePrompt, string $phase, string $model = ''): array
     {
         $modelFlag = $model ? "--model {$model}" : '';
-        $extraFlags = trim("{$modelFlag} --effort medium");
+        // Pure translation doesn't need reasoning — skip --effort to save time.
+        // VD rewrite also a single-pass transformation; fine without effort too.
+        $extraFlags = trim($modelFlag);
+        // 300s matches nginx fastcgi_read_timeout; 180s wasn't enough for
+        // longer articles (~14 KB JSON) under current Claude API latency.
+        $syncTimeout = 300;
 
         if ($this->driver === 'local') {
             $isWindows = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
@@ -442,10 +447,10 @@ PROMPT;
                 $promptFile = "{$tmpDir}{$sep}article-{$phase}-sync-" . uniqid() . '.txt';
                 file_put_contents($promptFile, $claudePrompt);
                 $cmd = "& \"{$this->claudePath}\" -p (Get-Content -Raw \"{$promptFile}\") {$extraFlags} --dangerously-skip-permissions";
-                $result = Process::timeout(180)->run(['powershell', '-Command', $cmd]);
+                $result = Process::timeout($syncTimeout)->run(['powershell', '-Command', $cmd]);
                 @unlink($promptFile);
             } else {
-                $result = Process::timeout(180)->run([
+                $result = Process::timeout($syncTimeout)->run([
                     'bash', '-lc',
                     "{$this->claudePath} -p " . escapeshellarg($claudePrompt) . " {$extraFlags} --dangerously-skip-permissions",
                 ]);
@@ -462,7 +467,7 @@ PROMPT;
             }
 
             $remoteCmd = "bash -lc 'source ~/.profile 2>/dev/null; {$this->claudePath} -p \"\$(cat {$promptFile})\" {$extraFlags} --dangerously-skip-permissions; rm -f {$promptFile} 2>/dev/null || true'";
-            $result = Process::timeout(180)->run($this->sshCommand(escapeshellarg($remoteCmd)));
+            $result = Process::timeout($syncTimeout)->run($this->sshCommand(escapeshellarg($remoteCmd)));
         }
 
         if (!$result->successful()) {

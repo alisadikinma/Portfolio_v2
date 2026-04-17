@@ -88,11 +88,14 @@ onMounted(async () => {
 const article = computed(() => idea.value?.generated_article || null)
 
 const availableLanguages = computed(() => {
-  if (!article.value) return ['en']
-  const langs = []
-  if (article.value.en || article.value.title) langs.push('en')
-  if (article.value.id) langs.push('id')
-  return langs.length ? langs : ['en']
+  // Both tabs are always reachable so the user can see translation progress
+  // / failure / retry UI on the EN tab even when EN content doesn't exist yet.
+  if (!article.value) return ['id', 'en']
+  const hasId = !!(article.value.id || article.value.title)
+  const hasEn = !!article.value.en
+  if (hasId && !hasEn) return ['id', 'en']
+  if (hasEn && !hasId) return ['en']
+  return ['id', 'en']
 })
 
 function getArticleContent(art, lang) {
@@ -264,10 +267,10 @@ async function handlePublish() {
             </div>
           </div>
           <div class="w-full bg-amber-200/50 dark:bg-amber-800/30 rounded-full h-1.5 overflow-hidden">
-            <div class="bg-amber-500 dark:bg-amber-400 h-1.5 rounded-full animate-pulse" :style="{ width: Math.min(100, (translationElapsed / 60) * 100) + '%' }"></div>
+            <div class="bg-amber-500 dark:bg-amber-400 h-1.5 rounded-full animate-pulse" :style="{ width: Math.min(100, (translationElapsed / 120) * 100) + '%' }"></div>
           </div>
           <p class="mt-2 text-xs font-mono text-amber-700 dark:text-amber-400">
-            {{ translationElapsed }}s elapsed<span v-if="translationElapsed < 60"> &middot; ~{{ 60 - translationElapsed }}s remaining</span><span v-else> &middot; taking longer than usual...</span>
+            {{ translationElapsed }}s elapsed<span v-if="translationElapsed < 120"> &middot; ~{{ 120 - translationElapsed }}s remaining</span><span v-else> &middot; taking longer than usual...</span>
           </p>
         </div>
 
