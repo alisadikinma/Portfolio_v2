@@ -592,7 +592,29 @@ class ContentIdeaController extends Controller
         }
 
         if ($request->has('generated_article')) {
-            $idea->generated_article = $request->input('generated_article');
+            $incoming = $request->input('generated_article');
+            $existing = $idea->generated_article ?? [];
+
+            // Merge image_prompts per-segment: preserve backend-managed fields
+            // (variations[], status, job_uuid, generated_url, error) when the
+            // incoming payload omits them. Frontend strips these deliberately
+            // (see ImageGeneration.vue persistDraft) so the prior replace-all
+            // save was wiping webhook results on every keystroke.
+            if (isset($incoming['image_prompts']) && is_array($incoming['image_prompts'])) {
+                $existingPrompts = $existing['image_prompts'] ?? [];
+                $preserveFields = ['variations', 'status', 'job_uuid', 'generated_url', 'error'];
+                foreach ($incoming['image_prompts'] as $i => $newPrompt) {
+                    $existingPrompt = $existingPrompts[$i] ?? [];
+                    foreach ($preserveFields as $field) {
+                        if (!array_key_exists($field, $newPrompt) && array_key_exists($field, $existingPrompt)) {
+                            $newPrompt[$field] = $existingPrompt[$field];
+                        }
+                    }
+                    $incoming['image_prompts'][$i] = $newPrompt;
+                }
+            }
+
+            $idea->generated_article = $incoming;
         }
         $idea->save();
 
