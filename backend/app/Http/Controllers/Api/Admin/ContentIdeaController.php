@@ -680,18 +680,37 @@ class ContentIdeaController extends Controller
                 }
             }
 
-            // Enforce max 3 variations
             $variations = $imagePrompts[$segmentIndex]['variations'];
-            if (count($variations) >= 3) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Maximum 3 variations per segment.',
-                ], 422);
+
+            // Retry-in-place: reuse a failed or orphaned slot before appending. An
+            // orphan is status=generating with no job_uuid — left over when the
+            // queue call or save crashed before the UUID was persisted.
+            $reuseIndex = null;
+            foreach ($variations as $vi => $v) {
+                $vStatus = $v['status'] ?? '';
+                $isFailed = $vStatus === 'failed';
+                $isOrphan = $vStatus === 'generating' && empty($v['job_uuid']);
+                if ($isFailed || $isOrphan) {
+                    $reuseIndex = $vi;
+                    break;
+                }
             }
 
-            // Append a new variation slot
-            $variationIndex = count($variations);
-            $variations[] = ['url' => null, 'job_uuid' => null, 'status' => 'generating'];
+            if ($reuseIndex !== null) {
+                $variationIndex = $reuseIndex;
+                $priorSlot = $variations[$reuseIndex];
+                $variations[$reuseIndex] = ['url' => null, 'job_uuid' => null, 'status' => 'generating'];
+            } else {
+                if (count($variations) >= 3) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Maximum 3 variations per segment.',
+                    ], 422);
+                }
+                $variationIndex = count($variations);
+                $priorSlot = null;
+                $variations[] = ['url' => null, 'job_uuid' => null, 'status' => 'generating'];
+            }
             $imagePrompts[$segmentIndex]['variations'] = $variations;
             $imagePrompts[$segmentIndex]['status'] = 'generating';
             $article['image_prompts'] = $imagePrompts;
@@ -720,14 +739,18 @@ class ContentIdeaController extends Controller
         );
 
         if (!$uuid) {
-            // Remove the pending variation slot
+            // Restore the slot we touched. array_pop would drop the LAST slot which
+            // may be unrelated — so restore/remove by actual variationIndex.
             $imagePrompts = $article['image_prompts'];
-            array_pop($imagePrompts[$segmentIndex]['variations']);
-            if (empty($imagePrompts[$segmentIndex]['variations'])) {
-                $imagePrompts[$segmentIndex]['status'] = 'pending';
+            if ($reuseIndex !== null && $priorSlot !== null) {
+                $imagePrompts[$segmentIndex]['variations'][$variationIndex] = $priorSlot;
             } else {
-                $imagePrompts[$segmentIndex]['status'] = 'done';
+                array_splice($imagePrompts[$segmentIndex]['variations'], $variationIndex, 1);
             }
+            $vs = $imagePrompts[$segmentIndex]['variations'];
+            $anyGenerating = collect($vs)->contains(fn ($v) => ($v['status'] ?? '') === 'generating');
+            $anyDone = collect($vs)->contains(fn ($v) => ($v['status'] ?? '') === 'done' && !empty($v['url']));
+            $imagePrompts[$segmentIndex]['status'] = $anyGenerating ? 'generating' : ($anyDone ? 'done' : 'pending');
             $article['image_prompts'] = $imagePrompts;
             $idea->generated_article = $article;
             $idea->save();

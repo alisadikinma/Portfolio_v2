@@ -102,23 +102,49 @@ class ProcessPendingImages extends Command
      */
     private function syncToContentIdea(ImageGenerationJob $job, ?string $imageUrl, bool $failed = false): void
     {
-        // Find content idea that has this job UUID in its image_prompts
-        $ideas = \App\Models\ContentIdea::whereIn('status', ['generating_images', 'article_ready'])
+        // Includes images_ready because late webhook/polling after retries must still sync
+        $ideas = \App\Models\ContentIdea::whereIn('status', ['article_ready', 'generating_images', 'images_ready'])
             ->whereNotNull('generated_article')
             ->get();
+
+        $status = $failed ? 'failed' : 'done';
 
         foreach ($ideas as $idea) {
             $article = $idea->generated_article;
             $prompts = $article['image_prompts'] ?? [];
             $updated = false;
+            $matchedSegment = null;
 
             foreach ($prompts as $i => $prompt) {
+                // Variations[] match first (new multi-choice schema)
+                $variations = $prompt['variations'] ?? [];
+                foreach ($variations as $vi => $v) {
+                    if (($v['job_uuid'] ?? null) === $job->uuid) {
+                        $prompts[$i]['variations'][$vi]['status'] = $status;
+                        if ($imageUrl) {
+                            $prompts[$i]['variations'][$vi]['url'] = $imageUrl;
+                        }
+                        // Mirror flat fields for backward compatibility
+                        if ($imageUrl) {
+                            $prompts[$i]['generated_url'] = $imageUrl;
+                        }
+                        // Segment status reflects aggregate variation state
+                        $anyGenerating = collect($prompts[$i]['variations'])->contains(fn ($vv) => ($vv['status'] ?? '') === 'generating');
+                        $prompts[$i]['status'] = $anyGenerating ? 'generating' : $status;
+                        $updated = true;
+                        $matchedSegment = $i;
+                        break 2;
+                    }
+                }
+
+                // Legacy flat job_uuid fallback
                 if (($prompt['job_uuid'] ?? null) === $job->uuid) {
-                    $prompts[$i]['status'] = $failed ? 'failed' : 'done';
+                    $prompts[$i]['status'] = $status;
                     if ($imageUrl) {
                         $prompts[$i]['generated_url'] = $imageUrl;
                     }
                     $updated = true;
+                    $matchedSegment = $i;
                     break;
                 }
             }
@@ -127,21 +153,20 @@ class ProcessPendingImages extends Command
                 $article['image_prompts'] = $prompts;
                 $idea->generated_article = $article;
 
-                // Check if all images are done → update status
-                $allDone = collect($prompts)->every(fn($p) => ($p['status'] ?? '') === 'done');
-                if ($allDone) {
+                $allResolved = collect($prompts)->every(fn ($p) => in_array($p['status'] ?? '', ['done', 'failed']));
+                $anyDone = collect($prompts)->contains(fn ($p) => ($p['status'] ?? '') === 'done');
+                if ($allResolved && $anyDone && $idea->status === 'generating_images') {
                     if ($idea->auto_mode) {
-                        // Auto mode: skip images_ready, go straight to completed
                         $idea->status = 'completed';
-                        $this->info("    All images done + auto_mode — idea #{$idea->id} → completed (auto-published)");
+                        $this->info("    All images resolved + auto_mode — idea #{$idea->id} → completed");
                     } else {
                         $idea->status = 'images_ready';
-                        $this->info("    All images done — idea #{$idea->id} → images_ready");
+                        $this->info("    All images resolved — idea #{$idea->id} → images_ready");
                     }
                 }
 
                 $idea->save();
-                $this->info("    Synced to content idea #{$idea->id}, segment {$i}");
+                $this->info("    Synced to content idea #{$idea->id}, segment {$matchedSegment}");
                 return;
             }
         }
