@@ -745,17 +745,31 @@ class ContentIdeaController extends Controller
         }
         $idea->save();
 
+        // Apply branded cover enhancement: inject post title overlay + creator
+        // face auto-reference for covers that depict humans. Non-cover prompts
+        // pass through untouched. Force model override for covers.
+        $segmentMeta = $article['image_prompts'][$segmentIndex] ?? [];
+        $forEnhance = array_merge($segmentMeta, [
+            'prompt_text' => $prompt,
+            'face_refs' => array_merge($faceRefs, $brandRefUrls),
+            'model' => $model,
+        ]);
+        $enhanced = app(\App\Services\CoverBrandingEnhancer::class)->enhance($forEnhance, $idea);
+        $finalPrompt = $enhanced['prompt_text'] ?? $prompt;
+        $finalModel = $enhanced['model'] ?? $model;
+        $finalFaceRefs = $enhanced['face_refs'] ?? array_merge($faceRefs, $brandRefUrls);
+
         // Call GeminiGen via ImageGenerationService
         $imageService = app(\App\Services\ImageGenerationService::class);
         $uuid = $imageService->queue(
             postId: null,
-            prompt: $prompt,
+            prompt: $finalPrompt,
             type: $segmentIndex === 0 ? 'hero' : 'inline',
             insertAfterHeading: null,
-            model: $model,
+            model: $finalModel,
             aspectRatio: $aspectRatio,
             style: $style,
-            faceRefs: array_merge($faceRefs, $brandRefUrls),
+            faceRefs: $finalFaceRefs,
             styleRefs: $styleRefs,
             additionalNotes: $additionalNotes
         );
