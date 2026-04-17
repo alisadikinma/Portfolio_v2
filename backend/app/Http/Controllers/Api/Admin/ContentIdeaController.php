@@ -849,10 +849,21 @@ class ContentIdeaController extends Controller
         $idea->generated_article = $article;
         $idea->save();
 
+        // Article shape: plugin writes translations as nested keys
+        // ($article['id']['title'], ['content'], ['meta_title'], ...)
+        // AND sometimes flat keys for legacy/single-lang output. Prefer nested
+        // under the declared primary lang, fall back to flat, then idea title.
         $primaryLang = $article['language'] ?? 'id';
-        $title = $article['title'] ?? $idea->title;
-        $content = $article['content'] ?? '';
-        $excerpt = $article['excerpt'] ?? null;
+        $primary = $article[$primaryLang] ?? [];
+        $title = $primary['title'] ?? $article['title'] ?? $idea->title;
+        $content = $primary['content'] ?? $article['content'] ?? '';
+        $excerpt = $primary['excerpt'] ?? $article['excerpt'] ?? null;
+        // Translation presence: plugin sometimes duplicates primary content into
+        // the other lang key. Treat as missing in that case so the retry cron
+        // re-runs /article-translate on publish.
+        $otherLang = $primaryLang === 'id' ? 'en' : 'id';
+        $otherContent = $article[$otherLang]['content'] ?? '';
+        $hasRealTranslation = $otherContent !== '' && $otherContent !== $content;
         // Prefer explicit cover-type prompt; fall back to index 0 for legacy prompts.
         $coverPrompt = collect($imagePrompts)->firstWhere('type', 'cover');
         $featuredImage = data_get($idea->generated_images, '0.url')
@@ -897,14 +908,14 @@ class ContentIdeaController extends Controller
                 'featured_image' => $featuredImage,
                 'published' => true,
                 'published_at' => now(),
-                'seo_score' => data_get($article, 'seo_analysis.score'),
-                'og_image' => data_get($article, 'og_image') ?? $featuredImage,
-                'translation_pending' => false,
+                'seo_score' => data_get($article, 'seo_analysis.score') ?? data_get($primary, 'seo_analysis.score'),
+                'og_image' => data_get($primary, 'og_image') ?? data_get($article, 'og_image') ?? $featuredImage,
+                'translation_pending' => !$hasRealTranslation,
                 'translation_attempts' => 0,
             ]
         );
 
-        // UPSERT primary-language translation
+        // UPSERT primary-language translation. Meta fields prefer nested over flat.
         PostTranslation::updateOrCreate(
             ['post_id' => $post->id, 'language' => $primaryLang],
             [
@@ -912,15 +923,15 @@ class ContentIdeaController extends Controller
                 'slug' => $uniqueSlug,
                 'excerpt' => $excerpt,
                 'content' => $content,
-                'meta_title' => data_get($article, 'meta_title'),
-                'meta_description' => data_get($article, 'meta_description'),
-                'meta_keywords' => data_get($article, 'meta_keywords'),
-                'og_title' => data_get($article, 'og_title'),
-                'og_description' => data_get($article, 'og_description'),
-                'canonical_url' => data_get($article, 'canonical_url'),
-                'ai_summary' => data_get($article, 'ai_summary'),
-                'schema_markup' => data_get($article, 'schema_markup'),
-                'faq_schema' => data_get($article, 'faq_schema'),
+                'meta_title' => data_get($primary, 'meta_title') ?? data_get($article, 'meta_title'),
+                'meta_description' => data_get($primary, 'meta_description') ?? data_get($article, 'meta_description'),
+                'meta_keywords' => data_get($primary, 'meta_keywords') ?? data_get($article, 'meta_keywords'),
+                'og_title' => data_get($primary, 'og_title') ?? data_get($article, 'og_title'),
+                'og_description' => data_get($primary, 'og_description') ?? data_get($article, 'og_description'),
+                'canonical_url' => data_get($primary, 'canonical_url') ?? data_get($article, 'canonical_url'),
+                'ai_summary' => data_get($primary, 'ai_summary') ?? data_get($article, 'ai_summary'),
+                'schema_markup' => data_get($primary, 'schema_markup') ?? data_get($article, 'schema_markup'),
+                'faq_schema' => data_get($primary, 'faq_schema') ?? data_get($article, 'faq_schema'),
             ]
         );
 
