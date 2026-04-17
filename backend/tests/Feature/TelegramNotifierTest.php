@@ -106,6 +106,7 @@ class TelegramNotifierTest extends TestCase
         $idea->id = 42;
         $idea->title = 'Failed Topic Draft';
         $idea->pipeline_failed_stage = 'research';
+        $idea->pipeline_attempts = 3;
         $idea->progress_log = [
             ['timestamp' => '2026-04-17T22:00:00Z', 'step' => 'prep', 'message' => 'Started'],
             ['timestamp' => '2026-04-17T22:05:00Z', 'step' => 'failed', 'message' => 'SSH timeout after 180s'],
@@ -119,7 +120,7 @@ class TelegramNotifierTest extends TestCase
                 && str_contains($text, 'Content pipeline failed')
                 && str_contains($text, 'Failed Topic Draft')
                 && str_contains($text, 'Failed stage: research')
-                && str_contains($text, 'Attempts: 3/3')
+                && str_contains($text, 'Attempts: 3')
                 && str_contains($text, 'SSH timeout after 180s')
                 && str_contains($text, '/admin/content-engine');
         });

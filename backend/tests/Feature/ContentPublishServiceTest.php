@@ -72,13 +72,52 @@ class ContentPublishServiceTest extends TestCase
     }
 
     /** @test */
-    public function publish_accepts_article_ready_images_ready_and_completed_statuses()
+    public function publish_does_not_throw_domain_exception_for_article_ready_status()
     {
-        // Verify the allow-list by inspecting source — we can't fully test publish()
-        // without DB, but we can verify the three allowed statuses don't trigger
-        // the early domain exception.
-        $reflection = new \ReflectionMethod(ContentPublishService::class, 'publish');
-        $source = file_get_contents($reflection->getFileName());
-        $this->assertStringContainsString("'article_ready', 'images_ready', 'completed'", $source);
+        $idea = new ContentIdea();
+        $idea->status = 'article_ready';
+
+        // Will throw on a DIFFERENT exception (TypeError/QueryException when it
+        // tries to touch DB) — but NOT a \DomainException from the status gate.
+        try {
+            $this->service->publish($idea);
+        } catch (\DomainException $e) {
+            $this->fail('publish() incorrectly rejected article_ready: ' . $e->getMessage());
+        } catch (\Throwable $e) {
+            // Other exceptions (DB, type, etc.) pass the status gate assertion
+        }
+        $this->assertTrue(true);
+    }
+
+    /** @test */
+    public function publish_does_not_throw_domain_exception_for_images_ready_status()
+    {
+        $idea = new ContentIdea();
+        $idea->status = 'images_ready';
+
+        try {
+            $this->service->publish($idea);
+        } catch (\DomainException $e) {
+            $this->fail('publish() incorrectly rejected images_ready: ' . $e->getMessage());
+        } catch (\Throwable $e) {
+            // Non-status-gate exception — acceptable
+        }
+        $this->assertTrue(true);
+    }
+
+    /** @test */
+    public function publish_does_not_throw_domain_exception_for_completed_status()
+    {
+        $idea = new ContentIdea();
+        $idea->status = 'completed';
+
+        try {
+            $this->service->publish($idea);
+        } catch (\DomainException $e) {
+            $this->fail('publish() incorrectly rejected completed: ' . $e->getMessage());
+        } catch (\Throwable $e) {
+            // Non-status-gate exception — acceptable
+        }
+        $this->assertTrue(true);
     }
 }

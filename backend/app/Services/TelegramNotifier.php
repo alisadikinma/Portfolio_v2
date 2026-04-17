@@ -115,13 +115,14 @@ class TelegramNotifier
         $frontendUrl = rtrim((string) config('app.frontend_url', 'https://alisadikinma.com'), '/');
         $reviewUrl = $frontendUrl . '/admin/content-engine';
 
+        $attempts = (int) ($idea->pipeline_attempts ?? 0);
         $lines = [
             '⚠️ *Content pipeline failed* — needs manual review',
             '',
             '*' . $title . '*',
             '',
             'Failed stage: ' . $stage,
-            'Attempts: 3/3',
+            'Attempts: ' . $attempts,
         ];
 
         if ($lastError !== '') {

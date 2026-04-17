@@ -31,6 +31,7 @@ class ContentPublishService
         }
 
         $article = $idea->generated_article ?? [];
+        $urlsToDelete = [];
 
         $imagePrompts = $this->compactVariations($article['image_prompts'] ?? [], $urlsToDelete);
         $article['image_prompts'] = $imagePrompts;
@@ -323,7 +324,8 @@ class ContentPublishService
 
         $canonicalUrl = data_get($langData, 'canonical_url') ?: data_get($article, 'canonical_url');
         if (empty($canonicalUrl)) {
-            $canonicalUrl = 'https://alisadikinma.com/blog/' . $slug;
+            $frontendUrl = rtrim((string) config('app.frontend_url', 'https://alisadikinma.com'), '/');
+            $canonicalUrl = $frontendUrl . '/blog/' . $slug;
         }
 
         return [
