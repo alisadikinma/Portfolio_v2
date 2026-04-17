@@ -8,6 +8,7 @@ use App\Models\Post;
 use App\Models\PostTranslation;
 use App\Services\ArticleGenerationService;
 use App\Services\ContentEngineService;
+use App\Services\ContentPublishService;
 use App\Services\TrendingTopicService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,7 +21,8 @@ class ContentIdeaController extends Controller
     public function __construct(
         private ArticleGenerationService $articleGen,
         private ContentEngineService $engine,
-        private TrendingTopicService $trending
+        private TrendingTopicService $trending,
+        private ContentPublishService $publishService
     ) {}
 
     /**
@@ -819,6 +821,10 @@ class ContentIdeaController extends Controller
 
     /**
      * GATE 2: Approve images and publish article to blog.
+     *
+     * Thin wrapper around ContentPublishService::publish — the same service
+     * is called by AutoPipelineOrchestrator in auto-mode. Keeps HTTP concerns
+     * here; all publish logic lives in the service.
      */
     public function approveAndPublish($id): JsonResponse
     {
@@ -827,255 +833,15 @@ class ContentIdeaController extends Controller
             return response()->json(['success' => false, 'message' => 'Content idea not found.'], 404);
         }
 
-        // 'completed' allowed so users can re-publish to update the post after
-        // fixing content/images (updateOrCreate keyed on source_idea_id is idempotent).
-        if (!in_array($idea->status, ['article_ready', 'images_ready', 'completed'])) {
-            return response()->json(['success' => false, 'message' => 'Cannot publish in current status.'], 422);
+        try {
+            $result = $this->publishService->publish($idea);
+        } catch (\DomainException $e) {
+            $status = str_contains($e->getMessage(), 'No category') ? 409 : 422;
+            return response()->json(['success' => false, 'message' => $e->getMessage()], $status);
         }
 
-        $article = $idea->generated_article ?? [];
-
-        // Compact variations to selected-only and collect non-selected URLs for
-        // file cleanup after Post is successfully created. This is the actual
-        // cleanup gate — previously done prematurely at Approve & Continue in
-        // the frontend Images step. See docs/plans/2026-04-17-content-engine-preview-4bugs-plan.md
-        $imagePrompts = $article['image_prompts'] ?? [];
-        $urlsToDelete = [];
-        foreach ($imagePrompts as $i => $prompt) {
-            $variations = $prompt['variations'] ?? [];
-            if (empty($variations)) continue;
-
-            $selectedIdx = $prompt['selected_variation'] ?? 0;
-            $selectedVar = $variations[$selectedIdx] ?? $variations[0] ?? null;
-            $selectedUrl = $selectedVar['url'] ?? ($prompt['generated_url'] ?? null);
-
-            foreach ($variations as $vi => $v) {
-                if ($vi !== $selectedIdx && !empty($v['url']) && $v['url'] !== $selectedUrl) {
-                    $urlsToDelete[] = $v['url'];
-                }
-            }
-
-            if ($selectedVar) {
-                $imagePrompts[$i]['variations'] = [$selectedVar];
-                $imagePrompts[$i]['selected_variation'] = 0;
-                $imagePrompts[$i]['generated_url'] = $selectedUrl;
-            }
-        }
-        $article['image_prompts'] = $imagePrompts;
-        $idea->generated_article = $article;
-        $idea->save();
-
-        // Article shape: plugin writes translations as nested keys
-        // ($article['id']['title'], ['content'], ['meta_title'], ...)
-        // AND sometimes flat keys for legacy/single-lang output. Prefer nested
-        // under the declared primary lang, fall back to flat, then idea title.
-        $primaryLang = $article['language'] ?? 'id';
-        $primary = $article[$primaryLang] ?? [];
-        $title = $primary['title'] ?? $article['title'] ?? $idea->title;
-        $rawContent = $primary['content'] ?? $article['content'] ?? '';
-        $excerpt = $primary['excerpt'] ?? $article['excerpt'] ?? null;
-        // Splice body images into content at plugin-resolved positions. Mirrors
-        // the frontend ArticleFinalize view (contentWithImages computed) so the
-        // published post renders the same placements the user approved.
-        $content = $this->spliceBodyImagesIntoContent($rawContent, $imagePrompts);
-        // Translation presence: plugin sometimes duplicates primary content into
-        // the other lang key. Treat as missing in that case so the retry cron
-        // re-runs /article-translate on publish.
-        $otherLang = $primaryLang === 'id' ? 'en' : 'id';
-        $otherContent = $article[$otherLang]['content'] ?? '';
-        $hasRealTranslation = $otherContent !== '' && $otherContent !== $content;
-        // Prefer explicit cover-type prompt; fall back to index 0 for legacy prompts.
-        $coverPrompt = collect($imagePrompts)->firstWhere('type', 'cover');
-        $featuredImage = data_get($idea->generated_images, '0.url')
-            ?? data_get($idea->generated_images, '0')
-            ?? data_get($coverPrompt, 'generated_url')
-            ?? data_get($imagePrompts, '0.generated_url')
-            ?? null;
-
-        // Resolve category_id: idea.niche → Category lookup, fallback to first category
-        $categoryId = null;
-        if (!empty($idea->niche)) {
-            $category = \App\Models\Category::where('slug', Str::slug($idea->niche))
-                ->orWhere('name', $idea->niche)
-                ->first();
-            $categoryId = $category?->id;
-        }
-        if (!$categoryId) {
-            $categoryId = \App\Models\Category::orderBy('id')->value('id');
-        }
-        if (!$categoryId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No category available. Create at least one category before publishing.',
-            ], 409);
-        }
-
-        // Build unique slug: append short idea id if slug collides
-        $baseSlug = Str::slug($title);
-        $uniqueSlug = $baseSlug;
-        $existing = Post::where('slug', $uniqueSlug)->where('source_idea_id', '!=', $idea->id)->first();
-        if ($existing) {
-            $uniqueSlug = $baseSlug . '-' . $idea->id;
-        }
-
-        // UPSERT Post — title/content/excerpt/schema_markup/faq_schema live in
-        // post_translations, NOT posts. Only og_image is a posts-table column.
-        $post = Post::updateOrCreate(
-            ['source_idea_id' => $idea->id],
-            [
-                'category_id' => $categoryId,
-                'slug' => $uniqueSlug,
-                'featured_image' => $featuredImage,
-                'published' => true,
-                'published_at' => now(),
-                'seo_score' => data_get($article, 'seo_analysis.score') ?? data_get($primary, 'seo_analysis.score'),
-                'og_image' => data_get($primary, 'og_image') ?? data_get($article, 'og_image') ?? $featuredImage,
-                'translation_pending' => !$hasRealTranslation,
-                'translation_attempts' => 0,
-            ]
-        );
-
-        // SEO fallbacks — plugin doesn't always emit meta fields. Generate
-        // sensible defaults so the admin post-edit view isn't blank.
-        $seo = $this->buildSeoDefaults($idea, $title, $excerpt, $content, $uniqueSlug, $primary, $article);
-
-        // UPSERT primary-language translation
-        PostTranslation::updateOrCreate(
-            ['post_id' => $post->id, 'language' => $primaryLang],
-            [
-                'title' => $title,
-                'slug' => $uniqueSlug,
-                'excerpt' => $excerpt,
-                'content' => $content,
-                'meta_title' => $seo['meta_title'],
-                'meta_description' => $seo['meta_description'],
-                'meta_keywords' => $seo['meta_keywords'],
-                'og_title' => data_get($primary, 'og_title') ?: $seo['meta_title'],
-                'og_description' => data_get($primary, 'og_description') ?: $seo['meta_description'],
-                'canonical_url' => $seo['canonical_url'],
-                'ai_summary' => data_get($primary, 'ai_summary') ?? data_get($article, 'ai_summary'),
-                'schema_markup' => data_get($primary, 'schema_markup') ?? data_get($article, 'schema_markup'),
-                'faq_schema' => data_get($primary, 'faq_schema') ?? data_get($article, 'faq_schema'),
-            ]
-        );
-
-        // UPSERT secondary-language translation when a real translation exists
-        // in the idea (not just a duplicate of primary). Applies the same
-        // body-image splice so figures render identically across languages.
-        if ($hasRealTranslation) {
-            $secondary = $article[$otherLang] ?? [];
-            $secondaryTitle = $secondary['title'] ?? $title;
-            $secondaryExcerpt = $secondary['excerpt'] ?? $excerpt;
-            $secondaryContent = $this->spliceBodyImagesIntoContent(
-                $secondary['content'] ?? '',
-                $imagePrompts
-            );
-            $seoSecondary = $this->buildSeoDefaults(
-                $idea, $secondaryTitle, $secondaryExcerpt, $secondaryContent, $uniqueSlug, $secondary, $article
-            );
-            PostTranslation::updateOrCreate(
-                ['post_id' => $post->id, 'language' => $otherLang],
-                [
-                    'title' => $secondaryTitle,
-                    'slug' => $uniqueSlug,
-                    'excerpt' => $secondaryExcerpt,
-                    'content' => $secondaryContent,
-                    'meta_title' => $seoSecondary['meta_title'],
-                    'meta_description' => $seoSecondary['meta_description'],
-                    'meta_keywords' => $seoSecondary['meta_keywords'],
-                    'og_title' => data_get($secondary, 'og_title') ?: $seoSecondary['meta_title'],
-                    'og_description' => data_get($secondary, 'og_description') ?: $seoSecondary['meta_description'],
-                    'canonical_url' => $seoSecondary['canonical_url'],
-                    'ai_summary' => data_get($secondary, 'ai_summary'),
-                    // Structured data copied from primary — language-agnostic
-                    'schema_markup' => data_get($secondary, 'schema_markup') ?? data_get($primary, 'schema_markup'),
-                    'faq_schema' => data_get($secondary, 'faq_schema') ?? data_get($primary, 'faq_schema'),
-                ]
-            );
-        }
-
-        // Auto-populate related_posts — up to 5 recent published posts in the
-        // same category (excluding self). Only runs when no existing relations
-        // are set so admin edits aren't clobbered on re-publish.
-        if ($post->relatedPosts()->count() === 0) {
-            $relatedIds = Post::where('category_id', $categoryId)
-                ->where('id', '!=', $post->id)
-                ->where('published', true)
-                ->orderByDesc('published_at')
-                ->limit(5)
-                ->pluck('id');
-            if ($relatedIds->isNotEmpty()) {
-                $syncData = [];
-                foreach ($relatedIds as $idx => $rid) {
-                    $syncData[$rid] = ['sort_order' => $idx + 1];
-                }
-                $post->relatedPosts()->sync($syncData);
-            }
-        }
-
-        // Delete non-selected variation files from storage. Runs after the Post
-        // is safely written so a mid-flight failure doesn't orphan the selected
-        // variant. Failures here are logged but non-fatal — the post is already
-        // created and the orphaned files are recoverable via a sweep job.
-        if (!empty($urlsToDelete)) {
-            $storageBase = url('/storage/');
-            $deleted = 0;
-            foreach ($urlsToDelete as $imageUrl) {
-                if (!str_starts_with($imageUrl, $storageBase)) continue;
-                $relativePath = str_replace($storageBase . '/', '', $imageUrl);
-                try {
-                    if (Storage::disk('public')->exists($relativePath)) {
-                        Storage::disk('public')->delete($relativePath);
-                        $deleted++;
-                    }
-                } catch (\Throwable $e) {
-                    Log::warning('[ContentIdea] Failed to delete variation file', [
-                        'path' => $relativePath,
-                        'error' => $e->getMessage(),
-                    ]);
-                }
-            }
-            if ($deleted > 0) {
-                Log::info('[ContentIdea] Cleaned up variation files on publish', [
-                    'idea_id' => $idea->id,
-                    'post_id' => $post->id,
-                    'deleted_count' => $deleted,
-                    'requested_count' => count($urlsToDelete),
-                ]);
-            }
-        }
-
-        // Gate the translate phase behind feature flag
-        $translationPending = false;
-        $targetLocales = array_values(array_diff($idea->languages ?? [$primaryLang], [$primaryLang]));
-
-        if (
-            config('services.article_generation.use_translate_phase')
-            && !empty($targetLocales)
-        ) {
-            $targetLocale = $targetLocales[0];
-            $idempotencyKey = (string) Str::uuid();
-            $result = $this->articleGen->triggerTranslate($post->id, $idempotencyKey, $targetLocale);
-
-            $post->update([
-                'translation_pending' => true,
-                'translation_attempts' => 1,
-                'last_translation_attempt' => now(),
-            ]);
-            $translationPending = true;
-
-            Log::info('[ContentIdea] Translation triggered', [
-                'idea_id' => $idea->id,
-                'post_id' => $post->id,
-                'target_locale' => $targetLocale,
-                'pid' => $result['pid'] ?? null,
-            ]);
-        }
-
-        $idea->update([
-            'status' => 'completed',
-            'result_post_id' => $post->id,
-        ]);
+        $post = $result['post'];
+        $translationPending = $result['translation_pending'];
 
         return response()->json([
             'success' => true,
@@ -1090,6 +856,7 @@ class ContentIdeaController extends Controller
                 : 'Published.',
         ]);
     }
+
 
     // ========================================================================
     // FINALIZE: Translation Phase (post-publish)
@@ -1602,235 +1369,4 @@ class ContentIdeaController extends Controller
         ]);
     }
 
-    /**
-     * Build SEO meta defaults when the plugin doesn't emit them. Keeps the
-     * admin post-edit view from showing blank Meta Title/Description/Keywords
-     * fields. Generator-supplied values always win over the fallbacks.
-     *
-     * @return array{meta_title:string,meta_description:string,meta_keywords:?string,canonical_url:string}
-     */
-    private function buildSeoDefaults(
-        ContentIdea $idea,
-        string $title,
-        ?string $excerpt,
-        string $content,
-        string $slug,
-        array $langData,
-        array $article
-    ): array {
-        $metaTitle = data_get($langData, 'meta_title') ?: data_get($article, 'meta_title');
-        if (empty($metaTitle)) {
-            $metaTitle = Str::limit(trim($title), 57, '...');
-        }
-
-        $metaDescription = data_get($langData, 'meta_description') ?: data_get($article, 'meta_description');
-        if (empty($metaDescription)) {
-            $source = $excerpt ?: strip_tags($content);
-            $source = preg_replace('/\s+/', ' ', (string) $source);
-            $metaDescription = Str::limit(trim($source), 155, '...');
-        }
-
-        $metaKeywords = data_get($langData, 'meta_keywords') ?: data_get($article, 'meta_keywords');
-        if (empty($metaKeywords)) {
-            $parts = array_filter([
-                $idea->niche,
-                $idea->pillar !== 'general' ? $idea->pillar : null,
-            ]);
-            if (is_array($idea->tags ?? null)) {
-                foreach (array_slice($idea->tags, 0, 3) as $t) {
-                    if (!empty($t)) $parts[] = $t;
-                }
-            }
-            $metaKeywords = $parts ? implode(', ', array_unique(array_map('trim', $parts))) : null;
-        }
-
-        $canonicalUrl = data_get($langData, 'canonical_url') ?: data_get($article, 'canonical_url');
-        if (empty($canonicalUrl)) {
-            $canonicalUrl = 'https://alisadikinma.com/blog/' . $slug;
-        }
-
-        return [
-            'meta_title' => $metaTitle,
-            'meta_description' => $metaDescription,
-            'meta_keywords' => $metaKeywords,
-            'canonical_url' => $canonicalUrl,
-        ];
-    }
-
-    /**
-     * Translate the primary-language article to English in-place on the idea.
-     * Synchronous — blocks for ~30-60s while Claude CLI runs via SSH. Writes
-     * status/error fields on generated_article so the frontend can poll or
-     * reflect the outcome on refresh.
-     */
-    public function translateArticle($id, Request $request): JsonResponse
-    {
-        @set_time_limit(200);
-
-        $idea = ContentIdea::find($id);
-        if (!$idea) {
-            return response()->json(['success' => false, 'message' => 'Content idea not found.'], 404);
-        }
-
-        $article = $idea->generated_article ?? [];
-        $primaryLang = $article['language'] ?? 'id';
-        $targetLang = $primaryLang === 'id' ? 'en' : 'id';
-        $primary = $article[$primaryLang] ?? [];
-
-        if (empty($primary['title']) && empty($primary['content'])) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Primary-language article content is missing; nothing to translate.',
-            ], 422);
-        }
-
-        // Already translated? en.content exists and differs from primary
-        $existing = $article[$targetLang]['content'] ?? '';
-        if ($existing !== '' && $existing !== ($primary['content'] ?? '')) {
-            return response()->json([
-                'success' => true,
-                'data' => $idea->fresh(),
-                'message' => 'Already translated.',
-            ]);
-        }
-
-        // Mark status so polling / subsequent checks see the in-flight state
-        $article['translation_status'] = 'translating';
-        $article['translation_started_at'] = now()->toIso8601String();
-        unset($article['translation_error']);
-        $idea->generated_article = $article;
-        $idea->save();
-
-        $result = $this->articleGen->translateArticle($primary);
-
-        // Re-fetch to avoid clobbering any concurrent writes (webhooks, etc.)
-        $idea->refresh();
-        $article = $idea->generated_article ?? [];
-
-        if (!$result['success']) {
-            $article['translation_status'] = 'failed';
-            $article['translation_error'] = $result['error'] ?? 'Unknown error';
-            $idea->generated_article = $article;
-            $idea->save();
-            return response()->json([
-                'success' => false,
-                'message' => 'Translation failed: ' . ($result['error'] ?? 'unknown'),
-                'data' => $idea->fresh(),
-            ], 500);
-        }
-
-        $translated = $result['translated'];
-        // Non-translated fields copied from primary (language-agnostic)
-        $article[$targetLang] = array_merge($article[$targetLang] ?? [], [
-            'title' => $translated['title'] ?? '',
-            'content' => $translated['content'] ?? '',
-            'excerpt' => $translated['excerpt'] ?? '',
-            'meta_title' => $translated['meta_title'] ?? '',
-            'meta_description' => $translated['meta_description'] ?? '',
-            'og_title' => $translated['og_title'] ?? '',
-            'og_description' => $translated['og_description'] ?? '',
-            'ai_summary' => $translated['ai_summary'] ?? '',
-            'schema_markup' => $primary['schema_markup'] ?? ($article[$targetLang]['schema_markup'] ?? null),
-            'faq_schema' => $primary['faq_schema'] ?? ($article[$targetLang]['faq_schema'] ?? null),
-            'canonical_url' => $primary['canonical_url'] ?? ($article[$targetLang]['canonical_url'] ?? null),
-        ]);
-        $article['translation_status'] = 'done';
-        $article['translation_completed_at'] = now()->toIso8601String();
-        unset($article['translation_error']);
-        $idea->generated_article = $article;
-        $idea->save();
-
-        return response()->json([
-            'success' => true,
-            'data' => $idea->fresh(),
-            'message' => 'Article translated.',
-        ]);
-    }
-
-    /**
-     * Splice body-image <figure> tags into HTML content at plugin-resolved
-     * positions. Port of frontend imagePositioning.js + ArticleFinalize
-     * contentWithImages. Cover images are skipped (attached separately via
-     * posts.featured_image). Prompts without generated_url are skipped.
-     */
-    private function spliceBodyImagesIntoContent(string $html, array $imagePrompts): string
-    {
-        if ($html === '' || empty($imagePrompts)) return $html;
-        $blocks = $this->parseBlockElements($html);
-        if (empty($blocks)) return $html;
-
-        $totalAll = count($imagePrompts);
-        $positioned = [];
-        foreach ($imagePrompts as $origIndex => $img) {
-            if (empty($img['generated_url']) || ($img['type'] ?? '') === 'cover') continue;
-            $pos = $this->resolveImagePosition($img, $origIndex, $totalAll, $blocks);
-            $positioned[] = ['img' => $img, 'pos' => $pos];
-        }
-        if (empty($positioned)) return $html;
-
-        // Descending splice keeps earlier indices stable
-        usort($positioned, fn ($a, $b) => $b['pos'] - $a['pos']);
-
-        $blockHtml = array_column($blocks, 'html');
-        foreach ($positioned as $p) {
-            $img = $p['img'];
-            $url = htmlspecialchars($img['generated_url'], ENT_QUOTES, 'UTF-8');
-            $alt = htmlspecialchars($img['concept'] ?? '', ENT_QUOTES, 'UTF-8');
-            $figure = '<figure class="my-8 not-prose">'
-                . '<img src="' . $url . '" alt="' . $alt . '" class="w-full rounded-xl" loading="lazy" />'
-                . '<figcaption class="text-sm text-neutral-500 dark:text-neutral-400 mt-2 text-center">' . $alt . '</figcaption>'
-                . '</figure>';
-            $safePos = max(0, min($p['pos'], count($blockHtml)));
-            array_splice($blockHtml, $safePos, 0, [$figure]);
-        }
-
-        return implode("\n", $blockHtml);
-    }
-
-    private function parseBlockElements(string $html): array
-    {
-        $doc = new \DOMDocument();
-        libxml_use_internal_errors(true);
-        // The xml encoding hint forces UTF-8 decoding so non-ASCII headings
-        // match correctly in resolveImagePosition.
-        $doc->loadHTML('<?xml encoding="utf-8" ?><div>' . $html . '</div>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
-        libxml_clear_errors();
-        $root = $doc->getElementsByTagName('div')->item(0);
-        if (!$root) return [];
-
-        $blocks = [];
-        foreach ($root->childNodes as $node) {
-            if ($node->nodeType !== XML_ELEMENT_NODE) continue;
-            $blocks[] = [
-                'tag' => strtoupper($node->nodeName),
-                'text' => $node->textContent,
-                'html' => $doc->saveHTML($node),
-            ];
-        }
-        return $blocks;
-    }
-
-    private function resolveImagePosition(array $img, int $index, int $total, array $blocks): int
-    {
-        if (($img['type'] ?? '') === 'cover') return 0;
-        if (isset($img['suggested_position']) && is_numeric($img['suggested_position'])) {
-            return (int) $img['suggested_position'];
-        }
-        if (!empty($img['insert_after_heading']) && count($blocks) > 0) {
-            $target = mb_strtolower(trim((string) $img['insert_after_heading']));
-            foreach ($blocks as $i => $b) {
-                if (preg_match('/^H[1-6]$/i', $b['tag'])) {
-                    $text = mb_strtolower(trim($b['text']));
-                    if ($text === $target || str_contains($text, $target) || str_contains($target, $text)) {
-                        return $i + 1;
-                    }
-                }
-            }
-        }
-        if (count($blocks) > 0 && $total > 0) {
-            $step = (int) floor(count($blocks) / ($total + 1));
-            return max(1, $step * ($index + 1));
-        }
-        return $index;
-    }
 }
