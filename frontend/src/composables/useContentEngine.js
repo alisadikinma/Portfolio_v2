@@ -5,11 +5,11 @@ export function useContentEngine() {
   const isLoading = ref(false)
   const error = ref(null)
 
-  const request = async (method, url, data = null, params = null) => {
+  const request = async (method, url, data = null, params = null, overrides = {}) => {
     isLoading.value = true
     error.value = null
     try {
-      const config = {}
+      const config = { ...overrides }
       if (params) config.params = params
       let response
       if (method === 'get') {
@@ -80,7 +80,16 @@ export function useContentEngine() {
       face_ref_url: faceRefUrl,
     })
 
-  const translateArticle = (id) => request('post', `/admin/content-engine/ideas/${id}/translate-article`)
+  // Translation runs SSH → Claude CLI; backend has a 180s process timeout.
+  // The default axios timeout of 30s would abort long runs early, so override
+  // to 200s to give the full backend budget plus a small cushion.
+  const translateArticle = (id) => request(
+    'post',
+    `/admin/content-engine/ideas/${id}/translate-article`,
+    null,
+    null,
+    { timeout: 200000 }
+  )
 
   const searchStockImages = (query, options = {}) => {
     const params = { q: query, ...options }
