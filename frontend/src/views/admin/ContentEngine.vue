@@ -174,8 +174,6 @@
               </th>
               <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400 w-10">#</th>
               <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400">Topic</th>
-              <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400">Pillar</th>
-              <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400">Priority</th>
               <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400">Status</th>
               <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400">Source</th>
               <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400">Published</th>
@@ -185,18 +183,18 @@
           </thead>
           <tbody class="divide-y divide-neutral-100 dark:divide-neutral-700">
             <tr v-if="isLoading && !ideas.length">
-              <td colspan="10" class="px-4 py-12 text-center text-neutral-500 dark:text-neutral-400">
+              <td colspan="8" class="px-4 py-12 text-center text-neutral-500 dark:text-neutral-400">
                 <svg class="animate-spin h-6 w-6 mx-auto mb-2 text-amber-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
                 Loading ideas...
               </td>
             </tr>
             <tr v-else-if="!ideas.length">
-              <td colspan="10" class="px-4 py-12 text-center text-neutral-500 dark:text-neutral-400">
+              <td colspan="8" class="px-4 py-12 text-center text-neutral-500 dark:text-neutral-400">
                 No ideas found. Click "Add Idea" or "Pull Trending" to get started.
               </td>
             </tr>
             <tr v-for="(idea, idx) in ideas" :key="idea.id" class="hover:bg-neutral-50 dark:hover:bg-neutral-700/30 transition-colors" :class="{ 'bg-amber-50/50 dark:bg-amber-900/10': selectedIdeaIds.includes(idea.id) }">
-              <td class="px-4 py-3">
+              <td class="px-4 py-3 align-top">
                 <input
                   type="checkbox"
                   :value="idea.id"
@@ -205,17 +203,13 @@
                   :aria-label="`Select idea ${idea.title}`"
                 />
               </td>
-              <td class="px-4 py-3 text-neutral-400 dark:text-neutral-500">{{ idx + 1 }}</td>
-              <td class="px-4 py-3 text-neutral-900 dark:text-neutral-100 font-medium max-w-xs truncate">{{ idea.title }}</td>
-              <td class="px-4 py-3 text-neutral-600 dark:text-neutral-300 text-xs">{{ idea.pillar || '-' }}</td>
-              <td class="px-4 py-3">
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium" :class="priorityClass(idea.priority)">{{ idea.priority || '-' }}</span>
-              </td>
-              <td class="px-4 py-3">
+              <td class="px-4 py-3 text-neutral-400 dark:text-neutral-500 align-top">{{ idx + 1 }}</td>
+              <td class="px-4 py-3 text-neutral-900 dark:text-neutral-100 font-medium break-words whitespace-normal">{{ idea.title }}</td>
+              <td class="px-4 py-3 align-top">
                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium" :class="statusClass(idea.status)">{{ formatStatus(idea.status) }}</span>
               </td>
-              <td class="px-4 py-3 text-neutral-500 dark:text-neutral-400 text-xs">{{ idea.source || 'manual' }}</td>
-              <td class="px-4 py-3 text-xs text-neutral-500 dark:text-neutral-400">
+              <td class="px-4 py-3 text-neutral-500 dark:text-neutral-400 text-xs align-top">{{ idea.source || 'manual' }}</td>
+              <td class="px-4 py-3 text-xs text-neutral-500 dark:text-neutral-400 align-top">
                 <span
                   v-if="formatPubDateRelative(idea.source_data?.pub_date)"
                   :title="formatPubDateAbsolute(idea.source_data?.pub_date)"
@@ -225,12 +219,12 @@
                 </span>
                 <span v-else>—</span>
               </td>
-              <td class="px-4 py-3 text-center">
+              <td class="px-4 py-3 text-center align-top">
                 <button @click="toggleAutoMode(idea)" :class="['w-8 h-5 rounded-full relative transition-colors', idea.auto_mode ? 'bg-amber-500' : 'bg-neutral-300 dark:bg-neutral-600']">
                   <span :class="['absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform', idea.auto_mode ? 'translate-x-3.5' : 'translate-x-0.5']"></span>
                 </button>
               </td>
-              <td class="px-4 py-3">
+              <td class="px-4 py-3 align-top">
                 <div class="flex items-center justify-end gap-1">
                   <!-- Status-aware action icon (replaces 7 colored text buttons) -->
                   <button
