@@ -344,27 +344,21 @@ class PostController extends Controller
         try {
             DB::beginTransaction();
 
-            // Prepare update data (only Post model fields)
+            // Prepare update data — posts-table columns ONLY.
+            // title/content/excerpt/schema_markup/faq_schema live in post_translations
+            // (per-language) and must be sent via the translations[] array; writing
+            // them to posts here produces SQLSTATE[42S22] "Unknown column".
             $updateData = $request->only([
                 'category_id',
-                'title',
                 'slug',
-                'excerpt',
-                'content',
                 'tags',
                 'is_premium',
                 'published',
                 'published_at',
-                // Global SEO fields (not per-language)
                 'og_image',
-                'schema_markup',
-                'faq_schema',
                 'seo_score',
                 'index_follow',
             ]);
-            
-            // Note: Per-language SEO fields (meta_title, meta_description, og_title,
-            // og_description, canonical_url, ai_summary) are in post_translations table
 
             // Handle featured image (base64 or file)
             if ($request->filled('featured_image')) {
