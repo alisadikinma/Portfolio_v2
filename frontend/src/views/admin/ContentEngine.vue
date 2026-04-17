@@ -503,12 +503,14 @@
           </div>
         </div>
 
-        <!-- Pipeline Phase Cards — horizontal scroll, single row -->
-        <div class="flex gap-2 mb-4 overflow-x-auto pb-1 snap-x snap-mandatory">
+        <!-- Pipeline Phase Cards — equal-width columns spanning full modal.
+             articleGenerationPhases is always 3 (Prep, Write, Score) after
+             filtering out the Gate 2 Images phase; grid-cols-3 is safe here. -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
           <div
             v-for="phase in articleGenerationPhases"
             :key="phase.skill"
-            class="rounded-lg border px-3 py-2.5 transition-all flex-shrink-0 w-64 snap-start"
+            class="rounded-lg border px-3 py-2.5 transition-all min-w-0"
             :class="phaseCardClass(phase)"
           >
             <!-- Header: Phase name + Model badge + Status -->
