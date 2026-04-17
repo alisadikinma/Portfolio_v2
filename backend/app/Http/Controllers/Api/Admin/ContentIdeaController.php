@@ -887,7 +887,8 @@ class ContentIdeaController extends Controller
             $uniqueSlug = $baseSlug . '-' . $idea->id;
         }
 
-        // UPSERT Post — title/content/excerpt live in post_translations, NOT posts table
+        // UPSERT Post — title/content/excerpt/schema_markup/faq_schema live in
+        // post_translations, NOT posts. Only og_image is a posts-table column.
         $post = Post::updateOrCreate(
             ['source_idea_id' => $idea->id],
             [
@@ -897,8 +898,6 @@ class ContentIdeaController extends Controller
                 'published' => true,
                 'published_at' => now(),
                 'seo_score' => data_get($article, 'seo_analysis.score'),
-                'schema_markup' => data_get($article, 'schema_markup'),
-                'faq_schema' => data_get($article, 'faq_schema'),
                 'og_image' => data_get($article, 'og_image') ?? $featuredImage,
                 'translation_pending' => false,
                 'translation_attempts' => 0,
@@ -915,9 +914,13 @@ class ContentIdeaController extends Controller
                 'content' => $content,
                 'meta_title' => data_get($article, 'meta_title'),
                 'meta_description' => data_get($article, 'meta_description'),
+                'meta_keywords' => data_get($article, 'meta_keywords'),
                 'og_title' => data_get($article, 'og_title'),
                 'og_description' => data_get($article, 'og_description'),
+                'canonical_url' => data_get($article, 'canonical_url'),
                 'ai_summary' => data_get($article, 'ai_summary'),
+                'schema_markup' => data_get($article, 'schema_markup'),
+                'faq_schema' => data_get($article, 'faq_schema'),
             ]
         );
 
