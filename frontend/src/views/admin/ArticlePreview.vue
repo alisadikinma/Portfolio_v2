@@ -225,17 +225,18 @@ const imagePlan = computed(() => {
   const outline = article.value?.prep_data?.outline
   const sections = outline?.sections || []
   const items = []
-  const title = article.value?.title || idea.value?.title
-  if (title) {
-    items.push({ key: 'cover', label: 'Cover', concept: `Hero visual for "${title}"` })
-  }
+  // The /article-images plugin authors one cinematic prompt per outline
+  // section that has an image_concept; the first is typed 'cover'. So count
+  // derives directly from the sections with a concept — no synthetic cover.
+  let firstWithConcept = true
   for (const s of sections) {
     if (s && s.image_concept) {
       items.push({
         key: `section-${s.position}`,
-        label: s.title || `Section #${s.position}`,
+        label: firstWithConcept ? 'Cover' : (s.title || `Section #${s.position}`),
         concept: s.image_concept,
       })
+      firstWithConcept = false
     }
   }
   return { count: items.length, items }
