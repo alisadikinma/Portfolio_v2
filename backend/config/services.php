@@ -52,6 +52,12 @@ return [
         'api_key' => env('CONTENT_ENGINE_API_KEY', ''),
     ],
 
+    'telegram' => [
+        'bot_token' => env('TELEGRAM_BOT_TOKEN'),
+        'chat_id' => env('TELEGRAM_CHAT_ID'),
+        'enabled' => env('TELEGRAM_ENABLED', true),
+    ],
+
     'article_generation' => [
         'driver' => env('ARTICLE_GEN_DRIVER', 'ssh'),
         'ssh_host' => env('ARTICLE_GEN_SSH_HOST', ''),
