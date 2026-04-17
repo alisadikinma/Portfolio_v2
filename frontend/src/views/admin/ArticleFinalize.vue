@@ -193,6 +193,11 @@ async function handlePublish() {
     } else {
       toast.success('Article published to blog!')
     }
+    // Open the public blog post in a new tab so the user can verify render.
+    const slug = result.data?.post_slug
+    if (slug) {
+      window.open(`/blog/${slug}`, '_blank', 'noopener')
+    }
     router.push({ name: 'admin-content-engine' })
   } else {
     toast.error(result.error || 'Failed to publish')

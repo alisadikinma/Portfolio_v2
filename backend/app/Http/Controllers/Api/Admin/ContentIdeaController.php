@@ -1040,6 +1040,7 @@ class ContentIdeaController extends Controller
             'data' => [
                 'idea' => $idea->fresh(),
                 'published_post_id' => $post->id,
+                'post_slug' => $post->slug,
                 'translation_pending' => $translationPending,
             ],
             'message' => $translationPending
