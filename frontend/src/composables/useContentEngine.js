@@ -80,6 +80,8 @@ export function useContentEngine() {
       face_ref_url: faceRefUrl,
     })
 
+  const translateArticle = (id) => request('post', `/admin/content-engine/ideas/${id}/translate-article`)
+
   const searchStockImages = (query, options = {}) => {
     const params = { q: query, ...options }
     return request('get', '/admin/content-engine/stock-images/search', null, params)
@@ -155,6 +157,7 @@ export function useContentEngine() {
     saveDraft,
     generateSegmentImage,
     rewriteSegmentVd,
+    translateArticle,
     searchStockImages,
     approveArticle,
     regenerateArticle,

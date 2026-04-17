@@ -211,6 +211,103 @@ class ArticleGenerationService
     }
 
     /**
+     * Translate an Indonesian article JSON to US English in one synchronous call.
+     * Returns the translated fields: title, content (HTML preserved), excerpt,
+     * meta_title, meta_description, og_title, og_description, ai_summary.
+     *
+     * @param array $source ['title', 'content', 'excerpt', 'meta_title', ...]
+     * @return array{success: bool, translated: array|null, error: string|null}
+     */
+    public function translateArticle(array $source): array
+    {
+        $model = config('services.article_generation.model_translate', 'sonnet');
+        $prompt = $this->buildTranslatePrompt($source);
+
+        try {
+            $result = $this->executeSyncPrompt($prompt, 'translate-inline', $model);
+        } catch (\Exception $e) {
+            Log::error('[ArticleGeneration] Translate failed (sync exec)', ['error' => $e->getMessage()]);
+            return ['success' => false, 'translated' => null, 'error' => $e->getMessage()];
+        }
+
+        if (!$result['success']) {
+            return ['success' => false, 'translated' => null, 'error' => $result['error']];
+        }
+
+        $parsed = $this->parseTranslateJson($result['output']);
+        if ($parsed === null) {
+            Log::error('[ArticleGeneration] Translate parse failed', [
+                'output_head' => mb_substr($result['output'], 0, 500),
+            ]);
+            return ['success' => false, 'translated' => null, 'error' => 'Could not parse translation JSON from model output'];
+        }
+
+        Log::info('[ArticleGeneration] Article translated', [
+            'source_content_len' => strlen($source['content'] ?? ''),
+            'translated_content_len' => strlen($parsed['content'] ?? ''),
+        ]);
+
+        return ['success' => true, 'translated' => $parsed, 'error' => null];
+    }
+
+    private function buildTranslatePrompt(array $source): string
+    {
+        // Only feed the fields we expect back. Keeps prompt size bounded.
+        $input = [
+            'title' => $source['title'] ?? '',
+            'content' => $source['content'] ?? '',
+            'excerpt' => $source['excerpt'] ?? '',
+            'meta_title' => $source['meta_title'] ?? '',
+            'meta_description' => $source['meta_description'] ?? '',
+            'og_title' => $source['og_title'] ?? '',
+            'og_description' => $source['og_description'] ?? '',
+            'ai_summary' => $source['ai_summary'] ?? '',
+        ];
+        $json = json_encode($input, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        return <<<PROMPT
+You translate an Indonesian article to natural, native US English for a tech/AI blog.
+
+INPUT (JSON):
+{$json}
+
+RULES:
+- Translate every value to natural US English. Keep the register casual-professional (tech blog for AI practitioners).
+- Keep technical terms in English (API, AI, prompt, model, SEO, JSON, etc.) — don't over-translate.
+- CRITICAL: preserve HTML tags exactly in `content` (h1, h2, h3, p, ul, ol, li, strong, em, a, blockquote, code, pre, etc.). Translate the text between tags, keep the tag structure 1:1.
+- Preserve HTML attributes exactly (href values, class names, etc.). Only translate visible text and alt/title attributes where present.
+- If the source uses Indonesian slang (gue, lo, nge-, bakal), translate to natural casual US English equivalents (I, you, to/gonna, etc.), not literal.
+- meta_title: max 60 chars. meta_description: 150-160 chars.
+- Return ONE JSON object with exactly these keys: title, content, excerpt, meta_title, meta_description, og_title, og_description, ai_summary.
+- NO preamble, NO explanation, NO markdown fence. Output must start with `{` and end with `}`.
+PROMPT;
+    }
+
+    private function parseTranslateJson(string $raw): ?array
+    {
+        $text = trim($raw);
+        if ($text === '') return null;
+
+        // Strip optional markdown fence
+        $text = preg_replace('/^```(?:json)?\s*/i', '', $text);
+        $text = preg_replace('/\s*```$/', '', $text);
+
+        // Find the first { and last } — model sometimes wraps in narration
+        $start = strpos($text, '{');
+        $end = strrpos($text, '}');
+        if ($start === false || $end === false || $end <= $start) return null;
+        $text = substr($text, $start, $end - $start + 1);
+
+        $decoded = json_decode($text, true);
+        if (!is_array($decoded)) return null;
+
+        // Must at minimum have title + content
+        if (empty($decoded['title']) || empty($decoded['content'])) return null;
+
+        return $decoded;
+    }
+
+    /**
      * Download a face reference image to a temp file.
      * For SSH driver: downloads on the remote VPS.
      * For local driver: downloads locally.

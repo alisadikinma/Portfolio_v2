@@ -8,7 +8,7 @@ import { resolveImagePosition } from '@/utils/imagePositioning'
 
 const route = useRoute()
 const router = useRouter()
-const { getIdea, approveAndPublish, isLoading } = useContentEngine()
+const { getIdea, approveAndPublish, translateArticle, isLoading } = useContentEngine()
 const toast = useToast()
 
 const idea = ref(null)
@@ -16,15 +16,69 @@ const loadError = ref(null)
 const activeLang = ref('id')
 const publishing = ref(false)
 
+// Translation state
+const translating = ref(false)
+const translationError = ref(null)
+const translationStartedAt = ref(null)
+const translationElapsed = ref(0)
+let translationTimer = null
+
+function startTranslationTimer() {
+  translationStartedAt.value = Date.now()
+  translationElapsed.value = 0
+  if (translationTimer) clearInterval(translationTimer)
+  translationTimer = setInterval(() => {
+    translationElapsed.value = Math.floor((Date.now() - translationStartedAt.value) / 1000)
+  }, 1000)
+}
+
+function stopTranslationTimer() {
+  if (translationTimer) {
+    clearInterval(translationTimer)
+    translationTimer = null
+  }
+  translationStartedAt.value = null
+}
+
+async function runTranslation() {
+  if (translating.value) return
+  translating.value = true
+  translationError.value = null
+  startTranslationTimer()
+  try {
+    const result = await translateArticle(idea.value.id)
+    if (result.success && result.data) {
+      idea.value = result.data
+      toast.success('English translation ready.')
+    } else {
+      translationError.value = result.error || 'Translation failed.'
+    }
+  } catch (e) {
+    translationError.value = e?.message || 'Translation failed.'
+  } finally {
+    translating.value = false
+    stopTranslationTimer()
+  }
+}
+
 onMounted(async () => {
   const id = route.params.id
   const result = await getIdea(id)
   if (result.success && result.data) {
     idea.value = result.data
-    // Prefer 'id' if available, fall back to 'en' if only English exists
     const art = result.data?.generated_article
+    // Prefer 'id' if available, fall back to 'en' if only English exists
     if (!art?.id?.content && art?.en?.content) {
       activeLang.value = 'en'
+    }
+    // Auto-kick off English translation if it's missing or a duplicate of
+    // the primary language. Publish is gated until this completes.
+    const primaryContent = art?.id?.content || ''
+    const enContent = art?.en?.content || ''
+    const enMissingOrDup = !enContent || enContent === primaryContent
+    const alreadyRunning = art?.translation_status === 'translating'
+    if (enMissingOrDup && !alreadyRunning) {
+      runTranslation()
     }
   } else {
     loadError.value = result.error || 'Failed to load content idea'
@@ -103,8 +157,26 @@ const isUntranslated = computed(() => {
   if (activeLang.value !== 'en') return false
   const en = article.value?.en?.content || ''
   const id = article.value?.id?.content || ''
-  // Untranslated when EN is missing OR when pipeline duplicated primary-lang into EN.
   return !en || en === id
+})
+
+// True when EN is missing/duplicate — used to gate the Publish button regardless
+// of which tab the user is looking at. Publish requires a real EN translation.
+const translationMissing = computed(() => {
+  const en = article.value?.en?.content || ''
+  const id = article.value?.id?.content || ''
+  return !en || en === id
+})
+
+const canPublish = computed(() =>
+  !publishing.value && !translating.value && !translationMissing.value
+)
+
+const publishButtonLabel = computed(() => {
+  if (publishing.value) return 'Publishing...'
+  if (translating.value) return 'Waiting for English translation...'
+  if (translationMissing.value) return 'Translation needed to publish'
+  return 'Publish to Blog'
 })
 
 const hasActiveContent = computed(() => !!currentContent.value.content)
@@ -151,6 +223,15 @@ async function handlePublish() {
       <!-- Step Bar -->
       <PipelineStepBar :current-step="3" :idea-id="route.params.id" :idea-status="idea.status" />
 
+      <!-- Persistent translation-progress pill (visible on any tab) -->
+      <div v-if="translating" class="max-w-3xl mx-auto px-4 sm:px-6 pt-4">
+        <div class="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+          <svg class="animate-spin h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+          <span>Translating to English</span>
+          <span class="font-mono text-[11px] opacity-75">{{ translationElapsed }}s</span>
+        </div>
+      </div>
+
       <!-- Language Tabs -->
       <div class="max-w-3xl mx-auto px-4 sm:px-6 pt-6">
         <div class="flex gap-1 border-b border-neutral-200 dark:border-neutral-700">
@@ -168,14 +249,48 @@ async function handlePublish() {
 
       <!-- WYSIWYG Article -->
       <div class="max-w-3xl mx-auto px-4 sm:px-6 py-6">
-        <!-- Untranslated notice (English tab, no EN content yet) -->
-        <div v-if="isUntranslated" class="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-5 flex items-start gap-3">
+        <!-- Translation in progress (English tab) -->
+        <div v-if="activeLang === 'en' && translating" class="rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-6">
+          <div class="flex items-start gap-3 mb-4">
+            <svg class="animate-spin h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+            <div class="text-sm text-amber-800 dark:text-amber-300">
+              <p class="font-semibold text-base">Menerjemahkan ke Bahasa Inggris...</p>
+              <p class="mt-1">Claude via VPS sedang memproses. Biasanya 30-60 detik. Jangan tutup halaman ini.</p>
+            </div>
+          </div>
+          <div class="w-full bg-amber-200/50 dark:bg-amber-800/30 rounded-full h-1.5 overflow-hidden">
+            <div class="bg-amber-500 dark:bg-amber-400 h-1.5 rounded-full animate-pulse" :style="{ width: Math.min(100, (translationElapsed / 60) * 100) + '%' }"></div>
+          </div>
+          <p class="mt-2 text-xs font-mono text-amber-700 dark:text-amber-400">
+            {{ translationElapsed }}s elapsed<span v-if="translationElapsed < 60"> &middot; ~{{ 60 - translationElapsed }}s remaining</span><span v-else> &middot; taking longer than usual...</span>
+          </p>
+        </div>
+
+        <!-- Translation failed (English tab) -->
+        <div v-else-if="activeLang === 'en' && translationError" class="rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-5">
+          <div class="flex items-start gap-3 mb-3">
+            <svg class="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M4.93 19h14.14a2 2 0 001.74-3L13.74 4a2 2 0 00-3.48 0L3.2 16a2 2 0 001.73 3z"/></svg>
+            <div class="text-sm text-red-800 dark:text-red-300">
+              <p class="font-semibold">Translation failed</p>
+              <p class="mt-1 break-words">{{ translationError }}</p>
+            </div>
+          </div>
+          <button @click="runTranslation" class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg bg-red-600 hover:bg-red-700 text-white transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            Retry translation
+          </button>
+        </div>
+
+        <!-- Untranslated (English tab) — happens briefly before auto-trigger fires -->
+        <div v-else-if="isUntranslated" class="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-5 flex items-start gap-3">
           <svg class="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/>
           </svg>
           <div class="text-sm text-amber-800 dark:text-amber-300">
             <p class="font-medium">Belum diterjemahkan.</p>
-            <p class="mt-1">Terjemahan otomatis ke bahasa Inggris akan berjalan saat Anda klik <strong>Publish to Blog</strong>.</p>
+            <button @click="runTranslation" class="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-amber-600 hover:bg-amber-700 text-white transition-colors">
+              Translate to English
+            </button>
           </div>
         </div>
 
@@ -209,9 +324,20 @@ async function handlePublish() {
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
             Back to Images
           </button>
-          <button @click="handlePublish" :disabled="publishing" class="inline-flex items-center gap-1.5 px-5 py-2 text-sm font-medium rounded-lg bg-green-600 hover:bg-green-700 text-white transition-colors disabled:opacity-50">
-            {{ publishing ? 'Publishing...' : 'Publish to Blog' }}
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+          <button
+            @click="handlePublish"
+            :disabled="!canPublish"
+            :title="translating ? 'English translation in progress — publish will enable when complete.' : (translationMissing ? 'Run English translation before publishing.' : '')"
+            :class="[
+              'inline-flex items-center gap-1.5 px-5 py-2 text-sm font-medium rounded-lg text-white transition-colors disabled:opacity-70 disabled:cursor-not-allowed',
+              translating ? 'bg-amber-500 hover:bg-amber-500' :
+              translationMissing ? 'bg-neutral-400 hover:bg-neutral-400' :
+              'bg-green-600 hover:bg-green-700',
+            ]"
+          >
+            <svg v-if="translating" class="animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+            {{ publishButtonLabel }}
+            <svg v-if="!translating && !translationMissing" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
           </button>
         </div>
       </div>
