@@ -941,6 +941,36 @@ class ContentIdeaController extends Controller
             ]
         );
 
+        // UPSERT secondary-language translation when a real translation exists
+        // in the idea (not just a duplicate of primary). Applies the same
+        // body-image splice so figures render identically across languages.
+        if ($hasRealTranslation) {
+            $secondary = $article[$otherLang] ?? [];
+            $secondaryContent = $this->spliceBodyImagesIntoContent(
+                $secondary['content'] ?? '',
+                $imagePrompts
+            );
+            PostTranslation::updateOrCreate(
+                ['post_id' => $post->id, 'language' => $otherLang],
+                [
+                    'title' => $secondary['title'] ?? $title,
+                    'slug' => $uniqueSlug,
+                    'excerpt' => $secondary['excerpt'] ?? null,
+                    'content' => $secondaryContent,
+                    'meta_title' => data_get($secondary, 'meta_title'),
+                    'meta_description' => data_get($secondary, 'meta_description'),
+                    'meta_keywords' => data_get($secondary, 'meta_keywords'),
+                    'og_title' => data_get($secondary, 'og_title'),
+                    'og_description' => data_get($secondary, 'og_description'),
+                    'canonical_url' => data_get($secondary, 'canonical_url'),
+                    'ai_summary' => data_get($secondary, 'ai_summary'),
+                    // Structured data copied from primary — language-agnostic
+                    'schema_markup' => data_get($secondary, 'schema_markup') ?? data_get($primary, 'schema_markup'),
+                    'faq_schema' => data_get($secondary, 'faq_schema') ?? data_get($primary, 'faq_schema'),
+                ]
+            );
+        }
+
         // Delete non-selected variation files from storage. Runs after the Post
         // is safely written so a mid-flight failure doesn't orphan the selected
         // variant. Failures here are logged but non-fatal — the post is already
