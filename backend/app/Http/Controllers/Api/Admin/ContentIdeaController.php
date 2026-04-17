@@ -921,7 +921,11 @@ class ContentIdeaController extends Controller
             ]
         );
 
-        // UPSERT primary-language translation. Meta fields prefer nested over flat.
+        // SEO fallbacks — plugin doesn't always emit meta fields. Generate
+        // sensible defaults so the admin post-edit view isn't blank.
+        $seo = $this->buildSeoDefaults($idea, $title, $excerpt, $content, $uniqueSlug, $primary, $article);
+
+        // UPSERT primary-language translation
         PostTranslation::updateOrCreate(
             ['post_id' => $post->id, 'language' => $primaryLang],
             [
@@ -929,12 +933,12 @@ class ContentIdeaController extends Controller
                 'slug' => $uniqueSlug,
                 'excerpt' => $excerpt,
                 'content' => $content,
-                'meta_title' => data_get($primary, 'meta_title') ?? data_get($article, 'meta_title'),
-                'meta_description' => data_get($primary, 'meta_description') ?? data_get($article, 'meta_description'),
-                'meta_keywords' => data_get($primary, 'meta_keywords') ?? data_get($article, 'meta_keywords'),
-                'og_title' => data_get($primary, 'og_title') ?? data_get($article, 'og_title'),
-                'og_description' => data_get($primary, 'og_description') ?? data_get($article, 'og_description'),
-                'canonical_url' => data_get($primary, 'canonical_url') ?? data_get($article, 'canonical_url'),
+                'meta_title' => $seo['meta_title'],
+                'meta_description' => $seo['meta_description'],
+                'meta_keywords' => $seo['meta_keywords'],
+                'og_title' => data_get($primary, 'og_title') ?: $seo['meta_title'],
+                'og_description' => data_get($primary, 'og_description') ?: $seo['meta_description'],
+                'canonical_url' => $seo['canonical_url'],
                 'ai_summary' => data_get($primary, 'ai_summary') ?? data_get($article, 'ai_summary'),
                 'schema_markup' => data_get($primary, 'schema_markup') ?? data_get($article, 'schema_markup'),
                 'faq_schema' => data_get($primary, 'faq_schema') ?? data_get($article, 'faq_schema'),
@@ -946,29 +950,53 @@ class ContentIdeaController extends Controller
         // body-image splice so figures render identically across languages.
         if ($hasRealTranslation) {
             $secondary = $article[$otherLang] ?? [];
+            $secondaryTitle = $secondary['title'] ?? $title;
+            $secondaryExcerpt = $secondary['excerpt'] ?? $excerpt;
             $secondaryContent = $this->spliceBodyImagesIntoContent(
                 $secondary['content'] ?? '',
                 $imagePrompts
             );
+            $seoSecondary = $this->buildSeoDefaults(
+                $idea, $secondaryTitle, $secondaryExcerpt, $secondaryContent, $uniqueSlug, $secondary, $article
+            );
             PostTranslation::updateOrCreate(
                 ['post_id' => $post->id, 'language' => $otherLang],
                 [
-                    'title' => $secondary['title'] ?? $title,
+                    'title' => $secondaryTitle,
                     'slug' => $uniqueSlug,
-                    'excerpt' => $secondary['excerpt'] ?? null,
+                    'excerpt' => $secondaryExcerpt,
                     'content' => $secondaryContent,
-                    'meta_title' => data_get($secondary, 'meta_title'),
-                    'meta_description' => data_get($secondary, 'meta_description'),
-                    'meta_keywords' => data_get($secondary, 'meta_keywords'),
-                    'og_title' => data_get($secondary, 'og_title'),
-                    'og_description' => data_get($secondary, 'og_description'),
-                    'canonical_url' => data_get($secondary, 'canonical_url'),
+                    'meta_title' => $seoSecondary['meta_title'],
+                    'meta_description' => $seoSecondary['meta_description'],
+                    'meta_keywords' => $seoSecondary['meta_keywords'],
+                    'og_title' => data_get($secondary, 'og_title') ?: $seoSecondary['meta_title'],
+                    'og_description' => data_get($secondary, 'og_description') ?: $seoSecondary['meta_description'],
+                    'canonical_url' => $seoSecondary['canonical_url'],
                     'ai_summary' => data_get($secondary, 'ai_summary'),
                     // Structured data copied from primary — language-agnostic
                     'schema_markup' => data_get($secondary, 'schema_markup') ?? data_get($primary, 'schema_markup'),
                     'faq_schema' => data_get($secondary, 'faq_schema') ?? data_get($primary, 'faq_schema'),
                 ]
             );
+        }
+
+        // Auto-populate related_posts — up to 5 recent published posts in the
+        // same category (excluding self). Only runs when no existing relations
+        // are set so admin edits aren't clobbered on re-publish.
+        if ($post->relatedPosts()->count() === 0) {
+            $relatedIds = Post::where('category_id', $categoryId)
+                ->where('id', '!=', $post->id)
+                ->where('published', true)
+                ->orderByDesc('published_at')
+                ->limit(5)
+                ->pluck('id');
+            if ($relatedIds->isNotEmpty()) {
+                $syncData = [];
+                foreach ($relatedIds as $idx => $rid) {
+                    $syncData[$rid] = ['sort_order' => $idx + 1];
+                }
+                $post->relatedPosts()->sync($syncData);
+            }
         }
 
         // Delete non-selected variation files from storage. Runs after the Post
@@ -1558,6 +1586,61 @@ class ContentIdeaController extends Controller
             ],
             'message' => 'Image prompt regeneration triggered.',
         ]);
+    }
+
+    /**
+     * Build SEO meta defaults when the plugin doesn't emit them. Keeps the
+     * admin post-edit view from showing blank Meta Title/Description/Keywords
+     * fields. Generator-supplied values always win over the fallbacks.
+     *
+     * @return array{meta_title:string,meta_description:string,meta_keywords:?string,canonical_url:string}
+     */
+    private function buildSeoDefaults(
+        ContentIdea $idea,
+        string $title,
+        ?string $excerpt,
+        string $content,
+        string $slug,
+        array $langData,
+        array $article
+    ): array {
+        $metaTitle = data_get($langData, 'meta_title') ?: data_get($article, 'meta_title');
+        if (empty($metaTitle)) {
+            $metaTitle = Str::limit(trim($title), 57, '...');
+        }
+
+        $metaDescription = data_get($langData, 'meta_description') ?: data_get($article, 'meta_description');
+        if (empty($metaDescription)) {
+            $source = $excerpt ?: strip_tags($content);
+            $source = preg_replace('/\s+/', ' ', (string) $source);
+            $metaDescription = Str::limit(trim($source), 155, '...');
+        }
+
+        $metaKeywords = data_get($langData, 'meta_keywords') ?: data_get($article, 'meta_keywords');
+        if (empty($metaKeywords)) {
+            $parts = array_filter([
+                $idea->niche,
+                $idea->pillar !== 'general' ? $idea->pillar : null,
+            ]);
+            if (is_array($idea->tags ?? null)) {
+                foreach (array_slice($idea->tags, 0, 3) as $t) {
+                    if (!empty($t)) $parts[] = $t;
+                }
+            }
+            $metaKeywords = $parts ? implode(', ', array_unique(array_map('trim', $parts))) : null;
+        }
+
+        $canonicalUrl = data_get($langData, 'canonical_url') ?: data_get($article, 'canonical_url');
+        if (empty($canonicalUrl)) {
+            $canonicalUrl = 'https://alisadikinma.com/blog/' . $slug;
+        }
+
+        return [
+            'meta_title' => $metaTitle,
+            'meta_description' => $metaDescription,
+            'meta_keywords' => $metaKeywords,
+            'canonical_url' => $canonicalUrl,
+        ];
     }
 
     /**
