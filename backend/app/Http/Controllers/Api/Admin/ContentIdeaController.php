@@ -46,7 +46,10 @@ class ContentIdeaController extends Controller
             $query->where('title', 'like', '%' . $request->query('search') . '%');
         }
 
-        $perPage = min((int) $request->query('per_page', 15), 50);
+        // Admin page ships without client-side pagination so the dedup-grouping
+        // sort covers the entire dataset. Cap at 500 to prevent runaway queries
+        // if the table ever explodes in size.
+        $perPage = min((int) $request->query('per_page', 500), 500);
         $ideas = $query->orderBy('created_at', 'desc')->paginate($perPage);
 
         // Auto-sync: check workflow completion for in-progress ideas

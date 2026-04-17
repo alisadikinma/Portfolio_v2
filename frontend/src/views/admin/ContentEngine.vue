@@ -272,28 +272,11 @@
         </table>
       </div>
 
-      <!-- Pagination -->
-      <div v-if="pagination.last_page > 1" class="flex items-center justify-between px-4 py-3 border-t border-neutral-200 dark:border-neutral-700">
+      <!-- Total count footer -->
+      <div class="flex items-center justify-end px-4 py-3 border-t border-neutral-200 dark:border-neutral-700">
         <span class="text-xs text-neutral-500 dark:text-neutral-400">
-          {{ (pagination.current_page - 1) * pagination.per_page + 1 }}–{{ Math.min(pagination.current_page * pagination.per_page, pagination.total) }} of {{ pagination.total }}
+          {{ ideas.length }} ideas
         </span>
-        <div class="flex items-center gap-1">
-          <button @click="pagination.current_page = 1; refreshIdeas()" :disabled="pagination.current_page <= 1" class="px-2.5 py-1 text-xs rounded-lg border border-neutral-300 dark:border-neutral-600 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-700 disabled:opacity-30 transition-colors">
-            First
-          </button>
-          <button @click="pagination.current_page--; refreshIdeas()" :disabled="pagination.current_page <= 1" class="px-2.5 py-1 text-xs rounded-lg border border-neutral-300 dark:border-neutral-600 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-700 disabled:opacity-30 transition-colors">
-            Prev
-          </button>
-          <span class="px-3 py-1 text-xs font-medium text-neutral-700 dark:text-neutral-300">
-            {{ pagination.current_page }} / {{ pagination.last_page }}
-          </span>
-          <button @click="pagination.current_page++; refreshIdeas()" :disabled="pagination.current_page >= pagination.last_page" class="px-2.5 py-1 text-xs rounded-lg border border-neutral-300 dark:border-neutral-600 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-700 disabled:opacity-30 transition-colors">
-            Next
-          </button>
-          <button @click="pagination.current_page = pagination.last_page; refreshIdeas()" :disabled="pagination.current_page >= pagination.last_page" class="px-2.5 py-1 text-xs rounded-lg border border-neutral-300 dark:border-neutral-600 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-700 disabled:opacity-30 transition-colors">
-            Last
-          </button>
-        </div>
       </div>
     </div>
 
@@ -850,7 +833,7 @@ async function refreshIdeas() {
   isLoading.value = true
   try {
     // Filter out empty string values to avoid backend treating them as real filters
-    const params = { page: pagination.value.current_page, per_page: 15 }
+    const params = { per_page: 500 }
     if (filters.pillar) params.pillar = filters.pillar
     if (filters.status) params.status = filters.status
     if (filters.priority) params.priority = filters.priority
