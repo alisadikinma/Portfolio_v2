@@ -506,7 +506,7 @@
         <!-- Pipeline Phase Cards — horizontal scroll, single row -->
         <div class="flex gap-2 mb-4 overflow-x-auto pb-1 snap-x snap-mandatory">
           <div
-            v-for="phase in pipelinePhases"
+            v-for="phase in articleGenerationPhases"
             :key="phase.skill"
             class="rounded-lg border px-3 py-2.5 transition-all flex-shrink-0 w-64 snap-start"
             :class="phaseCardClass(phase)"
@@ -797,7 +797,11 @@ const pipelinePhases = [
   },
 ]
 
-// Flatten for backward compat
+// Only Gate 1 phases show in the Article Generation Progress modal. Image-
+// related phases (gate: 'images') live in Gate 2 and shouldn't appear here.
+const articleGenerationPhases = pipelinePhases.filter(p => p.gate !== 'images')
+
+// Flatten for backward compat — keeps all phase step names including images
 const progressSteps = pipelinePhases.flatMap(p => p.steps)
 
 // Research preview
