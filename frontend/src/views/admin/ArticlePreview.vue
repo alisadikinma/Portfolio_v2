@@ -86,9 +86,12 @@ function getArticleContent(article, lang) {
 // ── Computed ──
 const article = computed(() => idea.value?.generated_article || null)
 
-const isUntranslated = computed(() =>
-  activeLang.value === 'en' && !article.value?.en?.content
-)
+const isUntranslated = computed(() => {
+  if (activeLang.value !== 'en') return false
+  const en = article.value?.en?.content || ''
+  const id = article.value?.id?.content || ''
+  return !en || en === id
+})
 
 const availableLanguages = computed(() => {
   if (!article.value) return ['en']

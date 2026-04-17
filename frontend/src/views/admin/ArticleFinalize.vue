@@ -99,9 +99,13 @@ const coverImage = computed(() => {
   return cover?.generated_url || ''
 })
 
-const isUntranslated = computed(() =>
-  activeLang.value === 'en' && !article.value?.en?.content
-)
+const isUntranslated = computed(() => {
+  if (activeLang.value !== 'en') return false
+  const en = article.value?.en?.content || ''
+  const id = article.value?.id?.content || ''
+  // Untranslated when EN is missing OR when pipeline duplicated primary-lang into EN.
+  return !en || en === id
+})
 
 const hasActiveContent = computed(() => !!currentContent.value.content)
 
