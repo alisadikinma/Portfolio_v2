@@ -28,13 +28,15 @@ class ImageGenerationService
         string $prompt,
         string $type = 'hero',
         string $insertAfterHeading = null,
-        string $model = 'nano-banana-2',
+        ?string $model = null,
         string $aspectRatio = '16:9',
         string $style = 'Photorealistic',
         array $faceRefs = [],
         array $styleRefs = [],
         string $additionalNotes = ''
     ): ?string {
+        $model = $model ?? config('content.default_image_model') ?? 'nano-banana-pro';
+
         if (empty($this->apiKey)) {
             Log::error('[ImageGen] GEMINIGEN_API_KEY not configured.');
             return null;
