@@ -1369,4 +1369,94 @@ class ContentIdeaController extends Controller
         ]);
     }
 
+    /**
+     * Translate the primary-language article to English in-place on the idea.
+     * Synchronous — blocks for ~30-60s while Claude CLI runs via SSH. Writes
+     * status/error fields on generated_article so the frontend can poll or
+     * reflect the outcome on refresh.
+     */
+    public function translateArticle($id, Request $request): JsonResponse
+    {
+        @set_time_limit(200);
+
+        $idea = ContentIdea::find($id);
+        if (!$idea) {
+            return response()->json(['success' => false, 'message' => 'Content idea not found.'], 404);
+        }
+
+        $article = $idea->generated_article ?? [];
+        $primaryLang = $article['language'] ?? 'id';
+        $targetLang = $primaryLang === 'id' ? 'en' : 'id';
+        $primary = $article[$primaryLang] ?? [];
+
+        if (empty($primary['title']) && empty($primary['content'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Primary-language article content is missing; nothing to translate.',
+            ], 422);
+        }
+
+        // Already translated? en.content exists and differs from primary
+        $existing = $article[$targetLang]['content'] ?? '';
+        if ($existing !== '' && $existing !== ($primary['content'] ?? '')) {
+            return response()->json([
+                'success' => true,
+                'data' => $idea->fresh(),
+                'message' => 'Already translated.',
+            ]);
+        }
+
+        // Mark status so polling / subsequent checks see the in-flight state
+        $article['translation_status'] = 'translating';
+        $article['translation_started_at'] = now()->toIso8601String();
+        unset($article['translation_error']);
+        $idea->generated_article = $article;
+        $idea->save();
+
+        $result = $this->articleGen->translateArticle($primary);
+
+        // Re-fetch to avoid clobbering any concurrent writes (webhooks, etc.)
+        $idea->refresh();
+        $article = $idea->generated_article ?? [];
+
+        if (!$result['success']) {
+            $article['translation_status'] = 'failed';
+            $article['translation_error'] = $result['error'] ?? 'Unknown error';
+            $idea->generated_article = $article;
+            $idea->save();
+            return response()->json([
+                'success' => false,
+                'message' => 'Translation failed: ' . ($result['error'] ?? 'unknown'),
+                'data' => $idea->fresh(),
+            ], 500);
+        }
+
+        $translated = $result['translated'];
+        // Non-translated fields copied from primary (language-agnostic)
+        $article[$targetLang] = array_merge($article[$targetLang] ?? [], [
+            'title' => $translated['title'] ?? '',
+            'content' => $translated['content'] ?? '',
+            'excerpt' => $translated['excerpt'] ?? '',
+            'meta_title' => $translated['meta_title'] ?? '',
+            'meta_description' => $translated['meta_description'] ?? '',
+            'og_title' => $translated['og_title'] ?? '',
+            'og_description' => $translated['og_description'] ?? '',
+            'ai_summary' => $translated['ai_summary'] ?? '',
+            'schema_markup' => $primary['schema_markup'] ?? ($article[$targetLang]['schema_markup'] ?? null),
+            'faq_schema' => $primary['faq_schema'] ?? ($article[$targetLang]['faq_schema'] ?? null),
+            'canonical_url' => $primary['canonical_url'] ?? ($article[$targetLang]['canonical_url'] ?? null),
+        ]);
+        $article['translation_status'] = 'done';
+        $article['translation_completed_at'] = now()->toIso8601String();
+        unset($article['translation_error']);
+        $idea->generated_article = $article;
+        $idea->save();
+
+        return response()->json([
+            'success' => true,
+            'data' => $idea->fresh(),
+            'message' => 'Article translated.',
+        ]);
+    }
+
 }
