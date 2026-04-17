@@ -858,8 +858,12 @@ class ContentIdeaController extends Controller
         $primaryLang = $article['language'] ?? 'id';
         $primary = $article[$primaryLang] ?? [];
         $title = $primary['title'] ?? $article['title'] ?? $idea->title;
-        $content = $primary['content'] ?? $article['content'] ?? '';
+        $rawContent = $primary['content'] ?? $article['content'] ?? '';
         $excerpt = $primary['excerpt'] ?? $article['excerpt'] ?? null;
+        // Splice body images into content at plugin-resolved positions. Mirrors
+        // the frontend ArticleFinalize view (contentWithImages computed) so the
+        // published post renders the same placements the user approved.
+        $content = $this->spliceBodyImagesIntoContent($rawContent, $imagePrompts);
         // Translation presence: plugin sometimes duplicates primary content into
         // the other lang key. Treat as missing in that case so the retry cron
         // re-runs /article-translate on publish.
@@ -1523,5 +1527,92 @@ class ContentIdeaController extends Controller
             ],
             'message' => 'Image prompt regeneration triggered.',
         ]);
+    }
+
+    /**
+     * Splice body-image <figure> tags into HTML content at plugin-resolved
+     * positions. Port of frontend imagePositioning.js + ArticleFinalize
+     * contentWithImages. Cover images are skipped (attached separately via
+     * posts.featured_image). Prompts without generated_url are skipped.
+     */
+    private function spliceBodyImagesIntoContent(string $html, array $imagePrompts): string
+    {
+        if ($html === '' || empty($imagePrompts)) return $html;
+        $blocks = $this->parseBlockElements($html);
+        if (empty($blocks)) return $html;
+
+        $totalAll = count($imagePrompts);
+        $positioned = [];
+        foreach ($imagePrompts as $origIndex => $img) {
+            if (empty($img['generated_url']) || ($img['type'] ?? '') === 'cover') continue;
+            $pos = $this->resolveImagePosition($img, $origIndex, $totalAll, $blocks);
+            $positioned[] = ['img' => $img, 'pos' => $pos];
+        }
+        if (empty($positioned)) return $html;
+
+        // Descending splice keeps earlier indices stable
+        usort($positioned, fn ($a, $b) => $b['pos'] - $a['pos']);
+
+        $blockHtml = array_column($blocks, 'html');
+        foreach ($positioned as $p) {
+            $img = $p['img'];
+            $url = htmlspecialchars($img['generated_url'], ENT_QUOTES, 'UTF-8');
+            $alt = htmlspecialchars($img['concept'] ?? '', ENT_QUOTES, 'UTF-8');
+            $figure = '<figure class="my-8 not-prose">'
+                . '<img src="' . $url . '" alt="' . $alt . '" class="w-full rounded-xl" loading="lazy" />'
+                . '<figcaption class="text-sm text-neutral-500 dark:text-neutral-400 mt-2 text-center">' . $alt . '</figcaption>'
+                . '</figure>';
+            $safePos = max(0, min($p['pos'], count($blockHtml)));
+            array_splice($blockHtml, $safePos, 0, [$figure]);
+        }
+
+        return implode("\n", $blockHtml);
+    }
+
+    private function parseBlockElements(string $html): array
+    {
+        $doc = new \DOMDocument();
+        libxml_use_internal_errors(true);
+        // The xml encoding hint forces UTF-8 decoding so non-ASCII headings
+        // match correctly in resolveImagePosition.
+        $doc->loadHTML('<?xml encoding="utf-8" ?><div>' . $html . '</div>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        libxml_clear_errors();
+        $root = $doc->getElementsByTagName('div')->item(0);
+        if (!$root) return [];
+
+        $blocks = [];
+        foreach ($root->childNodes as $node) {
+            if ($node->nodeType !== XML_ELEMENT_NODE) continue;
+            $blocks[] = [
+                'tag' => strtoupper($node->nodeName),
+                'text' => $node->textContent,
+                'html' => $doc->saveHTML($node),
+            ];
+        }
+        return $blocks;
+    }
+
+    private function resolveImagePosition(array $img, int $index, int $total, array $blocks): int
+    {
+        if (($img['type'] ?? '') === 'cover') return 0;
+        if (isset($img['suggested_position']) && is_numeric($img['suggested_position'])) {
+            return (int) $img['suggested_position'];
+        }
+        if (!empty($img['insert_after_heading']) && count($blocks) > 0) {
+            $target = mb_strtolower(trim((string) $img['insert_after_heading']));
+            foreach ($blocks as $i => $b) {
+                if (preg_match('/^H[1-6]$/i', $b['tag'])) {
+                    $text = mb_strtolower(trim($b['text']));
+                    if ($text === $target || str_contains($text, $target) || str_contains($target, $text)) {
+                        return $i + 1;
+                    }
+                }
+            }
+        }
+        if (count($blocks) > 0 && $total > 0) {
+            $step = (int) floor(count($blocks) / ($total + 1));
+            return max(1, $step * ($index + 1));
+        }
+        return $index;
     }
 }
