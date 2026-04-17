@@ -297,40 +297,6 @@
       </div>
     </div>
 
-    <!-- Workflow History -->
-    <div class="bg-white dark:bg-neutral-800 rounded-xl shadow-sm border border-neutral-200 dark:border-neutral-700 p-6">
-      <h2 class="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">Workflow History</h2>
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="bg-neutral-50 dark:bg-neutral-700/50 text-left">
-              <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400">ID</th>
-              <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400">Type</th>
-              <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400">Topic</th>
-              <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400">Status</th>
-              <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400">Step</th>
-              <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400">Created</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-neutral-100 dark:divide-neutral-700">
-            <tr v-if="!workflows.length">
-              <td colspan="6" class="px-4 py-8 text-center text-neutral-500 dark:text-neutral-400">No workflows yet.</td>
-            </tr>
-            <tr v-for="wf in workflows" :key="wf.id" class="hover:bg-neutral-50 dark:hover:bg-neutral-700/30 transition-colors">
-              <td class="px-4 py-3 text-neutral-400 dark:text-neutral-500 font-mono text-xs">{{ wf.id }}</td>
-              <td class="px-4 py-3 text-neutral-900 dark:text-neutral-100">{{ wf.type || '-' }}</td>
-              <td class="px-4 py-3 text-neutral-600 dark:text-neutral-300 max-w-xs truncate">{{ wf.topic || wf.title || '-' }}</td>
-              <td class="px-4 py-3">
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium" :class="statusClass(wf.status)">{{ formatStatus(wf.status) }}</span>
-              </td>
-              <td class="px-4 py-3 text-neutral-600 dark:text-neutral-300 text-xs">{{ wf.current_step || wf.step || '-' }}</td>
-              <td class="px-4 py-3 text-neutral-500 dark:text-neutral-400 text-xs">{{ formatDate(wf.created_at) }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
     <!-- Edit Idea Modal -->
     <div v-if="showEditModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="showEditModal = false">
       <div class="bg-white dark:bg-neutral-800 rounded-xl shadow-xl max-w-lg w-full mx-4 p-6">
@@ -600,7 +566,6 @@ const {
   approveArticle,
   startImageGeneration,
   approveAndPublish,
-  listWorkflows,
 } = useContentEngine()
 
 const pillars = ['Vibe Coding', 'AI Automation', 'AI Agents', 'AI Video & Image', 'General']
@@ -638,10 +603,8 @@ function togglePageSelection() {
     selectedIdeaIds.value = [...selectedIdeaIds.value, ...newIds]
   }
 }
-const workflows = ref([])
 const filters = reactive({ pillar: '', status: '', priority: '', search: '' })
 const pagination = ref({ current_page: 1, last_page: 1, per_page: 15, total: 0 })
-let pollInterval = null
 let searchTimeout = null
 
 // UI state
@@ -872,6 +835,17 @@ async function refreshHealth() {
   }
 }
 
+// Normalize a title into a duplicate-detection key. Lowercase, strip
+// non-alphanumeric, collapse whitespace — near-duplicates ("AI Coding Tools"
+// vs "AI Coding Tools!") produce the same key and cluster adjacent.
+function dedupKey(title) {
+  return String(title || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 async function refreshIdeas() {
   isLoading.value = true
   try {
@@ -883,7 +857,18 @@ async function refreshIdeas() {
     if (filters.search) params.search = filters.search
     const response = await api.get('/admin/content-engine/ideas', { params })
     if (response.data?.success) {
-      ideas.value = response.data.data || []
+      const rows = response.data.data || []
+      // Sort so near-duplicate titles are adjacent — primary key is the
+      // normalized title, tiebreak by id descending (newest within a
+      // duplicate cluster comes first).
+      rows.sort((a, b) => {
+        const ka = dedupKey(a.title)
+        const kb = dedupKey(b.title)
+        if (ka < kb) return -1
+        if (ka > kb) return 1
+        return (b.id || 0) - (a.id || 0)
+      })
+      ideas.value = rows
       if (response.data.meta) {
         pagination.value = response.data.meta
       }
@@ -892,13 +877,6 @@ async function refreshIdeas() {
     console.error('Failed to load ideas:', err)
   } finally {
     isLoading.value = false
-  }
-}
-
-async function refreshWorkflows() {
-  const result = await listWorkflows()
-  if (result.success) {
-    workflows.value = result.data || []
   }
 }
 
@@ -1461,12 +1439,10 @@ function viewDrafts(idea) {
 
 // Lifecycle
 onMounted(async () => {
-  await Promise.all([refreshHealth(), refreshIdeas(), refreshWorkflows()])
-  pollInterval = setInterval(refreshWorkflows, 10000)
+  await Promise.all([refreshHealth(), refreshIdeas()])
 })
 
 onUnmounted(() => {
-  if (pollInterval) clearInterval(pollInterval)
   if (searchTimeout) clearTimeout(searchTimeout)
   stopProgressPolling()
 })
