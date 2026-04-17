@@ -18,7 +18,7 @@ const additionalNotes = ref('')
 const faceRefs = ref([])
 const styleRefs = ref([])
 const brandRefs = ref([])  // brand/product images from manifest
-const selectedModel = ref('nano-banana-2')
+const selectedModel = ref('nano-banana-pro')
 const selectedStyle = ref('Photorealistic')
 
 // ── Face ref upload ──
@@ -31,7 +31,7 @@ const brandFileInput = ref(null)
 const brandUploading = ref(false)
 
 // ── Options ──
-const modelOptions = ['nano-banana-2', 'nano-banana-pro', 'imagen-4']
+const modelOptions = ['nano-banana-pro', 'nano-banana-2', 'imagen-4']
 const styleOptions = ['Photorealistic', 'Cinematic', 'Portrait Cinematic', 'Minimal', 'Abstract', 'Illustration']
 const maxRefs = 3
 
@@ -48,7 +48,7 @@ watch(() => [props.visible, props.segment?.index], ([vis]) => {
       if (typeof ref === 'string') return { filename: '', url: ref }
       return ref
     }).filter(ref => ref.url && !ref.url.startsWith('blob:'))
-    selectedModel.value = props.segment.model || 'nano-banana-2'
+    selectedModel.value = props.segment.model || 'nano-banana-pro'
     selectedStyle.value = props.segment.style || 'Photorealistic'
     facePasteUrl.value = ''
     showFacePaste.value = false
