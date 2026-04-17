@@ -35,6 +35,10 @@ class ContentIdea extends Model
         'process_pid',
         'auto_mode',
         'scheduled_at',
+        'pipeline_attempts',
+        'pipeline_last_attempt_at',
+        'pipeline_next_retry_at',
+        'pipeline_failed_stage',
     ];
 
     protected $casts = [
@@ -50,6 +54,8 @@ class ContentIdea extends Model
         'generated_images' => 'array',
         'image_references' => 'array',
         'progress_log' => 'array',
+        'pipeline_last_attempt_at' => 'datetime',
+        'pipeline_next_retry_at' => 'datetime',
     ];
 
     /**
