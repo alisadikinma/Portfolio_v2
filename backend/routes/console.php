@@ -17,3 +17,16 @@ Schedule::command('blog:process-images')->everyMinute();
 
 // Content Engine: retry failed ID→EN translations every 5 minutes (max 3 attempts)
 Schedule::command('content:process-pending-translations')->everyFiveMinutes()->withoutOverlapping();
+
+// Content Engine: advance auto_mode ideas one stage per tick (strict sequential
+// gating in orchestrator — operating hours + in-flight check). 10-min lock TTL
+// covers longest single-stage SSH call.
+Schedule::command('content:auto-pipeline')
+    ->everyMinute()
+    ->withoutOverlapping(10);
+
+// Content Engine: daily 05:00 Asia/Jakarta — pull trending topics, fuzzy-dedup
+// against last 30 days, auto-import as draft ideas with auto_mode=true
+Schedule::command('content:pull-trending-daily')
+    ->dailyAt('05:00')
+    ->timezone('Asia/Jakarta');
