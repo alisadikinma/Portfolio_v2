@@ -813,7 +813,9 @@ class ContentIdeaController extends Controller
             return response()->json(['success' => false, 'message' => 'Content idea not found.'], 404);
         }
 
-        if (!in_array($idea->status, ['article_ready', 'images_ready'])) {
+        // 'completed' allowed so users can re-publish to update the post after
+        // fixing content/images (updateOrCreate keyed on source_idea_id is idempotent).
+        if (!in_array($idea->status, ['article_ready', 'images_ready', 'completed'])) {
             return response()->json(['success' => false, 'message' => 'Cannot publish in current status.'], 422);
         }
 
