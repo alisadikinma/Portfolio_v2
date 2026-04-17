@@ -147,6 +147,99 @@ class ImageGenerationService
     }
 
     /**
+     * Dispatch GeminiGen jobs for every image_prompt on the given idea.
+     * Used by AutoPipelineOrchestrator to advance article_ready → generating_images.
+     *
+     * For each prompt, applies CoverBrandingEnhancer (title overlay + creator
+     * face inject on type='cover'), then calls queue(). Attaches returned
+     * UUIDs back onto the variations[] slot + flat job_uuid for backward compat.
+     *
+     * Skips prompts that already have a 'done' variation (idempotency for
+     * retry scenarios). Flips idea.status to 'generating_images' when at
+     * least one job dispatched successfully.
+     *
+     * Returns count of jobs dispatched.
+     */
+    public function triggerForIdea(ContentIdea $idea): int
+    {
+        $article = $idea->generated_article ?? [];
+        $prompts = $article['image_prompts'] ?? [];
+        if (empty($prompts)) {
+            Log::info("[ImageGen] triggerForIdea: idea #{$idea->id} has no image_prompts — skipping");
+            return 0;
+        }
+
+        $enhancer = app(CoverBrandingEnhancer::class);
+        $dispatched = 0;
+
+        foreach ($prompts as $i => $prompt) {
+            // Idempotency: skip if already done
+            $hasDoneVariation = collect($prompt['variations'] ?? [])
+                ->contains(fn ($v) => ($v['status'] ?? '') === 'done' && !empty($v['url']));
+            if ($hasDoneVariation) {
+                continue;
+            }
+
+            // Apply cover branding enhancement (no-op for inline prompts)
+            $forEnhance = array_merge($prompt, [
+                'prompt_text' => $prompt['prompt_text'] ?? ($prompt['prompt'] ?? ''),
+                'face_refs' => $prompt['face_refs'] ?? [],
+                'model' => $prompt['model'] ?? null,
+            ]);
+            $enhanced = $enhancer->enhance($forEnhance, $idea);
+
+            $promptText = $enhanced['prompt_text'] ?? ($prompt['prompt_text'] ?? $prompt['prompt'] ?? '');
+            $model = $enhanced['model'] ?? null;
+            $faceRefs = $enhanced['face_refs'] ?? [];
+
+            // Normalize brand_refs → flat URL array
+            $brandRefUrls = [];
+            foreach ($prompt['brand_refs'] ?? [] as $ref) {
+                if (is_array($ref) && !empty($ref['url'])) $brandRefUrls[] = $ref['url'];
+                elseif (is_string($ref) && $ref !== '') $brandRefUrls[] = $ref;
+            }
+
+            $uuid = $this->queue(
+                postId: null,
+                prompt: $promptText,
+                type: $i === 0 ? 'hero' : 'inline',
+                insertAfterHeading: $prompt['insert_after_heading'] ?? null,
+                model: $model,
+                aspectRatio: $prompt['aspect_ratio'] ?? '16:9',
+                style: $prompt['style'] ?? 'Photorealistic',
+                faceRefs: array_merge($faceRefs, $brandRefUrls),
+                styleRefs: $prompt['style_refs'] ?? [],
+                additionalNotes: $prompt['additional_notes'] ?? ''
+            );
+
+            if (!$uuid) {
+                Log::warning("[ImageGen] triggerForIdea: queue failed for idea #{$idea->id} segment {$i}");
+                continue;
+            }
+
+            // Append a generating variation slot with the returned UUID
+            $variations = $prompts[$i]['variations'] ?? [];
+            $variations[] = ['url' => null, 'job_uuid' => $uuid, 'status' => 'generating'];
+            $prompts[$i]['variations'] = $variations;
+            $prompts[$i]['job_uuid'] = $uuid;
+            $prompts[$i]['status'] = 'generating';
+            $dispatched++;
+        }
+
+        if ($dispatched > 0) {
+            $article['image_prompts'] = $prompts;
+            $idea->generated_article = $article;
+            if ($idea->status === 'article_ready') {
+                $idea->status = 'generating_images';
+            }
+            $idea->save();
+            Log::info("[ImageGen] triggerForIdea: dispatched {$dispatched} jobs for idea #{$idea->id}");
+        }
+
+        return $dispatched;
+    }
+
+    /**
      * Handle GeminiGen webhook callback.
      * Called when image generation completes or fails.
      */
