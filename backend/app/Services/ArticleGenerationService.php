@@ -547,7 +547,7 @@ PROMPT;
 
         $modelFlag = $model ? "--model {$model}" : '';
         $refsFlag = $refsFile ? "--append-system-prompt-file {$refsFile}" : '';
-        $extraFlags = trim("{$modelFlag} {$refsFlag} --effort medium");
+        $extraFlags = trim("{$modelFlag} {$refsFlag}");
 
         if ($isWindows) {
             $sep = DIRECTORY_SEPARATOR;
@@ -606,7 +606,7 @@ PROMPT;
         // Step 2: Build runner script with model + refs flags
         $modelFlag = $model ? "--model {$model}" : '';
         $refsFlag = $refsFile ? "--append-system-prompt-file {$refsFile}" : '';
-        $extraFlags = trim("{$modelFlag} {$refsFlag} --effort medium");
+        $extraFlags = trim("{$modelFlag} {$refsFlag}");
 
         $scriptContent = base64_encode(implode("\n", [
             '#!/bin/bash',
