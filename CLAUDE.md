@@ -544,6 +544,15 @@ Located at `D:\Projects\Portfolio_v2\.claude\agents\`:
 2. Update documentation if needed
 3. Commit with conventional commits: `feat:`, `fix:`, `docs:`, etc.
 
+### Git Push Policy (STRICT)
+**Default after any fix = commit ONLY. Never push autonomously.**
+
+- After completing a fix or feature, stop at `git commit`. Do not run `git push` unless the user explicitly asks (e.g. "push", "deploy", "naikin ke prod", "push main").
+- Push triggers VPS auto-deploy via GitHub Actions CI/CD (see `.github/workflows/`) — pushing without permission deploys straight to production.
+- When the user does ask to push, a single `git push origin main` is sufficient; CI/CD handles SSH + `deploy.sh` on the VPS.
+- If the harness blocks the push (main-branch guard), surface it to the user with the exact command to run manually — do not try to work around the block.
+- Never force-push to `main`.
+
 ## GEO (Generative Engine Optimization) / LLM-Friendly
 
 ### Current State (Fixed April 10, 2026)
