@@ -305,14 +305,21 @@ class ContentIdeaController extends Controller
      */
     public function importTrending(Request $request): JsonResponse
     {
-        $validated = $request->validate([
+        $request->validate([
             'topics' => 'required|array|min:1',
             'topics.*.title' => 'required|string|max:500',
             'topics.*.source' => 'nullable|string',
         ]);
 
+        // Read raw input (not $request->validated()) so enrichment fields
+        // (heat, publisher, publisher_tier, pub_date, publisher_count, etc.)
+        // survive into source_data. The validated() array only contains keys
+        // listed in rules above, which silently drops everything else.
+        $topics = (array) $request->input('topics', []);
+
         $imported = [];
-        foreach ($validated['topics'] as $topic) {
+        foreach ($topics as $topic) {
+            if (empty($topic['title'])) continue;
             $imported[] = ContentIdea::create([
                 'title' => $topic['title'],
                 'source' => $topic['source'] ?? 'manual',

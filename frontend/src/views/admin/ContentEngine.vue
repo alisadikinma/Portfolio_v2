@@ -1194,6 +1194,17 @@ async function handleImportTrending() {
     source: t.source,
     pillar: t.pillar || '',
     priority: t.priority || 'medium',
+    // Forward enrichment fields (publisher / heat / pub_date / coverage count)
+    // so the backend persists them in source_data. These drive the trending-
+    // priority sort and the card meta display when the idea renders in the list.
+    publisher: t.publisher || '',
+    publisher_tier: t.publisher_tier ?? null,
+    pub_date: t.pub_date || '',
+    heat: t.heat || '',
+    publisher_count: t.publisher_count ?? 0,
+    trusted_publisher_count: t.trusted_publisher_count ?? 0,
+    description: t.description || '',
+    link: t.link || '',
   }))
   const result = await importTrending(topics)
   if (result.success) {
