@@ -103,7 +103,14 @@
       "Bash(claude plugin:*)",
       "Bash(claude plugins:*)",
       "Read(//d/Projects/sparkfluence_platform/src/components/studio/panels/**)",
-      "Read(//d/Projects/sparkfluence_platform/src/**)"
+      "Read(//d/Projects/sparkfluence_platform/src/**)",
+      "Bash(D:/xampp/php/php.exe -l D:/Projects/Portfolio_v2/backend/app/Services/ImageGenerationService.php)",
+      "Bash(scp d:/tmp/backfill-images.php alisadikinma_vps:/tmp/)",
+      "Bash(D:/xampp/php/php.exe -l d:/Projects/Portfolio_v2/backend/app/Http/Controllers/Api/Admin/ContentIdeaController.php)",
+      "Bash(D:/xampp/php/php.exe -l d:/Projects/Portfolio_v2/backend/routes/api.php)",
+      "Bash(D:/xampp/php/php.exe -l d:/Projects/Portfolio_v2/backend/app/Services/ArticleGenerationService.php)",
+      "Bash(D:/xampp/php/php.exe -l d:/Projects/Portfolio_v2/backend/config/services.php)",
+      "Bash(D:/xampp/php/php.exe -l d:/Projects/Portfolio_v2/backend/app/Services/ImageGenerationService.php)"
     ],
     "deny": [],
     "ask": [],
