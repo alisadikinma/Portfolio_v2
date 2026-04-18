@@ -34,8 +34,15 @@ class CoverBrandingEnhancer
         $type = $prompt['type'] ?? null;
 
         if ($type === 'cover') {
-            // 1. Inject title instruction into prompt_text
-            $title = $this->sanitizeTitle($this->resolveTitle($idea));
+            // 1. Inject title instruction into prompt_text.
+            // Source priority: user-editable caption first, then article title.
+            // Caption is the field users actually edit in the admin UI — per
+            // CLAUDE.md it's "article title (exact or light SEO paraphrase)"
+            // for covers, so using it as the overlay source matches user mental
+            // model (edit caption → see it rendered) and keeps semantics intact.
+            $caption = is_string($prompt['caption'] ?? null) ? trim($prompt['caption']) : '';
+            $titleSource = $caption !== '' ? $caption : $this->resolveTitle($idea);
+            $title = $this->sanitizeTitle($titleSource);
             $title = $this->truncateTitle($title);
             $promptText = $prompt['prompt_text'] ?? '';
             $prompt['prompt_text'] = $this->injectTitleInstruction($promptText, $title);

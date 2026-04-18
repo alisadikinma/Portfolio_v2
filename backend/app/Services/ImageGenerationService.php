@@ -204,6 +204,17 @@ class ImageGenerationService
                 elseif (is_string($ref) && $ref !== '') $brandRefUrls[] = $ref;
             }
 
+            // Watermark logo URL the enhancer pushed into file_urls. Merge into
+            // styleRefs (not faceRefs) so queue() doesn't append a "maintain
+            // facial identity" instruction that would misapply to a brand logo.
+            // The more specific watermark instruction already in $promptText
+            // dominates. Without this merge the logo URL is dropped and the
+            // model fabricates a letterform watermark from scratch.
+            $enhancerFileUrls = array_values(array_filter(
+                $enhanced['file_urls'] ?? [],
+                fn ($u) => is_string($u) && $u !== ''
+            ));
+
             $uuid = $this->queue(
                 postId: null,
                 prompt: $promptText,
@@ -213,7 +224,7 @@ class ImageGenerationService
                 aspectRatio: $prompt['aspect_ratio'] ?? '16:9',
                 style: $prompt['style'] ?? 'Photorealistic',
                 faceRefs: array_merge($faceRefs, $brandRefUrls),
-                styleRefs: $prompt['style_refs'] ?? [],
+                styleRefs: array_merge($prompt['style_refs'] ?? [], $enhancerFileUrls),
                 additionalNotes: $prompt['additional_notes'] ?? '',
                 plannedFilename: $this->buildBrandedFilename($idea, $i)
             );

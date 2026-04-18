@@ -180,4 +180,5 @@ class ImageGenerationTriggerForIdeaTest extends TestCase
         $this->assertSame(0, $count);
         $this->assertSame('article_ready', $idea->status);
     }
+
 }

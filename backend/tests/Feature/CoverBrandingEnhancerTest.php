@@ -107,6 +107,55 @@ class CoverBrandingEnhancerTest extends TestCase
     }
 
     /** @test */
+    public function cover_overlay_uses_caption_when_present_not_article_title()
+    {
+        // Regression: the user-editable caption field must drive the big
+        // thumbnail-style overlay rendered into the image. Previously the
+        // enhancer always used resolveTitle($idea), so users who edited the
+        // caption in the admin UI saw no change on regenerate.
+        $prompt = [
+            'type' => 'cover',
+            'prompt_text' => 'A scene',
+            'visual_direction' => 'abstract',
+            'caption' => '15 examples of what Gemini 3 can do',
+            'face_refs' => [],
+            'model' => 'nano-banana-2',
+        ];
+
+        $this->mockSetting(null);
+        $idea = $this->makeIdea(['title' => 'Completely Different Article Title']);
+
+        $result = $this->enhancer->enhance($prompt, $idea);
+
+        $this->assertStringContainsString('15 examples of what Gemini 3 can do', $result['prompt_text']);
+        $this->assertStringNotContainsString('Completely Different Article Title', $result['prompt_text']);
+    }
+
+    /** @test */
+    public function cover_overlay_falls_back_to_article_title_when_caption_empty()
+    {
+        // When caption is blank/whitespace/missing, overlay must still render —
+        // fall through to resolveTitle($idea) so cold-start ideas aren't blank.
+        foreach ([null, '', '   '] as $emptyCaption) {
+            $prompt = [
+                'type' => 'cover',
+                'prompt_text' => 'A scene',
+                'visual_direction' => 'abstract',
+                'caption' => $emptyCaption,
+                'face_refs' => [],
+                'model' => 'nano-banana-2',
+            ];
+
+            $this->mockSetting(null);
+            $idea = $this->makeIdea(['title' => 'Fallback Article Title']);
+
+            $result = $this->enhancer->enhance($prompt, $idea);
+
+            $this->assertStringContainsString('Fallback Article Title', $result['prompt_text']);
+        }
+    }
+
+    /** @test */
     public function cover_prompt_with_human_keyword_prepends_creator_face_url()
     {
         Storage::disk('public')->put('about/ali.png', 'fake-image-data');
