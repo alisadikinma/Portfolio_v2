@@ -368,9 +368,13 @@
             </option>
           </select>
         </div>
-        <!-- Search + Select All -->
-        <div class="flex items-center gap-3 mb-3">
-          <input v-model="trendingSearch" type="text" placeholder="Search topics... (e.g. claude)" class="flex-1 rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 text-sm px-3 py-2 focus:ring-amber-500 focus:border-amber-500 placeholder-neutral-400" />
+        <!-- Search + Trusted toggle + Select All -->
+        <div class="flex items-center gap-3 mb-3 flex-wrap">
+          <input v-model="trendingSearch" type="text" placeholder="Search topics... (e.g. claude)" class="flex-1 min-w-[200px] rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 text-sm px-3 py-2 focus:ring-amber-500 focus:border-amber-500 placeholder-neutral-400" />
+          <label class="flex items-center gap-2 cursor-pointer whitespace-nowrap text-xs text-neutral-600 dark:text-neutral-400" title="Filter to Tier 1 + Tier 2 publishers (Reuters, Bloomberg, TechCrunch, WIRED, etc.)">
+            <input type="checkbox" v-model="trustedOnly" class="rounded border-neutral-300 text-amber-600 focus:ring-amber-500" />
+            Trusted only
+          </label>
           <label v-if="filteredTrending.length" class="flex items-center gap-2 cursor-pointer whitespace-nowrap text-xs text-neutral-500 dark:text-neutral-400">
             <input type="checkbox" :checked="allFilteredSelected" @change="toggleSelectAll" class="rounded border-neutral-300 text-amber-600 focus:ring-amber-500" />
             Select All
@@ -385,15 +389,38 @@
           <label v-for="topic in pagedTrending" :key="topic.title || topic.topic" class="flex items-start gap-3 p-3 rounded-lg border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-700/30 cursor-pointer transition-colors">
             <input type="checkbox" :value="topic" v-model="selectedTrending" class="mt-0.5 rounded border-neutral-300 text-amber-600 focus:ring-amber-500" />
             <div class="flex-1 min-w-0">
-              <p class="text-sm font-medium text-neutral-900 dark:text-neutral-100">{{ topic.title || topic.topic }}</p>
-              <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-neutral-100 text-neutral-500 dark:bg-neutral-700 dark:text-neutral-400 mt-1">{{ topic.source || 'unknown' }}</span>
+              <p class="text-sm font-medium text-neutral-900 dark:text-neutral-100 line-clamp-2">{{ topic.title || topic.topic }}</p>
+              <!-- Meta line: publisher · relative date · coverage count -->
+              <div class="flex items-center flex-wrap gap-x-1.5 gap-y-0.5 mt-1 text-[10px] text-neutral-500 dark:text-neutral-400">
+                <span v-if="topic.publisher" class="font-medium truncate max-w-[140px]" :title="topic.publisher">{{ topic.publisher }}</span>
+                <span v-if="topic.publisher && topic.pub_date" class="text-neutral-300 dark:text-neutral-600">·</span>
+                <span v-if="topic.pub_date" :title="topic.pub_date">{{ relativeDate(topic.pub_date) }}</span>
+                <span v-if="topic.publisher_count > 1" class="text-neutral-300 dark:text-neutral-600">·</span>
+                <span v-if="topic.publisher_count > 1" class="italic" :title="`Covered by ${topic.publisher_count} publishers`">{{ topic.publisher_count }} sources</span>
+              </div>
+              <!-- Badge row: heat + source type + tier -->
+              <div class="flex items-center flex-wrap gap-1 mt-1.5">
+                <span v-if="topic.heat === 'hot'" class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/30">
+                  🔥 HOT
+                </span>
+                <span v-else-if="topic.heat === 'trending'" class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                  📈 TRENDING
+                </span>
+                <span v-if="topic.publisher_tier === 1" class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20" title="Tier 1 — Authoritative publisher">
+                  TIER 1
+                </span>
+                <span v-else-if="topic.publisher_tier === 2" class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20" title="Tier 2 — Reputable publisher">
+                  TIER 2
+                </span>
+                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-neutral-100 text-neutral-500 dark:bg-neutral-700 dark:text-neutral-400">{{ topic.source || 'unknown' }}</span>
+              </div>
             </div>
           </label>
         </div>
         <div class="flex items-center justify-between mt-3 pt-3 border-t border-neutral-100 dark:border-neutral-700/50">
           <!-- Always show the total count, even when the result set fits on one page -->
           <span class="text-xs text-neutral-500 dark:text-neutral-400">
-            Showing {{ pageRangeLabel }}<span v-if="trendingSearch.trim() || trendingSourceFilter" class="text-neutral-400 dark:text-neutral-500"> (filtered from {{ trendingTopics.length }})</span>
+            Showing {{ pageRangeLabel }}<span v-if="trendingSearch.trim() || trendingSourceFilter || trustedOnly" class="text-neutral-400 dark:text-neutral-500"> (filtered from {{ trendingTopics.length }})</span>
           </span>
           <div v-if="filteredTrending.length > perPage" class="flex items-center gap-1">
             <button
@@ -670,29 +697,52 @@ const trendingTopics = ref([])
 const selectedTrending = ref([])
 const trendingSourceFilter = ref('')
 const trendingSearch = ref('')
+const trustedOnly = ref(true) // default: hide tier-3 niche blogs
 const currentPage = ref(1)
 const perPage = 24
 const filteredTrending = computed(() => {
   let results = trendingTopics.value
+  if (trustedOnly.value) {
+    // Tier 1+2 only. Keep entries that lack a tier (non-news sources) visible.
+    results = results.filter(t => !t.publisher_tier || t.publisher_tier <= 2)
+  }
   if (trendingSourceFilter.value) {
     results = results.filter(t => t.source === trendingSourceFilter.value)
   }
   if (trendingSearch.value.trim()) {
-    // Multi-token AND search across title + description + pillar. Lets users
-    // type "claude design" and match any item containing both words, in any
-    // order, regardless of whether they're adjacent in the title.
+    // Multi-token AND search across title + description + pillar + publisher.
     const tokens = trendingSearch.value.trim().toLowerCase().split(/\s+/).filter(Boolean)
     results = results.filter(t => {
       const haystack = [
         t.title || '',
         t.description || '',
         t.pillar || '',
+        t.publisher || '',
       ].join(' ').toLowerCase()
       return tokens.every(tok => haystack.includes(tok))
     })
   }
   return results
 })
+
+// Convert an RFC-822 (or ISO) date string to "3h ago" / "2d ago" / "Apr 14".
+// Returns '' when the date is unparseable or empty.
+function relativeDate(dateStr) {
+  if (!dateStr) return ''
+  const t = Date.parse(dateStr)
+  if (isNaN(t)) return ''
+  const diffMs = Date.now() - t
+  const diffMin = Math.floor(diffMs / 60000)
+  if (diffMin < 1) return 'just now'
+  if (diffMin < 60) return `${diffMin}m ago`
+  const diffHr = Math.floor(diffMin / 60)
+  if (diffHr < 24) return `${diffHr}h ago`
+  const diffDay = Math.floor(diffHr / 24)
+  if (diffDay < 7) return `${diffDay}d ago`
+  // Older than a week — show absolute short date
+  const d = new Date(t)
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
 const allFilteredSelected = computed(() => filteredTrending.value.length > 0 && filteredTrending.value.every(t => selectedTrending.value.includes(t)))
 const visibleSelectedCount = computed(() =>
   filteredTrending.value.filter(t => selectedTrending.value.includes(t)).length
@@ -711,7 +761,7 @@ const pageRangeLabel = computed(() => {
   const end = Math.min(currentPage.value * perPage, filteredTrending.value.length)
   return `${start}-${end} of ${filteredTrending.value.length}`
 })
-watch([trendingSearch, trendingSourceFilter], () => { currentPage.value = 1 })
+watch([trendingSearch, trendingSourceFilter, trustedOnly], () => { currentPage.value = 1 })
 watch([() => filters.pillar, () => filters.status, () => filters.priority, () => filters.search], () => {
   selectedIdeaIds.value = []
 })

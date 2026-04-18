@@ -348,10 +348,12 @@ class TrendingTopicService
 
                 $items = $this->parseRss($response->body());
                 foreach ($items as &$item) {
-                    // Clean Google News title: remove " - SourceName" suffix
+                    // Publisher now comes from <source> element via parseRss; still strip
+                    // the " - Publisher" suffix from the display title for readability.
                     $item['title'] = preg_replace('/\s*-\s*[^-]{2,40}$/', '', $item['title']);
                     $item['source'] = 'google_news';
                     $item['score'] = 75; // News is timely and authoritative
+                    $item['publisher_tier'] = $this->classifyPublisherTier($item['publisher'] ?? '');
                 }
                 $results = array_merge($results, $items);
             } catch (\Exception $e) {
@@ -379,11 +381,21 @@ class TrendingTopicService
                 $title = trim((string) $item->title);
                 if (empty($title)) continue;
 
+                // Google News RSS includes <source url="...">Publisher</source> — clean extraction
+                $publisher = isset($item->source) ? trim((string) $item->source) : '';
+                if ($publisher === '') {
+                    // Fallback: parse trailing " - Publisher" from title
+                    if (preg_match('/\s-\s([^-]{2,40})$/', $title, $m)) {
+                        $publisher = trim($m[1]);
+                    }
+                }
+
                 $items[] = [
                     'title' => $title,
                     'description' => trim((string) ($item->description ?? '')),
                     'link' => trim((string) ($item->link ?? '')),
                     'pub_date' => trim((string) ($item->pubDate ?? '')),
+                    'publisher' => $publisher,
                 ];
             }
         } catch (\Exception $e) {
@@ -391,6 +403,133 @@ class TrendingTopicService
         }
 
         return $items;
+    }
+
+    // ------------------------------------------------------------------------
+    // Publisher trust tiers — used to filter + weight virality scoring.
+    // Keys match against case-insensitive `contains` on publisher string.
+    // ------------------------------------------------------------------------
+    private const TIER_1_PUBLISHERS = [
+        'reuters', 'bloomberg', 'wall street journal', 'wsj', 'new york times', 'nyt',
+        'bbc', 'associated press', 'ap news', 'financial times', 'the economist',
+        'techcrunch', 'wired', 'the verge', 'ars technica', 'mit technology review',
+        'cnbc', 'forbes', 'the guardian', 'washington post', 'axios',
+    ];
+
+    private const TIER_2_PUBLISHERS = [
+        'mashable', 'engadget', 'zdnet', 'business insider', 'fast company',
+        '9to5mac', '9to5google', 'the information', 'venturebeat', 'techradar',
+        'cnet', 'pcmag', 'siliconangle', 'decrypt', 'semafor', 'protocol',
+        'anthropic', 'openai', 'google', 'microsoft', 'amazon', // official vendor blogs
+        'kompas', 'detik', 'cnn indonesia', 'liputan6', 'tempo', 'tribun',
+    ];
+
+    private function classifyPublisherTier(string $publisher): int
+    {
+        $lower = strtolower($publisher);
+        if ($lower === '') return 3;
+        foreach (self::TIER_1_PUBLISHERS as $p) if (str_contains($lower, $p)) return 1;
+        foreach (self::TIER_2_PUBLISHERS as $p) if (str_contains($lower, $p)) return 2;
+        return 3;
+    }
+
+    /**
+     * Group trends with ≥60% overlapping significant-word sets. Picks the
+     * highest-tier publisher's title as canonical, sums distinct publishers,
+     * and records the publisher list so the UI can show "covered by 4 sources".
+     */
+    private function dedupAndRank(array $trends): array
+    {
+        // Stable ordering: tier asc then date desc so tier-1 wins canonical title.
+        usort($trends, function ($a, $b) {
+            $tierDiff = ($a['publisher_tier'] ?? 3) <=> ($b['publisher_tier'] ?? 3);
+            if ($tierDiff !== 0) return $tierDiff;
+            $aTs = strtotime($a['pub_date'] ?? '') ?: 0;
+            $bTs = strtotime($b['pub_date'] ?? '') ?: 0;
+            return $bTs <=> $aTs;
+        });
+
+        $tokenize = function (string $title): array {
+            $clean = preg_replace('/[^a-z0-9\s]/i', ' ', strtolower($title));
+            $words = array_filter(explode(' ', $clean), fn($w) => strlen($w) > 3);
+            return array_values(array_unique($words));
+        };
+
+        $clusters = [];
+        foreach ($trends as $t) {
+            $tokens = $tokenize($t['title'] ?? '');
+            if (empty($tokens)) continue;
+            $merged = false;
+            foreach ($clusters as $ci => &$cluster) {
+                $intersect = count(array_intersect($tokens, $cluster['tokens']));
+                $smaller = min(count($tokens), count($cluster['tokens'])) ?: 1;
+                if ($intersect / $smaller >= 0.6) {
+                    $cluster['publishers'][] = $t['publisher'] ?? '';
+                    $cluster['tiers'][] = $t['publisher_tier'] ?? 3;
+                    $cluster['pub_dates'][] = $t['pub_date'] ?? '';
+                    $merged = true;
+                    break;
+                }
+            }
+            unset($cluster);
+            if (!$merged) {
+                $clusters[] = [
+                    'canonical' => $t,
+                    'tokens' => $tokens,
+                    'publishers' => [$t['publisher'] ?? ''],
+                    'tiers' => [$t['publisher_tier'] ?? 3],
+                    'pub_dates' => [$t['pub_date'] ?? ''],
+                ];
+            }
+        }
+
+        $now = time();
+        $output = [];
+        foreach ($clusters as $c) {
+            $canon = $c['canonical'];
+            // Only count distinct trusted publishers (tier 1+2) for heat.
+            $trustedPublishers = [];
+            foreach ($c['publishers'] as $idx => $pub) {
+                if (($c['tiers'][$idx] ?? 3) <= 2 && $pub !== '') {
+                    $trustedPublishers[strtolower($pub)] = $pub;
+                }
+            }
+            $trustedCount = count($trustedPublishers);
+
+            // Hottest age across all reports in the cluster (lowest hours).
+            $minAgeH = PHP_INT_MAX;
+            foreach ($c['pub_dates'] as $d) {
+                $ts = strtotime($d) ?: 0;
+                if ($ts > 0) {
+                    $ageH = ($now - $ts) / 3600;
+                    if ($ageH < $minAgeH) $minAgeH = $ageH;
+                }
+            }
+            if ($minAgeH === PHP_INT_MAX) $minAgeH = 9999;
+
+            // Heat: 🔥 HOT = 3+ trusted in 24h; 📈 TRENDING = 2 publishers in 12h
+            $allPublishers = array_filter($c['publishers'], fn($p) => $p !== '');
+            $allCount = count(array_unique(array_map('strtolower', $allPublishers)));
+            if ($trustedCount >= 3 && $minAgeH <= 24) {
+                $heat = 'hot';
+            } elseif ($allCount >= 2 && $minAgeH <= 12) {
+                $heat = 'trending';
+            } else {
+                $heat = 'standard';
+            }
+
+            $canon['publisher_count'] = $allCount;
+            $canon['trusted_publisher_count'] = $trustedCount;
+            $canon['heat'] = $heat;
+            $canon['age_hours'] = round($minAgeH, 1);
+            // Boost score by heat + trust so downstream sort surfaces best first.
+            $heatBoost = $heat === 'hot' ? 40 : ($heat === 'trending' ? 20 : 0);
+            $tierBoost = (4 - ($canon['publisher_tier'] ?? 3)) * 10;
+            $canon['score'] = ($canon['score'] ?? 50) + $heatBoost + $tierBoost;
+            $output[] = $canon;
+        }
+
+        return $output;
     }
 
     private function filterTechTopics(array $trends): array
@@ -476,6 +615,17 @@ class TrendingTopicService
         }
 
         $techTrends = $this->filterTechTopics($allTrends);
+        // Ensure publisher_tier is populated even for non-news sources so the
+        // frontend always sees a consistent schema.
+        foreach ($techTrends as &$t) {
+            if (!isset($t['publisher_tier'])) {
+                $t['publisher_tier'] = $this->classifyPublisherTier($t['publisher'] ?? '');
+            }
+        }
+        unset($t);
+        // Cluster near-duplicate topics so cross-publisher coverage becomes a
+        // virality signal rather than list-spam.
+        $techTrends = $this->dedupAndRank($techTrends);
         usort($techTrends, fn($a, $b) => ($b['score'] ?? 0) <=> ($a['score'] ?? 0));
 
         return $techTrends;
