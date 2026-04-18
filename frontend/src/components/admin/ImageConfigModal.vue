@@ -57,6 +57,8 @@ watch(() => [props.visible, props.segment?.index], ([vis]) => {
 
 const segLabel = computed(() => props.segment?.label || 'Image')
 const segConcept = computed(() => props.segment?.concept || '')
+const segCaption = computed(() => (props.segment?.caption || '').trim())
+const isCoverSeg = computed(() => props.segment?.type === 'cover')
 
 // ── Face ref handlers ──
 async function handleFaceFileUpload(e) {
@@ -188,6 +190,23 @@ function handleApply() {
           <div class="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-neutral-200 dark:divide-neutral-700">
             <!-- LEFT: Notes + Face Refs + Model/Style -->
             <div class="p-5 space-y-5">
+              <!-- Caption preview (read-only — edited on main page) -->
+              <div v-if="segCaption">
+                <label class="block text-[11px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider mb-1.5">
+                  <span class="inline-flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z"/></svg>
+                    Caption
+                  </span>
+                </label>
+                <div class="px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40">
+                  <p class="text-xs text-amber-800 dark:text-amber-300 leading-snug">{{ segCaption }}</p>
+                  <p class="text-[10px] text-amber-600/70 dark:text-amber-400/70 mt-1">
+                    {{ isCoverSeg ? 'Rendered as the hero caption on the blog post.' : 'Figcaption below the image on the blog post.' }}
+                    Edit on the main page.
+                  </p>
+                </div>
+              </div>
+
               <!-- Additional Notes -->
               <div>
                 <label class="block text-[11px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider mb-1.5">Additional Notes (optional)</label>
