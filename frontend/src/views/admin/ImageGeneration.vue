@@ -304,9 +304,16 @@ async function generateSingle(segIndex) {
   if (result.success) {
     const uuid = result.data?.uuid
     const varIdx = result.data?.variation_index ?? (seg.variations || []).length
-    // Append the new variation slot locally
     if (!seg.variations) seg.variations = []
-    seg.variations.push({ url: null, job_uuid: uuid, status: 'generating' })
+    // Backend uses retry-in-place — when a failed/orphan slot exists it reuses
+    // that slot's index rather than appending. Mirror that locally so the UI
+    // stays consistent with DB; otherwise the local "ghost" slot disappears on refresh.
+    if (varIdx < seg.variations.length) {
+      seg.variations[varIdx] = { url: null, job_uuid: uuid, status: 'generating' }
+    } else {
+      seg.variations.push({ url: null, job_uuid: uuid, status: 'generating' })
+    }
+    seg.selected_variation = varIdx
     seg.job_uuid = uuid
     toast.success(`Image variation ${varIdx + 1} generation started`)
   } else {
