@@ -172,18 +172,27 @@ function initSegments() {
     const hasAnyDone = variations.some(v => v.status === 'done' && v.url)
     const anyGenerating = variations.some(v => v.status === 'generating')
 
-    // Segment-level status: generating if any variation is generating, done if any done, else pending
+    // Segment-level status: generating if any variation is generating, done if any done,
+    // failed when variations exist but all failed, else fall back to DB / pending.
     let segStatus = img.status || 'pending'
     if (anyGenerating) segStatus = 'generating'
     else if (hasAnyDone) segStatus = 'done'
+    else if (variations.length > 0 && variations.every(v => v.status === 'failed')) segStatus = 'failed'
     else if (segStatus === 'generating' && !img.job_uuid) segStatus = 'failed'
+
+    // Auto-fill caption when plugin didn't author one. Cover → article title;
+    // inline → concept (plugin already writes short descriptive concepts). User edits
+    // win on next save via persistDraft and stick on reload.
+    const autoCaption = img.type === 'cover'
+      ? (article.title || idea.value?.title || '')
+      : (img.concept || '')
 
     return {
       ...img,
       index: i,
       visual_direction: img.visual_direction || img.prompt || '',
       visual_direction_original: img.visual_direction_original || '',
-      caption: img.caption || '',
+      caption: img.caption || autoCaption,
       needs_creator_face: img.needs_creator_face ?? false,
       style: img.style || 'Photorealistic',
       model: img.model || 'nano-banana-pro',
@@ -384,6 +393,7 @@ function startPolling() {
       // Update segment-level status
       const anyGenerating = (seg.variations || []).some(v => v.status === 'generating')
       const anyDone = (seg.variations || []).some(v => v.status === 'done' && v.url)
+      const vars = seg.variations || []
       if (anyGenerating) {
         seg.status = 'generating'
       } else if (anyDone) {
@@ -399,6 +409,9 @@ function startPolling() {
             seg.generated_url = seg.variations[firstDone].url
           }
         }
+      } else if (vars.length > 0 && vars.every(v => v.status === 'failed')) {
+        // All variations failed → surface failure so user can retry
+        seg.status = 'failed'
       }
     }
   }, 5000)

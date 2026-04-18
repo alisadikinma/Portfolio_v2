@@ -136,14 +136,19 @@ class CoverBrandingEnhancer
         }
 
         $relative = ltrim($value, '/');
-        $diskPath = preg_replace('#^storage/#', '', $relative);
+        $relative = preg_replace('#^storage/#', '', $relative);
 
-        if (!Storage::disk('public')->exists($diskPath)) {
-            Log::warning('Cover branding: creator_brand_logo file not found on disk', ['path' => $diskPath]);
-            return null;
+        // Files are saved to webroot (public_path) by SettingsController::updateCreatorBrandSettings,
+        // not to storage/app/public. Check webroot first, then fall back to storage disk for legacy paths.
+        if (file_exists(public_path($relative))) {
+            return url('/' . $relative);
+        }
+        if (Storage::disk('public')->exists($relative)) {
+            return url('/storage/' . $relative);
         }
 
-        return url('/storage/' . $diskPath);
+        Log::warning('Cover branding: creator_brand_logo file not found on disk', ['path' => $relative]);
+        return null;
     }
 
     /**
@@ -236,14 +241,19 @@ class CoverBrandingEnhancer
 
         $relative = ltrim($value, '/');
         // Strip leading "storage/" if stored with the prefix
-        $diskPath = preg_replace('#^storage/#', '', $relative);
+        $relative = preg_replace('#^storage/#', '', $relative);
 
-        if (!Storage::disk('public')->exists($diskPath)) {
-            Log::warning('Cover branding: profile_photo file not found on disk', ['path' => $diskPath]);
-            return null;
+        // SettingsController::updateAboutSettings saves profile_photo to webroot (public_path).
+        // Check webroot first, fall back to storage disk for legacy paths.
+        if (file_exists(public_path($relative))) {
+            return url('/' . $relative);
+        }
+        if (Storage::disk('public')->exists($relative)) {
+            return url('/storage/' . $relative);
         }
 
-        return url('/storage/' . $diskPath);
+        Log::warning('Cover branding: profile_photo file not found on disk', ['path' => $relative]);
+        return null;
     }
 
     private function resolveTitle(ContentIdea $idea): string
