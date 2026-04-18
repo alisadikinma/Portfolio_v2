@@ -17,8 +17,13 @@ class CreatorBrandSettingsSeeder extends Seeder
             ['key' => 'watermark_enabled',     'value' => 'false',            'type' => 'text'],
         ];
 
+        // firstOrCreate — NOT updateOrCreate — so running this seeder on every
+        // deploy (see scripts/deploy.sh) only inserts missing rows and never
+        // clobbers values the user has saved through the admin UI. Using
+        // updateOrCreate here caused watermark_enabled, tagline, slug, and
+        // opacity to reset to defaults on every production deploy.
         foreach ($settings as $setting) {
-            Setting::updateOrCreate(
+            Setting::firstOrCreate(
                 ['key' => $setting['key'], 'group' => 'creator_brand'],
                 ['value' => $setting['value'], 'type' => $setting['type']]
             );

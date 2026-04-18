@@ -423,7 +423,18 @@ async function handleStockImageSelect(imageUrl, segIndex) {
 // ── Poll for generation completion ──
 function startPolling() {
   pollInterval = setInterval(async () => {
-    const generating = segments.value.some(s => s.status === 'generating')
+    // Check both segment status AND variation status. A segment can have
+    // status='done' (one variation finished) while another variation is still
+    // 'generating' — e.g. user clicked "+" to add a second variant. Without
+    // the variation-level check, a race inside this same poll loop (stale
+    // local variations mid-generateSingle) can flip seg.status to 'done'
+    // based on the existing done variation, after which polling bails out
+    // and the new variation stays stuck on the spinner until page refresh.
+    const generating = segments.value.some(s =>
+      s.status === 'generating' ||
+      s.status === 'rewriting_vd' ||
+      (s.variations || []).some(v => v.status === 'generating')
+    )
     if (!generating) return
 
     const result = await getIdea(idea.value.id)

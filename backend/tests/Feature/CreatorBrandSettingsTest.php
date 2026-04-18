@@ -50,6 +50,30 @@ class CreatorBrandSettingsTest extends TestCase
     }
 
     /** @test */
+    public function seeder_preserves_user_saved_values_on_rerun(): void
+    {
+        // Simulates: fresh install → seeder → user saves custom values via
+        // admin UI → deploy runs seeder again. User values MUST survive.
+        // Regression guard: seeder previously used updateOrCreate which
+        // clobbered watermark settings on every production deploy.
+        $this->seed(CreatorBrandSettingsSeeder::class);
+
+        Setting::where('group', 'creator_brand')->where('key', 'watermark_enabled')->update(['value' => 'true']);
+        Setting::where('group', 'creator_brand')->where('key', 'watermark_opacity')->update(['value' => '0.75']);
+        Setting::where('group', 'creator_brand')->where('key', 'creator_brand_tagline')->update(['value' => 'custom tagline']);
+        Setting::where('group', 'creator_brand')->where('key', 'creator_brand_slug')->update(['value' => 'customslug']);
+        Setting::where('group', 'creator_brand')->where('key', 'creator_brand_logo')->update(['value' => '/uploads/branding/user-logo.png']);
+
+        $this->seed(CreatorBrandSettingsSeeder::class);
+
+        $this->assertSame('true', Setting::where('group', 'creator_brand')->where('key', 'watermark_enabled')->value('value'));
+        $this->assertSame('0.75', Setting::where('group', 'creator_brand')->where('key', 'watermark_opacity')->value('value'));
+        $this->assertSame('custom tagline', Setting::where('group', 'creator_brand')->where('key', 'creator_brand_tagline')->value('value'));
+        $this->assertSame('customslug', Setting::where('group', 'creator_brand')->where('key', 'creator_brand_slug')->value('value'));
+        $this->assertSame('/uploads/branding/user-logo.png', Setting::where('group', 'creator_brand')->where('key', 'creator_brand_logo')->value('value'));
+    }
+
+    /** @test */
     public function image_generation_jobs_table_has_planned_filename_column(): void
     {
         $this->assertTrue(
