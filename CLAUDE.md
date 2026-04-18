@@ -438,6 +438,42 @@ npm run build         # Production build
 npm run preview       # Preview production build
 ```
 
+## Deployment (Auto CI/CD — NO Manual Deploy)
+
+**Production deploys are fully automated via GitHub Actions. Never SSH-deploy manually.**
+
+Every `git push origin main` triggers [.github/workflows/deploy.yml](.github/workflows/deploy.yml), which SSHs into the VPS and runs [scripts/deploy.sh](scripts/deploy.sh):
+
+1. `git fetch + reset --hard origin/main`
+2. `composer install --no-dev --optimize-autoloader`
+3. `php artisan migrate --force`
+4. Idempotent seeders (e.g. `CreatorBrandSettingsSeeder`)
+5. Laravel cache clear + recache (config/route/view)
+6. `npm ci + npm run build` (frontend)
+7. Fix `storage/` + `bootstrap/cache/` permissions
+8. `php artisan queue:restart`
+9. Health check via `curl https://alisadikinma.com/api/health`
+
+**Workflow:**
+```bash
+git add <files>
+git commit -m "..."
+git push origin main   # ← auto-deploys, watch at https://github.com/alisadikinma/Portfolio_v2/actions
+```
+
+**Manual trigger** (rare — e.g. retry after infra fix): Actions tab → *Deploy to VPS* → Run workflow.
+
+**Bypass build steps** (debug only): `DEPLOY_SKIP_FRONTEND=1` or `DEPLOY_SKIP_COMPOSER=1` on the VPS when running `scripts/deploy.sh` directly.
+
+**Required GitHub secrets** (already configured — see [.github/workflows/README.md](.github/workflows/README.md)): `VPS_SSH_HOST`, `VPS_SSH_USER`, `VPS_SSH_KEY`, `VPS_SSH_PORT`, `VPS_PROJECT_PATH`.
+
+**Concurrency:** `deploy-production` group with `cancel-in-progress: false` — pushes during an active deploy queue rather than interrupt mid-migration.
+
+**DO NOT:**
+- Manually `ssh` and run `git pull` / `deploy.sh` (creates drift vs. workflow state)
+- `--force` push to `main` (breaks concurrent deploy assumptions)
+- Edit files directly on the VPS (next deploy will `git reset --hard` over them)
+
 ## Code Style Conventions
 
 ### Laravel
