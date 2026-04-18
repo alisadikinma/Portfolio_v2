@@ -5,7 +5,7 @@
 # Runs ON the VPS, in the project root. Designed to be:
 #   - Idempotent (safe to re-run)
 #   - Non-interactive (for CI/CD)
-#   - Fail-fast (halts on any error)
+#   - Fail-fast (halts on any error, with clear diagnostic output)
 #
 # Invocation:
 #   ./scripts/deploy.sh                   # standard deploy
@@ -17,10 +17,57 @@
 
 set -euo pipefail
 
+# ---- 0. Load shell environment (non-interactive SSH skips these by default) --
+# Tools like composer/npm/php/node often live in non-default PATH — must source
+# login profiles to pick them up.
+[ -f /etc/profile ]          && . /etc/profile           || true
+[ -f "$HOME/.bashrc" ]       && . "$HOME/.bashrc"        || true
+[ -f "$HOME/.profile" ]      && . "$HOME/.profile"       || true
+[ -f "$HOME/.bash_profile" ] && . "$HOME/.bash_profile"  || true
+
+# Extend PATH with common install locations so we don't depend on shell rc
+export PATH="$HOME/.local/bin:$HOME/bin:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:$PATH"
+
+# Load NVM if present (Node.js via nvm is common on VPS installs)
+if [ -s "$HOME/.nvm/nvm.sh" ]; then
+  export NVM_DIR="$HOME/.nvm"
+  # shellcheck disable=SC1091
+  . "$NVM_DIR/nvm.sh"
+fi
+
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_ROOT"
 
 echo "▶ Deploying from $(pwd) @ $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+echo "▶ User: $(whoami) | Host: $(hostname)"
+echo "▶ PATH: $PATH"
+
+# ---- 0.5. Preflight tool check — fail fast with actionable message -----------
+echo "▶ Preflight tool check:"
+missing_tools=()
+for tool in git composer php node npm; do
+  if path="$(command -v "$tool" 2>/dev/null)"; then
+    printf "  ✓ %-10s %s\n" "$tool" "$path"
+  else
+    printf "  ✗ %-10s NOT FOUND\n" "$tool"
+    missing_tools+=("$tool")
+  fi
+done
+
+if [ ${#missing_tools[@]} -gt 0 ]; then
+  echo ""
+  echo "❌ Missing tools: ${missing_tools[*]}"
+  echo "   Fix: ensure they're installed on the VPS and in the deploy user's PATH."
+  echo "   Common install paths to check:"
+  echo "     composer → /usr/local/bin/composer"
+  echo "     npm/node → /usr/bin/, /usr/local/bin/, or via nvm in ~/.nvm/"
+  echo "     php      → /usr/bin/php"
+  echo ""
+  echo "   Workarounds if tools exist but aren't in PATH:"
+  echo "     1. Add to ~/.bashrc: export PATH=\"/path/to/tool:\$PATH\""
+  echo "     2. Or set DEPLOY_SKIP_COMPOSER=1 / DEPLOY_SKIP_FRONTEND=1 to bypass"
+  exit 127
+fi
 
 # ---- 1. Git sync ------------------------------------------------------------
 echo "▶ git fetch + fast-forward origin/main"
