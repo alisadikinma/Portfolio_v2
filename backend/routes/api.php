@@ -395,6 +395,21 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
             'content_length' => $request->header('Content-Length'),
         ]);
 
+        // Defense: reject shell-quoting corruption where body parses as
+        // {"<url>": null} instead of a real structured payload.
+        if (!$request->has('article') && !$request->has('generated_article') && !$request->has('combined_score')) {
+            \Illuminate\Support\Facades\Log::warning('[complete] rejected malformed body', [
+                'idea_id' => $id,
+                'keys_received' => array_keys($request->all()),
+                'raw_body_preview' => substr($request->getContent(), 0, 300),
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Missing required fields. Body must include "article" or "combined_score". Use file-based curl to avoid shell quoting corruption.',
+                'keys_received' => array_keys($request->all()),
+            ], 400);
+        }
+
         // Detect schema: new plugin sends "article" key, old sends "generated_article"
         if ($request->has('article')) {
             // New schema from article-content-writer plugin v1.1+
@@ -572,8 +587,25 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
             return response()->json(['success' => false, 'message' => 'Idea not found.'], 404);
         }
 
+        $prepData = $request->input('prep_data', []);
+
+        // Defense: prep_data must be a populated object. Reject shell-quoted
+        // payload corruption (where the body becomes {"<url>": null}).
+        if (!is_array($prepData) || empty($prepData) || !isset($prepData['outline'])) {
+            \Illuminate\Support\Facades\Log::warning('[save-prep] rejected malformed body', [
+                'idea_id' => $id,
+                'keys_received' => array_keys($request->all()),
+                'raw_body_preview' => substr($request->getContent(), 0, 300),
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Missing or invalid prep_data. Body must be JSON with prep_data.outline at minimum. Use file-based curl (curl -d @file.json) to avoid shell quoting issues.',
+                'keys_received' => array_keys($request->all()),
+            ], 400);
+        }
+
         $existing = $idea->generated_article ?? [];
-        $existing['prep_data'] = $request->input('prep_data', []);
+        $existing['prep_data'] = $prepData;
         $idea->update(['generated_article' => $existing]);
 
         return response()->json(['success' => true, 'message' => 'Prep data saved.']);
@@ -588,6 +620,27 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
         $existing = $idea->generated_article ?? [];
         // Merge article data, preserving prep_data
         $articleData = $request->except(['prep_data']);
+
+        // Defense: reject malformed bodies where shell quoting mangled the
+        // curl payload (e.g. keys like "/automation/..." with null values).
+        // See debug 2026-04-18: idea #74 saved a URL path as the only key
+        // because bash split the -d argument on unescaped quotes in content.
+        $hasTitle = isset($articleData['title']) && is_string($articleData['title']) && trim($articleData['title']) !== '';
+        $hasContent = isset($articleData['content']) && is_string($articleData['content']) && trim($articleData['content']) !== '';
+        if (!$hasTitle || !$hasContent) {
+            \Illuminate\Support\Facades\Log::warning('[save-article] rejected malformed body', [
+                'idea_id' => $id,
+                'keys_received' => array_keys($articleData),
+                'content_type' => $request->header('Content-Type'),
+                'raw_body_preview' => substr($request->getContent(), 0, 300),
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Missing required fields. Body must be JSON with title (non-empty) and content (non-empty). Re-send using file-based curl (curl -d @prompt.json) to avoid shell quoting issues.',
+                'keys_received' => array_keys($articleData),
+            ], 400);
+        }
+
         $idea->update(['generated_article' => array_merge($existing, $articleData)]);
 
         return response()->json(['success' => true, 'message' => 'Article data saved.']);
@@ -740,6 +793,7 @@ Route::middleware(['auth:sanctum'])->prefix('admin/content-engine')->group(funct
     Route::post('/ideas/{id}/archive', [ContentIdeaController::class, 'archive']);
     Route::post('/ideas/{id}/restore', [ContentIdeaController::class, 'restore']);
     Route::post('/ideas/{id}/revert', [ContentIdeaController::class, 'revertToDraft']);
+    Route::post('/ideas/{id}/resume', [ContentIdeaController::class, 'resumePipeline']);
 
     // Trending topics
     Route::get('/trending', [ContentIdeaController::class, 'pullTrending']);

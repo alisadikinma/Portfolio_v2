@@ -221,6 +221,47 @@ class ContentIdeaController extends Controller
         return response()->json(['success' => true, 'data' => $idea->fresh(), 'message' => 'Reverted to draft.']);
     }
 
+    /**
+     * Resume pipeline from the last incomplete sub-step.
+     * Unlike revertToDraft, this preserves partial progress:
+     *   - prep_data present + no article body → resumes at article-write
+     *   - article body present + no scores → resumes at article-score
+     *   - article_ready → dispatches image generation
+     *   - completed + no post → publishes
+     *
+     * Works for both stuck 'researching' ideas and terminal 'failed' ideas.
+     */
+    public function resumePipeline($id): JsonResponse
+    {
+        $idea = ContentIdea::find($id);
+        if (!$idea) {
+            return response()->json(['success' => false, 'message' => 'Content idea not found.'], 404);
+        }
+
+        if (!in_array($idea->status, ['researching', 'failed', 'generating_images', 'article_ready', 'completed'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Resume requires status researching, failed, generating_images, article_ready, or completed. Current: ' . $idea->status,
+            ], 422);
+        }
+
+        try {
+            $orchestrator = app(\App\Services\AutoPipelineOrchestrator::class);
+            $resumed = $orchestrator->resumeIdea($idea);
+
+            return response()->json([
+                'success' => true,
+                'data' => $resumed->fresh(),
+                'message' => 'Pipeline resumed from ' . $resumed->current_step,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Resume failed: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
     // ========================================================================
     // TRENDING TOPICS
     // ========================================================================

@@ -131,23 +131,126 @@ class AutoPipelineOrchestrator
 
         if (!$idea) return null;
 
-        $stage = $idea->pipeline_failed_stage;
-        Log::info("[AutoPipeline] Retrying idea #{$idea->id} stage={$stage} attempt=" . ($idea->pipeline_attempts + 1));
+        Log::info("[AutoPipeline] Retrying idea #{$idea->id} stage={$idea->pipeline_failed_stage} attempt=" . ($idea->pipeline_attempts + 1));
 
-        // Reset status to prior stage + clear retry schedule
-        $previousStatus = match ($stage) {
-            'research' => 'draft',
-            'images' => 'article_ready',
-            'publish' => 'completed',
-            default => 'draft',
-        };
+        // Resume from the exact sub-step that failed — don't restart from scratch
+        return $this->resumeIdea($idea);
+    }
 
+    /**
+     * Resume a stuck/failed idea from the last incomplete sub-step.
+     * Inspects generated_article data to decide which trigger to invoke:
+     *   - no prep_data          → re-run prep (Steps 1-3)
+     *   - no title/content      → re-run write (Step 4)
+     *   - article_ready + no images → dispatch images
+     *   - completed + no post   → publish
+     *   - otherwise             → re-run score (Step 5)
+     *
+     * Callable from admin "Resume" endpoint (manual ideas) and from
+     * retryDueFailed (auto-mode ideas). Clears failed state and schedules
+     * the next step directly.
+     */
+    public function resumeIdea(ContentIdea $idea): ContentIdea
+    {
+        $article = $idea->generated_article ?? [];
+        $hasPrep = !empty(data_get($article, 'prep_data.outline'));
+        $hasTitle = !empty(data_get($article, 'title'));
+        $hasContent = !empty(data_get($article, 'content'));
+        $hasScored = !empty(data_get($article, 'combined_score')) || !empty(data_get($article, 'virality_score'));
+
+        // Clear failed scheduling before dispatching
         $idea->update([
-            'status' => $previousStatus,
             'pipeline_next_retry_at' => null,
+            'pipeline_failed_stage' => null,
         ]);
 
-        // Re-enter the pipeline immediately on next tick
+        try {
+            if (!$hasPrep) {
+                return $this->resumeAtPrep($idea);
+            }
+            if (!$hasTitle || !$hasContent) {
+                return $this->resumeAtWrite($idea);
+            }
+            if (!$hasScored && $idea->status !== 'article_ready' && $idea->status !== 'completed') {
+                return $this->resumeAtScore($idea);
+            }
+            if ($idea->status === 'article_ready') {
+                // Images stage
+                $dispatched = $this->imageGen->triggerForIdea($idea);
+                $idea->update([
+                    'status' => $dispatched > 0 ? 'generating_images' : 'completed',
+                    'pipeline_last_attempt_at' => now(),
+                ]);
+                Log::info("[AutoPipeline] Resume: idea #{$idea->id} dispatched {$dispatched} image jobs");
+                return $idea;
+            }
+            if ($idea->status === 'completed' && !Post::where('source_idea_id', $idea->id)->exists()) {
+                $result = $this->publishService->publish($idea);
+                $this->telegram->notifyPublishSuccess($result['post']);
+                Log::info("[AutoPipeline] Resume: idea #{$idea->id} published");
+                return $idea;
+            }
+            // Fallback: article data exists + status unclear → retry score
+            return $this->resumeAtScore($idea);
+        } catch (\Throwable $e) {
+            Log::error("[AutoPipeline] Resume failed for idea #{$idea->id}: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    private function resumeAtPrep(ContentIdea $idea): ContentIdea
+    {
+        $languages = $idea->languages ?? ['id'];
+        $result = $this->articleGen->triggerPrep($idea->id, [
+            'topic' => $idea->title,
+            'languages' => $languages,
+            'instructions' => $idea->instructions ?? '',
+        ]);
+        if (!($result['success'] ?? false)) {
+            throw new \RuntimeException('triggerPrep returned unsuccessful: ' . ($result['error'] ?? 'unknown'));
+        }
+        $idea->update([
+            'status' => 'researching',
+            'progress_percentage' => 0,
+            'current_step' => 'prep_resume',
+            'process_pid' => $result['pid'] ?? null,
+            'pipeline_last_attempt_at' => now(),
+        ]);
+        Log::info("[AutoPipeline] Resume: idea #{$idea->id} re-started at prep (pid={$result['pid']})");
+        return $idea;
+    }
+
+    private function resumeAtWrite(ContentIdea $idea): ContentIdea
+    {
+        $result = $this->articleGen->triggerWrite($idea->id);
+        if (!($result['success'] ?? false)) {
+            throw new \RuntimeException('triggerWrite returned unsuccessful: ' . ($result['error'] ?? 'unknown'));
+        }
+        $idea->update([
+            'status' => 'researching',
+            'progress_percentage' => 50,
+            'current_step' => 'write_resume',
+            'process_pid' => $result['pid'] ?? null,
+            'pipeline_last_attempt_at' => now(),
+        ]);
+        Log::info("[AutoPipeline] Resume: idea #{$idea->id} re-started at write (pid={$result['pid']})");
+        return $idea;
+    }
+
+    private function resumeAtScore(ContentIdea $idea): ContentIdea
+    {
+        $result = $this->articleGen->triggerScore($idea->id);
+        if (!($result['success'] ?? false)) {
+            throw new \RuntimeException('triggerScore returned unsuccessful: ' . ($result['error'] ?? 'unknown'));
+        }
+        $idea->update([
+            'status' => 'researching',
+            'progress_percentage' => 85,
+            'current_step' => 'score_resume',
+            'process_pid' => $result['pid'] ?? null,
+            'pipeline_last_attempt_at' => now(),
+        ]);
+        Log::info("[AutoPipeline] Resume: idea #{$idea->id} re-started at score (pid={$result['pid']})");
         return $idea;
     }
 
