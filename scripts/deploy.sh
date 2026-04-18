@@ -20,10 +20,14 @@ set -euo pipefail
 # ---- 0. Load shell environment (non-interactive SSH skips these by default) --
 # Tools like composer/npm/php/node often live in non-default PATH — must source
 # login profiles to pick them up.
+# IMPORTANT: disable `nounset` temporarily — system profile scripts (byobu,
+# bash-completion, etc.) often reference unset vars which would trip `set -u`.
+set +u
 [ -f /etc/profile ]          && . /etc/profile           || true
 [ -f "$HOME/.bashrc" ]       && . "$HOME/.bashrc"        || true
 [ -f "$HOME/.profile" ]      && . "$HOME/.profile"       || true
 [ -f "$HOME/.bash_profile" ] && . "$HOME/.bash_profile"  || true
+set -u
 
 # Extend PATH with common install locations so we don't depend on shell rc
 export PATH="$HOME/.local/bin:$HOME/bin:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:$PATH"
