@@ -507,7 +507,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
                     prompt: $prompt['visual_direction'] ?? $prompt['prompt'] ?? '',
                     type: ($prompt['type'] ?? 'inline') === 'cover' ? 'hero' : 'inline',
                     insertAfterHeading: null,
-                    model: $prompt['model'] ?? 'nano-banana-2',
+                    model: $prompt['model'] ?? config('content.default_image_model', 'nano-banana-pro'),
                     aspectRatio: $prompt['aspect_ratio'] ?? '16:9',
                     style: $prompt['style'] ?? 'Photorealistic'
                 );
@@ -622,7 +622,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
                     prompt: $item['prompt'] ?? '',
                     type: ($item['type'] ?? 'inline') === 'cover' ? 'hero' : 'inline',
                     insertAfterHeading: $item['insert_after_heading'] ?? null,
-                    model: $item['model'] ?? 'nano-banana-2',
+                    model: $item['model'] ?? config('content.default_image_model', 'nano-banana-pro'),
                     aspectRatio: $item['aspect_ratio'] ?? '16:9',
                     style: $item['style'] ?? 'Cinematic',
                     faceRefs: $item['face_refs'] ?? [],

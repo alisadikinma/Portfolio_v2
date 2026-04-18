@@ -656,7 +656,7 @@ class ContentIdeaController extends Controller
         ]);
 
         $segmentIndex = $request->input('segment_index');
-        $model = $request->input('model', 'nano-banana-2');
+        $model = $request->input('model', config('content.default_image_model', 'nano-banana-pro'));
         $aspectRatio = $request->input('aspect_ratio', '16:9');
         $style = $request->input('style');
         $prompt = $request->input('prompt');

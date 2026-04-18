@@ -75,9 +75,9 @@ function hasSegmentConfig(seg) {
 let saveTimeout = null
 let pollInterval = null
 
-// ── Style/Model/Ratio options (defaults: Photorealistic, nano-banana-2, 16:9) ──
+// ── Style/Model/Ratio options (defaults: Photorealistic, nano-banana-pro, 16:9) ──
 const styleOptions = ['Photorealistic', 'Cinematic', 'Portrait Cinematic', 'Minimal', 'Abstract', 'Illustration']
-const modelOptions = ['nano-banana-2', 'nano-banana-pro', 'imagen-4']
+const modelOptions = ['nano-banana-pro', 'nano-banana-2', 'imagen-4']
 const ratioOptions = ['16:9', '4:3', '1:1', '9:16']
 
 // ── Load idea ──
@@ -149,7 +149,7 @@ function initSegments() {
       visual_direction: img.visual_direction || img.prompt || '',
       visual_direction_original: img.visual_direction_original || '',
       style: img.style || 'Photorealistic',
-      model: img.model || 'nano-banana-2',
+      model: img.model || 'nano-banana-pro',
       aspect_ratio: img.aspect_ratio || '16:9',
       reference_image_url: img.reference_image_url || '',
       face_refs: (img.face_refs || []).filter(isUsableRef),
