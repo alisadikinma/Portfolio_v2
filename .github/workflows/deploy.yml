@@ -1,0 +1,51 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:  # allow manual trigger from GitHub UI
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false  # never cancel a running deploy mid-flight
+
+jobs:
+  deploy:
+    name: Auto-deploy to production VPS
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout (sanity check only — not rsynced)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H -p ${{ secrets.VPS_SSH_PORT || '22' }} ${{ secrets.VPS_SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Run deploy.sh on VPS
+        env:
+          SSH_HOST: ${{ secrets.VPS_SSH_HOST }}
+          SSH_USER: ${{ secrets.VPS_SSH_USER }}
+          SSH_PORT: ${{ secrets.VPS_SSH_PORT || '22' }}
+          PROJECT_PATH: ${{ secrets.VPS_PROJECT_PATH }}
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            -p "$SSH_PORT" \
+            -o StrictHostKeyChecking=yes \
+            -o ServerAliveInterval=30 \
+            "$SSH_USER@$SSH_HOST" \
+            "cd '$PROJECT_PATH' && bash scripts/deploy.sh"
+
+      - name: Verify deploy via /api/health
+        run: |
+          sleep 3
+          curl --fail --silent --show-error --max-time 15 \
+            https://alisadikinma.com/api/health \
+            -o /tmp/health.json
+          cat /tmp/health.json
