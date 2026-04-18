@@ -328,6 +328,10 @@ class TrendingTopicService
             // AI-specific search feeds (not generic "Technology" topic)
             'https://news.google.com/rss/search?q=artificial+intelligence+OR+AI+agents+OR+LLM+OR+ChatGPT+OR+Claude+AI+OR+Gemini+AI&hl=en&gl=US&ceid=US:en',
             'https://news.google.com/rss/search?q=vibe+coding+OR+AI+automation+OR+AI+video+generation+OR+generative+AI&hl=en&gl=US&ceid=US:en',
+            // AI vendor product launches — picks up Anthropic/OpenAI/Google/xAI
+            // releases (Claude Design, Claude Skills, GPT-5, Gemini 3, Grok X, etc.)
+            // that the generic AI queries above sometimes miss.
+            'https://news.google.com/rss/search?q=Anthropic+OR+OpenAI+launch+OR+%22Claude+Code%22+OR+%22Claude+Skills%22+OR+%22Claude+Agents%22+OR+%22Claude+Design%22+OR+%22GPT-5%22+OR+%22Gemini+3%22+OR+xAI+Grok&hl=en&gl=US&ceid=US:en',
             // Indonesian AI news
             'https://news.google.com/rss/search?q=kecerdasan+buatan+OR+AI+Indonesia+OR+ChatGPT+OR+otomatisasi+AI&hl=id&gl=ID&ceid=ID:id',
         ];

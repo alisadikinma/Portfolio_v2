@@ -677,8 +677,18 @@ const filteredTrending = computed(() => {
     results = results.filter(t => t.source === trendingSourceFilter.value)
   }
   if (trendingSearch.value.trim()) {
-    const q = trendingSearch.value.trim().toLowerCase()
-    results = results.filter(t => (t.title || '').toLowerCase().includes(q))
+    // Multi-token AND search across title + description + pillar. Lets users
+    // type "claude design" and match any item containing both words, in any
+    // order, regardless of whether they're adjacent in the title.
+    const tokens = trendingSearch.value.trim().toLowerCase().split(/\s+/).filter(Boolean)
+    results = results.filter(t => {
+      const haystack = [
+        t.title || '',
+        t.description || '',
+        t.pillar || '',
+      ].join(' ').toLowerCase()
+      return tokens.every(tok => haystack.includes(tok))
+    })
   }
   return results
 })
