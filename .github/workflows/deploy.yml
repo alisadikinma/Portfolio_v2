@@ -22,11 +22,23 @@ jobs:
           fetch-depth: 1
 
       - name: Install SSH key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_KEY }}
+          SSH_HOST: ${{ secrets.VPS_SSH_HOST }}
+          SSH_PORT: ${{ secrets.VPS_SSH_PORT || '22' }}
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 700 ~/.ssh
+          # Preserve newlines via env var (NOT inline interpolation — that corrupts multi-line keys)
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H -p ${{ secrets.VPS_SSH_PORT || '22' }} ${{ secrets.VPS_SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+          # Validate key is a real OpenSSH key (fail fast with clear message)
+          head -1 ~/.ssh/deploy_key | grep -qE '^-----BEGIN (OPENSSH|RSA|EC) PRIVATE KEY-----$' \
+            || { echo "::error::VPS_SSH_KEY secret is malformed — missing BEGIN header"; exit 1; }
+          # ssh-keyscan is best-effort; failure is OK because the SSH step uses accept-new fallback
+          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null \
+            || echo "::warning::ssh-keyscan failed — will use StrictHostKeyChecking=accept-new on connect"
+          chmod 600 ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: Run deploy.sh on VPS
         env:
@@ -37,8 +49,10 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key \
             -p "$SSH_PORT" \
-            -o StrictHostKeyChecking=yes \
+            -o StrictHostKeyChecking=accept-new \
+            -o UserKnownHostsFile=~/.ssh/known_hosts \
             -o ServerAliveInterval=30 \
+            -o ConnectTimeout=30 \
             "$SSH_USER@$SSH_HOST" \
             "cd '$PROJECT_PATH' && bash scripts/deploy.sh"
 
