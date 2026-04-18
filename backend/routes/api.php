@@ -539,6 +539,33 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
         return response()->json(['success' => true, 'data' => $idea]);
     });
 
+    Route::get('/content-ideas/{id}/mechanical-scores', function ($id) {
+        $idea = \App\Models\ContentIdea::find($id);
+        if (!$idea) {
+            return response()->json(['success' => false, 'message' => 'Idea not found.'], 404);
+        }
+        $article = $idea->generated_article ?? [];
+        $title = data_get($article, 'title', $idea->title ?? '');
+        $content = data_get($article, 'content', '');
+        $keyword = data_get($article, 'keyword', data_get($article, 'prep_data.keyword', ''));
+        $language = data_get($article, 'language', 'id');
+
+        if ($content === '' || $title === '') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Article content or title missing. Save article data first via /save-article.',
+            ], 409);
+        }
+
+        $scorer = app(\App\Services\MechanicalScoringService::class);
+        $scores = $scorer->analyze($title, $content, $keyword, [
+            'language' => $language,
+            'current_year' => (int) date('Y'),
+        ]);
+
+        return response()->json(['success' => true, 'data' => $scores]);
+    });
+
     Route::put('/content-ideas/{id}/save-prep', function (\Illuminate\Http\Request $request, $id) {
         $idea = \App\Models\ContentIdea::find($id);
         if (!$idea) {
