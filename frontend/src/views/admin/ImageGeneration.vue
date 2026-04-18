@@ -18,6 +18,8 @@ const loadError = ref(null)
 const segments = ref([])
 const generatingAll = ref(false)
 const configSegment = ref(null) // segment being configured in modal
+const variantConfirmSeg = ref(null) // segment awaiting variant-confirm modal
+const variantExtraNote = ref('')
 const lightboxIndex = ref(-1)
 const adHocPreview = ref(null) // { url, title } — for chip clicks (face/style refs)
 const generatedSegments = computed(() => segments.value.filter(s => s.status === 'done' && s.generated_url))
@@ -284,6 +286,43 @@ async function handleGenerateAll() {
     await generateSingle(seg.index)
   }
   generatingAll.value = false
+}
+
+// Opens the variant confirmation modal. Lets user tack on a one-off
+// instruction for this attempt only (won't pollute seg.additional_notes)
+// and explicitly confirm before firing the API call + spending tokens.
+function openVariantConfirm(segIndex) {
+  const seg = segments.value[segIndex]
+  if (!seg) return
+  if ((seg.variations || []).length >= 3) {
+    toast.error('Maximum 3 variations per segment')
+    return
+  }
+  variantConfirmSeg.value = seg
+  variantExtraNote.value = ''
+}
+
+function closeVariantConfirm() {
+  variantConfirmSeg.value = null
+  variantExtraNote.value = ''
+}
+
+async function confirmVariantGenerate() {
+  const seg = variantConfirmSeg.value
+  if (!seg) return
+  const extra = variantExtraNote.value.trim()
+  const savedNotes = seg.additional_notes
+  // Merge one-off instruction with existing notes for this single call.
+  // Restore original notes after dispatch so the extra doesn't stick.
+  if (extra) {
+    seg.additional_notes = savedNotes ? `${savedNotes}\n${extra}` : extra
+  }
+  closeVariantConfirm()
+  try {
+    await generateSingle(seg.index)
+  } finally {
+    if (extra) seg.additional_notes = savedNotes
+  }
 }
 
 async function generateSingle(segIndex) {
@@ -855,7 +894,9 @@ async function handleApprove() {
                   <span v-if="v.source === 'stock'" class="absolute bottom-0.5 right-0.5 px-1 py-px text-[7px] font-bold uppercase rounded bg-blue-500/80 text-white leading-none">S</span>
                 </button>
 
-                <!-- Add variation: dropdown with Generate / Stock options -->
+                <!-- Add variation: dropdown with Generate / Stock options. Opens upward
+                     to avoid being clipped by the card's bottom edge when this segment
+                     card sits near the bottom of the viewport. -->
                 <div
                   v-if="(seg.variations || []).length < 3 && !(seg.variations || []).some(v => v.status === 'generating')"
                   class="relative flex-shrink-0 group/add"
@@ -866,9 +907,9 @@ async function handleApprove() {
                   >
                     <svg class="w-5 h-5 text-neutral-400 dark:text-neutral-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
                   </button>
-                  <!-- Dropdown -->
-                  <div class="absolute top-full left-0 mt-1 w-36 rounded-lg bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 shadow-lg opacity-0 invisible group-hover/add:opacity-100 group-hover/add:visible transition-all z-20">
-                    <button @click="generateSingle(seg.index)" class="w-full px-3 py-2 text-left text-xs text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 rounded-t-lg flex items-center gap-2">
+                  <!-- Dropdown (opens upward) -->
+                  <div class="absolute bottom-full left-0 mb-1 w-36 rounded-lg bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 shadow-lg opacity-0 invisible group-hover/add:opacity-100 group-hover/add:visible transition-all z-50">
+                    <button @click="openVariantConfirm(seg.index)" class="w-full px-3 py-2 text-left text-xs text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 rounded-t-lg flex items-center gap-2">
                       <svg class="w-3.5 h-3.5 text-amber-500" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                       Generate AI
                     </button>
@@ -907,6 +948,47 @@ async function handleApprove() {
       @apply="handleConfigApply"
       @close="configSegment = null"
     />
+
+    <!-- Variant Confirm Modal -->
+    <Teleport to="body">
+      <div v-if="variantConfirmSeg" class="fixed inset-0 z-[60] flex items-center justify-center p-4">
+        <div @click="closeVariantConfirm" class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
+        <div class="relative w-full max-w-md bg-white dark:bg-neutral-800 rounded-2xl shadow-2xl border border-neutral-200 dark:border-neutral-700">
+          <div class="px-5 py-4 border-b border-neutral-200 dark:border-neutral-700">
+            <h3 class="text-base font-semibold text-neutral-900 dark:text-neutral-100">Generate new variant?</h3>
+            <p class="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+              {{ (variantConfirmSeg.variations || []).length === 0
+                  ? `Create the first image for ${variantConfirmSeg.label}.`
+                  : `Another attempt for ${variantConfirmSeg.label} (${(variantConfirmSeg.variations || []).length}/3 used).` }}
+            </p>
+          </div>
+          <div class="px-5 py-4 space-y-3">
+            <div>
+              <label class="block text-[11px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider mb-1.5">
+                Additional instruction <span class="text-neutral-400 normal-case font-normal">(optional, one-off)</span>
+              </label>
+              <textarea
+                v-model="variantExtraNote"
+                rows="3"
+                maxlength="300"
+                class="w-full px-3 py-2 text-sm rounded-xl border border-neutral-200 dark:border-neutral-600/60 bg-neutral-50 dark:bg-neutral-900/50 text-neutral-900 dark:text-neutral-100 focus:ring-1 focus:ring-amber-500/50 focus:border-amber-500/50 placeholder-neutral-400 dark:placeholder-neutral-600 resize-none"
+                placeholder="e.g. make it more dramatic, cooler palette, tighter composition..."
+              ></textarea>
+              <p class="text-[10px] text-neutral-400 dark:text-neutral-500 mt-1">Applies only to this attempt — won't modify the saved notes on the segment.</p>
+            </div>
+          </div>
+          <div class="px-5 py-3 border-t border-neutral-200 dark:border-neutral-700 flex items-center justify-end gap-2">
+            <button @click="closeVariantConfirm" class="px-4 py-2 text-sm font-medium rounded-lg border border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors">
+              Cancel
+            </button>
+            <button @click="confirmVariantGenerate" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-amber-600 hover:bg-amber-700 text-white transition-colors">
+              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+              Generate
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
 
     <!-- Image Lightbox -->
     <BaseLightbox
