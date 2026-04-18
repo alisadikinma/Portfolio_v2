@@ -46,7 +46,7 @@ class ContentIdeaController extends Controller
             $query->where('title', 'like', '%' . $request->query('search') . '%');
         }
 
-        // Admin page ships without client-side pagination so the dedup-grouping
+        // Admin page ships without client-side pagination so the trending-score
         // sort covers the entire dataset. Cap at 500 to prevent runaway queries
         // if the table ever explodes in size.
         $perPage = min((int) $request->query('per_page', 500), 500);
@@ -58,6 +58,15 @@ class ContentIdeaController extends Controller
                 $this->syncIdeaStatus($idea);
             }
         }
+
+        // Trending-priority sort: HOT topics with many trusted publishers and
+        // fresh pub_dates float to row 1 so the user works the highest-signal
+        // headlines first. Manual (non-trending-import) ideas fall back to
+        // created_at order. Uses fields populated by TrendingTopicService
+        // during import and stored in source_data JSON.
+        $items = $ideas->items();
+        usort($items, fn ($a, $b) => $this->computeTrendingScore($b) <=> $this->computeTrendingScore($a));
+        $ideas->setCollection(collect($items));
 
         return response()->json([
             'success' => true,
@@ -805,6 +814,18 @@ class ContentIdeaController extends Controller
         $finalModel = $enhanced['model'] ?? $model;
         $finalFaceRefs = $enhanced['face_refs'] ?? array_merge($faceRefs, $brandRefUrls);
 
+        // Watermark logo URL the enhancer pushed into file_urls. Merge into
+        // styleRefs so it reaches GeminiGen as a multipart file reference —
+        // the more specific watermark instruction in $finalPrompt dominates.
+        // Without this, the logo URL never ships and the model invents a
+        // letterform watermark from scratch (rendered the brand slug "AD"
+        // instead of the actual uploaded logo PNG).
+        $enhancerFileUrls = array_values(array_filter(
+            $enhanced['file_urls'] ?? [],
+            fn ($u) => is_string($u) && $u !== ''
+        ));
+        $finalStyleRefs = array_merge($styleRefs, $enhancerFileUrls);
+
         // Call GeminiGen via ImageGenerationService
         $imageService = app(\App\Services\ImageGenerationService::class);
         $uuid = $imageService->queue(
@@ -816,7 +837,7 @@ class ContentIdeaController extends Controller
             aspectRatio: $aspectRatio,
             style: $style,
             faceRefs: $finalFaceRefs,
-            styleRefs: $styleRefs,
+            styleRefs: $finalStyleRefs,
             additionalNotes: $additionalNotes
         );
 
@@ -1174,6 +1195,56 @@ class ContentIdeaController extends Controller
                 'workflows' => $idea->workflows,
             ],
         ]);
+    }
+
+    // ========================================================================
+    // INTERNAL: Trending-score sort helper
+    // ========================================================================
+
+    /**
+     * Score an idea for "trending priority" sort. Higher = closer to row 1.
+     * Weights: heat tier (dominant) > trusted publisher count > pub_date recency >
+     * created_at recency as tiebreaker for manual ideas with no trend metadata.
+     *
+     * Values pulled from source_data JSON populated by TrendingTopicService
+     * during import. Manual ideas (no source_data) score 0 + created_at, so
+     * they fall below any trending-import item.
+     */
+    private function computeTrendingScore(ContentIdea $idea): float
+    {
+        $data = is_array($idea->source_data) ? $idea->source_data : [];
+
+        $heat = strtolower((string) ($data['heat'] ?? ''));
+        $heatBonus = match ($heat) {
+            'hot' => 10000,
+            'trending' => 5000,
+            'standard' => 500,
+            default => 0,
+        };
+
+        $trustedCount = (int) ($data['trusted_publisher_count'] ?? $data['publisher_count'] ?? 0);
+        $coverageBonus = min($trustedCount, 10) * 100;
+
+        // Fresher news wins. pub_date is RFC-822; convert to age in hours.
+        $pubTs = !empty($data['pub_date']) ? strtotime($data['pub_date']) : 0;
+        $recencyBonus = 0;
+        if ($pubTs > 0) {
+            $ageHours = max(0, (time() - $pubTs) / 3600);
+            // Linear decay over 7 days, then flat zero.
+            $recencyBonus = max(0, 168 - $ageHours) * 2; // up to 336
+        }
+
+        // Tiebreaker only: normalize created_at to 0..100 based on how recent
+        // it is within the last 30 days. Keeps manual ideas below any trending
+        // import (which starts at +500 for standard, +5000 for trending).
+        $createdTs = $idea->created_at ? $idea->created_at->timestamp : 0;
+        $createdBonus = 0;
+        if ($createdTs > 0) {
+            $ageDays = max(0, (time() - $createdTs) / 86400);
+            $createdBonus = max(0, 30 - $ageDays) * (100 / 30); // 0..100
+        }
+
+        return $heatBonus + $coverageBonus + $recencyBonus + $createdBonus;
     }
 
     // ========================================================================
