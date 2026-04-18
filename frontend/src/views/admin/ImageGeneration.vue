@@ -148,6 +148,19 @@ function mapManifestToSegment(manifest, img, segIndex) {
 
 const isAwaitingBrand = computed(() => idea.value?.status === 'awaiting_brand_images')
 
+// Trim inline auto-caption to max ~80 chars on a word boundary, with an
+// ellipsis. Strips trailing punctuation before appending so we don't get
+// ",…" or ";…" glued together. Only runs on the auto-default path — once
+// a user edits and saves, we keep whatever they wrote verbatim.
+function shortenCaption(text, maxLen = 80) {
+  const s = (text || '').trim()
+  if (s.length <= maxLen) return s
+  const slice = s.slice(0, maxLen - 1)
+  const lastSpace = slice.lastIndexOf(' ')
+  const base = lastSpace > maxLen * 0.5 ? slice.slice(0, lastSpace) : slice
+  return base.replace(/[.,;:\-–—]+$/, '').trim() + '…'
+}
+
 function initSegments() {
   const article = idea.value?.generated_article
   if (!article?.image_prompts) return
@@ -180,12 +193,12 @@ function initSegments() {
     else if (variations.length > 0 && variations.every(v => v.status === 'failed')) segStatus = 'failed'
     else if (segStatus === 'generating' && !img.job_uuid) segStatus = 'failed'
 
-    // Auto-fill caption when plugin didn't author one. Cover → article title;
-    // inline → concept (plugin already writes short descriptive concepts). User edits
-    // win on next save via persistDraft and stick on reload.
+    // Auto-fill caption when plugin didn't author one. Cover → article title (full);
+    // inline → concept trimmed to ≤80 chars on a word boundary so figcaptions stay
+    // tight and powerful. User edits win on next save via persistDraft and stick on reload.
     const autoCaption = img.type === 'cover'
       ? (article.title || idea.value?.title || '')
-      : (img.concept || '')
+      : shortenCaption(img.concept || '', 80)
 
     return {
       ...img,
