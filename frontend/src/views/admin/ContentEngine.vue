@@ -159,6 +159,49 @@
 
     <!-- Ideas Table -->
     <div class="bg-white dark:bg-neutral-800 rounded-xl shadow-sm border border-neutral-200 dark:border-neutral-700 overflow-hidden">
+      <!-- Tabs: Draft / Completed -->
+      <div class="flex items-center border-b border-neutral-200 dark:border-neutral-700 px-2">
+        <button
+          type="button"
+          @click="switchTab('draft')"
+          :class="[
+            'px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors',
+            activeTab === 'draft'
+              ? 'border-amber-500 text-amber-600 dark:text-amber-400'
+              : 'border-transparent text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200'
+          ]"
+        >
+          Draft
+          <span
+            :class="[
+              'ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-semibold rounded-full',
+              activeTab === 'draft'
+                ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400'
+                : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-400'
+            ]"
+          >{{ draftCount }}</span>
+        </button>
+        <button
+          type="button"
+          @click="switchTab('completed')"
+          :class="[
+            'px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors',
+            activeTab === 'completed'
+              ? 'border-amber-500 text-amber-600 dark:text-amber-400'
+              : 'border-transparent text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200'
+          ]"
+        >
+          Completed
+          <span
+            :class="[
+              'ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-semibold rounded-full',
+              activeTab === 'completed'
+                ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400'
+                : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-400'
+            ]"
+          >{{ completedCount }}</span>
+        </button>
+      </div>
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead>
@@ -182,18 +225,19 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-neutral-100 dark:divide-neutral-700">
-            <tr v-if="isLoading && !ideas.length">
+            <tr v-if="isLoading && !displayedIdeas.length">
               <td colspan="8" class="px-4 py-12 text-center text-neutral-500 dark:text-neutral-400">
                 <svg class="animate-spin h-6 w-6 mx-auto mb-2 text-amber-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
                 Loading ideas...
               </td>
             </tr>
-            <tr v-else-if="!ideas.length">
+            <tr v-else-if="!displayedIdeas.length">
               <td colspan="8" class="px-4 py-12 text-center text-neutral-500 dark:text-neutral-400">
-                No ideas found. Click "Add Idea" or "Pull Trending" to get started.
+                <template v-if="activeTab === 'completed'">No completed ideas yet.</template>
+                <template v-else>No ideas found. Click "Add Idea" or "Pull Trending" to get started.</template>
               </td>
             </tr>
-            <tr v-for="(idea, idx) in ideas" :key="idea.id" class="hover:bg-neutral-50 dark:hover:bg-neutral-700/30 transition-colors" :class="{ 'bg-amber-50/50 dark:bg-amber-900/10': selectedIdeaIds.includes(idea.id) }">
+            <tr v-for="(idea, idx) in displayedIdeas" :key="idea.id" class="hover:bg-neutral-50 dark:hover:bg-neutral-700/30 transition-colors" :class="{ 'bg-amber-50/50 dark:bg-amber-900/10': selectedIdeaIds.includes(idea.id) }">
               <td class="px-4 py-3 align-top">
                 <input
                   type="checkbox"
@@ -275,7 +319,7 @@
       <!-- Total count footer -->
       <div class="flex items-center justify-end px-4 py-3 border-t border-neutral-200 dark:border-neutral-700">
         <span class="text-xs text-neutral-500 dark:text-neutral-400">
-          {{ ideas.length }} ideas
+          {{ displayedIdeas.length }} {{ activeTab === 'completed' ? 'completed' : 'draft' }} / {{ ideas.length }} total
         </span>
       </div>
     </div>
@@ -571,20 +615,34 @@ const healthOnline = ref(false)
 const ideas = ref([])
 const selectedIdeaIds = ref([])
 const bulkProcessing = ref(false)
+const activeTab = ref('draft')
+const displayedIdeas = computed(() => {
+  if (activeTab.value === 'completed') {
+    return ideas.value.filter(i => i.status === 'completed')
+  }
+  return ideas.value.filter(i => i.status !== 'completed')
+})
+const draftCount = computed(() => ideas.value.filter(i => i.status !== 'completed').length)
+const completedCount = computed(() => ideas.value.filter(i => i.status === 'completed').length)
 const allPageSelected = computed(() =>
-  ideas.value.length > 0 && ideas.value.every(i => selectedIdeaIds.value.includes(i.id))
+  displayedIdeas.value.length > 0 && displayedIdeas.value.every(i => selectedIdeaIds.value.includes(i.id))
 )
 const somePageSelected = computed(() =>
   selectedIdeaIds.value.length > 0 && !allPageSelected.value
 )
 function togglePageSelection() {
-  const pageIds = ideas.value.map(i => i.id)
+  const pageIds = displayedIdeas.value.map(i => i.id)
   if (allPageSelected.value) {
     selectedIdeaIds.value = selectedIdeaIds.value.filter(id => !pageIds.includes(id))
   } else {
     const newIds = pageIds.filter(id => !selectedIdeaIds.value.includes(id))
     selectedIdeaIds.value = [...selectedIdeaIds.value, ...newIds]
   }
+}
+function switchTab(tab) {
+  if (activeTab.value === tab) return
+  activeTab.value = tab
+  selectedIdeaIds.value = []
 }
 const filters = reactive({ pillar: '', status: '', priority: '', search: '' })
 const pagination = ref({ current_page: 1, last_page: 1, per_page: 15, total: 0 })
