@@ -116,6 +116,163 @@
         </div>
       </BaseCard>
 
+      <!-- Creator Brand Card (Image Watermark + Filename Prefix) -->
+      <BaseCard>
+        <h2 class="text-xl font-display font-semibold text-neutral-900 dark:text-neutral-100 mb-2">
+          Creator Brand — Image Watermark
+        </h2>
+        <p class="text-sm text-neutral-600 dark:text-neutral-400 mb-6">
+          Applied automatically to every AI-generated blog image. Logo + tagline render at the configured opacity; filename prefix is used for storage and downloads.
+        </p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- Brand Logo -->
+          <div class="md:col-span-2">
+            <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+              Brand Logo <span class="text-xs text-neutral-500">(PNG with transparent background recommended)</span>
+            </label>
+            <div class="flex items-center gap-4">
+              <div class="relative w-24 h-24 rounded-lg overflow-hidden bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center border border-neutral-200 dark:border-neutral-700">
+                <img
+                  v-if="brandLogoPreviewUrl"
+                  :src="brandLogoPreviewUrl"
+                  alt="Brand Logo"
+                  class="w-full h-full object-contain"
+                  @error="brandFormData.creator_brand_logo = null"
+                />
+                <svg v-else class="w-10 h-10 text-neutral-400 dark:text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <div class="flex-1">
+                <input
+                  ref="brandLogoInput"
+                  type="file"
+                  accept="image/*"
+                  class="hidden"
+                  @change="handleBrandLogoChange"
+                />
+                <BaseButton
+                  type="button"
+                  button-type="secondary"
+                  @click="$refs.brandLogoInput.click()"
+                >
+                  {{ brandLogoPreviewUrl ? 'Change Logo' : 'Upload Logo' }}
+                </BaseButton>
+                <p class="text-xs text-neutral-500 dark:text-neutral-400 mt-2">
+                  Max 5MB. Square or horizontal PNG preferred.
+                </p>
+              </div>
+              <BaseButton
+                v-if="brandLogoPreviewUrl"
+                type="button"
+                button-type="danger"
+                @click="removeBrandLogo"
+              >
+                Remove
+              </BaseButton>
+            </div>
+          </div>
+
+          <!-- Brand Tagline -->
+          <div>
+            <label for="creator_brand_tagline" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+              Tagline <span class="text-xs text-neutral-500">(rendered below logo)</span>
+            </label>
+            <input
+              id="creator_brand_tagline"
+              v-model="brandFormData.creator_brand_tagline"
+              type="text"
+              maxlength="60"
+              class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="alisadikinma.com"
+            />
+          </div>
+
+          <!-- Brand Slug -->
+          <div>
+            <label for="creator_brand_slug" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+              Filename Prefix <span class="text-xs text-neutral-500">(lowercase, kebab-case)</span>
+            </label>
+            <input
+              id="creator_brand_slug"
+              v-model="brandFormData.creator_brand_slug"
+              type="text"
+              maxlength="60"
+              :class="[
+                'w-full px-4 py-2 border rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:border-transparent',
+                brandSlugError ? 'border-red-500 focus:ring-red-500' : 'border-neutral-300 dark:border-neutral-600 focus:ring-blue-500'
+              ]"
+              placeholder="alisadikinma"
+              @blur="validateBrandSlug"
+            />
+            <p v-if="brandSlugError" class="text-xs text-red-500 mt-1">{{ brandSlugError }}</p>
+            <p v-else class="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+              Filenames: <code>{{ brandFormData.creator_brand_slug || 'alisadikinma' }}-{{ '{seo-keyword}' }}-cover.png</code>
+            </p>
+          </div>
+
+          <!-- Opacity Slider -->
+          <div>
+            <label for="watermark_opacity" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+              Watermark Opacity
+              <span class="text-xs font-mono text-blue-600 dark:text-blue-400 ml-2">{{ watermarkOpacityPct }}%</span>
+            </label>
+            <input
+              id="watermark_opacity"
+              v-model.number="watermarkOpacityPct"
+              type="range"
+              min="5"
+              max="95"
+              step="5"
+              class="w-full h-2 bg-neutral-200 dark:bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
+            />
+            <div class="flex justify-between text-[10px] text-neutral-500 mt-1">
+              <span>5% (subtle)</span>
+              <span>50%</span>
+              <span>95% (bold)</span>
+            </div>
+          </div>
+
+          <!-- Enable Toggle -->
+          <div class="flex items-center justify-between p-4 rounded-lg bg-neutral-50 dark:bg-neutral-800/40 border border-neutral-200 dark:border-neutral-700">
+            <div>
+              <div class="text-sm font-medium text-neutral-700 dark:text-neutral-300">Enable Watermark</div>
+              <p class="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">Applied to every generated image</p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              :aria-checked="watermarkEnabledBool"
+              @click="watermarkEnabledBool = !watermarkEnabledBool"
+              :class="[
+                'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
+                watermarkEnabledBool ? 'bg-blue-600' : 'bg-neutral-300 dark:bg-neutral-600'
+              ]"
+            >
+              <span
+                :class="[
+                  'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
+                  watermarkEnabledBool ? 'translate-x-6' : 'translate-x-1'
+                ]"
+              />
+            </button>
+          </div>
+        </div>
+
+        <!-- Save Button (dedicated for this card) -->
+        <div class="mt-6 flex justify-end">
+          <BaseButton
+            type="button"
+            button-type="primary"
+            :disabled="brandSubmitting || !!brandSlugError"
+            @click="handleBrandSubmit"
+          >
+            {{ brandSubmitting ? 'Saving...' : 'Save Creator Brand' }}
+          </BaseButton>
+        </div>
+      </BaseCard>
+
       <!-- Hero & About Enhancement Card -->
       <BaseCard>
         <h2 class="text-xl font-display font-semibold text-neutral-900 dark:text-neutral-100 mb-6">
@@ -1050,6 +1207,111 @@ const certLogoInputs = ref([])
 const certLogoFiles = ref({}) // { index: File }
 const certLogosRemoved = ref([]) // [index]
 
+// ── Creator Brand (Watermark + Filename Prefix) ──
+const brandLogoInput = ref(null)
+const brandLogoFile = ref(null)
+const brandLogoRemoved = ref(false)
+const brandSubmitting = ref(false)
+const brandSlugError = ref('')
+const brandFormData = ref({
+  creator_brand_logo: null,
+  creator_brand_tagline: 'alisadikinma.com',
+  creator_brand_slug: 'alisadikinma',
+  watermark_opacity: '0.30',
+  watermark_enabled: 'false',
+})
+
+// Opacity slider binds as integer percentage; convert to/from stored string
+const watermarkOpacityPct = computed({
+  get: () => Math.round(parseFloat(brandFormData.value.watermark_opacity || '0.30') * 100),
+  set: (pct) => {
+    const clamped = Math.max(5, Math.min(95, Number(pct) || 30))
+    brandFormData.value.watermark_opacity = (clamped / 100).toFixed(2)
+  },
+})
+
+const watermarkEnabledBool = computed({
+  get: () => brandFormData.value.watermark_enabled === 'true' || brandFormData.value.watermark_enabled === true,
+  set: (val) => { brandFormData.value.watermark_enabled = val ? 'true' : 'false' },
+})
+
+const brandLogoPreviewUrl = computed(() => {
+  if (brandLogoRemoved.value) return null
+  if (brandLogoFile.value) return URL.createObjectURL(brandLogoFile.value)
+  const logo = brandFormData.value.creator_brand_logo
+  if (!logo) return null
+  if (logo.startsWith('http://') || logo.startsWith('https://')) return logo
+  const apiBase = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || ''
+  return apiBase.replace(/\/api\/?$/, '') + logo
+})
+
+function handleBrandLogoChange(event) {
+  const file = event.target.files[0]
+  if (!file) return
+  if (file.size > 5 * 1024 * 1024) {
+    uiStore.showError('Logo file must not exceed 5MB', 'Upload Error')
+    return
+  }
+  brandLogoFile.value = file
+  brandLogoRemoved.value = false
+}
+
+function removeBrandLogo() {
+  brandLogoFile.value = null
+  brandLogoRemoved.value = true
+  brandFormData.value.creator_brand_logo = null
+  if (brandLogoInput.value) brandLogoInput.value.value = ''
+}
+
+function validateBrandSlug() {
+  const slug = (brandFormData.value.creator_brand_slug || '').trim()
+  if (!slug) {
+    brandSlugError.value = 'Slug is required — used as filename prefix'
+    return false
+  }
+  if (!/^[a-z0-9-]+$/.test(slug)) {
+    brandSlugError.value = 'Lowercase letters, numbers, hyphens only (no spaces)'
+    return false
+  }
+  brandSlugError.value = ''
+  return true
+}
+
+async function handleBrandSubmit() {
+  if (!validateBrandSlug()) return
+
+  brandSubmitting.value = true
+  try {
+    const data = new FormData()
+    data.append('_method', 'PUT')
+    if (brandLogoFile.value) data.append('creator_brand_logo', brandLogoFile.value)
+    if (brandFormData.value.creator_brand_tagline) data.append('creator_brand_tagline', brandFormData.value.creator_brand_tagline)
+    if (brandFormData.value.creator_brand_slug) data.append('creator_brand_slug', brandFormData.value.creator_brand_slug)
+    data.append('watermark_opacity', brandFormData.value.watermark_opacity)
+    data.append('watermark_enabled', brandFormData.value.watermark_enabled)
+
+    await settingsStore.updateCreatorBrandSettings(data)
+    uiStore.showSuccess('Creator brand settings updated successfully', 'Saved')
+
+    // Refresh store state back into formData
+    const fresh = settingsStore.creatorBrandSettings
+    brandFormData.value = {
+      creator_brand_logo: fresh.creator_brand_logo,
+      creator_brand_tagline: fresh.creator_brand_tagline || 'alisadikinma.com',
+      creator_brand_slug: fresh.creator_brand_slug || 'alisadikinma',
+      watermark_opacity: fresh.watermark_opacity || '0.30',
+      watermark_enabled: fresh.watermark_enabled || 'false',
+    }
+    brandLogoFile.value = null
+    brandLogoRemoved.value = false
+    if (brandLogoInput.value) brandLogoInput.value.value = ''
+  } catch (err) {
+    uiStore.showError(err.response?.data?.message || err.message || 'Failed to save creator brand', 'Save Failed')
+  } finally {
+    brandSubmitting.value = false
+  }
+}
+
 // Current photo URL
 const currentPhotoUrl = computed(() => {
   if (photoRemoved.value) return null
@@ -1402,7 +1664,23 @@ async function loadSettings() {
   error.value = null
 
   try {
-    await settingsStore.fetchAboutSettings()
+    await Promise.all([
+      settingsStore.fetchAboutSettings(),
+      settingsStore.fetchCreatorBrandSettings().catch((err) => {
+        // Non-fatal: creator_brand seeder may not have run on older installs
+        console.warn('[AboutSettings] creator_brand fetch failed — using defaults', err)
+      }),
+    ])
+
+    // Populate creator brand form data
+    const cb = settingsStore.creatorBrandSettings || {}
+    brandFormData.value = {
+      creator_brand_logo: cb.creator_brand_logo || null,
+      creator_brand_tagline: cb.creator_brand_tagline || 'alisadikinma.com',
+      creator_brand_slug: cb.creator_brand_slug || 'alisadikinma',
+      watermark_opacity: cb.watermark_opacity || '0.30',
+      watermark_enabled: cb.watermark_enabled || 'false',
+    }
 
     // Populate form data
     const experiences = JSON.parse(JSON.stringify(settingsStore.aboutSettings.experience || []))

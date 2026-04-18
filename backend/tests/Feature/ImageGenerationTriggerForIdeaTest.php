@@ -31,16 +31,33 @@ class ImageGenerationTriggerForIdeaTest extends TestCase
                 ->push(['uuid' => 'uuid-4', 'status' => 1], 200),
         ]);
 
-        // Avoid DB writes for ImageGenerationJob::create
+        // Avoid DB writes for ImageGenerationJob::create + stub collision lookup for buildBrandedFilename
         $jobMock = Mockery::mock('alias:' . ImageGenerationJob::class);
         $jobMock->shouldReceive('create')->andReturn(new ImageGenerationJob());
+        $collisionQuery = Mockery::mock('Illuminate\Database\Eloquent\Builder');
+        $collisionQuery->shouldReceive('exists')->andReturn(false);
+        $jobMock->shouldReceive('where')->with('planned_filename', Mockery::any())->andReturn($collisionQuery);
 
-        // Mock Setting::where(...)->value(...) for CoverBrandingEnhancer
-        $query = Mockery::mock('Illuminate\Database\Eloquent\Builder');
-        $query->shouldReceive('where')->with('key', 'profile_photo')->andReturnSelf();
-        $query->shouldReceive('value')->with('value')->andReturn(null);
+        // Mock Setting::where(...)->value(...) for CoverBrandingEnhancer (profile_photo)
+        $aboutQuery = Mockery::mock('Illuminate\Database\Eloquent\Builder');
+        $aboutQuery->shouldReceive('where')->with('key', 'profile_photo')->andReturnSelf();
+        $aboutQuery->shouldReceive('value')->with('value')->andReturn(null);
+
+        // creator_brand group — slug resolves to 'alisadikinma' for filename helper,
+        // all other keys (watermark_enabled, logo, tagline, opacity) resolve to null
+        // so watermark append is a no-op in these tests.
+        $brandQuery = Mockery::mock('Illuminate\Database\Eloquent\Builder');
+        $brandQuery->shouldReceive('where')->andReturnUsing(function ($col, $key) {
+            $stub = Mockery::mock('Illuminate\Database\Eloquent\Builder');
+            $stub->shouldReceive('value')->with('value')->andReturn(
+                $key === 'creator_brand_slug' ? 'alisadikinma' : null
+            );
+            return $stub;
+        });
+
         $settingMock = Mockery::mock('alias:' . Setting::class);
-        $settingMock->shouldReceive('where')->with('group', 'about')->andReturn($query);
+        $settingMock->shouldReceive('where')->with('group', 'about')->andReturn($aboutQuery);
+        $settingMock->shouldReceive('where')->with('group', 'creator_brand')->andReturn($brandQuery);
     }
 
     protected function tearDown(): void

@@ -14,8 +14,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('post_translations', function (Blueprint $table) {
-            $table->json('schema_markup')->nullable()->after('ai_summary');
-            $table->json('faq_schema')->nullable()->after('schema_markup');
+            if (!Schema::hasColumn('post_translations', 'schema_markup')) {
+                $table->json('schema_markup')->nullable()->after('ai_summary');
+            }
+            if (!Schema::hasColumn('post_translations', 'faq_schema')) {
+                $table->json('faq_schema')->nullable()->after('schema_markup');
+            }
         });
     }
 
@@ -25,7 +29,10 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('post_translations', function (Blueprint $table) {
-            $table->dropColumn(['schema_markup', 'faq_schema']);
+            $existing = array_filter(['schema_markup', 'faq_schema'], fn ($c) => Schema::hasColumn('post_translations', $c));
+            if (!empty($existing)) {
+                $table->dropColumn($existing);
+            }
         });
     }
 };

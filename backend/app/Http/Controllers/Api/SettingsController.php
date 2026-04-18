@@ -455,4 +455,119 @@ class SettingsController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Get creator brand settings (watermark + filename prefix config).
+     * Returns all 5 keys with seeded defaults applied when a row is missing.
+     */
+    public function getCreatorBrandSettings(): JsonResponse
+    {
+        try {
+            $settings = Setting::byGroup('creator_brand')->get();
+
+            $data = [];
+            foreach ($settings as $setting) {
+                $data[$setting->key] = $setting->value;
+            }
+
+            $data = array_merge([
+                'creator_brand_logo' => null,
+                'creator_brand_tagline' => 'alisadikinma.com',
+                'creator_brand_slug' => 'alisadikinma',
+                'watermark_opacity' => '0.30',
+                'watermark_enabled' => 'false',
+            ], $data);
+
+            return response()->json([
+                'success' => true,
+                'data' => $data,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to fetch creator brand settings', ['error' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch creator brand settings',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred',
+            ], 500);
+        }
+    }
+
+    /**
+     * Update creator brand settings. Accepts FormData (for logo upload) or JSON.
+     * Inline validation — no FormRequest class to keep the surface area tight.
+     */
+    public function updateCreatorBrandSettings(\Illuminate\Http\Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'creator_brand_logo' => ['nullable', 'file', 'image', 'max:5120'],
+            'creator_brand_tagline' => ['nullable', 'string', 'max:60'],
+            'creator_brand_slug' => ['nullable', 'string', 'max:60', 'regex:/^[a-z0-9-]+$/'],
+            'watermark_opacity' => ['nullable', 'numeric', 'min:0.05', 'max:0.95'],
+            'watermark_enabled' => ['nullable', 'in:true,false,1,0'],
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+            // Logo upload (mirrors profile_photo pattern)
+            if ($request->hasFile('creator_brand_logo')) {
+                $file = $request->file('creator_brand_logo');
+                $filename = time() . '_' . $file->getClientOriginalName();
+
+                $uploadPath = public_path('uploads/branding');
+                if (!file_exists($uploadPath)) {
+                    mkdir($uploadPath, 0755, true);
+                }
+                $file->move($uploadPath, $filename);
+
+                $oldLogo = Setting::where('group', 'creator_brand')->where('key', 'creator_brand_logo')->first();
+                if ($oldLogo && $oldLogo->value && file_exists(public_path($oldLogo->value))) {
+                    unlink(public_path($oldLogo->value));
+                }
+
+                $validated['creator_brand_logo'] = '/uploads/branding/' . $filename;
+            } else {
+                unset($validated['creator_brand_logo']);
+            }
+
+            // Normalize scalar types before persistence
+            if (isset($validated['watermark_enabled'])) {
+                $validated['watermark_enabled'] = in_array($validated['watermark_enabled'], [true, 'true', 1, '1'], true) ? 'true' : 'false';
+            }
+            if (isset($validated['watermark_opacity'])) {
+                $validated['watermark_opacity'] = (string) $validated['watermark_opacity'];
+            }
+
+            foreach ($validated as $key => $value) {
+                $type = $key === 'creator_brand_logo' ? 'image' : 'text';
+                Setting::updateOrCreate(
+                    ['key' => $key, 'group' => 'creator_brand'],
+                    ['value' => $value, 'type' => $type]
+                );
+            }
+
+            DB::commit();
+
+            // Return fresh state
+            $fresh = Setting::byGroup('creator_brand')->get();
+            $data = [];
+            foreach ($fresh as $s) {
+                $data[$s->key] = $s->value;
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Creator brand settings updated successfully',
+                'data' => $data,
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Failed to update creator brand settings', ['error' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update creator brand settings',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred',
+            ], 500);
+        }
+    }
 }

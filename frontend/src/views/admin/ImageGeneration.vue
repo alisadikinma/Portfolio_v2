@@ -30,6 +30,30 @@ const lightboxTitle = computed(() => {
   const s = generatedSegments.value[lightboxIndex.value]
   return s ? `${s.label} — ${s.concept || s.visual_direction || ''}`.trim() : ''
 })
+// ── Branded filename helpers (loaded from creator_brand settings on mount) ──
+const brandSlug = ref('alisadikinma')
+
+function slugify(str) {
+  return (str || '').toString().toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    || 'image'
+}
+
+// NOTE: seg.index MUST equal the segment's 0-based position in image_prompts[] —
+// the backend's ImageGenerationService::buildBrandedFilename uses the array index
+// with the same label contract ('cover' for index 0, 'body-N' for inline).
+// Any filtered subset must preserve seg.index; do NOT reassign indices here.
+function computeBrandedFilename(seg) {
+  if (!seg) return 'image.png'
+  const keywordSource = idea.value?.generated_article?.prep_data?.research?.keyword
+    || idea.value?.title
+    || 'image'
+  const keywordSlug = slugify(keywordSource)
+  const label = seg.index === 0 ? 'cover' : `body-${seg.index}`
+  return `${brandSlug.value}-${keywordSlug}-${label}.png`
+}
+
 const lightboxFilename = computed(() => {
   if (adHocPreview.value) {
     const name = adHocPreview.value.url.split('/').pop() || 'reference.jpg'
@@ -37,8 +61,7 @@ const lightboxFilename = computed(() => {
   }
   const s = generatedSegments.value[lightboxIndex.value]
   if (!s) return ''
-  const slug = (s.label || 'image').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
-  return `${slug}.jpg`
+  return computeBrandedFilename(s)
 })
 const lightboxOpen = computed(() => adHocPreview.value !== null || lightboxIndex.value >= 0)
 const lightboxTotal = computed(() => (adHocPreview.value ? 1 : generatedSegments.value.length))
@@ -80,10 +103,22 @@ const styleOptions = ['Photorealistic', 'Cinematic', 'Portrait Cinematic', 'Mini
 const modelOptions = ['nano-banana-pro', 'nano-banana-2', 'imagen-4']
 const ratioOptions = ['16:9', '4:3', '1:1', '9:16']
 
-// ── Load idea ──
+// ── Load idea + brand slug ──
+async function loadBrandSlug() {
+  try {
+    const { default: api } = await import('@/services/api')
+    const res = await api.get('/admin/settings/creator-brand')
+    if (res.data?.success && res.data.data?.creator_brand_slug) {
+      brandSlug.value = res.data.data.creator_brand_slug
+    }
+  } catch (err) {
+    console.warn('[ImageGeneration] creator_brand slug fetch failed — falling back to default', err)
+  }
+}
+
 onMounted(async () => {
   const id = route.params.id
-  const result = await getIdea(id)
+  const [result] = await Promise.all([getIdea(id), loadBrandSlug()])
   if (result.success && result.data) {
     idea.value = result.data
     initSegments()
@@ -148,6 +183,8 @@ function initSegments() {
       index: i,
       visual_direction: img.visual_direction || img.prompt || '',
       visual_direction_original: img.visual_direction_original || '',
+      caption: img.caption || '',
+      needs_creator_face: img.needs_creator_face ?? false,
       style: img.style || 'Photorealistic',
       model: img.model || 'nano-banana-pro',
       aspect_ratio: img.aspect_ratio || '16:9',
@@ -194,6 +231,8 @@ async function persistDraft() {
       type: seg.type,
       section: seg.section,
       concept: seg.concept,
+      caption: seg.caption || '',
+      needs_creator_face: seg.needs_creator_face ?? false,
       prompt: getPrompt(seg),
       visual_direction: seg.visual_direction,
       visual_direction_original: seg.visual_direction_original,
@@ -547,6 +586,28 @@ async function handleApprove() {
               <div>
                 <label class="block text-[11px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider mb-1.5">Visual Direction</label>
                 <textarea v-model="seg.visual_direction" @input="scheduleAutoSave" rows="4" class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-neutral-200 dark:border-neutral-600/60 bg-neutral-50 dark:bg-neutral-900/50 text-neutral-900 dark:text-neutral-100 focus:ring-1 focus:ring-amber-500/50 focus:border-amber-500/50 placeholder-neutral-400 dark:placeholder-neutral-600 resize-none transition-colors" placeholder="Describe the scene, lighting, camera angle, color palette, mood...&#10;e.g. Cinematic wide shot of a futuristic workspace, warm golden light, dark moody atmosphere, cyan accent lighting"></textarea>
+              </div>
+
+              <!-- Caption (per-type placeholder + helper) -->
+              <div>
+                <label class="flex items-center justify-between mb-1.5">
+                  <span class="text-[11px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider">Caption</span>
+                  <span class="text-[10px] text-neutral-400 dark:text-neutral-500">{{ (seg.caption || '').length }} / 150</span>
+                </label>
+                <input
+                  v-model="seg.caption"
+                  @input="scheduleAutoSave"
+                  type="text"
+                  maxlength="150"
+                  :placeholder="seg.type === 'cover'
+                    ? 'Article title (or lightly SEO-paraphrased with primary keyword)'
+                    : '5-12 words of supporting context (e.g. \u201cTerminal output after first successful generation\u201d)'"
+                  class="w-full px-3.5 py-2 text-sm rounded-xl border border-neutral-200 dark:border-neutral-600/60 bg-neutral-50 dark:bg-neutral-900/50 text-neutral-900 dark:text-neutral-100 focus:ring-1 focus:ring-amber-500/50 focus:border-amber-500/50 placeholder-neutral-400 dark:placeholder-neutral-600 transition-colors"
+                />
+                <p class="mt-1 text-[10px] text-neutral-400 dark:text-neutral-500">
+                  <template v-if="seg.type === 'cover'">Defaults to the article title. Shown as the figcaption under the hero image on the blog post.</template>
+                  <template v-else>Short figcaption below the image. Do not repeat the article title or section heading.</template>
+                </p>
               </div>
 
               <!-- Config pills row -->

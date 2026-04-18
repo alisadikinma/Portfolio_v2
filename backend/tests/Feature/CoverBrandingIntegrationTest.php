@@ -45,8 +45,17 @@ class CoverBrandingIntegrationTest extends TestCase
         $query->shouldReceive('where')->with('key', 'profile_photo')->andReturnSelf();
         $query->shouldReceive('value')->with('value')->andReturn($value);
 
+        // creator_brand group — watermark disabled; all keys resolve to null
+        $brandQuery = Mockery::mock('Illuminate\Database\Eloquent\Builder');
+        $brandQuery->shouldReceive('where')->andReturnUsing(function ($col, $key) {
+            $stub = Mockery::mock('Illuminate\Database\Eloquent\Builder');
+            $stub->shouldReceive('value')->with('value')->andReturn(null);
+            return $stub;
+        });
+
         $mock = Mockery::mock('alias:' . Setting::class);
         $mock->shouldReceive('where')->with('group', 'about')->andReturn($query);
+        $mock->shouldReceive('where')->with('group', 'creator_brand')->andReturn($brandQuery);
     }
 
     /**
@@ -108,7 +117,7 @@ class CoverBrandingIntegrationTest extends TestCase
     }
 
     /** @test */
-    public function controller_shape_for_inline_segment_passes_through_unchanged()
+    public function controller_shape_for_inline_segment_without_human_passes_through_unchanged()
     {
         $this->mockSetting('about/ali.png');
 
@@ -118,7 +127,8 @@ class CoverBrandingIntegrationTest extends TestCase
 
         $segmentMeta = [
             'type' => 'inline',
-            'visual_direction' => 'abstract person coding',
+            // No human keyword in VD — inline must pass through unchanged
+            'visual_direction' => 'abstract glowing monitors in dark studio',
             'status' => 'pending',
         ];
 
@@ -132,15 +142,17 @@ class CoverBrandingIntegrationTest extends TestCase
         $forEnhance = $this->buildControllerShape($segmentMeta, $requestData);
         $enhanced = (new CoverBrandingEnhancer())->enhance($forEnhance, $idea);
 
-        // Inline: unchanged — model respected, no title injection, no face ref
+        // Inline without flag/keyword: unchanged — model respected, no title injection, no face ref
         $this->assertSame('imagen-4', $enhanced['model']);
         $this->assertSame('Abstract code visualization', $enhanced['prompt_text']);
         $this->assertSame([], $enhanced['face_refs']);
     }
 
     /** @test */
-    public function cover_without_human_keyword_gets_title_but_no_face_inject()
+    public function cover_without_human_keyword_still_gets_title_and_face_auto_inject()
     {
+        // NEW behavior (Phase 3): cover ALWAYS gets creator face, regardless of keywords.
+        Storage::disk('public')->put('about/ali.png', 'fake');
         $this->mockSetting('about/ali.png');
 
         $idea = new ContentIdea();
@@ -165,8 +177,9 @@ class CoverBrandingIntegrationTest extends TestCase
 
         // Title injected
         $this->assertStringContainsString('Dashboard Trick', $enhanced['prompt_text']);
-        // No face injection (no human keyword)
-        $this->assertSame([], $enhanced['face_refs']);
+        // Cover always auto-injects face — no longer keyword-gated
+        $this->assertCount(1, $enhanced['face_refs']);
+        $this->assertStringContainsString('about/ali.png', $enhanced['face_refs'][0]);
         // Model still forced for cover type
         $this->assertSame('nano-banana-pro', $enhanced['model']);
     }

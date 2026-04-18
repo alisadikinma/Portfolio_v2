@@ -260,6 +260,9 @@ Route::middleware(['auth:sanctum'])->prefix('admin/settings')->group(function ()
     Route::get('/site', [SettingsController::class, 'getSiteSettings']);
     Route::put('/site', [SettingsController::class, 'updateSiteSettings']);
     Route::post('/site', [SettingsController::class, 'updateSiteSettings']); // POST with _method=PUT for FormData
+    Route::get('/creator-brand', [SettingsController::class, 'getCreatorBrandSettings']);
+    Route::put('/creator-brand', [SettingsController::class, 'updateCreatorBrandSettings']);
+    Route::post('/creator-brand', [SettingsController::class, 'updateCreatorBrandSettings']); // POST with _method=PUT for FormData
 });
 
 // Admin Menu Items Routes

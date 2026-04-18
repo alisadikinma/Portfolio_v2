@@ -9,7 +9,7 @@ class ImageGenerationJob extends Model
 {
     protected $fillable = [
         'post_id', 'uuid', 'type', 'prompt',
-        'insert_after_heading', 'status',
+        'insert_after_heading', 'planned_filename', 'status',
         'image_url', 'remote_url', 'error_message',
     ];
 

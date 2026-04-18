@@ -22,7 +22,7 @@ Modern, scalable full-stack portfolio and CMS featuring RESTful API architecture
 | **API Endpoints** | 140+ documented endpoints |
 | **Performance** | <500ms cached loads (83% improvement) |
 | **Security Score** | 95/100 |
-| **Last Updated** | April 13, 2026 |
+| **Last Updated** | April 18, 2026 |
 
 ---
 
@@ -311,6 +311,15 @@ Carousels:    GET /api/automation/carousel/accounts, /drafts
 - Auto-continuation via `continue-pipeline` endpoint (prep→write→score chained automatically)
 - **~6-8 minutes** per article (down from ~15 min single-session)
 
+### Creator Brand System (April 18, 2026)
+- **Auto creator-face injection** on every cover image (no keyword gate) + on inline when `needs_creator_face: true` or human keywords match
+- **Sync VD rewrite** fires on auto-inject so the prompt describes the actual person in the profile photo (no demographic contradiction)
+- **DB-driven watermark** via new `creator_brand` Settings group (logo + tagline + opacity + enabled) — prompt-injected on every image type
+- **Branded filenames**: `{brand-slug}-{seo-keyword}-{cover|body-N}.png` (e.g. `alisadikinma-vibe-coding-tools-cover.png`) — same pattern in storage + lightbox download
+- **Per-type captions**: cover = article title, inline = 5-12 words of supporting context (plugin-authored, user-editable)
+- **Dedicated admin UI card** on AboutSettings with logo uploader, tagline input, slug validator, opacity slider, enable toggle
+- **Backward compatible**: `watermark_enabled` opt-in default off, legacy blog pipeline unchanged
+
 ### Performance
 - TanStack Query caching (5-60min stale times per resource)
 - 83% faster repeat visits, 70% fewer API calls
@@ -442,4 +451,4 @@ Contact: ali.sadikincom85@gmail.com | Location: Batam, Indonesia
 
 ---
 
-**Last Updated:** April 13, 2026 | **Version:** 2.2.0 | **Status:** Production Ready
+**Last Updated:** April 18, 2026 | **Version:** 2.3.0 | **Status:** Production Ready

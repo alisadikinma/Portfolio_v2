@@ -9,8 +9,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // 1. Expand status enum for 2-gate article pipeline
-        DB::statement("ALTER TABLE content_ideas MODIFY COLUMN status ENUM('draft','researching','article_ready','generating_images','images_ready','completed','archived') DEFAULT 'draft'");
+        // 1. Expand status enum for 2-gate article pipeline (MySQL-only raw ALTER;
+        //    SQLite tests use portable VARCHAR from the create migration and accept any value)
+        if (DB::connection()->getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE content_ideas MODIFY COLUMN status ENUM('draft','researching','article_ready','generating_images','images_ready','completed','archived') DEFAULT 'draft'");
+        }
 
         // 2. Add result tracking fields
         Schema::table('content_ideas', function (Blueprint $table) {
@@ -24,7 +27,9 @@ return new class extends Migration
 
     public function down(): void
     {
-        DB::statement("ALTER TABLE content_ideas MODIFY COLUMN status ENUM('draft','researching','researched','generating','completed','archived') DEFAULT 'draft'");
+        if (DB::connection()->getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE content_ideas MODIFY COLUMN status ENUM('draft','researching','researched','generating','completed','archived') DEFAULT 'draft'");
+        }
 
         Schema::table('content_ideas', function (Blueprint $table) {
             $table->dropColumn(['result_post_id', 'generated_article', 'generated_images', 'image_instructions', 'image_references']);

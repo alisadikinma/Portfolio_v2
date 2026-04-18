@@ -10,12 +10,16 @@ use Illuminate\Support\Facades\Storage;
 class CoverBrandingEnhancer
 {
     public const HUMAN_KEYWORDS = [
-        // English
+        // English — core
         'person', 'people', 'man', 'woman', 'face', 'portrait', 'human',
         'creator', 'founder', 'speaker', 'author', 'selfie', 'figure',
+        // English — expanded (common article subjects)
+        'developer', 'engineer', 'designer', 'marketer', 'user', 'student',
+        'entrepreneur', 'coder', 'programmer', 'executive',
         // Indonesian
         'pria', 'wanita', 'orang', 'manusia', 'muka', 'wajah',
         'pembicara', 'tokoh', 'penulis', 'pencipta',
+        'pengembang', 'perancang', 'mahasiswa', 'wirausaha',
     ];
 
     private const TITLE_INSTRUCTION_TEMPLATE =
@@ -27,32 +31,173 @@ class CoverBrandingEnhancer
             return $prompt;
         }
 
-        if (($prompt['type'] ?? null) !== 'cover') {
+        $type = $prompt['type'] ?? null;
+
+        if ($type === 'cover') {
+            // 1. Inject title instruction into prompt_text
+            $title = $this->sanitizeTitle($this->resolveTitle($idea));
+            $title = $this->truncateTitle($title);
+            $promptText = $prompt['prompt_text'] ?? '';
+            $prompt['prompt_text'] = $this->injectTitleInstruction($promptText, $title);
+
+            // 2. Cover ALWAYS gets creator face — no keyword gate (thumbnails need the face)
+            $prompt = $this->prependCreatorFace($prompt, $idea);
+
+            // 3. Append watermark (brand consistency across all images)
+            $prompt = $this->appendWatermark($prompt);
+
+            // 4. Force model
+            $prompt['model'] = config('content.cover_branding.model', 'nano-banana-pro');
+
             return $prompt;
         }
 
-        // 1. Inject title instruction into prompt_text
-        $title = $this->sanitizeTitle($this->resolveTitle($idea));
-        $title = $this->truncateTitle($title);
-
-        $promptText = $prompt['prompt_text'] ?? '';
-        $prompt['prompt_text'] = $this->injectTitleInstruction($promptText, $title);
-
-        // 2. Keyword scan → prepend creator face URL if human detected
-        $scanText = ($prompt['visual_direction'] ?? '') . ' ' . ($prompt['prompt_text'] ?? '');
-        if ($this->hasHumanKeyword($scanText)) {
-            $creatorUrl = $this->getCreatorFaceUrl();
-            if ($creatorUrl !== null) {
-                $existing = $prompt['face_refs'] ?? [];
-                if (!is_array($existing)) {
-                    $existing = [];
-                }
-                $prompt['face_refs'] = array_merge([$creatorUrl], $existing);
+        if ($type === 'inline') {
+            // Inline: inject only when plugin flags `needs_creator_face: true`
+            // OR when expanded human-keyword list matches the VD/prompt text.
+            $flagged = ($prompt['needs_creator_face'] ?? false) === true;
+            $scanText = ($prompt['visual_direction'] ?? '') . ' ' . ($prompt['prompt_text'] ?? '');
+            if ($flagged || $this->hasHumanKeyword($scanText)) {
+                $prompt = $this->prependCreatorFace($prompt, $idea);
             }
+
+            // Watermark applies to inline too (brand consistency)
+            $prompt = $this->appendWatermark($prompt);
+
+            return $prompt;
         }
 
-        // 3. Force model
-        $prompt['model'] = config('content.cover_branding.model', 'nano-banana-pro');
+        return $prompt;
+    }
+
+    /**
+     * Append watermark instruction to prompt_text and add brand logo URL to file_urls.
+     * No-op when watermark_enabled is false OR when the brand logo file cannot be
+     * resolved on disk. Reads config from the creator_brand Settings group.
+     */
+    private function appendWatermark(array $prompt): array
+    {
+        $enabled = Setting::where('group', 'creator_brand')
+            ->where('key', 'watermark_enabled')
+            ->value('value');
+
+        if ($enabled !== 'true' && $enabled !== true && $enabled !== '1' && $enabled !== 1) {
+            return $prompt;
+        }
+
+        $logoUrl = $this->getCreatorBrandLogoUrl();
+        if ($logoUrl === null) {
+            Log::warning('Cover branding: watermark_enabled but creator_brand_logo unresolvable — skipping watermark');
+            return $prompt;
+        }
+
+        $tagline = (string) (Setting::where('group', 'creator_brand')
+            ->where('key', 'creator_brand_tagline')
+            ->value('value') ?? 'alisadikinma.com');
+
+        $opacityRaw = Setting::where('group', 'creator_brand')
+            ->where('key', 'watermark_opacity')
+            ->value('value');
+        $opacity = is_numeric($opacityRaw) ? (float) $opacityRaw : 0.30;
+        $opacity = max(0.05, min(0.95, $opacity));
+        $pct = (int) round($opacity * 100);
+
+        $instruction = ". Apply a centered semi-transparent watermark at {$pct}% opacity using the provided brand logo reference image. Directly below the logo, render the text '{$tagline}' in clean minimal sans-serif typography at matching opacity. Watermark must not dominate focal subjects — keep it subtle but visible.";
+        $prompt['prompt_text'] = ($prompt['prompt_text'] ?? '') . $instruction;
+
+        $fileUrls = $prompt['file_urls'] ?? [];
+        if (!is_array($fileUrls)) {
+            $fileUrls = [];
+        }
+        if (!in_array($logoUrl, $fileUrls, true)) {
+            $fileUrls[] = $logoUrl;
+        }
+        $prompt['file_urls'] = $fileUrls;
+
+        return $prompt;
+    }
+
+    /**
+     * Resolve creator brand logo URL from Setting. Returns null if not configured
+     * or file missing from public disk. Follows the same pattern as getCreatorFaceUrl().
+     */
+    public function getCreatorBrandLogoUrl(): ?string
+    {
+        $value = Setting::where('group', 'creator_brand')
+            ->where('key', 'creator_brand_logo')
+            ->value('value');
+
+        if (empty($value) || !is_string($value)) {
+            return null;
+        }
+
+        if (str_starts_with($value, 'http://') || str_starts_with($value, 'https://')) {
+            return $value;
+        }
+
+        $relative = ltrim($value, '/');
+        $diskPath = preg_replace('#^storage/#', '', $relative);
+
+        if (!Storage::disk('public')->exists($diskPath)) {
+            Log::warning('Cover branding: creator_brand_logo file not found on disk', ['path' => $diskPath]);
+            return null;
+        }
+
+        return url('/storage/' . $diskPath);
+    }
+
+    /**
+     * Prepend creator face URL to face_refs and, when this is the first auto-inject
+     * (no visual_direction_original snapshot yet), trigger the sync VD rewrite so
+     * the VD text matches the actual reference photo's demographics.
+     */
+    private function prependCreatorFace(array $prompt, ContentIdea $idea): array
+    {
+        $creatorUrl = $this->getCreatorFaceUrl();
+        if ($creatorUrl === null) {
+            return $prompt;
+        }
+
+        $existing = $prompt['face_refs'] ?? [];
+        if (!is_array($existing)) {
+            $existing = [];
+        }
+        // Idempotency: don't duplicate the creator URL if it's already first
+        if (!in_array($creatorUrl, $existing, true)) {
+            $prompt['face_refs'] = array_merge([$creatorUrl], $existing);
+        } else {
+            $prompt['face_refs'] = $existing;
+        }
+
+        // Auto-rewrite VD on first-time auto-inject so VD describes actual person
+        $hasOriginal = !empty($prompt['visual_direction_original'] ?? '');
+        $currentVd = $prompt['visual_direction'] ?? '';
+        if (!$hasOriginal && trim($currentVd) !== '') {
+            try {
+                $articleGen = app(\App\Services\ArticleGenerationService::class);
+                $result = $articleGen->rewriteVisualDirectionForFace(
+                    $currentVd,
+                    $creatorUrl,
+                    [
+                        'type' => $prompt['type'] ?? null,
+                        'concept' => $prompt['concept'] ?? null,
+                    ]
+                );
+
+                if (($result['success'] ?? false) === true && !empty($result['rewritten_vd'])) {
+                    $prompt['visual_direction_original'] = $currentVd;
+                    $prompt['visual_direction'] = $result['rewritten_vd'];
+                } else {
+                    Log::warning('Cover branding: VD auto-rewrite failed — keeping original VD', [
+                        'error' => $result['error'] ?? 'unknown',
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Cover branding: VD auto-rewrite threw — keeping original VD', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
 
         return $prompt;
     }

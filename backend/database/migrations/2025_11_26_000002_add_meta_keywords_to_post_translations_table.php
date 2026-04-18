@@ -13,9 +13,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('post_translations', function (Blueprint $table) {
-            $table->string('meta_keywords')->nullable()->after('meta_description');
-        });
+        if (!Schema::hasColumn('post_translations', 'meta_keywords')) {
+            Schema::table('post_translations', function (Blueprint $table) {
+                $table->string('meta_keywords')->nullable()->after('meta_description');
+            });
+        }
     }
 
     /**
@@ -23,8 +25,10 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('post_translations', function (Blueprint $table) {
-            $table->dropColumn('meta_keywords');
-        });
+        if (Schema::hasColumn('post_translations', 'meta_keywords')) {
+            Schema::table('post_translations', function (Blueprint $table) {
+                $table->dropColumn('meta_keywords');
+            });
+        }
     }
 };

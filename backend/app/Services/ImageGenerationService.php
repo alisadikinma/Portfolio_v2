@@ -4,9 +4,11 @@ namespace App\Services;
 
 use App\Models\ContentIdea;
 use App\Models\ImageGenerationJob;
+use App\Models\Setting;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class ImageGenerationService
 {
@@ -33,7 +35,8 @@ class ImageGenerationService
         string $style = 'Photorealistic',
         array $faceRefs = [],
         array $styleRefs = [],
-        string $additionalNotes = ''
+        string $additionalNotes = '',
+        ?string $plannedFilename = null
     ): ?string {
         $model = $model ?? config('content.default_image_model') ?? 'nano-banana-pro';
 
@@ -106,13 +109,14 @@ class ImageGenerationService
 
             // If image is ready immediately (status=2), handle it now
             if ($status === 2 && isset($data['generate_result'])) {
-                $localUrl = $this->downloadAndStore($data['generate_result']);
+                $localUrl = $this->downloadAndStore($data['generate_result'], $plannedFilename);
                 ImageGenerationJob::create([
                     'post_id' => $postId,
                     'uuid' => $uuid,
                     'type' => $type,
                     'prompt' => $prompt,
                     'insert_after_heading' => $insertAfterHeading,
+                    'planned_filename' => $plannedFilename,
                     'status' => 'completed',
                     'image_url' => $localUrl,
                     'remote_url' => $data['generate_result'],
@@ -134,6 +138,7 @@ class ImageGenerationService
                 'type' => $type,
                 'prompt' => $prompt,
                 'insert_after_heading' => $insertAfterHeading,
+                'planned_filename' => $plannedFilename,
                 'status' => 'processing',
             ]);
 
@@ -209,7 +214,8 @@ class ImageGenerationService
                 style: $prompt['style'] ?? 'Photorealistic',
                 faceRefs: array_merge($faceRefs, $brandRefUrls),
                 styleRefs: $prompt['style_refs'] ?? [],
-                additionalNotes: $prompt['additional_notes'] ?? ''
+                additionalNotes: $prompt['additional_notes'] ?? '',
+                plannedFilename: $this->buildBrandedFilename($idea, $i)
             );
 
             if (!$uuid) {
@@ -260,8 +266,8 @@ class ImageGenerationService
                 return false;
             }
 
-            // Download and store locally
-            $localUrl = $this->downloadAndStore($remoteUrl);
+            // Download and store locally (uses branded filename when planned at dispatch time)
+            $localUrl = $this->downloadAndStore($remoteUrl, $job->planned_filename);
 
             $job->update([
                 'status' => 'completed',
@@ -381,12 +387,18 @@ class ImageGenerationService
 
     /**
      * Insert an inline image into the post's content after the specified heading.
+     * Figcaption sources in priority order:
+     *   1. image_prompts[].caption from the matching content_idea segment (plugin-authored)
+     *   2. image_prompts[].concept (creative brief fallback)
+     *   3. $job->insert_after_heading (legacy fallback)
      */
     private function insertInlineImage(ImageGenerationJob $job): void
     {
         if (!$job->image_url || !$job->insert_after_heading) return;
 
-        $imgTag = '<figure class="my-8"><img src="' . e($job->image_url) . '" alt="' . e(\Illuminate\Support\Str::limit($job->prompt, 100)) . '" class="w-full rounded-xl" loading="lazy" /><figcaption class="text-sm text-gray-500 mt-2 text-center">' . e(\Illuminate\Support\Str::limit($job->insert_after_heading, 80)) . '</figcaption></figure>';
+        $captionText = $this->resolveFigcaption($job);
+
+        $imgTag = '<figure class="my-8"><img src="' . e($job->image_url) . '" alt="' . e(\Illuminate\Support\Str::limit($job->prompt, 100)) . '" class="w-full rounded-xl" loading="lazy" /><figcaption class="text-sm text-gray-500 mt-2 text-center">' . e(\Illuminate\Support\Str::limit($captionText, 160)) . '</figcaption></figure>';
 
         // Insert into all translations for this post
         foreach ($job->post->translations as $translation) {
@@ -404,9 +416,72 @@ class ImageGenerationService
     }
 
     /**
-     * Download image from URL and store in public storage.
+     * Resolve figcaption text for a completed job by looking up the matching
+     * content_idea segment. Falls back to concept, then insert_after_heading.
      */
-    public function downloadAndStore(string $imageUrl): ?string
+    private function resolveFigcaption(ImageGenerationJob $job): string
+    {
+        $ideas = ContentIdea::whereIn('status', ['article_ready', 'generating_images', 'images_ready', 'completed'])
+            ->orderByDesc('updated_at')
+            ->limit(50)
+            ->get();
+
+        foreach ($ideas as $idea) {
+            $prompts = $idea->generated_article['image_prompts'] ?? [];
+            foreach ($prompts as $p) {
+                $variations = $p['variations'] ?? [];
+                foreach ($variations as $v) {
+                    if (($v['job_uuid'] ?? null) === $job->uuid) {
+                        return $p['caption'] ?? $p['concept'] ?? $job->insert_after_heading;
+                    }
+                }
+                if (($p['job_uuid'] ?? null) === $job->uuid) {
+                    return $p['caption'] ?? $p['concept'] ?? $job->insert_after_heading;
+                }
+            }
+        }
+
+        return $job->insert_after_heading;
+    }
+
+    /**
+     * Build a branded filename for an idea's segment image.
+     * Pattern: {creator_brand_slug}-{seo-keyword-slug}-{segment-label}.png
+     * Collision: appends -v2, -v3, ... if an ImageGenerationJob already
+     * has the candidate filename (user regenerated the same segment).
+     */
+    public function buildBrandedFilename(ContentIdea $idea, int $segmentIndex): string
+    {
+        $brandSlug = Setting::where('group', 'creator_brand')
+            ->where('key', 'creator_brand_slug')
+            ->value('value') ?: 'alisadikinma';
+
+        $article = $idea->generated_article ?? [];
+        $keywordSource = $article['prep_data']['research']['keyword']
+            ?? $idea->title
+            ?? 'image';
+
+        $keywordSlug = Str::slug($keywordSource) ?: 'image';
+        $label = $segmentIndex === 0 ? 'cover' : "body-{$segmentIndex}";
+        $base = "{$brandSlug}-{$keywordSlug}-{$label}";
+
+        $candidate = "{$base}.png";
+        $suffix = 2;
+        while (ImageGenerationJob::where('planned_filename', $candidate)->exists()) {
+            $candidate = "{$base}-v{$suffix}.png";
+            $suffix++;
+        }
+
+        return $candidate;
+    }
+
+    /**
+     * Download image from URL and store in public storage.
+     * If $customFilename provided, stores as blog-images/{$customFilename}
+     * instead of the legacy timestamp pattern. Extension is NOT changed —
+     * caller is responsible for the full filename (including .png/.jpg).
+     */
+    public function downloadAndStore(string $imageUrl, ?string $customFilename = null): ?string
     {
         try {
             $response = Http::timeout(30)->get($imageUrl);
@@ -422,7 +497,9 @@ class ImageGenerationService
                 return $imageUrl;
             }
 
-            $filename = 'blog-images/' . time() . '_' . uniqid() . '.jpg';
+            $filename = $customFilename
+                ? 'blog-images/' . $customFilename
+                : 'blog-images/' . time() . '_' . uniqid() . '.jpg';
             $written = Storage::disk('public')->put($filename, $imageData);
 
             if (!$written) {

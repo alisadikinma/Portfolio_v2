@@ -30,6 +30,7 @@ class DatabaseSeeder extends Seeder
             AboutSettingsSeeder::class,
             SiteSettingsSeeder::class,
             CtaSettingsSeeder::class, // CTA section settings
+            CreatorBrandSettingsSeeder::class, // creator watermark/filename branding
         ]);
 
         $this->command->info('✅ Database seeding completed successfully!');

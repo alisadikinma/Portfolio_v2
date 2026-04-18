@@ -41,8 +41,18 @@ class CoverBrandingEnhancerTest extends TestCase
         $query->shouldReceive('where')->with('key', 'profile_photo')->andReturnSelf();
         $query->shouldReceive('value')->with('value')->andReturn($value);
 
+        // creator_brand group — default: watermark disabled (matches seeded default),
+        // all other keys resolve to null so appendWatermark is a no-op in these tests.
+        $brandQuery = Mockery::mock('Illuminate\Database\Eloquent\Builder');
+        $brandQuery->shouldReceive('where')->andReturnUsing(function ($col, $key) {
+            $stub = Mockery::mock('Illuminate\Database\Eloquent\Builder');
+            $stub->shouldReceive('value')->with('value')->andReturn(null);
+            return $stub;
+        });
+
         $mock = Mockery::mock('alias:' . Setting::class);
         $mock->shouldReceive('where')->with('group', 'about')->andReturn($query);
+        $mock->shouldReceive('where')->with('group', 'creator_brand')->andReturn($brandQuery);
     }
 
     private function makeIdea(array $override = []): ContentIdea

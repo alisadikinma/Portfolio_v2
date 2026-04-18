@@ -242,6 +242,28 @@ Recent migrations (post-initial):
 - `social_accounts` - Social media publishing accounts
 - `content_ideas` - Content idea pipeline with status flow
 - `update_content_ideas_article_pipeline` - Article pipeline fields (generated_article, generated_images, image_instructions)
+- `add_planned_filename_to_image_generation_jobs` - Branded filename field (`alisadikinma-{seo-keyword}-{segment}.png`)
+
+### `settings` group: `creator_brand` (April 18, 2026)
+
+Creator brand config for image watermark + filename prefix. 5 rows seeded via `CreatorBrandSettingsSeeder`:
+
+| key | default | purpose |
+|---|---|---|
+| `creator_brand_logo` | null | Brand logo file (`/uploads/branding/{timestamp}_{name}.png`) — passed to GeminiGen as `file_urls` when watermark enabled |
+| `creator_brand_tagline` | `alisadikinma.com` | Text rendered below logo in watermark instruction |
+| `creator_brand_slug` | `alisadikinma` | Filename prefix for all generated blog images (lowercase kebab-case) |
+| `watermark_opacity` | `0.30` | Stored as string `'0.00'-'1.00'`, clamped server-side to `[0.05, 0.95]` |
+| `watermark_enabled` | `false` | Opt-in toggle (`'true'` / `'false'` strings) |
+
+Admin UI: dedicated "Creator Brand — Image Watermark" card on [AboutSettings.vue](frontend/src/views/admin/AboutSettings.vue) (below Basic Information). Has its own submit button (`handleBrandSubmit`) separate from the main About form.
+
+API routes (all `auth:sanctum`):
+```
+GET    /api/admin/settings/creator-brand
+PUT    /api/admin/settings/creator-brand
+POST   /api/admin/settings/creator-brand  (FormData with _method=PUT for logo upload)
+```
 
 ## Critical Schema Notes
 
@@ -737,6 +759,22 @@ dispatching to GeminiGen. This prevents demographic contradiction between VD tex
 - Fallback: on rewrite failure, error toast + generate with original VD (no hard block)
 - Chips: face/style ref thumbnails + notes icon visible on segment cards below Style/Model/Ratio pills
 
+### Auto Creator-Face + Watermark + Branded Filenames (April 18, 2026)
+
+Backend-owned brand policy applied automatically at every GeminiGen dispatch via [CoverBrandingEnhancer](backend/app/Services/CoverBrandingEnhancer.php) + [ImageGenerationService](backend/app/Services/ImageGenerationService.php). Plugin stays creative-focused — never prescribes logos, filenames, or brand overlays.
+
+**Cover auto-inject (always)** — every cover image gets the creator's profile photo prepended to `face_refs` regardless of keyword match. Then sync VD rewrite fires (same pipeline as manual Gate 2 upload) so the VD describes the actual person. Idempotent via `visual_direction_original` sentinel.
+
+**Inline auto-inject (conditional)** — inline images get creator face when `image_prompts[i].needs_creator_face === true` (plugin-authored flag from `/article-images`) OR when the expanded `HUMAN_KEYWORDS` list matches the VD/prompt text. Expanded list includes: `developer, engineer, designer, marketer, user, student, entrepreneur, coder, programmer, executive` (EN) + `pengembang, perancang, mahasiswa, wirausaha` (ID).
+
+**Watermark prompt-injection (cover + inline)** — when `creator_brand` settings have `watermark_enabled='true'` AND `creator_brand_logo` resolves, `CoverBrandingEnhancer::appendWatermark()` appends a centered-watermark instruction string (reads `watermark_opacity` + `creator_brand_tagline` from DB) to `prompt_text` AND pushes the brand logo URL into `file_urls[]`. Applies to every image type for brand consistency. Graceful no-op + warning log when logo missing.
+
+**Branded filenames** — every `ImageGenerationJob` dispatched from `triggerForIdea()` gets a `planned_filename` column set to `{creator_brand_slug}-{slug(research.keyword || title)}-{cover|body-N}.png`. The webhook's `downloadAndStore($remoteUrl, $job->planned_filename)` saves the file under that name. Collisions get `-v2`, `-v3` suffix. Frontend lightbox download uses the identical pattern via `ImageGeneration.vue::computeBrandedFilename`. Example: `alisadikinma-vibe-coding-tools-2026-cover.png`.
+
+**Per-type captions (new field `image_prompts[i].caption`)** — authored by `/article-images` plugin. Cover = article title (exact or light SEO paraphrase). Inline = 5-12 words of supporting context (MUST NOT duplicate title or H2 heading). Backend `insertInlineImage()` sources figcaption from `caption` → `concept` → `insert_after_heading` fallback chain. Editable inline in Content Engine UI via caption input under Visual Direction (auto-saved).
+
+**Tests:** 19 backend tests across 4 suites — `CreatorBrandSettingsTest` (5), `BrandedFilenameTest` (4), `CoverBrandingAutoInjectTest` (7), `WatermarkInjectionTest` (3). All green.
+
 ### Plugin: article-content-writer (v2.0.0)
 ```
 Location: D:\Projects\claude-plugin\article-content-writer\
@@ -809,7 +847,7 @@ ARTICLE_GEN_USE_TRANSLATE_PHASE=false
 
 ---
 
-**Last Updated:** April 17, 2026 (Content Engine preview fixes — shared image positioning helper, id default tab + untranslated banner, variation cleanup moved to server-side approveAndPublish)
+**Last Updated:** April 18, 2026 (Creator Brand system — auto-inject cover face + VD rewrite, prompt-injection watermark (cover+inline), branded filenames `alisadikinma-{keyword}-{segment}.png`, per-type image captions, `creator_brand` Settings group + AboutSettings card)
 **Maintainer:** Ali Sadikin (ali.sadikincom85@gmail.com)
 **Environment:** Windows 11, D:\Projects\Portfolio_v2
 **PHP:** D:\xampp\php\php.exe (8.2.12) — use full path, not in system PATH

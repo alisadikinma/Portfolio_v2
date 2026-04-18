@@ -23,6 +23,13 @@ export const useSettingsStore = defineStore('settings', {
       meta_tags: [],
       analytics_code: ''
     },
+    creatorBrandSettings: {
+      creator_brand_logo: null,
+      creator_brand_tagline: 'alisadikinma.com',
+      creator_brand_slug: 'alisadikinma',
+      watermark_opacity: '0.30',
+      watermark_enabled: 'false'
+    },
     loading: false,
     error: null
   }),
@@ -157,6 +164,56 @@ export const useSettingsStore = defineStore('settings', {
       } catch (error) {
         console.error('❌ Store update failed:', error)
         this.error = error.response?.data?.message || 'Failed to update site settings'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async fetchCreatorBrandSettings() {
+      this.loading = true
+      this.error = null
+
+      try {
+        const response = await api.get('/admin/settings/creator-brand')
+
+        if (response.data.success) {
+          this.creatorBrandSettings = response.data.data
+        }
+
+        return this.creatorBrandSettings
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to fetch creator brand settings'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async updateCreatorBrandSettings(settingsData) {
+      this.loading = true
+      this.error = null
+
+      try {
+        const config = settingsData instanceof FormData ? {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        } : {}
+
+        if (settingsData instanceof FormData && !settingsData.has('_method')) {
+          settingsData.append('_method', 'PUT')
+        }
+
+        const response = await api.post('/admin/settings/creator-brand', settingsData, config)
+
+        if (response.data.success) {
+          this.creatorBrandSettings = response.data.data
+        }
+
+        return this.creatorBrandSettings
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to update creator brand settings'
         throw error
       } finally {
         this.loading = false
