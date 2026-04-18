@@ -390,11 +390,12 @@
             </div>
           </label>
         </div>
-        <div v-if="filteredTrending.length > perPage" class="flex items-center justify-between mt-3 pt-3 border-t border-neutral-100 dark:border-neutral-700/50">
+        <div class="flex items-center justify-between mt-3 pt-3 border-t border-neutral-100 dark:border-neutral-700/50">
+          <!-- Always show the total count, even when the result set fits on one page -->
           <span class="text-xs text-neutral-500 dark:text-neutral-400">
-            Showing {{ pageRangeLabel }}
+            Showing {{ pageRangeLabel }}<span v-if="trendingSearch.trim() || trendingSourceFilter" class="text-neutral-400 dark:text-neutral-500"> (filtered from {{ trendingTopics.length }})</span>
           </span>
-          <div class="flex items-center gap-1">
+          <div v-if="filteredTrending.length > perPage" class="flex items-center gap-1">
             <button
               @click="currentPage = Math.max(1, currentPage - 1)"
               :disabled="currentPage === 1"
