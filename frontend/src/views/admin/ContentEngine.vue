@@ -564,9 +564,9 @@
         </div>
 
         <!-- Pipeline Phase Cards — equal-width columns spanning full modal.
-             articleGenerationPhases is always 3 (Prep, Write, Score) after
-             filtering out the Gate 2 Images phase; grid-cols-3 is safe here. -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+             articleGenerationPhases is always 4 (Research, Strategy+Outline,
+             Write, Score) after filtering out the Gate 2 Images phase. -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
           <div
             v-for="phase in articleGenerationPhases"
             :key="phase.skill"
@@ -577,7 +577,7 @@
             <div class="flex items-center justify-between mb-2">
               <div class="flex items-center gap-2">
                 <span class="text-[11px] font-bold uppercase tracking-wide" :class="phaseHeaderColor(phase)">{{ phase.name }}</span>
-                <span class="text-[9px] font-mono px-1.5 py-0.5 rounded" :class="phaseModelBadge(phase)">{{ phase.model }}</span>
+                <span class="text-[9px] font-mono px-1.5 py-0.5 rounded" :class="phaseModelBadge(phase)">{{ phaseModelLabel(phase) }}</span>
               </div>
               <span class="text-[10px] font-mono font-medium" :class="phaseStatusColor(phase)">{{ phaseStatus(phase) }}</span>
             </div>
@@ -587,7 +587,7 @@
                 v-for="step in phase.steps"
                 :key="step.name"
                 class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium"
-                :class="stepIndicatorClass(step)"
+                :class="[stepIndicatorClass(step), { 'opacity-40': step.deepOnly && resolvedResearchModel(progressIdea) === 'Sonnet' }]"
               >
                 <svg v-if="stepIsDone(step)" class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
                 <svg v-else-if="stepIsActive(step)" class="animate-spin w-2.5 h-2.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
@@ -892,15 +892,30 @@ const logContainer = ref(null)
 
 const pipelinePhases = [
   {
-    name: 'Prep',
-    skill: '/article-prep',
-    model: 'Sonnet',
-    pctRange: '0–35%',
+    name: 'Research',
+    skill: '/article-research',
+    modelDynamic: true,
+    pctRange: '0–15%',
     minPct: 0,
+    maxPct: 15,
+    steps: [
+      { name: 'input_collection', label: 'Input', pct: 2 },
+      { name: 'research_layer_1', label: 'Layer 1 (Discovery)', pct: 5 },
+      { name: 'research_layer_2', label: 'Layer 2 (Deep Read)', pct: 9, deepOnly: true },
+      { name: 'research_layer_3', label: 'Layer 3 (Synthesis)', pct: 12, deepOnly: true },
+      { name: 'research_layer_4', label: 'Layer 4 + Review', pct: 14 },
+      { name: 'research', label: 'Saved', pct: 15 },
+    ],
+  },
+  {
+    name: 'Strategy+Outline',
+    skill: '/article-strategy-outline',
+    model: 'Sonnet',
+    pctRange: '15–35%',
+    minPct: 15,
     maxPct: 35,
     steps: [
-      { name: 'input_collection', label: 'Input', pct: 5 },
-      { name: 'research', label: 'Research', pct: 15 },
+      { name: 'input_collection', label: 'Input', pct: 17 },
       { name: 'strategy', label: 'Strategy', pct: 25 },
       { name: 'outline', label: 'Outline', pct: 35 },
     ],
@@ -956,6 +971,18 @@ const articleGenerationPhases = pipelinePhases.filter(p => p.gate !== 'images')
 
 // Flatten for backward compat — keeps all phase step names including images
 const progressSteps = pipelinePhases.flatMap(p => p.steps)
+
+// Resolves the Claude model badge for the Research phase (dynamic based on
+// idea.research_tier_override + idea.virality_score). Quick tier → Sonnet,
+// Deep tier → Opus, Auto → Opus if virality_score ≥ 70 else Sonnet.
+function resolvedResearchModel(idea) {
+  if (!idea) return 'Sonnet'
+  const tier = idea.research_tier_override ?? 'auto'
+  if (tier === 'deep') return 'Opus'
+  if (tier === 'quick') return 'Sonnet'
+  // auto
+  return (idea.virality_score != null && idea.virality_score >= 70) ? 'Opus' : 'Sonnet'
+}
 
 // Research preview
 const researchData = ref(null)
@@ -1560,10 +1587,15 @@ function phaseHeaderColor(phase) {
 }
 
 function phaseModelBadge(phase) {
-  const s = phaseState(phase)
-  if (s === 'done') return 'bg-green-900/40 text-green-400'
-  if (s === 'active') return 'bg-amber-900/40 text-amber-400'
-  return 'bg-neutral-800 text-neutral-500'
+  const model = phase.modelDynamic ? resolvedResearchModel(progressIdea.value) : phase.model
+  if (model === 'Opus') {
+    return 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/30'
+  }
+  return 'bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/30'
+}
+
+function phaseModelLabel(phase) {
+  return phase.modelDynamic ? resolvedResearchModel(progressIdea.value) : phase.model
 }
 
 function phaseStatus(phase) {
