@@ -495,6 +495,32 @@
               </label>
             </div>
           </div>
+          <div data-testid="research-tier-picker">
+            <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">Research Tier</label>
+            <div class="space-y-2">
+              <label v-for="tier in ['auto','quick','deep']" :key="tier" class="flex items-start gap-2 cursor-pointer">
+                <input type="radio" :value="tier" v-model="configResearchTier" class="mt-1 text-amber-600 focus:ring-amber-500" />
+                <div class="flex-1 text-sm">
+                  <div class="flex items-center gap-2">
+                    <span class="capitalize text-neutral-700 dark:text-neutral-300 font-medium">{{ tier }}</span>
+                    <template v-if="tier === configResearchTier">
+                      <span
+                        class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border"
+                        :class="tierPreview.model === 'Opus' ? 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/30' : 'bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/30'"
+                      >{{ tierPreview.model }}</span>
+                      <span class="text-neutral-500 dark:text-neutral-400 text-xs">~{{ tierPreview.time }}</span>
+                    </template>
+                  </div>
+                  <div v-if="tier === configResearchTier && tierPreview.note" class="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+                    {{ tierPreview.note }}
+                  </div>
+                  <p v-else-if="tier === 'auto'" class="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">Auto-picks Deep for virality_score ≥ 70</p>
+                  <p v-else-if="tier === 'quick'" class="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">Sonnet, 5-8 data points, fast</p>
+                  <p v-else class="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">Opus, 20-30 data points + entities + personas</p>
+                </div>
+              </label>
+            </div>
+          </div>
           <div>
             <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">Instructions (optional)</label>
             <textarea v-model="configInstructions" rows="3" placeholder="Any specific instructions for research..." class="block w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 text-sm px-3 py-2 focus:ring-amber-500 focus:border-amber-500 placeholder-neutral-400"></textarea>
@@ -831,6 +857,18 @@ function toggleSelectAll() {
 // Config modal
 const configLanguages = ref([])
 const configInstructions = ref('')
+const configResearchTier = ref('auto')  // 'auto' | 'quick' | 'deep'
+
+const tierPreview = computed(() => {
+  const tier = configResearchTier.value
+  const score = currentIdea.value?.virality_score
+  if (tier === 'quick') return { model: 'Sonnet', time: '1-2 min' }
+  if (tier === 'deep') return { model: 'Opus', time: '5-8 min' }
+  // auto
+  if (score == null) return { model: 'Sonnet', time: '1-2 min', note: 'no score yet → Quick' }
+  if (score >= 70) return { model: 'Opus', time: '5-8 min', note: `score ${score} ≥ 70 → Deep` }
+  return { model: 'Sonnet', time: '1-2 min', note: `score ${score} < 70 → Quick` }
+})
 
 // Image config modal
 const imageInstructions = ref('')
@@ -1278,6 +1316,7 @@ function openConfigModal(idea) {
   currentIdea.value = idea
   configLanguages.value = ['id', 'en']
   configInstructions.value = ''
+  configResearchTier.value = idea?.research_tier_override || 'auto'
   showConfigModal.value = true
 }
 
@@ -1286,6 +1325,7 @@ async function handleStartResearch() {
   const result = await startResearch(currentIdea.value.id, {
     languages: configLanguages.value,
     instructions: configInstructions.value || undefined,
+    research_tier: configResearchTier.value,
   })
   if (result.success) {
     toast.success('Article generation started via CLI')
