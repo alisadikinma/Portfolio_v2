@@ -288,6 +288,7 @@ import { useMetaTags } from '@/composables/useMetaTags'
 import { usePageSections } from '@/composables/usePageSections'
 import { useToast } from '@/composables/useToast'
 import { stripFaqSection } from '@/utils/stripFaqSection'
+import { extractFaqFromHtml } from '@/utils/extractFaqFromHtml'
 import FaqAccordion from '@/components/blog/FaqAccordion.vue'
 import api from '@/services/api'
 
@@ -357,16 +358,20 @@ const copyUrl = async () => {
 }
 
 // ── FAQ accordion ─────────────────────────────────────────────────────────────
-// faq_schema is populated by the article-write plugin as JSON-LD FAQPage
-// (mainEntity[].name + mainEntity[].acceptedAnswer.text). Render it as an
-// interactive accordion and strip the matching inline FAQ section from the
-// body HTML so the content isn't duplicated.
+// Primary source: faq_schema JSON-LD populated by article-write plugin
+// (mainEntity[].name + mainEntity[].acceptedAnswer.text). For older posts
+// predating reliable schema emission, fall back to parsing the FAQ section
+// out of the body HTML directly (supports both <h3>Q</h3><p>A</p> and
+// <p><strong>Q</strong></p><p>A</p> patterns).
 const faqItems = computed(() => {
   const entities = post.value?.seo?.faq_schema?.mainEntity
-  if (!Array.isArray(entities)) return []
-  return entities
-    .filter((e) => typeof e?.name === 'string' && typeof e?.acceptedAnswer?.text === 'string')
-    .map((e) => ({ question: e.name, answer: e.acceptedAnswer.text }))
+  if (Array.isArray(entities) && entities.length > 0) {
+    const fromSchema = entities
+      .filter((e) => typeof e?.name === 'string' && typeof e?.acceptedAnswer?.text === 'string')
+      .map((e) => ({ question: e.name, answer: e.acceptedAnswer.text }))
+    if (fromSchema.length > 0) return fromSchema
+  }
+  return extractFaqFromHtml(post.value?.content || '')
 })
 
 const contentWithoutFaq = computed(() => {

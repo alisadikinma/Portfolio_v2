@@ -80,9 +80,10 @@ function onKey(e, i) {
             role="region"
           >
             <div class="overflow-hidden">
-              <p class="px-5 pb-5 text-fg-muted text-[15px] leading-relaxed">
-                {{ item.answer }}
-              </p>
+              <div
+                class="px-5 pb-5 text-fg-muted text-[15px] leading-relaxed faq-answer"
+                v-html="item.answer"
+              ></div>
             </div>
           </div>
         </li>
