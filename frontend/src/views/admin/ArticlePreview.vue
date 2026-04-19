@@ -112,6 +112,90 @@ const currentTitle = computed({
   set: (val) => { editedTitles.value[activeLang.value] = val },
 })
 
+// ── Phase C: Mechanical Scorecard ──
+// Read-only snapshot stored at write-done time by MechanicalSnapshotWriter.
+// Shape matches MechanicalScoringService::analyze() plus captured_at ISO.
+const mechanicalSnapshot = computed(() => idea.value?.mechanical_scores_snapshot || null)
+
+function scoreStatusClasses(status) {
+  switch (status) {
+    case 'green':
+      return 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+    case 'amber':
+      return 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30'
+    case 'red':
+      return 'bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30'
+    default:
+      return 'bg-neutral-200 text-neutral-500 dark:bg-neutral-700 dark:text-neutral-400 border-neutral-300 dark:border-neutral-600'
+  }
+}
+
+// Threshold-based status for GEO + AI-humanization counts (the snapshot
+// already provides traffic-light status for the 6 SEO chips, but counts
+// need to be bucketed here for display).
+function countStatus(value, greenMin, amberMin) {
+  if (value >= greenMin) return 'green'
+  if (value >= amberMin) return 'amber'
+  return 'red'
+}
+
+function humanizationStatus(count) {
+  if (count === 0) return 'green'
+  if (count <= 2) return 'amber'
+  return 'red'
+}
+
+const seoChips = computed(() => {
+  const seo = mechanicalSnapshot.value?.seo
+  if (!seo) return []
+  const fmtBool = (v) => (v ? '✓' : '✗')
+  return [
+    { key: 'title_length', label: 'Title length', display: `${seo.title_length?.value ?? '—'} chars`, status: seo.title_length?.status || 'neutral' },
+    { key: 'keyword_in_title', label: 'Keyword in title', display: fmtBool(seo.keyword_in_title?.value), status: seo.keyword_in_title?.status || 'neutral' },
+    { key: 'title_word_count', label: 'Title words', display: `${seo.title_word_count?.value ?? '—'}`, status: seo.title_word_count?.status || 'neutral' },
+    { key: 'body_keyword_density', label: 'Keyword density', display: `${seo.body_keyword_density?.value ?? 0}%`, status: seo.body_keyword_density?.status || 'neutral' },
+    { key: 'keyword_in_first_100', label: 'In first 100', display: fmtBool(seo.keyword_in_first_100?.value), status: seo.keyword_in_first_100?.status || 'neutral' },
+    { key: 'keyword_in_headings', label: 'In headings', display: `${seo.keyword_in_headings?.value ?? 0}`, status: seo.keyword_in_headings?.status || 'neutral' },
+  ]
+})
+
+const geoChips = computed(() => {
+  const snap = mechanicalSnapshot.value
+  if (!snap) return []
+  const freshness = snap.freshness_signals ?? 0
+  const faq = snap.faq_pair_count ?? 0
+  const h2 = snap.h2_count ?? 0
+  const h3 = snap.h3_count ?? 0
+  return [
+    { key: 'freshness_signals', label: 'Freshness signals', display: `${freshness}`, status: countStatus(freshness, 2, 1) },
+    { key: 'faq_pair_count', label: 'FAQ pairs', display: `${faq}`, status: countStatus(faq, 3, 1) },
+    { key: 'h2_count', label: 'H2 headings', display: `${h2}`, status: countStatus(h2, 3, 1) },
+    { key: 'h3_count', label: 'H3 headings', display: `${h3}`, status: countStatus(h3, 4, 2) },
+  ]
+})
+
+const aiHumanizationChips = computed(() => {
+  const ai = mechanicalSnapshot.value?.ai_humanization
+  if (!ai) return []
+  const tier1 = ai.tier1_violation_count ?? 0
+  const tier2 = ai.tier2_clusters ?? 0
+  const tier3 = Array.isArray(ai.tier3_density_issues) ? ai.tier3_density_issues.length : 0
+  return [
+    { key: 'tier1', label: 'Tier 1 violations', display: `${tier1}`, status: humanizationStatus(tier1) },
+    { key: 'tier2', label: 'Tier 2 clusters', display: `${tier2}`, status: humanizationStatus(tier2) },
+    { key: 'tier3', label: 'Tier 3 density issues', display: `${tier3}`, status: humanizationStatus(tier3) },
+  ]
+})
+
+const humanizationNote = computed(() => mechanicalSnapshot.value?.ai_humanization?.note || null)
+
+function formatCapturedAt(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  return d.toLocaleString()
+}
+
 const titleCharCount = computed(() => currentTitle.value.length)
 
 const titleLengthStatus = computed(() => {
@@ -487,6 +571,74 @@ async function handleApprove() {
               {{ currentTitle.toLowerCase().includes(targetKeyword.toLowerCase()) ? '\u2713' : '\u2717' }} Keyword in title
             </span>
           </template>
+        </div>
+      </div>
+
+      <!-- Phase C: Mechanical Scorecard (no AI cost, deterministic metrics) -->
+      <div v-if="mechanicalSnapshot" class="max-w-3xl mx-auto px-4 sm:px-6 pt-4" data-testid="mechanical-scorecard">
+        <div class="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800/60 p-4">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100 uppercase tracking-wide">Mechanical Scorecard</h3>
+            <span v-if="mechanicalSnapshot.captured_at" class="text-xs text-neutral-500 dark:text-neutral-400" :title="mechanicalSnapshot.captured_at">
+              captured {{ formatCapturedAt(mechanicalSnapshot.captured_at) }}
+            </span>
+          </div>
+
+          <!-- SEO row -->
+          <div class="mb-3">
+            <p class="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase mb-1.5">SEO</p>
+            <div class="flex flex-wrap gap-1.5">
+              <span
+                v-for="chip in seoChips"
+                :key="chip.key"
+                :class="['inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium border', scoreStatusClasses(chip.status)]"
+                :title="chip.label"
+              >
+                <span class="opacity-70">{{ chip.label }}</span>
+                <span class="font-semibold">{{ chip.display }}</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- GEO row -->
+          <div class="mb-3">
+            <p class="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase mb-1.5">GEO signals</p>
+            <div class="flex flex-wrap gap-1.5">
+              <span
+                v-for="chip in geoChips"
+                :key="chip.key"
+                :class="['inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium border', scoreStatusClasses(chip.status)]"
+                :title="chip.label"
+              >
+                <span class="opacity-70">{{ chip.label }}</span>
+                <span class="font-semibold">{{ chip.display }}</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- AI Humanization row -->
+          <div>
+            <p class="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase mb-1.5">AI Humanization</p>
+            <div class="flex flex-wrap gap-1.5">
+              <span
+                v-for="chip in aiHumanizationChips"
+                :key="chip.key"
+                :class="['inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium border', scoreStatusClasses(chip.status)]"
+                :title="chip.label"
+              >
+                <span class="opacity-70">{{ chip.label }}</span>
+                <span class="font-semibold">{{ chip.display }}</span>
+              </span>
+            </div>
+            <p v-if="humanizationNote" class="mt-1.5 text-[11px] italic text-neutral-500 dark:text-neutral-400">{{ humanizationNote }}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scorecard empty-state (legacy ideas or ideas still pre-write) -->
+      <div v-else-if="idea && idea.status === 'article_ready'" class="max-w-3xl mx-auto px-4 sm:px-6 pt-4">
+        <div class="rounded-lg border border-dashed border-neutral-200 dark:border-neutral-700 p-3 text-xs text-neutral-500 dark:text-neutral-400">
+          Mechanical scores not yet captured for this idea — older articles produced before the scorecard feature shipped.
         </div>
       </div>
 
