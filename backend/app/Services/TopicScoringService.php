@@ -133,8 +133,19 @@ class TopicScoringService
      */
     public function scoreViralityBatch(array $topics): array
     {
+        return $this->scoreViralityBatchWithStatus($topics)['topics'];
+    }
+
+    /**
+     * Internal variant that also reports whether the AI leg succeeded.
+     * scoreBatch() uses this to decide whether a result deserves caching.
+     *
+     * @return array{topics: array, ai_succeeded: bool}
+     */
+    private function scoreViralityBatchWithStatus(array $topics): array
+    {
         if (count($topics) === 0) {
-            return [];
+            return ['topics' => [], 'ai_succeeded' => true];
         }
         if (count($topics) > self::MAX_BATCH_SIZE) {
             throw new \InvalidArgumentException(
@@ -149,14 +160,14 @@ class TopicScoringService
             $result = $articleGen->runSonnetSync($prompt, 'topic-scoring', 'sonnet');
         } catch (\Throwable $e) {
             Log::warning('[TopicScoring] Sonnet call threw', ['error' => $e->getMessage()]);
-            return $this->zeroScoreAll($topics);
+            return ['topics' => $this->zeroScoreAll($topics), 'ai_succeeded' => false];
         }
 
         if (empty($result['success']) || empty($result['output'])) {
             Log::warning('[TopicScoring] Sonnet returned failure', [
                 'error' => $result['error'] ?? null,
             ]);
-            return $this->zeroScoreAll($topics);
+            return ['topics' => $this->zeroScoreAll($topics), 'ai_succeeded' => false];
         }
 
         $parsed = $this->parseViralityResponse($result['output']);
@@ -164,10 +175,13 @@ class TopicScoringService
             Log::warning('[TopicScoring] Failed to parse Sonnet output as JSON', [
                 'output_head' => substr((string) $result['output'], 0, 200),
             ]);
-            return $this->zeroScoreAll($topics);
+            return ['topics' => $this->zeroScoreAll($topics), 'ai_succeeded' => false];
         }
 
-        return $this->mergeViralityResults($topics, $parsed);
+        return [
+            'topics' => $this->mergeViralityResults($topics, $parsed),
+            'ai_succeeded' => true,
+        ];
     }
 
     private function buildViralityPrompt(array $topics): string
@@ -182,9 +196,10 @@ class TopicScoringService
             $lines[] = "{$idx}. [{$source}] {$title}{$descSnippet}";
         }
         $listed = implode("\n", $lines);
+        $count = count($topics);
 
         return <<<PROMPT
-You are scoring {count} trending topics for viral potential. For each topic, evaluate:
+You are scoring {$count} trending topics for viral potential. For each topic, evaluate:
 - virality_score: integer 0-100 (0 = inert, 100 = extreme viral potential)
 - triggers: 5 booleans from Jonah Berger's STEPPS framework:
   * social_currency: sharing it makes the sharer look smart/in-the-know
@@ -194,7 +209,7 @@ You are scoring {count} trending topics for viral potential. For each topic, eva
   * cognitive_gap: creates curiosity gap that demands resolution
 
 Topics:
-{listed}
+{$listed}
 
 Return ONLY a JSON array, one object per input topic in the SAME ORDER, with this exact shape:
 [
@@ -298,31 +313,40 @@ PROMPT;
 
         $key = $this->cacheKey($topics);
 
-        return Cache::remember($key, self::CACHE_TTL_SECONDS, function () use ($topics) {
-            // Mechanical momentum first — cheap, no AI.
-            $withMomentum = [];
-            foreach (array_values($topics) as $topic) {
-                $topic['momentum_score'] = $this->computeMomentum($topic);
-                $withMomentum[] = $topic;
-            }
+        $cached = Cache::get($key);
+        if (is_array($cached)) {
+            return $cached;
+        }
 
-            // Virality AI scoring (single batch call).
-            $scored = $this->scoreViralityBatch($withMomentum);
+        // Mechanical momentum first — cheap, no AI.
+        $withMomentum = [];
+        foreach (array_values($topics) as $topic) {
+            $topic['momentum_score'] = $this->computeMomentum($topic);
+            $withMomentum[] = $topic;
+        }
 
-            // Composite = weighted average, int-clamped.
-            $out = [];
-            foreach ($scored as $topic) {
-                $momentum = (int) ($topic['momentum_score'] ?? 0);
-                $virality = (int) ($topic['virality_score'] ?? 0);
-                $composite = (int) round(
-                    $momentum * self::MOMENTUM_WEIGHT + $virality * self::VIRALITY_WEIGHT
-                );
-                $topic['composite_score'] = max(0, min(100, $composite));
-                $out[] = $topic;
-            }
+        // Virality AI scoring (single batch call) — track success so we can
+        // skip the cache write on AI failure and avoid poisoning the key
+        // with zero-scores for the next hour.
+        $result = $this->scoreViralityBatchWithStatus($withMomentum);
 
-            return $out;
-        });
+        // Composite = weighted average, int-clamped.
+        $out = [];
+        foreach ($result['topics'] as $topic) {
+            $momentum = (int) ($topic['momentum_score'] ?? 0);
+            $virality = (int) ($topic['virality_score'] ?? 0);
+            $composite = (int) round(
+                $momentum * self::MOMENTUM_WEIGHT + $virality * self::VIRALITY_WEIGHT
+            );
+            $topic['composite_score'] = max(0, min(100, $composite));
+            $out[] = $topic;
+        }
+
+        if ($result['ai_succeeded']) {
+            Cache::put($key, $out, self::CACHE_TTL_SECONDS);
+        }
+
+        return $out;
     }
 
     private function cacheKey(array $topics): string

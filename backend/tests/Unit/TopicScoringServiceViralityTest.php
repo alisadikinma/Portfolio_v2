@@ -126,4 +126,39 @@ class TopicScoringServiceViralityTest extends TestCase
         $service = new TopicScoringService();
         $this->assertSame([], $service->scoreViralityBatch([]));
     }
+
+    public function test_prompt_actually_contains_topic_titles_and_count(): void
+    {
+        // Regression: PHP heredocs require {$var} — a bare {var} is a literal.
+        // This test captures the prompt text sent to Sonnet and asserts the
+        // topic titles + count are interpolated, not left as placeholders.
+        $capturedPrompt = null;
+
+        $mock = Mockery::mock(ArticleGenerationService::class);
+        $mock->shouldReceive('runSonnetSync')
+            ->once()
+            ->andReturnUsing(function ($prompt) use (&$capturedPrompt) {
+                $capturedPrompt = $prompt;
+                return [
+                    'success' => true,
+                    'output' => '[{"title":"alpha","virality_score":50,"triggers":{"social_currency":false,"high_arousal":false,"practical_utility":false,"identity_signaling":false,"cognitive_gap":false}},{"title":"beta","virality_score":50,"triggers":{"social_currency":false,"high_arousal":false,"practical_utility":false,"identity_signaling":false,"cognitive_gap":false}}]',
+                    'error' => null,
+                ];
+            });
+        app()->instance(ArticleGenerationService::class, $mock);
+
+        $service = new TopicScoringService();
+        $service->scoreViralityBatch([
+            ['title' => 'alpha-topic-unique-marker', 'source' => 'google_news'],
+            ['title' => 'beta-topic-unique-marker', 'source' => 'google_trends'],
+        ]);
+
+        $this->assertNotNull($capturedPrompt);
+        $this->assertStringContainsString('alpha-topic-unique-marker', $capturedPrompt);
+        $this->assertStringContainsString('beta-topic-unique-marker', $capturedPrompt);
+        $this->assertStringContainsString('You are scoring 2 trending topics', $capturedPrompt);
+        // Catch any future heredoc-placeholder regression
+        $this->assertStringNotContainsString('{count}', $capturedPrompt);
+        $this->assertStringNotContainsString('{listed}', $capturedPrompt);
+    }
 }

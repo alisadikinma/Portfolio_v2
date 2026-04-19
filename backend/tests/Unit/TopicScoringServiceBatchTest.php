@@ -153,4 +153,58 @@ class TopicScoringServiceBatchTest extends TestCase
         $service = new TopicScoringService();
         $this->assertSame([], $service->scoreBatch([]));
     }
+
+    public function test_ai_failure_does_not_poison_cache_for_subsequent_calls(): void
+    {
+        // Simulate AI failure on the FIRST call — should return zero-scores
+        // without caching. The SECOND call should re-invoke Sonnet (now
+        // succeeding) and produce the real scores. Under the old behavior,
+        // the second call would get cached zeros and never invoke Sonnet.
+        $mock = Mockery::mock(ArticleGenerationService::class);
+        $mock->shouldReceive('runSonnetSync')
+            ->twice()
+            ->andReturnValues([
+                ['success' => false, 'output' => '', 'error' => 'ssh timeout'],
+                [
+                    'success' => true,
+                    'output' => json_encode([
+                        ['title' => 'alpha', 'virality_score' => 90, 'triggers' => [
+                            'social_currency' => true, 'high_arousal' => true,
+                            'practical_utility' => false, 'identity_signaling' => true,
+                            'cognitive_gap' => false,
+                        ]],
+                        ['title' => 'beta', 'virality_score' => 55, 'triggers' => [
+                            'social_currency' => false, 'high_arousal' => false,
+                            'practical_utility' => true, 'identity_signaling' => false,
+                            'cognitive_gap' => true,
+                        ]],
+                        ['title' => 'gamma', 'virality_score' => 30, 'triggers' => [
+                            'social_currency' => false, 'high_arousal' => false,
+                            'practical_utility' => false, 'identity_signaling' => false,
+                            'cognitive_gap' => false,
+                        ]],
+                    ]),
+                    'error' => null,
+                ],
+            ]);
+        app()->instance(ArticleGenerationService::class, $mock);
+
+        $service = new TopicScoringService();
+        $topics = [
+            ['title' => 'alpha', 'source' => 'google_news'],
+            ['title' => 'beta', 'source' => 'google_trends'],
+            ['title' => 'gamma', 'source' => 'tiktok'],
+        ];
+
+        $firstResult = $service->scoreBatch($topics);
+        // First call: AI failed → zero virality scores returned, NOT cached
+        $this->assertSame(0, $firstResult[0]['virality_score']);
+        $this->assertSame(0, $firstResult[1]['virality_score']);
+
+        $secondResult = $service->scoreBatch($topics);
+        // Second call: re-invokes Sonnet (success), returns real scores
+        $this->assertSame(90, $secondResult[0]['virality_score']);
+        $this->assertSame(55, $secondResult[1]['virality_score']);
+        $this->assertSame(30, $secondResult[2]['virality_score']);
+    }
 }
