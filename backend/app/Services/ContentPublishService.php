@@ -70,7 +70,7 @@ class ContentPublishService
             ?? data_get($imagePrompts, '0.generated_url')
             ?? null;
 
-        $categoryId = $this->resolveCategoryId($idea);
+        $categoryId = $this->resolveCategoryId($idea, $title, $primary, $article);
         if (!$categoryId) {
             throw new \DomainException('No category available. Create at least one category before publishing.');
         }
@@ -162,15 +162,82 @@ class ContentPublishService
         return $imagePrompts;
     }
 
-    private function resolveCategoryId(ContentIdea $idea): ?int
-    {
+    /**
+     * Resolve the best-fit category for an idea.
+     *
+     * Order of precedence:
+     *   1. Exact niche match (slug or name)
+     *   2. Exact pillar match (slug or name)
+     *   3. Token-overlap scoring — score every category by counting how many
+     *      of its name/slug tokens appear in the article's title + tags +
+     *      meta_keywords + excerpt. The highest non-zero score wins.
+     *   4. A "generic" category (general / uncategorized / other / news) if one exists
+     *   5. Log a warning and return the newest category (less biased than oldest)
+     */
+    private function resolveCategoryId(
+        ContentIdea $idea,
+        string $title = '',
+        array $primary = [],
+        array $article = []
+    ): ?int {
+        $categories = Category::all(['id', 'name', 'slug']);
+        if ($categories->isEmpty()) return null;
+        if ($categories->count() === 1) return $categories->first()->id;
+
         if (!empty($idea->niche)) {
-            $category = Category::where('slug', Str::slug($idea->niche))
-                ->orWhere('name', $idea->niche)
-                ->first();
-            if ($category) return $category->id;
+            $match = $categories->first(fn ($c) =>
+                $c->slug === Str::slug($idea->niche) || strcasecmp($c->name, $idea->niche) === 0
+            );
+            if ($match) return $match->id;
         }
-        return Category::orderBy('id')->value('id');
+
+        if (!empty($idea->pillar) && $idea->pillar !== 'general') {
+            $match = $categories->first(fn ($c) =>
+                $c->slug === Str::slug($idea->pillar) || strcasecmp($c->name, $idea->pillar) === 0
+            );
+            if ($match) return $match->id;
+        }
+
+        $haystack = Str::lower(implode(' ', array_filter([
+            $title,
+            $idea->title,
+            is_array($idea->tags) ? implode(' ', $idea->tags) : '',
+            data_get($primary, 'meta_keywords') ?: data_get($article, 'meta_keywords') ?: '',
+            data_get($primary, 'meta_title') ?: '',
+            data_get($primary, 'excerpt') ?: '',
+        ])));
+        $haystackTokens = array_filter(preg_split('/[^a-z0-9]+/', $haystack));
+
+        if (!empty($haystackTokens)) {
+            $scored = $categories->map(function ($c) use ($haystackTokens) {
+                $needles = array_filter(array_unique(array_merge(
+                    preg_split('/[^a-z0-9]+/', Str::lower($c->name)) ?: [],
+                    preg_split('/[^a-z0-9]+/', Str::lower($c->slug)) ?: []
+                )));
+                $needles = array_filter($needles, fn ($t) => strlen($t) >= 3);
+                $score = 0;
+                foreach ($needles as $n) {
+                    $score += count(array_keys($haystackTokens, $n));
+                }
+                return ['id' => $c->id, 'score' => $score];
+            })->sortByDesc('score')->values();
+
+            if ($scored[0]['score'] > 0) return $scored[0]['id'];
+        }
+
+        foreach (['general', 'uncategorized', 'other', 'news', 'technology', 'ai'] as $fallbackSlug) {
+            $generic = $categories->first(fn ($c) => $c->slug === $fallbackSlug);
+            if ($generic) return $generic->id;
+        }
+
+        Log::warning('ContentPublishService: no category match — falling back to newest category', [
+            'idea_id' => $idea->id,
+            'idea_title' => $idea->title,
+            'idea_niche' => $idea->niche,
+            'idea_pillar' => $idea->pillar,
+        ]);
+
+        return Category::orderByDesc('id')->value('id');
     }
 
     private function buildUniqueSlug(string $title, ContentIdea $idea): string
