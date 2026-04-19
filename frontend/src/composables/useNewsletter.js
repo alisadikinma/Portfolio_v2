@@ -1,5 +1,12 @@
 import { ref } from 'vue'
 import api from '@/services/api'
+import {
+  isDismissed,
+  isSubscribed,
+  markDismissed,
+  markSubscribed,
+  clearNewsletterState,
+} from '@/utils/newsletterState'
 
 export function useNewsletter() {
   const isLoading = ref(false)
@@ -15,11 +22,18 @@ export function useNewsletter() {
       const res = await api.post('/newsletter/subscribe', { email })
       if (res.data.success) {
         success.value = true
+        markSubscribed(email)
       }
       return { success: true, message: res.data.message }
     } catch (err) {
+      const code = err.response?.data?.error?.code
       const msg = err.response?.data?.error?.message || 'Failed to subscribe'
       error.value = msg
+      // 409 duplicate still counts as "subscribed" for dedup purposes.
+      if (code === 'DUPLICATE') {
+        markSubscribed(email)
+        return { success: false, duplicate: true, message: msg }
+      }
       return { success: false, message: msg }
     } finally {
       isLoading.value = false
@@ -32,6 +46,7 @@ export function useNewsletter() {
 
     try {
       await api.delete('/newsletter/unsubscribe', { data: { email } })
+      clearNewsletterState()
       return { success: true }
     } catch (err) {
       error.value = err.response?.data?.error?.message || 'Failed to unsubscribe'
@@ -41,5 +56,15 @@ export function useNewsletter() {
     }
   }
 
-  return { isLoading, error, success, subscribe, unsubscribe }
+  return {
+    isLoading,
+    error,
+    success,
+    subscribe,
+    unsubscribe,
+    // State-aware helpers (pure, re-exported for convenience)
+    isDismissed,
+    isSubscribed,
+    markDismissed,
+  }
 }
