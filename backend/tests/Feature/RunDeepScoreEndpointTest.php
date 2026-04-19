@@ -28,6 +28,14 @@ class RunDeepScoreEndpointTest extends TestCase
     protected function tearDown(): void
     {
         Mockery::close();
+        // Reset the PRAGMA so sibling tests in the same artisan process
+        // (notably ResearchTierOverrideMigrationTest's enum-rejection
+        // assertion) see a clean SQLite session with CHECK constraints
+        // re-enabled. PRAGMAs are session-local and persist across tests
+        // otherwise.
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            DB::statement('PRAGMA ignore_check_constraints = OFF');
+        }
         parent::tearDown();
     }
 
