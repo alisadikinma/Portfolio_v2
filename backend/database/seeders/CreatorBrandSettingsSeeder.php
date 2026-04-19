@@ -13,7 +13,7 @@ class CreatorBrandSettingsSeeder extends Seeder
             ['key' => 'creator_brand_logo',    'value' => null,               'type' => 'image'],
             ['key' => 'creator_brand_tagline', 'value' => 'alisadikinma.com', 'type' => 'text'],
             ['key' => 'creator_brand_slug',    'value' => 'alisadikinma',     'type' => 'text'],
-            ['key' => 'watermark_opacity',     'value' => '0.30',             'type' => 'text'],
+            ['key' => 'watermark_opacity',     'value' => '0.20',             'type' => 'text'],
             ['key' => 'watermark_enabled',     'value' => 'false',            'type' => 'text'],
         ];
 

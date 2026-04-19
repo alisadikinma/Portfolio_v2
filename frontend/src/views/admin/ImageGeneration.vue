@@ -341,6 +341,15 @@ async function generateSingle(segIndex) {
   seg.status = 'generating'
   const prompt = getPrompt(seg)
 
+  // Optimistic placeholder: show a spinner in the variation strip (and in the
+  // main preview when no existing image is set) the moment the user clicks
+  // Generate, instead of waiting for the API round-trip to come back. Without
+  // this the "+" drop-down "Generate AI" click looked dead until the next
+  // poll tick — user had to refresh the browser to see any loading feedback.
+  if (!seg.variations) seg.variations = []
+  const optimisticIdx = seg.variations.length
+  seg.variations.push({ url: null, job_uuid: null, status: 'generating', pending: true })
+
   const result = await generateSegmentImage(idea.value.id, {
     segment_index: segIndex,
     prompt,
@@ -355,11 +364,12 @@ async function generateSingle(segIndex) {
 
   if (result.success) {
     const uuid = result.data?.uuid
-    const varIdx = result.data?.variation_index ?? (seg.variations || []).length
-    if (!seg.variations) seg.variations = []
-    // Backend uses retry-in-place — when a failed/orphan slot exists it reuses
-    // that slot's index rather than appending. Mirror that locally so the UI
-    // stays consistent with DB; otherwise the local "ghost" slot disappears on refresh.
+    const varIdx = result.data?.variation_index ?? optimisticIdx
+    // Drop the optimistic placeholder, then write the server-reported slot.
+    // Backend uses retry-in-place — on retry it may return an earlier index
+    // (reusing a failed slot) rather than appending. Mirror that locally so
+    // the UI matches the DB; otherwise the placeholder lingers until refresh.
+    seg.variations.splice(optimisticIdx, 1)
     if (varIdx < seg.variations.length) {
       seg.variations[varIdx] = { url: null, job_uuid: uuid, status: 'generating' }
     } else {
@@ -369,7 +379,9 @@ async function generateSingle(segIndex) {
     seg.job_uuid = uuid
     toast.success(`Image variation ${varIdx + 1} generation started`)
   } else {
-    // Revert status if no variations are generating
+    // API rejected — remove the optimistic placeholder so the strip goes back
+    // to its pre-click state, then surface the error.
+    seg.variations.splice(optimisticIdx, 1)
     const anyGenerating = (seg.variations || []).some(v => v.status === 'generating')
     seg.status = anyGenerating ? 'generating' : (seg.variations?.length ? 'done' : 'failed')
     toast.error(result.error || `Failed to generate image ${segIndex + 1}`)

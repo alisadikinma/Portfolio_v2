@@ -109,7 +109,7 @@ class CoverBrandingEnhancer
         $opacity = max(0.05, min(0.95, $opacity));
         $pct = (int) round($opacity * 100);
 
-        $instruction = ". Apply a centered semi-transparent watermark at {$pct}% opacity using the provided brand logo reference image. Directly below the logo, render the text '{$tagline}' in clean minimal sans-serif typography at matching opacity. Watermark must not dominate focal subjects — keep it subtle but visible.";
+        $instruction = ". Apply a small compact brand watermark at the bottom-center of the frame using the provided brand logo reference image — logo must be no larger than 6% of the image width and rendered at {$pct}% opacity. Directly below the logo, render the text '{$tagline}' in clean sans-serif typography roughly 2x the height of the logo, in white or light-neutral color at 60-70% opacity so the tagline reads clearly and crisply while the logo stays subtle. Tagline must be noticeably more prominent than the logo itself, but the whole watermark block must not dominate or obscure focal subjects.";
         $prompt['prompt_text'] = ($prompt['prompt_text'] ?? '') . $instruction;
 
         $fileUrls = $prompt['file_urls'] ?? [];

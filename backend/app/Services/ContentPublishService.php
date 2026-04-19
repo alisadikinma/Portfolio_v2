@@ -357,11 +357,26 @@ class ContentPublishService
         foreach ($positioned as $p) {
             $img = $p['img'];
             $url = htmlspecialchars($img['generated_url'], ENT_QUOTES, 'UTF-8');
-            $alt = htmlspecialchars($img['concept'] ?? '', ENT_QUOTES, 'UTF-8');
+            // Caption source chain (per CLAUDE.md contract): explicit caption →
+            // concept → insert_after_heading. User-authored caption wins because
+            // that's the field they actually edit in the admin UI.
+            $captionRaw = trim((string) ($img['caption'] ?? ''));
+            if ($captionRaw === '') {
+                $captionRaw = trim((string) ($img['concept'] ?? ''));
+            }
+            if ($captionRaw === '') {
+                $captionRaw = trim((string) ($img['insert_after_heading'] ?? ''));
+            }
+            $caption = htmlspecialchars($captionRaw, ENT_QUOTES, 'UTF-8');
+            // Alt text prefers concept (semantic description), falls back to caption.
+            $altRaw = trim((string) ($img['concept'] ?? '')) ?: $captionRaw;
+            $alt = htmlspecialchars($altRaw, ENT_QUOTES, 'UTF-8');
             $figure = '<figure class="my-8 not-prose">'
-                . '<img src="' . $url . '" alt="' . $alt . '" class="w-full rounded-xl" loading="lazy" />'
-                . '<figcaption class="text-sm text-neutral-500 dark:text-neutral-400 mt-2 text-center">' . $alt . '</figcaption>'
-                . '</figure>';
+                . '<img src="' . $url . '" alt="' . $alt . '" class="w-full rounded-xl" loading="lazy" />';
+            if ($caption !== '') {
+                $figure .= '<figcaption class="text-sm text-neutral-500 dark:text-neutral-400 mt-2 text-center">' . $caption . '</figcaption>';
+            }
+            $figure .= '</figure>';
             $safePos = max(0, min($p['pos'], count($blockHtml)));
             array_splice($blockHtml, $safePos, 0, [$figure]);
         }

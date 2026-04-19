@@ -59,12 +59,18 @@ export function useContentEngine() {
 
   const pullTrending = (source = '') => {
     const params = source ? { source } : {}
-    return request('get', '/admin/content-engine/trending', null, params)
+    // Trending aggregates Google News RSS + Google Trends JSON + optional
+    // Instagram — several serial external fetches that occasionally push past
+    // the global 30s axios default, especially on first-hit cold caches.
+    // Give it 90s so a slow upstream doesn't surface as "timeout of 30000ms".
+    return request('get', '/admin/content-engine/trending', null, params, { timeout: 90000 })
   }
 
   const scoreBatchTrending = (source = '') => {
     const body = source ? { source } : {}
-    return request('post', '/admin/content-engine/trending/score-batch', body)
+    // Batch virality scoring can run Claude CLI over many topics; same rationale
+    // as pullTrending — lift the ceiling so it doesn't die at 30s.
+    return request('post', '/admin/content-engine/trending/score-batch', body, null, { timeout: 120000 })
   }
 
   const importTrending = (topics) => request('post', '/admin/content-engine/trending/import', { topics })
