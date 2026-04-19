@@ -383,11 +383,6 @@
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Trending Topics</h3>
           <div class="flex items-center gap-2">
-            <select v-model="trendingSortBy" class="rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 text-xs px-2 py-1 focus:ring-amber-500 focus:border-amber-500" title="Sort order">
-              <option value="virality">⚡ Virality</option>
-              <option value="momentum">📊 Momentum</option>
-              <option value="recency">🕒 Recency</option>
-            </select>
             <select v-model="trendingSourceFilter" @change="filterTrendingTopics" class="rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 text-xs px-2 py-1 focus:ring-amber-500 focus:border-amber-500">
               <option value="">All Sources</option>
               <option v-for="src in trendingSources.filter(s => s.value)" :key="src.value" :value="src.value" :disabled="src.disabled">
@@ -416,43 +411,35 @@
           <div v-else-if="!filteredTrending.length" class="py-8 text-center text-neutral-500 dark:text-neutral-400">No trending topics found.</div>
           <label v-for="topic in pagedTrending" :key="topic.title || topic.topic" class="flex items-start gap-3 p-3 rounded-lg border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-700/30 cursor-pointer transition-colors">
             <input type="checkbox" :value="topic" v-model="selectedTrending" class="mt-0.5 rounded border-neutral-300 text-amber-600 focus:ring-amber-500" />
+            <!-- ⚡ Score chip — single leading visual signal. Heat + tier boosts
+                 are already folded into displayScore() server-side; hover the
+                 chip for the breakdown. Color-graded at 80/50 so a glance tells
+                 you "take this", "maybe", or "skip". -->
+            <span
+              v-if="topicDisplayScore(topic) != null"
+              :class="[
+                'flex-shrink-0 inline-flex items-center justify-center min-w-[48px] px-2 py-1 rounded-lg text-xs font-bold border',
+                topicDisplayScore(topic) >= 80 ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30' :
+                topicDisplayScore(topic) >= 50 ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30' :
+                'bg-neutral-200 text-neutral-500 dark:bg-neutral-700 dark:text-neutral-400 border-neutral-300 dark:border-neutral-600'
+              ]"
+              :title="viralityTooltip(topic)"
+            >
+              ⚡ {{ topicDisplayScore(topic) }}
+            </span>
             <div class="flex-1 min-w-0">
               <p class="text-sm font-medium text-neutral-900 dark:text-neutral-100 line-clamp-2">{{ topic.title || topic.topic }}</p>
-              <!-- Meta line: publisher · relative date · coverage count -->
+              <!-- Meta line: publisher · relative date · coverage count · source.
+                   Heat/tier stay on the payload for the tooltip but no longer
+                   compete for attention as badges. -->
               <div class="flex items-center flex-wrap gap-x-1.5 gap-y-0.5 mt-1 text-[10px] text-neutral-500 dark:text-neutral-400">
                 <span v-if="topic.publisher" class="font-medium truncate max-w-[140px]" :title="topic.publisher">{{ topic.publisher }}</span>
                 <span v-if="topic.publisher && topic.pub_date" class="text-neutral-300 dark:text-neutral-600">·</span>
                 <span v-if="topic.pub_date" :title="topic.pub_date">{{ relativeDate(topic.pub_date) }}</span>
                 <span v-if="topic.publisher_count > 1" class="text-neutral-300 dark:text-neutral-600">·</span>
                 <span v-if="topic.publisher_count > 1" class="italic" :title="`Covered by ${topic.publisher_count} publishers`">{{ topic.publisher_count }} sources</span>
-              </div>
-              <!-- Badge row: heat + source type + tier -->
-              <div class="flex items-center flex-wrap gap-1 mt-1.5">
-                <span v-if="topic.heat === 'hot'" class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/30">
-                  🔥 HOT
-                </span>
-                <span v-else-if="topic.heat === 'trending'" class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
-                  📈 TRENDING
-                </span>
-                <span v-if="topic.publisher_tier === 1" class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20" title="Tier 1 — Authoritative publisher">
-                  TIER 1
-                </span>
-                <span v-else-if="topic.publisher_tier === 2" class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20" title="Tier 2 — Reputable publisher">
-                  TIER 2
-                </span>
-                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-neutral-100 text-neutral-500 dark:bg-neutral-700 dark:text-neutral-400">{{ topic.source || 'unknown' }}</span>
-                <span
-                  v-if="topic.composite_score != null"
-                  :class="[
-                    'inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold border',
-                    topic.composite_score >= 80 ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30' :
-                    topic.composite_score >= 50 ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30' :
-                    'bg-neutral-200 text-neutral-500 dark:bg-neutral-700 dark:text-neutral-400 border-neutral-300 dark:border-neutral-600'
-                  ]"
-                  :title="viralityTooltip(topic)"
-                >
-                  ⚡ {{ topic.composite_score }}
-                </span>
+                <span v-if="topic.source" class="text-neutral-300 dark:text-neutral-600">·</span>
+                <span v-if="topic.source">{{ topic.source }}</span>
               </div>
             </div>
           </label>
@@ -776,7 +763,6 @@ const selectedTrending = ref([])
 const trendingSourceFilter = ref('')
 const trendingSearch = ref('')
 const trustedOnly = ref(true) // default: hide tier-3 niche blogs
-const trendingSortBy = ref('virality') // 'virality' (default) | 'momentum' | 'recency'
 const currentPage = ref(1)
 const perPage = 24
 const filteredTrending = computed(() => {
@@ -804,18 +790,38 @@ const filteredTrending = computed(() => {
   return results
 })
 
-// Multi-line tooltip describing the virality score breakdown on a trending card.
+// Resolve the score displayed on the card. Prefer backend-computed display_score
+// (AI composite + heat + tier boost, clamped 0-100). Falls back to raw composite_score
+// for older cached payloads so a pre-rollout browser tab doesn't render blank chips.
+function topicDisplayScore(topic) {
+  if (topic.display_score != null) return topic.display_score
+  if (topic.composite_score != null) return topic.composite_score
+  return null
+}
+
+// Multi-line tooltip explaining how the ⚡ score was built. Shows AI sub-scores
+// (virality / momentum) + heat and tier boosts + final total, so a curious user
+// can see "why did this 94 beat that 87" without re-surfacing the noisy badges.
 function viralityTooltip(topic) {
-  if (topic.composite_score == null) return ''
-  const parts = []
-  if (topic.virality_score != null) parts.push(`Virality: ${topic.virality_score}`)
-  if (topic.momentum_score != null) parts.push(`Momentum: ${topic.momentum_score}`)
-  let out = parts.join(' · ')
+  const total = topicDisplayScore(topic)
+  if (total == null) return ''
+  const lines = []
+  const subparts = []
+  if (topic.virality_score != null) subparts.push(`Virality ${topic.virality_score}`)
+  if (topic.momentum_score != null) subparts.push(`Momentum ${topic.momentum_score}`)
+  if (subparts.length) lines.push(subparts.join(' · '))
+  const boosts = []
+  if (topic.heat === 'hot') boosts.push(`🔥 HOT (+${topic.heat_boost ?? 15})`)
+  else if (topic.heat === 'trending') boosts.push(`📈 TRENDING (+${topic.heat_boost ?? 8})`)
+  if (topic.publisher_tier === 1) boosts.push(`Tier 1 (+${topic.tier_boost ?? 5})`)
+  else if (topic.publisher_tier === 2) boosts.push(`Tier 2 (+${topic.tier_boost ?? 2})`)
+  if (boosts.length) lines.push(boosts.join(' · '))
+  lines.push(`= ${total}`)
   if (topic.triggers && typeof topic.triggers === 'object') {
     const active = Object.keys(topic.triggers).filter(k => topic.triggers[k])
-    if (active.length) out += `\nTriggers: ${active.join(', ')}`
+    if (active.length) lines.push(`Triggers: ${active.join(', ')}`)
   }
-  return out
+  return lines.join('\n')
 }
 
 // Convert an RFC-822 (or ISO) date string to "3h ago" / "2d ago" / "Apr 14".
@@ -844,20 +850,12 @@ const totalSelectedCount = computed(() => selectedTrending.value.length)
 const totalPages = computed(() =>
   Math.max(1, Math.ceil(filteredTrending.value.length / perPage))
 )
+// Single sort: the ⚡ display_score desc. Heat and publisher tier boosts are
+// folded into display_score on the backend so hot tier-1 items naturally lead.
+// Falls back to raw composite_score for cached pre-rollout payloads.
 const sortedTrending = computed(() => {
   const list = [...filteredTrending.value]
-  if (trendingSortBy.value === 'virality') {
-    return list.sort((a, b) => (b.composite_score ?? -1) - (a.composite_score ?? -1))
-  }
-  if (trendingSortBy.value === 'momentum') {
-    return list.sort((a, b) => (b.momentum_score ?? -1) - (a.momentum_score ?? -1))
-  }
-  // recency
-  return list.sort((a, b) => {
-    const at = a.pub_date ? Date.parse(a.pub_date) : 0
-    const bt = b.pub_date ? Date.parse(b.pub_date) : 0
-    return (isNaN(bt) ? 0 : bt) - (isNaN(at) ? 0 : at)
-  })
+  return list.sort((a, b) => (topicDisplayScore(b) ?? -1) - (topicDisplayScore(a) ?? -1))
 })
 const pagedTrending = computed(() => {
   const start = (currentPage.value - 1) * perPage
@@ -872,7 +870,7 @@ const pageRangeLabel = computed(() => {
   const end = Math.min(currentPage.value * perPage, sortedTrending.value.length)
   return `${start}-${end} of ${sortedTrending.value.length}`
 })
-watch([trendingSearch, trendingSourceFilter, trustedOnly, trendingSortBy], () => { currentPage.value = 1 })
+watch([trendingSearch, trendingSourceFilter, trustedOnly], () => { currentPage.value = 1 })
 watch([() => filters.pillar, () => filters.status, () => filters.priority, () => filters.search], () => {
   selectedIdeaIds.value = []
 })

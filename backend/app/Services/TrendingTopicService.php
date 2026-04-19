@@ -633,13 +633,19 @@ class TrendingTopicService
 
     /**
      * Scored variant of getAllTrends() — layers momentum + virality AI scores
-     * on top of the filtered tech trends, sorted by composite_score desc.
+     * on top of the filtered tech trends, sorted by display_score desc.
      *
      * Caps input at TopicScoringService::MAX_BATCH_SIZE so the AI batch fits
      * comfortably in one Sonnet call. Cached 1h downstream in TopicScoringService.
      *
+     * display_score = composite_score + heat_boost + tier_boost (clamped 0-100).
+     * This is the single number the admin UI shows and sorts by. Boost weights
+     * are tunable via config/content.php. Individual signals (heat, tier,
+     * virality_score, momentum_score) remain on the payload so the UI can
+     * explain the score in a tooltip.
+     *
      * @return array each element = original trend fields + momentum_score,
-     *   virality_score, triggers, composite_score.
+     *   virality_score, triggers, composite_score, display_score.
      */
     public function getScoredTopics(?string $source = null): array
     {
@@ -652,9 +658,35 @@ class TrendingTopicService
 
         $scored = app(TopicScoringService::class)->scoreBatch($capped);
 
-        usort($scored, fn ($a, $b) => ($b['composite_score'] ?? 0) <=> ($a['composite_score'] ?? 0));
+        $scored = array_map(fn ($t) => $this->applyDisplayScore($t), $scored);
+
+        usort($scored, fn ($a, $b) => ($b['display_score'] ?? 0) <=> ($a['display_score'] ?? 0));
 
         return $scored;
+    }
+
+    /**
+     * Fold heat + publisher-tier boost into composite_score to produce the
+     * single display_score the admin UI uses for ranking. Pure function —
+     * mutates and returns a copy of the topic array.
+     */
+    private function applyDisplayScore(array $topic): array
+    {
+        $composite = (int) ($topic['composite_score'] ?? 0);
+        $heatBoosts = config('content.trending.heat_boost', ['hot' => 15, 'trending' => 8, 'standard' => 0]);
+        $tierBoosts = config('content.trending.tier_boost', [1 => 5, 2 => 2, 3 => 0]);
+
+        $heat = $topic['heat'] ?? 'standard';
+        $tier = (int) ($topic['publisher_tier'] ?? 3);
+
+        $heatBoost = (int) ($heatBoosts[$heat] ?? 0);
+        $tierBoost = (int) ($tierBoosts[$tier] ?? 0);
+
+        $topic['heat_boost'] = $heatBoost;
+        $topic['tier_boost'] = $tierBoost;
+        $topic['display_score'] = max(0, min(100, $composite + $heatBoost + $tierBoost));
+
+        return $topic;
     }
 
     public function suggestCategory(string $title): int
