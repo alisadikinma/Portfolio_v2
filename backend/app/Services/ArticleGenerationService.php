@@ -424,6 +424,17 @@ PROMPT;
     }
 
     /**
+     * Public synchronous Sonnet call — used by topic scoring and any other
+     * one-shot transformation that can't wait for the async pipeline.
+     *
+     * @return array{success: bool, output: string, error: string|null}
+     */
+    public function runSonnetSync(string $prompt, string $phase = 'sync', string $model = 'sonnet'): array
+    {
+        return $this->executeSyncPrompt($prompt, $phase, $model);
+    }
+
+    /**
      * Synchronous prompt execution — waits for stdout and returns it.
      * Used by VD rewrite (not the background pipeline phases).
      *

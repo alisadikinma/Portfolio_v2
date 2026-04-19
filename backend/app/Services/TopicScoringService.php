@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Topic virality pre-scoring for the trending pipeline.
@@ -16,6 +17,17 @@ use Carbon\Carbon;
  */
 class TopicScoringService
 {
+    /** Maximum topics per Sonnet batch to avoid prompt truncation. */
+    public const MAX_BATCH_SIZE = 20;
+
+    private const VIRALITY_TRIGGERS = [
+        'social_currency',
+        'high_arousal',
+        'practical_utility',
+        'identity_signaling',
+        'cognitive_gap',
+    ];
+
     private const SOURCE_WEIGHTS = [
         'google_news' => 30,
         'google_trends' => 35,
@@ -96,5 +108,165 @@ class TopicScoringService
             return 10;
         }
         return 15;
+    }
+
+    /**
+     * Batch-score topics for virality using a single Sonnet call.
+     * Returns the input array augmented with virality_score + triggers per row.
+     *
+     * @param array $topics each element must have at least 'title'. Optional: source, description.
+     * @return array same order as input, each enriched with virality_score + triggers.
+     * @throws \InvalidArgumentException if batch exceeds MAX_BATCH_SIZE.
+     */
+    public function scoreViralityBatch(array $topics): array
+    {
+        if (count($topics) === 0) {
+            return [];
+        }
+        if (count($topics) > self::MAX_BATCH_SIZE) {
+            throw new \InvalidArgumentException(
+                'Topic batch exceeds ' . self::MAX_BATCH_SIZE . ' topic cap (got ' . count($topics) . ')'
+            );
+        }
+
+        $prompt = $this->buildViralityPrompt($topics);
+        $articleGen = app(ArticleGenerationService::class);
+
+        try {
+            $result = $articleGen->runSonnetSync($prompt, 'topic-scoring', 'sonnet');
+        } catch (\Throwable $e) {
+            Log::warning('[TopicScoring] Sonnet call threw', ['error' => $e->getMessage()]);
+            return $this->zeroScoreAll($topics);
+        }
+
+        if (empty($result['success']) || empty($result['output'])) {
+            Log::warning('[TopicScoring] Sonnet returned failure', [
+                'error' => $result['error'] ?? null,
+            ]);
+            return $this->zeroScoreAll($topics);
+        }
+
+        $parsed = $this->parseViralityResponse($result['output']);
+        if ($parsed === null) {
+            Log::warning('[TopicScoring] Failed to parse Sonnet output as JSON', [
+                'output_head' => substr((string) $result['output'], 0, 200),
+            ]);
+            return $this->zeroScoreAll($topics);
+        }
+
+        return $this->mergeViralityResults($topics, $parsed);
+    }
+
+    private function buildViralityPrompt(array $topics): string
+    {
+        $lines = [];
+        foreach (array_values($topics) as $i => $t) {
+            $idx = $i + 1;
+            $title = $t['title'] ?? '';
+            $source = $t['source'] ?? 'unknown';
+            $desc = trim((string) ($t['description'] ?? ''));
+            $descSnippet = $desc !== '' ? ' | ' . mb_substr($desc, 0, 240) : '';
+            $lines[] = "{$idx}. [{$source}] {$title}{$descSnippet}";
+        }
+        $listed = implode("\n", $lines);
+
+        return <<<PROMPT
+You are scoring {count} trending topics for viral potential. For each topic, evaluate:
+- virality_score: integer 0-100 (0 = inert, 100 = extreme viral potential)
+- triggers: 5 booleans from Jonah Berger's STEPPS framework:
+  * social_currency: sharing it makes the sharer look smart/in-the-know
+  * high_arousal: provokes strong emotion (awe, anger, excitement)
+  * practical_utility: useful, actionable info people save/send
+  * identity_signaling: aligns with tribe/profession identity
+  * cognitive_gap: creates curiosity gap that demands resolution
+
+Topics:
+{listed}
+
+Return ONLY a JSON array, one object per input topic in the SAME ORDER, with this exact shape:
+[
+  {"title":"...","virality_score":80,"triggers":{"social_currency":true,"high_arousal":true,"practical_utility":false,"identity_signaling":true,"cognitive_gap":false}}
+]
+
+No prose, no markdown, no code fences. Pure JSON array only.
+PROMPT;
+    }
+
+    private function parseViralityResponse(string $raw): ?array
+    {
+        $raw = trim($raw);
+        if ($raw === '') {
+            return null;
+        }
+
+        // Strip common wrappers like ```json ... ```
+        if (preg_match('/```(?:json)?\s*(.+?)\s*```/s', $raw, $m)) {
+            $raw = trim($m[1]);
+        }
+
+        // Find the first JSON array/object
+        $start = strpos($raw, '[');
+        if ($start === false) {
+            return null;
+        }
+        $end = strrpos($raw, ']');
+        if ($end === false || $end <= $start) {
+            return null;
+        }
+        $slice = substr($raw, $start, ($end - $start) + 1);
+
+        $decoded = json_decode($slice, true);
+        if (!is_array($decoded)) {
+            return null;
+        }
+
+        return $decoded;
+    }
+
+    private function mergeViralityResults(array $topics, array $aiResults): array
+    {
+        $out = [];
+        foreach (array_values($topics) as $i => $topic) {
+            $ai = $aiResults[$i] ?? null;
+
+            $score = 0;
+            $triggers = $this->emptyTriggers();
+
+            if (is_array($ai)) {
+                $rawScore = $ai['virality_score'] ?? 0;
+                $score = (int) max(0, min(100, (int) $rawScore));
+
+                if (isset($ai['triggers']) && is_array($ai['triggers'])) {
+                    foreach (self::VIRALITY_TRIGGERS as $key) {
+                        $triggers[$key] = (bool) ($ai['triggers'][$key] ?? false);
+                    }
+                }
+            }
+
+            $topic['virality_score'] = $score;
+            $topic['triggers'] = $triggers;
+            $out[] = $topic;
+        }
+        return $out;
+    }
+
+    private function zeroScoreAll(array $topics): array
+    {
+        $out = [];
+        foreach (array_values($topics) as $topic) {
+            $topic['virality_score'] = 0;
+            $topic['triggers'] = $this->emptyTriggers();
+            $out[] = $topic;
+        }
+        return $out;
+    }
+
+    private function emptyTriggers(): array
+    {
+        $triggers = [];
+        foreach (self::VIRALITY_TRIGGERS as $key) {
+            $triggers[$key] = false;
+        }
+        return $triggers;
     }
 }
