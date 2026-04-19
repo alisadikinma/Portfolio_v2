@@ -493,12 +493,16 @@ class ContentIdeaController extends Controller
             'languages' => 'required|array|min:1',
             'languages.*' => 'in:en,id',
             'instructions' => 'nullable|string',
+            'research_tier' => 'nullable|string|in:auto,quick,deep',
         ]);
+
+        $researchTier = $validated['research_tier'] ?? 'auto';
 
         $idea->update([
             'output_types' => ['blog_article'],
             'languages' => $validated['languages'],
             'instructions' => $validated['instructions'] ?? null,
+            'research_tier_override' => $researchTier,
             'status' => 'researching',
             'progress_percentage' => 0,
             'current_step' => 'initializing',
@@ -510,21 +514,25 @@ class ContentIdeaController extends Controller
             ]],
         ]);
 
-        // Use split pipeline (prep→write→score) when refs are configured, else fallback to single /article-gen
-        $useSplitPipeline = !empty(config('services.article_generation.refs_prep'));
+        // Phase B.7: gate the split-skill flow (viral-first v3) behind a feature flag.
+        // When ON we dispatch /article-research via triggerResearch with a resolved tier.
+        // When OFF we fall through to the legacy split (triggerPrep) or single (triggerGeneration) path.
+        $skillSplitEnabled = (bool) config('services.article_generation.skill_split_enabled', false);
+        $useLegacySplitPipeline = !$skillSplitEnabled && !empty(config('services.article_generation.refs_prep'));
 
-        if ($useSplitPipeline) {
-            $result = $this->articleGen->triggerPrep($idea->id, [
-                'topic' => $idea->title,
-                'languages' => $validated['languages'],
-                'instructions' => $validated['instructions'] ?? '',
-            ]);
+        $config = [
+            'topic' => $idea->title,
+            'languages' => $validated['languages'],
+            'instructions' => $validated['instructions'] ?? '',
+        ];
+
+        if ($skillSplitEnabled) {
+            $resolvedTier = $this->articleGen->resolveResearchTier($idea->fresh());
+            $result = $this->articleGen->triggerResearch($idea->id, $config, $resolvedTier);
+        } elseif ($useLegacySplitPipeline) {
+            $result = $this->articleGen->triggerPrep($idea->id, $config);
         } else {
-            $result = $this->articleGen->triggerGeneration($idea->id, [
-                'topic' => $idea->title,
-                'languages' => $validated['languages'],
-                'instructions' => $validated['instructions'] ?? '',
-            ]);
+            $result = $this->articleGen->triggerGeneration($idea->id, $config);
         }
 
         if ($result['success']) {
@@ -533,7 +541,7 @@ class ContentIdeaController extends Controller
                 'workflows' => [[
                     'type' => 'blog_article',
                     'driver' => 'claude_cli',
-                    'pipeline' => $useSplitPipeline ? 'split' : 'single',
+                    'pipeline' => $skillSplitEnabled ? 'research_split' : ($useLegacySplitPipeline ? 'split' : 'single'),
                     'pid' => $result['pid'],
                     'status' => 'running',
                     'created_at' => now()->toISOString(),
@@ -552,12 +560,20 @@ class ContentIdeaController extends Controller
             ]);
         }
 
+        if ($result['success']) {
+            $successMessage = match (true) {
+                $skillSplitEnabled => 'Viral-first research pipeline started (research → strategy → write → score).',
+                $useLegacySplitPipeline => 'Split pipeline started (prep → write → score).',
+                default => 'Article generation started via CLI.',
+            };
+        } else {
+            $successMessage = 'Generation trigger failed, but idea is in researching state.';
+        }
+
         return response()->json([
             'success' => true,
             'data' => $idea->fresh(),
-            'message' => $result['success']
-                ? ($useSplitPipeline ? 'Split pipeline started (prep → write → score).' : 'Article generation started via CLI.')
-                : 'Generation trigger failed, but idea is in researching state.',
+            'message' => $successMessage,
         ]);
     }
 
