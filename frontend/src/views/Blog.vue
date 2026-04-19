@@ -248,36 +248,69 @@
     </section>
 
     <!-- Newsletter -->
-    <section class="container-custom mb-24">
+    <section v-if="!newsletterAlreadySubscribed" class="container-custom mb-24">
       <div class="bezel-shell max-w-2xl mx-auto">
         <div class="bezel-core p-8 md:p-12 relative overflow-hidden text-center">
           <div class="absolute -top-20 -right-20 w-48 h-48 rounded-full opacity-8 blur-3xl pointer-events-none" style="background: #D4A843;"></div>
           <div class="absolute -bottom-20 -left-20 w-48 h-48 rounded-full opacity-8 blur-3xl pointer-events-none" style="background: #06B6D4;"></div>
 
           <div class="relative">
-            <span class="eyebrow-tag text-accent-gold mb-4 inline-flex">Stay in the loop</span>
-            <h2 class="section-heading text-3xl md:text-4xl font-bold mt-4 mb-4">
-              Get the latest <span class="text-gradient">articles</span>
-            </h2>
-            <p class="text-fg-muted mb-8 leading-relaxed font-light">
-              Thoughtful pieces on AI, engineering, and the future of work.
-            </p>
+            <!-- Idle / loading / error state -->
+            <div v-if="nlStatus === 'idle' || nlStatus === 'loading' || nlStatus === 'error'">
+              <span class="eyebrow-tag text-accent-gold mb-4 inline-flex">Stay in the loop</span>
+              <h2 class="section-heading text-3xl md:text-4xl font-bold mt-4 mb-4">
+                Get the latest <span class="text-gradient">articles</span>
+              </h2>
+              <p class="text-fg-muted mb-8 leading-relaxed font-light">
+                Thoughtful pieces on AI, engineering, and the future of work.
+              </p>
 
-            <form class="flex flex-col sm:flex-row gap-3 max-w-sm mx-auto" @submit.prevent="subscribeNewsletter">
-              <div class="flex-1 bezel-shell-sm">
-                <input
-                  v-model="newsletterEmail"
-                  type="email"
-                  placeholder="your@email.com"
-                  class="w-full px-4 py-3 bg-transparent text-fg-primary placeholder-fg-dim text-sm focus:outline-none rounded-[calc(1.25rem-4px)]"
-                />
+              <form class="flex flex-col sm:flex-row gap-3 max-w-sm mx-auto" @submit.prevent="subscribeNewsletter">
+                <div class="flex-1 bezel-shell-sm">
+                  <input
+                    v-model="newsletterEmail"
+                    type="email"
+                    placeholder="your@email.com"
+                    required
+                    :disabled="nlStatus === 'loading'"
+                    class="w-full px-4 py-3 bg-transparent text-fg-primary placeholder-fg-dim text-sm focus:outline-none rounded-[calc(1.25rem-4px)] disabled:opacity-50"
+                  />
+                </div>
+                <button type="submit" class="btn-gold text-sm" :disabled="nlStatus === 'loading'">
+                  <span v-if="nlStatus !== 'loading'">Subscribe</span>
+                  <span v-else class="inline-flex items-center gap-2">
+                    <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Sending
+                  </span>
+                </button>
+              </form>
+
+              <p v-if="nlStatus === 'error'" class="text-red-400 text-xs mt-3">{{ nlErrorMsg }}</p>
+              <p v-else class="text-fg-dim text-xs mt-4">No spam. Unsubscribe anytime.</p>
+            </div>
+
+            <!-- Success state -->
+            <Transition name="fade" mode="out-in">
+              <div v-if="nlStatus === 'success' || nlStatus === 'duplicate'" class="py-6">
+                <div
+                  class="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-5"
+                  :class="nlStatus === 'success' ? 'bg-accent-gold/15 border border-accent-gold/40' : 'bg-accent-cyan/15 border border-accent-cyan/40'"
+                >
+                  <svg class="w-7 h-7" :class="nlStatus === 'success' ? 'text-accent-gold' : 'text-accent-cyan'" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <h3 class="section-heading text-2xl md:text-3xl font-bold mb-2">
+                  {{ nlStatus === 'success' ? "You're in!" : "Already subscribed" }}
+                </h3>
+                <p class="text-fg-muted text-sm">
+                  {{ nlStatus === 'success' ? 'Check your inbox for a welcome note.' : "You're on the list ✓" }}
+                </p>
               </div>
-              <button type="submit" class="btn-gold text-sm">
-                Subscribe
-              </button>
-            </form>
-
-            <p class="text-fg-dim text-xs mt-4">No spam. Unsubscribe anytime.</p>
+            </Transition>
           </div>
         </div>
       </div>
@@ -290,23 +323,29 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { usePosts } from '@/composables/usePosts'
-import { useToast } from '@/composables/useToast'
+import { useNewsletter } from '@/composables/useNewsletter'
 import api from '@/services/api'
 
 const route = useRoute()
 const { posts, isLoading, fetchPosts } = usePosts()
-const toast = useToast()
+const { subscribe: nlSubscribe, isSubscribed: nlIsSubscribed } = useNewsletter()
 
 const categories = ref([])
 const selectedCategory = ref(null)
 const searchQuery = ref('')
 const currentPage = ref(1)
 const perPage = 9
+
+// Newsletter state
 const newsletterEmail = ref('')
+const nlStatus = ref('idle') // 'idle' | 'loading' | 'success' | 'duplicate' | 'error'
+const nlErrorMsg = ref('')
+const newsletterAlreadySubscribed = ref(false)
 
 const lang = computed(() => route.params.lang || 'en')
 
 onMounted(async () => {
+  newsletterAlreadySubscribed.value = nlIsSubscribed()
   await fetchPosts({}, lang.value)
   try {
     const res = await api.get('/categories')
@@ -385,8 +424,36 @@ const readingTime = (text) => {
   return Math.max(1, Math.round(words / 200))
 }
 
-const subscribeNewsletter = () => {
-  toast.info('Coming soon — newsletter subscription is not yet available.')
-  newsletterEmail.value = ''
+const subscribeNewsletter = async () => {
+  const email = newsletterEmail.value.trim()
+  if (!email) return
+
+  nlStatus.value = 'loading'
+  nlErrorMsg.value = ''
+
+  const result = await nlSubscribe(email)
+
+  if (result.success) {
+    nlStatus.value = 'success'
+    newsletterEmail.value = ''
+  } else if (result.duplicate) {
+    nlStatus.value = 'duplicate'
+    newsletterEmail.value = ''
+  } else {
+    nlStatus.value = 'error'
+    nlErrorMsg.value = result.message || 'Something went wrong. Please try again.'
+  }
 }
 </script>
+
+<style scoped>
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(4px);
+}
+</style>
