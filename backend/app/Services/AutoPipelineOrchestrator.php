@@ -295,6 +295,16 @@ class AutoPipelineOrchestrator
             ]);
 
             Log::info("[AutoPipeline] Started research for idea #{$idea->id} pid={$result['pid']}");
+
+            // Fire Telegram start notification — gives operator visibility on
+            // which topic just entered the pipeline. Swallow errors so notification
+            // infra never blocks pipeline progression.
+            try {
+                $this->telegram->notifyPipelineStart($idea->fresh());
+            } catch (\Throwable $e) {
+                Log::warning('[AutoPipeline] Telegram start notification threw: ' . $e->getMessage());
+            }
+
             return $idea;
         } catch (\Throwable $e) {
             $this->markFailed($idea, 'research', $e->getMessage());

@@ -323,7 +323,17 @@
                 <span v-else class="text-xs text-neutral-400 dark:text-neutral-600">—</span>
               </td>
               <td class="px-4 py-3 align-top">
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium" :class="statusClass(idea.status)">{{ formatStatus(idea.status) }}</span>
+                <div class="flex flex-col gap-1">
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium w-fit" :class="statusClass(idea.status)">
+                    {{ formatStatus(idea.status) }}
+                    <span v-if="['researching', 'generating_images'].includes(idea.status) && idea.progress_percentage != null" class="font-mono">· {{ idea.progress_percentage }}%</span>
+                  </span>
+                  <div v-if="['researching', 'generating_images'].includes(idea.status) && idea.progress_percentage != null"
+                       class="w-24 h-1 bg-neutral-200 dark:bg-neutral-700 rounded-full overflow-hidden">
+                    <div class="h-full bg-blue-500 dark:bg-blue-400 transition-all duration-500"
+                         :style="{ width: (idea.progress_percentage || 0) + '%' }"></div>
+                  </div>
+                </div>
               </td>
               <td class="px-4 py-3 text-neutral-500 dark:text-neutral-400 text-xs align-top">{{ idea.source || 'manual' }}</td>
               <td class="px-4 py-3 text-xs text-neutral-500 dark:text-neutral-400 align-top">
@@ -1913,17 +1923,54 @@ function stopProgressPolling() {
   }
 }
 
+// Sync a single idea's progress fields back into the list. Used by both
+// modal polling (pollProgress) and silent list polling (silentListPoll)
+// so the table row updates live without requiring the modal to be open.
+function syncIdeaProgress(ideaId, data) {
+  const idx = ideas.value.findIndex(i => i.id === ideaId)
+  if (idx === -1) return
+  if (data.progress_percentage != null) ideas.value[idx].progress_percentage = data.progress_percentage
+  if (data.current_step != null) ideas.value[idx].current_step = data.current_step
+  if (data.status != null) ideas.value[idx].status = data.status
+}
+
+// Silent list-level poll — updates table row without touching modal state.
+// Fires when the table has any idea in researching/generating_images status
+// even if the progress modal is closed, so operator can watch % advance
+// directly in the list view.
+let listPollInterval = null
+
+async function silentListPoll() {
+  const inflight = ideas.value.find(i => ['researching', 'generating_images'].includes(i.status))
+  if (!inflight) return stopListPolling()
+  const result = await getProgress(inflight.id)
+  if (result.success && result.data) {
+    syncIdeaProgress(inflight.id, result.data)
+    // If the idea transitioned off an in-flight status, refresh the list
+    // to pull downstream state changes (publish, article_ready, etc).
+    if (!['researching', 'generating_images'].includes(result.data.status)) {
+      await refreshIdeas()
+    }
+  }
+}
+
+function startListPolling() {
+  if (listPollInterval) return
+  listPollInterval = setInterval(silentListPoll, 5000)
+}
+
+function stopListPolling() {
+  if (listPollInterval) {
+    clearInterval(listPollInterval)
+    listPollInterval = null
+  }
+}
+
 async function pollProgress(ideaId) {
   const result = await getProgress(ideaId)
   if (result.success && result.data) {
     progressData.value = result.data
-    // Sync progress back to ideas list so the table row updates in real-time
-    const idx = ideas.value.findIndex(i => i.id === ideaId)
-    if (idx !== -1) {
-      ideas.value[idx].progress_percentage = result.data.progress_percentage
-      ideas.value[idx].current_step = result.data.current_step
-      ideas.value[idx].status = result.data.status || ideas.value[idx].status
-    }
+    syncIdeaProgress(ideaId, result.data)
     // Auto-scroll log to bottom
     if (logContainer.value) {
       setTimeout(() => {
@@ -1951,10 +1998,21 @@ function viewDrafts(idea) {
 // Lifecycle
 onMounted(async () => {
   await Promise.all([refreshHealth(), refreshIdeas()])
+  // Kick off list-level polling — silentListPoll self-stops when no in-flight idea.
+  silentListPoll()
+  startListPolling()
 })
 
 onUnmounted(() => {
   if (searchTimeout) clearTimeout(searchTimeout)
   stopProgressPolling()
+  stopListPolling()
 })
+
+// Whenever the list refreshes and reveals a new in-flight idea,
+// make sure the silent poll interval is running.
+watch(ideas, (rows) => {
+  const hasInflight = rows.some(i => ['researching', 'generating_images'].includes(i.status))
+  if (hasInflight && !listPollInterval) startListPolling()
+}, { deep: false })
 </script>

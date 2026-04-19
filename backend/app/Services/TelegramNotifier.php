@@ -24,6 +24,12 @@ class TelegramNotifier
         $this->send($message);
     }
 
+    public function notifyPipelineStart(ContentIdea $idea): void
+    {
+        $message = $this->buildStartMessage($idea);
+        $this->send($message);
+    }
+
     private function send(string $message): void
     {
         if (!config('services.telegram.enabled', true)) {
@@ -131,6 +137,35 @@ class TelegramNotifier
 
         $lines[] = '';
         $lines[] = 'Review: ' . $reviewUrl;
+
+        return implode("\n", $lines);
+    }
+
+    private function buildStartMessage(ContentIdea $idea): string
+    {
+        $title = $this->escapeMarkdown((string) $idea->title);
+        $displayScore = $idea->source_data['display_score']
+            ?? $idea->virality_score
+            ?? null;
+        $pillar = $this->escapeMarkdown((string) ($idea->pillar ?? 'n/a'));
+        $source = $this->escapeMarkdown((string) ($idea->source ?? 'n/a'));
+
+        $frontendUrl = rtrim((string) config('app.frontend_url', 'https://alisadikinma.com'), '/');
+        $reviewUrl = $frontendUrl . '/admin/content-engine';
+
+        $lines = [
+            '🎬 *Pipeline started*',
+            '',
+            '*' . $title . '*',
+            '',
+        ];
+
+        if ($displayScore !== null) {
+            $lines[] = 'Virality: ' . (int) $displayScore;
+        }
+        $lines[] = 'Pillar: ' . $pillar . ' | Source: ' . $source;
+        $lines[] = '';
+        $lines[] = 'Monitor: ' . $reviewUrl;
 
         return implode("\n", $lines);
     }
