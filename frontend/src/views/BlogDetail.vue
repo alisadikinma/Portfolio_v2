@@ -146,11 +146,11 @@
             {{ post.excerpt }}
           </p>
 
-          <!-- Article body -->
+          <!-- Article body (FAQ stripped — rendered as accordion below) -->
           <div
-            v-if="post.content"
+            v-if="contentWithoutFaq"
             class="blog-content"
-            v-html="post.content"
+            v-html="contentWithoutFaq"
           ></div>
 
           <!-- Tags -->
@@ -222,6 +222,9 @@
         </div>
       </div>
 
+      <!-- ─── FAQ Accordion ─── -->
+      <FaqAccordion :items="faqItems" />
+
       <!-- ─── Related Posts — Continue Reading ─── -->
       <section v-if="relatedPosts.length" class="container-custom mb-20">
         <div class="max-w-5xl mx-auto">
@@ -235,8 +238,16 @@
               v-for="related in relatedPosts"
               :key="related.id"
               :to="`/${lang}/blog/${related.slug}`"
-              class="group rounded-xl overflow-hidden bg-bg-elevated/50 border border-white/5 hover:border-accent-gold/20 transition-all duration-300"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="group relative rounded-xl overflow-hidden bg-bg-elevated/50 border border-white/5 hover:border-accent-gold/20 transition-all duration-300"
             >
+              <!-- External-link hint (appears on hover) -->
+              <div class="pointer-events-none absolute top-3 right-3 z-10 w-7 h-7 rounded-full bg-bg-deep/70 backdrop-blur-sm border border-white/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                <svg class="w-3.5 h-3.5 text-accent-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                </svg>
+              </div>
               <div class="aspect-[16/10] bg-bg-elevated overflow-hidden">
                 <img
                   v-if="related.featured_image"
@@ -276,6 +287,8 @@ import { usePosts } from '@/composables/usePosts'
 import { useMetaTags } from '@/composables/useMetaTags'
 import { usePageSections } from '@/composables/usePageSections'
 import { useToast } from '@/composables/useToast'
+import { stripFaqSection } from '@/utils/stripFaqSection'
+import FaqAccordion from '@/components/blog/FaqAccordion.vue'
 import api from '@/services/api'
 
 const route = useRoute()
@@ -342,6 +355,25 @@ const copyUrl = async () => {
     toast.error('Could not copy link.')
   }
 }
+
+// ── FAQ accordion ─────────────────────────────────────────────────────────────
+// faq_schema is populated by the article-write plugin as JSON-LD FAQPage
+// (mainEntity[].name + mainEntity[].acceptedAnswer.text). Render it as an
+// interactive accordion and strip the matching inline FAQ section from the
+// body HTML so the content isn't duplicated.
+const faqItems = computed(() => {
+  const entities = post.value?.seo?.faq_schema?.mainEntity
+  if (!Array.isArray(entities)) return []
+  return entities
+    .filter((e) => typeof e?.name === 'string' && typeof e?.acceptedAnswer?.text === 'string')
+    .map((e) => ({ question: e.name, answer: e.acceptedAnswer.text }))
+})
+
+const contentWithoutFaq = computed(() => {
+  const html = post.value?.content
+  if (!html || faqItems.value.length === 0) return html
+  return stripFaqSection(html)
+})
 
 // ── Thumbnail for OG ──────────────────────────────────────────────────────────
 const thumbnailUrl = computed(() => {
