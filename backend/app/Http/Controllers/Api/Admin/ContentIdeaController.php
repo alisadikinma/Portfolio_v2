@@ -402,6 +402,18 @@ class ContentIdeaController extends Controller
      * Phase C opt-in: dispatch the Sonnet /article-score skill on demand.
      * Only allowed when the idea is in 'article_ready' — the default Phase C
      * skip path leaves ideas at that status with just a mechanical snapshot.
+     *
+     * Stuck-idea recovery: if the /article-score plugin hangs and never calls
+     * back, the idea is stuck at status='researching', current_step='deep_scoring'.
+     * To recover manually:
+     *   UPDATE content_ideas
+     *     SET status='article_ready', progress_percentage=100,
+     *         current_step='mechanical_snapshot', process_pid=NULL
+     *     WHERE id=<stuck_id>;
+     * Mechanical snapshot remains intact, so the scorecard still renders and
+     * the user can re-click Run Deep Quality Analysis. Future work: add an
+     * admin "Reset to article_ready" button in ArticlePreview.vue that wraps
+     * this recovery via a dedicated endpoint.
      */
     public function runDeepScore($id): JsonResponse
     {
@@ -414,6 +426,18 @@ class ContentIdeaController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => "Cannot run deep score: idea must be in article_ready status (current: {$idea->status}).",
+            ], 409);
+        }
+
+        // Content guard — the skip path in continue-pipeline flips status to
+        // article_ready even when generated_article is empty (so downstream
+        // image dispatch isn't blocked). But /article-score needs real content
+        // to score, so reject that edge case here with a clear message.
+        $content = trim((string) data_get($idea->generated_article, 'content', ''));
+        if ($content === '') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot run deep score: article content is empty. Regenerate or save the article first.',
             ], 409);
         }
 

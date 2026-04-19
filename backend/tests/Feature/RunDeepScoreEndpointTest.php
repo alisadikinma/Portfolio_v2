@@ -131,4 +131,54 @@ class RunDeepScoreEndpointTest extends TestCase
 
         $response->assertStatus(404);
     }
+
+    public function test_rejects_article_ready_idea_with_empty_content(): void
+    {
+        // Phase C skip path can leave status=article_ready with no content
+        // if write callback lost the body. Deep score would then dispatch
+        // Sonnet against an empty article, which silently scores garbage.
+        // The endpoint must reject that case.
+        $this->authenticate();
+
+        $mock = Mockery::mock(ArticleGenerationService::class);
+        $mock->shouldNotReceive('triggerScore');
+        app()->instance(ArticleGenerationService::class, $mock);
+
+        $idea = ContentIdea::create([
+            'title' => 'Stub with no body',
+            'source' => 'manual',
+            'status' => 'article_ready',
+            'progress_percentage' => 100,
+            'current_step' => 'mechanical_snapshot',
+            'generated_article' => ['title' => 'Stub', 'content' => '', 'language' => 'en'],
+        ]);
+
+        $response = $this->postJson("/api/admin/content-engine/ideas/{$idea->id}/run-deep-score");
+
+        $response->assertStatus(409);
+        $response->assertJsonPath('success', false);
+        $this->assertStringContainsString('empty', $response->json('message'));
+    }
+
+    public function test_rejects_when_generated_article_entirely_missing(): void
+    {
+        $this->authenticate();
+
+        $mock = Mockery::mock(ArticleGenerationService::class);
+        $mock->shouldNotReceive('triggerScore');
+        app()->instance(ArticleGenerationService::class, $mock);
+
+        $idea = ContentIdea::create([
+            'title' => 'No article yet',
+            'source' => 'manual',
+            'status' => 'article_ready',
+            'progress_percentage' => 100,
+            'current_step' => 'mechanical_snapshot',
+            'generated_article' => null,
+        ]);
+
+        $response = $this->postJson("/api/admin/content-engine/ideas/{$idea->id}/run-deep-score");
+
+        $response->assertStatus(409);
+    }
 }

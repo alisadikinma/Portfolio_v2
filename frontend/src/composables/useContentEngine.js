@@ -75,8 +75,6 @@ export function useContentEngine() {
 
   const getProgress = (id) => request('get', `/admin/content-engine/ideas/${id}/progress`)
 
-  const getMechanicalScores = (id) => request('get', `/automation/content-ideas/${id}/mechanical-scores`)
-
   const runDeepScore = (id) => request('post', `/admin/content-engine/ideas/${id}/run-deep-score`)
 
   const saveDraft = (id, data) => request('put', `/admin/content-engine/ideas/${id}/save-draft`, data)
@@ -172,7 +170,6 @@ export function useContentEngine() {
     startResearch,
     getResearch,
     getProgress,
-    getMechanicalScores,
     runDeepScore,
     saveDraft,
     generateSegmentImage,
