@@ -36,14 +36,23 @@ onMounted(async () => {
   }
 })
 
+// Flat-format articles carry their language in the `language` field
+// (e.g. `{title, content, language: 'id'}`). Normalize to a 2-letter tag,
+// default to 'en' when absent (legacy behaviour).
+function flatArticleLang(article) {
+  const raw = (article?.language || 'en').toString().toLowerCase()
+  return raw.startsWith('id') ? 'id' : 'en'
+}
+
 function initFromArticle() {
   const article = idea.value?.generated_article
   if (!article) return
 
-  // Auto-detect active language: pick first language that has content
+  // Auto-detect active language: pick first language that has content.
+  // Nested format wins; fall back to flat format's declared language.
   if (article.id?.content) activeLang.value = 'id'
   else if (article.en?.content) activeLang.value = 'en'
-  else if (article.content) activeLang.value = 'en'
+  else if (article.content) activeLang.value = flatArticleLang(article)
 
   // Initialize editable titles from nested or flat format
   const en = getArticleContent(article, 'en')
@@ -64,6 +73,10 @@ function initFromArticle() {
 }
 
 // ── Backward-compatible content getter ──
+// Nested format wins (`article.en.content`, `article.id.content`).
+// Flat format (`article.title` + `article.content`) is returned under its
+// declared `language` tab only — don't surface Indonesian content on the
+// English tab or vice versa.
 function getArticleContent(article, lang) {
   if (article?.[lang]) {
     return {
@@ -72,8 +85,7 @@ function getArticleContent(article, lang) {
       wordCount: article[lang].word_count || 0,
     }
   }
-  // Legacy flat format — treat as English
-  if (article?.title) {
+  if (article?.title && flatArticleLang(article) === lang) {
     return {
       title: article.title || '',
       content: article.content || '',
@@ -88,16 +100,21 @@ const article = computed(() => idea.value?.generated_article || null)
 
 const isUntranslated = computed(() => {
   if (activeLang.value !== 'en') return false
-  const en = article.value?.en?.content || ''
-  const id = article.value?.id?.content || ''
-  return !en || en === id
+  const a = article.value
+  if (!a) return false
+  const nestedEn = a.en?.content || ''
+  const nestedId = a.id?.content || ''
+  const flatIsEn = a.content && flatArticleLang(a) === 'en'
+  if (nestedEn || flatIsEn) return false
+  return !!nestedId || !!a.content
 })
 
 const availableLanguages = computed(() => {
   if (!article.value) return ['en']
   const langs = []
-  if (article.value.en || article.value.title) langs.push('en')
-  if (article.value.id) langs.push('id')
+  const flatLang = article.value.content ? flatArticleLang(article.value) : null
+  if (article.value.en || flatLang === 'en') langs.push('en')
+  if (article.value.id || flatLang === 'id') langs.push('id')
   if (langs.length === 0) langs.push('en')
   return langs
 })
