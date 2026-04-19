@@ -73,6 +73,52 @@ class ArticleGenerationService
     }
 
     /**
+     * Trigger Phase B Step 1: Research (NEW — replaces /article-prep steps 1).
+     * Model selected per tier: Opus (deep) or Sonnet (quick).
+     *
+     * @return array{success: bool, pid: int|null, error: string|null}
+     */
+    public function triggerResearch(int $ideaId, array $config, string $tier): array
+    {
+        $topic = $config['topic'] ?? '';
+        $languages = implode(',', $config['languages'] ?? ['en']);
+        $keyword = $config['keyword'] ?? '';
+        $instructions = $config['instructions'] ?? '';
+
+        $prompt = "/article-research --idea-id {$ideaId} --api-url {$this->apiUrl} --api-token {$this->apiToken}";
+        $prompt .= ' --topic "' . addslashes($topic) . '"';
+        $prompt .= " --languages {$languages}";
+        $prompt .= " --research-tier {$tier}";
+        if ($keyword) {
+            $prompt .= ' --keyword "' . addslashes($keyword) . '"';
+        }
+        if ($instructions) {
+            $prompt .= ' --instructions "' . addslashes($instructions) . '"';
+        }
+
+        $model = $this->resolveResearchModel($tier);
+        $refsFile = config('services.article_generation.refs_research', '');
+
+        return $this->executePrompt($prompt, $ideaId, 'research', $model, $refsFile);
+    }
+
+    /**
+     * Trigger Phase B Step 2: Strategy + Outline (NEW).
+     * Always runs on Sonnet. Reads research_data from DB — no CLI args beyond ID.
+     *
+     * @return array{success: bool, pid: int|null, error: string|null}
+     */
+    public function triggerStrategyOutline(int $ideaId): array
+    {
+        $prompt = "/article-strategy-outline --idea-id {$ideaId} --api-url {$this->apiUrl} --api-token {$this->apiToken}";
+
+        $model = config('services.article_generation.model_strategy_outline', 'sonnet');
+        $refsFile = config('services.article_generation.refs_strategy_outline', '');
+
+        return $this->executePrompt($prompt, $ideaId, 'strategy-outline', $model, $refsFile);
+    }
+
+    /**
      * Trigger article writing (Step 4: write + polish + images).
      * Uses /article-write skill on Opus with refs-write.md.
      *
@@ -568,9 +614,14 @@ PROMPT;
     /**
      * Execute a prompt via SSH or local, with optional model and refs file.
      *
+     * Visibility is `protected` so test doubles can subclass and override it
+     * to capture dispatch arguments without running real SSH/local processes.
+     * Not part of the public API — always invoked through the `triggerX()`
+     * methods.
+     *
      * @return array{success: bool, pid: int|null, error: string|null}
      */
-    private function executePrompt(string $prompt, int $ideaId, string $phase, string $model = '', string $refsFile = ''): array
+    protected function executePrompt(string $prompt, int $ideaId, string $phase, string $model = '', string $refsFile = ''): array
     {
         try {
             if ($this->driver === 'local') {
