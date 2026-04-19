@@ -832,6 +832,7 @@ Route::middleware(['auth:sanctum'])->prefix('admin/content-engine')->group(funct
     Route::get('/ideas/{id}/progress', [ContentIdeaController::class, 'getProgress']);
     Route::post('/ideas/{id}/approve-article', [ContentIdeaController::class, 'approveArticle']);
     Route::post('/ideas/{id}/regenerate', [ContentIdeaController::class, 'regenerateArticle']);
+    Route::post('/ideas/{id}/run-deep-score', [ContentIdeaController::class, 'runDeepScore']);
 
     // Pipeline: Gate 2 (Images)
     Route::put('/ideas/{id}/save-draft', [ContentIdeaController::class, 'saveDraft']);

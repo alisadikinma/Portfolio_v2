@@ -398,6 +398,56 @@ class ContentIdeaController extends Controller
         ], 201);
     }
 
+    /**
+     * Phase C opt-in: dispatch the Sonnet /article-score skill on demand.
+     * Only allowed when the idea is in 'article_ready' — the default Phase C
+     * skip path leaves ideas at that status with just a mechanical snapshot.
+     */
+    public function runDeepScore($id): JsonResponse
+    {
+        $idea = ContentIdea::find($id);
+        if (!$idea) {
+            return response()->json(['success' => false, 'message' => 'Content idea not found.'], 404);
+        }
+
+        if ($idea->status !== 'article_ready') {
+            return response()->json([
+                'success' => false,
+                'message' => "Cannot run deep score: idea must be in article_ready status (current: {$idea->status}).",
+            ], 409);
+        }
+
+        $result = $this->articleGen->triggerScore($idea->id);
+
+        if (!($result['success'] ?? false)) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['error'] ?? 'Deep score dispatch failed.',
+            ], 500);
+        }
+
+        $idea->update([
+            'status' => 'researching',
+            'progress_percentage' => 85,
+            'current_step' => 'deep_scoring',
+            'process_pid' => $result['pid'] ?? null,
+            'progress_log' => array_merge(
+                $idea->progress_log ?? [],
+                [[
+                    'timestamp' => now()->toISOString(),
+                    'step' => 'deep_scoring_started',
+                    'percentage' => 85,
+                    'message' => 'User-requested deep quality analysis (Sonnet /article-score)',
+                ]]
+            ),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'data' => ['pid' => $result['pid'] ?? null],
+        ]);
+    }
+
     // ========================================================================
     // GATE 1: ARTICLE GENERATION (Research + Write)
     // ========================================================================
