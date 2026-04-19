@@ -3,6 +3,13 @@
 return [
     'default_image_model' => env('DEFAULT_IMAGE_MODEL', 'nano-banana-pro'),
 
+    // AutoPipelineOrchestrator operating window — only advances auto_mode ideas
+    // between window_start (inclusive) and window_end (exclusive) in the given
+    // timezone. Prevents overnight SSH dispatches that would wake up at 3 AM.
+    'auto_timezone' => env('CONTENT_AUTO_TIMEZONE', 'Asia/Jakarta'),
+    'auto_window_start' => (int) env('CONTENT_AUTO_WINDOW_START', 6),
+    'auto_window_end' => (int) env('CONTENT_AUTO_WINDOW_END', 22),
+
     'cover_branding' => [
         'enabled' => env('COVER_BRANDING_ENABLED', true),
         'model' => env('COVER_BRANDING_MODEL', 'nano-banana-pro'),

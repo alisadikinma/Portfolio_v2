@@ -67,6 +67,7 @@ class AutoPipelineOrchestratorTest extends TestCase
         $builder->shouldReceive('whereNull')->andReturnSelf();
         $builder->shouldReceive('whereNotNull')->andReturnSelf();
         $builder->shouldReceive('orderBy')->andReturnSelf();
+        $builder->shouldReceive('orderByRaw')->andReturnSelf();
 
         $builder->shouldReceive('first')->andReturn($mockReturns['first'] ?? null);
         $builder->shouldReceive('get')->andReturn($mockReturns['get'] ?? new Collection());

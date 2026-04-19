@@ -256,9 +256,19 @@ class AutoPipelineOrchestrator
 
     private function startNextDraft(): ?ContentIdea
     {
+        // Priority: match the "Virality" badge shown in the admin Content
+        // Engine UI, which is source_data.display_score = composite_score +
+        // heat_boost + tier_boost. Sorting by the raw virality_score column
+        // would diverge from UI order (tier-1 publishers get +5 boost).
+        //
+        // Order: display_score DESC → virality_score DESC → created_at ASC.
+        // COALESCE handles legacy ideas without source_data.display_score
+        // (fall back to the column). MySQL DESC sorts NULL last naturally.
         $idea = ContentIdea::where('auto_mode', true)
             ->where('status', 'draft')
             ->whereNull('scheduled_at')
+            ->orderByRaw("COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(source_data, '$.display_score')) AS UNSIGNED), virality_score, 0) DESC")
+            ->orderBy('virality_score', 'desc')
             ->orderBy('created_at')
             ->first();
 

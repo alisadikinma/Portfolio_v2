@@ -337,8 +337,8 @@
                 <span v-else>—</span>
               </td>
               <td class="px-4 py-3 text-center align-top">
-                <button @click="toggleAutoMode(idea)" :class="['w-8 h-5 rounded-full relative transition-colors', idea.auto_mode ? 'bg-amber-500' : 'bg-neutral-300 dark:bg-neutral-600']">
-                  <span :class="['absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform', idea.auto_mode ? 'translate-x-3.5' : 'translate-x-0.5']"></span>
+                <button @click="toggleAutoMode(idea)" :class="['w-9 h-5 rounded-full relative transition-colors', idea.auto_mode ? 'bg-amber-500' : 'bg-neutral-300 dark:bg-neutral-600']">
+                  <span :class="['absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform', idea.auto_mode ? 'translate-x-4' : 'translate-x-0']"></span>
                 </button>
               </td>
               <td class="px-4 py-3 align-top">
