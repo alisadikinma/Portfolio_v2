@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useContentEngine } from '@/composables/useContentEngine'
 import { useToast } from '@/composables/useToast'
@@ -8,7 +8,7 @@ import { parseBlockElements, resolveImagePosition } from '@/utils/imagePositioni
 
 const route = useRoute()
 const router = useRouter()
-const { getIdea, approveArticle, saveDraft, regenerateArticle, isLoading } = useContentEngine()
+const { getIdea, approveArticle, saveDraft, regenerateArticle, runDeepScore, getProgress, isLoading } = useContentEngine()
 const toast = useToast()
 
 // ── State ──
@@ -195,6 +195,140 @@ function formatCapturedAt(iso) {
   if (isNaN(d.getTime())) return ''
   return d.toLocaleString()
 }
+
+// ── Phase C.8: Deep Quality Analysis button state machine ──
+const deepScoring = ref(false)
+const deepScoreError = ref(null)
+let deepScorePollId = null
+
+// The score-returned articles carry {quality_gate, virality_score, seo_analysis,
+// ai_humanization, geo_score, combined_score} on generated_article — see
+// routes/api.php L459-472 for the persistence shape.
+const deepScores = computed(() => {
+  const a = idea.value?.generated_article
+  if (!a) return null
+  const combined = a.combined_score
+  if (combined == null) return null
+  return {
+    quality: a.quality_gate?.score ?? a.quality_score ?? null,
+    virality: a.virality_score?.score ?? a.virality_score_value ?? null,
+    seo: a.seo_analysis?.score ?? a.seo_score ?? null,
+    aiHumanization: a.ai_humanization?.score ?? null,
+    geo: a.geo_score?.score ?? null,
+    combined: typeof combined === 'object' ? (combined.total ?? combined.score ?? null) : combined,
+    grade: typeof combined === 'object' ? (combined.grade ?? null) : null,
+  }
+})
+
+const hasDeepScores = computed(() => deepScores.value !== null && deepScores.value.combined !== null)
+
+const deepScoreStatus = computed(() => {
+  if (deepScoreError.value) return 'failed'
+  if (deepScoring.value) return 'running'
+  if (!idea.value) return 'unavailable'
+  const status = idea.value.status
+  const step = idea.value.current_step
+  if (status === 'researching' && step === 'deep_scoring') return 'running'
+  if (hasDeepScores.value) return 'done'
+  if (status === 'article_ready') return 'ready'
+  return 'unavailable'
+})
+
+const deepScoreLabel = computed(() => {
+  switch (deepScoreStatus.value) {
+    case 'running': {
+      const pct = idea.value?.progress_percentage ?? 0
+      return `Scoring... ${pct}%`
+    }
+    case 'done':
+      return `Deep Score: ${deepScores.value?.combined ?? '—'}/100`
+    case 'failed':
+      return 'Score Failed — Retry'
+    case 'unavailable':
+      return 'Deep Analysis Unavailable'
+    default:
+      return 'Run Deep Quality Analysis'
+  }
+})
+
+const deepScoreButtonClasses = computed(() => {
+  switch (deepScoreStatus.value) {
+    case 'running':
+      return 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 cursor-wait'
+    case 'done':
+      return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25'
+    case 'failed':
+      return 'bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30 hover:bg-red-500/25'
+    case 'unavailable':
+      return 'bg-neutral-100 text-neutral-400 dark:bg-neutral-800 dark:text-neutral-600 border-neutral-200 dark:border-neutral-700 cursor-not-allowed'
+    default:
+      return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25'
+  }
+})
+
+function stopDeepScorePolling() {
+  if (deepScorePollId) {
+    clearInterval(deepScorePollId)
+    deepScorePollId = null
+  }
+}
+
+async function startDeepScore() {
+  if (!idea.value) return
+  if (!['ready', 'failed', 'done'].includes(deepScoreStatus.value)) return
+
+  deepScoreError.value = null
+  deepScoring.value = true
+
+  const result = await runDeepScore(idea.value.id)
+  if (!result.success) {
+    deepScoring.value = false
+    deepScoreError.value = result.error || 'Deep score dispatch failed'
+    toast.error(deepScoreError.value)
+    return
+  }
+
+  // Reflect dispatch-side update locally so the button switches to running
+  // immediately instead of waiting for the first poll.
+  idea.value = {
+    ...idea.value,
+    status: 'researching',
+    current_step: 'deep_scoring',
+    progress_percentage: 85,
+    process_pid: result.data?.pid ?? null,
+  }
+
+  // Poll /progress every 3s (mirrors ContentEngine.vue's existing polling cadence).
+  stopDeepScorePolling()
+  deepScorePollId = setInterval(async () => {
+    const progressRes = await getProgress(idea.value.id)
+    if (!progressRes.success) return
+
+    const data = progressRes.data || {}
+    idea.value = {
+      ...idea.value,
+      progress_percentage: data.progress_percentage ?? idea.value.progress_percentage,
+      current_step: data.current_step ?? idea.value.current_step,
+      status: data.status ?? idea.value.status,
+    }
+
+    const done = data.progress_percentage === 100 || data.status === 'article_ready'
+    if (done) {
+      stopDeepScorePolling()
+      // Re-fetch the full idea so generated_article.combined_score + scorecard fields arrive.
+      const refreshed = await getIdea(idea.value.id)
+      if (refreshed.success && refreshed.data) {
+        idea.value = refreshed.data
+      }
+      deepScoring.value = false
+      toast.success('Deep quality analysis complete')
+    }
+  }, 3000)
+}
+
+onBeforeUnmount(() => {
+  stopDeepScorePolling()
+})
 
 const titleCharCount = computed(() => currentTitle.value.length)
 
@@ -575,70 +709,108 @@ async function handleApprove() {
       </div>
 
       <!-- Phase C: Mechanical Scorecard (no AI cost, deterministic metrics) -->
-      <div v-if="mechanicalSnapshot" class="max-w-3xl mx-auto px-4 sm:px-6 pt-4" data-testid="mechanical-scorecard">
+      <div v-if="idea" class="max-w-3xl mx-auto px-4 sm:px-6 pt-4" data-testid="mechanical-scorecard">
         <div class="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800/60 p-4">
           <div class="flex items-center justify-between mb-3">
             <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100 uppercase tracking-wide">Mechanical Scorecard</h3>
-            <span v-if="mechanicalSnapshot.captured_at" class="text-xs text-neutral-500 dark:text-neutral-400" :title="mechanicalSnapshot.captured_at">
+            <span v-if="mechanicalSnapshot?.captured_at" class="text-xs text-neutral-500 dark:text-neutral-400" :title="mechanicalSnapshot.captured_at">
               captured {{ formatCapturedAt(mechanicalSnapshot.captured_at) }}
             </span>
           </div>
 
-          <!-- SEO row -->
-          <div class="mb-3">
-            <p class="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase mb-1.5">SEO</p>
-            <div class="flex flex-wrap gap-1.5">
-              <span
-                v-for="chip in seoChips"
-                :key="chip.key"
-                :class="['inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium border', scoreStatusClasses(chip.status)]"
-                :title="chip.label"
-              >
-                <span class="opacity-70">{{ chip.label }}</span>
-                <span class="font-semibold">{{ chip.display }}</span>
+          <template v-if="mechanicalSnapshot">
+            <!-- SEO row -->
+            <div class="mb-3">
+              <p class="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase mb-1.5">SEO</p>
+              <div class="flex flex-wrap gap-1.5">
+                <span
+                  v-for="chip in seoChips"
+                  :key="chip.key"
+                  :class="['inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium border', scoreStatusClasses(chip.status)]"
+                  :title="chip.label"
+                >
+                  <span class="opacity-70">{{ chip.label }}</span>
+                  <span class="font-semibold">{{ chip.display }}</span>
+                </span>
+              </div>
+            </div>
+
+            <!-- GEO row -->
+            <div class="mb-3">
+              <p class="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase mb-1.5">GEO signals</p>
+              <div class="flex flex-wrap gap-1.5">
+                <span
+                  v-for="chip in geoChips"
+                  :key="chip.key"
+                  :class="['inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium border', scoreStatusClasses(chip.status)]"
+                  :title="chip.label"
+                >
+                  <span class="opacity-70">{{ chip.label }}</span>
+                  <span class="font-semibold">{{ chip.display }}</span>
+                </span>
+              </div>
+            </div>
+
+            <!-- AI Humanization row -->
+            <div>
+              <p class="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase mb-1.5">AI Humanization</p>
+              <div class="flex flex-wrap gap-1.5">
+                <span
+                  v-for="chip in aiHumanizationChips"
+                  :key="chip.key"
+                  :class="['inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium border', scoreStatusClasses(chip.status)]"
+                  :title="chip.label"
+                >
+                  <span class="opacity-70">{{ chip.label }}</span>
+                  <span class="font-semibold">{{ chip.display }}</span>
+                </span>
+              </div>
+              <p v-if="humanizationNote" class="mt-1.5 text-[11px] italic text-neutral-500 dark:text-neutral-400">{{ humanizationNote }}</p>
+            </div>
+          </template>
+
+          <!-- Empty-state for ideas without a snapshot (legacy or pre-write) -->
+          <p v-else class="text-xs italic text-neutral-500 dark:text-neutral-400">
+            No mechanical scores captured — this idea predates the scorecard feature or hasn't completed the write phase yet.
+          </p>
+
+          <!-- Deep Analysis Results (only when scores exist) -->
+          <div v-if="hasDeepScores" class="mt-4 pt-3 border-t border-neutral-200 dark:border-neutral-700">
+            <p class="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase mb-1.5">Deep Analysis (5-gate AI)</p>
+            <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs">
+              <span v-if="deepScores.quality != null" class="text-neutral-700 dark:text-neutral-300">Quality <strong>{{ deepScores.quality }}/10</strong></span>
+              <span v-if="deepScores.virality != null" class="text-neutral-700 dark:text-neutral-300">Virality <strong>{{ deepScores.virality }}/5</strong></span>
+              <span v-if="deepScores.seo != null" class="text-neutral-700 dark:text-neutral-300">SEO <strong>{{ deepScores.seo }}/6</strong></span>
+              <span v-if="deepScores.aiHumanization != null" class="text-neutral-700 dark:text-neutral-300">AI Humanization <strong>{{ deepScores.aiHumanization }}/20</strong></span>
+              <span v-if="deepScores.geo != null" class="text-neutral-700 dark:text-neutral-300">GEO <strong>{{ deepScores.geo }}/5</strong></span>
+              <span class="text-neutral-700 dark:text-neutral-300">
+                Combined <strong class="text-base">{{ deepScores.combined }}</strong><span class="text-neutral-400">/100</span>
+                <span v-if="deepScores.grade" class="ml-1 text-emerald-600 dark:text-emerald-400 font-semibold">{{ deepScores.grade }}</span>
               </span>
             </div>
           </div>
 
-          <!-- GEO row -->
-          <div class="mb-3">
-            <p class="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase mb-1.5">GEO signals</p>
-            <div class="flex flex-wrap gap-1.5">
-              <span
-                v-for="chip in geoChips"
-                :key="chip.key"
-                :class="['inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium border', scoreStatusClasses(chip.status)]"
-                :title="chip.label"
-              >
-                <span class="opacity-70">{{ chip.label }}</span>
-                <span class="font-semibold">{{ chip.display }}</span>
-              </span>
-            </div>
+          <!-- Run Deep Quality Analysis button -->
+          <div class="mt-4">
+            <button
+              data-testid="run-deep-score-btn"
+              @click="startDeepScore"
+              :disabled="deepScoreStatus === 'unavailable' || deepScoreStatus === 'running'"
+              :class="['w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border transition-colors disabled:opacity-70', deepScoreButtonClasses]"
+              :title="deepScoreStatus === 'unavailable' ? 'Deep analysis is only available once the article is in article_ready status' : 'Runs /article-score on Sonnet (~1 min)'"
+            >
+              <svg v-if="deepScoreStatus === 'running'" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              <span v-else-if="deepScoreStatus === 'done'">OK</span>
+              <span v-else-if="deepScoreStatus === 'failed'">ERR</span>
+              <span v-else>AI</span>
+              <span>{{ deepScoreLabel }}</span>
+              <span v-if="deepScoreStatus === 'done'" class="text-xs opacity-70">· click to re-run</span>
+            </button>
+            <p v-if="deepScoreError" class="mt-1.5 text-[11px] text-red-600 dark:text-red-400">{{ deepScoreError }}</p>
           </div>
-
-          <!-- AI Humanization row -->
-          <div>
-            <p class="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase mb-1.5">AI Humanization</p>
-            <div class="flex flex-wrap gap-1.5">
-              <span
-                v-for="chip in aiHumanizationChips"
-                :key="chip.key"
-                :class="['inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium border', scoreStatusClasses(chip.status)]"
-                :title="chip.label"
-              >
-                <span class="opacity-70">{{ chip.label }}</span>
-                <span class="font-semibold">{{ chip.display }}</span>
-              </span>
-            </div>
-            <p v-if="humanizationNote" class="mt-1.5 text-[11px] italic text-neutral-500 dark:text-neutral-400">{{ humanizationNote }}</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Scorecard empty-state (legacy ideas or ideas still pre-write) -->
-      <div v-else-if="idea && idea.status === 'article_ready'" class="max-w-3xl mx-auto px-4 sm:px-6 pt-4">
-        <div class="rounded-lg border border-dashed border-neutral-200 dark:border-neutral-700 p-3 text-xs text-neutral-500 dark:text-neutral-400">
-          Mechanical scores not yet captured for this idea — older articles produced before the scorecard feature shipped.
         </div>
       </div>
 
