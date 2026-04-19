@@ -50,10 +50,11 @@ class TrendingTopicServiceScoredTest extends TestCase
         $this->assertSame(90, $result[0]['composite_score']);
     }
 
-    public function test_get_scored_topics_caps_input_at_batch_size(): void
+    public function test_get_scored_topics_chunks_large_input_into_max_batch_calls(): void
     {
+        // 50 trends, default max_scored=60 → all 50 processed across ceil(50/20) = 3 chunks.
         $rawTrends = [];
-        for ($i = 0; $i < 30; $i++) {
+        for ($i = 0; $i < 50; $i++) {
             $rawTrends[] = ['title' => "topic-{$i}", 'source' => 'google_news'];
         }
 
@@ -62,11 +63,10 @@ class TrendingTopicServiceScoredTest extends TestCase
 
         $scoringMock = Mockery::mock(TopicScoringService::class);
         $scoringMock->shouldReceive('scoreBatch')
-            ->once()
+            ->times(3)
             ->withArgs(function ($topics) {
-                // Enforce that getScoredTopics caps at MAX_BATCH_SIZE before
-                // dispatching to scoreBatch. Prevents AI cost blowout.
-                return count($topics) === TopicScoringService::MAX_BATCH_SIZE;
+                // No chunk exceeds MAX_BATCH_SIZE — prompt-safe boundary preserved.
+                return count($topics) <= TopicScoringService::MAX_BATCH_SIZE;
             })
             ->andReturnUsing(function ($topics) {
                 return array_map(fn ($t) => array_merge($t, ['composite_score' => 50, 'momentum_score' => 50, 'virality_score' => 50, 'triggers' => []]), $topics);
@@ -75,7 +75,33 @@ class TrendingTopicServiceScoredTest extends TestCase
 
         $result = $trendingService->getScoredTopics();
 
-        $this->assertCount(TopicScoringService::MAX_BATCH_SIZE, $result);
+        $this->assertCount(50, $result);
+    }
+
+    public function test_get_scored_topics_caps_at_max_scored_config(): void
+    {
+        // Raise ceiling artificially low via config to prove the cap is honored.
+        config(['content.trending.max_scored' => 25]);
+
+        $rawTrends = [];
+        for ($i = 0; $i < 100; $i++) {
+            $rawTrends[] = ['title' => "topic-{$i}", 'source' => 'google_news'];
+        }
+
+        $trendingService = Mockery::mock(TrendingTopicService::class)->makePartial();
+        $trendingService->shouldReceive('getAllTrends')->once()->andReturn($rawTrends);
+
+        $scoringMock = Mockery::mock(TopicScoringService::class);
+        $scoringMock->shouldReceive('scoreBatch')
+            ->times(2) // 25 topics → chunks of 20 + 5
+            ->andReturnUsing(function ($topics) {
+                return array_map(fn ($t) => array_merge($t, ['composite_score' => 50, 'momentum_score' => 50, 'virality_score' => 50, 'triggers' => []]), $topics);
+            });
+        app()->instance(TopicScoringService::class, $scoringMock);
+
+        $result = $trendingService->getScoredTopics();
+
+        $this->assertCount(25, $result);
     }
 
     public function test_get_scored_topics_passes_source_filter_through(): void

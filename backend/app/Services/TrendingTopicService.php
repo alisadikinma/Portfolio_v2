@@ -635,8 +635,10 @@ class TrendingTopicService
      * Scored variant of getAllTrends() — layers momentum + virality AI scores
      * on top of the filtered tech trends, sorted by display_score desc.
      *
-     * Caps input at TopicScoringService::MAX_BATCH_SIZE so the AI batch fits
-     * comfortably in one Sonnet call. Cached 1h downstream in TopicScoringService.
+     * Scores up to `content.trending.max_scored` topics (default 60) by
+     * splitting the input into chunks of TopicScoringService::MAX_BATCH_SIZE
+     * (prompt-safe per Sonnet call) and running each chunk sequentially.
+     * Each chunk is cached independently downstream.
      *
      * display_score = composite_score + heat_boost + tier_boost (clamped 0-100).
      * This is the single number the admin UI shows and sorts by. Boost weights
@@ -654,11 +656,20 @@ class TrendingTopicService
             return [];
         }
 
-        $capped = array_slice(array_values($trends), 0, TopicScoringService::MAX_BATCH_SIZE);
+        $maxScored = (int) config('content.trending.max_scored', 60);
+        $maxScored = max(TopicScoringService::MAX_BATCH_SIZE, $maxScored);
 
-        $scored = app(TopicScoringService::class)->scoreBatch($capped);
+        $input = array_slice(array_values($trends), 0, $maxScored);
+        $chunks = array_chunk($input, TopicScoringService::MAX_BATCH_SIZE);
+        $scoringService = app(TopicScoringService::class);
 
-        $scored = array_map(fn ($t) => $this->applyDisplayScore($t), $scored);
+        $scored = [];
+        foreach ($chunks as $chunk) {
+            $chunkScored = $scoringService->scoreBatch($chunk);
+            foreach ($chunkScored as $topic) {
+                $scored[] = $this->applyDisplayScore($topic);
+            }
+        }
 
         usort($scored, fn ($a, $b) => ($b['display_score'] ?? 0) <=> ($a['display_score'] ?? 0));
 

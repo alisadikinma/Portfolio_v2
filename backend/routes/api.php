@@ -607,6 +607,10 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
             ], 400);
         }
 
+        // Strip `\/` → `/` in outline/meta strings to prevent the same HTML
+        // corruption seen in save-article (see HtmlSlashSanitizer docblock).
+        $prepData = \App\Support\HtmlSlashSanitizer::apply($prepData);
+
         $existing = $idea->generated_article ?? [];
         $existing['prep_data'] = $prepData;
         $idea->update(['generated_article' => $existing]);
@@ -671,6 +675,14 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
                 'keys_received' => array_keys($articleData),
             ], 400);
         }
+
+        // Sanitize JSON-escape leakage in HTML content. The plugin sometimes
+        // double-escapes slashes (`\/` survives into the stored string), which
+        // turns `</p>` into literal `<\/p>` text at render time — breaks HTML
+        // parsing and makes every block cascade into the prior tag's styling.
+        // Strip the escape defensively so stored content is always clean HTML.
+        // Applies to title + content + any per-language {id,en}.{title,content}.
+        $articleData = \App\Support\HtmlSlashSanitizer::apply($articleData);
 
         $idea->update(['generated_article' => array_merge($existing, $articleData)]);
 

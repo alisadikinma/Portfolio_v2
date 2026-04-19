@@ -25,5 +25,10 @@ return [
             2 => (int) env('TRENDING_TIER_BOOST_2', 2),
             3 => 0,
         ],
+        // Max topics to run through AI scoring per Pull Trending call.
+        // Scorer chunks in batches of TopicScoringService::MAX_BATCH_SIZE (20)
+        // so 60 = 3 Sonnet calls. Raise when the admin modal feels too thin;
+        // each extra chunk adds ~3-5s latency + 1 Sonnet invocation.
+        'max_scored' => (int) env('TRENDING_MAX_SCORED', 60),
     ],
 ];
