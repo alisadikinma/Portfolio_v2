@@ -512,36 +512,17 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
             ]);
         }
 
-        // Auto mode: if enabled, auto-start image generation
+        // Auto mode: if enabled, auto-start image generation. Route through
+        // triggerForIdea so CoverBrandingEnhancer runs — injects title overlay
+        // on cover, prepends creator face, appends watermark instruction + logo
+        // URL, and sets branded filename. Previously this block bypassed the
+        // enhancer by calling queue() directly, so auto-mode images shipped
+        // without title/watermark/branding (idea #220 symptom).
         $idea->refresh();
         if ($idea->auto_mode && $idea->status === 'article_ready') {
             $imageService = app(\App\Services\ImageGenerationService::class);
-            $article = $idea->generated_article ?? [];
-            $prompts = $article['image_prompts'] ?? [];
-
-            foreach ($prompts as $i => $prompt) {
-                $uuid = $imageService->queue(
-                    postId: null,
-                    prompt: $prompt['visual_direction'] ?? $prompt['prompt'] ?? '',
-                    type: ($prompt['type'] ?? 'inline') === 'cover' ? 'hero' : 'inline',
-                    insertAfterHeading: null,
-                    model: $prompt['model'] ?? config('content.default_image_model', 'nano-banana-pro'),
-                    aspectRatio: $prompt['aspect_ratio'] ?? '16:9',
-                    style: $prompt['style'] ?? 'Photorealistic'
-                );
-                if ($uuid) {
-                    $prompts[$i]['job_uuid'] = $uuid;
-                    $prompts[$i]['status'] = 'generating';
-                }
-            }
-
-            $article['image_prompts'] = $prompts;
-            $idea->update([
-                'status' => 'generating_images',
-                'generated_article' => $article,
-            ]);
-
-            \Illuminate\Support\Facades\Log::info("[AutoMode] Idea #{$idea->id}: auto-started image generation for " . count($prompts) . " images");
+            $dispatched = $imageService->triggerForIdea($idea);
+            \Illuminate\Support\Facades\Log::info("[AutoMode] Idea #{$idea->id}: auto-started image generation — {$dispatched} jobs dispatched via triggerForIdea (enhancer applied)");
         }
 
         return response()->json(['success' => true, 'data' => $idea->fresh()]);
@@ -697,7 +678,11 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
 
         $service = app(\App\Services\ArticleGenerationService::class);
 
-        // Explicit phase handoff: article-images → GeminiGen (Gate 2 split flow)
+        // Explicit phase handoff: article-images → GeminiGen (Gate 2 split flow).
+        // Route through triggerForIdea so CoverBrandingEnhancer runs (title on
+        // cover, creator face auto-inject, watermark + logo, branded filenames).
+        // Previously this block invoked queue() directly, bypassing enhancer and
+        // shipping raw plugin prompts to GeminiGen.
         $phase = $request->input('phase');
         if ($phase === 'images') {
             $article = $idea->generated_article ?? [];
@@ -709,34 +694,12 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
             }
 
             $imageService = app(\App\Services\ImageGenerationService::class);
-            $prompts = data_get($article, 'image_prompts', []);
-            $queuedJobs = [];
+            $dispatched = $imageService->triggerForIdea($idea);
 
-            foreach ($prompts as $index => $item) {
-                $uuid = $imageService->queue(
-                    postId: null,
-                    prompt: $item['prompt'] ?? '',
-                    type: ($item['type'] ?? 'inline') === 'cover' ? 'hero' : 'inline',
-                    insertAfterHeading: $item['insert_after_heading'] ?? null,
-                    model: $item['model'] ?? config('content.default_image_model', 'nano-banana-pro'),
-                    aspectRatio: $item['aspect_ratio'] ?? '16:9',
-                    style: $item['style'] ?? 'Cinematic',
-                    faceRefs: $item['face_refs'] ?? [],
-                    styleRefs: $item['style_refs'] ?? [],
-                    additionalNotes: $item['additional_notes'] ?? ''
-                );
-
-                if ($uuid) {
-                    $prompts[$index]['job_uuid'] = $uuid;
-                    $prompts[$index]['status'] = 'generating';
-                    $queuedJobs[] = $uuid;
-                }
-            }
-
-            $article['image_prompts'] = $prompts;
+            // triggerForIdea flips status to generating_images when any job is
+            // dispatched; mirror the legacy progress snapshot fields so the
+            // admin UI shows the Gate 2 → images transition consistently.
             $idea->update([
-                'generated_article' => $article,
-                'status' => 'generating_images',
                 'progress_percentage' => 30,
                 'current_step' => 'gemini_gen',
             ]);
@@ -744,7 +707,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
             return response()->json([
                 'success' => true,
                 'next_phase' => 'gemini_gen',
-                'queued' => count($queuedJobs),
+                'queued' => $dispatched,
             ]);
         }
 
