@@ -38,7 +38,21 @@ class ContentPublishService
         $idea->generated_article = $article;
         $idea->save();
 
-        $primaryLang = $article['language'] ?? 'id';
+        // Primary language resolution — plugin SHOULD set $article['language']
+        // at top-level, but older pipelines or plugin bugs sometimes store
+        // content under a language key (e.g. 'id' or 'en') without the flag.
+        // Fallback chain: explicit language field → first language key that
+        // actually contains content → 'id' default.
+        $primaryLang = $article['language'] ?? null;
+        if (!$primaryLang || empty($article[$primaryLang]['content'] ?? '')) {
+            foreach (['id', 'en'] as $candidate) {
+                if (!empty($article[$candidate]['content'] ?? '')) {
+                    $primaryLang = $candidate;
+                    break;
+                }
+            }
+            $primaryLang = $primaryLang ?? 'id';
+        }
         $primary = $article[$primaryLang] ?? [];
         $title = $primary['title'] ?? $article['title'] ?? $idea->title;
         $rawContent = $primary['content'] ?? $article['content'] ?? '';

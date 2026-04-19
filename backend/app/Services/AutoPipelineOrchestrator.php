@@ -54,25 +54,30 @@ class AutoPipelineOrchestrator
         // flipped to failed, freeing the in-flight slot for the next tick.
         $this->detectAndFlipStuckIdeas();
 
+        // Priority 1 (ALWAYS — not gated by in-flight): publish a completed
+        // idea. Publishing is a local DB write + Telegram ping — no SSH, no
+        // shared compute. Running it concurrently with a researching idea is
+        // safe and prevents completed articles from stalling in the queue
+        // while the pipeline works on the next one.
+        $published = $this->publishReady();
+        if ($published) return $published;
+
+        // Remaining priorities compete for the single SSH/GeminiGen slot.
         if ($this->hasInFlightIdea()) {
             return null;
         }
 
-        // Priority 1: retry a failed idea whose delay has elapsed
+        // Priority 2: retry a failed idea whose delay has elapsed
         $retried = $this->retryDueFailed();
         if ($retried) return $retried;
 
-        // Priority 2: start research on a draft idea
+        // Priority 3: start research on a draft idea
         $started = $this->startNextDraft();
         if ($started) return $started;
 
-        // Priority 3: advance article_ready → image generation
+        // Priority 4: advance article_ready → image generation
         $imaged = $this->dispatchImagesForReady();
         if ($imaged) return $imaged;
-
-        // Priority 4: publish a completed idea not yet published
-        $published = $this->publishReady();
-        if ($published) return $published;
 
         return null;
     }
