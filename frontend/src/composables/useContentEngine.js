@@ -148,6 +148,9 @@ export function useContentEngine() {
   const resumeImagePipeline = (id) =>
     request('post', `/automation/content-ideas/${id}/continue-pipeline`, { phase: 'images_resume' })
 
+  const resumePipeline = (id) =>
+    request('post', `/admin/content-engine/ideas/${id}/resume`)
+
   const downloadStockImage = (url) =>
     request('post', '/admin/content-engine/download-stock-image', { url })
 
@@ -189,6 +192,7 @@ export function useContentEngine() {
     updateImageConcept,
     regenerateImagePrompts,
     resumeImagePipeline,
+    resumePipeline,
     downloadStockImage,
     cleanupVariationImages,
     listWorkflows,

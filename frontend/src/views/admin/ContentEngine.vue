@@ -615,7 +615,7 @@
         <!-- Progress Bar -->
         <div class="mb-4">
           <div class="flex items-center justify-between mb-1.5">
-            <span class="text-sm font-medium text-neutral-700 dark:text-neutral-300">{{ formatStepName(progressData.current_step) }}</span>
+            <span class="text-sm font-medium text-neutral-700 dark:text-neutral-300">{{ formatStepName(resolveCurrentStep(progressData.current_step, progressData.progress_percentage || 0)) }}</span>
             <span class="text-sm font-mono text-amber-600 dark:text-amber-400">{{ progressData.progress_percentage }}%</span>
           </div>
           <div class="w-full bg-neutral-200 dark:bg-neutral-700 rounded-full h-3 overflow-hidden">
@@ -692,9 +692,27 @@
               {{ progressData.progress_percentage >= 100 ? 'Completed' : progressData.process_alive !== false ? 'Process running' : 'Process stopped' }}
             </span>
           </div>
-          <button @click="closeProgressModal" class="px-4 py-2 text-sm font-medium rounded-lg border border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors">
-            Close
-          </button>
+          <div class="flex items-center gap-2">
+            <button
+              v-if="canRetry"
+              @click="handleRetryPipeline"
+              :disabled="isRetrying"
+              class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg bg-amber-600 hover:bg-amber-700 text-white transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              :title="'Resume from last incomplete sub-step'"
+            >
+              <svg v-if="isRetrying" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+              </svg>
+              <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+              </svg>
+              {{ isRetrying ? 'Resuming…' : 'Retry' }}
+            </button>
+            <button @click="closeProgressModal" class="px-4 py-2 text-sm font-medium rounded-lg border border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors">
+              Close
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -731,6 +749,7 @@ const {
   approveArticle,
   startImageGeneration,
   approveAndPublish,
+  resumePipeline,
 } = useContentEngine()
 
 const pillars = ['Vibe Coding', 'AI Automation', 'AI Agents', 'AI Video & Image', 'General']
@@ -1098,7 +1117,7 @@ const pipelinePhases = [
     minPct: 15,
     maxPct: 35,
     steps: [
-      { name: 'input_collection', label: 'Input', pct: 17 },
+      { name: 'load_prep', label: 'Load Prep', pct: 17 },
       { name: 'strategy', label: 'Strategy', pct: 25 },
       { name: 'outline', label: 'Outline', pct: 35 },
     ],
@@ -1666,6 +1685,7 @@ function formatStepName(step) {
   const map = {
     initializing: 'Initializing...',
     input_collection: 'Collecting input...',
+    load_prep: 'Loading prep data...',
     topic_research: 'Researching topic...',
     research: 'Researching topic...',
     framework_selection: 'Selecting framework...',
@@ -1714,9 +1734,23 @@ function isInImagesGate() {
   return s === 'generating_images' || IMAGE_PHASE_STEPS.includes(step)
 }
 
+// Backend emits the same step name for multiple phases (e.g. `input_collection`
+// fires at both Research start and Strategy+Outline start). Disambiguate by
+// pct range so each phase's step resolves to a unique frontend identifier.
+function resolveCurrentStep(rawStep, pct) {
+  if (rawStep === 'input_collection' && pct >= 15) return 'load_prep'
+  return rawStep
+}
+
+// Find the phase a step belongs to (for pct-range gating of active/done state).
+function phaseForStep(step) {
+  return pipelinePhases.find(p => p.steps.includes(step))
+}
+
 function stepIsDone(step) {
   const pct = progressData.value.progress_percentage || 0
-  const currentStep = progressData.value.current_step || ''
+  const rawStep = progressData.value.current_step || ''
+  const currentStep = resolveCurrentStep(rawStep, pct)
   const isImageStep = IMAGE_PHASE_STEPS.includes(step.name)
 
   // Image steps only evaluate while we're in the Images gate
@@ -1728,7 +1762,14 @@ function stepIsDone(step) {
     return pct > step.pct && currentStep !== step.name
   }
 
-  // Non-image steps: original global-progress logic
+  // Non-image steps: phase-aware ordering — a step is done if pct has moved
+  // strictly past this step's phase. If pct hasn't reached the phase yet,
+  // the step can't be done. Boundary pct === maxPct falls through to the
+  // index check (may still be the active step).
+  const phase = phaseForStep(step)
+  if (phase && pct > phase.maxPct) return true
+  if (phase && pct < phase.minPct) return false
+
   const currentIdx = progressSteps.findIndex(s => s.name === currentStep)
   const stepIdx = progressSteps.findIndex(s => s.name === step.name)
   if (currentIdx > stepIdx) return true
@@ -1737,12 +1778,15 @@ function stepIsDone(step) {
 
 function stepIsActive(step) {
   const pct = progressData.value.progress_percentage || 0
-  const currentStep = progressData.value.current_step || ''
+  const rawStep = progressData.value.current_step || ''
+  const currentStep = resolveCurrentStep(rawStep, pct)
   if (pct >= 100) return false
-  // Active only if this is the current step OR percentage matches but waiting for next phase
-  if (currentStep === step.name) return true
-  // Between phases: last step of prev phase shows as done, not active
-  return false
+  if (currentStep !== step.name) return false
+  // Guard against duplicate names across phases: only active when pct falls
+  // within this step's phase range.
+  const phase = phaseForStep(step)
+  if (phase && (pct < phase.minPct || pct > phase.maxPct)) return false
+  return true
 }
 
 function stepIndicatorClass(step) {
@@ -1824,6 +1868,36 @@ function openProgressModal(idea) {
 function closeProgressModal() {
   showProgressModal.value = false
   stopProgressPolling()
+}
+
+// Retry a stuck / failed pipeline. Backend's resumeIdea() inspects partial
+// state and re-dispatches from the last incomplete sub-step (e.g. article
+// body present + no scores → resumes at article-score).
+const isRetrying = ref(false)
+
+const canRetry = computed(() => {
+  const pct = progressData.value.progress_percentage || 0
+  const step = progressData.value.current_step || ''
+  const alive = progressData.value.process_alive
+  const status = progressIdea.value?.status
+  if (pct >= 100 || status === 'completed' || status === 'article_ready') return false
+  return step === 'failed' || alive === false
+})
+
+async function handleRetryPipeline() {
+  if (!progressIdea.value?.id || isRetrying.value) return
+  isRetrying.value = true
+  try {
+    const result = await resumePipeline(progressIdea.value.id)
+    if (result.success) {
+      toast.success(result.message || 'Pipeline resumed')
+      startProgressPolling(progressIdea.value.id)
+    } else {
+      toast.error(result.error || 'Failed to resume pipeline')
+    }
+  } finally {
+    isRetrying.value = false
+  }
 }
 
 function startProgressPolling(ideaId) {
