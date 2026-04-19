@@ -62,6 +62,11 @@ export function useContentEngine() {
     return request('get', '/admin/content-engine/trending', null, params)
   }
 
+  const scoreBatchTrending = (source = '') => {
+    const body = source ? { source } : {}
+    return request('post', '/admin/content-engine/trending/score-batch', body)
+  }
+
   const importTrending = (topics) => request('post', '/admin/content-engine/trending/import', { topics })
 
   const startResearch = (id, config) => request('post', `/admin/content-engine/ideas/${id}/research`, config)
@@ -158,6 +163,7 @@ export function useContentEngine() {
     restoreIdea,
     revertToDraft,
     pullTrending,
+    scoreBatchTrending,
     importTrending,
     startResearch,
     getResearch,
