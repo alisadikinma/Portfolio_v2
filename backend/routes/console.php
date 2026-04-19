@@ -20,10 +20,14 @@ Schedule::command('content:process-pending-translations')->everyFiveMinutes()->w
 
 // Content Engine: advance auto_mode ideas one stage per tick (strict sequential
 // gating in orchestrator — operating hours + in-flight check). 10-min lock TTL
-// covers longest single-stage SSH call.
-Schedule::command('content:auto-pipeline')
-    ->everyMinute()
-    ->withoutOverlapping(10);
+// covers longest single-stage SSH call. Fires 8x/day at fixed Jakarta times so
+// the blog feed gets a controlled cadence instead of per-minute spam.
+foreach (['05:30', '06:00', '12:00', '17:00', '18:00', '19:00', '20:00', '21:00'] as $autoPipelineTime) {
+    Schedule::command('content:auto-pipeline')
+        ->dailyAt($autoPipelineTime)
+        ->timezone('Asia/Jakarta')
+        ->withoutOverlapping(10);
+}
 
 // Content Engine: daily 05:00 Asia/Jakarta — pull trending topics, fuzzy-dedup
 // against last 30 days, auto-import as draft ideas with auto_mode=true

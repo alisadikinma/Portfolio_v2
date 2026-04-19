@@ -597,7 +597,7 @@ class ContentIdeaController extends Controller
             return response()->json(['success' => false, 'message' => 'Can only regenerate from article_ready, images_ready, or failed state.'], 422);
         }
 
-        $languages = $idea->languages ?? ['en'];
+        $languages = $idea->languages ?? ['id'];
         $instructions = $request->input('instructions', $idea->instructions);
         $previousStatus = $idea->status;
 
