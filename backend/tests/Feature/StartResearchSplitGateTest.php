@@ -124,8 +124,9 @@ class StartResearchSplitGateTest extends TestCase
             )
             ->andReturn(['success' => true, 'pid' => 22002, 'error' => null]);
         $mock->shouldNotReceive('triggerResearch');
-        // Even if controller resolves tier eagerly, it must not be used to dispatch.
-        $mock->shouldReceive('resolveResearchTier')->zeroOrMoreTimes()->andReturn('deep');
+        // When split flag is OFF the controller must not eagerly resolve the
+        // tier — doing so indicates a regression where the split branch fires.
+        $mock->shouldNotReceive('resolveResearchTier');
         app()->instance(ArticleGenerationService::class, $mock);
 
         $response = $this->postJson("/api/admin/content-engine/ideas/{$idea->id}/research", [

@@ -95,6 +95,16 @@ class ArticleGenerationTierResolverTest extends TestCase
         $this->assertSame('quick', $this->service->resolveResearchTier($idea));
     }
 
+    public function test_kill_switch_does_not_override_explicit_deep(): void
+    {
+        config()->set('services.article_generation.deep_research_enabled', false);
+        $idea = new \App\Models\ContentIdea([
+            'research_tier_override' => 'deep',
+            'virality_score' => 95,
+        ]);
+        $this->assertEquals('deep', $this->service->resolveResearchTier($idea));
+    }
+
     // ==================================================================
     // resolveResearchModel(string $tier): string
     // ==================================================================

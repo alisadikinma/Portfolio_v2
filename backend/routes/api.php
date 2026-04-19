@@ -767,7 +767,10 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
                 ], 409);
             }
             $result = $service->triggerStrategyOutline($idea->id);
-            $idea->update(['process_pid' => $result['pid']]);
+            $idea->update([
+                'process_pid' => $result['pid'],
+                'current_step' => 'strategy_outline_dispatched',
+            ]);
             return response()->json(['success' => true, 'next_phase' => 'strategy_outline', 'pid' => $result['pid']]);
         }
 

@@ -80,6 +80,10 @@ class ArticleGenerationService
      */
     public function triggerResearch(int $ideaId, array $config, string $tier): array
     {
+        if (!in_array($tier, ['quick', 'deep'], true)) {
+            throw new \InvalidArgumentException("triggerResearch expects tier 'quick' or 'deep', got '{$tier}'");
+        }
+
         $topic = $config['topic'] ?? '';
         $languages = implode(',', $config['languages'] ?? ['en']);
         $keyword = $config['keyword'] ?? '';
@@ -195,14 +199,18 @@ class ArticleGenerationService
     }
 
     /**
-     * Resolve which research tier ('quick' or 'deep') applies to a given idea.
+     * Resolve research tier for an idea.
      *
-     * Precedence:
-     *   1. Kill switch: if config `deep_research_enabled` is false AND override is
-     *      'auto', force 'quick' (ignore virality score entirely).
-     *   2. Explicit override 'quick' or 'deep' wins regardless of score.
-     *   3. 'auto' (default): 'deep' when Phase A virality_score >= 70, else 'quick'.
-     *   4. Null / missing virality_score under auto → safe 'quick' default.
+     * Resolution order:
+     *   1. Explicit override ('quick' or 'deep') → returned as-is.
+     *   2. 'auto' override + deep_research_enabled=false → forces 'quick' (kill switch).
+     *   3. 'auto' override + virality_score >= 70 → 'deep'.
+     *   4. 'auto' override + virality_score < 70 or null → 'quick'.
+     *
+     * The kill switch (`ARTICLE_GEN_DEEP_RESEARCH_ENABLED=false`) only affects
+     * auto-mode decisions. An explicit operator choice of 'deep' is respected
+     * even when the kill switch is active — the assumption is that an explicit
+     * override represents a deliberate cost decision.
      */
     public function resolveResearchTier(\App\Models\ContentIdea $idea): string
     {

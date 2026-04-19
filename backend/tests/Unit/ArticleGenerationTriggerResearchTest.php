@@ -164,4 +164,16 @@ class ArticleGenerationTriggerResearchTest extends TestCase
         $this->assertSame(4242, $result['pid']);
         $this->assertNull($result['error']);
     }
+
+    public function test_rejects_invalid_tier(): void
+    {
+        $service = new class extends \App\Services\ArticleGenerationService {
+            protected function executePrompt(string $prompt, int $ideaId, string $phase, string $model = '', string $refsFile = ''): array
+            {
+                return ['success' => true, 'pid' => 1, 'error' => null];
+            }
+        };
+        $this->expectException(\InvalidArgumentException::class);
+        $service->triggerResearch(42, ['topic' => 't', 'languages' => ['en']], 'turbo');
+    }
 }

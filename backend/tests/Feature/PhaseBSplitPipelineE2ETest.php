@@ -292,8 +292,9 @@ class PhaseBSplitPipelineE2ETest extends TestCase
         $mock->shouldNotReceive('triggerResearch');
         $mock->shouldNotReceive('triggerStrategyOutline');
         $mock->shouldNotReceive('triggerGeneration');
-        // Controller resolves tier eagerly even when flag OFF if present; tolerate.
-        $mock->shouldReceive('resolveResearchTier')->zeroOrMoreTimes()->andReturn('deep');
+        // When split flag is OFF the controller must not resolve the research
+        // tier — doing so signals the split branch fired by accident.
+        $mock->shouldNotReceive('resolveResearchTier');
 
         $this->app->instance(ArticleGenerationService::class, $mock);
 

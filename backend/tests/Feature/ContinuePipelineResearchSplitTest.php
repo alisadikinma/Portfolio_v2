@@ -104,6 +104,7 @@ class ContinuePipelineResearchSplitTest extends TestCase
 
         $fresh = ContentIdea::find($idea->id);
         $this->assertSame(999, $fresh->process_pid);
+        $this->assertEquals('strategy_outline_dispatched', $fresh->current_step);
     }
 
     public function test_split_flag_off_at_progress_15_falls_through_to_default_400(): void
