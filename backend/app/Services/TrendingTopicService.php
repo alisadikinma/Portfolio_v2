@@ -631,6 +631,32 @@ class TrendingTopicService
         return $techTrends;
     }
 
+    /**
+     * Scored variant of getAllTrends() — layers momentum + virality AI scores
+     * on top of the filtered tech trends, sorted by composite_score desc.
+     *
+     * Caps input at TopicScoringService::MAX_BATCH_SIZE so the AI batch fits
+     * comfortably in one Sonnet call. Cached 1h downstream in TopicScoringService.
+     *
+     * @return array each element = original trend fields + momentum_score,
+     *   virality_score, triggers, composite_score.
+     */
+    public function getScoredTopics(?string $source = null): array
+    {
+        $trends = $this->getAllTrends($source);
+        if (empty($trends)) {
+            return [];
+        }
+
+        $capped = array_slice(array_values($trends), 0, TopicScoringService::MAX_BATCH_SIZE);
+
+        $scored = app(TopicScoringService::class)->scoreBatch($capped);
+
+        usort($scored, fn ($a, $b) => ($b['composite_score'] ?? 0) <=> ($a['composite_score'] ?? 0));
+
+        return $scored;
+    }
+
     public function suggestCategory(string $title): int
     {
         $text = strtolower($title);
