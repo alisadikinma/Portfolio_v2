@@ -237,6 +237,7 @@
               </th>
               <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400 w-10">#</th>
               <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400">Topic</th>
+              <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400 w-20">⚡ Virality</th>
               <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400">Status</th>
               <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400">Source</th>
               <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400">Published</th>
@@ -246,13 +247,13 @@
           </thead>
           <tbody class="divide-y divide-neutral-100 dark:divide-neutral-700">
             <tr v-if="isLoading && !displayedIdeas.length">
-              <td colspan="8" class="px-4 py-12 text-center text-neutral-500 dark:text-neutral-400">
+              <td colspan="9" class="px-4 py-12 text-center text-neutral-500 dark:text-neutral-400">
                 <svg class="animate-spin h-6 w-6 mx-auto mb-2 text-amber-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
                 Loading ideas...
               </td>
             </tr>
             <tr v-else-if="!displayedIdeas.length">
-              <td colspan="8" class="px-4 py-12 text-center text-neutral-500 dark:text-neutral-400">
+              <td colspan="9" class="px-4 py-12 text-center text-neutral-500 dark:text-neutral-400">
                 <template v-if="activeTab === 'completed'">No completed ideas yet.</template>
                 <template v-else-if="activeTab === 'in_progress'">No in-progress ideas. Start research on a draft to move it here.</template>
                 <template v-else>No ideas found. Click "Add Idea" or "Pull Trending" to get started.</template>
@@ -270,6 +271,21 @@
               </td>
               <td class="px-4 py-3 text-neutral-400 dark:text-neutral-500 align-top">{{ idx + 1 }}</td>
               <td class="px-4 py-3 text-neutral-900 dark:text-neutral-100 font-medium break-words whitespace-normal">{{ idea.title }}</td>
+              <td class="px-4 py-3 align-top">
+                <span
+                  v-if="ideaViralityScore(idea) != null"
+                  :class="[
+                    'inline-flex items-center justify-center min-w-[42px] px-2 py-0.5 rounded text-xs font-bold border',
+                    ideaViralityScore(idea) >= 80 ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30' :
+                    ideaViralityScore(idea) >= 50 ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30' :
+                    'bg-neutral-200 text-neutral-500 dark:bg-neutral-700 dark:text-neutral-400 border-neutral-300 dark:border-neutral-600'
+                  ]"
+                  :title="ideaViralityTooltip(idea)"
+                >
+                  ⚡ {{ ideaViralityScore(idea) }}
+                </span>
+                <span v-else class="text-xs text-neutral-400 dark:text-neutral-600">—</span>
+              </td>
               <td class="px-4 py-3 align-top">
                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium" :class="statusClass(idea.status)">{{ formatStatus(idea.status) }}</span>
               </td>
@@ -814,6 +830,40 @@ function topicDisplayScore(topic) {
   return null
 }
 
+// Resolve the virality score shown in the ideas-list table.
+// Preference order: source_data.display_score (new, boosted) → idea.virality_score
+// (top-level column persisted at import) → source_data.composite_score (raw AI).
+// This keeps old ideas (imported before display_score existed) from rendering blank.
+function ideaViralityScore(idea) {
+  const sd = idea?.source_data || {}
+  if (sd.display_score != null) return sd.display_score
+  if (idea?.virality_score != null) return idea.virality_score
+  if (sd.composite_score != null) return sd.composite_score
+  return null
+}
+
+// Same breakdown layout as the trending modal's viralityTooltip, but reads
+// from idea.source_data. Shows AI sub-scores + heat/tier boosts + final total
+// so hovering the ⚡ chip in the table explains how the number was built.
+function ideaViralityTooltip(idea) {
+  const sd = idea?.source_data || {}
+  const total = ideaViralityScore(idea)
+  if (total == null) return ''
+  const lines = []
+  const parts = []
+  if (sd.virality_score != null) parts.push(`Virality ${sd.virality_score}`)
+  if (sd.momentum_score != null) parts.push(`Momentum ${sd.momentum_score}`)
+  if (parts.length) lines.push(parts.join(' · '))
+  const boosts = []
+  if (sd.heat === 'hot') boosts.push(`🔥 HOT (+${sd.heat_boost ?? 15})`)
+  else if (sd.heat === 'trending') boosts.push(`📈 TRENDING (+${sd.heat_boost ?? 8})`)
+  if (sd.publisher_tier === 1) boosts.push(`Tier 1 (+${sd.tier_boost ?? 5})`)
+  else if (sd.publisher_tier === 2) boosts.push(`Tier 2 (+${sd.tier_boost ?? 2})`)
+  if (boosts.length) lines.push(boosts.join(' · '))
+  lines.push(`= ${total}`)
+  return lines.join('\n')
+}
+
 // Multi-line tooltip explaining how the ⚡ score was built. Shows AI sub-scores
 // (virality / momentum) + heat and tier boosts + final total, so a curious user
 // can see "why did this 94 beat that 87" without re-surfacing the noisy badges.
@@ -1123,14 +1173,16 @@ async function refreshIdeas() {
     const response = await api.get('/admin/content-engine/ideas', { params })
     if (response.data?.success) {
       const rows = response.data.data || []
-      // Sort so near-duplicate titles are adjacent — primary key is the
-      // normalized title, tiebreak by id descending (newest within a
-      // duplicate cluster comes first).
+      // Sort by published date descending — newest first so the freshest
+      // trending topics lead the table. Manual ideas without a pub_date fall
+      // back to id desc (≈ created_at desc). Same-day near-duplicates still
+      // cluster naturally because they share the same date bucket.
       rows.sort((a, b) => {
-        const ka = dedupKey(a.title)
-        const kb = dedupKey(b.title)
-        if (ka < kb) return -1
-        if (ka > kb) return 1
+        const at = a.source_data?.pub_date ? Date.parse(a.source_data.pub_date) : 0
+        const bt = b.source_data?.pub_date ? Date.parse(b.source_data.pub_date) : 0
+        const atSafe = isNaN(at) ? 0 : at
+        const btSafe = isNaN(bt) ? 0 : bt
+        if (btSafe !== atSafe) return btSafe - atSafe
         return (b.id || 0) - (a.id || 0)
       })
       ideas.value = rows
