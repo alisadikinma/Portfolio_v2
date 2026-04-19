@@ -349,6 +349,14 @@ PROMPT;
         return $out;
     }
 
+    /**
+     * Key is derived from the ordered title set only — two batches with
+     * identical titles in identical order but differing source / pub_date /
+     * publisher_tier / description share a cache entry. Practically safe
+     * because the trending aggregator deduplicates by title before scoring
+     * and the 1-hour TTL is short. The CACHE_VERSION prefix lets us rotate
+     * when the scoring formula or prompt changes (bump v1 → v2).
+     */
     private function cacheKey(array $topics): string
     {
         $titles = array_map(

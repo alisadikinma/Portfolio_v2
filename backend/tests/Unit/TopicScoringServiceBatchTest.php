@@ -123,11 +123,17 @@ class TopicScoringServiceBatchTest extends TestCase
             ['title' => 'zeta', 'source' => 'tiktok'],
         ];
 
-        $service->scoreBatch($setA);
-        $service->scoreBatch($setB);
+        $resultA = $service->scoreBatch($setA);
+        $resultB = $service->scoreBatch($setB);
 
-        // Again, Mockery ->times(2) enforces the invariant
-        $this->assertTrue(true);
+        // Distinct title sets → distinct cache keys → two Sonnet calls.
+        // The primary assertion is the Mockery ->times(2) invariant enforced
+        // at tearDown(); these result-shape assertions back it up with a
+        // visible positive signal on the test report.
+        $this->assertCount(3, $resultA);
+        $this->assertCount(3, $resultB);
+        $this->assertSame('alpha', $resultA[0]['title']);
+        $this->assertSame('delta', $resultB[0]['title']);
     }
 
     public function test_preserves_original_topic_fields(): void

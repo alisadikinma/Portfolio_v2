@@ -326,8 +326,10 @@ class ContentIdeaController extends Controller
      */
     public function scoreTrendingBatch(Request $request): JsonResponse
     {
-        $source = $request->input('source') ?: $request->query('source');
-        $source = $source ?: null;
+        // Request::input() reads from both body and query string by default,
+        // so this handles the composable's POST-body call and any future
+        // ?source=... query-string call with a single lookup.
+        $source = $request->input('source') ?: null;
 
         $scored = $this->trending->getScoredTopics($source);
 

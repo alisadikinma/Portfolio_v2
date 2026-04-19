@@ -807,10 +807,13 @@ const pagedTrending = computed(() => {
   return sortedTrending.value.slice(start, start + perPage)
 })
 const pageRangeLabel = computed(() => {
-  if (filteredTrending.value.length === 0) return '0 of 0'
+  // Read from sortedTrending for consistency with pagedTrending (same source).
+  // Count is identical to filteredTrending since sort doesn't change length,
+  // but reading from the same source the paged view uses is less confusing.
+  if (sortedTrending.value.length === 0) return '0 of 0'
   const start = (currentPage.value - 1) * perPage + 1
-  const end = Math.min(currentPage.value * perPage, filteredTrending.value.length)
-  return `${start}-${end} of ${filteredTrending.value.length}`
+  const end = Math.min(currentPage.value * perPage, sortedTrending.value.length)
+  return `${start}-${end} of ${sortedTrending.value.length}`
 })
 watch([trendingSearch, trendingSourceFilter, trustedOnly, trendingSortBy], () => { currentPage.value = 1 })
 watch([() => filters.pillar, () => filters.status, () => filters.priority, () => filters.search], () => {
