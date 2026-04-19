@@ -361,12 +361,19 @@
       <div class="bg-white dark:bg-neutral-800 rounded-xl shadow-xl max-w-7xl w-full mx-4 p-6 max-h-[85vh] flex flex-col">
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Trending Topics</h3>
-          <select v-model="trendingSourceFilter" @change="filterTrendingTopics" class="rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 text-xs px-2 py-1 focus:ring-amber-500 focus:border-amber-500">
-            <option value="">All Sources</option>
-            <option v-for="src in trendingSources.filter(s => s.value)" :key="src.value" :value="src.value" :disabled="src.disabled">
-              {{ src.label }}{{ src.badge ? ` (${src.badge})` : '' }}
-            </option>
-          </select>
+          <div class="flex items-center gap-2">
+            <select v-model="trendingSortBy" class="rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 text-xs px-2 py-1 focus:ring-amber-500 focus:border-amber-500" title="Sort order">
+              <option value="virality">⚡ Virality</option>
+              <option value="momentum">📊 Momentum</option>
+              <option value="recency">🕒 Recency</option>
+            </select>
+            <select v-model="trendingSourceFilter" @change="filterTrendingTopics" class="rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 text-xs px-2 py-1 focus:ring-amber-500 focus:border-amber-500">
+              <option value="">All Sources</option>
+              <option v-for="src in trendingSources.filter(s => s.value)" :key="src.value" :value="src.value" :disabled="src.disabled">
+                {{ src.label }}{{ src.badge ? ` (${src.badge})` : '' }}
+              </option>
+            </select>
+          </div>
         </div>
         <!-- Search + Trusted toggle + Select All -->
         <div class="flex items-center gap-3 mb-3 flex-wrap">
@@ -383,7 +390,7 @@
         <div class="flex-1 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 min-h-0 content-start">
           <div v-if="trendingLoading" class="py-8 text-center text-neutral-500 dark:text-neutral-400">
             <svg class="animate-spin h-6 w-6 mx-auto mb-2 text-amber-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-            Loading trending topics...
+            {{ trendingScoring ? 'Scoring topics...' : 'Loading trending topics...' }}
           </div>
           <div v-else-if="!filteredTrending.length" class="py-8 text-center text-neutral-500 dark:text-neutral-400">No trending topics found.</div>
           <label v-for="topic in pagedTrending" :key="topic.title || topic.topic" class="flex items-start gap-3 p-3 rounded-lg border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-700/30 cursor-pointer transition-colors">
@@ -626,6 +633,7 @@ const {
   restoreIdea,
   revertToDraft,
   pullTrending,
+  scoreBatchTrending,
   importTrending,
   startResearch,
   getResearch,
@@ -697,6 +705,7 @@ const showResearchModal = ref(false)
 const trendingDropdownOpen = ref(false)
 const currentIdea = ref(null)
 const trendingLoading = ref(false)
+const trendingScoring = ref(false)
 
 // Add form
 const newIdea = reactive({ title: '', pillar: '', priority: 'medium', auto_mode: false, scheduled_at: '' })
@@ -710,6 +719,7 @@ const selectedTrending = ref([])
 const trendingSourceFilter = ref('')
 const trendingSearch = ref('')
 const trustedOnly = ref(true) // default: hide tier-3 niche blogs
+const trendingSortBy = ref('virality') // 'virality' (default) | 'momentum' | 'recency'
 const currentPage = ref(1)
 const perPage = 24
 const filteredTrending = computed(() => {
@@ -777,9 +787,24 @@ const totalSelectedCount = computed(() => selectedTrending.value.length)
 const totalPages = computed(() =>
   Math.max(1, Math.ceil(filteredTrending.value.length / perPage))
 )
+const sortedTrending = computed(() => {
+  const list = [...filteredTrending.value]
+  if (trendingSortBy.value === 'virality') {
+    return list.sort((a, b) => (b.composite_score ?? -1) - (a.composite_score ?? -1))
+  }
+  if (trendingSortBy.value === 'momentum') {
+    return list.sort((a, b) => (b.momentum_score ?? -1) - (a.momentum_score ?? -1))
+  }
+  // recency
+  return list.sort((a, b) => {
+    const at = a.pub_date ? Date.parse(a.pub_date) : 0
+    const bt = b.pub_date ? Date.parse(b.pub_date) : 0
+    return (isNaN(bt) ? 0 : bt) - (isNaN(at) ? 0 : at)
+  })
+})
 const pagedTrending = computed(() => {
   const start = (currentPage.value - 1) * perPage
-  return filteredTrending.value.slice(start, start + perPage)
+  return sortedTrending.value.slice(start, start + perPage)
 })
 const pageRangeLabel = computed(() => {
   if (filteredTrending.value.length === 0) return '0 of 0'
@@ -787,7 +812,7 @@ const pageRangeLabel = computed(() => {
   const end = Math.min(currentPage.value * perPage, filteredTrending.value.length)
   return `${start}-${end} of ${filteredTrending.value.length}`
 })
-watch([trendingSearch, trendingSourceFilter, trustedOnly], () => { currentPage.value = 1 })
+watch([trendingSearch, trendingSourceFilter, trustedOnly, trendingSortBy], () => { currentPage.value = 1 })
 watch([() => filters.pillar, () => filters.status, () => filters.priority, () => filters.search], () => {
   selectedIdeaIds.value = []
 })
@@ -1200,8 +1225,10 @@ async function openTrendingModal(source) {
   currentPage.value = 1
   showTrendingModal.value = true
   trendingLoading.value = true
-  const result = await pullTrending(source)
+  trendingScoring.value = true
+  const result = await scoreBatchTrending(source)
   trendingLoading.value = false
+  trendingScoring.value = false
   if (result.success) {
     trendingTopics.value = result.data || []
   } else {
