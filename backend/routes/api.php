@@ -614,6 +614,34 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
         return response()->json(['success' => true, 'message' => 'Prep data saved.']);
     });
 
+    // Viral-First Pipeline v3 — Phase B.5: persist lean research schema v2
+    // (data_points, quotes, entities, personas, written_guides) to top-level
+    // research_data column. Mirrors save-prep's shape/error envelope.
+    Route::put('/content-ideas/{id}/save-research', function (\Illuminate\Http\Request $request, $id) {
+        $idea = \App\Models\ContentIdea::find($id);
+        if (!$idea) {
+            return response()->json(['success' => false, 'message' => 'Idea not found.'], 404);
+        }
+
+        $researchData = $request->input('research_data', []);
+        if (!is_array($researchData) || empty($researchData) || !isset($researchData['data_points'])) {
+            \Illuminate\Support\Facades\Log::warning('[save-research] rejected malformed body', [
+                'idea_id' => $id,
+                'keys_received' => array_keys($request->all()),
+                'raw_body_preview' => substr($request->getContent(), 0, 300),
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Missing or invalid research_data. Body must be JSON with research_data.data_points at minimum. Use file-based curl (curl -d @file.json) to avoid shell quoting issues.',
+                'keys_received' => array_keys($request->all()),
+            ], 400);
+        }
+
+        $idea->update(['research_data' => $researchData]);
+
+        return response()->json(['success' => true, 'message' => 'Research data saved.']);
+    });
+
     Route::put('/content-ideas/{id}/save-article', function (\Illuminate\Http\Request $request, $id) {
         $idea = \App\Models\ContentIdea::find($id);
         if (!$idea) {
