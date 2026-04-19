@@ -1422,6 +1422,17 @@ async function handleImportTrending() {
     trusted_publisher_count: t.trusted_publisher_count ?? 0,
     description: t.description || '',
     link: t.link || '',
+    // Forward scoring fields produced by score-batch so the backend can persist
+    // virality_score + virality_breakdown and surface the ⚡ badge in the ideas
+    // list. Without these, importTrending() sees null for every score and the
+    // Virality column stays "—" on every imported row.
+    composite_score: t.composite_score ?? null,
+    virality_score: t.virality_score ?? null,
+    momentum_score: t.momentum_score ?? null,
+    triggers: Array.isArray(t.triggers) ? t.triggers : null,
+    display_score: t.display_score ?? null,
+    heat_boost: t.heat_boost ?? null,
+    tier_boost: t.tier_boost ?? null,
   }))
   const result = await importTrending(topics)
   if (result.success) {
