@@ -753,6 +753,23 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
         }
 
         $progress = $idea->progress_percentage ?? 0;
+        $splitEnabled = (bool) config('services.article_generation.skill_split_enabled', false);
+
+        // Research done (15%) → trigger strategy-outline (Phase B split flow only).
+        // Legacy single-session pipeline leaves progress at 15 only transiently
+        // while /article-prep runs, so the split flag gates this branch to
+        // prevent legacy flows from accidentally firing strategy-outline.
+        if ($splitEnabled && $progress >= 15 && $progress < 35) {
+            if (empty($idea->research_data)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot continue: research_data not yet saved. /article-research must call /save-research first.',
+                ], 409);
+            }
+            $result = $service->triggerStrategyOutline($idea->id);
+            $idea->update(['process_pid' => $result['pid']]);
+            return response()->json(['success' => true, 'next_phase' => 'strategy_outline', 'pid' => $result['pid']]);
+        }
 
         // Prep done (35%) → trigger write
         if ($progress >= 35 && $progress < 85) {
