@@ -660,8 +660,14 @@ async function handleApprove() {
               <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
               SEO
             </button>
-            <button @click="handleApprove" :disabled="approving" class="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium rounded-lg bg-amber-600 hover:bg-amber-700 text-white transition-colors disabled:opacity-50">
+            <button
+              @click="handleApprove"
+              :disabled="approving || deepScoreStatus === 'running'"
+              :title="deepScoreStatus === 'running' ? 'Deep quality analysis in progress — please wait for it to finish before approving' : ''"
+              class="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium rounded-lg bg-amber-600 hover:bg-amber-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               <template v-if="approving">Approving...</template>
+              <template v-else-if="deepScoreStatus === 'running'">Scoring in progress…</template>
               <template v-else>Approve &amp; Continue</template>
             </button>
           </div>
