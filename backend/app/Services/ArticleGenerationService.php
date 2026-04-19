@@ -149,6 +149,56 @@ class ArticleGenerationService
     }
 
     /**
+     * Resolve which research tier ('quick' or 'deep') applies to a given idea.
+     *
+     * Precedence:
+     *   1. Kill switch: if config `deep_research_enabled` is false AND override is
+     *      'auto', force 'quick' (ignore virality score entirely).
+     *   2. Explicit override 'quick' or 'deep' wins regardless of score.
+     *   3. 'auto' (default): 'deep' when Phase A virality_score >= 70, else 'quick'.
+     *   4. Null / missing virality_score under auto → safe 'quick' default.
+     */
+    public function resolveResearchTier(\App\Models\ContentIdea $idea): string
+    {
+        $override = $idea->research_tier_override ?? 'auto';
+
+        // Kill switch: force quick when deep research globally disabled
+        $deepEnabled = (bool) config('services.article_generation.deep_research_enabled', true);
+        if (!$deepEnabled && $override === 'auto') {
+            return 'quick';
+        }
+
+        if ($override === 'quick' || $override === 'deep') {
+            return $override;
+        }
+
+        // Auto: deep when Phase A virality_score >= 70, else quick
+        $score = $idea->virality_score;
+        if ($score !== null && $score >= 70) {
+            return 'deep';
+        }
+        return 'quick';
+    }
+
+    /**
+     * Resolve the Claude model name to use for a given research tier.
+     *
+     * @param string $tier 'quick' or 'deep' (NOT 'auto' — callers must first
+     *                     resolve auto via resolveResearchTier()).
+     * @throws \InvalidArgumentException when tier is not 'quick' or 'deep'.
+     */
+    public function resolveResearchModel(string $tier): string
+    {
+        if ($tier === 'deep') {
+            return config('services.article_generation.model_research_deep', 'opus');
+        }
+        if ($tier === 'quick') {
+            return config('services.article_generation.model_research_quick', 'sonnet');
+        }
+        throw new \InvalidArgumentException("resolveResearchModel expects 'quick' or 'deep', got '{$tier}'");
+    }
+
+    /**
      * Rewrite a Visual Direction paragraph so it matches the person in a face
      * reference image. Keeps scene, setting, lighting, mood intact; only
      * updates age / gender / hair / attire / appearance to match the reference.
