@@ -733,8 +733,31 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
             return response()->json(['success' => true, 'next_phase' => 'write', 'pid' => $result['pid']]);
         }
 
-        // Write done (85%) → trigger score
+        // Write done (85%) → trigger score OR skip per Phase C env flag
         if ($progress >= 85 && $progress < 100) {
+            $useScorePhase = (bool) config('services.article_generation.use_score_phase', false);
+
+            if (!$useScorePhase) {
+                // Phase C default path: skip AI /article-score, capture mechanical
+                // metrics inline, flip idea to article_ready so downstream (image
+                // generation) advances without a Sonnet call.
+                $snapshot = app(\App\Services\MechanicalSnapshotWriter::class)->captureFor($idea);
+                $snapshotSaved = !isset($snapshot['error']);
+
+                $idea->update([
+                    'status' => 'article_ready',
+                    'progress_percentage' => 100,
+                    'current_step' => 'mechanical_snapshot',
+                    'process_pid' => null,
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'next_phase' => 'score_skipped',
+                    'mechanical_snapshot_saved' => $snapshotSaved,
+                ]);
+            }
+
             $result = $service->triggerScore($idea->id);
             $idea->update(['process_pid' => $result['pid']]);
             return response()->json(['success' => true, 'next_phase' => 'score', 'pid' => $result['pid']]);
