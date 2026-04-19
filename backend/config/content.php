@@ -10,6 +10,14 @@ return [
     'auto_window_start' => (int) env('CONTENT_AUTO_WINDOW_START', 6),
     'auto_window_end' => (int) env('CONTENT_AUTO_WINDOW_END', 22),
 
+    // Minimum gap (minutes) between starting successive draft articles. The
+    // orchestrator stamps a cache key every time startNextDraft() succeeds
+    // and skips picking a new draft until this many minutes have elapsed.
+    // Publish / image dispatch / retry are NOT affected — only the cadence
+    // of brand-new article generation. Default 30 min spreads publishing
+    // throughout the day and avoids flooding the blog feed.
+    'auto_start_interval_minutes' => (int) env('CONTENT_AUTO_START_INTERVAL_MINUTES', 30),
+
     'cover_branding' => [
         'enabled' => env('COVER_BRANDING_ENABLED', true),
         'model' => env('COVER_BRANDING_MODEL', 'nano-banana-pro'),

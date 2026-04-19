@@ -150,9 +150,6 @@ class TelegramNotifier
         $pillar = $this->escapeMarkdown((string) ($idea->pillar ?? 'n/a'));
         $source = $this->escapeMarkdown((string) ($idea->source ?? 'n/a'));
 
-        $frontendUrl = rtrim((string) config('app.frontend_url', 'https://alisadikinma.com'), '/');
-        $reviewUrl = $frontendUrl . '/admin/content-engine';
-
         $lines = [
             '🎬 *Pipeline started*',
             '',
@@ -164,8 +161,6 @@ class TelegramNotifier
             $lines[] = 'Virality: ' . (int) $displayScore;
         }
         $lines[] = 'Pillar: ' . $pillar . ' | Source: ' . $source;
-        $lines[] = '';
-        $lines[] = 'Monitor: ' . $reviewUrl;
 
         return implode("\n", $lines);
     }

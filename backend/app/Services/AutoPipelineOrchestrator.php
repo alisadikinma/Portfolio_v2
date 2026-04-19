@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\ContentIdea;
 use App\Models\Post;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -30,6 +31,7 @@ class AutoPipelineOrchestrator
     private const RETRY_DELAY_MINUTES = 5;
     private const RESEARCH_TIMEOUT_MINUTES = 15;
     private const IMAGES_TIMEOUT_MINUTES = 10;
+    private const LAST_START_CACHE_KEY = 'auto_pipeline:last_start_at';
 
     public function __construct(
         private ArticleGenerationService $articleGen,
@@ -261,6 +263,20 @@ class AutoPipelineOrchestrator
 
     private function startNextDraft(): ?ContentIdea
     {
+        // Throttle: enforce minimum gap between article starts. Keeps the
+        // blog feed from being flooded with back-to-back posts. Cache key
+        // is stamped after every successful start below.
+        $intervalMinutes = (int) config('content.auto_start_interval_minutes', 30);
+        if ($intervalMinutes > 0) {
+            $lastStart = Cache::get(self::LAST_START_CACHE_KEY);
+            if ($lastStart instanceof Carbon) {
+                $elapsed = $lastStart->diffInMinutes(now());
+                if ($elapsed < $intervalMinutes) {
+                    return null;
+                }
+            }
+        }
+
         // Priority: match the "Virality" badge shown in the admin Content
         // Engine UI, which is source_data.display_score = composite_score +
         // heat_boost + tier_boost. Sorting by the raw virality_score column
@@ -298,6 +314,11 @@ class AutoPipelineOrchestrator
                 'process_pid' => $result['pid'] ?? null,
                 'pipeline_last_attempt_at' => now(),
             ]);
+
+            // Stamp the throttle gate so the next startNextDraft() tick knows
+            // the interval timer. 7-day TTL is effectively forever for this
+            // use case; the value is overwritten on the next successful start.
+            Cache::put(self::LAST_START_CACHE_KEY, now(), now()->addDays(7));
 
             Log::info("[AutoPipeline] Started research for idea #{$idea->id} pid={$result['pid']}");
 
