@@ -800,6 +800,7 @@ Route::middleware(['auth:sanctum'])->prefix('admin/content-engine')->group(funct
 
     // Trending topics
     Route::get('/trending', [ContentIdeaController::class, 'pullTrending']);
+    Route::post('/trending/score-batch', [ContentIdeaController::class, 'scoreTrendingBatch']);
     Route::post('/trending/import', [ContentIdeaController::class, 'importTrending']);
 
     // Pipeline: Gate 1 (Article)

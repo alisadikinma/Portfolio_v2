@@ -301,6 +301,24 @@ class ContentIdeaController extends Controller
     }
 
     /**
+     * Pull trending topics AND score them for virality before returning.
+     * Wraps TrendingTopicService::getScoredTopics() — sorted desc by composite_score,
+     * capped at TopicScoringService::MAX_BATCH_SIZE (20) topics.
+     */
+    public function scoreTrendingBatch(Request $request): JsonResponse
+    {
+        $source = $request->input('source') ?: $request->query('source');
+        $source = $source ?: null;
+
+        $scored = $this->trending->getScoredTopics($source);
+
+        return response()->json([
+            'success' => true,
+            'data' => $scored,
+        ]);
+    }
+
+    /**
      * Import selected trending topics as content ideas.
      */
     public function importTrending(Request $request): JsonResponse
