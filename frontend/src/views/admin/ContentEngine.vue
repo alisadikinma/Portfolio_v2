@@ -398,6 +398,10 @@
             <input type="checkbox" v-model="trustedOnly" class="rounded border-neutral-300 text-amber-600 focus:ring-amber-500" />
             Trusted only
           </label>
+          <label class="flex items-center gap-2 cursor-pointer whitespace-nowrap text-xs text-neutral-600 dark:text-neutral-400" :title="`Hide low-virality topics (⚡ below ${HIGH_VIRALITY_THRESHOLD}). Untick to see every scored topic.`">
+            <input type="checkbox" v-model="highViralityOnly" class="rounded border-neutral-300 text-amber-600 focus:ring-amber-500" />
+            ⚡ ≥ {{ HIGH_VIRALITY_THRESHOLD }} only
+          </label>
           <label v-if="filteredTrending.length" class="flex items-center gap-2 cursor-pointer whitespace-nowrap text-xs text-neutral-500 dark:text-neutral-400">
             <input type="checkbox" :checked="allFilteredSelected" @change="toggleSelectAll" class="rounded border-neutral-300 text-amber-600 focus:ring-amber-500" />
             Select All
@@ -447,7 +451,7 @@
         <div class="flex items-center justify-between mt-3 pt-3 border-t border-neutral-100 dark:border-neutral-700/50">
           <!-- Always show the total count, even when the result set fits on one page -->
           <span class="text-xs text-neutral-500 dark:text-neutral-400">
-            Showing {{ pageRangeLabel }}<span v-if="trendingSearch.trim() || trendingSourceFilter || trustedOnly" class="text-neutral-400 dark:text-neutral-500"> (filtered from {{ trendingTopics.length }})</span>
+            Showing {{ pageRangeLabel }}<span v-if="trendingSearch.trim() || trendingSourceFilter || trustedOnly || highViralityOnly" class="text-neutral-400 dark:text-neutral-500"> (filtered from {{ trendingTopics.length }})</span>
           </span>
           <div v-if="filteredTrending.length > perPage" class="flex items-center gap-1">
             <button
@@ -763,6 +767,8 @@ const selectedTrending = ref([])
 const trendingSourceFilter = ref('')
 const trendingSearch = ref('')
 const trustedOnly = ref(true) // default: hide tier-3 niche blogs
+const highViralityOnly = ref(true) // default: hide ⚡ < 60 so the modal leads with actionable topics only
+const HIGH_VIRALITY_THRESHOLD = 60
 const currentPage = ref(1)
 const perPage = 24
 const filteredTrending = computed(() => {
@@ -770,6 +776,15 @@ const filteredTrending = computed(() => {
   if (trustedOnly.value) {
     // Tier 1+2 only. Keep entries that lack a tier (non-news sources) visible.
     results = results.filter(t => !t.publisher_tier || t.publisher_tier <= 2)
+  }
+  if (highViralityOnly.value) {
+    // Hide low-scoring items (⚡ < 60). Keep entries lacking a score — pre-scored
+    // payloads or cached topics shouldn't silently disappear. Use topicDisplayScore
+    // so the filter honors the same number the card shows.
+    results = results.filter(t => {
+      const score = topicDisplayScore(t)
+      return score == null || score >= HIGH_VIRALITY_THRESHOLD
+    })
   }
   if (trendingSourceFilter.value) {
     results = results.filter(t => t.source === trendingSourceFilter.value)
@@ -870,7 +885,7 @@ const pageRangeLabel = computed(() => {
   const end = Math.min(currentPage.value * perPage, sortedTrending.value.length)
   return `${start}-${end} of ${sortedTrending.value.length}`
 })
-watch([trendingSearch, trendingSourceFilter, trustedOnly], () => { currentPage.value = 1 })
+watch([trendingSearch, trendingSourceFilter, trustedOnly, highViralityOnly], () => { currentPage.value = 1 })
 watch([() => filters.pillar, () => filters.status, () => filters.priority, () => filters.search], () => {
   selectedIdeaIds.value = []
 })
