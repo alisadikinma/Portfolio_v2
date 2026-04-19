@@ -277,6 +277,13 @@
       </section>
 
     </article>
+
+    <!-- Floating newsletter banner — fires 60s after mount -->
+    <NewsletterFloatingBanner
+      :show="showFloatingBanner"
+      @dismiss="onFloatingBannerDismiss"
+      @subscribed="onFloatingBannerSubscribed"
+    />
   </div>
 </template>
 
@@ -286,10 +293,12 @@ import { useRoute } from 'vue-router'
 import { usePosts } from '@/composables/usePosts'
 import { useMetaTags } from '@/composables/useMetaTags'
 import { usePageSections } from '@/composables/usePageSections'
+import { useNewsletter } from '@/composables/useNewsletter'
 import { useToast } from '@/composables/useToast'
 import { stripFaqSection } from '@/utils/stripFaqSection'
 import { extractFaqFromHtml } from '@/utils/extractFaqFromHtml'
 import FaqAccordion from '@/components/blog/FaqAccordion.vue'
+import NewsletterFloatingBanner from '@/components/blog/NewsletterFloatingBanner.vue'
 import api from '@/services/api'
 
 const route = useRoute()
@@ -298,6 +307,7 @@ const toast = useToast()
 const { post, isLoadingPost: isLoading, fetchPost } = usePosts()
 const { updatePageMeta, updateMetaTag, injectBreadcrumbSchema, injectArticleSchema, updateHreflang } = useMetaTags()
 const { fetchActiveSections } = usePageSections()
+const { isSubscribed: nlIsSubscribed, isDismissed: nlIsDismissed } = useNewsletter()
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const fetchError = ref(null)
@@ -305,6 +315,28 @@ const relatedPosts = ref([])
 const urlCopied = ref(false)
 const articleContent = ref(null)
 const readingProgress = ref(0)
+const showFloatingBanner = ref(false)
+let floatingBannerTimerId = null
+
+function scheduleFloatingBanner() {
+  if (nlIsSubscribed() || nlIsDismissed()) return
+  floatingBannerTimerId = setTimeout(() => {
+    if (nlIsSubscribed() || nlIsDismissed()) return
+    showFloatingBanner.value = true
+  }, 60_000)
+}
+
+function onFloatingBannerDismiss() {
+  showFloatingBanner.value = false
+}
+
+function onFloatingBannerSubscribed() {
+  showFloatingBanner.value = false
+  if (floatingBannerTimerId) {
+    clearTimeout(floatingBannerTimerId)
+    floatingBannerTimerId = null
+  }
+}
 
 // Reading progress tracking
 const handleScroll = () => {
@@ -472,11 +504,16 @@ onMounted(async () => {
   } else if (post.value) {
     updateMetaTags()
     await fetchRelatedPosts()
+    scheduleFloatingBanner()
   }
 })
 
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
+  if (floatingBannerTimerId) {
+    clearTimeout(floatingBannerTimerId)
+    floatingBannerTimerId = null
+  }
 })
 
 // Refetch when language changes (user switches via LanguageSwitcher)
