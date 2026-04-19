@@ -413,6 +413,18 @@
                   TIER 2
                 </span>
                 <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-neutral-100 text-neutral-500 dark:bg-neutral-700 dark:text-neutral-400">{{ topic.source || 'unknown' }}</span>
+                <span
+                  v-if="topic.composite_score != null"
+                  :class="[
+                    'inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold border',
+                    topic.composite_score >= 80 ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30' :
+                    topic.composite_score >= 50 ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30' :
+                    'bg-neutral-200 text-neutral-500 dark:bg-neutral-700 dark:text-neutral-400 border-neutral-300 dark:border-neutral-600'
+                  ]"
+                  :title="viralityTooltip(topic)"
+                >
+                  ⚡ {{ topic.composite_score }}
+                </span>
               </div>
             </div>
           </label>
@@ -724,6 +736,20 @@ const filteredTrending = computed(() => {
   }
   return results
 })
+
+// Multi-line tooltip describing the virality score breakdown on a trending card.
+function viralityTooltip(topic) {
+  if (topic.composite_score == null) return ''
+  const parts = []
+  if (topic.virality_score != null) parts.push(`Virality: ${topic.virality_score}`)
+  if (topic.momentum_score != null) parts.push(`Momentum: ${topic.momentum_score}`)
+  let out = parts.join(' · ')
+  if (topic.triggers && typeof topic.triggers === 'object') {
+    const active = Object.keys(topic.triggers).filter(k => topic.triggers[k])
+    if (active.length) out += `\nTriggers: ${active.join(', ')}`
+  }
+  return out
+}
 
 // Convert an RFC-822 (or ISO) date string to "3h ago" / "2d ago" / "Apr 14".
 // Returns '' when the date is unparseable or empty.
