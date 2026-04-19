@@ -301,6 +301,25 @@ class ContentIdeaController extends Controller
     }
 
     /**
+     * Extract an int field from a mixed array, or null when missing/invalid.
+     * Used by importTrending() to carry virality scores safely.
+     */
+    private function resolveInt(array $data, string $key): ?int
+    {
+        if (!array_key_exists($key, $data)) {
+            return null;
+        }
+        $value = $data[$key];
+        if ($value === null || $value === '') {
+            return null;
+        }
+        if (!is_numeric($value)) {
+            return null;
+        }
+        return (int) $value;
+    }
+
+    /**
      * Pull trending topics AND score them for virality before returning.
      * Wraps TrendingTopicService::getScoredTopics() — sorted desc by composite_score,
      * capped at TopicScoringService::MAX_BATCH_SIZE (20) topics.
@@ -338,12 +357,38 @@ class ContentIdeaController extends Controller
         $imported = [];
         foreach ($topics as $topic) {
             if (empty($topic['title'])) continue;
-            $imported[] = ContentIdea::create([
+
+            $payload = [
                 'title' => $topic['title'],
                 'source' => $topic['source'] ?? 'manual',
                 'status' => 'draft',
                 'source_data' => $topic,
-            ]);
+            ];
+
+            // Carry scored signals (Phase A) forward onto the ContentIdea
+            // so downstream tiering/prioritization can read them without
+            // re-running the scorer. composite_score wins as the headline
+            // virality_score if present; else raw virality_score; else null.
+            $composite = $this->resolveInt($topic, 'composite_score');
+            $virality = $this->resolveInt($topic, 'virality_score');
+            $momentum = $this->resolveInt($topic, 'momentum_score');
+            $triggers = $topic['triggers'] ?? null;
+
+            $headlineScore = $composite ?? $virality;
+            if ($headlineScore !== null) {
+                $payload['virality_score'] = $headlineScore;
+            }
+
+            if ($composite !== null || $virality !== null || $momentum !== null || is_array($triggers)) {
+                $payload['virality_breakdown'] = [
+                    'momentum' => $momentum,
+                    'virality' => $virality,
+                    'composite' => $composite,
+                    'triggers' => is_array($triggers) ? $triggers : null,
+                ];
+            }
+
+            $imported[] = ContentIdea::create($payload);
         }
 
         return response()->json([

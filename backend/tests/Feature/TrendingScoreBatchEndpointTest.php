@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\ContentIdea;
 use App\Models\User;
 use App\Services\TopicScoringService;
 use App\Services\TrendingTopicService;
@@ -143,5 +144,58 @@ class TrendingScoreBatchEndpointTest extends TestCase
             'success' => true,
             'data' => [],
         ]);
+    }
+
+    public function test_import_persists_virality_score_and_breakdown(): void
+    {
+        $this->actingAsAdmin();
+
+        $response = $this->postJson('/api/admin/content-engine/trending/import', [
+            'topics' => [[
+                'title' => 'Scored Topic',
+                'source' => 'google_news',
+                'composite_score' => 88,
+                'momentum_score' => 75,
+                'virality_score' => 95,
+                'triggers' => [
+                    'social_currency' => true,
+                    'high_arousal' => true,
+                    'practical_utility' => false,
+                    'identity_signaling' => true,
+                    'cognitive_gap' => false,
+                ],
+            ]],
+        ]);
+
+        $response->assertStatus(201);
+
+        $idea = ContentIdea::where('title', 'Scored Topic')->first();
+        $this->assertNotNull($idea);
+        $this->assertSame(88, (int) $idea->virality_score);
+        $this->assertIsArray($idea->virality_breakdown);
+        $this->assertSame(75, $idea->virality_breakdown['momentum']);
+        $this->assertSame(95, $idea->virality_breakdown['virality']);
+        $this->assertTrue($idea->virality_breakdown['triggers']['social_currency']);
+        $this->assertTrue($idea->virality_breakdown['triggers']['identity_signaling']);
+        $this->assertFalse($idea->virality_breakdown['triggers']['cognitive_gap']);
+    }
+
+    public function test_import_without_score_leaves_fields_null(): void
+    {
+        $this->actingAsAdmin();
+
+        $response = $this->postJson('/api/admin/content-engine/trending/import', [
+            'topics' => [[
+                'title' => 'Legacy Unscored Topic',
+                'source' => 'google_news',
+            ]],
+        ]);
+
+        $response->assertStatus(201);
+
+        $idea = ContentIdea::where('title', 'Legacy Unscored Topic')->first();
+        $this->assertNotNull($idea);
+        $this->assertNull($idea->virality_score);
+        $this->assertNull($idea->virality_breakdown);
     }
 }
