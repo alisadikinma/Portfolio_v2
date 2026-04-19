@@ -316,19 +316,27 @@
       </div>
     </section>
 
+    <!-- Sticky footer newsletter bar (triggers after 60% scroll) -->
+    <NewsletterFooterBar
+      :show="showFooterBar"
+      @dismiss="onFooterBarDismiss"
+      @subscribed="onFooterBarSubscribed"
+    />
+
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { usePosts } from '@/composables/usePosts'
 import { useNewsletter } from '@/composables/useNewsletter'
+import NewsletterFooterBar from '@/components/blog/NewsletterFooterBar.vue'
 import api from '@/services/api'
 
 const route = useRoute()
 const { posts, isLoading, fetchPosts } = usePosts()
-const { subscribe: nlSubscribe, isSubscribed: nlIsSubscribed } = useNewsletter()
+const { subscribe: nlSubscribe, isSubscribed: nlIsSubscribed, isDismissed: nlIsDismissed } = useNewsletter()
 
 const categories = ref([])
 const selectedCategory = ref(null)
@@ -341,6 +349,41 @@ const newsletterEmail = ref('')
 const nlStatus = ref('idle') // 'idle' | 'loading' | 'success' | 'duplicate' | 'error'
 const nlErrorMsg = ref('')
 const newsletterAlreadySubscribed = ref(false)
+const showFooterBar = ref(false)
+
+// Scroll-triggered footer bar
+let scrollRafId = null
+let scrollListener = null
+
+function checkScrollThreshold() {
+  if (newsletterAlreadySubscribed.value || nlIsDismissed()) {
+    showFooterBar.value = false
+    return
+  }
+  const doc = document.documentElement
+  const scrollY = window.scrollY || doc.scrollTop
+  const maxScroll = doc.scrollHeight - window.innerHeight
+  if (maxScroll <= 0) return
+  const pct = scrollY / maxScroll
+  if (pct > 0.6) showFooterBar.value = true
+}
+
+function onScroll() {
+  if (scrollRafId !== null) return
+  scrollRafId = requestAnimationFrame(() => {
+    scrollRafId = null
+    checkScrollThreshold()
+  })
+}
+
+function onFooterBarDismiss() {
+  showFooterBar.value = false
+}
+
+function onFooterBarSubscribed() {
+  newsletterAlreadySubscribed.value = true
+  showFooterBar.value = false
+}
 
 const lang = computed(() => route.params.lang || 'en')
 
@@ -351,6 +394,22 @@ onMounted(async () => {
     const res = await api.get('/categories')
     categories.value = res.data?.data || res.data || []
   } catch {}
+
+  scrollListener = onScroll
+  window.addEventListener('scroll', scrollListener, { passive: true })
+  // Trigger once after mount in case user lands deep-scrolled (e.g. back-button)
+  requestAnimationFrame(checkScrollThreshold)
+})
+
+onUnmounted(() => {
+  if (scrollListener) {
+    window.removeEventListener('scroll', scrollListener)
+    scrollListener = null
+  }
+  if (scrollRafId !== null) {
+    cancelAnimationFrame(scrollRafId)
+    scrollRafId = null
+  }
 })
 
 // Refetch when language changes
