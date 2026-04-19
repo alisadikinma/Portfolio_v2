@@ -27,6 +27,7 @@ class ContentIdea extends Model
         'virality_score',
         'virality_breakdown',
         'mechanical_scores_snapshot',
+        'research_tier_override',
         'result_post_id',
         'generated_article',
         'generated_images',
