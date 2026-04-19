@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -19,6 +20,18 @@ class TopicScoringService
 {
     /** Maximum topics per Sonnet batch to avoid prompt truncation. */
     public const MAX_BATCH_SIZE = 20;
+
+    /** Composite score cache TTL (1 hour — matches trend refresh cadence). */
+    private const CACHE_TTL_SECONDS = 3600;
+
+    /** Cache namespace version — bump when scoring formula changes. */
+    private const CACHE_VERSION = 'v1';
+
+    /** Composite weight for mechanical momentum signal (0..1). */
+    private const MOMENTUM_WEIGHT = 0.4;
+
+    /** Composite weight for AI virality signal (0..1). */
+    private const VIRALITY_WEIGHT = 0.6;
 
     private const VIRALITY_TRIGGERS = [
         'social_currency',
@@ -268,5 +281,56 @@ PROMPT;
             $triggers[$key] = false;
         }
         return $triggers;
+    }
+
+    /**
+     * Top-level scoring entry point. Combines mechanical momentum + AI virality
+     * into a composite 0-100 score with 1-hour cache keyed by title set.
+     *
+     * Each returned topic carries the original fields plus: momentum_score,
+     * virality_score, triggers, composite_score.
+     */
+    public function scoreBatch(array $topics): array
+    {
+        if (count($topics) === 0) {
+            return [];
+        }
+
+        $key = $this->cacheKey($topics);
+
+        return Cache::remember($key, self::CACHE_TTL_SECONDS, function () use ($topics) {
+            // Mechanical momentum first — cheap, no AI.
+            $withMomentum = [];
+            foreach (array_values($topics) as $topic) {
+                $topic['momentum_score'] = $this->computeMomentum($topic);
+                $withMomentum[] = $topic;
+            }
+
+            // Virality AI scoring (single batch call).
+            $scored = $this->scoreViralityBatch($withMomentum);
+
+            // Composite = weighted average, int-clamped.
+            $out = [];
+            foreach ($scored as $topic) {
+                $momentum = (int) ($topic['momentum_score'] ?? 0);
+                $virality = (int) ($topic['virality_score'] ?? 0);
+                $composite = (int) round(
+                    $momentum * self::MOMENTUM_WEIGHT + $virality * self::VIRALITY_WEIGHT
+                );
+                $topic['composite_score'] = max(0, min(100, $composite));
+                $out[] = $topic;
+            }
+
+            return $out;
+        });
+    }
+
+    private function cacheKey(array $topics): string
+    {
+        $titles = array_map(
+            fn ($t) => (string) ($t['title'] ?? ''),
+            array_values($topics)
+        );
+        return 'topic_scores_' . self::CACHE_VERSION . '_' . sha1(implode('|', $titles));
     }
 }
