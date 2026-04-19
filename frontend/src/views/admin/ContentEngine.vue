@@ -159,7 +159,7 @@
 
     <!-- Ideas Table -->
     <div class="bg-white dark:bg-neutral-800 rounded-xl shadow-sm border border-neutral-200 dark:border-neutral-700 overflow-hidden">
-      <!-- Tabs: Draft / Completed -->
+      <!-- Tabs: Draft / In-progress / Completed -->
       <div class="flex items-center border-b border-neutral-200 dark:border-neutral-700 px-2">
         <button
           type="button"
@@ -180,6 +180,26 @@
                 : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-400'
             ]"
           >{{ draftCount }}</span>
+        </button>
+        <button
+          type="button"
+          @click="switchTab('in_progress')"
+          :class="[
+            'px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors',
+            activeTab === 'in_progress'
+              ? 'border-amber-500 text-amber-600 dark:text-amber-400'
+              : 'border-transparent text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200'
+          ]"
+        >
+          In-progress
+          <span
+            :class="[
+              'ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-semibold rounded-full',
+              activeTab === 'in_progress'
+                ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400'
+                : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-400'
+            ]"
+          >{{ inProgressCount }}</span>
         </button>
         <button
           type="button"
@@ -234,6 +254,7 @@
             <tr v-else-if="!displayedIdeas.length">
               <td colspan="8" class="px-4 py-12 text-center text-neutral-500 dark:text-neutral-400">
                 <template v-if="activeTab === 'completed'">No completed ideas yet.</template>
+                <template v-else-if="activeTab === 'in_progress'">No in-progress ideas. Start research on a draft to move it here.</template>
                 <template v-else>No ideas found. Click "Add Idea" or "Pull Trending" to get started.</template>
               </td>
             </tr>
@@ -319,7 +340,7 @@
       <!-- Total count footer -->
       <div class="flex items-center justify-end px-4 py-3 border-t border-neutral-200 dark:border-neutral-700">
         <span class="text-xs text-neutral-500 dark:text-neutral-400">
-          {{ displayedIdeas.length }} {{ activeTab === 'completed' ? 'completed' : 'draft' }} / {{ ideas.length }} total
+          {{ displayedIdeas.length }} {{ activeTab === 'completed' ? 'completed' : activeTab === 'in_progress' ? 'in-progress' : 'draft' }} / {{ ideas.length }} total
         </span>
       </div>
     </div>
@@ -689,14 +710,24 @@ const healthOnline = ref(false)
 const ideas = ref([])
 const selectedIdeaIds = ref([])
 const bulkProcessing = ref(false)
+const IN_PROGRESS_STATUSES = ['researching', 'article_ready', 'generating_images', 'images_ready']
 const activeTab = ref('draft')
 const displayedIdeas = computed(() => {
   if (activeTab.value === 'completed') {
     return ideas.value.filter(i => i.status === 'completed')
   }
-  return ideas.value.filter(i => i.status !== 'completed')
+  if (activeTab.value === 'in_progress') {
+    return ideas.value.filter(i => IN_PROGRESS_STATUSES.includes(i.status))
+  }
+  // Draft tab: draft + archived (anything not in-progress and not completed)
+  return ideas.value.filter(i => !IN_PROGRESS_STATUSES.includes(i.status) && i.status !== 'completed')
 })
-const draftCount = computed(() => ideas.value.filter(i => i.status !== 'completed').length)
+const draftCount = computed(() =>
+  ideas.value.filter(i => !IN_PROGRESS_STATUSES.includes(i.status) && i.status !== 'completed').length
+)
+const inProgressCount = computed(() =>
+  ideas.value.filter(i => IN_PROGRESS_STATUSES.includes(i.status)).length
+)
 const completedCount = computed(() => ideas.value.filter(i => i.status === 'completed').length)
 const allPageSelected = computed(() =>
   displayedIdeas.value.length > 0 && displayedIdeas.value.every(i => selectedIdeaIds.value.includes(i.id))
