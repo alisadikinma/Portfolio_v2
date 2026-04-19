@@ -31,8 +31,9 @@ class ProcessPendingTranslations extends Command
                 : null;
 
             $primaryLang = data_get($idea?->generated_article, 'language', 'id');
+            // Default languages: Indonesian primary + English secondary (translation target)
             $targetLocales = array_values(array_diff(
-                $idea?->languages ?? ['en'],
+                $idea?->languages ?? ['id', 'en'],
                 [$primaryLang]
             ));
 

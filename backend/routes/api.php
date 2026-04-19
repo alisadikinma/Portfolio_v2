@@ -417,7 +417,9 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
         if ($request->has('article')) {
             // New schema from article-content-writer plugin v1.1+
             $pluginArticle = $request->input('article', []);
-            $languages = $idea->languages ?? ['en'];
+            // Default to Indonesian primary — matches AutoPipelineOrchestrator default
+            // (auto_mode drafts created by trending import have languages=null)
+            $languages = $idea->languages ?? ['id'];
             $existing = $idea->generated_article ?? [];
 
             // Build nested-by-language generated_article, preserving existing content

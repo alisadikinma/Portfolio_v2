@@ -35,7 +35,7 @@ class ArticleGenerationService
     public function triggerGeneration(int $ideaId, array $config = []): array
     {
         $topic = $config['topic'] ?? '';
-        $languages = implode(',', $config['languages'] ?? ['en']);
+        $languages = implode(',', $config['languages'] ?? ['id']);
         $instructions = $config['instructions'] ?? '';
 
         $prompt = $this->buildArticleGenPrompt($ideaId, $topic, $languages, $instructions);
@@ -52,7 +52,7 @@ class ArticleGenerationService
     public function triggerPrep(int $ideaId, array $config = []): array
     {
         $topic = $config['topic'] ?? '';
-        $languages = implode(',', $config['languages'] ?? ['en']);
+        $languages = implode(',', $config['languages'] ?? ['id']);
         $instructions = $config['instructions'] ?? '';
         $keyword = $config['keyword'] ?? '';
 
@@ -85,7 +85,7 @@ class ArticleGenerationService
         }
 
         $topic = $config['topic'] ?? '';
-        $languages = implode(',', $config['languages'] ?? ['en']);
+        $languages = implode(',', $config['languages'] ?? ['id']);
         $keyword = $config['keyword'] ?? '';
         $instructions = $config['instructions'] ?? '';
 

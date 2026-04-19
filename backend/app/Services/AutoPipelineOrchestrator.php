@@ -207,7 +207,7 @@ class AutoPipelineOrchestrator
 
     private function resumeAtPrep(ContentIdea $idea): ContentIdea
     {
-        $languages = $idea->languages ?? ['id'];
+        $languages = $idea->languages ?? ['id', 'en'];
         $result = $this->articleGen->triggerPrep($idea->id, [
             'topic' => $idea->title,
             'languages' => $languages,
@@ -217,6 +217,7 @@ class AutoPipelineOrchestrator
             throw new \RuntimeException('triggerPrep returned unsuccessful: ' . ($result['error'] ?? 'unknown'));
         }
         $idea->update([
+            'languages' => $languages,
             'status' => 'researching',
             'progress_percentage' => 0,
             'current_step' => 'prep_resume',
@@ -296,7 +297,7 @@ class AutoPipelineOrchestrator
         if (!$idea) return null;
 
         try {
-            $languages = $idea->languages ?? ['id'];
+            $languages = $idea->languages ?? ['id', 'en'];
             $result = $this->articleGen->triggerPrep($idea->id, [
                 'topic' => $idea->title,
                 'languages' => $languages,
@@ -308,6 +309,7 @@ class AutoPipelineOrchestrator
             }
 
             $idea->update([
+                'languages' => $languages,
                 'status' => 'researching',
                 'progress_percentage' => 0,
                 'current_step' => 'auto_pipeline_start',

@@ -43,7 +43,8 @@ class ProcessScheduledIdeas extends Command
                 ]);
 
                 // Trigger article generation via SSH/local CLI
-                $languages = $idea->languages ?? ['en'];
+                // Default primary language is Indonesian (matches AutoPipelineOrchestrator + ContentPublishService fallback)
+                $languages = $idea->languages ?? ['id'];
                 $articleGen->trigger($idea->id, $idea->title, implode(',', $languages), $idea->instructions ?? '');
 
                 $this->info("  Started research for idea #{$idea->id}");
