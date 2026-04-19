@@ -236,11 +236,47 @@
                 />
               </th>
               <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400 w-10">#</th>
-              <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400">Topic</th>
-              <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400 w-20">⚡ Virality</th>
+              <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400">
+                <button
+                  type="button"
+                  @click="cycleSort('topic')"
+                  class="inline-flex items-center gap-1 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors"
+                  :title="`Sort by Topic (${sortColumn === 'topic' ? (sortDir === 'asc' ? 'A→Z, click for Z→A' : 'Z→A, click to clear') : 'click A→Z'})`"
+                >
+                  Topic
+                  <span class="text-[10px] w-3" :class="sortColumn === 'topic' ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-300 dark:text-neutral-600'">
+                    {{ sortColumn === 'topic' ? (sortDir === 'asc' ? '▲' : '▼') : '↕' }}
+                  </span>
+                </button>
+              </th>
+              <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400 w-20">
+                <button
+                  type="button"
+                  @click="cycleSort('virality')"
+                  class="inline-flex items-center gap-1 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors"
+                  :title="`Sort by Virality (${sortColumn === 'virality' ? (sortDir === 'asc' ? 'low→high, click for high→low' : 'high→low, click to clear') : 'click low→high'})`"
+                >
+                  ⚡ Virality
+                  <span class="text-[10px] w-3" :class="sortColumn === 'virality' ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-300 dark:text-neutral-600'">
+                    {{ sortColumn === 'virality' ? (sortDir === 'asc' ? '▲' : '▼') : '↕' }}
+                  </span>
+                </button>
+              </th>
               <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400">Status</th>
               <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400">Source</th>
-              <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400">Published</th>
+              <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400">
+                <button
+                  type="button"
+                  @click="cycleSort('published')"
+                  class="inline-flex items-center gap-1 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors"
+                  :title="`Sort by Published (${sortColumn === 'published' ? (sortDir === 'asc' ? 'oldest first, click for newest first' : 'newest first, click to clear') : 'click oldest first'})`"
+                >
+                  Published
+                  <span class="text-[10px] w-3" :class="sortColumn === 'published' ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-300 dark:text-neutral-600'">
+                    {{ sortColumn === 'published' ? (sortDir === 'asc' ? '▲' : '▼') : '↕' }}
+                  </span>
+                </button>
+              </th>
               <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400 text-center w-16">Auto</th>
               <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400 text-right">Actions</th>
             </tr>
@@ -719,15 +755,68 @@ const selectedIdeaIds = ref([])
 const bulkProcessing = ref(false)
 const IN_PROGRESS_STATUSES = ['researching', 'article_ready', 'generating_images', 'images_ready']
 const activeTab = ref('draft')
+
+// Column sort state. Null column = keep backend's trending-priority order.
+// Cycle per column header: null → asc → desc → null. Rows with null values
+// always sink to the bottom regardless of direction so "—" cells don't
+// pollute the top of either sort.
+const sortColumn = ref(null) // 'topic' | 'virality' | 'published' | null
+const sortDir = ref('asc')   // 'asc' | 'desc'
+
+function cycleSort(column) {
+  if (sortColumn.value !== column) {
+    sortColumn.value = column
+    sortDir.value = 'asc'
+  } else if (sortDir.value === 'asc') {
+    sortDir.value = 'desc'
+  } else {
+    sortColumn.value = null
+    sortDir.value = 'asc'
+  }
+}
+
+function sortValue(idea, column) {
+  if (column === 'topic') return (idea.title || '').toLowerCase()
+  if (column === 'virality') return ideaViralityScore(idea)
+  if (column === 'published') {
+    const raw = idea.source_data?.pub_date
+    const ts = raw ? Date.parse(raw) : NaN
+    return Number.isNaN(ts) ? null : ts
+  }
+  return null
+}
+
+function compareIdeas(a, b) {
+  const col = sortColumn.value
+  if (!col) return 0
+  const va = sortValue(a, col)
+  const vb = sortValue(b, col)
+  // Null/empty values always sink to bottom regardless of sort direction
+  const aEmpty = va == null || va === ''
+  const bEmpty = vb == null || vb === ''
+  if (aEmpty && bEmpty) return 0
+  if (aEmpty) return 1
+  if (bEmpty) return -1
+  let cmp
+  if (typeof va === 'string' && typeof vb === 'string') cmp = va.localeCompare(vb)
+  else cmp = va < vb ? -1 : va > vb ? 1 : 0
+  return sortDir.value === 'asc' ? cmp : -cmp
+}
+
 const displayedIdeas = computed(() => {
+  let rows
   if (activeTab.value === 'completed') {
-    return ideas.value.filter(i => i.status === 'completed')
+    rows = ideas.value.filter(i => i.status === 'completed')
+  } else if (activeTab.value === 'in_progress') {
+    rows = ideas.value.filter(i => IN_PROGRESS_STATUSES.includes(i.status))
+  } else {
+    // Draft tab: draft + archived (anything not in-progress and not completed)
+    rows = ideas.value.filter(i => !IN_PROGRESS_STATUSES.includes(i.status) && i.status !== 'completed')
   }
-  if (activeTab.value === 'in_progress') {
-    return ideas.value.filter(i => IN_PROGRESS_STATUSES.includes(i.status))
+  if (sortColumn.value) {
+    rows = [...rows].sort(compareIdeas)
   }
-  // Draft tab: draft + archived (anything not in-progress and not completed)
-  return ideas.value.filter(i => !IN_PROGRESS_STATUSES.includes(i.status) && i.status !== 'completed')
+  return rows
 })
 const draftCount = computed(() =>
   ideas.value.filter(i => !IN_PROGRESS_STATUSES.includes(i.status) && i.status !== 'completed').length
