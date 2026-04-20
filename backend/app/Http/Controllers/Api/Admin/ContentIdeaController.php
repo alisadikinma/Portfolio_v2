@@ -1295,6 +1295,13 @@ class ContentIdeaController extends Controller
 
         $t = $request->input('translation');
         $locale = $request->input('target_locale');
+
+        // Sanitize JSON-escape leakage on every string field. The translate
+        // plugin output sometimes carries `\/` escapes (e.g. `<\/p>`) that
+        // DOMParser won't recognize as closing tags, cascading the whole
+        // article into the prior tag's styling. Apply defensively before
+        // img-alt rewrite so the rewritten content is also clean.
+        $t = \App\Support\HtmlSlashSanitizer::apply($t);
         $translatedContent = $t['content'];
 
         // Rewrite <img alt="..."> in translated content if image_alt_map provided

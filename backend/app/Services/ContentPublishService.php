@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\ContentIdea;
 use App\Models\Post;
 use App\Models\PostTranslation;
+use App\Support\HtmlSlashSanitizer;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -31,7 +32,13 @@ class ContentPublishService
             throw new \DomainException('Cannot publish in current status: ' . $idea->status);
         }
 
-        $article = $idea->generated_article ?? [];
+        // Defense-in-depth: sanitize JSON-escape leakage (`\/` → `/`) on the
+        // final-hop article data before we copy it into post_translations.
+        // Every upstream writer (/complete, save-article, save-translation,
+        // triggerTranslatePreflight) already does this, but applying here
+        // too guarantees that any legacy idea (e.g. published before the
+        // sanitizer was wired everywhere) gets clean HTML in the Post.
+        $article = HtmlSlashSanitizer::apply($idea->generated_article ?? []);
         $urlsToDelete = [];
 
         $imagePrompts = $this->compactVariations($article['image_prompts'] ?? [], $urlsToDelete);

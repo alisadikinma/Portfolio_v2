@@ -369,6 +369,12 @@ class ArticleGenerationService
 
         $translated = $result['translated'] ?? [];
 
+        // Sanitize JSON-escape leakage in the translated HTML content. The
+        // Sonnet translate output can contain `\/` inside content/excerpt
+        // strings that would otherwise render as literal `<\/p>` text in
+        // the admin Finalize preview + final post_translations row.
+        $translated = \App\Support\HtmlSlashSanitizer::apply($translated);
+
         // Merge into existing target-lang slot so manual edits survive a rerun.
         $existing = $article[$target] ?? [];
         $article[$target] = array_merge($existing, [

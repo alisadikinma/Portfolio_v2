@@ -530,6 +530,15 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
                 $generatedArticle['prep_data'] = $existing['prep_data'];
             }
 
+            // Sanitize JSON-escape leakage in HTML content before persist. The
+            // plugin sometimes double-escapes slashes (`\/` survives into the
+            // stored string), which turns `</p>` into literal `<\/p>` text at
+            // render time — breaks HTML parsing in ArticleFinalize.vue (which
+            // uses DOMParser) and cascades every block into the prior tag's
+            // styling. save-article already applies this; must mirror here
+            // because /complete writes the canonical nested-by-language shape.
+            $generatedArticle = \App\Support\HtmlSlashSanitizer::apply($generatedArticle);
+
             $idea->update([
                 'status' => 'article_ready',
                 'generated_article' => $generatedArticle,
@@ -545,9 +554,13 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
             ]);
         } else {
             // Old schema: generated_article passed directly
+            $legacyArticle = $request->input('generated_article');
+            if (is_array($legacyArticle)) {
+                $legacyArticle = \App\Support\HtmlSlashSanitizer::apply($legacyArticle);
+            }
             $idea->update([
                 'status' => 'article_ready',
-                'generated_article' => $request->input('generated_article'),
+                'generated_article' => $legacyArticle,
                 'research_data' => $request->input('research_data'),
                 'progress_percentage' => 100,
                 'current_step' => 'completed',

@@ -309,14 +309,23 @@ class ImageGenerationService
             return true;
 
         } elseif ($event === 'IMAGE_GENERATION_FAILED') {
+            $reason = $data['error_message'] ?? 'Unknown error';
             $job->update([
                 'status' => 'failed',
-                'error_message' => $data['error_message'] ?? 'Unknown error',
+                'error_message' => $reason,
             ]);
-            Log::error("[ImageGen] Webhook: failed for UUID {$uuid} — " . ($data['error_message'] ?? ''));
+            Log::error("[ImageGen] Webhook: failed for UUID {$uuid} — {$reason}");
 
-            // Content Engine: mark the segment as failed
-            $this->updateContentIdeaSegment($uuid, 'failed', null, $data['error_message'] ?? 'Unknown error');
+            // Mark the variation + segment status 'failed'.
+            $this->updateContentIdeaSegment($uuid, 'failed', null, $reason);
+            // Drive the segment retry state machine: bump retry_count,
+            // append failure_history, auto-schedule retry or mark terminal.
+            // Previously only the poller path (ProcessPendingImages) called
+            // this — webhooks bypassed it, so an idea whose GeminiGen failed
+            // via webhook got stuck in 'generating' status (variation was
+            // flipped to 'failed' but without the state-machine semantics
+            // the UI kept showing "Generating…" until the user refreshed).
+            $this->handleSegmentFailure($job, $reason);
 
             return false;
         }
