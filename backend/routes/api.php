@@ -326,6 +326,34 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
     Route::get('/blog/trending-topic', [\App\Http\Controllers\Api\BlogPipelineController::class, 'trendingTopic']);
     Route::post('/blog/save-draft', [\App\Http\Controllers\Api\BlogPipelineController::class, 'saveDraft']);
 
+    // Entity Reference lookup (for article-images plugin Phase 3.5b —
+    // cache-first check before hitting Wikidata/Commons)
+    Route::get('/entity-refs/lookup', function (\Illuminate\Http\Request $request) {
+        $name = trim((string) $request->query('name', ''));
+        $type = $request->query('type');
+
+        if ($name === '') {
+            return response()->json(['success' => false, 'message' => 'name query param required'], 400);
+        }
+
+        $service = app(\App\Services\EntityReferenceService::class);
+        $result = $service->findOrFetch($name, $type);
+
+        if ($result === null) {
+            return response()->json([
+                'success' => true,
+                'cached' => false,
+                'data' => null,
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'cached' => true,
+            'data' => $result,
+        ]);
+    });
+
     // Content Ideas Pipeline (for Claude CLI article-content-writer plugin)
     Route::get('/content-ideas/pending', function () {
         $idea = \App\Models\ContentIdea::where('status', 'researching')
@@ -368,19 +396,34 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
             'progress_log' => array_merge($idea->progress_log ?? [], [$logEntry]),
         ];
 
-        // Handle brand manifest from article-images skill
+        // Handle brand + entity manifest from article-images skill
         if ($request->input('step') === 'manifest_needed' && $request->has('manifest')) {
+            $manifest = $request->input('manifest');
+
+            // Dedicated column for the new entity-aware flow (Phase F).
+            // Replaces the previous generated_article['brand_manifest']-only
+            // pattern but keeps the legacy location populated for backward
+            // compat with readers that still look there.
+            $updateData['pending_manifest'] = $manifest;
+
             $article = $idea->generated_article ?? [];
-            $article['brand_manifest'] = $request->input('manifest');
+            $article['brand_manifest'] = $manifest;
             $updateData['generated_article'] = $article;
 
             // In automation mode (auto_mode), skip blocking — all items optional
             if (!$idea->auto_mode) {
-                $updateData['status'] = 'awaiting_brand_images';
+                $updateData['status'] = 'awaiting_manual_upload';
             }
         }
 
         $idea->update($updateData);
+
+        // Dispatch Telegram alert for manifest_needed (the service itself
+        // gates on telegram_enabled + per-type toggle + token+chat_id presence,
+        // so this is a cheap no-op when Telegram isn't configured).
+        if ($request->input('step') === 'manifest_needed') {
+            \App\Jobs\DispatchTelegramNotification::dispatch($idea, 'manifest_needed');
+        }
 
         return response()->json(['success' => true, 'data' => $logEntry]);
     });
@@ -873,6 +916,186 @@ Route::middleware(['auth:sanctum'])->prefix('admin/content-engine')->group(funct
     // Pipeline: Gate 2 split flow — per-section concept editing + prompt regeneration
     Route::put('/ideas/{id}/update-image-concept', [ContentIdeaController::class, 'updateImageConcept']);
     Route::post('/ideas/{id}/regenerate-image-prompts', [ContentIdeaController::class, 'regenerateImagePrompts']);
+
+    // Pipeline: Gate 2 entity-aware cover flow (Phase F of named-entity plan)
+    // Called by the frontend EntityUploadSlot component when the user provides
+    // a reference image for an entity that couldn't be auto-fetched from
+    // Wikimedia (license fail / notability fail / API error).
+    Route::post('/ideas/{id}/upload-entity-reference', function (\Illuminate\Http\Request $request, $id) {
+        $idea = \App\Models\ContentIdea::find($id);
+        if (!$idea) {
+            return response()->json(['success' => false, 'message' => 'Idea not found.'], 404);
+        }
+
+        $validated = $request->validate([
+            'entity_name' => 'required|string|max:255',
+            'entity_type' => 'required|in:person,landmark,logo,product',
+            'file' => 'required|image|max:10240',
+        ]);
+
+        $file = $request->file('file');
+        $slug = \Illuminate\Support\Str::slug($validated['entity_name']) ?: 'entity';
+        $ext = strtolower($file->getClientOriginalExtension() ?: 'jpg');
+        $filename = "user_{$slug}_" . time() . '.' . $ext;
+
+        $relativePath = "entity-refs/{$validated['entity_type']}/{$filename}";
+        $file->storeAs('entity-refs/' . $validated['entity_type'], $filename, 'public');
+
+        $localUrl = url('/storage/' . $relativePath);
+
+        $ref = \App\Models\EntityReference::create([
+            'qid' => null,
+            'name' => $validated['entity_name'],
+            'entity_type' => $validated['entity_type'],
+            'local_path' => $relativePath,
+            'local_url' => $localUrl,
+            'license' => 'USER-UPLOADED',
+            'source' => 'user_upload',
+            'fetched_at' => now(),
+        ]);
+
+        // Patch image_prompts[].entity_refs[] for every segment that references
+        // this entity by name (matched case-insensitively).
+        $article = $idea->generated_article ?? [];
+        $prompts = $article['image_prompts'] ?? [];
+        $nameLc = mb_strtolower($validated['entity_name']);
+        $patched = 0;
+
+        foreach ($prompts as $i => $prompt) {
+            $refs = $prompt['entity_refs'] ?? [];
+            $found = false;
+
+            foreach ($refs as $j => $existing) {
+                if (mb_strtolower($existing['name'] ?? '') === $nameLc) {
+                    $prompts[$i]['entity_refs'][$j] = [
+                        'qid' => null,
+                        'name' => $validated['entity_name'],
+                        'entity_type' => $validated['entity_type'],
+                        'url' => $localUrl,
+                        'license' => 'USER-UPLOADED',
+                        'attribution' => null,
+                    ];
+                    $found = true;
+                    $patched++;
+                    break;
+                }
+            }
+
+            // If the manifest listed this entity but no placeholder yet, append.
+            $manifest = $idea->pending_manifest ?? [];
+            $manifestEntities = $manifest['entity'] ?? [];
+            foreach ($manifestEntities as $me) {
+                if (!$found && mb_strtolower($me['entity_name'] ?? '') === $nameLc
+                    && in_array('Cover', $me['used_in'] ?? [])
+                    && ($prompt['type'] ?? '') === 'cover') {
+                    $prompts[$i]['entity_refs'][] = [
+                        'qid' => null,
+                        'name' => $validated['entity_name'],
+                        'entity_type' => $validated['entity_type'],
+                        'url' => $localUrl,
+                        'license' => 'USER-UPLOADED',
+                        'attribution' => null,
+                    ];
+                    $patched++;
+                    break;
+                }
+            }
+        }
+
+        $article['image_prompts'] = $prompts;
+
+        // Clear the matching manifest.entity[] slot (mark as resolved)
+        $manifest = $idea->pending_manifest ?? [];
+        $manifestEntities = $manifest['entity'] ?? [];
+        foreach ($manifestEntities as $k => $me) {
+            if (mb_strtolower($me['entity_name'] ?? '') === $nameLc) {
+                $manifestEntities[$k]['status'] = 'resolved';
+                $manifestEntities[$k]['fetched_url'] = $localUrl;
+            }
+        }
+        $manifest['entity'] = $manifestEntities;
+
+        // If no more required missing entities, resume pipeline status
+        $stillBlocking = collect($manifestEntities)
+            ->contains(fn ($e) => ($e['status'] ?? null) === 'missing' && ($e['required'] ?? false) === true);
+
+        $updateData = [
+            'generated_article' => $article,
+            'pending_manifest' => $manifest,
+        ];
+
+        if (!$stillBlocking && $idea->status === 'awaiting_manual_upload') {
+            $updateData['status'] = 'article_ready';
+        }
+
+        $idea->update($updateData);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Entity reference uploaded and merged into {$patched} segment(s)",
+            'data' => [
+                'entity_reference' => $ref,
+                'segments_patched' => $patched,
+                'still_blocking' => $stillBlocking,
+            ],
+        ]);
+    });
+
+    Route::post('/ideas/{id}/skip-entity-reference', function (\Illuminate\Http\Request $request, $id) {
+        $idea = \App\Models\ContentIdea::find($id);
+        if (!$idea) {
+            return response()->json(['success' => false, 'message' => 'Idea not found.'], 404);
+        }
+
+        $validated = $request->validate([
+            'entity_name' => 'required|string|max:255',
+        ]);
+
+        $nameLc = mb_strtolower($validated['entity_name']);
+
+        // Remove the entity from image_prompts[].entity_refs[] so the cover
+        // falls back to creator-face behavior (per Phase C gate).
+        $article = $idea->generated_article ?? [];
+        $prompts = $article['image_prompts'] ?? [];
+        foreach ($prompts as $i => $prompt) {
+            $refs = $prompt['entity_refs'] ?? [];
+            $refs = array_values(array_filter(
+                $refs,
+                fn ($r) => mb_strtolower($r['name'] ?? '') !== $nameLc
+            ));
+            $prompts[$i]['entity_refs'] = $refs;
+        }
+        $article['image_prompts'] = $prompts;
+
+        $manifest = $idea->pending_manifest ?? [];
+        $manifestEntities = $manifest['entity'] ?? [];
+        foreach ($manifestEntities as $k => $me) {
+            if (mb_strtolower($me['entity_name'] ?? '') === $nameLc) {
+                $manifestEntities[$k]['status'] = 'skipped';
+            }
+        }
+        $manifest['entity'] = $manifestEntities;
+
+        $stillBlocking = collect($manifestEntities)
+            ->contains(fn ($e) => ($e['status'] ?? null) === 'missing' && ($e['required'] ?? false) === true);
+
+        $updateData = [
+            'generated_article' => $article,
+            'pending_manifest' => $manifest,
+        ];
+
+        if (!$stillBlocking && $idea->status === 'awaiting_manual_upload') {
+            $updateData['status'] = 'article_ready';
+        }
+
+        $idea->update($updateData);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Entity skipped — will use creator face fallback',
+            'data' => ['still_blocking' => $stillBlocking],
+        ]);
+    });
 
     // Stock image search (Pexels + Unsplash proxy)
     Route::get('/stock-images/search', [\App\Http\Controllers\Api\Admin\StockImageController::class, 'search']);
