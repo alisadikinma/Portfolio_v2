@@ -57,6 +57,30 @@ class CoverBrandingEnhancer
             $hasPersonEntity = collect($entityRefs)
                 ->contains(fn ($e) => is_array($e) && ($e['entity_type'] ?? null) === 'person');
 
+            // Auto-detect fallback: when the plugin missed the named entity
+            // (entity_refs[] is empty AND title looks like a role+org pattern
+            // like "Anthropic CEO" / "the President"), try resolving the
+            // person inline via EntityReferenceService — no SSH round-trip
+            // through /article-images required. Catches:
+            //   1. Articles authored by older plugin versions before Phase G
+            //      shipped (zero entity detection)
+            //   2. Plugin runs that legitimately ran NER but role-resolution
+            //      missed (e.g. lede mentioned the person only by surname)
+            //   3. Operators clicking Generate AI without first re-running
+            //      Regen Prompt
+            // No-op when entity_refs is already populated (plugin did its job)
+            // or when the title doesn't suggest a public-figure subject.
+            if (empty($entityRefs) && !$hasPersonEntity) {
+                $autoEntity = $this->autoResolvePersonFromTitle($idea);
+                if ($autoEntity !== null) {
+                    $entityRefs = [$autoEntity];
+                    $hasPersonEntity = true;
+                    // Persist back onto the prompt array so downstream
+                    // dispatches reuse the resolution rather than re-querying.
+                    $prompt['entity_refs'] = $entityRefs;
+                }
+            }
+
             if ($hasPersonEntity) {
                 // Person URLs → face_refs so GeminiGen's queue() appends the
                 // "maintain exact facial identity" prompt instruction.
@@ -243,6 +267,76 @@ class CoverBrandingEnhancer
         }
 
         return $prompt;
+    }
+
+    /**
+     * Auto-resolve a person entity from the article's title when the plugin
+     * left entity_refs[] empty. Two-pass strategy:
+     *
+     *   Pass 1 — direct name detection: scan title for proper-noun bigrams
+     *   (e.g. "Dario Amodei", "Sam Altman") and try Wikidata directly.
+     *
+     *   Pass 2 — role+org pattern: detect "[Org] CEO" / "CEO [Org]" /
+     *   "[Org]'s founder" patterns. Lookup the org first, then if the
+     *   article body names a person near the role keyword, try that name.
+     *   This covers titles that say "Anthropic CEO" without naming the
+     *   actual person (Dario Amodei is named only in the lede).
+     *
+     * Returns ['qid','name','entity_type'=>'person','url',...] or null.
+     * Synchronous + cached — typical latency 1-3s on cache hit, 5-10s on
+     * fresh Wikidata fetch. No SSH involved.
+     */
+    private function autoResolvePersonFromTitle(ContentIdea $idea): ?array
+    {
+        $title = $this->resolveTitle($idea);
+        if ($title === '') {
+            return null;
+        }
+
+        $service = app(EntityReferenceService::class);
+
+        // Pass 1: scan title for [A-Z][a-z]+ [A-Z][a-z]+ bigrams that look
+        // like personal names ("Dario Amodei", "Sam Altman", "Elon Musk").
+        if (preg_match_all('/\b([A-Z][a-z]+\s+[A-Z][a-z]+)\b/u', $title, $matches)) {
+            foreach ($matches[1] as $candidate) {
+                // Skip obvious org/place tokens to avoid wasted Wikidata queries
+                if (preg_match('/\b(Inc|LLC|Corp|Ltd|White House|Capitol|Pentagon|United States|New York)\b/i', $candidate)) {
+                    continue;
+                }
+                $hit = $service->findOrFetch($candidate, 'person');
+                if ($hit !== null && ($hit['entity_type'] ?? null) === 'person') {
+                    return $hit;
+                }
+            }
+        }
+
+        // Pass 2: role + org pattern. Resolve org → person via article body
+        // scan for "[role keyword] [Capitalized Name]" patterns.
+        $rolePattern = '/\b(CEO|CTO|CFO|COO|President|Founder|Director|Chairman|Senator|Governor|Minister)\b/i';
+        if (!preg_match($rolePattern, $title)) {
+            return null;
+        }
+
+        $article = $idea->generated_article ?? [];
+        $lang = $article['language'] ?? 'id';
+        $langNode = $article[$lang] ?? [];
+        $body = (string) ($langNode['content'] ?? $article['content'] ?? '');
+        if ($body === '') {
+            return null;
+        }
+
+        // Strip HTML and look for "[role] [Name Surname]" in the first 1000
+        // chars (lede). News convention names the subject in the opening.
+        $lede = mb_substr(strip_tags($body), 0, 1500);
+        if (preg_match('/\b(CEO|CTO|CFO|COO|President|Founder|Director|Chairman)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})\b/u', $lede, $m)) {
+            $candidate = $m[2];
+            $hit = $service->findOrFetch($candidate, 'person');
+            if ($hit !== null && ($hit['entity_type'] ?? null) === 'person') {
+                return $hit;
+            }
+        }
+
+        return null;
     }
 
     public function hasHumanKeyword(string $text): bool
