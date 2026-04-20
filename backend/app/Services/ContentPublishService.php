@@ -416,25 +416,48 @@ class ContentPublishService
             ?: data_get($article, 'meta_keywords');
 
         if (empty($metaKeywords)) {
+            // Web SEO best practice (Bing/Yandex era — Google deprecated
+            // ranking weight in 2009 but still indexes meta_keywords for
+            // internal search/discovery, AI crawlers, and llms.txt parsers):
+            //
+            //   - 5-8 short keywords (1-3 words each, NEVER full sentences)
+            //   - Entity-focused: brand names, person names, product names,
+            //     topic keywords. Each keyword should be something a user
+            //     would actually type into a search box.
+            //   - Avoid stuffing the target_keyword phrase verbatim — that
+            //     long-tail SEO phrase belongs in title + meta_title, not
+            //     in the meta_keywords list. Including it here hurts
+            //     scannability and bloats the tag.
+            //
+            // Strategy: extract clean entity tokens from article body lede,
+            // optionally prepend a broad topic keyword (category name or
+            // pillar) for discoverability. Skip the target_keyword phrase
+            // entirely — it's redundant with title/meta_title.
             $primary = data_get($article, 'target_keyword')
                 ?: data_get($article, 'seo_analysis.keyword')
                 ?: data_get($article, 'prep_data.keyword');
-            if (!empty($primary)) {
-                // Synthesize a real comma-separated keyword list:
-                // primary phrase first, then up to 5 related terms harvested
-                // from the title's proper nouns + multi-word capitalized
-                // entities. Filters out tokens already contained in the
-                // primary phrase (avoid "gugatan Musk vs Altman OpenAI 2026,
-                // Musk, Altman, OpenAI, 2026" which duplicates everything).
-                $keywords = [trim($primary)];
-                $titleSource = (string) ($title ?? '');
-                $extracted = $this->extractKeywordTerms($titleSource, $primary);
-                foreach ($extracted as $term) {
-                    if (count($keywords) >= 6) break;
-                    $keywords[] = $term;
-                }
-                $metaKeywords = implode(', ', $keywords);
+            $bodySource = (string) ($content ?? '');
+            $extracted = $this->extractKeywordTerms($bodySource, (string) $primary);
+
+            $keywords = [];
+
+            // Broad topic keyword first — gives the list a discoverability
+            // anchor for users searching by topic ("AI", "Tech", "Business").
+            // Pulled from idea.niche when meaningful, else first word of pillar.
+            $broadTopic = $this->resolveBroadTopic($idea);
+            if ($broadTopic !== null) {
+                $keywords[] = $broadTopic;
             }
+
+            // Then extracted entities — these are the high-signal SEO tokens.
+            // Cap at 7 total so the meta tag stays tight + scannable.
+            foreach ($extracted as $term) {
+                if (count($keywords) >= 7) break;
+                if (in_array(mb_strtolower($term), array_map('mb_strtolower', $keywords), true)) continue;
+                $keywords[] = $term;
+            }
+
+            $metaKeywords = !empty($keywords) ? implode(', ', $keywords) : null;
         }
 
         if (empty($metaKeywords)) {
@@ -465,6 +488,33 @@ class ContentPublishService
     }
 
     /**
+     * Map idea pillar/niche to a single broad-topic keyword for the meta_keywords
+     * list anchor. Returns null when no clean mapping exists (skips rather
+     * than emit garbage). Pulled from a small explicit map so the output
+     * is predictable across the catalog — no per-idea string parsing.
+     */
+    private function resolveBroadTopic(\App\Models\ContentIdea $idea): ?string
+    {
+        $pillarMap = [
+            'vibe_coding' => 'AI Coding',
+            'ai_automation' => 'AI Automation',
+            'ai_agents' => 'AI Agents',
+            'ai_video_image' => 'AI Media',
+            'general' => null,
+        ];
+        $byPillar = $pillarMap[$idea->pillar ?? 'general'] ?? null;
+        if ($byPillar !== null) return $byPillar;
+
+        // Niche fallback. Strip the "& Tech" suffix and similar separators.
+        $niche = trim((string) ($idea->niche ?? ''));
+        if ($niche === '' || strcasecmp($niche, 'AI & Tech') === 0) return 'AI';
+        // Take first 1-2 words, drop punctuation
+        $first = preg_replace('/[^\p{L}\p{N}\s]/u', ' ', $niche);
+        $words = preg_split('/\s+/', trim($first));
+        return implode(' ', array_slice($words, 0, 2));
+    }
+
+    /**
      * Extract candidate SEO keywords from a title string. Returns ordered,
      * deduped list filtered against tokens already in the primary keyword
      * to avoid emitting "gugatan Musk vs Altman OpenAI 2026, Musk, Altman,
@@ -479,35 +529,68 @@ class ContentPublishService
      *
      * Idempotent + side-effect free — pure derivation from input string.
      */
-    private function extractKeywordTerms(string $title, string $primaryPhrase): array
+    private function extractKeywordTerms(string $source, string $primaryPhrase): array
     {
-        if ($title === '') return [];
+        if ($source === '') return [];
 
-        // Strip Indonesian + English filler words / framing tokens that
-        // routinely appear in titles but carry zero search value.
+        // Strip HTML + collapse whitespace for body-text scanning. Then take
+        // the lede (first 1200 chars) — that's where news prose introduces
+        // named entities. Past the lede the article gets dense and the
+        // signal-to-noise drops.
+        $text = preg_replace('/\s+/', ' ', strip_tags($source));
+        $text = mb_substr((string) $text, 0, 1200);
+
+        // Stopwords: any token that looks like a proper noun by capitalization
+        // alone but is actually filler. Sentence starters routinely produce
+        // false positives ("The lawsuit", "Itu adalah", "When Musk filed").
         $stop = [
-            'Bukan','Sekadar','Soal','Uang','Dan','Atau','Dengan','Tanpa','Untuk','Dari','Yang','Saat','Saja','Akan',
-            'The','And','Or','With','Without','For','From','That','When','Just','Will','About','Over','Just','Not',
-            'Best','New','Top','How','Why','What','Lawsuit','Trial','News','Update',
+            // EN articles + connectors + common verb-frames
+            'The','A','An','And','Or','But','With','Without','For','From','That','When','Just',
+            'Will','About','Over','Not','By','To','In','On','At','As','It','Its','Their','This',
+            'These','Those','He','She','They','We','You','I','Was','Were','Has','Have','Had',
+            'Be','Been','Is','Are','Said','Says','Filed','Wrote','Says','New','Top','How','Why',
+            'What','Best','First','Last','Next','Real','Big','Small','Old','Young','More','Most',
+            // ID articles + connectors
+            'Itu','Ini','Adalah','Yang','Dan','Atau','Dengan','Tanpa','Untuk','Dari','Saat',
+            'Saja','Akan','Pada','Oleh','Bukan','Sekadar','Soal','Uang','Telah','Sudah','Lagi',
+            'Karena','Tapi','Jika','Kalau','Lalu','Kemudian','Bahwa','Mereka','Dia','Kami','Kita',
+            // News-prose fillers
+            'Lawsuit','Trial','News','Update','Story','Report','Article','Piece','Way','Time',
+            'Year','Month','Day','Today','Yesterday','Tomorrow','Now','Then','Here','There',
         ];
 
-        $primaryLower = mb_strtolower($primaryPhrase);
         $candidates = [];
 
-        // Pass 1: capitalized bigrams (e.g. "Elon Musk", "Sam Altman")
-        if (preg_match_all('/\b([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)+)\b/u', $title, $bigrams)) {
-            foreach ($bigrams[1] as $b) {
-                $candidates[] = trim($b);
+        // Pass 1: TWO-word proper-noun bigrams ("Elon Musk", "Sam Altman",
+        // "Dario Amodei"). Both halves must NOT be a stopword. Restricted
+        // to bigrams only (3-word chains add noise like "And Then The").
+        if (preg_match_all('/\b([A-Z][a-z]{2,})\s+([A-Z][a-z]{2,})\b/u', $text, $m)) {
+            foreach ($m[0] as $idx => $full) {
+                $left = $m[1][$idx];
+                $right = $m[2][$idx];
+                if (in_array($left, $stop, true) || in_array($right, $stop, true)) continue;
+                $candidates[] = trim($full);
             }
         }
 
-        // Pass 2: standalone capitalized words + ALL-CAPS acronyms (OpenAI,
-        // Musk, Altman, SPAC, IPO). Rejects stopwords + numbers-only tokens.
-        if (preg_match_all('/\b([A-Z][a-zA-Z]{2,})\b/u', $title, $singles)) {
-            foreach ($singles[1] as $s) {
-                $s = trim($s);
-                if (in_array($s, $stop, true)) continue;
-                $candidates[] = $s;
+        // Pass 2: brand-style mixed-case tokens (OpenAI, xAI, ChatGPT, iPhone,
+        // GitHub) — these are camelcase or have a lowercase prefix followed
+        // by a caps run. Generic title-case words won't match.
+        if (preg_match_all('/\b([a-z]?[A-Z]{1,2}[a-z]+(?:[A-Z][a-zA-Z]+)+|[a-z][A-Z]+)\b/u', $text, $m)) {
+            foreach ($m[1] as $b) {
+                $b = trim($b);
+                if (mb_strlen($b) < 3) continue;
+                $candidates[] = $b;
+            }
+        }
+
+        // Pass 3: ALL-CAPS acronyms 2-5 letters (AI, IPO, SPAC, NASA, NATO).
+        // Lower bound 2 because "AI" is the ubiquitous tech context keyword.
+        if (preg_match_all('/\b([A-Z]{2,5})\b/u', $text, $m)) {
+            foreach ($m[1] as $a) {
+                $a = trim($a);
+                if (in_array($a, $stop, true)) continue;
+                $candidates[] = $a;
             }
         }
 
