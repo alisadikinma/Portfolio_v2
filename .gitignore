@@ -95,6 +95,10 @@ frontend/.nyc_output/
 .claude/logs/
 .claude/temp/
 
+# Session lock files (runtime state, never commit)
+.claude/scheduled_tasks.lock
+.claude/*.lock
+
 # ====================================
 # IDE & Editors
 # ====================================

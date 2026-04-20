@@ -110,7 +110,8 @@
       "Bash(D:/xampp/php/php.exe -l d:/Projects/Portfolio_v2/backend/routes/api.php)",
       "Bash(D:/xampp/php/php.exe -l d:/Projects/Portfolio_v2/backend/app/Services/ArticleGenerationService.php)",
       "Bash(D:/xampp/php/php.exe -l d:/Projects/Portfolio_v2/backend/config/services.php)",
-      "Bash(D:/xampp/php/php.exe -l d:/Projects/Portfolio_v2/backend/app/Services/ImageGenerationService.php)"
+      "Bash(D:/xampp/php/php.exe -l d:/Projects/Portfolio_v2/backend/app/Services/ImageGenerationService.php)",
+      "PowerShell(Get-Process | Where-Object { $_.ProcessName -match \"mysql|httpd|apache\" } | Select-Object ProcessName, Id | Format-Table)"
     ],
     "deny": [],
     "ask": [],
