@@ -153,8 +153,15 @@ export function useContentEngine() {
       image_concept: imageConcept,
     })
 
+  // Regen Prompt = backend SSH-dispatches /article-images via Claude CLI
+  // (background nohup). Dispatch itself just opens SSH + writes runner files
+  // + reads pidfile, but cold SSH connect can run 5-30s. Default 30s axios
+  // timeout collides with the slow path even when backend successfully
+  // queued the job — symptom: "timeout of 30000ms exceeded" while the
+  // skill actually started running. Same justification as translateArticle
+  // and pullTrending which already lift the ceiling.
   const regenerateImagePrompts = (id, sections = []) =>
-    request('post', `/admin/content-engine/ideas/${id}/regenerate-image-prompts`, { sections })
+    request('post', `/admin/content-engine/ideas/${id}/regenerate-image-prompts`, { sections }, null, { timeout: 90000 })
 
   const resumeImagePipeline = (id) =>
     request('post', `/automation/content-ideas/${id}/continue-pipeline`, { phase: 'images_resume' })
