@@ -441,11 +441,13 @@ function selectVariation(seg, varIdx) {
   scheduleAutoSave()
 }
 
-// Cancel a stuck `generating` variation without waiting for the backend
-// 10-min timeout. Marks the slot failed locally + persists so the segment
-// UI unsticks immediately. Backend poller will still catch the orphan
-// ImageGenerationJob via MAX_JOB_AGE_MINUTES (if any row exists) and
-// drive handleSegmentFailure — but the user gets instant relief here.
+// Cancel a stuck `generating` variation and REMOVE the slot entirely so
+// the operator can use the "+" dropdown to start a fresh attempt. Just
+// marking status='failed' left a red-X slot occupying one of the 3 slots
+// and kept the "+" button hidden (it's gated on no-generating-variations).
+// The backend poller still reconciles the orphan ImageGenerationJob via
+// MAX_JOB_AGE_MINUTES (if any row exists) — no data is lost, the UI just
+// stops waiting on a slot the user no longer wants.
 function cancelVariation(seg, vi, event) {
   event?.stopPropagation()
   const v = seg.variations?.[vi]
@@ -453,30 +455,92 @@ function cancelVariation(seg, vi, event) {
 
   const confirmed = window.confirm(
     `Cancel variation ${vi + 1} on ${seg.label}?\n\n` +
-    `This marks the attempt as failed locally so the segment can advance. ` +
-    `The backend will still reconcile the actual GeminiGen job on its next ` +
-    `poll cycle — no data is lost, just the UI stops waiting.`
+    `The slot will be removed so you can generate a fresh variation. ` +
+    `Backend reconciles the actual GeminiGen job on its next poll cycle.`
   )
   if (!confirmed) return
 
-  v.status = 'failed'
-  v.error = 'Cancelled by user'
+  // Remove the slot outright. splice instead of marking failed so the
+  // variation strip collapses and the "+ Add" button reappears.
+  seg.variations.splice(vi, 1)
 
-  // Recompute segment status locally — mirror initSegments precedence
-  const vars = seg.variations || []
+  // Adjust selected_variation if it now points to a missing/shifted slot.
   const selectedIdx = seg.selected_variation ?? 0
-  const selected = vars[selectedIdx]
+  if (selectedIdx === vi) {
+    // The cancelled slot was selected — prefer the first still-done slot,
+    // otherwise reset to 0 (harmless when variations is empty).
+    const firstDone = seg.variations.findIndex(x => x.status === 'done' && !!x.url)
+    seg.selected_variation = firstDone >= 0 ? firstDone : 0
+  } else if (selectedIdx > vi) {
+    // Slot removed was before the selected one — shift index down by 1.
+    seg.selected_variation = selectedIdx - 1
+  }
+
+  // Recompute segment status with the same precedence as initSegments
+  const vars = seg.variations
+  const selected = vars[seg.selected_variation ?? 0]
   const selectedIsDone = selected && selected.status === 'done' && !!selected.url
   const anyGenerating = vars.some(x => x.status === 'generating')
   const anyDone = vars.some(x => x.status === 'done' && x.url)
 
-  if (selectedIsDone) seg.status = 'done'
-  else if (anyGenerating) seg.status = 'generating'
-  else if (anyDone) seg.status = 'done'
-  else if (vars.length > 0 && vars.every(x => x.status === 'failed')) seg.status = 'failed'
+  if (selectedIsDone) {
+    seg.status = 'done'
+    seg.generated_url = selected.url
+  } else if (anyGenerating) {
+    seg.status = 'generating'
+  } else if (anyDone) {
+    seg.status = 'done'
+  } else if (vars.length > 0 && vars.every(x => x.status === 'failed')) {
+    seg.status = 'failed'
+  } else if (vars.length === 0) {
+    seg.status = 'pending'
+    seg.generated_url = ''
+  }
 
   scheduleAutoSave()
-  toast.success(`Variation ${vi + 1} cancelled — segment unstuck`)
+  toast.success(`Variation ${vi + 1} cancelled — slot cleared`)
+}
+
+// Remove a 'failed' variation slot. Same splice + reselect + recompute
+// logic as cancelVariation but skips the confirm dialog — nothing is in
+// flight to cancel, the slot is already a dead marker.
+function removeFailedVariation(seg, vi, event) {
+  event?.stopPropagation()
+  const v = seg.variations?.[vi]
+  if (!v || v.status !== 'failed') return
+
+  seg.variations.splice(vi, 1)
+
+  const selectedIdx = seg.selected_variation ?? 0
+  if (selectedIdx === vi) {
+    const firstDone = seg.variations.findIndex(x => x.status === 'done' && !!x.url)
+    seg.selected_variation = firstDone >= 0 ? firstDone : 0
+  } else if (selectedIdx > vi) {
+    seg.selected_variation = selectedIdx - 1
+  }
+
+  const vars = seg.variations
+  const selected = vars[seg.selected_variation ?? 0]
+  const selectedIsDone = selected && selected.status === 'done' && !!selected.url
+  const anyGenerating = vars.some(x => x.status === 'generating')
+  const anyDone = vars.some(x => x.status === 'done' && x.url)
+
+  if (selectedIsDone) {
+    seg.status = 'done'
+    seg.generated_url = selected.url
+  } else if (anyGenerating) {
+    seg.status = 'generating'
+  } else if (anyDone) {
+    seg.status = 'done'
+  } else if (vars.length > 0 && vars.every(x => x.status === 'failed')) {
+    seg.status = 'failed'
+  } else if (vars.length === 0) {
+    seg.status = 'pending'
+    seg.generated_url = ''
+  }
+
+  scheduleAutoSave()
+  toast.success(`Failed variation ${vi + 1} removed`)
 }
 
 // ── Phase B: Retry + Skip for failed segments ──
@@ -1218,8 +1282,19 @@ async function handleApprove() {
                       <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                   </div>
-                  <div v-else class="w-full h-full bg-red-500/5 flex items-center justify-center">
+                  <div v-else class="w-full h-full bg-red-500/5 flex items-center justify-center relative group/var">
                     <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    <!-- Remove X for failed slots: hover reveals, click removes
+                         the slot entirely so "+" reappears and the operator can
+                         generate a fresh variation. Mirrors cancelVariation for
+                         the 'generating' case but works for any cleanup. -->
+                    <button
+                      @click.stop="removeFailedVariation(seg, vi, $event)"
+                      class="absolute top-0 right-0 w-4 h-4 rounded-bl bg-red-500/80 hover:bg-red-600 text-white opacity-0 group-hover/var:opacity-100 transition-opacity flex items-center justify-center"
+                      :title="`Remove failed variation ${vi + 1}`"
+                    >
+                      <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
                   </div>
                   <!-- Index badge -->
                   <span :class="[
