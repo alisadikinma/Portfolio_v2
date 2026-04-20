@@ -431,7 +431,12 @@ class ImageGenerationService
      */
     private function findIdeaIdForJobUuid(string $uuid): ?int
     {
-        $ideas = ContentIdea::whereIn('status', ['article_ready', 'generating_images', 'images_ready'])
+        // Includes 'completed' so late webhook deliveries from operator-triggered
+        // retries (after the first variation already auto-advanced the idea)
+        // can still mirror status/url back into image_prompts[].variations[].
+        // Without this, retried variations stay 'generating' in the admin UI
+        // forever even though the underlying ImageGenerationJob is done/failed.
+        $ideas = ContentIdea::whereIn('status', ['article_ready', 'generating_images', 'images_ready', 'completed'])
             ->whereNotNull('generated_article')
             ->orderByDesc('updated_at')
             ->limit(50)

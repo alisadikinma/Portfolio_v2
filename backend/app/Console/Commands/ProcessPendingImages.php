@@ -154,8 +154,13 @@ class ProcessPendingImages extends Command
      */
     private function syncToContentIdea(ImageGenerationJob $job, ?string $imageUrl, bool $failed = false): void
     {
-        // Includes images_ready because late webhook/polling after retries must still sync
-        $ideas = \App\Models\ContentIdea::whereIn('status', ['article_ready', 'generating_images', 'images_ready'])
+        // Includes images_ready + completed because late webhook/polling after
+        // retries must still sync the variations[] mirror — operators routinely
+        // dispatch additional variations after the first one auto-advances the
+        // idea to images_ready/completed, and those late results must reach
+        // the admin UI even though the FSM has already moved on. Mirror-only
+        // update — never reverses the FSM transition.
+        $ideas = \App\Models\ContentIdea::whereIn('status', ['article_ready', 'generating_images', 'images_ready', 'completed'])
             ->whereNotNull('generated_article')
             ->get();
 
