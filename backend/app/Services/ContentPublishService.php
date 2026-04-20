@@ -403,7 +403,26 @@ class ContentPublishService
             $metaDescription = Str::limit(trim($source), 155, '...');
         }
 
-        $metaKeywords = data_get($langData, 'meta_keywords') ?: data_get($article, 'meta_keywords');
+        // Keyword resolution priority (most specific → least specific):
+        //   1. Plugin-authored per-language meta_keywords      (best)
+        //   2. Plugin-authored top-level meta_keywords
+        //   3. Article-level target_keyword (singular SEO target — set by
+        //      research/scoring step, ALWAYS present for AI-generated articles)
+        //   4. seo_analysis.keyword (synonym of target_keyword)
+        //   5. prep_data.keyword (research-step keyword)
+        //   6. niche + pillar + tags fallback (legacy generic chain)
+        //
+        // Layers 3-5 catch the very common case where the plugin runs the
+        // full SEO scoring pipeline and sets target_keyword like
+        // "gugatan Musk vs Altman OpenAI 2026" but never authors a
+        // meta_keywords list — without those layers every AI post falls
+        // through to layer 6 which yields the literal table-default
+        // "AI & Tech" since `niche` column DEFAULT is that string.
+        $metaKeywords = data_get($langData, 'meta_keywords')
+            ?: data_get($article, 'meta_keywords')
+            ?: data_get($article, 'target_keyword')
+            ?: data_get($article, 'seo_analysis.keyword')
+            ?: data_get($article, 'prep_data.keyword');
         if (empty($metaKeywords)) {
             $parts = array_filter([
                 $idea->niche,
