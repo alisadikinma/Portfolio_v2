@@ -16,91 +16,19 @@
       </div>
     </section>
 
-    <!-- Featured Post -->
-    <section v-if="featuredPost" class="container-custom mb-20">
-      <span class="eyebrow-tag text-fg-dim mb-6 inline-flex">Featured Post</span>
-      <div class="mt-4 bezel-shell cursor-pointer group" @click="$router.push(`/blog/${featuredPost.slug}`)">
-        <div class="bezel-core overflow-hidden">
-          <div class="grid md:grid-cols-2 gap-0">
-            <!-- Image -->
-            <div class="relative aspect-video md:aspect-auto overflow-hidden bg-bg-elevated">
-              <img
-                v-if="featuredPost.featured_image"
-                :src="featuredPost.featured_image"
-                :alt="featuredPost.title"
-                class="w-full h-full object-cover transition-transform duration-700 ease-spring group-hover:scale-105"
-              />
-              <div v-else class="w-full h-full flex items-center justify-center min-h-64">
-                <svg class="w-16 h-16 text-fg-dim" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                </svg>
-              </div>
-              <span
-                v-if="featuredPost.category?.name"
-                class="absolute top-4 left-4 eyebrow-tag text-accent-gold border-accent-gold/20"
-              >
-                {{ featuredPost.category.name }}
-              </span>
-            </div>
-
-            <!-- Content -->
-            <div class="p-8 md:p-10 flex flex-col justify-center">
-              <div class="flex items-center gap-3 mb-5">
-                <time :datetime="featuredPost.published_at" class="mono-label text-fg-dim">{{ formatDate(featuredPost.published_at) }}</time>
-                <span class="text-fg-dim text-xs">&middot;</span>
-                <span class="mono-label text-fg-dim">{{ readingTime(featuredPost.content || featuredPost.excerpt) }} min read</span>
-              </div>
-
-              <h2 class="section-heading text-3xl md:text-4xl font-bold text-fg-primary mb-4 group-hover:text-accent-gold transition-all duration-700 ease-spring leading-tight">
-                {{ featuredPost.title }}
-              </h2>
-
-              <p class="text-fg-muted leading-relaxed mb-8 line-clamp-3 font-light">
-                {{ featuredPost.excerpt }}
-              </p>
-
-              <div class="flex items-center gap-3">
-                <span class="btn-gold text-sm cursor-pointer">
-                  Read Article
-                  <span class="btn-icon-island">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12h15m0 0l-6.75-6.75M19.5 12l-6.75 6.75"/></svg>
-                  </span>
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
     <!-- Filters & Search -->
-    <section class="container-custom mb-10">
+    <section class="container-custom mb-8">
+      <BlogCategoryChips
+        :categories="categories"
+        :selected-id="selectedCategory"
+        @select="selectCategory"
+        class="mb-6"
+      />
       <div class="bezel-shell-sm">
-        <div class="bezel-core-sm p-5">
+        <div class="bezel-core-sm p-4">
           <div class="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-            <!-- Category Pills -->
-            <div class="flex flex-wrap gap-2">
-              <button
-                class="px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-700 ease-spring"
-                :class="selectedCategory === null
-                  ? 'bg-accent-gold/10 text-accent-gold border border-accent-gold/25'
-                  : 'bg-white/4 text-fg-muted border border-border-hairline hover:border-border-hover'"
-                @click="selectCategory(null)"
-              >
-                All Posts
-                <span class="ml-1.5 text-[10px] opacity-50">({{ filteredTotal }})</span>
-              </button>
-              <button
-                v-for="cat in categories"
-                :key="cat.id"
-                class="px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-700 ease-spring"
-                :class="selectedCategory === cat.id
-                  ? 'bg-accent-gold/10 text-accent-gold border border-accent-gold/25'
-                  : 'bg-white/4 text-fg-muted border border-border-hairline hover:border-border-hover'"
-                @click="selectCategory(cat.id)"
-              >
-                {{ cat.name }}
-              </button>
+            <div class="mono-label text-fg-dim text-xs">
+              {{ filteredTotal }} {{ filteredTotal === 1 ? 'article' : 'articles' }}
             </div>
 
             <!-- Search -->
@@ -132,8 +60,10 @@
     <!-- Post Grid -->
     <section class="container-custom mb-20">
       <!-- Loading -->
-      <div v-if="isLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        <div v-for="i in 6" :key="i" class="bezel-shell-sm"><div class="bezel-core-sm animate-pulse"><div class="aspect-video bg-white/3"></div><div class="p-6 space-y-3"><div class="h-3 bg-white/3 rounded w-1/3"></div><div class="h-5 bg-white/3 rounded w-4/5"></div><div class="h-4 bg-white/3 rounded w-full mt-2"></div></div></div></div>
+      <div v-if="isLoading" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="col-span-full bezel-shell"><div class="bezel-core animate-pulse aspect-[4/5] md:aspect-[21/9] bg-white/3"></div></div>
+        <div class="col-span-full bezel-shell-sm"><div class="bezel-core-sm animate-pulse grid md:grid-cols-2 gap-0"><div class="aspect-video md:aspect-[4/3] bg-white/3"></div><div class="p-8 space-y-3"><div class="h-3 bg-white/3 rounded w-1/3"></div><div class="h-6 bg-white/3 rounded w-4/5"></div><div class="h-4 bg-white/3 rounded w-full mt-2"></div></div></div></div>
+        <div v-for="i in 4" :key="i" class="bezel-shell-sm"><div class="bezel-core-sm animate-pulse"><div class="aspect-video bg-white/3"></div><div class="p-5 space-y-3"><div class="h-3 bg-white/3 rounded w-1/3"></div><div class="h-5 bg-white/3 rounded w-4/5"></div><div class="h-4 bg-white/3 rounded w-full mt-2"></div></div></div></div>
       </div>
 
       <!-- Empty state -->
@@ -149,71 +79,13 @@
         </div>
       </div>
 
-      <!-- Grid -->
-      <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        <article
-          v-for="post in paginatedPosts"
-          :key="post.id"
-          class="cursor-pointer group"
-          @click="$router.push(`/blog/${post.slug}`)"
-        >
-          <div class="bezel-shell-sm h-full">
-            <div class="bezel-core-sm overflow-hidden h-full flex flex-col">
-              <!-- Thumbnail -->
-              <div class="relative aspect-video overflow-hidden bg-bg-elevated flex-shrink-0">
-                <img
-                  v-if="post.featured_image"
-                  :src="post.featured_image"
-                  :alt="post.title"
-                  class="w-full h-full object-cover transition-transform duration-700 ease-spring group-hover:scale-105"
-                />
-                <div v-else class="w-full h-full flex items-center justify-center">
-                  <svg class="w-10 h-10 text-fg-dim" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                  </svg>
-                </div>
-                <span
-                  v-if="post.category?.name"
-                  class="absolute top-3 left-3 eyebrow-tag text-[8px] text-accent-cyan border-accent-cyan/15 bg-bg-deep/70 backdrop-blur-sm"
-                >
-                  {{ post.category.name }}
-                </span>
-              </div>
-
-              <!-- Body -->
-              <div class="p-5 flex flex-col flex-grow">
-                <div class="flex items-center gap-2 mb-3">
-                  <time :datetime="post.published_at" class="mono-label text-fg-dim text-[10px]">{{ formatDate(post.published_at) }}</time>
-                  <span class="text-fg-dim text-[10px]">&middot;</span>
-                  <span class="mono-label text-fg-dim text-[10px]">{{ readingTime(post.content || post.excerpt) }} min</span>
-                </div>
-
-                <h3 class="text-lg font-semibold font-display text-fg-primary mb-2 leading-snug group-hover:text-accent-gold transition-all duration-700 ease-spring line-clamp-2">
-                  {{ post.title }}
-                </h3>
-
-                <p class="text-fg-muted text-sm leading-relaxed line-clamp-3 flex-grow font-light">
-                  {{ post.excerpt }}
-                </p>
-
-                <div class="flex items-center justify-between pt-4 border-t border-border-hairline mt-auto">
-                  <span class="flex items-center gap-1 text-xs text-fg-dim">
-                    <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/>
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                    </svg>
-                    {{ post.views || 0 }}
-                  </span>
-                  <span class="text-accent-gold text-xs font-medium flex items-center gap-1 group-hover:gap-2 transition-all duration-700 ease-spring">
-                    Read
-                    <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12h15m0 0l-6.75-6.75M19.5 12l-6.75 6.75"/></svg>
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </article>
-      </div>
+      <!-- Feed -->
+      <BlogFeedDistributor
+        v-else
+        :posts="paginatedPosts"
+        :lang="lang"
+        :newsletter-every="9"
+      />
 
       <!-- Pagination -->
       <div v-if="totalPages > 1" class="flex items-center justify-center gap-2 mt-14">
@@ -332,6 +204,8 @@ import { useRoute } from 'vue-router'
 import { usePosts } from '@/composables/usePosts'
 import { useNewsletter } from '@/composables/useNewsletter'
 import NewsletterFooterBar from '@/components/blog/NewsletterFooterBar.vue'
+import BlogCategoryChips from '@/components/blog/BlogCategoryChips.vue'
+import BlogFeedDistributor from '@/components/blog/BlogFeedDistributor.vue'
 import api from '@/services/api'
 
 const route = useRoute()
@@ -417,10 +291,8 @@ watch(lang, async (newLang) => {
   await fetchPosts({}, newLang)
 })
 
-const featuredPost = computed(() => posts.value?.[0] ?? null)
-
 const filteredPosts = computed(() => {
-  let list = posts.value?.slice(1) ?? []
+  let list = posts.value ? [...posts.value] : []
   if (selectedCategory.value !== null) {
     list = list.filter(p => p.category?.id === selectedCategory.value)
   }
@@ -434,12 +306,7 @@ const filteredPosts = computed(() => {
   return list
 })
 
-const filteredTotal = computed(() => {
-  if (selectedCategory.value === null && !searchQuery.value.trim()) {
-    return posts.value?.length ?? 0
-  }
-  return filteredPosts.value.length
-})
+const filteredTotal = computed(() => filteredPosts.value.length)
 
 const totalPages = computed(() => Math.max(1, Math.ceil(filteredPosts.value.length / perPage)))
 
@@ -471,17 +338,6 @@ const selectCategory = (id) => {
 watch([selectedCategory, searchQuery], () => {
   currentPage.value = 1
 })
-
-const formatDate = (date) => {
-  if (!date) return ''
-  return new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
-}
-
-const readingTime = (text) => {
-  if (!text) return 1
-  const words = text.replace(/<[^>]+>/g, '').split(/\s+/).filter(Boolean).length
-  return Math.max(1, Math.round(words / 200))
-}
 
 const subscribeNewsletter = async () => {
   const email = newsletterEmail.value.trim()
