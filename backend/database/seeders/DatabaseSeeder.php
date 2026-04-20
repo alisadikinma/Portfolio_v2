@@ -31,6 +31,7 @@ class DatabaseSeeder extends Seeder
             SiteSettingsSeeder::class,
             CtaSettingsSeeder::class, // CTA section settings
             CreatorBrandSettingsSeeder::class, // creator watermark/filename branding
+            TelegramSettingsSeeder::class, // telegram bot for manifest/failure/success alerts
         ]);
 
         $this->command->info('✅ Database seeding completed successfully!');
