@@ -92,9 +92,13 @@ echo "▶ php artisan migrate --force"
 cd backend
 php artisan migrate --force
 
-# Idempotent seeders — safe to re-run (uses updateOrCreate)
+# Idempotent seeders — safe to re-run (uses firstOrCreate, never clobbers admin values)
 echo "▶ php artisan db:seed creator_brand (idempotent)"
 php artisan db:seed --class=CreatorBrandSettingsSeeder --force || \
+  echo "  (seeder failed or already applied — continuing)"
+
+echo "▶ php artisan db:seed telegram (idempotent)"
+php artisan db:seed --class=TelegramSettingsSeeder --force || \
   echo "  (seeder failed or already applied — continuing)"
 
 # ---- 4. Cache refresh --------------------------------------------------------

@@ -23,6 +23,14 @@ export const useSettingsStore = defineStore('settings', {
       meta_tags: [],
       analytics_code: ''
     },
+    telegramSettings: {
+      telegram_bot_token: null,
+      telegram_chat_id: null,
+      telegram_enabled: 'false',
+      telegram_notify_manifest_needed: 'true',
+      telegram_notify_generation_failed: 'true',
+      telegram_notify_publish_success: 'false',
+    },
     creatorBrandSettings: {
       creator_brand_logo: null,
       creator_brand_tagline: 'alisadikinma.com',
@@ -217,6 +225,53 @@ export const useSettingsStore = defineStore('settings', {
         throw error
       } finally {
         this.loading = false
+      }
+    },
+
+    // Phase I: Telegram notification settings
+    async fetchTelegramSettings() {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await api.get('/admin/settings/telegram')
+        if (response.data.success) {
+          this.telegramSettings = response.data.data
+        }
+        return this.telegramSettings
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to fetch telegram settings'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async updateTelegramSettings(payload) {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await api.put('/admin/settings/telegram', payload)
+        if (response.data.success) {
+          this.telegramSettings = response.data.data
+        }
+        return this.telegramSettings
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to update telegram settings'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async sendTelegramTestMessage() {
+      try {
+        const response = await api.post('/admin/settings/telegram/test', {})
+        return { success: true, data: response.data }
+      } catch (error) {
+        return {
+          success: false,
+          error: error.response?.data?.message || error.message || 'Test message failed',
+        }
       }
     },
 

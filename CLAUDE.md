@@ -265,6 +265,53 @@ PUT    /api/admin/settings/creator-brand
 POST   /api/admin/settings/creator-brand  (FormData with _method=PUT for logo upload)
 ```
 
+### `settings` group: `telegram` (April 20, 2026)
+
+Telegram Bot notifications for Content Engine operational alerts. 6 rows seeded via `TelegramSettingsSeeder`:
+
+| key | default | purpose |
+|---|---|---|
+| `telegram_bot_token` | null | BotFather-issued bot token (response masks to `1234****wxyz`) |
+| `telegram_chat_id` | null | Admin's personal chat_id (found via `getUpdates` API) |
+| `telegram_enabled` | `false` | Master opt-in toggle (all notifications no-op when false) |
+| `telegram_notify_manifest_needed` | `true` | Alert on public figure / landmark reference missing |
+| `telegram_notify_generation_failed` | `true` | Alert on GeminiGen failure |
+| `telegram_notify_publish_success` | `false` | Celebratory alert on successful publish (off by default) |
+
+Admin UI: "Telegram Notifications" card on [AboutSettings.vue](frontend/src/views/admin/AboutSettings.vue), below Creator Brand. Send-test-message button verifies config. Notifications dispatched via queued `App\Jobs\DispatchTelegramNotification` → `App\Services\TelegramNotificationService`.
+
+API routes:
+```
+GET    /api/admin/settings/telegram            (auth:sanctum)
+PUT    /api/admin/settings/telegram            (auth:sanctum)
+POST   /api/admin/settings/telegram/test       (auth:sanctum — triggers sendTestMessage)
+```
+
+### Named Entity Cover Generation (April 20, 2026) — NEW
+
+Fixes a major bug where blog covers about public figures (Dario Amodei, Elon Musk) or famous landmarks (White House, Capitol) silently used Ali's face instead of the real subject.
+
+**Plugin-side detection:** `/article-images` v2.7.0 Phase 3.5b detects named entities (persons / landmarks / logos / products) that appear in the article title or H2 heading, then hits the backend's cache-first lookup endpoint.
+
+**Backend flow:** [`EntityReferenceService::findOrFetch`](backend/app/Services/EntityReferenceService.php) queries Wikidata SPARQL (notability gate: sitelinks ≥ 5, P18 image exists) + Commons MediaWiki API (license whitelist: CC0, Public Domain, PD-USGov, CC-BY-4.0 — rejects CC-BY-SA share-alike). Valid hits download to `storage/app/public/entity-refs/{type}/{qid}_{slug}.{ext}` and persist in the new `entity_references` table for zero-roundtrip cache reuse on subsequent articles.
+
+**Cover branding gate:** [`CoverBrandingEnhancer::enhance`](backend/app/Services/CoverBrandingEnhancer.php) — when any entry in `image_prompts[i].entity_refs[]` has `entity_type='person'` on a cover, SKIP prepending Ali's creator face + SKIP VD auto-rewrite (plugin VD already names the person). Landmark/logo/product alone still inject creator face (Ali visits the landmark). All entity URLs merge into GeminiGen `file_urls`. Watermark + title overlay + branded filename unchanged.
+
+**Manifest + manual upload:** Plugin flags unfetchable entities (license fail, notability fail) in `manifest.entity[]` alongside existing `manifest.brand[]`. Backend progress endpoint persists to `content_ideas.pending_manifest`, flips status to `awaiting_manual_upload`, and dispatches `DispatchTelegramNotification` job. Admin resolves via `POST /admin/content-engine/ideas/{id}/upload-entity-reference` (creates `source=user_upload` EntityReference row + patches segments) or `skip-entity-reference` (removes entity, falls back to creator face).
+
+**New status:** `content_ideas.status` enum expanded to include `awaiting_manual_upload` between `generating_images` and `images_ready`.
+
+**UI:** [`EntityUploadSlot.vue`](frontend/src/components/admin/EntityUploadSlot.vue) renders per-entity chips (green fetched, red missing, amber skipped) in Gate 2 Image Config modal.
+
+API routes:
+```
+GET    /api/automation/entity-refs/lookup?name=...&type=...   (auth:sanctum, plugin)
+POST   /api/admin/content-engine/ideas/{id}/upload-entity-reference   (auth:sanctum)
+POST   /api/admin/content-engine/ideas/{id}/skip-entity-reference     (auth:sanctum)
+```
+
+Tests: 30+ across 10 phases covering model, service, gate, dispatch, manifest, upload/skip, lookup, E2E. See design doc at `docs/plans/2026-04-20-named-entity-aware-cover-generation.md`.
+
 ## Critical Schema Notes
 
 **`posts` table has NO `title`, `content`, or `excerpt` columns.**
