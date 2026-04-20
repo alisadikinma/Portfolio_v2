@@ -204,6 +204,75 @@ class SegmentFailureAutoRetryTest extends TestCase
     }
 
     /** @test */
+    public function retry_count_semantics_single_increment_per_failure(): void
+    {
+        // Regression: earlier code path double-counted — handleSegmentFailure
+        // bumped retry_count + RetryImageSegmentJob -> retrySegment ALSO
+        // bumped, effectively halving the 3-attempt budget. retrySegment
+        // no longer increments; only handleSegmentFailure does.
+        Queue::fake();
+
+        $idea = ContentIdea::create([
+            'title' => 'Single-increment',
+            'pillar' => 'ai_automation',
+            'priority' => 'medium',
+            'status' => 'generating_images',
+            'auto_mode' => true,
+            'generated_article' => [
+                'image_prompts' => [
+                    [
+                        'type' => 'cover',
+                        'prompt_text' => 'Cover',
+                        'status' => 'generating',
+                        'retry_count' => 0,
+                        'failure_history' => [],
+                        'terminal_at' => null,
+                        'variations' => [
+                            ['url' => null, 'job_uuid' => 'attempt-1', 'status' => 'generating'],
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        // First failure: retry_count 0 → 1
+        app(ImageGenerationService::class)->handleSegmentFailure($this->makeJob('attempt-1', 'boom'), 'boom');
+        $idea->refresh();
+        $this->assertSame(1, $idea->generated_article['image_prompts'][0]['retry_count']);
+        $this->assertNull($idea->generated_article['image_prompts'][0]['terminal_at']);
+
+        // Simulate auto-retry dispatch via retrySegment — must NOT bump counter
+        $article = $idea->generated_article;
+        $article['image_prompts'][0]['variations'] = [
+            ['url' => null, 'job_uuid' => 'attempt-2', 'status' => 'generating'],
+        ];
+        $article['image_prompts'][0]['status'] = 'generating';
+        $idea->update(['generated_article' => $article]);
+
+        $idea->refresh();
+        $this->assertSame(1, $idea->generated_article['image_prompts'][0]['retry_count'], 'retry_count must stay at 1 after dispatch');
+
+        // Second failure: retry_count 1 → 2
+        app(ImageGenerationService::class)->handleSegmentFailure($this->makeJob('attempt-2', 'boom2'), 'boom2');
+        $idea->refresh();
+        $this->assertSame(2, $idea->generated_article['image_prompts'][0]['retry_count']);
+        $this->assertNull($idea->generated_article['image_prompts'][0]['terminal_at']);
+
+        // Third failure: retry_count 2 → 3 (cap) → terminal
+        $article = $idea->generated_article;
+        $article['image_prompts'][0]['variations'] = [
+            ['url' => null, 'job_uuid' => 'attempt-3', 'status' => 'generating'],
+        ];
+        $article['image_prompts'][0]['status'] = 'generating';
+        $idea->update(['generated_article' => $article]);
+
+        app(ImageGenerationService::class)->handleSegmentFailure($this->makeJob('attempt-3', 'boom3'), 'boom3');
+        $idea->refresh();
+        $this->assertSame(3, $idea->generated_article['image_prompts'][0]['retry_count']);
+        $this->assertNotNull($idea->generated_article['image_prompts'][0]['terminal_at'], 'terminal_at set exactly at 3rd failure, confirming 3-attempt budget');
+    }
+
+    /** @test */
     public function no_match_silently_ignores(): void
     {
         Queue::fake();

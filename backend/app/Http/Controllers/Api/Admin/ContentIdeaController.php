@@ -1086,12 +1086,16 @@ class ContentIdeaController extends Controller
             ], 500);
         }
 
+        // retry_count reflects failures observed; the retry dispatch itself
+        // does NOT mutate it (see ImageGenerationService::retrySegment).
+        // Return the current value so the UI can label "Attempt N/MAX" where
+        // N = retry_count (next failure will bump it).
         return response()->json([
             'success' => true,
             'data' => [
                 'uuid' => $uuid,
                 'segment_index' => $i,
-                'retry_count' => $retryCount + 1,
+                'retry_count' => $retryCount,
             ],
             'message' => 'Retry dispatched.',
         ]);
@@ -1122,6 +1126,19 @@ class ContentIdeaController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Segment already done — skip refused.',
+            ], 409);
+        }
+
+        // Block skip while a GeminiGen job is still in flight — otherwise
+        // the webhook can race and flip the variation to done on an
+        // already-skipped segment, leaving the UI in a corrupted mixed
+        // state. Admin must wait for the in-flight attempt to resolve
+        // (fail) before skipping.
+        if ($currentStatus === 'generating') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Segment is still generating — wait for the attempt to complete before skipping.',
+                'code' => 'SEGMENT_STILL_GENERATING',
             ], 409);
         }
 

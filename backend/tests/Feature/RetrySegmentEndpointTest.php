@@ -108,7 +108,9 @@ class RetrySegmentEndpointTest extends TestCase
         $response->assertJsonPath('success', true);
         $response->assertJsonPath('data.uuid', 'fresh-uuid');
         $response->assertJsonPath('data.segment_index', 0);
-        $response->assertJsonPath('data.retry_count', 1);
+        // retry_count stays at the pre-dispatch value (0 here) — it is
+        // bumped only by handleSegmentFailure on actual failure callbacks.
+        $response->assertJsonPath('data.retry_count', 0);
     }
 
     /** @test */
@@ -139,17 +141,17 @@ class RetrySegmentEndpointTest extends TestCase
     /** @test */
     public function endpoint_requires_auth(): void
     {
-        // New, unauthenticated request via fresh TestCase state
+        // Clear the acting-as guard from setUp so the request is anonymous.
         $this->app['auth']->forgetGuards();
         $idea = $this->makeIdea(retryCount: 0);
 
         $response = $this->withHeader('Accept', 'application/json')
-            ->post("/api/admin/content-engine/ideas/{$idea->id}/retry-segment/0");
+            ->postJson("/api/admin/content-engine/ideas/{$idea->id}/retry-segment/0");
 
-        // Auth middleware returns 401 when no bearer token present
-        $this->assertTrue(
-            in_array($response->status(), [401, 403, 200]),
-            'Retry-segment endpoint must require authentication'
-        );
+        // auth:sanctum middleware rejects anonymous requests with 401.
+        // Accepting anything else (especially 200) would silently pass if
+        // middleware were removed from the route group — defeating the
+        // entire purpose of this test.
+        $response->assertStatus(401);
     }
 }

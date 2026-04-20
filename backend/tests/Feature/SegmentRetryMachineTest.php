@@ -96,8 +96,12 @@ class SegmentRetryMachineTest extends TestCase
     }
 
     /** @test */
-    public function retry_segment_bumps_retry_count_resets_variations_and_returns_new_uuid(): void
+    public function retry_segment_resets_variations_without_bumping_retry_count(): void
     {
+        // retry_count is owned by handleSegmentFailure and bumped only on
+        // actual failures. retrySegment() is a dispatch — it must NOT
+        // increment, otherwise each attempt consumes 2 budget units
+        // (failure + dispatch) instead of 1.
         $idea = $this->makeIdeaWithFailedSegment(retryCount: 1);
 
         $service = app(ImageGenerationService::class);
@@ -106,7 +110,7 @@ class SegmentRetryMachineTest extends TestCase
         $this->assertSame('retry-uuid-1', $uuid);
 
         $segment = $idea->generated_article['image_prompts'][0];
-        $this->assertSame(2, $segment['retry_count']);
+        $this->assertSame(1, $segment['retry_count'], 'retrySegment must NOT mutate retry_count');
         $this->assertSame('generating', $segment['status']);
         $this->assertCount(1, $segment['variations']);
         $this->assertSame('generating', $segment['variations'][0]['status']);
@@ -114,20 +118,18 @@ class SegmentRetryMachineTest extends TestCase
     }
 
     /** @test */
-    public function retry_segment_appends_prior_failure_to_history(): void
+    public function retry_segment_clears_terminal_at_on_manual_override(): void
     {
+        // Admin force-retry of a terminal segment: terminal_at is cleared
+        // so the advance rule stops seeing this segment as resolved-failed.
         $idea = $this->makeIdeaWithFailedSegment(retryCount: 1);
+        $article = $idea->generated_article;
+        $article['image_prompts'][0]['terminal_at'] = now()->toIso8601String();
+        $idea->generated_article = $article;
 
-        $service = app(ImageGenerationService::class);
-        $service->retrySegment($idea, 0);
+        app(ImageGenerationService::class)->retrySegment($idea, 0);
 
-        $segment = $idea->generated_article['image_prompts'][0];
-        $this->assertNotEmpty($segment['failure_history']);
-        $last = end($segment['failure_history']);
-        $this->assertSame(1, $last['attempt']);
-        $this->assertSame('old-uuid', $last['uuid']);
-        $this->assertSame('GeminiGen boom', $last['reason']);
-        $this->assertArrayHasKey('timestamp', $last);
+        $this->assertNull($idea->generated_article['image_prompts'][0]['terminal_at']);
     }
 
     /** @test */

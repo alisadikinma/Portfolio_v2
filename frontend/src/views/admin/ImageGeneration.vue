@@ -496,7 +496,10 @@ function canRetrySegment(seg) {
 
 function canSkipSegment(seg) {
   if (seg.status === 'done' || seg.status === 'skipped') return false
-  // Allow skip when the segment is stuck failed OR has some prior failure history
+  // Block skip while a GeminiGen job is in flight — backend also enforces
+  // this with 409 SEGMENT_STILL_GENERATING, but hiding the button avoids
+  // confusing the operator in the first place.
+  if (seg.status === 'generating') return false
   return seg.status === 'failed' || (seg.failure_history || []).length > 0
 }
 

@@ -461,6 +461,22 @@ class AutoPipelineOrchestrator
             return true;
         }
 
+        // Cache-lock guards against overlapping cron ticks: the translate
+        // SSH call runs ~30-60s, and if the scheduler fires every minute,
+        // a slow SSH can cause two ticks to enter this block simultaneously
+        // on the same idea. Without the lock both ticks increment
+        // translation_attempts_auto, prematurely exhausting the 3-attempt
+        // cap after just 1 real attempt. Lock expires after 120s (> max
+        // expected SSH duration) so a crashed process can't deadlock the
+        // idea permanently.
+        $lockKey = "auto_pipeline:translate_preflight:{$idea->id}";
+        $lock = Cache::lock($lockKey, 120);
+
+        if (!$lock->get()) {
+            Log::info("[AutoPipeline] Idea #{$idea->id} translate preflight already running (lock held), skipping this tick");
+            return false;
+        }
+
         try {
             $result = $this->articleGen->triggerTranslatePreflight($idea);
             $idea->increment('translation_attempts_auto');
@@ -478,6 +494,8 @@ class AutoPipelineOrchestrator
             Log::error("[AutoPipeline] Auto-translate threw for idea #{$idea->id}: " . $e->getMessage());
             $idea->increment('translation_attempts_auto');
             return false;
+        } finally {
+            $lock->release();
         }
     }
 

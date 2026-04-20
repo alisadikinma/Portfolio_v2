@@ -6,6 +6,7 @@ use App\Enums\ContentIdeaStatus;
 use App\Models\ContentIdea;
 use App\Models\ImageGenerationJob;
 use App\Models\Setting;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -330,19 +331,31 @@ class ImageGenerationService
      */
     private function updateContentIdeaSegment(string $uuid, string $status, ?string $imageUrl = null, ?string $errorMessage = null): void
     {
-        // Narrow scan: only ideas currently in image-gen-relevant statuses
-        $ideas = ContentIdea::whereIn('status', ['article_ready', 'generating_images', 'images_ready'])
-            ->orderByDesc('updated_at')
-            ->limit(50)
-            ->get();
+        // Step 1: find which idea owns this uuid (lightweight scan, no lock).
+        // Matches if any image_prompts[].job_uuid OR any variations[].job_uuid equals $uuid.
+        $ideaId = $this->findIdeaIdForJobUuid($uuid);
+        if ($ideaId === null) {
+            Log::info("[ImageGen] Webhook: no matching content_idea segment for UUID {$uuid} (ok if legacy blog post)");
+            return;
+        }
 
-        foreach ($ideas as $idea) {
+        // Step 2: re-read the idea under a row-level lock inside a transaction
+        // so concurrent GeminiGen webhooks can't stomp each other's variation
+        // updates. Race scenario before this fix: two webhooks for segments
+        // 0 and 1 arrive in parallel, both read the same stale snapshot of
+        // generated_article, each mark their own variation done, then the
+        // second update() wipes the first's write.
+        DB::transaction(function () use ($ideaId, $uuid, $status, $imageUrl, $errorMessage) {
+            $idea = ContentIdea::lockForUpdate()->find($ideaId);
+            if (!$idea) {
+                return;
+            }
+
             $article = $idea->generated_article ?? [];
             $prompts = $article['image_prompts'] ?? [];
             $matched = false;
 
             foreach ($prompts as $i => $p) {
-                // Search within variations[] array first (new multi-choice model)
                 $variations = $p['variations'] ?? [];
                 foreach ($variations as $vi => $v) {
                     if (($v['job_uuid'] ?? null) === $uuid) {
@@ -354,13 +367,11 @@ class ImageGenerationService
                             $prompts[$i]['variations'][$vi]['error'] = $errorMessage;
                         }
 
-                        // Update flat fields for backward compat + polling
                         $prompts[$i]['job_uuid'] = $uuid;
                         if ($imageUrl !== null) {
                             $prompts[$i]['generated_url'] = $imageUrl;
                         }
 
-                        // Segment status: 'done' if no variation is still generating, else keep 'generating'
                         $anyGenerating = collect($prompts[$i]['variations'])->contains(fn ($v) => ($v['status'] ?? '') === 'generating');
                         $prompts[$i]['status'] = $anyGenerating ? 'generating' : $status;
 
@@ -369,7 +380,6 @@ class ImageGenerationService
                     }
                 }
 
-                // Fallback: legacy flat job_uuid match (for segments without variations[])
                 if (($p['job_uuid'] ?? null) === $uuid) {
                     $prompts[$i]['status'] = $status;
                     if ($imageUrl !== null) {
@@ -383,24 +393,56 @@ class ImageGenerationService
                 }
             }
 
-            if ($matched) {
-                $article['image_prompts'] = $prompts;
-                $idea->update(['generated_article' => $article]);
-
-                // Auto-advance status: all segments done → images_ready
-                $allDone = collect($prompts)->every(fn ($p) => in_array($p['status'] ?? '', ['done', 'failed']));
-                $anyDone = collect($prompts)->contains(fn ($p) => ($p['status'] ?? '') === 'done');
-                if ($allDone && $anyDone && $idea->status === 'generating_images') {
-                    $idea->transitionTo(ContentIdeaStatus::ImagesReady, 'webhook_all_done');
-                    Log::info("[ImageGen] Content idea {$idea->id} → images_ready (all segments done)");
-                }
-
-                Log::info("[ImageGen] Webhook: updated segment for idea {$idea->id} uuid={$uuid} status={$status}");
+            if (!$matched) {
+                Log::warning("[ImageGen] Webhook: uuid {$uuid} disappeared from idea #{$idea->id} between scan and lock");
                 return;
+            }
+
+            $article['image_prompts'] = $prompts;
+            $idea->update(['generated_article' => $article]);
+
+            $allDone = collect($prompts)->every(fn ($p) => in_array($p['status'] ?? '', ['done', 'failed']));
+            $anyDone = collect($prompts)->contains(fn ($p) => ($p['status'] ?? '') === 'done');
+            if ($allDone && $anyDone && $idea->status === 'generating_images') {
+                $idea->transitionTo(ContentIdeaStatus::ImagesReady, 'webhook_all_done');
+                Log::info("[ImageGen] Content idea {$idea->id} → images_ready (all segments done)");
+            }
+
+            Log::info("[ImageGen] Webhook: updated segment for idea {$idea->id} uuid={$uuid} status={$status}");
+        });
+    }
+
+    /**
+     * Locate the ContentIdea whose generated_article.image_prompts[] contains
+     * the given job UUID. Returns null when no match (legacy blog pipeline).
+     *
+     * Split out so both updateContentIdeaSegment and handleSegmentFailure can
+     * re-fetch the idea under a row-level lock inside DB::transaction without
+     * each doing their own scan.
+     */
+    private function findIdeaIdForJobUuid(string $uuid): ?int
+    {
+        $ideas = ContentIdea::whereIn('status', ['article_ready', 'generating_images', 'images_ready'])
+            ->whereNotNull('generated_article')
+            ->orderByDesc('updated_at')
+            ->limit(50)
+            ->get(['id', 'generated_article']);
+
+        foreach ($ideas as $idea) {
+            $prompts = $idea->generated_article['image_prompts'] ?? [];
+            foreach ($prompts as $p) {
+                foreach ($p['variations'] ?? [] as $v) {
+                    if (($v['job_uuid'] ?? null) === $uuid) {
+                        return (int) $idea->id;
+                    }
+                }
+                if (($p['job_uuid'] ?? null) === $uuid) {
+                    return (int) $idea->id;
+                }
             }
         }
 
-        Log::info("[ImageGen] Webhook: no matching content_idea segment for UUID {$uuid} (ok if legacy blog post)");
+        return null;
     }
 
     /**
@@ -541,9 +583,14 @@ class ImageGenerationService
 
     /**
      * Retry a single failed image segment without re-running plugin NER.
-     * Increments retry_count, appends the previous failed variation to
-     * failure_history[], resets variations[] to a fresh generating slot,
-     * and re-queues to GeminiGen using the existing prompt + refs.
+     * Resets variations[] to a fresh generating slot and re-queues to
+     * GeminiGen using the existing prompt + refs.
+     *
+     * Does NOT increment retry_count — that counter is owned by
+     * handleSegmentFailure and incremented only on actual failure
+     * callbacks. If this method also bumped the counter, attempts 1
+     * through 2 would effectively consume the 3-attempt budget (double-
+     * counting on each cycle: failure increment + dispatch increment).
      *
      * Returns the new job UUID, or null if:
      *   - segment index out of range
@@ -568,21 +615,12 @@ class ImageGenerationService
             return null;
         }
 
-        // Archive the prior variation (typically status=failed) into failure_history[]
-        $lastVariation = !empty($segment['variations']) ? end($segment['variations']) : null;
-        if (is_array($lastVariation)) {
-            $segment['failure_history'] = $segment['failure_history'] ?? [];
-            $segment['failure_history'][] = [
-                'attempt' => $currentCount,
-                'uuid' => $lastVariation['job_uuid'] ?? null,
-                'reason' => $lastVariation['error'] ?? 'unknown',
-                'timestamp' => now()->toIso8601String(),
-            ];
-        }
-
         // Reset variations (clear stale UUIDs) so the new slot is the only one.
+        // retry_count stays the same — handleSegmentFailure already bumped it
+        // on the failure that triggered this retry. terminal_at cleared so a
+        // previously-exhausted segment can be manually retried after the cap
+        // is relaxed via admin action (e.g., ContentIdeaController::retrySegment).
         $segment['variations'] = [];
-        $segment['retry_count'] = $currentCount + 1;
         $segment['status'] = 'generating';
         $segment['terminal_at'] = null;
 
@@ -646,17 +684,33 @@ class ImageGenerationService
      * state machine: bump retry_count, append failure_history, decide
      * whether to auto-dispatch a RetryImageSegmentJob or mark terminal.
      *
+     * Runs inside DB::transaction + lockForUpdate so concurrent failure
+     * webhooks can't stomp each other's retry_count increments.
+     *
      * Called from the webhook/polling failure path. Idempotent when the
      * job UUID matches a segment in an idea currently in an image-gen
      * status. If no matching idea found, silently returns (legacy posts).
+     *
+     * NOTE: retry_count is incremented HERE on failure. It is NOT
+     * incremented in retrySegment() — that method only dispatches the
+     * next attempt. This avoids double-counting that would effectively
+     * halve the retry budget. Flow: attempt 1 fails → count=1, dispatch
+     * retry → attempt 2 fails → count=2, dispatch retry → attempt 3
+     * fails → count=3 (terminal).
      */
     public function handleSegmentFailure(\App\Models\ImageGenerationJob $job, ?string $reason = null): void
     {
-        $ideas = ContentIdea::whereIn('status', ['article_ready', 'generating_images', 'images_ready'])
-            ->whereNotNull('generated_article')
-            ->get();
+        $ideaId = $this->findIdeaIdForJobUuid($job->uuid);
+        if ($ideaId === null) {
+            return;
+        }
 
-        foreach ($ideas as $idea) {
+        DB::transaction(function () use ($ideaId, $job, $reason) {
+            $idea = ContentIdea::lockForUpdate()->find($ideaId);
+            if (!$idea) {
+                return;
+            }
+
             $article = $idea->generated_article ?? [];
             $prompts = $article['image_prompts'] ?? [];
             $matchIndex = null;
@@ -676,7 +730,8 @@ class ImageGenerationService
             }
 
             if ($matchIndex === null) {
-                continue;
+                Log::warning("[ImageGen] handleSegmentFailure: uuid {$job->uuid} disappeared from idea #{$idea->id} between scan and lock");
+                return;
             }
 
             $segment = $prompts[$matchIndex];
@@ -692,7 +747,6 @@ class ImageGenerationService
                 'timestamp' => now()->toIso8601String(),
             ];
 
-            // Propagate failed variation + top-level status
             foreach ($segment['variations'] ?? [] as $vi => $v) {
                 if (($v['job_uuid'] ?? null) === $job->uuid) {
                     $segment['variations'][$vi]['status'] = 'failed';
@@ -707,6 +761,13 @@ class ImageGenerationService
                 \App\Jobs\DispatchTelegramNotification::dispatch($idea->id, 'segment_retry_exhausted');
 
                 if ($matchIndex === 0) {
+                    // Runtime guard: cover-critical dispatch assumes index 0
+                    // is the cover. Plugin contract says image_prompts[0] is
+                    // always the cover, but log a warning if the type field
+                    // disagrees so we catch schema drift early.
+                    if (($segment['type'] ?? null) !== 'cover') {
+                        Log::warning("[ImageGen] cover_critical dispatched for segment 0 but type={$segment['type']} on idea #{$idea->id}");
+                    }
                     \App\Jobs\DispatchTelegramNotification::dispatch($idea->id, 'cover_critical');
                 }
 
@@ -722,7 +783,6 @@ class ImageGenerationService
             $article['image_prompts'] = $prompts;
             $idea->generated_article = $article;
             $idea->save();
-            return;
-        }
+        });
     }
 }

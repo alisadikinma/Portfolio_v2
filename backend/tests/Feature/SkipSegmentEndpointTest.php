@@ -91,6 +91,31 @@ class SkipSegmentEndpointTest extends TestCase
     }
 
     /** @test */
+    public function skip_refuses_when_segment_is_still_generating(): void
+    {
+        // Prevent the race where admin skips mid-flight and the GeminiGen
+        // webhook later flips the variation to done on an already-skipped
+        // segment — leaves a confusing mixed state.
+        $idea = ContentIdea::create([
+            'title' => 'In-flight skip',
+            'pillar' => 'ai_automation',
+            'priority' => 'medium',
+            'status' => 'generating_images',
+            'auto_mode' => false,
+            'generated_article' => [
+                'image_prompts' => [
+                    ['type' => 'cover', 'prompt_text' => 'c', 'status' => 'done'],
+                    ['type' => 'inline', 'prompt_text' => 'b', 'status' => 'generating'],
+                ],
+            ],
+        ]);
+
+        $this->postJson("/api/admin/content-engine/ideas/{$idea->id}/skip-segment/1")
+            ->assertStatus(409)
+            ->assertJsonPath('code', 'SEGMENT_STILL_GENERATING');
+    }
+
+    /** @test */
     public function skip_refuses_when_status_is_done(): void
     {
         $idea = ContentIdea::create([
