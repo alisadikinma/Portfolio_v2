@@ -404,25 +404,39 @@ class ContentPublishService
         }
 
         // Keyword resolution priority (most specific → least specific):
-        //   1. Plugin-authored per-language meta_keywords      (best)
+        //   1. Plugin-authored per-language meta_keywords      (best — already
+        //      a comma-separated list of 3-6 terms per /article-write spec)
         //   2. Plugin-authored top-level meta_keywords
-        //   3. Article-level target_keyword (singular SEO target — set by
-        //      research/scoring step, ALWAYS present for AI-generated articles)
-        //   4. seo_analysis.keyword (synonym of target_keyword)
-        //   5. prep_data.keyword (research-step keyword)
-        //   6. niche + pillar + tags fallback (legacy generic chain)
-        //
-        // Layers 3-5 catch the very common case where the plugin runs the
-        // full SEO scoring pipeline and sets target_keyword like
-        // "gugatan Musk vs Altman OpenAI 2026" but never authors a
-        // meta_keywords list — without those layers every AI post falls
-        // through to layer 6 which yields the literal table-default
-        // "AI & Tech" since `niche` column DEFAULT is that string.
+        //   3. Synthesized from target_keyword + extracted proper nouns from
+        //      title (covers the common case where the plugin only emits the
+        //      singular SEO target like "gugatan Musk vs Altman OpenAI 2026"
+        //      without related/LSI terms)
+        //   4. niche + pillar + tags fallback (legacy generic chain)
         $metaKeywords = data_get($langData, 'meta_keywords')
-            ?: data_get($article, 'meta_keywords')
-            ?: data_get($article, 'target_keyword')
-            ?: data_get($article, 'seo_analysis.keyword')
-            ?: data_get($article, 'prep_data.keyword');
+            ?: data_get($article, 'meta_keywords');
+
+        if (empty($metaKeywords)) {
+            $primary = data_get($article, 'target_keyword')
+                ?: data_get($article, 'seo_analysis.keyword')
+                ?: data_get($article, 'prep_data.keyword');
+            if (!empty($primary)) {
+                // Synthesize a real comma-separated keyword list:
+                // primary phrase first, then up to 5 related terms harvested
+                // from the title's proper nouns + multi-word capitalized
+                // entities. Filters out tokens already contained in the
+                // primary phrase (avoid "gugatan Musk vs Altman OpenAI 2026,
+                // Musk, Altman, OpenAI, 2026" which duplicates everything).
+                $keywords = [trim($primary)];
+                $titleSource = (string) ($title ?? '');
+                $extracted = $this->extractKeywordTerms($titleSource, $primary);
+                foreach ($extracted as $term) {
+                    if (count($keywords) >= 6) break;
+                    $keywords[] = $term;
+                }
+                $metaKeywords = implode(', ', $keywords);
+            }
+        }
+
         if (empty($metaKeywords)) {
             $parts = array_filter([
                 $idea->niche,
@@ -448,6 +462,90 @@ class ContentPublishService
             'meta_keywords' => $metaKeywords,
             'canonical_url' => $canonicalUrl,
         ];
+    }
+
+    /**
+     * Extract candidate SEO keywords from a title string. Returns ordered,
+     * deduped list filtered against tokens already in the primary keyword
+     * to avoid emitting "gugatan Musk vs Altman OpenAI 2026, Musk, Altman,
+     * OpenAI, 2026" which just restates the primary in fragments.
+     *
+     * Strategy:
+     *   1. Multi-word proper-noun bigrams ("Sam Altman", "Elon Musk")
+     *   2. Single-word capitalized tokens excluding stopwords + colon-suffix
+     *      framing ("Bukan:" or trailing punctuation)
+     *   3. ALL-CAPS acronyms (OpenAI is mixed case; SPAC, IPO, AI etc are
+     *      all-caps and meaningful as standalone keywords)
+     *
+     * Idempotent + side-effect free — pure derivation from input string.
+     */
+    private function extractKeywordTerms(string $title, string $primaryPhrase): array
+    {
+        if ($title === '') return [];
+
+        // Strip Indonesian + English filler words / framing tokens that
+        // routinely appear in titles but carry zero search value.
+        $stop = [
+            'Bukan','Sekadar','Soal','Uang','Dan','Atau','Dengan','Tanpa','Untuk','Dari','Yang','Saat','Saja','Akan',
+            'The','And','Or','With','Without','For','From','That','When','Just','Will','About','Over','Just','Not',
+            'Best','New','Top','How','Why','What','Lawsuit','Trial','News','Update',
+        ];
+
+        $primaryLower = mb_strtolower($primaryPhrase);
+        $candidates = [];
+
+        // Pass 1: capitalized bigrams (e.g. "Elon Musk", "Sam Altman")
+        if (preg_match_all('/\b([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)+)\b/u', $title, $bigrams)) {
+            foreach ($bigrams[1] as $b) {
+                $candidates[] = trim($b);
+            }
+        }
+
+        // Pass 2: standalone capitalized words + ALL-CAPS acronyms (OpenAI,
+        // Musk, Altman, SPAC, IPO). Rejects stopwords + numbers-only tokens.
+        if (preg_match_all('/\b([A-Z][a-zA-Z]{2,})\b/u', $title, $singles)) {
+            foreach ($singles[1] as $s) {
+                $s = trim($s);
+                if (in_array($s, $stop, true)) continue;
+                $candidates[] = $s;
+            }
+        }
+
+        // Dedupe IDENTICAL strings only — keep entity tokens even when
+        // they appear as substrings of the primary phrase. SEO best
+        // practice: have the long-tail target keyword AND standalone
+        // entity keywords side-by-side, e.g. for primary "gugatan Musk
+        // vs Altman OpenAI 2026" we WANT "Musk, Altman, OpenAI" as
+        // standalone keywords too — those are what users actually search
+        // for ("Sam Altman lawsuit"), and Google ranks each comma-
+        // separated term independently.
+        //
+        // Also dedupe single-word tokens that are themselves substrings
+        // of an already-emitted bigram on the same word (avoid
+        // "Sam Altman, Altman, Sam" — bigram already covers both halves).
+        $seen = [];
+        $out = [];
+        foreach ($candidates as $c) {
+            $lower = mb_strtolower($c);
+            if (isset($seen[$lower])) continue;
+
+            // If this is a single word AND we already emitted a bigram
+            // containing this word, skip — bigram already ranks for it.
+            if (!str_contains($c, ' ')) {
+                $coveredByBigram = false;
+                foreach ($out as $existing) {
+                    if (str_contains($existing, ' ') && stripos($existing, $c) !== false) {
+                        $coveredByBigram = true;
+                        break;
+                    }
+                }
+                if ($coveredByBigram) continue;
+            }
+
+            $seen[$lower] = true;
+            $out[] = $c;
+        }
+        return $out;
     }
 
     private function spliceBodyImagesIntoContent(string $html, array $imagePrompts): string
