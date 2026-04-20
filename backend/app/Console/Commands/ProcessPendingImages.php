@@ -14,6 +14,17 @@ class ProcessPendingImages extends Command
     protected $signature = 'blog:process-images';
     protected $description = 'Poll GeminiGen API for pending image jobs and download completed ones';
 
+    /**
+     * Jobs that have been 'processing' longer than this are considered
+     * stuck — GeminiGen either failed internally without firing the
+     * webhook, or is wedged in a queue state that will never resolve.
+     * We treat them as failed and drive handleSegmentFailure so the UI
+     * unsticks and auto-retry can fire. Must be longer than GeminiGen's
+     * typical generation time (~30-90s) but short enough that operators
+     * don't wait forever on a dead job.
+     */
+    private const MAX_JOB_AGE_MINUTES = 10;
+
     public function handle(ImageGenerationService $imageService): int
     {
         $pending = ImageGenerationJob::where('status', 'processing')->get();
@@ -35,7 +46,21 @@ class ProcessPendingImages extends Command
                     ->get("https://api.geminigen.ai/uapi/v1/history/{$job->uuid}");
 
                 if (!$response->successful()) {
-                    $this->warn("    HTTP {$response->status()} — skipping");
+                    // Transient HTTP error: skip this tick BUT still enforce
+                    // MAX_JOB_AGE so GeminiGen being down persistently
+                    // doesn't let stuck jobs pile up forever.
+                    $ageMinutes = $job->created_at
+                        ? (int) $job->created_at->diffInMinutes(now())
+                        : 0;
+                    if ($ageMinutes >= self::MAX_JOB_AGE_MINUTES) {
+                        $reason = "GeminiGen HTTP {$response->status()} after {$ageMinutes}min — treating as failed";
+                        $job->update(['status' => 'failed', 'error_message' => $reason]);
+                        $this->warn("    TIMEOUT: {$reason}");
+                        $this->syncToContentIdea($job, null, true);
+                        $imageService->handleSegmentFailure($job, $reason);
+                    } else {
+                        $this->warn("    HTTP {$response->status()} (age={$ageMinutes}min) — skipping this tick");
+                    }
                     continue;
                 }
 
@@ -90,7 +115,29 @@ class ProcessPendingImages extends Command
                     $imageService->handleSegmentFailure($job, $reason);
 
                 } else {
-                    $this->line("    Still processing (status={$status})");
+                    // Age-based stuck detection: GeminiGen sometimes fails
+                    // internally without firing the webhook AND without
+                    // flipping history.status to 3. Symptom: job stays
+                    // 'processing' forever, UI never unsticks. If the job
+                    // was created > MAX_JOB_AGE_MINUTES ago and GeminiGen
+                    // still reports status != 2/3, we treat it as failed
+                    // and drive the segment retry state machine.
+                    $ageMinutes = $job->created_at
+                        ? (int) $job->created_at->diffInMinutes(now())
+                        : 0;
+                    if ($ageMinutes >= self::MAX_JOB_AGE_MINUTES) {
+                        $reason = "Stuck in 'processing' for {$ageMinutes} min — GeminiGen never resolved (status={$status})";
+                        $job->update([
+                            'status' => 'failed',
+                            'error_message' => $reason,
+                        ]);
+                        $this->warn("    TIMEOUT: {$reason}");
+
+                        $this->syncToContentIdea($job, null, true);
+                        $imageService->handleSegmentFailure($job, $reason);
+                    } else {
+                        $this->line("    Still processing (status={$status}, age={$ageMinutes}min)");
+                    }
                 }
 
             } catch (\Exception $e) {

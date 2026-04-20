@@ -58,7 +58,20 @@ class CoverBrandingEnhancer
                 ->contains(fn ($e) => is_array($e) && ($e['entity_type'] ?? null) === 'person');
 
             if ($hasPersonEntity) {
-                $prompt = $this->mergeEntityRefsIntoFileUrls($prompt, $entityRefs);
+                // Person URLs → face_refs so GeminiGen's queue() appends the
+                // "maintain exact facial identity" prompt instruction.
+                // Previously all entity URLs went to file_urls which flows
+                // to styleRefs — the "maintain environment/style" instruction
+                // instead of identity, so the generated image ignored the
+                // actual person's face. Symptom: cover of "Anthropic CEO
+                // Visits White House" rendered with a generic tech-executive
+                // face (or fell back to creator face) instead of Dario
+                // Amodei's actual photo from Wikimedia.
+                $prompt = $this->promotePersonEntitiesToFaceRefs($prompt, $entityRefs);
+                // Non-person entities (landmark/logo/product) still go to
+                // file_urls — GeminiGen uses them as environment/style refs
+                // which is the correct channel for scenery and props.
+                $prompt = $this->mergeEntityRefsIntoFileUrls($prompt, $entityRefs, skipPersons: true);
             } else {
                 $prompt = $this->prependCreatorFace($prompt, $idea);
                 // Non-person entity URLs (landmarks/logos/products) still go
@@ -254,8 +267,13 @@ class CoverBrandingEnhancer
      * Called on covers when the plugin has populated entity_refs from
      * /article-images Phase 3.5b Wikidata lookup. GeminiGen consumes
      * file_urls as additional reference images for generation.
+     *
+     * When $skipPersons is true, person entities are excluded from this
+     * merge — they're expected to have been promoted to face_refs already
+     * (so GeminiGen applies the "maintain facial identity" instruction
+     * on them instead of the weaker "maintain environment/style" hint).
      */
-    private function mergeEntityRefsIntoFileUrls(array $prompt, array $entityRefs): array
+    private function mergeEntityRefsIntoFileUrls(array $prompt, array $entityRefs, bool $skipPersons = false): array
     {
         $fileUrls = $prompt['file_urls'] ?? [];
         if (!is_array($fileUrls)) {
@@ -264,6 +282,9 @@ class CoverBrandingEnhancer
 
         foreach ($entityRefs as $entity) {
             if (!is_array($entity)) {
+                continue;
+            }
+            if ($skipPersons && ($entity['entity_type'] ?? null) === 'person') {
                 continue;
             }
             $url = $entity['url'] ?? null;
@@ -276,6 +297,43 @@ class CoverBrandingEnhancer
         }
 
         $prompt['file_urls'] = $fileUrls;
+        return $prompt;
+    }
+
+    /**
+     * Promote person-type entity URLs into face_refs (dedupe-preserving).
+     * face_refs is the correct channel for identity references because
+     * ImageGenerationService::queue() appends a "maintain exact facial
+     * identity, appearance, and features" prompt directive for face_refs
+     * — without it, GeminiGen treats the URL as a generic style ref and
+     * the generated face doesn't match the Wikimedia reference photo.
+     *
+     * Idempotent: skips URLs already present in face_refs.
+     */
+    private function promotePersonEntitiesToFaceRefs(array $prompt, array $entityRefs): array
+    {
+        $faceRefs = $prompt['face_refs'] ?? [];
+        if (!is_array($faceRefs)) {
+            $faceRefs = [];
+        }
+
+        foreach ($entityRefs as $entity) {
+            if (!is_array($entity)) {
+                continue;
+            }
+            if (($entity['entity_type'] ?? null) !== 'person') {
+                continue;
+            }
+            $url = $entity['url'] ?? null;
+            if (!is_string($url) || $url === '') {
+                continue;
+            }
+            if (!in_array($url, $faceRefs, true)) {
+                $faceRefs[] = $url;
+            }
+        }
+
+        $prompt['face_refs'] = $faceRefs;
         return $prompt;
     }
 

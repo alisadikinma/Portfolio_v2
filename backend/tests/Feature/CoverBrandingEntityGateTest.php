@@ -87,13 +87,23 @@ class CoverBrandingEntityGateTest extends TestCase
 
         $result = $this->enhancer->enhance($prompt, $this->makeIdea());
 
-        // Creator face must NOT be prepended
+        // Creator face must NOT be prepended (entity gate fires).
         $creatorUrl = url('/storage/about/ali.png');
         $this->assertNotContains($creatorUrl, $result['face_refs'] ?? []);
-        $this->assertEmpty($result['face_refs'] ?? []);
 
-        // Entity URL must appear in file_urls for GeminiGen
+        // Person entity URL must be promoted to face_refs — that's the
+        // channel GeminiGen's queue() uses to emit the "maintain exact
+        // facial identity" prompt directive. Previously this URL went
+        // to file_urls (environment/style channel) which made GeminiGen
+        // ignore the identity reference. Symptom: cover of "Anthropic
+        // CEO Visits White House" rendered with a generic exec face
+        // instead of Dario Amodei's actual Wikimedia photo.
         $this->assertContains(
+            'https://alisadikinma.com/storage/entity-refs/person/Q115468560_dario-amodei.jpg',
+            $result['face_refs'] ?? []
+        );
+        // And NOT in file_urls (person URLs deliberately skip that bucket).
+        $this->assertNotContains(
             'https://alisadikinma.com/storage/entity-refs/person/Q115468560_dario-amodei.jpg',
             $result['file_urls'] ?? []
         );
@@ -162,7 +172,7 @@ class CoverBrandingEntityGateTest extends TestCase
     }
 
     /** @test */
-    public function cover_with_person_and_landmark_merges_both_urls_into_file_urls(): void
+    public function cover_with_person_and_landmark_routes_urls_to_correct_channels(): void
     {
         $this->mockSettings('about/ali.png');
 
@@ -191,16 +201,30 @@ class CoverBrandingEntityGateTest extends TestCase
 
         $result = $this->enhancer->enhance($prompt, $this->makeIdea());
 
-        // Person entity present → creator face skipped
-        $this->assertEmpty($result['face_refs'] ?? []);
-        // Both entity URLs in file_urls
+        $creatorUrl = url('/storage/about/ali.png');
+        $this->assertNotContains($creatorUrl, $result['face_refs'] ?? []);
+
+        // Person URL → face_refs (identity channel — triggers "maintain
+        // exact facial identity" prompt directive in queue())
         $this->assertContains(
+            'https://alisadikinma.com/storage/entity-refs/person/Q115468560_dario.jpg',
+            $result['face_refs'] ?? []
+        );
+        $this->assertNotContains(
             'https://alisadikinma.com/storage/entity-refs/person/Q115468560_dario.jpg',
             $result['file_urls'] ?? []
         );
+
+        // Landmark URL → file_urls (style/environment channel — landmark
+        // is context, not identity; queue() emits the "maintain visual
+        // consistency with environment" prompt directive for this bucket)
         $this->assertContains(
             'https://alisadikinma.com/storage/entity-refs/landmark/Q35525_white-house.jpg',
             $result['file_urls'] ?? []
+        );
+        $this->assertNotContains(
+            'https://alisadikinma.com/storage/entity-refs/landmark/Q35525_white-house.jpg',
+            $result['face_refs'] ?? []
         );
     }
 
@@ -240,7 +264,7 @@ class CoverBrandingEntityGateTest extends TestCase
     }
 
     /** @test */
-    public function entity_urls_are_deduped_in_file_urls(): void
+    public function person_entity_url_is_deduped_in_face_refs(): void
     {
         $this->mockSettings('about/ali.png');
 
@@ -248,8 +272,9 @@ class CoverBrandingEntityGateTest extends TestCase
             'type' => 'cover',
             'prompt_text' => 'scene',
             'visual_direction' => 'exec',
-            'face_refs' => [],
-            'file_urls' => [
+            // Person URL already present in face_refs (plugin pre-populated).
+            // Enhancer must not duplicate it when promoting from entity_refs.
+            'face_refs' => [
                 'https://alisadikinma.com/storage/entity-refs/person/Q115468560_dario.jpg',
             ],
             'entity_refs' => [
@@ -266,9 +291,9 @@ class CoverBrandingEntityGateTest extends TestCase
         $result = $this->enhancer->enhance($prompt, $this->makeIdea());
 
         $count = count(array_filter(
-            $result['file_urls'] ?? [],
+            $result['face_refs'] ?? [],
             fn($u) => $u === 'https://alisadikinma.com/storage/entity-refs/person/Q115468560_dario.jpg'
         ));
-        $this->assertSame(1, $count, 'Entity URL should appear exactly once in file_urls');
+        $this->assertSame(1, $count, 'Person entity URL should appear exactly once in face_refs');
     }
 }
