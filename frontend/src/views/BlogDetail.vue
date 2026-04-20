@@ -432,7 +432,14 @@ const updateMetaTags = () => {
     image: thumbnailUrl.value,
     url: window.location.href,
     type: 'article',
-    keywords: post.value.focus_keyword || post.value.tags?.join(', ')
+    // PostResource exposes per-translation SEO under `seo.meta_keywords`
+    // (see backend/app/Http/Resources/PostResource.php). Reading
+    // `focus_keyword` directly was a typo — that field doesn't exist on
+    // the API response, so `keywords` resolved to undefined and
+    // updatePageMeta() skipped its keyword override entirely. Result:
+    // the global site_settings keywords (Ali's branding chain) leaked
+    // onto every blog post page.
+    keywords: post.value.seo?.meta_keywords || post.value.meta_keywords || post.value.tags?.join(', ')
   })
   if (post.value.og_title) updateMetaTag('property', 'og:title', post.value.og_title)
   if (post.value.og_description) updateMetaTag('property', 'og:description', post.value.og_description)
