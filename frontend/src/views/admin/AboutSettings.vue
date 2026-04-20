@@ -273,6 +273,135 @@
         </div>
       </BaseCard>
 
+      <!-- Telegram Notifications Card (Phase I) -->
+      <BaseCard>
+        <h2 class="text-xl font-display font-semibold text-neutral-900 dark:text-neutral-100 mb-2">
+          Telegram Notifications — Manual Upload Alerts
+        </h2>
+        <p class="text-sm text-neutral-600 dark:text-neutral-400 mb-6">
+          Get pinged on your phone when the Content Engine needs you:
+          manual reference upload required, image generation failed, or a successful publish.
+          <br>
+          Setup: message
+          <a href="https://t.me/BotFather" target="_blank" class="text-amber-600 dark:text-amber-400 hover:underline">@BotFather</a>
+          on Telegram to create a bot, paste the token below. To find your chat_id,
+          message your new bot once then visit
+          <code class="text-xs bg-neutral-100 dark:bg-neutral-800 px-1 rounded">https://api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</code>
+          and copy the <code>chat.id</code> number.
+        </p>
+
+        <div class="space-y-4">
+          <div>
+            <label for="telegram_bot_token" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+              Bot Token
+              <span class="text-xs text-neutral-500">— from @BotFather (leave blank to keep existing)</span>
+            </label>
+            <input
+              id="telegram_bot_token"
+              v-model="telegramFormData.telegram_bot_token"
+              type="password"
+              placeholder="123456789:ABC-DEF..."
+              autocomplete="off"
+              class="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-amber-500"
+            >
+            <p v-if="telegramTokenMasked" class="text-xs text-neutral-500 mt-1">
+              Current: <code>{{ telegramTokenMasked }}</code>
+            </p>
+          </div>
+
+          <div>
+            <label for="telegram_chat_id" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+              Chat ID
+            </label>
+            <input
+              id="telegram_chat_id"
+              v-model="telegramFormData.telegram_chat_id"
+              type="text"
+              placeholder="987654321"
+              class="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-amber-500"
+            >
+          </div>
+
+          <div class="flex items-center justify-between pt-2 border-t border-neutral-200 dark:border-neutral-700">
+            <label class="flex items-center gap-3 cursor-pointer">
+              <input
+                v-model="telegramEnabledBool"
+                type="checkbox"
+                class="w-4 h-4 text-amber-600 border-neutral-300 rounded focus:ring-amber-500"
+              >
+              <span class="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                Enable Telegram notifications (master toggle)
+              </span>
+            </label>
+          </div>
+
+          <div class="pl-7 space-y-2" :class="{ 'opacity-50': !telegramEnabledBool }">
+            <label class="flex items-center gap-3 cursor-pointer">
+              <input
+                :checked="telegramFormData.telegram_notify_manifest_needed === 'true'"
+                type="checkbox"
+                :disabled="!telegramEnabledBool"
+                class="w-4 h-4 text-amber-600 border-neutral-300 rounded focus:ring-amber-500"
+                @change="e => telegramFormData.telegram_notify_manifest_needed = e.target.checked ? 'true' : 'false'"
+              >
+              <span class="text-sm text-neutral-700 dark:text-neutral-300">
+                Alert on manual-upload needed (public figure / landmark reference missing)
+              </span>
+            </label>
+
+            <label class="flex items-center gap-3 cursor-pointer">
+              <input
+                :checked="telegramFormData.telegram_notify_generation_failed === 'true'"
+                type="checkbox"
+                :disabled="!telegramEnabledBool"
+                class="w-4 h-4 text-amber-600 border-neutral-300 rounded focus:ring-amber-500"
+                @change="e => telegramFormData.telegram_notify_generation_failed = e.target.checked ? 'true' : 'false'"
+              >
+              <span class="text-sm text-neutral-700 dark:text-neutral-300">
+                Alert on image generation failure
+              </span>
+            </label>
+
+            <label class="flex items-center gap-3 cursor-pointer">
+              <input
+                :checked="telegramFormData.telegram_notify_publish_success === 'true'"
+                type="checkbox"
+                :disabled="!telegramEnabledBool"
+                class="w-4 h-4 text-amber-600 border-neutral-300 rounded focus:ring-amber-500"
+                @change="e => telegramFormData.telegram_notify_publish_success = e.target.checked ? 'true' : 'false'"
+              >
+              <span class="text-sm text-neutral-700 dark:text-neutral-300">
+                Alert on successful publish (celebratory)
+              </span>
+            </label>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-3 pt-4 border-t border-neutral-200 dark:border-neutral-700">
+            <BaseButton
+              type="button"
+              button-type="primary"
+              :disabled="telegramSubmitting"
+              @click="handleTelegramSubmit"
+            >
+              {{ telegramSubmitting ? 'Saving...' : 'Save Telegram Settings' }}
+            </BaseButton>
+
+            <BaseButton
+              type="button"
+              button-type="secondary"
+              :disabled="telegramTesting || !telegramEnabledBool"
+              @click="handleTelegramTest"
+            >
+              {{ telegramTesting ? 'Sending...' : '📨 Send test message' }}
+            </BaseButton>
+
+            <span v-if="telegramTestResult" :class="telegramTestResult.success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'" class="text-sm">
+              {{ telegramTestResult.message }}
+            </span>
+          </div>
+        </div>
+      </BaseCard>
+
       <!-- Hero & About Enhancement Card -->
       <BaseCard>
         <h2 class="text-xl font-display font-semibold text-neutral-900 dark:text-neutral-100 mb-6">
@@ -1221,6 +1350,61 @@ const brandFormData = ref({
   watermark_enabled: 'false',
 })
 
+// Phase I: Telegram notification settings
+const telegramSubmitting = ref(false)
+const telegramTesting = ref(false)
+const telegramTestResult = ref(null)
+const telegramFormData = ref({
+  telegram_bot_token: '',
+  telegram_chat_id: '',
+  telegram_enabled: 'false',
+  telegram_notify_manifest_needed: 'true',
+  telegram_notify_generation_failed: 'true',
+  telegram_notify_publish_success: 'false',
+})
+
+const telegramTokenMasked = computed(() => {
+  const t = settingsStore.telegramSettings?.telegram_bot_token
+  return t && t !== telegramFormData.value.telegram_bot_token ? t : null
+})
+
+const telegramEnabledBool = computed({
+  get: () => telegramFormData.value.telegram_enabled === 'true',
+  set: (v) => { telegramFormData.value.telegram_enabled = v ? 'true' : 'false' },
+})
+
+async function handleTelegramSubmit() {
+  telegramSubmitting.value = true
+  telegramTestResult.value = null
+  try {
+    const payload = { ...telegramFormData.value }
+    // Don't send the masked placeholder — only send a real token when the user types one
+    if (!payload.telegram_bot_token) delete payload.telegram_bot_token
+
+    await settingsStore.updateTelegramSettings(payload)
+    uiStore.showSuccess('Telegram settings saved', 'Saved')
+    telegramFormData.value.telegram_bot_token = '' // clear form — masked token now shown below
+  } catch (err) {
+    uiStore.showError(err.response?.data?.message || err.message || 'Failed to save telegram settings', 'Save Failed')
+  } finally {
+    telegramSubmitting.value = false
+  }
+}
+
+async function handleTelegramTest() {
+  telegramTesting.value = true
+  telegramTestResult.value = null
+  try {
+    const result = await settingsStore.sendTelegramTestMessage()
+    telegramTestResult.value = result.success
+      ? { success: true, message: '✓ Test message sent successfully — check your Telegram' }
+      : { success: false, message: '✗ ' + (result.error || 'Test failed') }
+    setTimeout(() => { telegramTestResult.value = null }, 8000)
+  } finally {
+    telegramTesting.value = false
+  }
+}
+
 // Opacity slider binds as integer percentage; convert to/from stored string
 const watermarkOpacityPct = computed({
   get: () => Math.round(parseFloat(brandFormData.value.watermark_opacity || '0.30') * 100),
@@ -1670,6 +1854,10 @@ async function loadSettings() {
         // Non-fatal: creator_brand seeder may not have run on older installs
         console.warn('[AboutSettings] creator_brand fetch failed — using defaults', err)
       }),
+      settingsStore.fetchTelegramSettings().catch((err) => {
+        // Non-fatal: telegram seeder may not have run on older installs
+        console.warn('[AboutSettings] telegram fetch failed — using defaults', err)
+      }),
     ])
 
     // Populate creator brand form data
@@ -1680,6 +1868,17 @@ async function loadSettings() {
       creator_brand_slug: cb.creator_brand_slug || 'alisadikinma',
       watermark_opacity: cb.watermark_opacity || '0.30',
       watermark_enabled: cb.watermark_enabled || 'false',
+    }
+
+    // Populate telegram form data (Phase I)
+    const tg = settingsStore.telegramSettings || {}
+    telegramFormData.value = {
+      telegram_bot_token: '', // never prefill — masked token shown via telegramTokenMasked
+      telegram_chat_id: tg.telegram_chat_id || '',
+      telegram_enabled: tg.telegram_enabled || 'false',
+      telegram_notify_manifest_needed: tg.telegram_notify_manifest_needed || 'true',
+      telegram_notify_generation_failed: tg.telegram_notify_generation_failed || 'true',
+      telegram_notify_publish_success: tg.telegram_notify_publish_success || 'false',
     }
 
     // Populate form data
