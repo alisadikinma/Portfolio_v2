@@ -157,6 +157,35 @@ export function useContentEngine() {
   const cleanupVariationImages = (urlsToDelete) =>
     request('post', '/admin/content-engine/cleanup-variation-images', { urls_to_delete: urlsToDelete })
 
+  // Phase H: named-entity-aware cover flow
+  const uploadEntityReference = async (id, entityName, entityType, file) => {
+    isLoading.value = true
+    error.value = null
+    try {
+      const formData = new FormData()
+      formData.append('entity_name', entityName)
+      formData.append('entity_type', entityType)
+      formData.append('file', file)
+
+      const response = await api.post(
+        `/admin/content-engine/ideas/${id}/upload-entity-reference`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } },
+      )
+      return { success: true, data: response.data.data, message: response.data.message }
+    } catch (err) {
+      error.value = err.response?.data?.message || err.message || 'Upload failed'
+      return { success: false, error: error.value }
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  const skipEntityReference = (id, entityName) =>
+    request('post', `/admin/content-engine/ideas/${id}/skip-entity-reference`, {
+      entity_name: entityName,
+    })
+
   const listWorkflows = () => request('get', '/admin/content-engine/workflows')
 
   const getWorkflowStatus = (id) => request('get', `/admin/content-engine/workflows/${id}`)
@@ -195,6 +224,8 @@ export function useContentEngine() {
     resumePipeline,
     downloadStockImage,
     cleanupVariationImages,
+    uploadEntityReference,
+    skipEntityReference,
     listWorkflows,
     getWorkflowStatus,
   }

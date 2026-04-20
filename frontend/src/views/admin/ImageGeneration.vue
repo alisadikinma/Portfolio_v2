@@ -7,6 +7,7 @@ import PipelineStepBar from '@/components/admin/PipelineStepBar.vue'
 import ImageConfigModal from '@/components/admin/ImageConfigModal.vue'
 import BaseLightbox from '@/components/base/BaseLightbox.vue'
 import StockImageSearch from '@/components/admin/StockImageSearch.vue'
+import EntityUploadSlot from '@/components/admin/EntityUploadSlot.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -149,6 +150,32 @@ function mapManifestToSegment(manifest, img, segIndex) {
 }
 
 const isAwaitingBrand = computed(() => idea.value?.status === 'awaiting_brand_images')
+
+// Phase H: named-entity-aware cover flow
+const isAwaitingManualUpload = computed(() => idea.value?.status === 'awaiting_manual_upload')
+
+const pendingEntityManifest = computed(() => {
+  const manifest = idea.value?.pending_manifest || idea.value?.generated_article?.brand_manifest
+  if (!manifest || typeof manifest !== 'object') return []
+  return Array.isArray(manifest.entity) ? manifest.entity : []
+})
+
+async function reloadIdeaState() {
+  const id = route.params.id
+  const result = await getIdea(id)
+  if (result.success && result.data) {
+    idea.value = result.data
+    initSegments()
+  }
+}
+
+async function handleEntityResolved() {
+  await reloadIdeaState()
+}
+
+async function handleEntitySkipped() {
+  await reloadIdeaState()
+}
 
 // Trim inline auto-caption to max ~80 chars on a word boundary, with an
 // ellipsis. Strips trailing punctuation before appending so we don't get
@@ -618,6 +645,37 @@ async function handleApprove() {
             <svg v-else class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
             {{ generatingAll ? 'Generating...' : allDone ? 'All Generated' : 'Generate All' }}
           </button>
+        </div>
+      </div>
+
+      <!-- Phase H: Awaiting named-entity upload banner (public figures / landmarks) -->
+      <div v-if="isAwaitingManualUpload && pendingEntityManifest.length > 0" class="max-w-5xl mx-auto px-4 sm:px-6 pt-4">
+        <div class="rounded-xl border border-red-300 dark:border-red-800/40 bg-red-50/50 dark:bg-red-900/10 p-4">
+          <div class="mb-3">
+            <p class="text-sm font-semibold text-red-800 dark:text-red-300">
+              Named entity references required
+            </p>
+            <p class="text-xs text-red-700 dark:text-red-400 mt-0.5">
+              The plugin detected specific public figures or landmarks in this article.
+              Upload reference photos (or skip to use creator face fallback) before generating images.
+            </p>
+          </div>
+          <div class="space-y-2">
+            <EntityUploadSlot
+              v-for="entity in pendingEntityManifest"
+              :key="entity.entity_name"
+              :idea-id="idea.id"
+              :entity-name="entity.entity_name"
+              :entity-type="entity.entity_type"
+              :status="entity.status"
+              :fetched-url="entity.fetched_url || null"
+              :license="entity.license || null"
+              :reason="entity.reason || null"
+              :required="entity.required !== false"
+              @resolved="handleEntityResolved"
+              @skipped="handleEntitySkipped"
+            />
+          </div>
         </div>
       </div>
 
