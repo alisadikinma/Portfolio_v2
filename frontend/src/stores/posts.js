@@ -116,7 +116,8 @@ export const usePostsStore = defineStore('posts', () => {
       const api = useApi()
 
       const response = await api.get(`/posts/${slug}`)
-      currentPost.value = response.data.data
+      // Single unwrap — useApi already returned response.data
+      currentPost.value = response.data
 
       return currentPost.value
     } catch (err) {
@@ -166,7 +167,9 @@ export const usePostsStore = defineStore('posts', () => {
 
       const response = await api.post('/admin/posts', postData)
 
-      return response.data.data
+      // Single unwrap — useApi already returned response.data (the envelope
+      // {message, data}). See updatePost above for the same fix rationale.
+      return response.data
     } catch (err) {
       error.value = err.response?.data?.message || 'Failed to create post'
       throw err
@@ -188,19 +191,25 @@ export const usePostsStore = defineStore('posts', () => {
       const { useApi } = await import('../composables/useApi')
       const api = useApi()
 
+      // useApi.put() returns response.data already (see CLAUDE.md gotcha).
+      // Backend response shape is { message, data: <PostResource> }, so the
+      // unwrapped value here IS that envelope — read .data once, not twice.
+      // Previously did response.data.data → undefined → caller saw
+      // updatedPost.title throw → false "Failed to update" alert despite
+      // the backend transaction committing successfully.
       const response = await api.put(`/admin/posts/${id}`, postData)
+      const updated = response.data
 
-      // Update in local state if exists
       const index = posts.value.findIndex(p => p.id === id)
       if (index !== -1) {
-        posts.value[index] = response.data.data
+        posts.value[index] = updated
       }
 
       if (currentPost.value?.id === id) {
-        currentPost.value = response.data.data
+        currentPost.value = updated
       }
 
-      return response.data.data
+      return updated
     } catch (err) {
       error.value = err.response?.data?.message || 'Failed to update post'
       throw err
