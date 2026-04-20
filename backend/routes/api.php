@@ -24,6 +24,7 @@ use App\Http\Controllers\Api\ChatbotController;
 use App\Http\Controllers\Api\GeoController;
 use App\Http\Controllers\Api\ActivityFeedController;
 use App\Http\Controllers\Api\NewsletterController;
+use App\Http\Controllers\Api\BlogPromoSlotController;
 use App\Http\Controllers\Api\CarouselDraftController;
 use App\Http\Controllers\Api\Admin\ContentIdeaController;
 
@@ -130,6 +131,9 @@ Route::get('/llms-full.txt', [GeoController::class, 'llmsFullTxt']);
 
 // Activity Feed
 Route::get('/activity-feed', [ActivityFeedController::class, 'index']);
+
+// Blog promo slot (mid-article rotator for BlogDetail.vue)
+Route::get('/blog/promo-slot', [BlogPromoSlotController::class, 'show']);
 
 // Newsletter
 Route::post('/newsletter/subscribe', [NewsletterController::class, 'subscribe'])->middleware('throttle:5,60');

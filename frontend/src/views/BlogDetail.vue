@@ -123,9 +123,13 @@
         </div>
       </figure>
 
-      <!-- ─── Content Layout — Clean Centered Column ─── -->
+      <!-- ─── Content Layout — Article + Sticky TOC ─── -->
       <div class="container-custom mb-16" ref="articleContent">
-        <div class="max-w-3xl mx-auto">
+        <div class="grid lg:grid-cols-[240px_minmax(0,720px)] gap-10 max-w-6xl mx-auto lg:justify-center">
+          <aside v-if="tocSections.length > 0" class="hidden lg:block">
+            <StickyTOC :sections="tocSections" :progress="readingProgress" />
+          </aside>
+          <div class="max-w-3xl">
 
           <!-- AI Summary Box -->
           <div
@@ -146,12 +150,15 @@
             {{ post.excerpt }}
           </p>
 
-          <!-- Article body (FAQ stripped — rendered as accordion below) -->
-          <div
+          <!-- Article body with mid-article injections (FAQ stripped — rendered as accordion below) -->
+          <BlogContentInjector
             v-if="contentWithoutFaq"
             class="blog-content"
-            v-html="contentWithoutFaq"
-          ></div>
+            :html="contentWithoutFaq"
+            :promo-slot="promoSlot"
+            :related-posts="relatedPosts"
+            :lang="lang"
+          />
 
           <!-- Tags -->
           <div v-if="post.tags?.length" class="mt-10 pt-8 border-t border-white/5">
@@ -219,8 +226,9 @@
               </div>
             </div>
           </div>
-        </div>
-      </div>
+          </div><!-- /max-w-3xl -->
+        </div><!-- /grid -->
+      </div><!-- /container-custom -->
 
       <!-- ─── FAQ Accordion ─── -->
       <FaqAccordion :items="faqItems" />
@@ -299,6 +307,9 @@ import { stripFaqSection } from '@/utils/stripFaqSection'
 import { extractFaqFromHtml } from '@/utils/extractFaqFromHtml'
 import FaqAccordion from '@/components/blog/FaqAccordion.vue'
 import NewsletterFloatingBanner from '@/components/blog/NewsletterFloatingBanner.vue'
+import StickyTOC from '@/components/blog/StickyTOC.vue'
+import BlogContentInjector from '@/components/blog/BlogContentInjector.vue'
+import { splitHtmlByH2 } from '@/utils/splitHtmlByH2'
 import api from '@/services/api'
 
 const route = useRoute()
@@ -316,6 +327,7 @@ const urlCopied = ref(false)
 const articleContent = ref(null)
 const readingProgress = ref(0)
 const showFloatingBanner = ref(false)
+const promoSlot = ref(null)
 let floatingBannerTimerId = null
 
 function scheduleFloatingBanner() {
@@ -410,6 +422,17 @@ const contentWithoutFaq = computed(() => {
   const html = post.value?.content
   if (!html || faqItems.value.length === 0) return html
   return stripFaqSection(html)
+})
+
+// Sections derived from the live article HTML — powers the StickyTOC.
+// Only H2 slots, with the same ids BlogContentInjector writes onto the
+// rendered headings so IntersectionObserver hooks up cleanly.
+const tocSections = computed(() => {
+  const html = contentWithoutFaq.value
+  if (!html) return []
+  return splitHtmlByH2(html)
+    .filter((s) => s.type === 'h2')
+    .map((s) => ({ id: s.id, text: s.text }))
 })
 
 // ── Thumbnail for OG ──────────────────────────────────────────────────────────
@@ -511,9 +534,19 @@ onMounted(async () => {
   } else if (post.value) {
     updateMetaTags()
     await fetchRelatedPosts()
+    fetchPromoSlot()
     scheduleFloatingBanner()
   }
 })
+
+async function fetchPromoSlot() {
+  try {
+    const res = await api.get('/blog/promo-slot')
+    promoSlot.value = res.data?.data || null
+  } catch {
+    promoSlot.value = null
+  }
+}
 
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
