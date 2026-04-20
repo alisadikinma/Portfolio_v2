@@ -22,7 +22,8 @@ Modern, scalable full-stack portfolio and CMS featuring RESTful API architecture
 | **API Endpoints** | 140+ documented endpoints |
 | **Performance** | <500ms cached loads (83% improvement) |
 | **Security Score** | 95/100 |
-| **Last Updated** | April 18, 2026 |
+| **AI Content Plugin** | article-content-writer v2.7.2 (Wikidata + lede + role-resolution + hard SEO audit) |
+| **Last Updated** | April 21, 2026 |
 
 ---
 
@@ -50,11 +51,15 @@ Modern, scalable full-stack portfolio and CMS featuring RESTful API architecture
 │                AUTOMATION LAYER                         │
 │  n8n / Zapier / Make.com via REST API + Webhooks       │
 ├─────────────────────────────────────────────────────────┤
-│              AI CONTENT PIPELINE (v2.0.0)                │
+│              AI CONTENT PIPELINE (v2.7.2)                │
 │  Claude Code CLI + article-content-writer plugin       │
-│  Split: prep(Sonnet) → write(Opus) → score(Sonnet)    │
-│  System prompt injection (--append-system-prompt-file)  │
-│  5 gates + combined 100-point scoring, ~6-8 min/article│
+│  Split: prep → write → score → images → translate      │
+│  All Sonnet, system prompt injection per phase          │
+│  5 gates + combined 100-point scoring, ~8-11 min/article│
+│  Named-entity covers: Wikidata + Commons + lede gate    │
+│  Backend auto-resolve person on every dispatch (no SSH) │
+│  FSM-guarded: ContentIdeaStatus enum + PipelineGuard    │
+│  Segment retry + skip + translate-before-publish gate   │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -295,21 +300,30 @@ Carousels:    GET /api/automation/carousel/accounts, /drafts
 - Bulk post creation
 - Duplicate detection
 
-### AI Content Pipeline (v2.0.0, Split Pipeline)
-- AI-powered article pipeline: Ideas → Research → Article → Images → Publish
+### AI Content Pipeline (v2.7.2, Split Pipeline)
+- AI-powered article pipeline: Ideas → Research → Article → Images → Translate → Publish
 - 2-gate approval system (article text review, then image review)
-- Trending topic aggregation from 5 sources (Google Trends, TikTok, YouTube, Google News, Instagram)
-- Spreadsheet-style admin UI for idea management
-- **Split pipeline with model switching:** prep (Sonnet) → write (Opus) → score (Sonnet)
+- Trending topic aggregation: Google Trends + Google News (TikTok/YouTube scrapers disabled, Instagram removed)
+- Spreadsheet-style admin UI for idea management (bulk actions, status-aware Play ▶ icon per row)
+- **Split pipeline — all Sonnet:** prep → write → score → images → translate (uniform model, no Opus)
 - **System prompt injection** via `--append-system-prompt-file` — zero Read tool calls, refs pre-compiled
-- `ArticleGenerationService` with `triggerPrep()` / `triggerWrite()` / `triggerScore()` + `triggerGeneration()` fallback
+- `ArticleGenerationService` with `triggerPrep()` / `triggerWrite()` / `triggerScore()` / `triggerImages()` / `triggerTranslate()` + `triggerGeneration()` fallback
 - **5 scoring gates:** Quality (7/10) + Virality (3/5) + SEO (4/6) + AI Humanization (20pt) + GEO (5pt)
 - **Combined 100-point weighted scoring** (min 70 to publish, 5 bands)
 - 20 hard rules (incl. 107-word AI replacement system, 36 AI pattern categories, GEO/AEO formatting)
 - 12 content templates with auto-selection
 - **Real-time progress tracking**: progress callbacks at each step, progress modal with bar + step indicators + streaming log
 - Auto-continuation via `continue-pipeline` endpoint (prep→write→score chained automatically)
-- **~6-8 minutes** per article (down from ~15 min single-session)
+- **~8-11 minutes** per article (split pipeline, down from ~15 min single-session)
+
+### Content Pipeline Hardening (April 21, 2026)
+- **Pipeline State Machine:** `ContentIdeaStatus` enum + `HasStatusTransitions` trait + `PipelineGuard` service. Strict adjacency map; illegal transitions throw `InvalidStateTransitionException`. Rolling `pipeline_state_log[]` JSON audit column (last 20 entries with from/to/reason/timestamp).
+- **Segment Retry Pipeline:** per-segment status (`pending/generating/done/failed/skipped`), auto-retry job with exponential backoff (2 attempts), manual retry/skip admin endpoints, replace-variation targeting specific slots.
+- **Translate-Before-Publish Gate:** sync SSH preflight blocks publish until secondary-language translation exists; 3 auto retries over 15 min; Telegram `auto_translate_exhausted` alert on exhaustion + falls through to monolingual publish.
+- **Resync artisan:** `content-engine:resync-stuck-variations` backfills UI drift from authoritative `image_generation_jobs` rows (dry-run + per-idea flags supported).
+- **Named-entity covers:** Wikidata SPARQL + Commons MediaWiki with license whitelist (CC0/PD/CC-BY-4.0, rejects SA); plugin 3-tier detection (title + headings + lede); backend `autoResolvePersonFromTitle` runs inline at every cover dispatch (no SSH round-trip, 1-3s cache hit).
+- **meta_keywords synthesis:** 4-tier resolution with body-lede entity extraction (capitalized bigrams + mixed-case brands + ALL-CAPS acronyms), broad-topic anchor from pillar, ~80-token stopword list. 5-7 short entity tokens (web SEO best practice).
+- **Telegram notifications:** `creator_brand` + `telegram` settings groups, queued `DispatchTelegramNotification` job, per-event toggles (`manifest_needed`, `generation_failed`, `publish_success`, `auto_translate_exhausted`).
 
 ### Creator Brand System (April 18, 2026)
 - **Auto creator-face injection** on every cover image (no keyword gate) + on inline when `needs_creator_face: true` or human keywords match
