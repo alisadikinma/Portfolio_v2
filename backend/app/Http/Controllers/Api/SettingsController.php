@@ -591,7 +591,7 @@ class SettingsController extends Controller
                 $data[$setting->key] = $setting->value;
             }
 
-            // Apply defaults for any missing rows (seeder should cover all 6
+            // Apply defaults for any missing rows (seeder should cover all 9
             // but be defensive for fresh DBs that haven't run the seeder yet).
             $data = array_merge([
                 'telegram_bot_token' => null,
@@ -600,6 +600,9 @@ class SettingsController extends Controller
                 'telegram_notify_manifest_needed' => 'true',
                 'telegram_notify_generation_failed' => 'true',
                 'telegram_notify_publish_success' => 'false',
+                'telegram_notify_segment_failed' => 'true',
+                'telegram_notify_cover_critical' => 'true',
+                'telegram_notify_translate_failed' => 'true',
             ], $data);
 
             $data['telegram_bot_token'] = $this->maskBotToken($data['telegram_bot_token']);
@@ -632,6 +635,9 @@ class SettingsController extends Controller
             'telegram_notify_manifest_needed' => ['nullable', 'in:true,false,1,0'],
             'telegram_notify_generation_failed' => ['nullable', 'in:true,false,1,0'],
             'telegram_notify_publish_success' => ['nullable', 'in:true,false,1,0'],
+            'telegram_notify_segment_failed' => ['nullable', 'in:true,false,1,0'],
+            'telegram_notify_cover_critical' => ['nullable', 'in:true,false,1,0'],
+            'telegram_notify_translate_failed' => ['nullable', 'in:true,false,1,0'],
         ]);
 
         DB::beginTransaction();
@@ -645,7 +651,15 @@ class SettingsController extends Controller
             }
 
             // Normalize booleans to canonical 'true'/'false' strings
-            foreach (['telegram_enabled', 'telegram_notify_manifest_needed', 'telegram_notify_generation_failed', 'telegram_notify_publish_success'] as $boolKey) {
+            foreach ([
+                'telegram_enabled',
+                'telegram_notify_manifest_needed',
+                'telegram_notify_generation_failed',
+                'telegram_notify_publish_success',
+                'telegram_notify_segment_failed',
+                'telegram_notify_cover_critical',
+                'telegram_notify_translate_failed',
+            ] as $boolKey) {
                 if (isset($validated[$boolKey])) {
                     $validated[$boolKey] = in_array($validated[$boolKey], [true, 'true', 1, '1'], true) ? 'true' : 'false';
                 }

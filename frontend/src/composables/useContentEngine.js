@@ -87,6 +87,17 @@ export function useContentEngine() {
 
   const generateSegmentImage = (id, segmentData) => request('post', `/admin/content-engine/ideas/${id}/generate-segment-image`, segmentData)
 
+  // Fast-path retry for a failed segment. Reuses cached prompt + refs,
+  // no plugin NER rerun. 409 when retry cap (3) reached — surface to user
+  // so they can choose Skip or Regenerate Prompt instead.
+  const retrySegment = (id, segmentIndex) =>
+    request('post', `/admin/content-engine/ideas/${id}/retry-segment/${segmentIndex}`)
+
+  // Manual skip. `force` required for cover (segment 0) — backend returns
+  // 409 COVER_SKIP_REQUIRES_FORCE so the UI can surface a confirm dialog.
+  const skipSegment = (id, segmentIndex, { force = false } = {}) =>
+    request('post', `/admin/content-engine/ideas/${id}/skip-segment/${segmentIndex}`, { force })
+
   const rewriteSegmentVd = (id, segmentIndex, faceRefUrl) =>
     request('post', `/admin/content-engine/ideas/${id}/rewrite-vd`, {
       segment_index: segmentIndex,
@@ -211,6 +222,8 @@ export function useContentEngine() {
     runDeepScore,
     saveDraft,
     generateSegmentImage,
+    retrySegment,
+    skipSegment,
     rewriteSegmentVd,
     translateArticle,
     searchStockImages,

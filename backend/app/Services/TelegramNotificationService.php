@@ -92,6 +92,77 @@ class TelegramNotificationService
     }
 
     /**
+     * Alert when a single image segment exhausts retry attempts (terminal failure).
+     * Includes segment index + last failure reason so the admin can decide to
+     * retry manually, skip the segment, or abandon the idea.
+     */
+    public function sendSegmentRetryExhausted(ContentIdea $idea, int $segmentIndex): bool
+    {
+        if (!$this->isEnabledFor('segment_failed')) {
+            return false;
+        }
+
+        $segment = $idea->generated_article['image_prompts'][$segmentIndex] ?? [];
+        $vd = $segment['visual_direction'] ?? ($segment['prompt_text'] ?? '');
+        $history = $segment['failure_history'] ?? [];
+        $lastReason = !empty($history) ? (end($history)['reason'] ?? 'unknown') : 'unknown';
+
+        $lines = [];
+        $lines[] = '⚠️ *Segment retry exhausted* — Content Engine';
+        $lines[] = '';
+        $lines[] = 'Article: _' . $this->escapeMarkdown($idea->title ?? 'Untitled') . '_';
+        $lines[] = 'Segment: #' . $segmentIndex;
+        if ($vd !== '') {
+            $lines[] = 'Direction: _' . $this->escapeMarkdown(\Illuminate\Support\Str::limit($vd, 140)) . '_';
+        }
+        $lines[] = 'Last failure: ' . $this->escapeMarkdown(\Illuminate\Support\Str::limit($lastReason, 200));
+        $lines[] = '';
+        $lines[] = '[Open Admin](' . $this->buildAdminUrl($idea) . ')';
+
+        return $this->send(implode("\n", $lines));
+    }
+
+    /**
+     * Alert when the cover segment (index 0) fails terminally. Cover is
+     * critical — idea cannot advance to images_ready without a usable cover
+     * image. Operator must retry, upload manually, or abandon.
+     */
+    public function sendCoverCriticalAlert(ContentIdea $idea): bool
+    {
+        if (!$this->isEnabledFor('cover_critical')) {
+            return false;
+        }
+
+        $text = "🛑 *Cover image critical failure* — Content Engine\n\n"
+            . 'Article: _' . $this->escapeMarkdown($idea->title ?? 'Untitled') . "_\n\n"
+            . "The cover segment (index 0) hit terminal failure. This idea is blocked "
+            . "at `generating_images` until the cover is retried, manually uploaded, or skipped.\n\n"
+            . "[Open Admin](" . $this->buildAdminUrl($idea) . ")";
+
+        return $this->send($text);
+    }
+
+    /**
+     * Alert when the cron auto-pipeline exhausts translation retries and falls
+     * back to publishing monolingual. Operator can manually re-run translate
+     * via the existing admin Gate 2 endpoint.
+     */
+    public function sendAutoTranslateExhausted(ContentIdea $idea): bool
+    {
+        if (!$this->isEnabledFor('translate_failed')) {
+            return false;
+        }
+
+        $text = "🌐 *Auto-translate exhausted* — Content Engine\n\n"
+            . 'Article: _' . $this->escapeMarkdown($idea->title ?? 'Untitled') . "_\n\n"
+            . "Published monolingual. Translation retries hit the cap — "
+            . "re-run translation manually from the admin UI if needed.\n\n"
+            . "[Open Admin](" . $this->buildAdminUrl($idea) . ")";
+
+        return $this->send($text);
+    }
+
+    /**
      * Celebratory alert on successful article publish.
      */
     public function sendPublishSuccess(ContentIdea $idea): bool

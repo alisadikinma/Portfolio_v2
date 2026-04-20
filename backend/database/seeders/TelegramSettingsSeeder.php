@@ -16,6 +16,9 @@ class TelegramSettingsSeeder extends Seeder
             ['key' => 'telegram_notify_manifest_needed',    'value' => 'true',  'type' => 'text'],
             ['key' => 'telegram_notify_generation_failed',  'value' => 'true',  'type' => 'text'],
             ['key' => 'telegram_notify_publish_success',    'value' => 'false', 'type' => 'text'],
+            ['key' => 'telegram_notify_segment_failed',     'value' => 'true',  'type' => 'text'],
+            ['key' => 'telegram_notify_cover_critical',     'value' => 'true',  'type' => 'text'],
+            ['key' => 'telegram_notify_translate_failed',   'value' => 'true',  'type' => 'text'],
         ];
 
         // firstOrCreate — NOT updateOrCreate — so running this seeder on every

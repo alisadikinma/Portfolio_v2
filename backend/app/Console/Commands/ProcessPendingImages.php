@@ -75,14 +75,18 @@ class ProcessPendingImages extends Command
                     $this->syncToContentIdea($job, $localUrl);
 
                 } elseif ($status === 3) {
+                    $reason = $data['error_message'] ?? 'Generation failed';
                     $job->update([
                         'status' => 'failed',
-                        'error_message' => $data['error_message'] ?? 'Generation failed',
+                        'error_message' => $reason,
                     ]);
-                    $this->error("    FAILED: " . ($data['error_message'] ?? 'unknown'));
+                    $this->error("    FAILED: " . $reason);
 
-                    // Sync failure to content_ideas
+                    // Sync failure to content_ideas (advance-rule update + variation mirror)
                     $this->syncToContentIdea($job, null, true);
+                    // Drive the segment retry state machine: bump retry_count,
+                    // append failure_history, auto-schedule retry or mark terminal.
+                    $imageService->handleSegmentFailure($job, $reason);
 
                 } else {
                     $this->line("    Still processing (status={$status})");
@@ -153,9 +157,24 @@ class ProcessPendingImages extends Command
                 $article['image_prompts'] = $prompts;
                 $idea->generated_article = $article;
 
-                $allResolved = collect($prompts)->every(fn ($p) => in_array($p['status'] ?? '', ['done', 'failed']));
+                // Advance rule: every segment must be 'done', 'skipped', or terminally-'failed'.
+                $allResolved = collect($prompts)->every(function ($p) {
+                    $status = $p['status'] ?? '';
+                    if ($status === 'done' || $status === 'skipped') {
+                        return true;
+                    }
+                    return $status === 'failed' && !empty($p['terminal_at']);
+                });
                 $anyDone = collect($prompts)->contains(fn ($p) => ($p['status'] ?? '') === 'done');
-                if ($allResolved && $anyDone && $idea->status === 'generating_images') {
+
+                // Cover-critical block: if segment 0 (cover) is terminal failure or skipped,
+                // do NOT advance — operator must intervene.
+                $cover = $prompts[0] ?? null;
+                $coverCritical = $cover !== null
+                    && in_array($cover['status'] ?? '', ['failed', 'skipped'], true)
+                    && !empty($cover['terminal_at']);
+
+                if ($allResolved && $anyDone && !$coverCritical && $idea->status === 'generating_images') {
                     if ($idea->auto_mode) {
                         $idea->status = 'completed';
                         $this->info("    All images resolved + auto_mode — idea #{$idea->id} → completed");
@@ -163,6 +182,8 @@ class ProcessPendingImages extends Command
                         $idea->status = 'images_ready';
                         $this->info("    All images resolved — idea #{$idea->id} → images_ready");
                     }
+                } elseif ($coverCritical && $idea->status === 'generating_images') {
+                    $this->warn("    Cover segment terminal — idea #{$idea->id} blocked at generating_images");
                 }
 
                 $idea->save();

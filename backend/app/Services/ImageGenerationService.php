@@ -12,6 +12,8 @@ use Illuminate\Support\Str;
 
 class ImageGenerationService
 {
+    public const MAX_SEGMENT_ATTEMPTS = 3;
+
     private string $apiKey;
     private string $baseUrl = 'https://api.geminigen.ai/uapi/v1';
 
@@ -529,6 +531,193 @@ class ImageGenerationService
         } catch (\Exception $e) {
             Log::error("[ImageGen] Download exception: {$e->getMessage()}");
             return $imageUrl;
+        }
+    }
+
+    /**
+     * Retry a single failed image segment without re-running plugin NER.
+     * Increments retry_count, appends the previous failed variation to
+     * failure_history[], resets variations[] to a fresh generating slot,
+     * and re-queues to GeminiGen using the existing prompt + refs.
+     *
+     * Returns the new job UUID, or null if:
+     *   - segment index out of range
+     *   - retry_count already >= MAX_SEGMENT_ATTEMPTS
+     *   - GeminiGen queue() fails
+     */
+    public function retrySegment(ContentIdea $idea, int $i): ?string
+    {
+        $article = $idea->generated_article ?? [];
+        $prompts = $article['image_prompts'] ?? [];
+
+        if (!isset($prompts[$i])) {
+            Log::warning("[ImageGen] retrySegment: index {$i} out of range for idea #{$idea->id}");
+            return null;
+        }
+
+        $segment = $prompts[$i];
+        $currentCount = (int) ($segment['retry_count'] ?? 0);
+
+        if ($currentCount >= self::MAX_SEGMENT_ATTEMPTS) {
+            Log::warning("[ImageGen] retrySegment: idea #{$idea->id} segment {$i} at cap ({$currentCount})");
+            return null;
+        }
+
+        // Archive the prior variation (typically status=failed) into failure_history[]
+        $lastVariation = !empty($segment['variations']) ? end($segment['variations']) : null;
+        if (is_array($lastVariation)) {
+            $segment['failure_history'] = $segment['failure_history'] ?? [];
+            $segment['failure_history'][] = [
+                'attempt' => $currentCount,
+                'uuid' => $lastVariation['job_uuid'] ?? null,
+                'reason' => $lastVariation['error'] ?? 'unknown',
+                'timestamp' => now()->toIso8601String(),
+            ];
+        }
+
+        // Reset variations (clear stale UUIDs) so the new slot is the only one.
+        $segment['variations'] = [];
+        $segment['retry_count'] = $currentCount + 1;
+        $segment['status'] = 'generating';
+        $segment['terminal_at'] = null;
+
+        // Prepare enhancer input using already-cached refs (no plugin NER re-run).
+        $enhancer = app(CoverBrandingEnhancer::class);
+        $forEnhance = array_merge($segment, [
+            'prompt_text' => $segment['prompt_text'] ?? ($segment['prompt'] ?? ''),
+            'face_refs' => $segment['face_refs'] ?? [],
+            'model' => $segment['model'] ?? null,
+        ]);
+        $enhanced = $enhancer->enhance($forEnhance, $idea);
+
+        $promptText = $enhanced['prompt_text'] ?? ($segment['prompt_text'] ?? $segment['prompt'] ?? '');
+        $model = $enhanced['model'] ?? null;
+        $faceRefs = $enhanced['face_refs'] ?? [];
+
+        $brandRefUrls = [];
+        foreach ($segment['brand_refs'] ?? [] as $ref) {
+            if (is_array($ref) && !empty($ref['url'])) $brandRefUrls[] = $ref['url'];
+            elseif (is_string($ref) && $ref !== '') $brandRefUrls[] = $ref;
+        }
+
+        $enhancerFileUrls = array_values(array_filter(
+            $enhanced['file_urls'] ?? [],
+            fn ($u) => is_string($u) && $u !== ''
+        ));
+
+        $uuid = $this->queue(
+            postId: null,
+            prompt: $promptText,
+            type: $i === 0 ? 'hero' : 'inline',
+            insertAfterHeading: $segment['insert_after_heading'] ?? null,
+            model: $model,
+            aspectRatio: $segment['aspect_ratio'] ?? '16:9',
+            style: $segment['style'] ?? 'Photorealistic',
+            faceRefs: array_merge($faceRefs, $brandRefUrls),
+            styleRefs: array_merge($segment['style_refs'] ?? [], $enhancerFileUrls),
+            additionalNotes: $segment['additional_notes'] ?? '',
+            plannedFilename: $this->buildBrandedFilename($idea, $i)
+        );
+
+        if (!$uuid) {
+            Log::warning("[ImageGen] retrySegment: queue failed for idea #{$idea->id} segment {$i}");
+            return null;
+        }
+
+        $segment['variations'][] = ['url' => null, 'job_uuid' => $uuid, 'status' => 'generating'];
+        $segment['job_uuid'] = $uuid;
+
+        $prompts[$i] = $segment;
+        $article['image_prompts'] = $prompts;
+        $idea->generated_article = $article;
+        $idea->save();
+
+        Log::info("[ImageGen] retrySegment: idea #{$idea->id} segment {$i} attempt {$segment['retry_count']} uuid={$uuid}");
+        return $uuid;
+    }
+
+    /**
+     * Update segment state on a GeminiGen failure and drive the retry
+     * state machine: bump retry_count, append failure_history, decide
+     * whether to auto-dispatch a RetryImageSegmentJob or mark terminal.
+     *
+     * Called from the webhook/polling failure path. Idempotent when the
+     * job UUID matches a segment in an idea currently in an image-gen
+     * status. If no matching idea found, silently returns (legacy posts).
+     */
+    public function handleSegmentFailure(\App\Models\ImageGenerationJob $job, ?string $reason = null): void
+    {
+        $ideas = ContentIdea::whereIn('status', ['article_ready', 'generating_images', 'images_ready'])
+            ->whereNotNull('generated_article')
+            ->get();
+
+        foreach ($ideas as $idea) {
+            $article = $idea->generated_article ?? [];
+            $prompts = $article['image_prompts'] ?? [];
+            $matchIndex = null;
+
+            foreach ($prompts as $i => $p) {
+                $variations = $p['variations'] ?? [];
+                foreach ($variations as $v) {
+                    if (($v['job_uuid'] ?? null) === $job->uuid) {
+                        $matchIndex = $i;
+                        break 2;
+                    }
+                }
+                if (($p['job_uuid'] ?? null) === $job->uuid) {
+                    $matchIndex = $i;
+                    break;
+                }
+            }
+
+            if ($matchIndex === null) {
+                continue;
+            }
+
+            $segment = $prompts[$matchIndex];
+            $priorCount = (int) ($segment['retry_count'] ?? 0);
+            $newCount = $priorCount + 1;
+
+            $segment['retry_count'] = $newCount;
+            $segment['failure_history'] = $segment['failure_history'] ?? [];
+            $segment['failure_history'][] = [
+                'attempt' => $priorCount,
+                'uuid' => $job->uuid,
+                'reason' => $reason ?? $job->error_message ?? 'unknown',
+                'timestamp' => now()->toIso8601String(),
+            ];
+
+            // Propagate failed variation + top-level status
+            foreach ($segment['variations'] ?? [] as $vi => $v) {
+                if (($v['job_uuid'] ?? null) === $job->uuid) {
+                    $segment['variations'][$vi]['status'] = 'failed';
+                    $segment['variations'][$vi]['error'] = $reason ?? 'unknown';
+                }
+            }
+            $segment['status'] = 'failed';
+
+            if ($newCount >= self::MAX_SEGMENT_ATTEMPTS) {
+                $segment['terminal_at'] = now()->toIso8601String();
+
+                \App\Jobs\DispatchTelegramNotification::dispatch($idea->id, 'segment_retry_exhausted');
+
+                if ($matchIndex === 0) {
+                    \App\Jobs\DispatchTelegramNotification::dispatch($idea->id, 'cover_critical');
+                }
+
+                Log::warning("[ImageGen] Segment {$matchIndex} on idea #{$idea->id} reached terminal failure after {$newCount} attempts");
+            } elseif ($idea->auto_mode) {
+                \App\Jobs\RetryImageSegmentJob::dispatch($idea->id, $matchIndex)
+                    ->delay(now()->addSeconds(60));
+
+                Log::info("[ImageGen] Scheduled auto-retry for idea #{$idea->id} segment {$matchIndex} (attempt {$newCount}/" . self::MAX_SEGMENT_ATTEMPTS . ')');
+            }
+
+            $prompts[$matchIndex] = $segment;
+            $article['image_prompts'] = $prompts;
+            $idea->generated_article = $article;
+            $idea->save();
+            return;
         }
     }
 }

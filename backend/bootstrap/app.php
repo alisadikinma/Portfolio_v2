@@ -32,5 +32,15 @@ return Application::configure(basePath: dirname(__DIR__))
         // This prevents CSRF 419 errors on API routes
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $exceptions->render(function (\App\Exceptions\InvalidStateTransitionException $e, \Illuminate\Http\Request $request) {
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json([
+                    'success' => false,
+                    'error' => [
+                        'code' => 'INVALID_STATE_TRANSITION',
+                        'message' => $e->getMessage(),
+                    ],
+                ], 409);
+            }
+        });
     })->create();

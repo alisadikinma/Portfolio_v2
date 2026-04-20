@@ -1047,6 +1047,118 @@ class ContentIdeaController extends Controller
     }
 
     /**
+     * Retry a single failed segment without re-running the plugin's NER
+     * pipeline. Reuses cached entity_refs/face_refs/brand_refs. Fast path
+     * for the common case of transient GeminiGen failures.
+     *
+     * Returns 409 when the segment is at the retry cap, 404 when idea or
+     * segment index doesn't exist, 500 when the GeminiGen queue call fails.
+     */
+    public function retrySegment($id, int $i): JsonResponse
+    {
+        $idea = ContentIdea::find($id);
+        if (!$idea) {
+            return response()->json(['success' => false, 'message' => 'Content idea not found.'], 404);
+        }
+
+        $prompts = $idea->generated_article['image_prompts'] ?? [];
+        if (!isset($prompts[$i])) {
+            return response()->json(['success' => false, 'message' => 'Segment index out of range.'], 404);
+        }
+
+        $retryCount = (int) ($prompts[$i]['retry_count'] ?? 0);
+        if ($retryCount >= \App\Services\ImageGenerationService::MAX_SEGMENT_ATTEMPTS) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Segment retry cap reached.',
+                'retry_count' => $retryCount,
+            ], 409);
+        }
+
+        $uuid = app(\App\Services\ImageGenerationService::class)->retrySegment($idea, $i);
+
+        if (!$uuid) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Retry failed to dispatch. Check image generation logs.',
+            ], 500);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'uuid' => $uuid,
+                'segment_index' => $i,
+                'retry_count' => $retryCount + 1,
+            ],
+            'message' => 'Retry dispatched.',
+        ]);
+    }
+
+    /**
+     * Manually skip a segment so the idea can advance even with a failure.
+     * Sets status='skipped' + terminal_at=now(). Appends a user_skip entry
+     * to failure_history[]. Refuses to skip the cover (index 0) without an
+     * explicit `force=true` body param — cover skip has blast radius.
+     */
+    public function skipSegment($id, int $i, Request $request): JsonResponse
+    {
+        $idea = ContentIdea::find($id);
+        if (!$idea) {
+            return response()->json(['success' => false, 'message' => 'Content idea not found.'], 404);
+        }
+
+        $article = $idea->generated_article ?? [];
+        $prompts = $article['image_prompts'] ?? [];
+
+        if (!isset($prompts[$i])) {
+            return response()->json(['success' => false, 'message' => 'Segment index out of range.'], 404);
+        }
+
+        $currentStatus = $prompts[$i]['status'] ?? '';
+        if ($currentStatus === 'done') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Segment already done — skip refused.',
+            ], 409);
+        }
+
+        $force = $request->boolean('force');
+        if ($i === 0 && !$force) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cover segment skip requires force=true — operator confirmation.',
+                'code' => 'COVER_SKIP_REQUIRES_FORCE',
+            ], 409);
+        }
+
+        $segment = $prompts[$i];
+        $segment['status'] = 'skipped';
+        $segment['terminal_at'] = now()->toIso8601String();
+        $segment['failure_history'] = $segment['failure_history'] ?? [];
+        $segment['failure_history'][] = [
+            'attempt' => (int) ($segment['retry_count'] ?? 0),
+            'uuid' => null,
+            'reason' => 'user_skip',
+            'timestamp' => now()->toIso8601String(),
+        ];
+
+        $prompts[$i] = $segment;
+        $article['image_prompts'] = $prompts;
+        $idea->update(['generated_article' => $article]);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'segment_index' => $i,
+                'status' => 'skipped',
+                'terminal_at' => $segment['terminal_at'],
+            ],
+            'message' => 'Segment skipped.',
+        ]);
+    }
+
+    /**
      * GATE 2: Approve images and publish article to blog.
      *
      * Thin wrapper around ContentPublishService::publish — the same service

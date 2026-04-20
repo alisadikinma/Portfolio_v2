@@ -374,6 +374,45 @@
                 Alert on successful publish (celebratory)
               </span>
             </label>
+
+            <label class="flex items-center gap-3 cursor-pointer">
+              <input
+                :checked="telegramFormData.telegram_notify_segment_failed === 'true'"
+                type="checkbox"
+                :disabled="!telegramEnabledBool"
+                class="w-4 h-4 text-amber-600 border-neutral-300 rounded focus:ring-amber-500"
+                @change="e => telegramFormData.telegram_notify_segment_failed = e.target.checked ? 'true' : 'false'"
+              >
+              <span class="text-sm text-neutral-700 dark:text-neutral-300">
+                Alert on segment retry exhausted (3 attempts, image stuck)
+              </span>
+            </label>
+
+            <label class="flex items-center gap-3 cursor-pointer">
+              <input
+                :checked="telegramFormData.telegram_notify_cover_critical === 'true'"
+                type="checkbox"
+                :disabled="!telegramEnabledBool"
+                class="w-4 h-4 text-amber-600 border-neutral-300 rounded focus:ring-amber-500"
+                @change="e => telegramFormData.telegram_notify_cover_critical = e.target.checked ? 'true' : 'false'"
+              >
+              <span class="text-sm text-neutral-700 dark:text-neutral-300">
+                Alert on cover-critical failure (idea blocked — cover image terminal)
+              </span>
+            </label>
+
+            <label class="flex items-center gap-3 cursor-pointer">
+              <input
+                :checked="telegramFormData.telegram_notify_translate_failed === 'true'"
+                type="checkbox"
+                :disabled="!telegramEnabledBool"
+                class="w-4 h-4 text-amber-600 border-neutral-300 rounded focus:ring-amber-500"
+                @change="e => telegramFormData.telegram_notify_translate_failed = e.target.checked ? 'true' : 'false'"
+              >
+              <span class="text-sm text-neutral-700 dark:text-neutral-300">
+                Alert on auto-translate exhausted (cron fell back to monolingual publish)
+              </span>
+            </label>
           </div>
 
           <div class="flex flex-wrap items-center gap-3 pt-4 border-t border-neutral-200 dark:border-neutral-700">
@@ -1361,6 +1400,9 @@ const telegramFormData = ref({
   telegram_notify_manifest_needed: 'true',
   telegram_notify_generation_failed: 'true',
   telegram_notify_publish_success: 'false',
+  telegram_notify_segment_failed: 'true',
+  telegram_notify_cover_critical: 'true',
+  telegram_notify_translate_failed: 'true',
 })
 
 const telegramTokenMasked = computed(() => {
@@ -1879,6 +1921,9 @@ async function loadSettings() {
       telegram_notify_manifest_needed: tg.telegram_notify_manifest_needed || 'true',
       telegram_notify_generation_failed: tg.telegram_notify_generation_failed || 'true',
       telegram_notify_publish_success: tg.telegram_notify_publish_success || 'false',
+      telegram_notify_segment_failed: tg.telegram_notify_segment_failed || 'true',
+      telegram_notify_cover_critical: tg.telegram_notify_cover_critical || 'true',
+      telegram_notify_translate_failed: tg.telegram_notify_translate_failed || 'true',
     }
 
     // Populate form data

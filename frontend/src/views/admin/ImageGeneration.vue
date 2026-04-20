@@ -11,7 +11,8 @@ import EntityUploadSlot from '@/components/admin/EntityUploadSlot.vue'
 
 const route = useRoute()
 const router = useRouter()
-const { getIdea, saveDraft, generateSegmentImage, rewriteSegmentVd, resumeImagePipeline, downloadStockImage, isLoading } = useContentEngine()
+const { getIdea, saveDraft, generateSegmentImage, retrySegment, skipSegment, rewriteSegmentVd, resumeImagePipeline, downloadStockImage, isLoading } = useContentEngine()
+const MAX_SEGMENT_ATTEMPTS = 3
 const toast = useToast()
 
 const idea = ref(null)
@@ -250,6 +251,11 @@ function initSegments() {
       generated_url: activeVar?.url || '',
       status: segStatus,
       label: img.type === 'cover' ? 'COVER' : `BODY-${i}`,
+      // Phase B: per-segment retry state. Surfaced in the UI as a small
+      // "Attempt N/3" badge + a Retry/Skip button pair.
+      retry_count: Number(img.retry_count || 0),
+      terminal_at: img.terminal_at || null,
+      failure_history: Array.isArray(img.failure_history) ? img.failure_history : [],
     }
   })
 }
@@ -420,6 +426,86 @@ function selectVariation(seg, varIdx) {
   seg.selected_variation = varIdx
   seg.generated_url = seg.variations[varIdx].url
   scheduleAutoSave()
+}
+
+// ── Phase B: Retry + Skip for failed segments ──
+
+async function retryFailedSegment(seg) {
+  if (!idea.value?.id) return
+  if ((seg.retry_count || 0) >= MAX_SEGMENT_ATTEMPTS) {
+    toast.error(`Retry cap reached (${MAX_SEGMENT_ATTEMPTS}). Use Skip or Regenerate Prompt instead.`)
+    return
+  }
+
+  const priorStatus = seg.status
+  seg.status = 'generating'
+  if (!seg.variations) seg.variations = []
+  const optimisticIdx = seg.variations.length
+  seg.variations.push({ url: null, job_uuid: null, status: 'generating', pending: true })
+
+  const result = await retrySegment(idea.value.id, seg.index)
+
+  if (result.success) {
+    seg.variations.splice(optimisticIdx, 1)
+    seg.variations.push({ url: null, job_uuid: result.data?.uuid, status: 'generating' })
+    seg.retry_count = result.data?.retry_count ?? (seg.retry_count + 1)
+    seg.terminal_at = null
+    seg.job_uuid = result.data?.uuid
+    toast.success(`Retry ${seg.retry_count}/${MAX_SEGMENT_ATTEMPTS} dispatched for ${seg.label}`)
+  } else {
+    seg.variations.splice(optimisticIdx, 1)
+    seg.status = priorStatus
+    toast.error(result.error || `Retry failed for ${seg.label}`)
+  }
+}
+
+async function skipFailedSegment(seg) {
+  if (!idea.value?.id) return
+
+  const isCover = seg.index === 0
+  const force = isCover
+    ? window.confirm(
+        `Skip the COVER segment? The article will publish with no cover image ` +
+        `and Ali's creator face will not appear on the featured position. ` +
+        `This has high blast radius — confirm only if you're sure.`
+      )
+    : true
+
+  if (isCover && !force) return
+
+  const result = await skipSegment(idea.value.id, seg.index, { force })
+
+  if (result.success) {
+    seg.status = 'skipped'
+    seg.terminal_at = result.data?.terminal_at || new Date().toISOString()
+    seg.failure_history = [
+      ...(seg.failure_history || []),
+      { attempt: seg.retry_count || 0, uuid: null, reason: 'user_skip', timestamp: seg.terminal_at },
+    ]
+    toast.success(`${seg.label} skipped — idea can now advance when other segments resolve`)
+  } else {
+    toast.error(result.error || `Skip failed for ${seg.label}`)
+  }
+}
+
+function canRetrySegment(seg) {
+  if (seg.status !== 'failed') return false
+  if ((seg.retry_count || 0) >= MAX_SEGMENT_ATTEMPTS) return false
+  return true
+}
+
+function canSkipSegment(seg) {
+  if (seg.status === 'done' || seg.status === 'skipped') return false
+  // Allow skip when the segment is stuck failed OR has some prior failure history
+  return seg.status === 'failed' || (seg.failure_history || []).length > 0
+}
+
+function failureHistoryTooltip(seg) {
+  const history = seg.failure_history || []
+  if (!history.length) return ''
+  return history
+    .map((h) => `#${h.attempt}: ${h.reason || 'unknown'} (${h.timestamp?.slice(0, 19).replace('T', ' ') || ''})`)
+    .join('\n')
 }
 
 // ── Stock image as variation ──
@@ -714,6 +800,37 @@ async function handleApprove() {
               </div>
             </div>
             <div class="flex items-center gap-2">
+              <!-- Retry count badge (visible after at least one failure attempt) -->
+              <span
+                v-if="(seg.retry_count || 0) > 0"
+                :title="failureHistoryTooltip(seg)"
+                class="text-[10px] font-mono px-2 py-0.5 rounded-md bg-red-500/5 text-red-600/80 dark:text-red-400/80 border border-red-500/20"
+              >
+                Attempt {{ seg.retry_count }}/{{ MAX_SEGMENT_ATTEMPTS }}
+              </span>
+
+              <!-- Retry button: only for failed segments under cap -->
+              <button
+                v-if="canRetrySegment(seg)"
+                @click="retryFailedSegment(seg)"
+                :disabled="isLoading"
+                class="px-2.5 py-1 text-[11px] font-medium rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-colors disabled:opacity-50"
+                title="Retry: reuse cached prompt + refs, new GeminiGen attempt"
+              >
+                Retry
+              </button>
+
+              <!-- Skip button: for failed or history-laden segments -->
+              <button
+                v-if="canSkipSegment(seg)"
+                @click="skipFailedSegment(seg)"
+                :disabled="isLoading"
+                class="px-2.5 py-1 text-[11px] font-medium rounded-lg bg-neutral-500/10 text-neutral-600 dark:text-neutral-300 border border-neutral-400/30 hover:bg-neutral-500/20 transition-colors disabled:opacity-50"
+                :title="seg.index === 0 ? 'Skip cover (high blast radius — confirms before submit)' : 'Skip: mark as skipped so idea can advance'"
+              >
+                Skip
+              </button>
+
               <button @click="openConfig(seg)" class="w-7 h-7 flex items-center justify-center rounded-lg text-neutral-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors" title="Configure references & settings">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
               </button>
@@ -722,9 +839,10 @@ async function handleApprove() {
                 seg.status === 'done' ? 'bg-green-500/10 text-green-600 dark:text-green-400' :
                 seg.status === 'generating' || seg.status === 'rewriting_vd' ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' :
                 seg.status === 'failed' ? 'bg-red-500/10 text-red-600 dark:text-red-400' :
+                seg.status === 'skipped' ? 'bg-neutral-500/10 text-neutral-500 dark:text-neutral-400' :
                 'bg-neutral-500/10 text-neutral-500 dark:text-neutral-400'
               ]">
-                {{ seg.status === 'done' ? 'Generated' : seg.status === 'rewriting_vd' ? 'Rewriting VD...' : seg.status === 'generating' ? 'Generating...' : seg.status === 'failed' ? 'Failed' : 'Pending' }}
+                {{ seg.status === 'done' ? 'Generated' : seg.status === 'rewriting_vd' ? 'Rewriting VD...' : seg.status === 'generating' ? 'Generating...' : seg.status === 'failed' ? 'Failed' : seg.status === 'skipped' ? 'Skipped' : 'Pending' }}
               </span>
             </div>
           </div>

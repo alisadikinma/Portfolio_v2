@@ -29,14 +29,16 @@ class DispatchTelegramNotification implements ShouldQueue
 
     public int $contentIdeaId;
     public string $notificationType;
+    public array $payload;
 
-    public function __construct(int|ContentIdea $idea, string $notificationType)
+    public function __construct(int|ContentIdea $idea, string $notificationType, array $payload = [])
     {
         // Dispatchable passes constructor args directly, so we accept either
         // an int id (dispatched after a DB lookup elsewhere) or the ContentIdea
         // model itself (most common — dispatch from controller action).
         $this->contentIdeaId = $idea instanceof ContentIdea ? $idea->id : $idea;
         $this->notificationType = $notificationType;
+        $this->payload = $payload;
     }
 
     public function handle(TelegramNotificationService $service): void
@@ -53,6 +55,12 @@ class DispatchTelegramNotification implements ShouldQueue
             'manifest_needed' => $service->sendManifestAlert($idea),
             'generation_failed' => $service->sendGenerationFailed($idea),
             'publish_success' => $service->sendPublishSuccess($idea),
+            'segment_retry_exhausted' => $service->sendSegmentRetryExhausted(
+                $idea,
+                (int) ($this->payload['segment_idx'] ?? $this->firstTerminalSegmentIndex($idea))
+            ),
+            'cover_critical' => $service->sendCoverCriticalAlert($idea),
+            'auto_translate_exhausted' => $service->sendAutoTranslateExhausted($idea),
             default => false,
         };
 
@@ -71,5 +79,21 @@ class DispatchTelegramNotification implements ShouldQueue
             'type' => $this->notificationType,
             'error' => $exception->getMessage(),
         ]);
+    }
+
+    /**
+     * Fallback segment index resolver — used when the dispatcher didn't
+     * pass an explicit segment_idx in $payload. Finds the first image
+     * prompt with a non-null terminal_at. Returns 0 as ultimate fallback.
+     */
+    private function firstTerminalSegmentIndex(ContentIdea $idea): int
+    {
+        $prompts = $idea->generated_article['image_prompts'] ?? [];
+        foreach ($prompts as $i => $p) {
+            if (!empty($p['terminal_at'])) {
+                return (int) $i;
+            }
+        }
+        return 0;
     }
 }

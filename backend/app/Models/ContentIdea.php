@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Traits\HasStatusTransitions;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class ContentIdea extends Model
 {
     use HasFactory;
+    use HasStatusTransitions;
 
     protected $fillable = [
         'title',
@@ -44,6 +46,9 @@ class ContentIdea extends Model
         'pipeline_next_retry_at',
         'pipeline_failed_stage',
         'pending_manifest',
+        'pipeline_state_log',
+        'translation_attempts_auto',
+        'translation_ready_at',
     ];
 
     protected $casts = [
@@ -64,6 +69,8 @@ class ContentIdea extends Model
         'pipeline_last_attempt_at' => 'datetime',
         'pipeline_next_retry_at' => 'datetime',
         'pending_manifest' => 'array',
+        'pipeline_state_log' => 'array',
+        'translation_ready_at' => 'datetime',
     ];
 
     /**
