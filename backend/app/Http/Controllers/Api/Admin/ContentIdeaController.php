@@ -1755,10 +1755,19 @@ class ContentIdeaController extends Controller
             return response()->json(['success' => false, 'message' => 'Content idea not found.'], 404);
         }
 
-        if (!in_array($idea->status, ['article_ready', 'images_ready', 'generating_images'])) {
+        // Includes 'completed' so operators can fix wrong covers post-publish
+        // without manually reverting status. Common case: cover ships with the
+        // creator's face when the article was about a public figure (entity
+        // detection missed the subject) — operator hits Regen Prompt to re-run
+        // /article-images NER + Wikidata lookup. Without 'completed' in this
+        // whitelist the button silently 409s and operators end up clicking
+        // Generate AI repeatedly, which dispatches with the same broken VD.
+        // Mirror behavior to ProcessPendingImages::syncToContentIdea + same
+        // rationale documented in 68001a38.
+        if (!in_array($idea->status, ['article_ready', 'images_ready', 'generating_images', 'completed'])) {
             return response()->json([
                 'success' => false,
-                'message' => 'Regenerate requires article_ready, images_ready, or generating_images status.',
+                'message' => 'Regenerate requires article_ready, images_ready, generating_images, or completed status.',
             ], 409);
         }
 
