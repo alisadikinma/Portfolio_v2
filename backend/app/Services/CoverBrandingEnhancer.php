@@ -47,10 +47,28 @@ class CoverBrandingEnhancer
             $promptText = $prompt['prompt_text'] ?? '';
             $prompt['prompt_text'] = $this->injectTitleInstruction($promptText, $title);
 
-            // 2. Cover ALWAYS gets creator face — no keyword gate (thumbnails need the face)
-            $prompt = $this->prependCreatorFace($prompt, $idea);
+            // 2. Named-entity gate (see docs/plans/2026-04-20-named-entity-aware-cover-generation.md).
+            // When the cover subject is a detected public figure (person
+            // entity in entity_refs[]), skip creator-face injection and skip
+            // VD auto-rewrite — the plugin already named the person in VD.
+            // Landmark/logo/product entities alone don't skip creator face
+            // (Ali is still in the scene, visiting the landmark).
+            $entityRefs = $prompt['entity_refs'] ?? [];
+            $hasPersonEntity = collect($entityRefs)
+                ->contains(fn ($e) => is_array($e) && ($e['entity_type'] ?? null) === 'person');
 
-            // 3. Append watermark (brand consistency across all images)
+            if ($hasPersonEntity) {
+                $prompt = $this->mergeEntityRefsIntoFileUrls($prompt, $entityRefs);
+            } else {
+                $prompt = $this->prependCreatorFace($prompt, $idea);
+                // Non-person entity URLs (landmarks/logos/products) still go
+                // into file_urls so GeminiGen has the visual reference.
+                if (!empty($entityRefs)) {
+                    $prompt = $this->mergeEntityRefsIntoFileUrls($prompt, $entityRefs);
+                }
+            }
+
+            // 3. Append watermark (brand consistency across all images, incl. entity covers)
             $prompt = $this->appendWatermark($prompt);
 
             // 4. Force model
@@ -229,6 +247,36 @@ class CoverBrandingEnhancer
     {
         $instruction = str_replace('{TITLE}', $title, self::TITLE_INSTRUCTION_TEMPLATE);
         return $promptText . $instruction;
+    }
+
+    /**
+     * Merge entity_refs[].url values into file_urls (dedupe-preserving).
+     * Called on covers when the plugin has populated entity_refs from
+     * /article-images Phase 3.5b Wikidata lookup. GeminiGen consumes
+     * file_urls as additional reference images for generation.
+     */
+    private function mergeEntityRefsIntoFileUrls(array $prompt, array $entityRefs): array
+    {
+        $fileUrls = $prompt['file_urls'] ?? [];
+        if (!is_array($fileUrls)) {
+            $fileUrls = [];
+        }
+
+        foreach ($entityRefs as $entity) {
+            if (!is_array($entity)) {
+                continue;
+            }
+            $url = $entity['url'] ?? null;
+            if (!is_string($url) || $url === '') {
+                continue;
+            }
+            if (!in_array($url, $fileUrls, true)) {
+                $fileUrls[] = $url;
+            }
+        }
+
+        $prompt['file_urls'] = $fileUrls;
+        return $prompt;
     }
 
     public function getCreatorFaceUrl(): ?string
