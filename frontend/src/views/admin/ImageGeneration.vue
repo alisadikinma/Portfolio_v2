@@ -11,7 +11,7 @@ import EntityUploadSlot from '@/components/admin/EntityUploadSlot.vue'
 
 const route = useRoute()
 const router = useRouter()
-const { getIdea, saveDraft, generateSegmentImage, retrySegment, skipSegment, rewriteSegmentVd, resumeImagePipeline, downloadStockImage, isLoading } = useContentEngine()
+const { getIdea, saveDraft, generateSegmentImage, retrySegment, skipSegment, regenerateImagePrompts, rewriteSegmentVd, resumeImagePipeline, downloadStockImage, isLoading } = useContentEngine()
 const MAX_SEGMENT_ATTEMPTS = 3
 const toast = useToast()
 
@@ -256,6 +256,12 @@ function initSegments() {
       retry_count: Number(img.retry_count || 0),
       terminal_at: img.terminal_at || null,
       failure_history: Array.isArray(img.failure_history) ? img.failure_history : [],
+      // Named-entity refs carried onto the segment so the "Regenerate
+      // Prompt" nudge can detect when a cover likely needs a fresh
+      // Wikimedia lookup (public figure / landmark on cover but
+      // entity_refs[] is empty — symptom: creator face keeps getting
+      // prepended as a fallback).
+      entity_refs: Array.isArray(img.entity_refs) ? img.entity_refs : [],
     }
   })
 }
@@ -509,6 +515,53 @@ function failureHistoryTooltip(seg) {
   return history
     .map((h) => `#${h.attempt}: ${h.reason || 'unknown'} (${h.timestamp?.slice(0, 19).replace('T', ' ') || ''})`)
     .join('\n')
+}
+
+// Regenerate Prompt: runs the full plugin /article-images skill for this one
+// section, which triggers fresh NER + Wikidata/Commons entity lookup. Use
+// this when Retry keeps reusing cached refs that are wrong or empty — e.g.
+// when an article about a public figure lands with an empty entity_refs[]
+// because the original NER run missed the subject.
+async function regenerateSegmentPrompt(seg) {
+  if (!idea.value?.id) return
+
+  const confirmed = window.confirm(
+    `Regenerate prompt for ${seg.label}?\n\n` +
+    `This re-runs the article-images skill via SSH (~30s) and refreshes entity ` +
+    `references from Wikipedia / Wikimedia. Use this when the image keeps ` +
+    `showing the wrong face (e.g. generic creator face instead of the actual ` +
+    `public figure named in the article).\n\n` +
+    `The current Visual Direction and prompt text will be overwritten.`
+  )
+  if (!confirmed) return
+
+  const priorStatus = seg.status
+  seg.status = 'rewriting_vd' // re-use this for "prompt authoring in progress" UX
+
+  const result = await regenerateImagePrompts(idea.value.id, [seg.index])
+
+  if (result.success) {
+    toast.success(`${seg.label} prompt regeneration triggered — NER + Wikimedia lookup running in background. Refresh in ~30s.`)
+  } else {
+    seg.status = priorStatus
+    toast.error(result.error || `Regenerate prompt failed for ${seg.label}`)
+  }
+}
+
+// Heuristic: show a subtle "missing entity refs?" nudge when the segment's
+// VD or caption mentions a proper-noun pattern but entity_refs[] is empty.
+// Only surfaced on covers, since inline images aren't gated on entity refs.
+function shouldNudgeEntityRefresh(seg) {
+  if (seg.index !== 0) return false
+  if ((seg.entity_refs || []).length > 0) return false
+
+  const text = `${seg.visual_direction || ''} ${seg.caption || ''} ${idea.value?.title || ''}`
+  // Match CEO/President/Prime Minister patterns, or Title-Case multi-word proper
+  // nouns that typically indicate public figures or landmarks. This is a soft
+  // signal — false positives are fine, operator decides to act or ignore.
+  const hasTitle = /\b(CEO|CTO|CFO|President|Minister|Founder|Senator|Governor)\b/i.test(text)
+  const hasMultiCapWord = /\b[A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\b/.test(text)
+  return hasTitle || hasMultiCapWord
 }
 
 // ── Stock image as variation ──
@@ -812,15 +865,31 @@ async function handleApprove() {
                 Attempt {{ seg.retry_count }}/{{ MAX_SEGMENT_ATTEMPTS }}
               </span>
 
-              <!-- Retry button: only for failed segments under cap -->
+              <!-- Retry button: reuse cached prompt + refs, just re-dispatch -->
               <button
                 v-if="canRetrySegment(seg)"
                 @click="retryFailedSegment(seg)"
                 :disabled="isLoading"
                 class="px-2.5 py-1 text-[11px] font-medium rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-colors disabled:opacity-50"
-                title="Retry: reuse cached prompt + refs, new GeminiGen attempt"
+                title="Retry: reuse cached prompt + refs, new GeminiGen attempt (fast, no SSH)"
               >
                 Retry
+              </button>
+
+              <!-- Regenerate Prompt button: re-run /article-images skill with
+                   fresh NER + Wikimedia lookup. Use when cached entity_refs
+                   are empty/wrong and Retry keeps falling back to creator
+                   face. Subtle amber "!" nudge when heuristic detects likely
+                   missing entity refs (public figure / landmark on cover). -->
+              <button
+                v-if="seg.status === 'failed' || shouldNudgeEntityRefresh(seg)"
+                @click="regenerateSegmentPrompt(seg)"
+                :disabled="isLoading || seg.status === 'rewriting_vd'"
+                class="px-2.5 py-1 text-[11px] font-medium rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500/20 transition-colors disabled:opacity-50 inline-flex items-center gap-1"
+                title="Regenerate Prompt: re-run /article-images via SSH — refreshes NER + Wikimedia entity lookup. Use when cached refs are wrong (e.g. missing public figure / landmark photo)"
+              >
+                <span v-if="shouldNudgeEntityRefresh(seg)" class="inline-block w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                Regen Prompt
               </button>
 
               <!-- Skip button: for failed or history-laden segments -->
