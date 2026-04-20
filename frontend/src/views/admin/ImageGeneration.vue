@@ -214,11 +214,18 @@ function initSegments() {
     const activeVar = variations[selectedVar]
     const hasAnyDone = variations.some(v => v.status === 'done' && v.url)
     const anyGenerating = variations.some(v => v.status === 'generating')
+    // If the user-selected variation is done, the segment is DONE from a
+    // workflow-gating perspective — additional variations still generating
+    // are optional bonus work, not a blocker. Previously `anyGenerating`
+    // won unconditionally, which left the segment stuck on "Generating…"
+    // forever when a second variation got orphaned (GeminiGen webhook
+    // never arrived, no matching ImageGenerationJob row, etc.) even
+    // though variation #1 was perfectly usable and already selected.
+    const selectedIsDone = activeVar && activeVar.status === 'done' && !!activeVar.url
 
-    // Segment-level status: generating if any variation is generating, done if any done,
-    // failed when variations exist but all failed, else fall back to DB / pending.
     let segStatus = img.status || 'pending'
-    if (anyGenerating) segStatus = 'generating'
+    if (selectedIsDone) segStatus = 'done'
+    else if (anyGenerating) segStatus = 'generating'
     else if (hasAnyDone) segStatus = 'done'
     else if (variations.length > 0 && variations.every(v => v.status === 'failed')) segStatus = 'failed'
     else if (segStatus === 'generating' && !img.job_uuid) segStatus = 'failed'
@@ -434,6 +441,44 @@ function selectVariation(seg, varIdx) {
   scheduleAutoSave()
 }
 
+// Cancel a stuck `generating` variation without waiting for the backend
+// 10-min timeout. Marks the slot failed locally + persists so the segment
+// UI unsticks immediately. Backend poller will still catch the orphan
+// ImageGenerationJob via MAX_JOB_AGE_MINUTES (if any row exists) and
+// drive handleSegmentFailure — but the user gets instant relief here.
+function cancelVariation(seg, vi, event) {
+  event?.stopPropagation()
+  const v = seg.variations?.[vi]
+  if (!v || v.status !== 'generating') return
+
+  const confirmed = window.confirm(
+    `Cancel variation ${vi + 1} on ${seg.label}?\n\n` +
+    `This marks the attempt as failed locally so the segment can advance. ` +
+    `The backend will still reconcile the actual GeminiGen job on its next ` +
+    `poll cycle — no data is lost, just the UI stops waiting.`
+  )
+  if (!confirmed) return
+
+  v.status = 'failed'
+  v.error = 'Cancelled by user'
+
+  // Recompute segment status locally — mirror initSegments precedence
+  const vars = seg.variations || []
+  const selectedIdx = seg.selected_variation ?? 0
+  const selected = vars[selectedIdx]
+  const selectedIsDone = selected && selected.status === 'done' && !!selected.url
+  const anyGenerating = vars.some(x => x.status === 'generating')
+  const anyDone = vars.some(x => x.status === 'done' && x.url)
+
+  if (selectedIsDone) seg.status = 'done'
+  else if (anyGenerating) seg.status = 'generating'
+  else if (anyDone) seg.status = 'done'
+  else if (vars.length > 0 && vars.every(x => x.status === 'failed')) seg.status = 'failed'
+
+  scheduleAutoSave()
+  toast.success(`Variation ${vi + 1} cancelled — segment unstuck`)
+}
+
 // ── Phase B: Retry + Skip for failed segments ──
 
 async function retryFailedSegment(seg) {
@@ -645,7 +690,16 @@ function startPolling() {
       const anyGenerating = (seg.variations || []).some(v => v.status === 'generating')
       const anyDone = (seg.variations || []).some(v => v.status === 'done' && v.url)
       const vars = seg.variations || []
-      if (anyGenerating) {
+      // Same precedence as initSegments: selected-variation-done wins so a
+      // stuck parallel variation doesn't lock the segment on "Generating…".
+      const selectedIdx = seg.selected_variation ?? 0
+      const selectedVar = seg.variations[selectedIdx]
+      const selectedIsDone = selectedVar && selectedVar.status === 'done' && !!selectedVar.url
+
+      if (selectedIsDone) {
+        seg.status = 'done'
+        seg.generated_url = selectedVar.url
+      } else if (anyGenerating) {
         seg.status = 'generating'
       } else if (anyDone) {
         seg.status = 'done'
@@ -1150,8 +1204,19 @@ async function handleApprove() {
                   :title="v.status === 'done' ? `Variation ${vi + 1} — click to select` : v.status === 'generating' ? 'Generating...' : 'Failed'"
                 >
                   <img v-if="v.url && v.status === 'done'" :src="v.url" class="w-full h-full object-cover" />
-                  <div v-else-if="v.status === 'generating'" class="w-full h-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center">
+                  <div v-else-if="v.status === 'generating'" class="w-full h-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center relative group/var">
                     <div class="w-5 h-5 rounded-full border-2 border-transparent border-t-amber-500 animate-spin"></div>
+                    <!-- Cancel X: surfaces on hover, lets operator dismiss a
+                         stuck attempt immediately without waiting for the
+                         backend 10-min timeout. Click.stop so it doesn't
+                         fall through to the parent button's selectVariation. -->
+                    <button
+                      @click.stop="cancelVariation(seg, vi, $event)"
+                      class="absolute top-0 right-0 w-4 h-4 rounded-bl bg-red-500/80 hover:bg-red-600 text-white opacity-0 group-hover/var:opacity-100 transition-opacity flex items-center justify-center"
+                      :title="`Cancel variation ${vi + 1} (stuck generating)`"
+                    >
+                      <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
                   </div>
                   <div v-else class="w-full h-full bg-red-500/5 flex items-center justify-center">
                     <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
