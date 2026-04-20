@@ -570,4 +570,157 @@ class SettingsController extends Controller
             ], 500);
         }
     }
+
+    // --------------------------------------------------------------------
+    // Telegram Notification Settings (Phase E of named-entity cover plan)
+    // --------------------------------------------------------------------
+
+    /**
+     * Get telegram notification settings. Bot token is MASKED in the response
+     * (only last 4 chars visible) so it's safe to surface in the admin UI —
+     * admin can re-paste on change but can't accidentally exfiltrate the full
+     * token to another browser tab or screenshot.
+     */
+    public function getTelegramSettings(): \Illuminate\Http\JsonResponse
+    {
+        try {
+            $settings = Setting::byGroup('telegram')->get();
+
+            $data = [];
+            foreach ($settings as $setting) {
+                $data[$setting->key] = $setting->value;
+            }
+
+            // Apply defaults for any missing rows (seeder should cover all 6
+            // but be defensive for fresh DBs that haven't run the seeder yet).
+            $data = array_merge([
+                'telegram_bot_token' => null,
+                'telegram_chat_id' => null,
+                'telegram_enabled' => 'false',
+                'telegram_notify_manifest_needed' => 'true',
+                'telegram_notify_generation_failed' => 'true',
+                'telegram_notify_publish_success' => 'false',
+            ], $data);
+
+            $data['telegram_bot_token'] = $this->maskBotToken($data['telegram_bot_token']);
+
+            return response()->json([
+                'success' => true,
+                'data' => $data,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to fetch telegram settings', ['error' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch telegram settings',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred',
+            ], 500);
+        }
+    }
+
+    /**
+     * Update telegram notification settings. All fields optional — omit a key
+     * to leave it unchanged. Bot token is only updated when a non-empty value
+     * is provided (prevents accidentally clearing it via empty form submit).
+     */
+    public function updateTelegramSettings(\Illuminate\Http\Request $request): \Illuminate\Http\JsonResponse
+    {
+        $validated = $request->validate([
+            'telegram_bot_token' => ['nullable', 'string', 'max:255'],
+            'telegram_chat_id' => ['nullable', 'string', 'max:50'],
+            'telegram_enabled' => ['nullable', 'in:true,false,1,0'],
+            'telegram_notify_manifest_needed' => ['nullable', 'in:true,false,1,0'],
+            'telegram_notify_generation_failed' => ['nullable', 'in:true,false,1,0'],
+            'telegram_notify_publish_success' => ['nullable', 'in:true,false,1,0'],
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+            // Bot token: preserve existing when payload omits key or provides empty.
+            // Handles both JSON (unset key) and FormData (empty string) cases.
+            $tokenValue = $request->input('telegram_bot_token');
+            if (!array_key_exists('telegram_bot_token', $validated) || $tokenValue === null || $tokenValue === '') {
+                unset($validated['telegram_bot_token']);
+            }
+
+            // Normalize booleans to canonical 'true'/'false' strings
+            foreach (['telegram_enabled', 'telegram_notify_manifest_needed', 'telegram_notify_generation_failed', 'telegram_notify_publish_success'] as $boolKey) {
+                if (isset($validated[$boolKey])) {
+                    $validated[$boolKey] = in_array($validated[$boolKey], [true, 'true', 1, '1'], true) ? 'true' : 'false';
+                }
+            }
+
+            foreach ($validated as $key => $value) {
+                Setting::updateOrCreate(
+                    ['key' => $key, 'group' => 'telegram'],
+                    ['value' => $value, 'type' => 'text']
+                );
+            }
+
+            DB::commit();
+
+            $fresh = Setting::byGroup('telegram')->get();
+            $data = [];
+            foreach ($fresh as $s) {
+                $data[$s->key] = $s->value;
+            }
+            $data['telegram_bot_token'] = $this->maskBotToken($data['telegram_bot_token'] ?? null);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Telegram settings updated successfully',
+                'data' => $data,
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Failed to update telegram settings', ['error' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update telegram settings',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred',
+            ], 500);
+        }
+    }
+
+    /**
+     * Send a test Telegram message using current settings. Used by the
+     * "Send test message" button in the AboutSettings Telegram card to verify
+     * the bot token + chat_id pairing works before relying on notifications.
+     */
+    public function testTelegramNotification(\App\Services\TelegramNotificationService $service): \Illuminate\Http\JsonResponse
+    {
+        $result = $service->sendTestMessage();
+
+        if (!($result['success'] ?? false)) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['error'] ?? 'Telegram send failed',
+                'telegram_response' => $result['telegram_response'] ?? null,
+            ], 400);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Test message sent successfully',
+            'telegram_response' => $result['telegram_response'] ?? null,
+        ]);
+    }
+
+    /**
+     * Mask bot token for safe display. Returns null → null so callers know
+     * when token hasn't been set. Masks middle portion: "123456789:ABC...wxyz".
+     */
+    private function maskBotToken(?string $token): ?string
+    {
+        if ($token === null || $token === '') {
+            return null;
+        }
+
+        if (strlen($token) <= 8) {
+            return '****';
+        }
+
+        return substr($token, 0, 4) . '****' . substr($token, -4);
+    }
 }

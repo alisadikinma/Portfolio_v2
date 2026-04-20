@@ -43,6 +43,7 @@ class ContentIdea extends Model
         'pipeline_last_attempt_at',
         'pipeline_next_retry_at',
         'pipeline_failed_stage',
+        'pending_manifest',
     ];
 
     protected $casts = [
@@ -62,6 +63,7 @@ class ContentIdea extends Model
         'progress_log' => 'array',
         'pipeline_last_attempt_at' => 'datetime',
         'pipeline_next_retry_at' => 'datetime',
+        'pending_manifest' => 'array',
     ];
 
     /**

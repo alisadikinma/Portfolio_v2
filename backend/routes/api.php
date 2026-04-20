@@ -263,6 +263,9 @@ Route::middleware(['auth:sanctum'])->prefix('admin/settings')->group(function ()
     Route::get('/creator-brand', [SettingsController::class, 'getCreatorBrandSettings']);
     Route::put('/creator-brand', [SettingsController::class, 'updateCreatorBrandSettings']);
     Route::post('/creator-brand', [SettingsController::class, 'updateCreatorBrandSettings']); // POST with _method=PUT for FormData
+    Route::get('/telegram', [SettingsController::class, 'getTelegramSettings']);
+    Route::put('/telegram', [SettingsController::class, 'updateTelegramSettings']);
+    Route::post('/telegram/test', [SettingsController::class, 'testTelegramNotification']);
 });
 
 // Admin Menu Items Routes
