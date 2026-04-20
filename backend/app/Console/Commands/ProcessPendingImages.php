@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Enums\ContentIdeaStatus;
 use App\Models\ImageGenerationJob;
 use App\Services\ImageGenerationService;
 use Illuminate\Console\Command;
@@ -175,18 +176,23 @@ class ProcessPendingImages extends Command
                     && !empty($cover['terminal_at']);
 
                 if ($allResolved && $anyDone && !$coverCritical && $idea->status === 'generating_images') {
+                    // Persist generated_article first (so the transitionTo
+                    // update doesn't lose the in-memory mutation), then
+                    // transition status via FSM.
+                    $idea->save();
                     if ($idea->auto_mode) {
-                        $idea->status = 'completed';
+                        $idea->transitionTo(ContentIdeaStatus::Completed, 'process_pending_images_all_done');
                         $this->info("    All images resolved + auto_mode — idea #{$idea->id} → completed");
                     } else {
-                        $idea->status = 'images_ready';
+                        $idea->transitionTo(ContentIdeaStatus::ImagesReady, 'process_pending_images_all_done');
                         $this->info("    All images resolved — idea #{$idea->id} → images_ready");
                     }
                 } elseif ($coverCritical && $idea->status === 'generating_images') {
                     $this->warn("    Cover segment terminal — idea #{$idea->id} blocked at generating_images");
+                    $idea->save();
+                } else {
+                    $idea->save();
                 }
-
-                $idea->save();
                 $this->info("    Synced to content idea #{$idea->id}, segment {$matchedSegment}");
                 return;
             }

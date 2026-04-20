@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Api\Admin;
 
+use App\Enums\ContentIdeaStatus;
+use App\Exceptions\InvalidStateTransitionException;
 use App\Http\Controllers\Controller;
 use App\Models\ContentIdea;
 use App\Models\Post;
@@ -186,7 +188,7 @@ class ContentIdeaController extends Controller
             return response()->json(['success' => false, 'message' => 'Content idea not found.'], 404);
         }
 
-        $idea->update(['status' => 'archived']);
+        $idea->transitionTo(ContentIdeaStatus::Archived, 'admin_archive');
         return response()->json(['success' => true, 'data' => $idea->fresh(), 'message' => 'Content idea archived.']);
     }
 
@@ -200,7 +202,7 @@ class ContentIdeaController extends Controller
             return response()->json(['success' => false, 'message' => 'Content idea not found.'], 404);
         }
 
-        $idea->update(['status' => 'draft']);
+        $idea->transitionTo(ContentIdeaStatus::Draft, 'admin_restore');
         return response()->json(['success' => true, 'data' => $idea->fresh(), 'message' => 'Content idea restored to draft.']);
     }
 
@@ -218,8 +220,7 @@ class ContentIdeaController extends Controller
             return response()->json(['success' => false, 'message' => 'Can only revert from article_ready or images_ready.'], 422);
         }
 
-        $idea->update([
-            'status' => 'draft',
+        $idea->transitionTo(ContentIdeaStatus::Draft, 'admin_revert', [
             'research_data' => null,
             'generated_article' => null,
             'generated_images' => null,
@@ -452,8 +453,7 @@ class ContentIdeaController extends Controller
             ], 500);
         }
 
-        $idea->update([
-            'status' => 'researching',
+        $idea->transitionTo(ContentIdeaStatus::Researching, 'admin_deep_score', [
             'progress_percentage' => 85,
             'current_step' => 'deep_scoring',
             'process_pid' => $result['pid'] ?? null,
@@ -498,12 +498,11 @@ class ContentIdeaController extends Controller
 
         $researchTier = $validated['research_tier'] ?? 'auto';
 
-        $idea->update([
+        $idea->transitionTo(ContentIdeaStatus::Researching, 'admin_start_research', [
             'output_types' => ['blog_article'],
             'languages' => $validated['languages'],
             'instructions' => $validated['instructions'] ?? null,
             'research_tier_override' => $researchTier,
-            'status' => 'researching',
             'progress_percentage' => 0,
             'current_step' => 'initializing',
             'progress_log' => [[
@@ -609,13 +608,15 @@ class ContentIdeaController extends Controller
         ]);
 
         if ($result['success']) {
-            // Only wipe old article after trigger succeeds
-            $idea->update([
+            // Only wipe old article after trigger succeeds. Route status
+            // change through transitionTo so the state-log captures the
+            // regenerate origin + allowed-from set (article_ready,
+            // images_ready, or failed researching).
+            $idea->transitionTo(ContentIdeaStatus::Researching, 'admin_regenerate', [
                 'generated_article' => null,
                 'generated_images' => null,
                 'image_instructions' => null,
                 'image_references' => null,
-                'status' => 'researching',
                 'progress_percentage' => 0,
                 'current_step' => 'initializing',
                 'instructions' => $instructions,
@@ -738,8 +739,9 @@ class ContentIdeaController extends Controller
             }
         }
         $idea->image_references = $referenceUrls;
-        $idea->status = 'generating_images';
+        // Flush instructions/references with save(), then FSM-transition the status.
         $idea->save();
+        $idea->transitionTo(ContentIdeaStatus::GeneratingImages, 'admin_start_image_generation');
 
         // Gate 2 split-phase flow: when flag is on and no prompts exist yet,
         // invoke /article-images skill to author cinematic prompts before GeminiGen.
@@ -956,11 +958,11 @@ class ContentIdeaController extends Controller
             $idea->generated_article = $article;
         }
 
-        // Set status to generating_images if not already
-        if ($idea->status === 'article_ready') {
-            $idea->status = 'generating_images';
-        }
+        // Persist generated_article changes, then FSM-transition status.
         $idea->save();
+        if ($idea->status === 'article_ready') {
+            $idea->transitionTo(ContentIdeaStatus::GeneratingImages, 'admin_generate_segment_image');
+        }
 
         // Apply branded cover enhancement: inject post title overlay + creator
         // face auto-reference for covers that depict humans. Non-cover prompts

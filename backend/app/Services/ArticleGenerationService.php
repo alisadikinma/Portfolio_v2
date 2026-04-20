@@ -322,6 +322,71 @@ class ArticleGenerationService
      * @param array $source ['title', 'content', 'excerpt', 'meta_title', ...]
      * @return array{success: bool, translated: array|null, error: string|null}
      */
+    /**
+     * Pre-publish translate preflight. Reads the primary-language article
+     * from $idea->generated_article, calls translateArticle() (sync SSH,
+     * ~30-60s), and writes the result into generated_article.{targetLang}.
+     *
+     * Gated by config('services.article_generation.use_translate_phase').
+     * When flag is off, returns success immediately (skipped=true) — caller
+     * treats as translation-ready. Cron orchestrator uses this via
+     * ensureTranslationBeforePublish() to block publish until EN content
+     * is populated (or until 3 attempts have exhausted, graceful degrade).
+     *
+     * @return array{success: bool, skipped?: bool, error?: string}
+     */
+    public function triggerTranslatePreflight(\App\Models\ContentIdea $idea): array
+    {
+        if (!config('services.article_generation.use_translate_phase', false)) {
+            return ['success' => true, 'skipped' => true];
+        }
+
+        $article = $idea->generated_article ?? [];
+        $primary = $article['language'] ?? 'id';
+        $target = $primary === 'id' ? 'en' : 'id';
+
+        // Source dict — prefer the nested {lang:{...}} form, fall back to
+        // flat top-level title/content for legacy schemas.
+        $source = $article[$primary] ?? [
+            'title' => $article['title'] ?? '',
+            'content' => $article['content'] ?? '',
+            'excerpt' => $article['excerpt'] ?? '',
+            'meta_title' => $article['meta_title'] ?? '',
+            'meta_description' => $article['meta_description'] ?? '',
+            'og_title' => $article['og_title'] ?? '',
+            'og_description' => $article['og_description'] ?? '',
+            'ai_summary' => $article['ai_summary'] ?? '',
+        ];
+
+        if (empty($source['content'])) {
+            return ['success' => false, 'error' => 'Primary-language content is empty — nothing to translate'];
+        }
+
+        $result = $this->translateArticle($source);
+        if (!$result['success']) {
+            return ['success' => false, 'error' => $result['error'] ?? 'translateArticle returned unsuccessful'];
+        }
+
+        $translated = $result['translated'] ?? [];
+
+        // Merge into existing target-lang slot so manual edits survive a rerun.
+        $existing = $article[$target] ?? [];
+        $article[$target] = array_merge($existing, [
+            'title' => $translated['title'] ?? ($existing['title'] ?? ''),
+            'content' => $translated['content'] ?? ($existing['content'] ?? ''),
+            'excerpt' => $translated['excerpt'] ?? ($existing['excerpt'] ?? ''),
+            'meta_title' => $translated['meta_title'] ?? ($existing['meta_title'] ?? ''),
+            'meta_description' => $translated['meta_description'] ?? ($existing['meta_description'] ?? ''),
+            'og_title' => $translated['og_title'] ?? ($existing['og_title'] ?? ''),
+            'og_description' => $translated['og_description'] ?? ($existing['og_description'] ?? ''),
+            'ai_summary' => $translated['ai_summary'] ?? ($existing['ai_summary'] ?? ''),
+        ]);
+
+        $idea->update(['generated_article' => $article]);
+
+        return ['success' => true];
+    }
+
     public function translateArticle(array $source): array
     {
         $model = config('services.article_generation.model_translate', 'sonnet');

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\ContentIdeaStatus;
 use App\Models\ContentIdea;
 use App\Models\ImageGenerationJob;
 use App\Models\Setting;
@@ -249,9 +250,13 @@ class ImageGenerationService
             $article['image_prompts'] = $prompts;
             $idea->generated_article = $article;
             if ($idea->status === 'article_ready') {
-                $idea->status = 'generating_images';
+                // Use transitionTo so the state change + article_prompts mutation
+                // persist atomically and the FSM log records the reason.
+                $idea->save(); // flush generated_article first
+                $idea->transitionTo(ContentIdeaStatus::GeneratingImages, 'trigger_for_idea');
+            } else {
+                $idea->save();
             }
-            $idea->save();
             Log::info("[ImageGen] triggerForIdea: dispatched {$dispatched} jobs for idea #{$idea->id}");
         }
 
@@ -386,7 +391,7 @@ class ImageGenerationService
                 $allDone = collect($prompts)->every(fn ($p) => in_array($p['status'] ?? '', ['done', 'failed']));
                 $anyDone = collect($prompts)->contains(fn ($p) => ($p['status'] ?? '') === 'done');
                 if ($allDone && $anyDone && $idea->status === 'generating_images') {
-                    $idea->update(['status' => 'images_ready']);
+                    $idea->transitionTo(ContentIdeaStatus::ImagesReady, 'webhook_all_done');
                     Log::info("[ImageGen] Content idea {$idea->id} → images_ready (all segments done)");
                 }
 

@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Enums\ContentIdeaStatus;
 use App\Models\ContentIdea;
 use App\Services\ArticleGenerationService;
 use Illuminate\Console\Command;
@@ -30,8 +31,7 @@ class ProcessScheduledIdeas extends Command
             $this->line("  Processing: {$idea->title} (scheduled: {$idea->scheduled_at})");
 
             try {
-                $idea->update([
-                    'status' => 'researching',
+                $idea->transitionTo(ContentIdeaStatus::Researching, 'scheduled_start', [
                     'progress_percentage' => 0,
                     'current_step' => 'starting',
                     'progress_log' => [[
@@ -54,6 +54,11 @@ class ProcessScheduledIdeas extends Command
                 $this->error("  Failed: {$e->getMessage()}");
                 Log::error("[Scheduler] Failed to start idea #{$idea->id}: {$e->getMessage()}");
 
+                // Rollback to draft so the scheduler can try again next tick.
+                // researching → draft isn't in the allow-map by default (the
+                // pipeline normally ends at completed/failed/archived), so
+                // use direct update here — this is an exception recovery
+                // path, not a normal state transition.
                 $idea->update([
                     'status' => 'draft',
                     'progress_log' => array_merge($idea->progress_log ?? [], [[

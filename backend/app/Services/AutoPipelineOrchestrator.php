@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\ContentIdeaStatus;
 use App\Models\ContentIdea;
 use App\Models\Post;
 use Illuminate\Support\Carbon;
@@ -31,6 +32,7 @@ class AutoPipelineOrchestrator
     private const RETRY_DELAY_MINUTES = 5;
     private const RESEARCH_TIMEOUT_MINUTES = 15;
     private const IMAGES_TIMEOUT_MINUTES = 10;
+    private const MAX_TRANSLATE_ATTEMPTS_AUTO = 3;
     private const LAST_START_CACHE_KEY = 'auto_pipeline:last_start_at';
 
     public function __construct(
@@ -184,10 +186,17 @@ class AutoPipelineOrchestrator
             if ($idea->status === 'article_ready') {
                 // Images stage
                 $dispatched = $this->imageGen->triggerForIdea($idea);
-                $idea->update([
-                    'status' => $dispatched > 0 ? 'generating_images' : 'completed',
-                    'pipeline_last_attempt_at' => now(),
-                ]);
+                if ($dispatched === 0) {
+                    // No prompts → skip straight to completed (edge path)
+                    $idea->transitionTo(ContentIdeaStatus::Completed, 'resume_no_images', [
+                        'pipeline_last_attempt_at' => now(),
+                    ]);
+                }
+                // When dispatched > 0, triggerForIdea already flipped status to
+                // generating_images; just stamp the last_attempt timestamp.
+                if ($dispatched > 0) {
+                    $idea->update(['pipeline_last_attempt_at' => now()]);
+                }
                 Log::info("[AutoPipeline] Resume: idea #{$idea->id} dispatched {$dispatched} image jobs");
                 return $idea;
             }
@@ -216,9 +225,8 @@ class AutoPipelineOrchestrator
         if (!($result['success'] ?? false)) {
             throw new \RuntimeException('triggerPrep returned unsuccessful: ' . ($result['error'] ?? 'unknown'));
         }
-        $idea->update([
+        $idea->transitionTo(ContentIdeaStatus::Researching, 'resume_prep', [
             'languages' => $languages,
-            'status' => 'researching',
             'progress_percentage' => 0,
             'current_step' => 'prep_resume',
             'process_pid' => $result['pid'] ?? null,
@@ -234,8 +242,7 @@ class AutoPipelineOrchestrator
         if (!($result['success'] ?? false)) {
             throw new \RuntimeException('triggerWrite returned unsuccessful: ' . ($result['error'] ?? 'unknown'));
         }
-        $idea->update([
-            'status' => 'researching',
+        $idea->transitionTo(ContentIdeaStatus::Researching, 'resume_write', [
             'progress_percentage' => 50,
             'current_step' => 'write_resume',
             'process_pid' => $result['pid'] ?? null,
@@ -251,8 +258,7 @@ class AutoPipelineOrchestrator
         if (!($result['success'] ?? false)) {
             throw new \RuntimeException('triggerScore returned unsuccessful: ' . ($result['error'] ?? 'unknown'));
         }
-        $idea->update([
-            'status' => 'researching',
+        $idea->transitionTo(ContentIdeaStatus::Researching, 'resume_score', [
             'progress_percentage' => 85,
             'current_step' => 'score_resume',
             'process_pid' => $result['pid'] ?? null,
@@ -286,11 +292,17 @@ class AutoPipelineOrchestrator
         // Order: display_score DESC → virality_score DESC → created_at ASC.
         // COALESCE handles legacy ideas without source_data.display_score
         // (fall back to the column). MySQL DESC sorts NULL last naturally.
-        $idea = ContentIdea::where('auto_mode', true)
+        // SQLite (test-only) lacks JSON_UNQUOTE — fall back to the column
+        // sort. Production always runs MySQL.
+        $query = ContentIdea::where('auto_mode', true)
             ->where('status', 'draft')
-            ->whereNull('scheduled_at')
-            ->orderByRaw("COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(source_data, '$.display_score')) AS UNSIGNED), virality_score, 0) DESC")
-            ->orderBy('virality_score', 'desc')
+            ->whereNull('scheduled_at');
+
+        if (\Illuminate\Support\Facades\DB::connection()->getDriverName() === 'mysql') {
+            $query->orderByRaw("COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(source_data, '$.display_score')) AS UNSIGNED), virality_score, 0) DESC");
+        }
+
+        $idea = $query->orderBy('virality_score', 'desc')
             ->orderBy('created_at')
             ->first();
 
@@ -308,9 +320,8 @@ class AutoPipelineOrchestrator
                 throw new \RuntimeException('triggerPrep returned unsuccessful: ' . ($result['error'] ?? 'unknown'));
             }
 
-            $idea->update([
+            $idea->transitionTo(ContentIdeaStatus::Researching, 'auto_pipeline_start', [
                 'languages' => $languages,
-                'status' => 'researching',
                 'progress_percentage' => 0,
                 'current_step' => 'auto_pipeline_start',
                 'process_pid' => $result['pid'] ?? null,
@@ -354,7 +365,7 @@ class AutoPipelineOrchestrator
             if ($dispatched === 0) {
                 // No prompts to dispatch but status was article_ready → skip to completed
                 Log::warning("[AutoPipeline] Idea #{$idea->id} had no dispatchable prompts, advancing to completed");
-                $idea->update(['status' => 'completed']);
+                $idea->transitionTo(ContentIdeaStatus::Completed, 'no_images_to_dispatch');
                 return $idea;
             }
             $idea->update(['pipeline_last_attempt_at' => now()]);
@@ -382,6 +393,12 @@ class AutoPipelineOrchestrator
             return null;
         }
 
+        // Phase C gate: ensure translation is present (or waived after
+        // 3 failed attempts) before committing to the publish path.
+        if (!$this->ensureTranslationBeforePublish($idea)) {
+            return null; // still working — try again next tick
+        }
+
         try {
             $result = $this->publishService->publish($idea);
             $post = $result['post'];
@@ -404,6 +421,66 @@ class AutoPipelineOrchestrator
         }
     }
 
+    /**
+     * Phase C translate-before-publish gate. Returns true when the idea is
+     * ready to publish (EN content populated, or cap reached and we've
+     * degraded gracefully). Returns false to defer publish to next tick.
+     *
+     * Branches:
+     *  - flag off              → return true (no gating)
+     *  - en content already    → stamp translation_ready_at, return true
+     *  - attempts ≥ cap (3)    → dispatch Telegram alert, set sentinel,
+     *                            return true (publish monolingual)
+     *  - otherwise             → call preflight (sync SSH ~30-60s). On
+     *                            success return true, on failure increment
+     *                            attempts and return false (retry next tick)
+     */
+    private function ensureTranslationBeforePublish(ContentIdea $idea): bool
+    {
+        if (!config('services.article_generation.use_translate_phase', false)) {
+            return true;
+        }
+
+        $article = $idea->generated_article ?? [];
+        $primaryLang = $article['language'] ?? 'id';
+        $targetLang = $primaryLang === 'id' ? 'en' : 'id';
+
+        if (!empty($article[$targetLang]['content'] ?? '')) {
+            if (!$idea->translation_ready_at) {
+                $idea->update(['translation_ready_at' => now()]);
+            }
+            return true;
+        }
+
+        $attempts = (int) ($idea->translation_attempts_auto ?? 0);
+        if ($attempts >= self::MAX_TRANSLATE_ATTEMPTS_AUTO) {
+            Log::warning("[AutoPipeline] Idea #{$idea->id} exhausted auto-translate retries ({$attempts}), publishing monolingual");
+
+            \App\Jobs\DispatchTelegramNotification::dispatch($idea->id, 'auto_translate_exhausted');
+            $idea->update(['translation_ready_at' => now()]);
+            return true;
+        }
+
+        try {
+            $result = $this->articleGen->triggerTranslatePreflight($idea);
+            $idea->increment('translation_attempts_auto');
+            $idea->update(['pipeline_last_attempt_at' => now()]);
+
+            if (($result['success'] ?? false) === true) {
+                Log::info("[AutoPipeline] Idea #{$idea->id} auto-translated (attempt " . $idea->fresh()->translation_attempts_auto . ')');
+                $idea->update(['translation_ready_at' => now()]);
+                return true;
+            }
+
+            Log::warning("[AutoPipeline] Auto-translate failed for idea #{$idea->id}: " . ($result['error'] ?? 'unknown'));
+            return false;
+        } catch (\Throwable $e) {
+            Log::error("[AutoPipeline] Auto-translate threw for idea #{$idea->id}: " . $e->getMessage());
+            $idea->increment('translation_attempts_auto');
+            return false;
+        }
+    }
+
     private function markFailed(ContentIdea $idea, string $stage, string $errorMessage): void
     {
         $attempts = (int) ($idea->pipeline_attempts ?? 0) + 1;
@@ -417,14 +494,21 @@ class AutoPipelineOrchestrator
             'message' => "[{$stage}] " . $errorMessage,
         ];
 
-        $idea->update([
-            'status' => 'failed',
+        // Use direct update when already failed (self-transition not in map);
+        // otherwise route through transitionTo so the log records the reason.
+        $extra = [
             'pipeline_attempts' => $attempts,
             'pipeline_last_attempt_at' => now(),
             'pipeline_next_retry_at' => $exhausted ? null : now()->addMinutes(self::RETRY_DELAY_MINUTES),
             'pipeline_failed_stage' => $stage,
             'progress_log' => $log,
-        ]);
+        ];
+
+        if ($idea->status === 'failed') {
+            $idea->update($extra);
+        } else {
+            $idea->transitionTo(ContentIdeaStatus::Failed, "markFailed_{$stage}", $extra);
+        }
 
         Log::warning("[AutoPipeline] Idea #{$idea->id} failed at {$stage} (attempt {$attempts}/" . self::MAX_ATTEMPTS . "): {$errorMessage}");
 

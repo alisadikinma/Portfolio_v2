@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\ContentIdeaStatus;
 use App\Models\Category;
 use App\Models\ContentIdea;
 use App\Models\Post;
@@ -125,10 +126,16 @@ class ContentPublishService
 
         $translationPending = $this->triggerTranslationIfEnabled($idea, $post, $primaryLang);
 
-        $idea->update([
-            'status' => 'completed',
-            'result_post_id' => $post->id,
-        ]);
+        // Transition to completed via FSM when not already there (idempotency
+        // guard — direct admin publish call on a `completed` idea re-runs
+        // this method; completed → completed is not in TRANSITIONS).
+        if ($idea->status !== 'completed') {
+            $idea->transitionTo(ContentIdeaStatus::Completed, 'publish_service', [
+                'result_post_id' => $post->id,
+            ]);
+        } else {
+            $idea->update(['result_post_id' => $post->id]);
+        }
 
         return [
             'post' => $post,
