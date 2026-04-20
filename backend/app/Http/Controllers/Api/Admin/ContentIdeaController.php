@@ -867,9 +867,14 @@ class ContentIdeaController extends Controller
             'brand_refs' => 'nullable|array',
             'brand_refs.*' => 'string|max:2000',
             'additional_notes' => 'nullable|string|max:1000',
+            // Optional: replace a specific existing variation slot (any status)
+            // instead of using the retry-in-place / append behavior. Used by
+            // the "Replace this variation" UI button on done thumbnails.
+            'replace_variation_index' => 'nullable|integer|min:0|max:2',
         ]);
 
         $segmentIndex = $request->input('segment_index');
+        $replaceIndex = $request->input('replace_variation_index');
         $model = $request->input('model', config('content.default_image_model', 'nano-banana-pro'));
         $aspectRatio = $request->input('aspect_ratio', '16:9');
         $style = $request->input('style');
@@ -923,17 +928,34 @@ class ContentIdeaController extends Controller
 
             $variations = $imagePrompts[$segmentIndex]['variations'];
 
+            // Explicit replace path — operator clicked "Replace" on a specific
+            // thumbnail. Overrides the retry-in-place heuristic and always
+            // targets the requested slot, regardless of its current status
+            // (done/failed/generating). Validates the slot actually exists
+            // so a malicious or stale request can't append instead.
+            $reuseIndex = null;
+            if ($replaceIndex !== null) {
+                if (!isset($variations[$replaceIndex])) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Variation slot {$replaceIndex} does not exist.",
+                    ], 422);
+                }
+                $reuseIndex = $replaceIndex;
+            }
+
             // Retry-in-place: reuse a failed or orphaned slot before appending. An
             // orphan is status=generating with no job_uuid — left over when the
             // queue call or save crashed before the UUID was persisted.
-            $reuseIndex = null;
-            foreach ($variations as $vi => $v) {
-                $vStatus = $v['status'] ?? '';
-                $isFailed = $vStatus === 'failed';
-                $isOrphan = $vStatus === 'generating' && empty($v['job_uuid']);
-                if ($isFailed || $isOrphan) {
-                    $reuseIndex = $vi;
-                    break;
+            if ($reuseIndex === null) {
+                foreach ($variations as $vi => $v) {
+                    $vStatus = $v['status'] ?? '';
+                    $isFailed = $vStatus === 'failed';
+                    $isOrphan = $vStatus === 'generating' && empty($v['job_uuid']);
+                    if ($isFailed || $isOrphan) {
+                        $reuseIndex = $vi;
+                        break;
+                    }
                 }
             }
 

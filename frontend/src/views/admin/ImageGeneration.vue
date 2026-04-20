@@ -11,7 +11,7 @@ import EntityUploadSlot from '@/components/admin/EntityUploadSlot.vue'
 
 const route = useRoute()
 const router = useRouter()
-const { getIdea, saveDraft, generateSegmentImage, retrySegment, skipSegment, regenerateImagePrompts, rewriteSegmentVd, resumeImagePipeline, downloadStockImage, isLoading } = useContentEngine()
+const { getIdea, saveDraft, generateSegmentImage, retrySegment, skipSegment, rewriteSegmentVd, resumeImagePipeline, downloadStockImage, isLoading } = useContentEngine()
 const MAX_SEGMENT_ATTEMPTS = 3
 const toast = useToast()
 
@@ -626,51 +626,58 @@ function failureHistoryTooltip(seg) {
     .join('\n')
 }
 
-// Regenerate Prompt: runs the full plugin /article-images skill for this one
-// section, which triggers fresh NER + Wikidata/Commons entity lookup. Use
-// this when Retry keeps reusing cached refs that are wrong or empty — e.g.
-// when an article about a public figure lands with an empty entity_refs[]
-// because the original NER run missed the subject.
-async function regenerateSegmentPrompt(seg) {
+// Replace a specific variation slot in-place — used by the small refresh
+// icon on done variation thumbnails. Backend's generateSegmentImage accepts
+// `replace_variation_index` to override its retry-in-place heuristic and
+// target the exact slot regardless of current status. Net effect: the slot
+// flips to 'generating' with a fresh GeminiGen UUID; webhook fills the new
+// image when ready, replacing whatever was there. The previous image's
+// file remains in storage until cleanup (no race on the public URL).
+async function replaceVariation(seg, vi, event) {
+  event?.stopPropagation()
+  if (!seg || !seg.variations?.[vi]) return
   if (!idea.value?.id) return
 
   const confirmed = window.confirm(
-    `Regenerate prompt for ${seg.label}?\n\n` +
-    `This re-runs the article-images skill via SSH (~30s) and refreshes entity ` +
-    `references from Wikipedia / Wikimedia. Use this when the image keeps ` +
-    `showing the wrong face (e.g. generic creator face instead of the actual ` +
-    `public figure named in the article).\n\n` +
-    `The current Visual Direction and prompt text will be overwritten.`
+    `Replace variation ${vi + 1} on ${seg.label}?\n\n` +
+    `The current image will be regenerated using the same Visual Direction ` +
+    `and references. The new attempt will replace this slot when GeminiGen ` +
+    `finishes (~30s).`
   )
   if (!confirmed) return
 
-  const priorStatus = seg.status
-  seg.status = 'rewriting_vd' // re-use this for "prompt authoring in progress" UX
+  if (saveTimeout) { clearTimeout(saveTimeout); saveTimeout = null }
 
-  const result = await regenerateImagePrompts(idea.value.id, [seg.index])
+  // Optimistic: flip the slot to 'generating' so the spinner shows immediately
+  const priorSlot = { ...seg.variations[vi] }
+  seg.variations[vi] = { url: null, job_uuid: null, status: 'generating' }
+  seg.status = 'generating'
+
+  const result = await generateSegmentImage(idea.value.id, {
+    segment_index: seg.index,
+    prompt: getPrompt(seg),
+    style: seg.style,
+    model: seg.model,
+    aspect_ratio: seg.aspect_ratio,
+    face_refs: seg.face_refs || [],
+    style_refs: seg.style_refs || [],
+    brand_refs: seg.brand_refs || [],
+    additional_notes: seg.additional_notes || '',
+    replace_variation_index: vi,
+  })
 
   if (result.success) {
-    toast.success(`${seg.label} prompt regeneration triggered — NER + Wikimedia lookup running in background. Refresh in ~30s.`)
+    const uuid = result.data?.uuid
+    seg.variations[vi] = { url: null, job_uuid: uuid, status: 'generating' }
+    seg.job_uuid = uuid
+    toast.success(`Variation ${vi + 1} regeneration started`)
   } else {
-    seg.status = priorStatus
-    toast.error(result.error || `Regenerate prompt failed for ${seg.label}`)
+    // Restore previous slot on dispatch failure
+    seg.variations[vi] = priorSlot
+    const anyGenerating = (seg.variations || []).some(v => v.status === 'generating')
+    seg.status = anyGenerating ? 'generating' : (seg.variations?.length ? 'done' : 'failed')
+    toast.error(result.error || `Failed to replace variation ${vi + 1}`)
   }
-}
-
-// Heuristic: show a subtle "missing entity refs?" nudge when the segment's
-// VD or caption mentions a proper-noun pattern but entity_refs[] is empty.
-// Only surfaced on covers, since inline images aren't gated on entity refs.
-function shouldNudgeEntityRefresh(seg) {
-  if (seg.index !== 0) return false
-  if ((seg.entity_refs || []).length > 0) return false
-
-  const text = `${seg.visual_direction || ''} ${seg.caption || ''} ${idea.value?.title || ''}`
-  // Match CEO/President/Prime Minister patterns, or Title-Case multi-word proper
-  // nouns that typically indicate public figures or landmarks. This is a soft
-  // signal — false positives are fine, operator decides to act or ignore.
-  const hasTitle = /\b(CEO|CTO|CFO|President|Minister|Founder|Senator|Governor)\b/i.test(text)
-  const hasMultiCapWord = /\b[A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\b/.test(text)
-  return hasTitle || hasMultiCapWord
 }
 
 // ── Stock image as variation ──
@@ -994,22 +1001,6 @@ async function handleApprove() {
                 Retry
               </button>
 
-              <!-- Regenerate Prompt button: re-run /article-images skill with
-                   fresh NER + Wikimedia lookup. Use when cached entity_refs
-                   are empty/wrong and Retry keeps falling back to creator
-                   face. Subtle amber "!" nudge when heuristic detects likely
-                   missing entity refs (public figure / landmark on cover). -->
-              <button
-                v-if="seg.status === 'failed' || shouldNudgeEntityRefresh(seg)"
-                @click="regenerateSegmentPrompt(seg)"
-                :disabled="isLoading || seg.status === 'rewriting_vd'"
-                class="px-2.5 py-1 text-[11px] font-medium rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500/20 transition-colors disabled:opacity-50 inline-flex items-center gap-1"
-                title="Regenerate Prompt: re-run /article-images via SSH — refreshes NER + Wikimedia entity lookup. Use when cached refs are wrong (e.g. missing public figure / landmark photo)"
-              >
-                <span v-if="shouldNudgeEntityRefresh(seg)" class="inline-block w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                Regen Prompt
-              </button>
-
               <!-- Skip button: for failed or history-laden segments -->
               <button
                 v-if="canSkipSegment(seg)"
@@ -1267,7 +1258,23 @@ async function handleApprove() {
                   ]"
                   :title="v.status === 'done' ? `Variation ${vi + 1} — click to select` : v.status === 'generating' ? 'Generating...' : 'Failed'"
                 >
-                  <img v-if="v.url && v.status === 'done'" :src="v.url" class="w-full h-full object-cover" />
+                  <div v-if="v.url && v.status === 'done'" class="w-full h-full relative group/var">
+                    <img :src="v.url" class="w-full h-full object-cover" />
+                    <!-- Replace icon: hover-revealed on done variations. Click
+                         dispatches a fresh GeminiGen run that targets THIS
+                         exact slot via replace_variation_index. Webhook
+                         swaps the image when ready (~30s). Spinner shows
+                         here in the meantime. Distinct from selectVariation
+                         (which is a click on the parent button) — click.stop
+                         prevents the parent's select-on-click behavior. -->
+                    <button
+                      @click.stop="replaceVariation(seg, vi, $event)"
+                      class="absolute top-0 right-0 w-4 h-4 rounded-bl bg-amber-500/80 hover:bg-amber-600 text-white opacity-0 group-hover/var:opacity-100 transition-opacity flex items-center justify-center"
+                      :title="`Replace variation ${vi + 1} — regenerate this slot in-place`"
+                    >
+                      <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    </button>
+                  </div>
                   <div v-else-if="v.status === 'generating'" class="w-full h-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center relative group/var">
                     <div class="w-5 h-5 rounded-full border-2 border-transparent border-t-amber-500 animate-spin"></div>
                     <!-- Cancel X: surfaces on hover, lets operator dismiss a
