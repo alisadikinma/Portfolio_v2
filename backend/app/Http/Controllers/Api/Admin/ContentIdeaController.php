@@ -1396,6 +1396,24 @@ class ContentIdeaController extends Controller
             'last_translation_attempt' => now(),
         ]);
 
+        // Gate Completed transition on translation readiness. The idea stayed
+        // at images_ready through publish() when use_translate_phase=true;
+        // now that EN translation landed, this is the "truly done" edge.
+        // Telegram publish-success notif piggy-backs here so readers get the
+        // alert with a working URL to the finished (multilingual) article.
+        $idea = ContentIdea::where('result_post_id', $post->id)->first();
+        if ($idea && $idea->status !== 'completed') {
+            $currentEnum = \App\Enums\ContentIdeaStatus::from($idea->status);
+            if ($currentEnum->canTransitionTo(\App\Enums\ContentIdeaStatus::Completed)) {
+                $idea->transitionTo(
+                    \App\Enums\ContentIdeaStatus::Completed,
+                    'translation_complete',
+                    ['result_post_id' => $post->id]
+                );
+                app(\App\Services\TelegramNotifier::class)->notifyPublishSuccess($post);
+            }
+        }
+
         return response()->json([
             'success' => true,
             'data' => [

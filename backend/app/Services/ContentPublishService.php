@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\ContentIdea;
 use App\Models\Post;
 use App\Models\PostTranslation;
+use App\Services\TelegramNotifier;
 use App\Support\HtmlSlashSanitizer;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -14,8 +15,10 @@ use Illuminate\Support\Str;
 
 class ContentPublishService
 {
-    public function __construct(private ArticleGenerationService $articleGen)
-    {
+    public function __construct(
+        private ArticleGenerationService $articleGen,
+        private ?TelegramNotifier $telegram = null,
+    ) {
     }
 
     /**
@@ -133,16 +136,34 @@ class ContentPublishService
 
         $translationPending = $this->triggerTranslationIfEnabled($idea, $post, $primaryLang);
 
-        // Transition to completed via FSM when not already there (idempotency
-        // guard — direct admin publish call on a `completed` idea re-runs
-        // this method; completed → completed is not in TRANSITIONS).
-        if ($idea->status !== 'completed') {
-            $idea->transitionTo(ContentIdeaStatus::Completed, 'publish_service', [
+        // FSM Completed transition is GATED on translation readiness when
+        // the translate phase flag is enabled. The idea is only "truly done"
+        // when both primary AND EN post_translations exist. When the flag is
+        // off, no EN is ever expected → flip inline (legacy behavior).
+        //
+        // When flag is on:
+        //   - English callback (markTranslationComplete) fires the transition
+        //     once post_translations.en lands.
+        //   - Auto-pipeline's ensureTranslationBeforePublish fires the
+        //     transition on the exhausted-retry fallback path.
+        //   - Admin always persists result_post_id NOW so both follow-up
+        //     sites can find the idea via Post::find(result_post_id).
+        $translateEnabled = config('services.article_generation.use_translate_phase', false);
+        $idea->update(['result_post_id' => $post->id]);
+
+        if (!$translateEnabled && $idea->status !== 'completed') {
+            $idea->transitionTo(ContentIdeaStatus::Completed, 'publish_service_no_translate', [
                 'result_post_id' => $post->id,
             ]);
-        } else {
-            $idea->update(['result_post_id' => $post->id]);
+            // Telegram publish-success fires on the Completed edge. Uses the
+            // existing TelegramNotifier (same pattern as AutoPipelineOrchestrator)
+            // which already builds the message with title + blog URL + summary.
+            $this->telegram?->notifyPublishSuccess($post);
         }
+        // translateEnabled = true → status stays at current value
+        // (article_ready / images_ready). Completed transition + Telegram
+        // happen in markTranslationComplete or AutoPipelineOrchestrator,
+        // whichever fires first.
 
         return [
             'post' => $post,
@@ -254,11 +275,27 @@ class ContentPublishService
         return Category::orderByDesc('id')->value('id');
     }
 
+    /**
+     * Resolve the slug for a Post about to be upserted on source_idea_id.
+     *
+     * Regen invariant: once a Post exists for this idea, reuse its slug
+     * permanently. User decision 2026-04-21 — URL stability trumps
+     * title-slug alignment, so inbound links, social shares, and SEO
+     * rankings never 404 when the admin regenerates a Completed idea
+     * with a different title.
+     *
+     * First publish: generate from the title; suffix `-{idea_id}` when the
+     * slug would collide with a Post of a different source_idea_id.
+     */
     private function buildUniqueSlug(string $title, ContentIdea $idea): string
     {
+        $existing = Post::where('source_idea_id', $idea->id)->first();
+        if ($existing && $existing->slug) {
+            return $existing->slug;
+        }
         $baseSlug = Str::slug($title);
-        $existing = Post::where('slug', $baseSlug)->where('source_idea_id', '!=', $idea->id)->first();
-        return $existing ? ($baseSlug . '-' . $idea->id) : $baseSlug;
+        $collision = Post::where('slug', $baseSlug)->where('source_idea_id', '!=', $idea->id)->first();
+        return $collision ? ($baseSlug . '-' . $idea->id) : $baseSlug;
     }
 
     private function upsertSecondaryTranslation(

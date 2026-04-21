@@ -406,6 +406,28 @@ class AutoPipelineOrchestrator
             // Fire Telegram success notification
             $this->telegram->notifyPublishSuccess($post);
 
+            // Gate Completed transition on translation readiness. When
+            // use_translate_phase is on, publish() deliberately leaves the
+            // idea at images_ready so the translation-complete callback /
+            // exhausted fallback can make the "truly done" call. Here in
+            // the orchestrator path, if we reached this branch then
+            // ensureTranslationBeforePublish already stamped
+            // translation_ready_at (either because EN landed or because
+            // 3-attempt cap exhausted) — so flipping Completed now is
+            // semantically correct. Guard against already-completed to
+            // keep the transition idempotent.
+            $idea->refresh();
+            if ($idea->status !== 'completed') {
+                $currentEnum = ContentIdeaStatus::from($idea->status);
+                if ($currentEnum->canTransitionTo(ContentIdeaStatus::Completed)) {
+                    $idea->transitionTo(
+                        ContentIdeaStatus::Completed,
+                        'auto_pipeline_publish',
+                        ['result_post_id' => $post->id]
+                    );
+                }
+            }
+
             $idea->update([
                 'pipeline_attempts' => 0,
                 'pipeline_next_retry_at' => null,
