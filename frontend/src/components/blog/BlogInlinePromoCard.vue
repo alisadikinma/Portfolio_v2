@@ -21,14 +21,34 @@ const hasImage = computed(() => {
 </script>
 
 <template>
+  <!--
+    RouterLink with custom slot → we get the resolved href from Vue Router
+    but render a plain <a target="_blank"> so the project/award opens in a
+    new tab. Goal: keep readers anchored to the blog post — they can
+    explore the case study in a new tab and return without losing scroll
+    position / reading progress / newsletter dismissal state.
+  -->
   <RouterLink
     v-if="card && card.link"
     :to="card.link"
-    class="my-10 block group rounded-2xl border bg-bg-elevated/50 backdrop-blur-sm overflow-hidden hover:bg-bg-elevated/70 transition-colors duration-300"
-    :class="accentClasses.border"
-    data-testid="blog-inline-promo-card"
+    custom
+    v-slot="{ href }"
   >
-    <div class="grid md:grid-cols-[40%_60%] gap-0">
+    <a
+      :href="href"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="relative my-10 block group rounded-2xl border bg-bg-elevated/50 backdrop-blur-sm overflow-hidden hover:bg-bg-elevated/70 transition-colors duration-300"
+      :class="accentClasses.border"
+      data-testid="blog-inline-promo-card"
+    >
+      <!-- External-link hint (top-right on hover) -->
+      <div class="pointer-events-none absolute top-3 right-3 z-10 w-7 h-7 rounded-full bg-bg-deep/70 backdrop-blur-sm border border-white/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+        <svg class="w-3.5 h-3.5" :class="accentClasses.eyebrow" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+        </svg>
+      </div>
+      <div class="grid md:grid-cols-[40%_60%] gap-0">
       <div
         v-if="hasImage"
         class="relative aspect-[4/3] overflow-hidden bg-bg-deep"
@@ -65,6 +85,7 @@ const hasImage = computed(() => {
           </svg>
         </span>
       </div>
-    </div>
+      </div>
+    </a>
   </RouterLink>
 </template>
