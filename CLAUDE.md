@@ -559,6 +559,28 @@ git push origin main   # ← auto-deploys, watch at https://github.com/alisadiki
 - Foreign keys: `category_id` (singular + _id)
 - Always include timestamps
 
+## Page Sections Mapping (admin ↔ view)
+
+`/admin/page-sections` rows are keyed by `(page_type, section_type)`. The table below lists which view reads which `section_type` — if a row exists in DB but isn't listed here, toggling it is a **ghost toggle** (no render effect). Always keep this in sync when adding/removing sections from views.
+
+| page_type | section_type | Rendered by | Component |
+|---|---|---|---|
+| `homepage` | `hero` | [Home.vue](frontend/src/views/Home.vue) | `CinematicHero` |
+| `homepage` | `skills-reel` | Home.vue | `SkillsReel` |
+| `homepage` | `skill-vibe-coding` | Home.vue | `SkillShowcase` |
+| `homepage` | `skill-ai-automation` | Home.vue | `SkillShowcase` |
+| `homepage` | `skill-ai-agents` | Home.vue | `SkillShowcase` |
+| `homepage` | `skill-ai-video` | Home.vue | `SkillShowcase` |
+| `homepage` | `featured-projects` | Home.vue | `ProjectsBento` |
+| `homepage` | `latest-blog` | Home.vue | `LatestBlog` (asymmetric 1-large + 2-stacked with thumbnails) |
+| `homepage` | `stats-cta` | Home.vue | `StatsBar` + `CTASection` (home variant) |
+| `about` | `cta` | [About.vue](frontend/src/views/About.vue) | `CTASection` (root variant, WhatsApp + social) |
+| `projects` | `cta` | [Projects.vue](frontend/src/views/Projects.vue) | `CTASection` (root variant) |
+| `gallery` | `cta` | [Gallery.vue](frontend/src/views/Gallery.vue) | `CTASection` (root variant) |
+| `blog` | `cta` | [BlogDetail.vue](frontend/src/views/BlogDetail.vue) | `CTASection` (root variant) — **article detail, NOT list** |
+
+**Naming convention:** `section_type` is kebab-case. Legacy snake_case rows (`featured_projects`, `latest_blog`, `cta` on homepage) exist in production DB as orphan ghosts from the original seeder — views do not read them. Don't revive snake_case; always use kebab-case for new sections and keep `PageSectionSeeder` in sync.
+
 ## Performance & Caching
 
 **TanStack Query Cache Strategy:**
@@ -568,6 +590,7 @@ git push origin main   # ← auto-deploys, watch at https://github.com/alisadiki
 - Testimonials: 30min stale time
 - Gallery: 60min + smart invalidation on mutations
 - About Settings: prefetched on router navigation
+- Page Sections: **30s staleTime + `refetchOnMount: 'always'`** — operators toggle visibility in `/admin/page-sections` and expect effect within next navigation, not 10 minutes. Override of global default (`refetchOnMount: false`).
 
 **Results:** 83% faster repeat visits, 70% fewer API calls, all pages < 500ms cached
 
@@ -602,9 +625,9 @@ Located at `D:\Projects\Portfolio_v2\.claude\agents\`:
 2. Check `PROJECT_STATUS.md` for current state
 3. Review existing patterns before creating new ones
 
-### After Changes:
+### After Changes (MANDATORY):
 1. Run tests
-2. Update documentation if needed
+2. **Update CLAUDE.md** — every change that touches architecture, routes, schema, composables, page-section mapping, new env vars, or pipeline stages MUST be reflected in the relevant CLAUDE.md section (root / backend / frontend) before commit. Skipping this leaves next session (or next contributor) debugging stale docs. Also update the "Last Updated" line at the bottom of root CLAUDE.md.
 3. Commit with conventional commits: `feat:`, `fix:`, `docs:`, etc.
 
 ### Git Push Policy (STRICT)
@@ -1037,7 +1060,7 @@ ARTICLE_GEN_USE_TRANSLATE_PHASE=false
 
 ---
 
-**Last Updated:** April 21, 2026 — Pipeline State Machine foundation (`ContentIdeaStatus` enum + `HasStatusTransitions` trait + `PipelineGuard`, strict adjacency map with audit log), Segment Retry Pipeline (auto retry job + manual retry/skip endpoints + replace-variation), Translate-Before-Publish Gate (sync SSH preflight, 3 auto retries, Telegram exhaustion alert), meta_keywords body-lede synthesis with broad-topic anchor (web SEO best practice — short entity tokens), backend auto-resolve person entity via Wikidata at every cover dispatch (no manual Regen Prompt needed), Replace-variation hover icon on done thumbnails, `completed` status added to syncToContentIdea + findIdeaIdForJobUuid + regenerateImagePrompts whitelists, `content-engine:resync-stuck-variations` artisan backfill, plugin v2.7.2 with hard pre-save SEO field audit + lede + role-resolution. Earlier (April 18): Creator Brand system — auto-inject cover face + VD rewrite, prompt-injection watermark, branded filenames `alisadikinma-{keyword}-{segment}.png`, per-type image captions, `creator_brand` Settings group + AboutSettings card.
+**Last Updated:** April 21, 2026 — Page Sections wiring fixes: `<LatestBlog>` mounted on Home (was never rendered despite component existing); `<CTASection>` moved from Blog list → BlogDetail (admin "Blog Page → Call to Action" controls article detail, not index); `LatestBlog` side cards now render `featured_image` thumbnails (40/60 horizontal split) matching the large card; `usePageSections` cache staleTime 10min → 30s + `refetchOnMount:'always'` so admin toggles surface on public pages within next navigation. Added "Page Sections Mapping" reference table in this CLAUDE.md to prevent ghost-toggle confusion. Earlier same day: Pipeline State Machine foundation (`ContentIdeaStatus` enum + `HasStatusTransitions` trait + `PipelineGuard`, strict adjacency map with audit log), Segment Retry Pipeline (auto retry job + manual retry/skip endpoints + replace-variation), Translate-Before-Publish Gate (sync SSH preflight, 3 auto retries, Telegram exhaustion alert), meta_keywords body-lede synthesis with broad-topic anchor (web SEO best practice — short entity tokens), backend auto-resolve person entity via Wikidata at every cover dispatch (no manual Regen Prompt needed), Replace-variation hover icon on done thumbnails, `completed` status added to syncToContentIdea + findIdeaIdForJobUuid + regenerateImagePrompts whitelists, `content-engine:resync-stuck-variations` artisan backfill, plugin v2.7.2 with hard pre-save SEO field audit + lede + role-resolution. Earlier (April 18): Creator Brand system — auto-inject cover face + VD rewrite, prompt-injection watermark, branded filenames `alisadikinma-{keyword}-{segment}.png`, per-type image captions, `creator_brand` Settings group + AboutSettings card.
 **Maintainer:** Ali Sadikin (ali.sadikincom85@gmail.com)
 **Environment:** Windows 11, D:\Projects\Portfolio_v2
 **PHP:** D:\xampp\php\php.exe (8.2.12) — use full path, not in system PATH
