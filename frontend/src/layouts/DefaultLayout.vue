@@ -25,8 +25,9 @@
     <!-- Footer -->
     <TheFooter />
 
-    <!-- Chatbot (public pages only) -->
-    <AskAliChatbot />
+    <!-- Chatbot temporarily removed — component kept in repo for re-enable
+         once the AI backend is wired. Import + mount restored by reverting
+         this diff. -->
 
     <!-- Global Toast -->
     <BaseToast position="top-right" />
@@ -37,6 +38,5 @@
 import AuroraBackground from '@/components/AuroraBackground.vue'
 import TheNavigation from '@/components/TheNavigation.vue'
 import TheFooter from '@/components/TheFooter.vue'
-import AskAliChatbot from '@/components/AskAliChatbot.vue'
 import { BaseToast } from '@/components/base'
 </script>

@@ -266,7 +266,16 @@ onMounted(async () => {
   await fetchPosts({}, lang.value)
   try {
     const res = await api.get('/categories')
-    categories.value = res.data?.data || res.data || []
+    const all = res.data?.data || res.data || []
+    // Hide empty categories from the filter chips — the API returns every
+    // category for admin compatibility, but showing a chip that links to
+    // zero posts is a dead-end click. posts_count is populated by
+    // CategoryController::index via withCount(['posts' => published()]).
+    // Categories without the count (legacy payload) default to visible so
+    // we never silently drop everything on schema drift.
+    categories.value = all.filter(c =>
+      c.posts_count === undefined || c.posts_count > 0
+    )
   } catch {}
 
   scrollListener = onScroll
