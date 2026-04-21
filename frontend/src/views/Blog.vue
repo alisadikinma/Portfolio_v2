@@ -188,6 +188,16 @@
       </div>
     </section>
 
+    <!-- CTA Section (controlled by admin page sections) -->
+    <CTASection
+      v-if="showCTASection"
+      heading="Let's Build Something Amazing"
+      description="Have a project in mind? Let's discuss how I can help turn your ideas into reality with <strong>innovative solutions & cutting-edge technology</strong>."
+      whatsapp-message="Hi! I'm interested in working together on a project. Can we discuss?"
+      :social-links="aboutSettings?.social_links"
+      :show-social-links="true"
+    />
+
     <!-- Sticky footer newsletter bar (triggers after 60% scroll) -->
     <NewsletterFooterBar
       :show="showFooterBar"
@@ -203,14 +213,24 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { usePosts } from '@/composables/usePosts'
 import { useNewsletter } from '@/composables/useNewsletter'
+import { usePageSections } from '@/composables/usePageSections'
+import { useAboutSettings } from '@/composables/useAboutSettings'
 import NewsletterFooterBar from '@/components/blog/NewsletterFooterBar.vue'
 import BlogCategoryChips from '@/components/blog/BlogCategoryChips.vue'
 import BlogFeedDistributor from '@/components/blog/BlogFeedDistributor.vue'
+import CTASection from '@/components/CTASection.vue'
 import api from '@/services/api'
 
 const route = useRoute()
 const { posts, isLoading, fetchPosts } = usePosts()
 const { subscribe: nlSubscribe, isSubscribed: nlIsSubscribed, isDismissed: nlIsDismissed } = useNewsletter()
+const { sections, fetchActiveSections } = usePageSections()
+const { aboutSettings } = useAboutSettings()
+
+const showCTASection = computed(() => {
+  const section = sections.value.find(s => s.section_type === 'cta')
+  return section ? !!section.is_active : false
+})
 
 const categories = ref([])
 const selectedCategory = ref(null)
@@ -263,6 +283,7 @@ const lang = computed(() => route.params.lang || 'en')
 
 onMounted(async () => {
   newsletterAlreadySubscribed.value = nlIsSubscribed()
+  fetchActiveSections('blog')
   await fetchPosts({}, lang.value)
   try {
     const res = await api.get('/categories')

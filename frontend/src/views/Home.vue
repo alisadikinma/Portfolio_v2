@@ -73,7 +73,12 @@
       <ProjectsBento v-if="isSectionActive('featured-projects')" />
     </div>
 
-    <!-- 8. STATS + CTA -->
+    <!-- 8. LATEST BLOG -->
+    <div class="snap-section">
+      <LatestBlog v-if="isSectionActive('latest-blog')" />
+    </div>
+
+    <!-- 9. STATS + CTA -->
     <div class="snap-section" v-if="isSectionActive('stats-cta')">
       <StatsBar />
       <CTASection />
@@ -90,6 +95,7 @@ import CinematicHero from '@/components/CinematicHero.vue'
 import SkillsReel from '@/components/home/SkillsReel.vue'
 import SkillShowcase from '@/components/home/SkillShowcase.vue'
 import ProjectsBento from '@/components/home/ProjectsBento.vue'
+import LatestBlog from '@/components/home/LatestBlog.vue'
 import StatsBar from '@/components/home/StatsBar.vue'
 import CTASection from '@/components/home/CTASection.vue'
 
