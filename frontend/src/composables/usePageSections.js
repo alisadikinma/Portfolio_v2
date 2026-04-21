@@ -30,7 +30,11 @@ export function usePageSections() {
     }
   })
 
-  // Fetch active sections with caching (10min stale / 1hr cache)
+  // Fetch active sections. Cache aggression deliberately low because this is
+  // admin-toggled visibility data — operators toggle a section on/off in
+  // /admin/page-sections and expect to see the effect on public pages within
+  // the next navigation, not in 10 minutes. refetchOnMount: 'always' overrides
+  // the global default (false) so every SPA route change gets fresh data.
   const {
     data: sectionsData,
     isLoading: publicLoading,
@@ -40,22 +44,22 @@ export function usePageSections() {
     queryKey: ['page-sections', selectedPage],
     queryFn: async () => {
       if (!selectedPage.value) return []
-      
+
       const params = { page: selectedPage.value }
       const response = await api.get('/page-sections', { params })
       console.log('[usePageSections] Background fetch complete')
-      
-      // Update localStorage cache
+
       const cacheKey = `page_sections_${selectedPage.value}`
-      setCache(cacheKey, response.data.data, 10 * 60 * 1000) // 10min
-      
+      setCache(cacheKey, response.data.data, 30 * 1000) // 30s
+
       return response.data.data
     },
     enabled: computed(() => !!selectedPage.value),
-    staleTime: 10 * 60 * 1000, // 10 minutes
-    gcTime: 60 * 60 * 1000, // 1 hour
+    staleTime: 30 * 1000, // 30 seconds
+    gcTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnMount: 'always',
     initialData: () => {
-      // Try get from localStorage first
+      // Show stale localStorage instantly for FCP, then refetch (refetchOnMount)
       if (!selectedPage.value) return []
       const cacheKey = `page_sections_${selectedPage.value}`
       return getCache(cacheKey) || []

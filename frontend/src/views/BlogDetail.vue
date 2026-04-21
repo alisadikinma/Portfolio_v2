@@ -278,6 +278,16 @@
 
     </article>
 
+    <!-- CTA Section (controlled by admin: Blog Page → Call to Action) -->
+    <CTASection
+      v-if="showCTASection"
+      heading="Let's Build Something Amazing"
+      description="Enjoyed this article? Let's turn ideas into reality with <strong>innovative AI solutions</strong>."
+      whatsapp-message="Hi! I just read your article and I'd love to discuss a project. Can we chat?"
+      :social-links="aboutSettings?.social_links"
+      :show-social-links="true"
+    />
+
     <!-- Floating newsletter banner — fires 60s after mount -->
     <NewsletterFloatingBanner
       :show="showFloatingBanner"
@@ -295,12 +305,14 @@ import { useMetaTags } from '@/composables/useMetaTags'
 import { usePageSections } from '@/composables/usePageSections'
 import { useNewsletter } from '@/composables/useNewsletter'
 import { useToast } from '@/composables/useToast'
+import { useAboutSettings } from '@/composables/useAboutSettings'
 import { stripFaqSection } from '@/utils/stripFaqSection'
 import { extractFaqFromHtml } from '@/utils/extractFaqFromHtml'
 import FaqAccordion from '@/components/blog/FaqAccordion.vue'
 import NewsletterFloatingBanner from '@/components/blog/NewsletterFloatingBanner.vue'
 import StickyTOC from '@/components/blog/StickyTOC.vue'
 import BlogContentInjector from '@/components/blog/BlogContentInjector.vue'
+import CTASection from '@/components/CTASection.vue'
 import { splitHtmlByH2 } from '@/utils/splitHtmlByH2'
 import api from '@/services/api'
 
@@ -309,8 +321,14 @@ const toast = useToast()
 
 const { post, isLoadingPost: isLoading, fetchPost } = usePosts()
 const { updatePageMeta, updateMetaTag, injectBreadcrumbSchema, injectArticleSchema, updateHreflang } = useMetaTags()
-const { fetchActiveSections } = usePageSections()
+const { sections, fetchActiveSections } = usePageSections()
 const { isSubscribed: nlIsSubscribed, isDismissed: nlIsDismissed } = useNewsletter()
+const { aboutSettings } = useAboutSettings()
+
+const showCTASection = computed(() => {
+  const section = sections.value.find(s => s.section_type === 'cta')
+  return section ? !!section.is_active : false
+})
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const fetchError = ref(null)

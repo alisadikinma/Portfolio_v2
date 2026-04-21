@@ -70,18 +70,28 @@
             class="group flex-1"
           >
             <div class="bezel-shell-sm h-full">
-              <div class="bezel-core-sm p-5 h-full flex flex-col">
-                <div class="flex items-center gap-2 mb-3">
-                  <span v-if="post.category" class="eyebrow-tag text-accent-cyan text-[9px]">{{ post.category?.name || post.category }}</span>
-                  <span class="mono-label text-fg-dim text-[9px]">{{ formatDate(post.published_at || post.created_at) }}</span>
+              <div class="bezel-core-sm h-full overflow-hidden flex">
+                <div v-if="post.featured_image" class="w-2/5 flex-shrink-0 overflow-hidden bg-bg-elevated">
+                  <img
+                    :src="post.featured_image"
+                    :alt="post.title"
+                    class="w-full h-full object-cover transition-transform duration-700 ease-spring group-hover:scale-105"
+                    loading="lazy"
+                  />
                 </div>
-                <h3 class="font-display text-lg font-semibold text-fg-primary group-hover:text-accent-gold transition-all duration-700 ease-spring line-clamp-2">
-                  {{ post.title }}
-                </h3>
-                <p class="text-sm text-fg-muted mt-2 line-clamp-2 font-light">{{ post.excerpt }}</p>
-                <div class="mt-auto pt-3 flex items-center gap-2 text-fg-dim group-hover:text-accent-gold transition-all duration-700 ease-spring">
-                  <span class="text-xs font-medium">Read</span>
-                  <svg class="w-3 h-3 group-hover:translate-x-1 transition-transform duration-700 ease-spring" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12h15m0 0l-6.75-6.75M19.5 12l-6.75 6.75"/></svg>
+                <div class="flex-1 p-5 flex flex-col">
+                  <div class="flex items-center gap-2 mb-3">
+                    <span v-if="post.category" class="eyebrow-tag text-accent-cyan text-[9px]">{{ post.category?.name || post.category }}</span>
+                    <span class="mono-label text-fg-dim text-[9px]">{{ formatDate(post.published_at || post.created_at) }}</span>
+                  </div>
+                  <h3 class="font-display text-lg font-semibold text-fg-primary group-hover:text-accent-gold transition-all duration-700 ease-spring line-clamp-2">
+                    {{ post.title }}
+                  </h3>
+                  <p class="text-sm text-fg-muted mt-2 line-clamp-2 font-light">{{ post.excerpt }}</p>
+                  <div class="mt-auto pt-3 flex items-center gap-2 text-fg-dim group-hover:text-accent-gold transition-all duration-700 ease-spring">
+                    <span class="text-xs font-medium">Read</span>
+                    <svg class="w-3 h-3 group-hover:translate-x-1 transition-transform duration-700 ease-spring" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12h15m0 0l-6.75-6.75M19.5 12l-6.75 6.75"/></svg>
+                  </div>
                 </div>
               </div>
             </div>
