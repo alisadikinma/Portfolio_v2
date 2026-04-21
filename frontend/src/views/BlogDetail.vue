@@ -246,16 +246,8 @@
               v-for="related in relatedPosts"
               :key="related.id"
               :to="`/${lang}/blog/${related.slug}`"
-              target="_blank"
-              rel="noopener noreferrer"
               class="group relative rounded-xl overflow-hidden bg-bg-elevated/50 border border-white/5 hover:border-accent-gold/20 transition-all duration-300"
             >
-              <!-- External-link hint (appears on hover) -->
-              <div class="pointer-events-none absolute top-3 right-3 z-10 w-7 h-7 rounded-full bg-bg-deep/70 backdrop-blur-sm border border-white/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                <svg class="w-3.5 h-3.5 text-accent-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
-                </svg>
-              </div>
               <div class="aspect-[16/10] bg-bg-elevated overflow-hidden">
                 <img
                   v-if="related.featured_image"
@@ -573,6 +565,30 @@ watch(lang, async (newLang) => {
     if (result.success && post.value) {
       updateMetaTags()
     }
+  }
+})
+
+// Refetch when slug changes — clicking a related post inside BlogDetail changes
+// the route param but Vue Router reuses the component instance, so we must
+// manually refetch + reset scroll + rehydrate secondary data.
+watch(() => route.params.slug, async (newSlug, oldSlug) => {
+  if (!newSlug || newSlug === oldSlug) return
+  window.scrollTo({ top: 0, behavior: 'auto' })
+  readingProgress.value = 0
+  showFloatingBanner.value = false
+  if (floatingBannerTimerId) {
+    clearTimeout(floatingBannerTimerId)
+    floatingBannerTimerId = null
+  }
+
+  const result = await fetchPost(newSlug, lang.value)
+  if (result.success && post.value) {
+    updateMetaTags()
+    await fetchRelatedPosts()
+    fetchPromoSlot()
+    scheduleFloatingBanner()
+  } else {
+    fetchError.value = result.error || 'Post not found'
   }
 })
 </script>

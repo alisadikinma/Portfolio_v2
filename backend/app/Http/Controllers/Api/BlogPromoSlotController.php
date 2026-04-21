@@ -77,7 +77,7 @@ class BlogPromoSlotController extends Controller
                 $project->meta_description,
                 $project->description,
             ], 180),
-            'image' => $project->image,
+            'image' => $this->resolveProjectImage($project->image),
             'link' => "/projects/{$project->slug}",
             'cta_label' => 'Read case study',
         ];
@@ -93,10 +93,34 @@ class BlogPromoSlotController extends Controller
                 $award->description,
                 $award->organization,
             ], 180),
-            'image' => $award->image,
+            'image' => $this->resolveAwardImage($award->image),
             'link' => '/awards',
             'cta_label' => 'See the story',
         ];
+    }
+
+    /**
+     * Mirrors ProjectResource::getImageUrl — raw `projects/...` stored paths
+     * resolve to `/storage/projects/...`. Absolute URLs pass through.
+     */
+    private function resolveProjectImage(?string $path): ?string
+    {
+        if (!$path) return null;
+        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) return $path;
+        if (str_starts_with($path, '/')) return url($path);
+        return asset('storage/' . $path);
+    }
+
+    /**
+     * Mirrors AwardResource — awards sit under `/uploads/awards/` on disk,
+     * not storage/. Absolute URLs pass through.
+     */
+    private function resolveAwardImage(?string $path): ?string
+    {
+        if (!$path) return null;
+        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) return $path;
+        if (str_starts_with($path, '/')) return url($path);
+        return asset('uploads/awards/' . $path);
     }
 
     private function genericPayload(): array

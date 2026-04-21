@@ -66,7 +66,8 @@ class BlogPromoSlotTest extends TestCase
             ->assertJsonPath('data.type', 'project')
             ->assertJsonPath('data.title', 'Pinned Showcase')
             ->assertJsonPath('data.link', '/projects/pinned-showcase')
-            ->assertJsonPath('data.cta_label', 'Read case study');
+            ->assertJsonPath('data.cta_label', 'Read case study')
+            ->assertJsonPath('data.image', 'http://localhost/storage/projects/pinned.jpg');
     }
 
     /** @test */
