@@ -56,6 +56,29 @@ class ContentIdeaStatusTransitionsTest extends TestCase
     }
 
     /** @test */
+    public function completed_can_revert_to_researching_for_regenerate(): void
+    {
+        // Admin-triggered Regenerate on a Completed idea must reopen the
+        // pipeline. The live Post stays at /blog/{slug} during regen —
+        // ContentPublishService uses Post::updateOrCreate keyed on id when
+        // the user re-publishes.
+        $this->assertTrue(
+            ContentIdeaStatus::Completed->canTransitionTo(ContentIdeaStatus::Researching)
+        );
+    }
+
+    /** @test */
+    public function completed_can_revert_to_generating_images_for_image_regenerate(): void
+    {
+        // Same rationale as article regen, but only images change (article
+        // stays locked). Admin clicks Regen on a Completed idea from the
+        // Images step of the preview.
+        $this->assertTrue(
+            ContentIdeaStatus::Completed->canTransitionTo(ContentIdeaStatus::GeneratingImages)
+        );
+    }
+
+    /** @test */
     public function failed_can_resume_to_researching_and_other_stages(): void
     {
         $this->assertTrue(ContentIdeaStatus::Failed->canTransitionTo(ContentIdeaStatus::Researching));

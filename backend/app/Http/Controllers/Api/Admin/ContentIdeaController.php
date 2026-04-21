@@ -599,13 +599,18 @@ class ContentIdeaController extends Controller
             return response()->json(['success' => false, 'message' => 'Content idea not found.'], 404);
         }
 
-        $allowedStatuses = ['article_ready', 'images_ready'];
+        // 'completed' is allowed so admin can re-run the pipeline on a
+        // published idea. The live Post stays at /blog/{slug} until
+        // re-publish (ContentPublishService uses Post::updateOrCreate keyed on
+        // id to rewrite in place). FSM transition below handles the
+        // completed → researching edge.
+        $allowedStatuses = ['article_ready', 'images_ready', 'completed'];
         // Also allow regeneration from failed researching state
         if ($idea->status === 'researching' && $idea->current_step === 'failed') {
             $allowedStatuses[] = 'researching';
         }
         if (!in_array($idea->status, $allowedStatuses)) {
-            return response()->json(['success' => false, 'message' => 'Can only regenerate from article_ready, images_ready, or failed state.'], 422);
+            return response()->json(['success' => false, 'message' => 'Can only regenerate from article_ready, images_ready, completed, or failed state.'], 422);
         }
 
         $languages = $idea->languages ?? ['id'];
@@ -1808,6 +1813,19 @@ class ContentIdeaController extends Controller
         $onlySections = $request->input('sections', []);
         $idempotencyKey = Str::uuid()->toString();
         $result = $this->articleGen->triggerImages($idea->id, $idempotencyKey, $onlySections);
+
+        // Revert completed → generating_images so the admin table reflects
+        // "in-progress" while the new prompts render. Other start statuses
+        // (article_ready, images_ready, generating_images) stay where they
+        // are — only completed needs the explicit transition. No $extra
+        // update args — the `source` column is an enum, and `reason` already
+        // captures intent for the pipeline_state_log audit trail.
+        if ($idea->status === 'completed') {
+            $idea->transitionTo(
+                \App\Enums\ContentIdeaStatus::GeneratingImages,
+                'admin_regenerate_images_from_completed'
+            );
+        }
 
         $idea->update([
             'process_pid' => $result['pid'] ?? null,

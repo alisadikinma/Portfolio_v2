@@ -36,7 +36,12 @@ enum ContentIdeaStatus: string
         'article_ready' => ['researching', 'generating_images', 'completed', 'failed', 'archived', 'draft'],
         'generating_images' => ['generating_images', 'images_ready', 'completed', 'failed', 'awaiting_manual_upload'],
         'images_ready' => ['completed', 'archived', 'draft'],
-        'completed' => ['archived'],
+        // completed → researching | generating_images: admin-triggered
+        // Regenerate on a Completed idea. The live Post stays at /blog/{slug}
+        // during regen — ContentPublishService uses Post::updateOrCreate keyed
+        // on id when the user re-publishes, rewriting the existing Post in
+        // place instead of orphaning + creating a new one.
+        'completed' => ['archived', 'researching', 'generating_images'],
         'failed' => ['researching', 'article_ready', 'generating_images', 'archived', 'draft'],
         'archived' => ['draft'],
     ];
