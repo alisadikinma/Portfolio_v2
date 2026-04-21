@@ -2,17 +2,16 @@
   <div class="min-h-screen">
 
     <!-- 1. HERO — VEO Warrior Video -->
-    <div class="snap-section">
-      <CinematicHero v-if="isSectionActive('hero')" />
+    <div class="snap-section" v-if="isSectionActive('hero')">
+      <CinematicHero />
     </div>
 
     <!-- 2. SKILLS REEL — Kinetic Marquee (no snap, flows naturally) -->
     <SkillsReel v-if="isSectionActive('skills-reel')" />
 
     <!-- 3. VIBE CODING -->
-    <div class="snap-section">
+    <div class="snap-section" v-if="isSectionActive('skill-vibe-coding')">
       <SkillShowcase
-        v-if="isSectionActive('skill-vibe-coding')"
         :title="getSectionField('skill-vibe-coding', 'title', 'Vibe Coding')"
         subtitle="Ship Products 10x Faster"
         :description="getSectionField('skill-vibe-coding', 'description', vibeCodingDesc)"
@@ -25,9 +24,8 @@
     </div>
 
     <!-- 4. AI AUTOMATION -->
-    <div class="snap-section">
+    <div class="snap-section" v-if="isSectionActive('skill-ai-automation')">
       <SkillShowcase
-        v-if="isSectionActive('skill-ai-automation')"
         :title="getSectionField('skill-ai-automation', 'title', 'AI Automation')"
         subtitle="Zero Manual Work"
         :description="getSectionField('skill-ai-automation', 'description', aiAutomationDesc)"
@@ -39,9 +37,8 @@
     </div>
 
     <!-- 5. AI AGENTS -->
-    <div class="snap-section">
+    <div class="snap-section" v-if="isSectionActive('skill-ai-agents')">
       <SkillShowcase
-        v-if="isSectionActive('skill-ai-agents')"
         :title="getSectionField('skill-ai-agents', 'title', 'AI Agents')"
         subtitle="Autonomous Task Execution"
         :description="getSectionField('skill-ai-agents', 'description', aiAgentsDesc)"
@@ -53,9 +50,8 @@
     </div>
 
     <!-- 6. AI VIDEO GENERATION -->
-    <div class="snap-section">
+    <div class="snap-section" v-if="isSectionActive('skill-ai-video')">
       <SkillShowcase
-        v-if="isSectionActive('skill-ai-video')"
         :title="getSectionField('skill-ai-video', 'title', 'AI Video Generation')"
         subtitle="From Prompt to Film"
         :description="getSectionField('skill-ai-video', 'description', aiVideoDesc)"
@@ -69,13 +65,13 @@
     </div>
 
     <!-- 7. FEATURED PROJECTS -->
-    <div class="snap-section">
-      <ProjectsBento v-if="isSectionActive('featured-projects')" />
+    <div class="snap-section" v-if="isSectionActive('featured-projects')">
+      <ProjectsBento />
     </div>
 
     <!-- 8. LATEST BLOG -->
-    <div class="snap-section">
-      <LatestBlog v-if="isSectionActive('latest-blog')" />
+    <div class="snap-section" v-if="isSectionActive('latest-blog')">
+      <LatestBlog />
     </div>
 
     <!-- 9. STATS + CTA -->
