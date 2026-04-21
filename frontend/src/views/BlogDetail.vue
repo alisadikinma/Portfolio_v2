@@ -356,8 +356,15 @@ const handleScroll = () => {
   const el = articleContent.value
   const rect = el.getBoundingClientRect()
   const total = el.scrollHeight
+  const denominator = total - window.innerHeight
+  // Stub-short posts (content shorter than viewport) would otherwise divide by
+  // zero/negative and flash the progress bar to 100% immediately.
+  if (denominator <= 0) {
+    readingProgress.value = 0
+    return
+  }
   const scrolled = Math.max(0, -rect.top)
-  readingProgress.value = Math.min(100, Math.round((scrolled / (total - window.innerHeight)) * 100))
+  readingProgress.value = Math.min(100, Math.round((scrolled / denominator) * 100))
 }
 
 // ── Reading time ──────────────────────────────────────────────────────────────
@@ -495,7 +502,9 @@ const updateMetaTags = () => {
 const fetchRelatedPosts = async () => {
   if (!post.value) return
   try {
-    const params = {}
+    // Cap payload — we only render 3 related cards at bottom + up to 2 inline.
+    // Fetch 4 so we can always exclude the current post without starving the list.
+    const params = { per_page: 4 }
     if (post.value.category?.id) params.category_id = post.value.category.id
     const res = await api.get('/posts', { params })
     const all = res.data?.data || []

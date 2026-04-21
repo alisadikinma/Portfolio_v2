@@ -76,7 +76,7 @@ const injectAfterChunkIndex = computed(() => {
 
 function renderInjection(kind) {
   if (kind === 'promo') {
-    return h(BlogInlinePromoCard, { slot: props.promoSlot })
+    return h(BlogInlinePromoCard, { card: props.promoSlot })
   }
   if (kind === 'newsletter') {
     return h(NewsletterInlineCard, { variant: 'detail' })
