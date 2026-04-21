@@ -33,7 +33,10 @@ class ContentIdeaController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = ContentIdea::query();
+        // Eager-load post.published_at so the Completed tab can show the
+        // blog-live timestamp instead of source_data.pub_date. Select only
+        // id + published_at on the related Post to keep payload small.
+        $query = ContentIdea::query()->with(['post:id,published_at']);
 
         if ($request->has('pillar')) {
             $query->byPillar($request->query('pillar'));
@@ -70,9 +73,18 @@ class ContentIdeaController extends Controller
         usort($items, fn ($a, $b) => $this->computeTrendingScore($b) <=> $this->computeTrendingScore($a));
         $ideas->setCollection(collect($items));
 
+        // Surface blog-live timestamp to the admin UI. Frontend prefers this
+        // over source_data.pub_date on Completed rows so the Published column
+        // shows "posted 30m ago" instead of "news article published 3d ago".
+        $data = collect($ideas->items())->map(function (ContentIdea $idea) {
+            $arr = $idea->toArray();
+            $arr['result_post_published_at'] = $idea->post?->published_at?->toIso8601String();
+            return $arr;
+        })->all();
+
         return response()->json([
             'success' => true,
-            'data' => $ideas->items(),
+            'data' => $data,
             'meta' => [
                 'current_page' => $ideas->currentPage(),
                 'last_page' => $ideas->lastPage(),

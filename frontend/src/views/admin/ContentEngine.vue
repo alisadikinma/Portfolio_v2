@@ -338,11 +338,11 @@
               <td class="px-4 py-3 text-neutral-500 dark:text-neutral-400 text-xs align-top">{{ idea.source || 'manual' }}</td>
               <td class="px-4 py-3 text-xs text-neutral-500 dark:text-neutral-400 align-top">
                 <span
-                  v-if="formatPubDateRelative(idea.source_data?.pub_date)"
-                  :title="formatPubDateAbsolute(idea.source_data?.pub_date)"
+                  v-if="formatPubDateRelative(displayPubDateIso(idea))"
+                  :title="displayPubDateTooltip(idea)"
                   class="cursor-help"
                 >
-                  {{ formatPubDateRelative(idea.source_data?.pub_date) }}
+                  {{ formatPubDateRelative(displayPubDateIso(idea)) }}
                 </span>
                 <span v-else>—</span>
               </td>
@@ -808,7 +808,9 @@ function sortValue(idea, column) {
   if (column === 'topic') return (idea.title || '').toLowerCase()
   if (column === 'virality') return ideaViralityScore(idea)
   if (column === 'published') {
-    const raw = idea.source_data?.pub_date
+    // Prefer blog-live timestamp when available (Completed ideas); else fall
+    // back to source pub_date. Matches the Published column display logic.
+    const raw = idea.result_post_published_at || idea.source_data?.pub_date
     const ts = raw ? Date.parse(raw) : NaN
     return Number.isNaN(ts) ? null : ts
   }
@@ -1254,6 +1256,23 @@ function formatPubDateAbsolute(iso) {
   return d.toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
+// Published column — for Completed ideas, prefer posts.published_at (the
+// actual blog-live timestamp) over source_data.pub_date (the news source's
+// publish date). Falls back to pub_date for non-completed ideas or when the
+// post hasn't been created yet.
+function displayPubDateIso(idea) {
+  return idea?.result_post_published_at || idea?.source_data?.pub_date || null
+}
+
+function displayPubDateTooltip(idea) {
+  const iso = displayPubDateIso(idea)
+  if (!iso) return ''
+  const absolute = formatPubDateAbsolute(iso)
+  return idea?.result_post_published_at
+    ? `Blog published at ${absolute}`
+    : `Source published at ${absolute}`
+}
+
 function debounceSearch() {
   if (searchTimeout) clearTimeout(searchTimeout)
   searchTimeout = setTimeout(() => { pagination.value.current_page = 1; refreshIdeas() }, 400)
@@ -1298,8 +1317,13 @@ async function refreshIdeas() {
       // back to id desc (≈ created_at desc). Same-day near-duplicates still
       // cluster naturally because they share the same date bucket.
       rows.sort((a, b) => {
-        const at = a.source_data?.pub_date ? Date.parse(a.source_data.pub_date) : 0
-        const bt = b.source_data?.pub_date ? Date.parse(b.source_data.pub_date) : 0
+        // Prefer the blog-live timestamp for Completed ideas so the freshest
+        // publishes lead that tab. Falls back to news-source pub_date for
+        // non-completed ideas (matches Published column display).
+        const aIso = a.result_post_published_at || a.source_data?.pub_date
+        const bIso = b.result_post_published_at || b.source_data?.pub_date
+        const at = aIso ? Date.parse(aIso) : 0
+        const bt = bIso ? Date.parse(bIso) : 0
         const atSafe = isNaN(at) ? 0 : at
         const btSafe = isNaN(bt) ? 0 : bt
         if (btSafe !== atSafe) return btSafe - atSafe

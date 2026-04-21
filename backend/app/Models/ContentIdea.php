@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Traits\HasStatusTransitions;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ContentIdea extends Model
 {
@@ -95,5 +96,14 @@ class ContentIdea extends Model
     public function scopeByStatus($query, string $status)
     {
         return $query->where('status', $status);
+    }
+
+    /**
+     * The Post created when this idea was published (if any).
+     * Set in ContentPublishService::publish via result_post_id FK.
+     */
+    public function post(): BelongsTo
+    {
+        return $this->belongsTo(Post::class, 'result_post_id');
     }
 }
