@@ -1,6 +1,7 @@
 <script setup>
 import { useI18n } from 'vue-i18n'
 import { useRouter, useRoute } from 'vue-router'
+import { setManualLocale } from '@/utils/resolveLocale'
 
 const { locale } = useI18n()
 const router = useRouter()
@@ -18,7 +19,10 @@ function switchLanguage(lang) {
   const newPath = route.fullPath.replace(`/${currentLang}`, `/${lang}`)
 
   locale.value = lang
-  localStorage.setItem('locale', lang)
+  // Stamps `locale_manual=true` so future visits respect this choice
+  // even if the user's timezone says otherwise (Indonesian user who
+  // prefers to read in English, for example).
+  setManualLocale(lang)
   router.replace(newPath !== route.fullPath ? newPath : `/${lang}`)
 }
 </script>

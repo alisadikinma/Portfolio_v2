@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useAboutSettings } from '@/composables/useAboutSettings'
 import i18n from '@/i18n'
+import { resolveLocale } from '@/utils/resolveLocale'
 
 const SUPPORTED_LANGS = ['en', 'id']
 
@@ -115,10 +116,10 @@ const routes = [
   // ============================================
   {
     path: '/',
-    redirect: () => {
-      const saved = localStorage.getItem('locale') || 'en'
-      return `/${saved}`
-    }
+    // Uses resolveLocale so a first-time visitor in Indonesia lands on
+    // /id, not /en. Falls through to saved preference or browser-timezone
+    // detection. See frontend/src/utils/resolveLocale.js for the full rules.
+    redirect: () => `/${resolveLocale()}`
   },
   { path: '/about', redirect: '/en/about' },
   { path: '/projects', redirect: '/en/projects' },
