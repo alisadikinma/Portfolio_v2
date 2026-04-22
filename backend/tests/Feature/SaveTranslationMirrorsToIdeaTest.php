@@ -201,4 +201,164 @@ class SaveTranslationMirrorsToIdeaTest extends TestCase
         $idea->refresh();
         $this->assertArrayNotHasKey('en', $idea->generated_article);
     }
+
+    /** @test */
+    public function save_translation_strips_figure_blocks_before_mirroring(): void
+    {
+        // post_translations stores figure-injected rendered HTML. The mirror
+        // into generated_article must produce raw body (no figures) because
+        // Finalize re-injects images from image_prompts at render time —
+        // keeping figures here would double-render them in the admin preview.
+        [$idea, $post] = $this->makePublishedIdeaAndPost();
+        $user = User::factory()->create();
+        $this->actingAs($user, 'sanctum');
+        $token = $user->createToken('auto', ['*'])->plainTextToken;
+
+        $contentWithFigures = '<p>Intro paragraph.</p>'
+            . "\n<figure class=\"my-8\"><img src=\"/a.png\" alt=\"alt\"/><figcaption>Cap</figcaption></figure>\n"
+            . '<p>Middle paragraph.</p>'
+            . "\n<figure><img src=\"/b.png\"/></figure>\n"
+            . '<p>Closing paragraph.</p>';
+
+        $this->withHeaders(['Authorization' => "Bearer {$token}"])
+            ->putJson("/api/automation/posts/{$post->id}/save-translation", [
+                'target_locale' => 'en',
+                'translation' => [
+                    'title' => 'English Title',
+                    'slug' => 'english-title',
+                    'content' => $contentWithFigures,
+                ],
+            ])
+            ->assertStatus(200);
+
+        // post_translations keeps the full rendered body (figures intact)
+        $pt = PostTranslation::where('post_id', $post->id)->where('language', 'en')->first();
+        $this->assertStringContainsString('<figure', $pt->content);
+
+        // generated_article.en stores raw body (figures removed)
+        $idea->refresh();
+        $en = $idea->generated_article['en'] ?? [];
+        $this->assertStringNotContainsString('<figure', $en['content'] ?? '');
+        $this->assertStringNotContainsString('figcaption', $en['content'] ?? '');
+        $this->assertStringContainsString('Intro paragraph.', $en['content'] ?? '');
+        $this->assertStringContainsString('Middle paragraph.', $en['content'] ?? '');
+        $this->assertStringContainsString('Closing paragraph.', $en['content'] ?? '');
+    }
+
+    /** @test */
+    public function save_translation_refuses_to_mirror_into_primary_language_slot(): void
+    {
+        // generated_article.id is the raw authored source of truth. Even if
+        // saveTranslation is invoked with target_locale=id (unusual but
+        // possible in edge cases), the mirror must NOT clobber the primary-
+        // language slot with post_translations rendered content.
+        [$idea, $post] = $this->makePublishedIdeaAndPost();
+        $user = User::factory()->create();
+        $this->actingAs($user, 'sanctum');
+        $token = $user->createToken('auto', ['*'])->plainTextToken;
+
+        $originalIdContent = $idea->generated_article['id']['content'];
+
+        $this->withHeaders(['Authorization' => "Bearer {$token}"])
+            ->putJson("/api/automation/posts/{$post->id}/save-translation", [
+                'target_locale' => 'id',
+                'translation' => [
+                    'title' => 'Different ID Title',
+                    'slug' => 'different-id',
+                    'content' => '<p>Different rendered ID body</p>',
+                ],
+            ])
+            ->assertStatus(200);
+
+        // post_translations.id updated (normal behavior)
+        $pt = PostTranslation::where('post_id', $post->id)->where('language', 'id')->first();
+        $this->assertSame('<p>Different rendered ID body</p>', $pt->content);
+
+        // generated_article.id untouched — raw authored content preserved
+        $idea->refresh();
+        $this->assertSame($originalIdContent, $idea->generated_article['id']['content']);
+    }
+
+    /** @test */
+    public function backfill_strips_figures_when_mirroring(): void
+    {
+        [$idea, $post] = $this->makePublishedIdeaAndPost();
+        PostTranslation::create([
+            'post_id' => $post->id,
+            'language' => 'en',
+            'title' => 'Historic EN',
+            'slug' => 'historic-en',
+            'content' => '<p>Opening.</p>'
+                . "\n<figure><img src=\"/x.png\"/><figcaption>Diagram</figcaption></figure>\n"
+                . '<p>Closing.</p>',
+        ]);
+
+        $this->artisan('content-engine:sync-translation-mirrors')->assertExitCode(0);
+
+        $idea->refresh();
+        $enContent = $idea->generated_article['en']['content'] ?? '';
+        $this->assertStringNotContainsString('<figure', $enContent);
+        $this->assertStringContainsString('Opening.', $enContent);
+        $this->assertStringContainsString('Closing.', $enContent);
+    }
+
+    /** @test */
+    public function backfill_never_touches_primary_language_slot(): void
+    {
+        // Even when post_translations.id differs from generated_article.id
+        // (expected: post_translations has figures, authored source does
+        // not), the backfill must leave generated_article.id alone. Running
+        // the backfill must NOT corrupt the raw authored primary-lang body.
+        [$idea, $post] = $this->makePublishedIdeaAndPost();
+        $originalIdContent = $idea->generated_article['id']['content'];
+
+        // Simulate real-world drift: post_translations.id has figures baked in.
+        PostTranslation::where('post_id', $post->id)
+            ->where('language', 'id')
+            ->update([
+                'content' => '<p>Isi bahasa Indonesia</p>'
+                    . "\n<figure><img src=\"/y.png\"/></figure>\n",
+            ]);
+
+        $this->artisan('content-engine:sync-translation-mirrors')->assertExitCode(0);
+
+        $idea->refresh();
+        $this->assertSame($originalIdContent, $idea->generated_article['id']['content']);
+    }
+
+    /** @test */
+    public function backfill_skips_ideas_that_already_have_legitimate_non_primary_content(): void
+    {
+        // Idea was already translated via the admin translateArticle path,
+        // which wrote raw EN content directly to generated_article.en. The
+        // backfill must NOT overwrite that content with the post_translations
+        // rendered version — doing so would replace raw body with
+        // figure-injected body and cause double-render in Finalize.
+        [$idea, $post] = $this->makePublishedIdeaAndPost();
+
+        $legitimateRawEn = '<p>Raw English authored via admin path.</p>';
+        $article = $idea->generated_article;
+        $article['en'] = [
+            'title' => 'Admin-authored EN',
+            'content' => $legitimateRawEn,
+        ];
+        $idea->generated_article = $article;
+        $idea->save();
+
+        // Post_translations reflects the rendered, figure-injected version.
+        PostTranslation::create([
+            'post_id' => $post->id,
+            'language' => 'en',
+            'title' => 'Rendered EN',
+            'slug' => 'rendered-en',
+            'content' => '<p>Raw English authored via admin path.</p>'
+                . "\n<figure><img src=\"/z.png\"/></figure>\n",
+        ]);
+
+        $this->artisan('content-engine:sync-translation-mirrors')->assertExitCode(0);
+
+        $idea->refresh();
+        $this->assertSame($legitimateRawEn, $idea->generated_article['en']['content']);
+        $this->assertSame('Admin-authored EN', $idea->generated_article['en']['title']);
+    }
 }
