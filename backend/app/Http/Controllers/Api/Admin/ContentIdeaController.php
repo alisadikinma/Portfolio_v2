@@ -1370,6 +1370,30 @@ class ContentIdeaController extends Controller
             ]
         );
 
+        // Mirror into content_ideas.generated_article.{locale} so Finalize UI
+        // (which reads the JSON blob, not post_translations) stays in sync.
+        // Without this, the admin tab shows "Belum diterjemahkan" for ideas
+        // whose blog post is already translated via the auto-publish path.
+        $idea = ContentIdea::where('result_post_id', $post->id)->first();
+        if ($idea) {
+            $article = $idea->generated_article ?? [];
+            $article[$locale] = array_merge($article[$locale] ?? [], [
+                'title' => $t['title'],
+                'content' => $translatedContent,
+                'excerpt' => $t['excerpt'] ?? null,
+                'meta_title' => $t['meta_title'] ?? null,
+                'meta_description' => $t['meta_description'] ?? null,
+                'og_title' => $t['og_title'] ?? null,
+                'og_description' => $t['og_description'] ?? null,
+                'ai_summary' => $t['ai_summary'] ?? null,
+            ]);
+            $article['translation_status'] = 'done';
+            $article['translation_completed_at'] = now()->toIso8601String();
+            unset($article['translation_error']);
+            $idea->generated_article = $article;
+            $idea->save();
+        }
+
         return response()->json([
             'success' => true,
             'data' => [
