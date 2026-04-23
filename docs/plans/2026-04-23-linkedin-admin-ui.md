@@ -1002,3 +1002,290 @@ All must pass before handing to `gaspol-plan` → `gaspol-execute`:
 ---
 
 **Design complete + scope-pivoted for multi-platform.** Ready for `/gaspol-plan` to append `## Implementation Plan` section. Code-review fixes (HasStatusTransitions refactor, telegram group placement, partial unique index, TanStack Query reference correction, approve endpoint semantics, PUT stub behavior, Phase D1 UI reachability) are all integrated into this revision.
+
+---
+
+## Design Phase 2 — Progress Modal (2026-04-23 session 3)
+
+Extension of Phase 1 (LinkedIn admin UI). Adds step-by-step conversion progress visualization matching the Content Engine Article Generation Progress modal pattern (screenshot at `/admin/content-engine` → in-progress idea → modal).
+
+### Decisions locked (this session)
+
+| # | Decision | Rationale |
+|---|---|---|
+| 13 | **4 phase cards** (BRIEF + CONTENT-merged + VALIDATE + SCHEDULE) | Matches Content Engine `grid-cols-4` layout exactly. CONVERT + CAROUSEL merged into one "CONTENT" card with format badge + conditional `Slides (N/10)` pill greyed for text posts |
+| 14 | **Both triggers** — modal from Queue list + inline timeline on detail view | Consistent with Content Engine UX. Modal opens on "View Progress" click from Queue list for in-progress drafts; inline progress panel on detail page when `status ∈ {pending_generation, generating, validating}` |
+| 15 | **No simulator command** — plugin wires callbacks when ready | Saves ~50 LoC. Dev testing via manual `tinker` insert into `progress_log` JSON column until plugin Phase D3 lands. Acceptable since UI renders the 3 card states (cold-start / active / completed) deterministically from data |
+| 16 | **Reuse `/progress` callback pattern from Content Engine** | `PUT /api/automation/linkedin/{id}/progress` with `{step, percentage, message}` — mirrors `PUT /api/automation/content-ideas/{id}/progress` exactly. Plugin's `linkedin-schedule` skill (plus each prior skill) emits sub-step progress via this endpoint during its execution |
+| 17 | **`progress_log` separate from `pipeline_state_log`** | Two distinct streams: `pipeline_state_log` = FSM audit (20-entry rotating), `progress_log` = plugin skill sub-step stream (100-entry rotating). Same split as ContentIdea |
+
+### Schema additions
+
+New follow-up migration `2026_04_23_000002_add_progress_tracking_to_linkedin_posts` adds 3 columns to existing `linkedin_posts`, **matching ContentIdea's progress columns exactly** for schema consistency (`add_progress_tracking_to_content_ideas.php:11-14`):
+
+```php
+$table->unsignedTinyInteger('progress_percentage')->default(0)->after('retry_count')
+    ->comment('0-100, plugin-authoritative');
+$table->string('current_step', 50)->nullable()->after('progress_percentage')
+    ->comment('Plugin-emitted step key; see LinkedInPost::PROGRESS_STEPS for whitelist');
+$table->json('progress_log')->nullable()->after('current_step')
+    ->comment('Rotating 100-entry stream of {step, percentage, message, timestamp}');
+```
+
+Column parity with ContentIdea (size 50, default 0 on progress_percentage). All non-breaking for existing rows — `progress_percentage=0` semantically matches "not yet started" for pending_generation rows. No index needed (never filtered on, only read per-draft in detail/modal).
+
+`LinkedInPost` model gets a `PROGRESS_STEPS` constant listing the whitelist:
+
+```php
+public const PROGRESS_STEPS = [
+    'initializing', 'input_collection',
+    'linkedin_brief', 'linkedin_brief_complete',
+    'linkedin_convert', 'linkedin_convert_complete',
+    'linkedin_carousel', 'linkedin_carousel_complete',
+    'linkedin_validate', 'linkedin_validate_complete',
+    'linkedin_schedule', 'completed', 'failed',
+];
+```
+
+**Deliberately skipped: `process_pid` column** — ContentIdea has one (for tracking Claude CLI PID on VPS). For LinkedIn we derive "process alive" from `now() - updated_at < 60s` on the frontend. Simpler, no VPS PID plumbing needed. If heartbeat polling proves insufficient in production, revisit.
+
+### Plugin callback contract — `PUT /automation/linkedin/{id}/progress`
+
+Token-gated automation endpoint (same middleware as existing `/automation/content-ideas/{id}/progress`). Body schema:
+
+```json
+{
+  "step": "linkedin_convert",
+  "percentage": 42,
+  "message": "Text drafted: 1247 chars, hook formula = PAS"
+}
+```
+
+Step name whitelist (snake_case, matches plugin skill names):
+```
+input_collection, linkedin_brief, linkedin_brief_complete,
+linkedin_convert, linkedin_convert_complete,
+linkedin_carousel, linkedin_carousel_complete,
+linkedin_validate, linkedin_validate_complete,
+linkedin_schedule, completed, failed
+```
+
+Handler:
+1. Validate `step` against `LinkedInPost::PROGRESS_STEPS` whitelist (unknown step → 422 with `errors.step` field)
+2. `clamp($percentage, 0, 100)`
+3. `$draft->update(['current_step' => $step, 'progress_percentage' => $pct])`
+4. Append `{step, percentage, message, timestamp: now()->toIso8601String()}` to `progress_log`, trim to last 100
+5. Return **200 OK** with `{success: true, data: $logEntry}` (matches existing Content Engine pattern at `backend/routes/api.php:436` — plugin uses the echoed entry for confirmation logging on its side)
+
+No FSM transition happens here. This endpoint is pure progress data. FSM transitions fire separately via `PUT .../save-brief`, `/save-post`, `/save-validation`, `/schedule` as already documented in plugin design §4.5.
+
+**Authorship split** (fixes session-3 review ambiguity):
+- **Backend writes `initializing`** when cron creates `LinkedInPost::create(status=pending_generation)` — first `progress_log` entry: `{step: 'initializing', percentage: 0, message: 'Generation queued'}`. Mirrors `ContentIdeaController:518-525` pattern.
+- **Backend writes `input_collection`** when dispatching `GenerateLinkedInPost` job — second entry: `{step: 'input_collection', percentage: 5, message: 'Loaded blog post: {title}'}`. This guarantees the modal shows at least 2 log entries immediately after cron fires, before the plugin even starts — no confusing empty terminal.
+- **Plugin writes everything else** (`linkedin_brief` → `completed` via `PUT /progress` endpoint). Plugin never emits `initializing` or `input_collection` — those are backend-owned.
+
+### Phase definition — 4-card grid
+
+```
+┌─────────────┬─────────────┬─────────────┬─────────────┐
+│  BRIEF      │  CONTENT    │  VALIDATE   │  SCHEDULE   │
+│  [Sonnet]   │  [Sonnet]   │  [Sonnet]   │  [Sonnet]   │
+│  ✓ Done     │  ⌛ 42%     │  ○ Wait     │  ○ Wait     │
+│             │  [carousel] │             │             │
+├─────────────┼─────────────┼─────────────┼─────────────┤
+│  ● Input    │  ● Hook     │  ○ AI slop  │  ○ Dispatch │
+│  ● Format   │  ● Body     │  ○ Bait     │  ○ Preview  │
+│  ● Hook     │  ● Link cmt │  ○ Hashtag  │  ○ Sched_at │
+│  ● Pillar   │  ● Hashtags │  ○ Link     │  ○ Cancel   │
+│  ● Quote    │  ⌛ Slides  │  ○ Depth    │             │
+│             │    (7/10)   │  ○ Hard-fail│             │
+├─────────────┼─────────────┼─────────────┼─────────────┤
+│ /linkedin-  │ /linkedin-  │ /linkedin-  │ /linkedin-  │
+│ brief       │ convert +   │ validate    │ schedule    │
+│ 0-20%       │ carousel    │ 70-90%      │ 90-100%     │
+│             │ 20-65%      │             │             │
+└─────────────┴─────────────┴─────────────┴─────────────┘
+```
+
+**Phase → step mapping** (drives `stepIsDone()`, `stepIsActive()`, `phaseStatus()` helpers):
+
+| Phase | Pct range | Steps in this phase |
+|---|---|---|
+| BRIEF | 0-20% | `input_collection`, `linkedin_brief`, `linkedin_brief_complete` |
+| CONTENT | 20-65% | `linkedin_convert`, `linkedin_convert_complete`, `linkedin_carousel`, `linkedin_carousel_complete` |
+| VALIDATE | 65-90% | `linkedin_validate`, `linkedin_validate_complete` |
+| SCHEDULE | 90-100% | `linkedin_schedule`, `completed` |
+| (failure) | — | `failed` → bar turns red, log entry shows error |
+
+**CONTENT card format adaptation**:
+- Header shows format badge: `[text]` amber or `[carousel]` cyan, reading from `draft.format`
+- `Slides (N/10)` sub-step pill is conditional:
+  - Text format: greyed out (`opacity-40`) with label `Slides (N/A)`, never receives check mark
+  - Carousel format: active pill, shows `Slides (7/10)` counter pulled from `draft.carousel_slides.length`
+- Skill footer **adapts to format** (matches Slides pill greying principle):
+  - Text format: `/linkedin-convert · 20-65%` only
+  - Carousel format: `/linkedin-convert + /linkedin-carousel · 20-65%`
+- Active skill determined by current_step prefix (`linkedin_convert_*` vs `linkedin_carousel_*`)
+- **Text-format progress bar jump is expected**: for text posts, `linkedin_convert_complete` fires at 45% then `linkedin_validate` starts at 65% — the bar visually jumps 45%→65% with no intermediate callback. This is by design (no artificial steps in the dead band). Plugin implementers: do NOT fill this gap with fake progress entries.
+
+### Shared Vue component
+
+New `frontend/src/components/admin/LinkedInProgressPanel.vue`:
+
+```
+Props:
+  draftId: Number (required — component runs its own useLinkedInDraft(id) query
+                   for independent 3s polling, does NOT receive draft object
+                   from parent to avoid staleness from parent's 30s list cache)
+  compact: Boolean (default false — removes the outer card chrome for inline use)
+
+Slots: none (self-contained)
+
+Emits:
+  regenerate: Number (draftId) — fired when user clicks Retry/Regenerate on failed state;
+                                 parent handles the mutation via useRegenerateLinkedInDraft
+  close: void — fired by explicit close action (modal only listens to this)
+
+Internal state: runs its own useLinkedInDraft(draftId) — guarantees 3s polling even
+                when parent's list has 30s staleTime
+```
+
+**Staleness fix rationale**: If the panel received a `draft: Object` prop from a list query, changes to `progress_log` would only flow when the parent refetches. Queue list uses `staleTime: 30_000` → the modal progress bar would freeze for 30s at a time despite the 3s poll convention. Running `useLinkedInDraft(draftId)` internally gives the panel its own polling loop, scoped to when it's mounted. Disabled automatically when parent unmounts (closes modal).
+
+Markup structure (mirrors `ContentEngine.vue:625-728`):
+1. Header strip: step label (from `formatStepName(current_step)`) + pct mono-font — use `progress_percentage ?? 0` to null-coalesce (column is unsigned tinyint default 0, but defensive for legacy rows pre-migration)
+2. Progress bar (gradient gold→amber, red on `current_step === 'failed'`) — width uses `(draft.progress_percentage ?? 0) + '%'`
+3. 4-card grid (responsive: `grid-cols-1 sm:grid-cols-2 lg:grid-cols-4`)
+4. Generation Log terminal (`bg-neutral-950`, auto-scroll via `ref="logContainer"` + `nextTick` + `scrollTop = scrollHeight`)
+5. Status footer: process-alive pulse dot (computed: `now() - updated_at < 60s`) + "Process running" / "Completed" / "Process stopped" label + **Regenerate button when `current_step === 'failed'`** (emits `regenerate` event; parent modal/detail view handles via `useRegenerateLinkedInDraft` mutation then closes/navigates)
+
+### Integration points
+
+**LinkedInProgressModal.vue** (new wrapper):
+- Props: `draftId: Number | null` (null = closed, number = open)
+- Fixed overlay (`fixed inset-0 z-50 bg-black/50`), click-outside closes
+- Inner card: `max-w-6xl w-full mx-4 p-6 max-h-[90vh] flex flex-col`
+- Renders `<LinkedInProgressPanel :draftId="draftId" />` when draftId is non-null
+- Listens to panel's `@regenerate` — calls `useRegenerateLinkedInDraft()` then emits close + navigates parent to new draft detail via `$router.push`
+- Emits `close` event (or uses `v-model:draftId` two-way binding)
+
+**LinkedInQueueList.vue** (edit existing):
+- Add "View Progress" kebab action for rows where `status ∈ {pending_generation, generating, validating, failed}` (include `failed` so operators can see the log + regenerate from the modal)
+- Action opens `LinkedInProgressModal` with current draft ID
+- Modal state: `const activeProgressDraftId = ref(null)`, open = set id, close = null
+- Mount `<LinkedInProgressModal v-model:draftId="activeProgressDraftId" />` once at the end of the template
+
+**LinkedInDraftDetail.vue** (edit existing):
+- Conditionally render `<LinkedInProgressPanel :draftId="Number(route.params.id)" :compact="true" @regenerate="handleRegenerate" />` above the content preview column
+- Condition: `draft.status ∈ {pending_generation, generating, validating}` (exclude `failed` from inline — detail view's own action bar already has Regenerate button, avoid duplicate CTA)
+- When status completes (awaiting_publish / published / manual_review), panel disappears — existing state_log timeline on metadata panel already covers historical view
+
+### Data Integration Map — Design Phase 2
+
+| Component | Data Source | Existing? | Notes |
+|---|---|---|---|
+| Schema: 3 new progress columns | New migration `2026_04_23_000002_*` | ❌ New | Additive, non-breaking |
+| Plugin callback endpoint | `PUT /api/automation/linkedin/{id}/progress` | ❌ New | Mirror Content Engine `PUT /api/automation/content-ideas/{id}/progress` |
+| Real-time polling | `useLinkedInDraft(id)` with `refetchInterval: 3_000` | ✅ | Already in existing composable at `frontend/src/composables/useLinkedInDrafts.js:72-76` — pauses automatically on terminal states. Panel runs this query internally, not through prop-passed draft object (staleness fix) |
+| Phase card markup | Copy from `ContentEngine.vue:640-674` | ✅ (reference) | Swap `articleGenerationPhases` → `linkedinPipelinePhases` |
+| Log streaming terminal | Copy from `ContentEngine.vue:677-695` | ✅ (reference) | Same auto-scroll ref pattern |
+| Phase helper functions | `stepIsDone`, `stepIsActive`, `phaseStatus`, `phaseHeaderColor`, `phaseModelBadge`, `phaseStatusColor` | ✅ (reference) | Adapt from ContentEngine.vue, parameterize over `linkedinPipelinePhases` |
+| Format-specific carousel greying | `draft.format === 'text'` check on Slides pill | ❌ New | 1-line computed property |
+| Modal trigger from Queue list | "View Progress" button — kebab menu extension | ❌ New | ~5 LoC in LinkedInQueueList.vue |
+| Inline panel on detail view | Mount panel when status in-progress | ❌ New | 1 `v-if` + 1 component mount in LinkedInDraftDetail.vue |
+| Failed state rendering | `current_step === 'failed'` → red progress bar + red log entries | ✅ (reference) | Same pattern as Content Engine |
+
+### Implementation feasibility
+
+**100% feasible — no placeholders.** Every building block exists:
+- Schema additions are 3 nullable columns (trivial migration)
+- Backend controller method mirrors existing Content Engine progress handler
+- Frontend component is 70% markup copy from `ContentEngine.vue:613-728` with phase definitions swapped
+- Composable polling already implemented and active for in-progress statuses
+
+**What waits on plugin**: actual `progress_log` entries + `progress_percentage` updates arrive only after plugin calls `PUT /automation/linkedin/{id}/progress`. Until plugin Phase D3 ships, the UI renders deterministically:
+- Cold-start draft (pending_generation, no progress data): "Waiting for plugin heartbeat..." placeholder in log area, progress bar at 0%
+- In-progress with plugin data: live updates every 3s
+- Completed draft: final state preserved, panel auto-hides after status → terminal
+
+### Success criteria (shipped when all pass)
+
+**Backend:**
+- [ ] Migration runs cleanly on fresh DB + existing production DB (schema parity with ContentIdea progress columns)
+- [ ] `LinkedInPost::PROGRESS_STEPS` constant contains the 13 whitelisted step names
+- [ ] `PUT /api/automation/linkedin/{id}/progress` handler accepts valid step + percentage + message, returns **200 with `{success, data: $logEntry}`** (Content Engine parity)
+- [ ] Feature test: step NOT in `PROGRESS_STEPS` → **422 with `errors.step` field** (new test, not inherited from Content Engine)
+- [ ] Feature test: inserting 101 `progress_log` entries trims to exactly 100 (rotating, `assertJsonCount(100, 'data.progress_log')`)
+- [ ] Feature test: percentage outside 0-100 → clamped, not rejected
+- [ ] Backend writes `initializing` + `input_collection` log entries when cron creates the draft AND dispatches the generation job (2 entries before plugin emits anything)
+
+**Frontend:**
+- [ ] `LinkedInProgressPanel.vue` accepts `draftId: Number` prop (not `draft: Object`) and runs its own `useLinkedInDraft(draftId)` query — verifiable by Vue Devtools showing independent query instance when mounted
+- [ ] Panel renders 4 phase cards with correct sub-step pills + format-adaptive Slides pill
+- [ ] CONTENT card skill footer adapts: `/linkedin-convert` for text, `/linkedin-convert + /linkedin-carousel` for carousel
+- [ ] Modal opens from Queue list "View Progress" kebab action for in-progress rows (including `failed`)
+- [ ] Inline panel renders on detail view when `status ∈ {pending_generation, generating, validating}` (excludes `failed` to avoid duplicate Regenerate CTA with detail's action bar)
+- [ ] Panel emits `regenerate` event when Retry button clicked on failed state; parent handles mutation
+- [ ] Progress bar turns red on `current_step === 'failed'`
+- [ ] Log auto-scrolls to latest entry on new `progress_log` item
+- [ ] Poll interval 3s; pauses when status terminal (verified by existing composable behavior at `useLinkedInDrafts.js:72-76`)
+- [ ] Progress bar width uses `(progress_percentage ?? 0) + '%'` null-safe expression
+
+**Docs:**
+- [ ] Root CLAUDE.md "API Routes" section's Admin Routes list includes `/api/admin/social-drafts/*` → updated to reference the new `/automation/linkedin/{id}/progress` endpoint under Automation Routes
+- [ ] Root CLAUDE.md "LinkedIn Admin UI Pipeline" section extended with Progress Modal subsection referencing component paths + callback contract
+
+### Appendix D — Plugin emit checklist (informational, for plugin implementers)
+
+When plugin skills execute, they should emit `PUT /automation/linkedin/{id}/progress` calls roughly as follows:
+
+```
+# /linkedin-brief (0-20%)
+step=input_collection,        pct=5,   msg="Loaded blog post: {title}"
+step=linkedin_brief,          pct=10,  msg="Analyzing blog structure: {N} H2 sections detected"
+step=linkedin_brief,          pct=15,  msg="Format decision: {text|carousel} (listicle heuristic: {yes|no})"
+step=linkedin_brief_complete, pct=20,  msg="Hook formula: {PAS|AIDA|...}, pillar: {AI Generalist|...}"
+
+# /linkedin-convert (20-45%)
+step=linkedin_convert,        pct=25,  msg="Drafting hook line..."
+step=linkedin_convert,        pct=35,  msg="Body expansion: {char_count} chars so far"
+step=linkedin_convert,        pct=42,  msg="Char gate check: {char_count} chars (sweet spot 1100-1300)"
+step=linkedin_convert_complete, pct=45, msg="Text post finalized, hashtags: {list}"
+
+# /linkedin-carousel (45-65%) — SKIP if format=text
+step=linkedin_carousel,       pct=50,  msg="Generating 8 slides..."
+step=linkedin_carousel,       pct=58,  msg="Slide 4/8: Direct Answer Block authored"
+step=linkedin_carousel_complete, pct=65, msg="Carousel JSON complete: 8 slides with image prompts"
+
+# /linkedin-validate (65-90%)
+step=linkedin_validate,       pct=70,  msg="AI-Slop scan: {N} violations"
+step=linkedin_validate,       pct=78,  msg="Hashtag count: {N} (rule: 3-5)"
+step=linkedin_validate,       pct=85,  msg="Depth Score: {score} — {pass|fail} threshold {80}"
+step=linkedin_validate_complete, pct=90, msg="Validation complete, decision: {awaiting_publish|manual_review}"
+
+# /linkedin-schedule (90-100%)
+step=linkedin_schedule,       pct=95,  msg="Posting to backend: POST /schedule"
+step=completed,               pct=100, msg="Scheduled at {time}, cancel window ends {time}"
+
+# On any failure
+step=failed,                  pct=current_pct (not reset), msg="Plugin error: {message}"
+```
+
+Plugin emit frequency: at phase entry, major sub-step, and phase complete. Not every internal LLM token — aim for ~3-5 entries per skill.
+
+---
+
+**Design Phase 2 complete — session-3 review fixes integrated.** Ready for `/gaspol-plan` to append implementation plan covering: migration → backend job dispatch with initial log entries → controller method (200 response + whitelist) → `PROGRESS_STEPS` constant on model → shared Vue component (draftId prop, internal query, regenerate emit) → modal wrapper (v-model:draftId) → integration in Queue list + Detail view → CLAUDE.md sync.
+
+**Session-3 review resolution summary:**
+- Critical 1 (schema mismatch): Fixed — migration now uses `VARCHAR(50)` + `default(0)` matching ContentIdea exactly
+- Critical 2 (input_collection authorship): Fixed — backend writes `initializing` + `input_collection` on cron dispatch; plugin never emits those two
+- Important 1 (204 vs 200): Fixed — 200 with `{success, data: $logEntry}` matches Content Engine `routes/api.php:436`
+- Important 2 (text-format bar jump): Documented as expected behavior; plugin implementers instructed not to fill the 45%→65% dead band
+- Important 3 (Retry/Regenerate gap): Fixed — panel emits `regenerate` event on failed state, modal + detail view handle mutation
+- Important 4 (modal staleness bug): Fixed — panel accepts `draftId: Number`, runs own `useLinkedInDraft()` query internally for independent 3s polling
+- Important 5 (skill footer adaptation): Fixed — CONTENT card skill footer format-adapts like the Slides pill
+- Minor 1 (whitelist constant): Added `LinkedInPost::PROGRESS_STEPS`
+- Minor 2 (null coalescing): Specified `(progress_percentage ?? 0)` in markup spec
+- Minor 3 (composable line references): Added `useLinkedInDrafts.js:72-76` in Data Integration Map
+- Minor 4 (CLAUDE.md section specificity): Success criteria now specify which sections extend

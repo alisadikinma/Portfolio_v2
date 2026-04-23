@@ -48,4 +48,24 @@ return [
 
     // PDF temp dir for carousel composition
     'pdf_temp_dir' => env('LINKEDIN_PDF_TEMP_DIR', storage_path('app/tmp/linkedin-pdfs')),
+
+    // Generation bridge — SSH to VPS `claudesn` user + run `claude -p "/linkedin-gen ..."`.
+    // Same pattern as article generation (see config/services.php article_generation).
+    // Plugin v0.2.0+ at https://github.com/alisadikinma/linkedin-post-writer.
+    'generation' => [
+        'driver' => env('LINKEDIN_GEN_DRIVER', 'ssh'), // 'ssh' or 'local'
+        'ssh_host' => env('LINKEDIN_GEN_SSH_HOST', 'localhost'),
+        'ssh_user' => env('LINKEDIN_GEN_SSH_USER', 'claudesn'),
+        'ssh_key' => env('LINKEDIN_GEN_SSH_KEY', '/var/www/.ssh/id_ed25519'),
+        'claude_path' => env('LINKEDIN_GEN_CLAUDE_PATH', 'claude'),
+        'model' => env('LINKEDIN_GEN_MODEL', 'sonnet'),
+        // 4 compiled reference bundles (paths on VPS, created by plugin's compile-refs.ts)
+        'refs_playbook' => env('LINKEDIN_GEN_REFS_PLAYBOOK', '/home/claudesn/refs-linkedin-playbook.md'),
+        'refs_templates' => env('LINKEDIN_GEN_REFS_TEMPLATES', '/home/claudesn/refs-linkedin-templates.md'),
+        'refs_formats' => env('LINKEDIN_GEN_REFS_FORMATS', '/home/claudesn/refs-linkedin-formats.md'),
+        'refs_carousel' => env('LINKEDIN_GEN_REFS_CAROUSEL', '/home/claudesn/refs-linkedin-carousel.md'),
+        // Sync execution timeout — plugin runs brief+convert+validate in ~30-60s,
+        // carousel path ~60-90s. 300s matches nginx fastcgi_read_timeout.
+        'timeout_seconds' => (int) env('LINKEDIN_GEN_TIMEOUT_SECONDS', 300),
+    ],
 ];

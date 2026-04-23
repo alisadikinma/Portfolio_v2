@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Enums\LinkedInPostStatus;
 use App\Exceptions\InvalidStateTransitionException;
 use App\Http\Controllers\Controller;
+use App\Jobs\GenerateLinkedInPost;
 use App\Models\LinkedInPost;
 use App\Services\LinkedInPublishService;
 use App\Services\PipelineGuard;
@@ -185,9 +186,9 @@ class LinkedInDraftController extends Controller
             ], 409);
         }
 
-        // NOTE: dispatch GenerateLinkedInPost job here once plugin Phase D6 ships.
-        // For now the new row sits in pending_generation waiting for the plugin.
-        Log::info('[LinkedInDraft] regenerate dispatched (stub)', [
+        GenerateLinkedInPost::dispatch($newDraft->id);
+
+        Log::info('[LinkedInDraft] regenerate dispatched', [
             'old_draft_id' => $draft->id,
             'new_draft_id' => $newDraft->id,
         ]);
@@ -195,8 +196,7 @@ class LinkedInDraftController extends Controller
         return response()->json([
             'success' => true,
             'data' => $newDraft->fresh(['post.translations']),
-            'message' => 'Regeneration queued. Plugin will pick it up on next cron tick.',
-            'warnings' => ['Plugin content-generation job dispatch is stubbed — new draft will remain pending_generation until Phase D6 ships'],
+            'message' => 'Regeneration queued. Worker will pick it up shortly.',
         ], 201);
     }
 

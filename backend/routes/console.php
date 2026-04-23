@@ -34,3 +34,18 @@ foreach (['05:30', '06:00', '12:00', '17:00', '18:00', '19:00', '20:00', '21:00'
 Schedule::command('content:pull-trending-daily')
     ->dailyAt('05:00')
     ->timezone('Asia/Jakarta');
+
+// LinkedIn: publish drafts whose cancel window has elapsed. Every minute so
+// scheduling resolution matches the user's expectation that approving at HH:MM
+// publishes at HH:(MM+cancel_window). withoutOverlapping prevents stacking if
+// LinkedIn API latency causes a tick to run long.
+Schedule::command('linkedin:process-scheduled')
+    ->everyMinute()
+    ->withoutOverlapping(5);
+
+// LinkedIn: scan blog for un-converted posts, dispatch plugin conversion jobs.
+// Daily 03:00 WIB — matches plugin design (plugin expects 24h lookback).
+Schedule::command('linkedin:scan-blog --hours=24')
+    ->dailyAt('03:00')
+    ->timezone('Asia/Jakarta')
+    ->withoutOverlapping(30);
