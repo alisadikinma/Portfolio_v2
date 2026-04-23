@@ -441,6 +441,221 @@
         </div>
       </BaseCard>
 
+      <!-- LinkedIn Integration Card -->
+      <BaseCard>
+        <h2 class="text-xl font-display font-semibold text-neutral-900 dark:text-neutral-100 mb-2">
+          LinkedIn Integration — Direct OAuth
+        </h2>
+        <p class="text-sm text-neutral-600 dark:text-neutral-400 mb-6">
+          Connect a LinkedIn account so blog posts can auto-convert + auto-publish as algorithm-optimized LinkedIn posts.
+          Register a LinkedIn Developer App at
+          <a href="https://linkedin.com/developers" target="_blank" class="text-amber-600 dark:text-amber-400 hover:underline">linkedin.com/developers</a>
+          with scope <code class="text-xs bg-neutral-100 dark:bg-neutral-800 px-1 rounded">w_member_social,r_liteprofile</code>
+          then paste <code class="text-xs bg-neutral-100 dark:bg-neutral-800 px-1 rounded">LINKEDIN_OAUTH_CLIENT_ID</code> + <code class="text-xs bg-neutral-100 dark:bg-neutral-800 px-1 rounded">LINKEDIN_OAUTH_CLIENT_SECRET</code> into <code class="text-xs bg-neutral-100 dark:bg-neutral-800 px-1 rounded">.env</code>.
+        </p>
+
+        <div v-if="linkedinLoading" class="py-6 text-center text-neutral-500">
+          Loading LinkedIn status…
+        </div>
+
+        <div v-else class="space-y-5">
+          <!-- OAuth flash messages -->
+          <div v-if="linkedinOauthFlash" class="rounded-lg px-4 py-3 text-sm" :class="{
+            'bg-emerald-500/10 border border-emerald-500/40 text-emerald-700 dark:text-emerald-400': linkedinOauthFlash.type === 'success',
+            'bg-red-500/10 border border-red-500/40 text-red-700 dark:text-red-400': linkedinOauthFlash.type === 'error',
+          }">
+            {{ linkedinOauthFlash.message }}
+          </div>
+
+          <!-- State 1: OAuth app NOT configured -->
+          <div
+            v-if="!linkedinOauthConfigured"
+            class="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4"
+          >
+            <p class="font-semibold text-amber-700 dark:text-amber-400 mb-2">⚠️ OAuth app not configured</p>
+            <p class="text-sm text-neutral-700 dark:text-neutral-300 mb-2">
+              Set these env vars on the VPS and restart the queue workers:
+            </p>
+            <pre class="text-xs bg-neutral-900 text-neutral-100 rounded p-3 overflow-x-auto">LINKEDIN_OAUTH_CLIENT_ID=...
+LINKEDIN_OAUTH_CLIENT_SECRET=...
+LINKEDIN_OAUTH_REDIRECT_URI=https://alisadikinma.com/api/admin/linkedin/oauth/callback</pre>
+          </div>
+
+          <!-- State 2: configured + connected -->
+          <div v-else-if="linkedinAccounts.length > 0" class="space-y-3">
+            <div
+              v-for="account in linkedinAccounts"
+              :key="account.id"
+              class="rounded-lg border border-neutral-200 dark:border-neutral-700 p-4 flex items-start justify-between gap-3"
+            >
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span v-if="!account.is_access_token_expired" class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  <span v-else class="w-2 h-2 rounded-full bg-red-500"></span>
+                  <span class="font-medium text-neutral-900 dark:text-neutral-100">{{ account.display_name }}</span>
+                  <span v-if="account.is_access_token_expired" class="text-xs text-red-500 font-medium">Token expired</span>
+                  <span v-else-if="account.needs_refresh" class="text-xs text-amber-500 font-medium">Needs refresh</span>
+                </div>
+                <p class="text-xs text-neutral-500 font-mono break-all mt-1">{{ account.person_urn }}</p>
+                <p class="text-xs text-neutral-500 mt-1">
+                  Token valid until: {{ formatDate(account.access_token_expires_at) }}
+                </p>
+                <p v-if="linkedinFormData.linkedin_last_test_connection_result" class="text-xs text-neutral-500 mt-1">
+                  Last test: {{ formatDate(linkedinFormData.linkedin_last_test_connection_at) }} — {{ linkedinFormData.linkedin_last_test_connection_result }}
+                </p>
+              </div>
+              <div class="flex flex-col gap-2 shrink-0">
+                <BaseButton
+                  type="button"
+                  button-type="secondary"
+                  :disabled="linkedinTesting"
+                  @click="handleLinkedInTest(account.id)"
+                >
+                  {{ linkedinTesting ? '…' : 'Test' }}
+                </BaseButton>
+                <BaseButton
+                  type="button"
+                  button-type="secondary"
+                  :disabled="linkedinSubmitting"
+                  @click="handleLinkedInDisconnect(account.id)"
+                >
+                  Disconnect
+                </BaseButton>
+              </div>
+            </div>
+
+            <div v-if="linkedinTestResult" class="text-sm" :class="linkedinTestResult.success ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'">
+              {{ linkedinTestResult.message }}
+            </div>
+
+            <BaseButton
+              type="button"
+              button-type="secondary"
+              :disabled="linkedinSubmitting"
+              @click="handleLinkedInConnect"
+            >
+              + Connect another account
+            </BaseButton>
+          </div>
+
+          <!-- State 3: configured but not connected -->
+          <div v-else class="rounded-lg border border-neutral-200 dark:border-neutral-700 p-4">
+            <p class="text-sm text-neutral-700 dark:text-neutral-300 mb-3">
+              OAuth app configured — no LinkedIn accounts connected yet.
+            </p>
+            <BaseButton
+              type="button"
+              button-type="primary"
+              :disabled="linkedinSubmitting"
+              @click="handleLinkedInConnect"
+            >
+              Connect LinkedIn Account
+            </BaseButton>
+          </div>
+
+          <!-- Publishing controls -->
+          <div class="pt-4 border-t border-neutral-200 dark:border-neutral-700 space-y-4">
+            <h3 class="text-sm font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider">
+              Publishing Controls
+            </h3>
+
+            <label class="flex items-center gap-3 cursor-pointer">
+              <input
+                :checked="linkedinFormData.linkedin_auto_publish === 'true'"
+                type="checkbox"
+                class="w-4 h-4 text-amber-600 border-neutral-300 rounded focus:ring-amber-500"
+                @change="e => linkedinFormData.linkedin_auto_publish = e.target.checked ? 'true' : 'false'"
+              >
+              <span class="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                Enable auto-publish (master kill-switch)
+              </span>
+            </label>
+            <p class="text-xs text-neutral-500 -mt-2 pl-7">
+              When OFF, drafts that pass validation stop at <code class="text-[10px] bg-neutral-100 dark:bg-neutral-800 px-1 rounded">awaiting_publish</code> and never fire the cancel-window timer.
+            </p>
+
+            <div>
+              <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                Depth Score threshold
+                <span class="font-mono text-amber-500 ml-2">{{ linkedinFormData.linkedin_depth_score_threshold }} / 100</span>
+              </label>
+              <input
+                v-model="linkedinFormData.linkedin_depth_score_threshold"
+                type="range"
+                min="60"
+                max="95"
+                class="w-full accent-amber-500"
+              >
+              <p class="text-xs text-neutral-500 mt-1">
+                Drafts scoring below this go to <code class="text-[10px] bg-neutral-100 dark:bg-neutral-800 px-1 rounded">manual_review</code>. Recommended 80 (quality gate), 70 (relaxed during ramp-up).
+              </p>
+            </div>
+
+            <div>
+              <label for="linkedin_cancel_window_minutes" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                Cancel window (minutes)
+              </label>
+              <input
+                id="linkedin_cancel_window_minutes"
+                v-model="linkedinFormData.linkedin_cancel_window_minutes"
+                type="number"
+                min="1"
+                max="1440"
+                class="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-amber-500"
+              >
+              <p class="text-xs text-neutral-500 mt-1">
+                Time between "awaiting_publish" and actual publish. Allows last-minute cancel via Telegram.
+              </p>
+            </div>
+          </div>
+
+          <!-- First comment automation -->
+          <div class="pt-4 border-t border-neutral-200 dark:border-neutral-700 space-y-3">
+            <h3 class="text-sm font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider">
+              First Comment Automation
+            </h3>
+
+            <label class="flex items-center gap-3 cursor-pointer">
+              <input
+                :checked="linkedinFormData.linkedin_first_comment_enabled === 'true'"
+                type="checkbox"
+                class="w-4 h-4 text-amber-600 border-neutral-300 rounded focus:ring-amber-500"
+                @change="e => linkedinFormData.linkedin_first_comment_enabled = e.target.checked ? 'true' : 'false'"
+              >
+              <span class="text-sm text-neutral-700 dark:text-neutral-300">
+                Auto-post blog link as first comment (avoids 60% reach penalty on body links)
+              </span>
+            </label>
+
+            <div class="pl-7">
+              <label for="linkedin_first_comment_delay_seconds" class="block text-xs text-neutral-600 dark:text-neutral-400 mb-1">
+                Delay (seconds)
+              </label>
+              <input
+                id="linkedin_first_comment_delay_seconds"
+                v-model="linkedinFormData.linkedin_first_comment_delay_seconds"
+                type="number"
+                min="0"
+                max="3600"
+                class="w-32 px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-sm focus:outline-none focus:border-amber-500"
+              >
+            </div>
+          </div>
+
+          <!-- Save button -->
+          <div class="pt-4 border-t border-neutral-200 dark:border-neutral-700">
+            <BaseButton
+              type="button"
+              button-type="primary"
+              :disabled="linkedinSubmitting"
+              @click="handleLinkedInSubmit"
+            >
+              {{ linkedinSubmitting ? 'Saving...' : 'Save LinkedIn Settings' }}
+            </BaseButton>
+          </div>
+        </div>
+      </BaseCard>
+
       <!-- Hero & About Enhancement Card -->
       <BaseCard>
         <h2 class="text-xl font-display font-semibold text-neutral-900 dark:text-neutral-100 mb-6">
@@ -1315,13 +1530,24 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useQueryClient } from '@tanstack/vue-query'
 import { useSettingsStore } from '@/stores/settings'
 import { useUiStore } from '@/stores/ui'
 import BaseCard from '@/components/base/BaseCard.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import api from '@/services/api'
+import {
+  useLinkedInAccounts,
+  useLinkedInSettings,
+  startLinkedInConnect,
+  useDisconnectLinkedInAccount,
+  useTestLinkedInConnection,
+} from '@/composables/useLinkedInDrafts'
+
+const route = useRoute()
+const router = useRouter()
 
 const queryClient = useQueryClient()
 const settingsStore = useSettingsStore()
@@ -1445,6 +1671,144 @@ async function handleTelegramTest() {
   } finally {
     telegramTesting.value = false
   }
+}
+
+// ============================================================================
+// LinkedIn Integration — direct OAuth + publishing controls
+// ============================================================================
+
+const linkedinSubmitting = ref(false)
+const linkedinTesting = ref(false)
+const linkedinTestResult = ref(null)
+const linkedinOauthFlash = ref(null)
+
+const linkedinFormData = ref({
+  linkedin_auto_publish: 'false',
+  linkedin_depth_score_threshold: '80',
+  linkedin_cancel_window_minutes: '15',
+  linkedin_first_comment_enabled: 'true',
+  linkedin_first_comment_delay_seconds: '30',
+  linkedin_last_test_connection_at: null,
+  linkedin_last_test_connection_result: null,
+})
+
+const {
+  oauthConfigured: linkedinOauthConfigured,
+  accounts: linkedinAccounts,
+  isLoading: linkedinAccountsLoading,
+  refetch: refetchLinkedinAccounts,
+} = useLinkedInAccounts()
+
+const {
+  settings: linkedinSettings,
+  isLoading: linkedinSettingsLoading,
+  save: saveLinkedinSettings,
+} = useLinkedInSettings()
+
+const disconnectMutation = useDisconnectLinkedInAccount()
+const testConnectionMutation = useTestLinkedInConnection()
+
+const linkedinLoading = computed(() =>
+  linkedinAccountsLoading.value || linkedinSettingsLoading.value
+)
+
+// Sync settings ref into local form data when query resolves
+watch(linkedinSettings, (s) => {
+  if (!s) return
+  linkedinFormData.value = {
+    linkedin_auto_publish: s.linkedin_auto_publish ?? 'false',
+    linkedin_depth_score_threshold: s.linkedin_depth_score_threshold ?? '80',
+    linkedin_cancel_window_minutes: s.linkedin_cancel_window_minutes ?? '15',
+    linkedin_first_comment_enabled: s.linkedin_first_comment_enabled ?? 'true',
+    linkedin_first_comment_delay_seconds: s.linkedin_first_comment_delay_seconds ?? '30',
+    linkedin_last_test_connection_at: s.linkedin_last_test_connection_at ?? null,
+    linkedin_last_test_connection_result: s.linkedin_last_test_connection_result ?? null,
+  }
+}, { immediate: true })
+
+async function handleLinkedInSubmit() {
+  linkedinSubmitting.value = true
+  try {
+    await saveLinkedinSettings({
+      linkedin_auto_publish: linkedinFormData.value.linkedin_auto_publish,
+      linkedin_depth_score_threshold: parseInt(linkedinFormData.value.linkedin_depth_score_threshold, 10),
+      linkedin_cancel_window_minutes: parseInt(linkedinFormData.value.linkedin_cancel_window_minutes, 10),
+      linkedin_first_comment_enabled: linkedinFormData.value.linkedin_first_comment_enabled,
+      linkedin_first_comment_delay_seconds: parseInt(linkedinFormData.value.linkedin_first_comment_delay_seconds, 10),
+    })
+    uiStore.showSuccess('LinkedIn settings saved', 'Saved')
+  } catch (err) {
+    uiStore.showError(err.response?.data?.message || err.message || 'Failed to save LinkedIn settings', 'Save Failed')
+  } finally {
+    linkedinSubmitting.value = false
+  }
+}
+
+async function handleLinkedInConnect() {
+  linkedinSubmitting.value = true
+  try {
+    await startLinkedInConnect() // redirects browser to LinkedIn
+  } catch (err) {
+    uiStore.showError(err.message || 'Failed to start LinkedIn OAuth', 'Connect Failed')
+    linkedinSubmitting.value = false
+  }
+}
+
+async function handleLinkedInDisconnect(accountId) {
+  if (!confirm('Disconnect this LinkedIn account? Scheduled posts will fail to publish.')) return
+  linkedinSubmitting.value = true
+  try {
+    await disconnectMutation.mutateAsync(accountId)
+    await refetchLinkedinAccounts()
+    uiStore.showSuccess('LinkedIn account disconnected', 'Disconnected')
+  } catch (err) {
+    uiStore.showError(err.response?.data?.error?.message || 'Failed to disconnect', 'Disconnect Failed')
+  } finally {
+    linkedinSubmitting.value = false
+  }
+}
+
+async function handleLinkedInTest(accountId) {
+  linkedinTesting.value = true
+  linkedinTestResult.value = null
+  try {
+    const result = await testConnectionMutation.mutateAsync(accountId)
+    const payload = result?.data || {}
+    linkedinTestResult.value = payload.success
+      ? { success: true, message: '✓ ' + (payload.message || 'Connection OK') }
+      : { success: false, message: '✗ ' + (payload.message || 'Connection failed') }
+    setTimeout(() => { linkedinTestResult.value = null }, 8000)
+  } catch (err) {
+    linkedinTestResult.value = { success: false, message: '✗ ' + (err.message || 'Test failed') }
+  } finally {
+    linkedinTesting.value = false
+  }
+}
+
+// Read OAuth callback flash from query params (?linkedin_oauth=success|error)
+function consumeOauthFlash() {
+  const { linkedin_oauth: flashType, message, account } = route.query
+  if (!flashType) return
+  if (flashType === 'success') {
+    linkedinOauthFlash.value = {
+      type: 'success',
+      message: '✓ LinkedIn connected' + (account ? ` as ${account}` : ''),
+    }
+  } else if (flashType === 'error') {
+    linkedinOauthFlash.value = {
+      type: 'error',
+      message: '✗ LinkedIn OAuth failed: ' + (message || 'unknown error'),
+    }
+  }
+  // Strip the query params so a refresh doesn't re-show the flash
+  router.replace({ query: {} })
+  // Auto-dismiss after 10s
+  setTimeout(() => { linkedinOauthFlash.value = null }, 10000)
+}
+
+function formatDate(iso) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleString()
 }
 
 // Opacity slider binds as integer percentage; convert to/from stored string
@@ -1999,6 +2363,7 @@ async function fetchGalleries() {
 onMounted(() => {
   loadSettings()
   fetchGalleries()
+  consumeOauthFlash()
 })
 </script>
 

@@ -2,28 +2,49 @@
 
 namespace App\Traits;
 
-use App\Enums\ContentIdeaStatus;
 use App\Exceptions\InvalidStateTransitionException;
+use BackedEnum;
 
+/**
+ * Generic FSM trait — works with any BackedEnum that exposes a
+ * TRANSITIONS constant (array<string, array<string>>) and a
+ * canTransitionTo(self $next): bool method.
+ *
+ * Models using this trait MUST implement statusEnumClass() returning
+ * the fully qualified enum class name.
+ *
+ * Example (ContentIdea):
+ *   protected function statusEnumClass(): string
+ *   {
+ *       return \App\Enums\ContentIdeaStatus::class;
+ *   }
+ */
 trait HasStatusTransitions
 {
     /**
+     * Each consuming model MUST declare which enum class governs its status column.
+     */
+    abstract protected function statusEnumClass(): string;
+
+    /**
      * Atomically transition status + optionally update other fields.
      *
-     * @param  ContentIdeaStatus|string  $next     target status
-     * @param  string|null               $reason   audit reason appended to pipeline_state_log
-     * @param  array                     $extra    additional fields to merge into the update call
+     * @param  BackedEnum|string  $next     target status (enum instance or string value)
+     * @param  string|null        $reason   audit reason appended to pipeline_state_log
+     * @param  array              $extra    additional fields to merge into the update call
      *
      * @throws InvalidStateTransitionException when the transition is not in TRANSITIONS map
      */
-    public function transitionTo(ContentIdeaStatus|string $next, ?string $reason = null, array $extra = []): self
+    public function transitionTo(BackedEnum|string $next, ?string $reason = null, array $extra = []): self
     {
-        $nextEnum = is_string($next) ? ContentIdeaStatus::from($next) : $next;
-        $currentEnum = ContentIdeaStatus::from($this->status);
+        $enumClass = $this->statusEnumClass();
+
+        $nextEnum = is_string($next) ? $enumClass::from($next) : $next;
+        $currentEnum = $enumClass::from($this->status);
 
         if (!$currentEnum->canTransitionTo($nextEnum)) {
             throw new InvalidStateTransitionException(
-                "Cannot transition {$this->status} → {$nextEnum->value} on idea #{$this->id}"
+                "Cannot transition {$this->status} → {$nextEnum->value} on " . static::class . " #{$this->id}"
             );
         }
 

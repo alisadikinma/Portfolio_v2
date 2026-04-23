@@ -119,6 +119,15 @@ class Post extends Model
         return $this->hasMany(PostTranslation::class);
     }
 
+    /**
+     * LinkedIn drafts derived from this blog post. One row per (post, status)
+     * generation attempt; regenerate soft-deletes old rows + creates new ones.
+     */
+    public function linkedinPosts()
+    {
+        return $this->hasMany(\App\Models\LinkedInPost::class);
+    }
+
     public function relatedPosts()
     {
         return $this->belongsToMany(Post::class, 'related_posts', 'post_id', 'related_post_id')

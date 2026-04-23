@@ -27,6 +27,8 @@ use App\Http\Controllers\Api\NewsletterController;
 use App\Http\Controllers\Api\BlogPromoSlotController;
 use App\Http\Controllers\Api\CarouselDraftController;
 use App\Http\Controllers\Api\Admin\ContentIdeaController;
+use App\Http\Controllers\Api\Admin\LinkedInDraftController;
+use App\Http\Controllers\Api\LinkedInOAuthController;
 
 // ============================================
 // Authentication Routes
@@ -270,6 +272,8 @@ Route::middleware(['auth:sanctum'])->prefix('admin/settings')->group(function ()
     Route::get('/telegram', [SettingsController::class, 'getTelegramSettings']);
     Route::put('/telegram', [SettingsController::class, 'updateTelegramSettings']);
     Route::post('/telegram/test', [SettingsController::class, 'testTelegramNotification']);
+    Route::get('/linkedin', [SettingsController::class, 'getLinkedInSettings']);
+    Route::put('/linkedin', [SettingsController::class, 'updateLinkedInSettings']);
 });
 
 // Admin Menu Items Routes
@@ -1189,3 +1193,34 @@ Route::middleware(['auth:sanctum'])->prefix('admin/content-engine')->group(funct
         ]);
     });
 });
+
+// ============================================================================
+// LinkedIn Admin Routes (auth:sanctum)
+// Per plugin design §4.5 + Addendum 3 §13 — full-stack admin owns OAuth,
+// publish, schedule. Plugin (WIP) generates content only.
+// ============================================================================
+
+// Admin draft CRUD (7 endpoints per plugin design §4.5)
+Route::middleware(['auth:sanctum'])->prefix('admin/linkedin-drafts')->group(function () {
+    Route::get('/', [LinkedInDraftController::class, 'index']);
+    Route::get('/{id}', [LinkedInDraftController::class, 'show']);
+    Route::put('/{id}', [LinkedInDraftController::class, 'update']);
+    Route::post('/{id}/regenerate', [LinkedInDraftController::class, 'regenerate']);
+    Route::post('/{id}/approve', [LinkedInDraftController::class, 'approve']);
+    Route::post('/{id}/cancel', [LinkedInDraftController::class, 'cancel']);
+    Route::post('/{id}/publish-now', [LinkedInDraftController::class, 'publishNow']);
+});
+
+// OAuth flow. `connect` is admin-only; `callback` is public (LinkedIn
+// redirects the browser here, then we redirect to the admin settings page).
+Route::middleware(['auth:sanctum'])->prefix('admin/linkedin')->group(function () {
+    Route::get('/connect', [LinkedInOAuthController::class, 'connect']);
+    Route::get('/account', [LinkedInOAuthController::class, 'index']);
+    Route::post('/account/{id}/test', [LinkedInOAuthController::class, 'test']);
+    Route::delete('/account/{id}', [LinkedInOAuthController::class, 'disconnect']);
+});
+
+// Public OAuth callback — LinkedIn redirects the browser here with code + state.
+// NOT behind auth:sanctum because LinkedIn doesn't know our session.
+// State token verification in the controller provides CSRF protection.
+Route::get('admin/linkedin/oauth/callback', [LinkedInOAuthController::class, 'callback']);

@@ -2,23 +2,31 @@
 
 namespace App\Services;
 
-use App\Enums\ContentIdeaStatus;
 use App\Exceptions\InvalidStateTransitionException;
-use App\Models\ContentIdea;
+use BackedEnum;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * Generic FSM transition wrapper with uniform logging.
+ *
+ * The model must use the HasStatusTransitions trait (or expose a
+ * transitionTo(BackedEnum, string) method) and have an integer `id`
+ * attribute suitable for log line formatting.
+ */
 class PipelineGuard
 {
-    public function advance(ContentIdea $idea, ContentIdeaStatus $next, string $reason, array $context = []): ContentIdea
+    public function advance(Model $model, BackedEnum $next, string $reason, array $context = []): Model
     {
-        $previous = $idea->status;
+        $previous = $model->status;
+        $modelName = class_basename($model);
 
         try {
-            $idea->transitionTo($next, $reason);
-            Log::info("[PipelineGuard] idea #{$idea->id} {$reason}: {$previous} → {$next->value}", $context);
-            return $idea;
+            $model->transitionTo($next, $reason);
+            Log::info("[PipelineGuard] {$modelName} #{$model->id} {$reason}: {$previous} → {$next->value}", $context);
+            return $model;
         } catch (InvalidStateTransitionException $e) {
-            Log::error("[PipelineGuard] illegal transition on idea #{$idea->id}: {$e->getMessage()}", $context);
+            Log::error("[PipelineGuard] illegal transition on {$modelName} #{$model->id}: {$e->getMessage()}", $context);
             throw $e;
         }
     }

@@ -35,12 +35,13 @@ phpMyAdmin:    http://localhost/phpmyadmin
 
 ### Backend Architecture (Laravel 12)
 
-**Controller Map (25 controllers):**
+**Controller Map (27 controllers):**
 ```
 app/Http/Controllers/Api/
 ├── Admin/
 │   ├── ContentIdeaController.php  # Content Engine idea pipeline (17 routes)
-│   └── DashboardController.php    # Admin dashboard stats
+│   ├── DashboardController.php    # Admin dashboard stats
+│   └── LinkedInDraftController.php # LinkedIn admin drafts CRUD (7 routes: list/show/update/regenerate/approve/cancel/publish-now)
 ├── ActivityFeedController.php     # Public activity feed
 ├── AuthController.php             # Login, register, logout, me
 ├── AutomationController.php       # n8n/Zapier automation API
@@ -53,6 +54,7 @@ app/Http/Controllers/Api/
 ├── GalleryController.php          # Gallery CRUD + bulk upload
 ├── GalleryItemController.php      # Gallery items CRUD + bulk upload
 ├── GeoController.php              # GEO: llms.txt & llms-full.txt endpoints
+├── LinkedInOAuthController.php    # LinkedIn OAuth 2.0 flow (connect/callback/index/test/disconnect)
 ├── MenuItemController.php         # Dynamic navbar menu items
 ├── NewsletterController.php       # Newsletter subscribe/unsubscribe
 ├── PageSectionController.php      # Dynamic page sections (homepage)
@@ -66,7 +68,7 @@ app/Http/Controllers/Api/
 └── TokenController.php            # Automation API token management
 ```
 
-**Model Map (21 models):**
+**Model Map (23 models):**
 ```
 app/Models/
 ├── Award.php              # HasSeoFields trait
@@ -78,6 +80,8 @@ app/Models/
 ├── Gallery.php            # award_id relationship
 ├── GalleryItem.php        # Belongs to Gallery
 ├── ImageGenerationJob.php # GeminiGen image job tracking
+├── LinkedInAccount.php    # LinkedIn OAuth tokens (encrypted access_token + refresh_token casts)
+├── LinkedInPost.php       # Blog→LinkedIn conversion drafts (HasStatusTransitions, SoftDeletes, 8-state FSM)
 ├── MenuItem.php           # Dynamic navbar
 ├── Newsletter.php
 ├── PageSection.php        # Dynamic homepage sections
@@ -98,8 +102,13 @@ app/Services/
 ├── ArticleGenerationService.php # SSH/local exec to trigger Claude CLI on VPS (async pipeline phases + sync VD rewrite)
 ├── ContentEngineService.php     # Legacy HTTP client (kept for health check proxy)
 ├── ImageGenerationService.php   # GeminiGen image generation
+├── LinkedInOAuthService.php     # OAuth 2.0 authorize URL + token exchange + refresh + /v2/me profile fetch
+├── LinkedInPublishService.php   # LinkedIn REST API v2 wrapper (publishText/publishCarousel stubs — wiring pending plugin content-gen)
+├── PipelineGuard.php            # Generic FSM advance() with uniform logging — works with any HasStatusTransitions model
 └── TrendingTopicService.php     # 4-source trend aggregation (Google Trends, TikTok, YouTube, Google News)
 ```
+
+**FSM Infrastructure (April 23, 2026 refactor):** [`HasStatusTransitions`](backend/app/Traits/HasStatusTransitions.php) + [`PipelineGuard`](backend/app/Services/PipelineGuard.php) are now **enum-class-generic**. Each consuming model declares its status enum via `protected function statusEnumClass(): string`. `ContentIdea` returns `ContentIdeaStatus::class`; `LinkedInPost` returns `LinkedInPostStatus::class`. Guard signature widened to `advance(Model $model, BackedEnum $next, ...)`. All existing ContentIdea callers remain type-compatible.
 
 **Filament Admin (partial):**
 ```
@@ -287,6 +296,74 @@ PUT    /api/admin/settings/telegram            (auth:sanctum)
 POST   /api/admin/settings/telegram/test       (auth:sanctum — triggers sendTestMessage)
 ```
 
+### `settings` group: `linkedin` (April 23, 2026)
+
+Operator-facing LinkedIn publishing flags. 7 rows seeded via `LinkedInSettingsSeeder`:
+
+| key | default | purpose |
+|---|---|---|
+| `linkedin_auto_publish` | `'false'` | Master kill-switch — when OFF, approved drafts stop at `awaiting_publish` and never fire |
+| `linkedin_depth_score_threshold` | `'80'` | Min depth score for auto-publish; lower drafts → `manual_review` |
+| `linkedin_cancel_window_minutes` | `'15'` | Time between approval and actual publish — allows Telegram cancel |
+| `linkedin_first_comment_enabled` | `'true'` | Auto-post blog link as first comment (avoids 60% LinkedIn reach penalty on body links) |
+| `linkedin_first_comment_delay_seconds` | `'30'` | Delay before POSTing first comment to `/v2/socialActions/{urn}/comments` |
+| `linkedin_last_test_connection_at` | null | Timestamp of last successful Test Connection |
+| `linkedin_last_test_connection_result` | null | `'ok'` / `'error: {msg}'` |
+
+**Also extends `telegram` group** with 3 LinkedIn notify toggles (live in telegram group so `TelegramNotificationService` reads from one source per Decision #9):
+- `telegram_notify_linkedin_preview` — sent when draft → awaiting_publish
+- `telegram_notify_linkedin_depth_failed` — sent when draft → manual_review
+- `telegram_notify_linkedin_published` — sent after successful publish
+
+Admin UI: "LinkedIn Integration — Direct OAuth" card on [AboutSettings.vue](frontend/src/views/admin/AboutSettings.vue), below Telegram card. 3-state UX (OAuth not configured / installed-not-connected / connected). OAuth connect button redirects to LinkedIn, callback flash messages rendered via `?linkedin_oauth=success|error` query params.
+
+Env vars (infrastructure, not operator-editable):
+```env
+LINKEDIN_OAUTH_CLIENT_ID=         # from LinkedIn Developer App
+LINKEDIN_OAUTH_CLIENT_SECRET=
+LINKEDIN_OAUTH_REDIRECT_URI=https://alisadikinma.com/api/admin/linkedin/oauth/callback
+LINKEDIN_OAUTH_SCOPES=w_member_social,r_liteprofile
+LINKEDIN_API_BASE_URL=https://api.linkedin.com/v2
+LINKEDIN_API_VERSION=202405
+```
+
+### LinkedIn Admin UI Pipeline (April 23, 2026)
+
+Admin side of the blog→LinkedIn auto-publish workflow. Plugin `linkedin-post-writer` (WIP, separate repo at `D:\Projects\claude-plugin\linkedin-post-writer`) generates content only — **this admin UI owns all operational concerns: OAuth, schedule, publish, FSM, cancel window**. Per plugin Addendum 3, backbone is **direct LinkedIn REST API v2** (NOT MixPost — plugin Decision #6 rejected after verification that MixPost OSS doesn't support LinkedIn, only Facebook + Twitter + Mastodon).
+
+**New tables** (migration `2026_04_23_000001_create_linkedin_tables`):
+- `linkedin_accounts` — one row per OAuth-connected account, encrypted token casts, access + refresh expiry timestamps (nullable — MySQL strict mode)
+- `linkedin_posts` — 24 cols, one LIVE draft per post_id (app-level invariant enforced in regenerate; MySQL doesn't support partial unique indexes)
+
+**FSM** — [`LinkedInPostStatus`](backend/app/Enums/LinkedInPostStatus.php) enum with 8 states:
+```
+pending_generation → generating → validating → awaiting_publish → published
+                                                 ↓         ↓
+                                           manual_review  cancelled
+                                                 ↓
+                                                 awaiting_publish (admin approve)
+failed → generating (regenerate)    cancelled → generating (regenerate)
+```
+Uses generic `HasStatusTransitions` trait (refactored this session). Reason strings mandatory for every transition.
+
+**Frontend views** (all TanStack Query via [`useLinkedInDrafts.js`](frontend/src/composables/useLinkedInDrafts.js)):
+- [`/admin/linkedin-posts`](frontend/src/views/admin/LinkedInPostsList.vue) — success feed (published / scheduled / cancelled), card grid, status filter tabs, hover actions
+- [`/admin/linkedin-queue`](frontend/src/views/admin/LinkedInQueueList.vue) — triage table (manual_review default, failed, in_progress, all), inline actions + counts per tab
+- [`/admin/linkedin-drafts/:id`](frontend/src/views/admin/LinkedInDraftDetail.vue) — 2-col detail with LinkedIn-style card mockup (text) / swipeable slide viewer (carousel) + validation panel + state_log timeline + inline edit mode (hashtag chip editor, char counter at 1100-1300 sweet spot, 3-5 enforced)
+
+**Sidebar** (AdminLayout.vue): new "LinkedIn" section with Posts + Queue links between Content Engine and Testimonials.
+
+**Plugin integration TODO** (deferred until plugin Phase D3-D11 ships):
+- `LinkedInPublishService::publishText()` + `publishCarousel()` — currently return 503 stubs with clear message
+- `GenerateLinkedInPost` job + `ScanBlogForLinkedInConversion` cron (03:00 WIB daily)
+- 8 automation callback endpoints at `/automation/linkedin/*` for plugin progress callbacks
+- Telegram webhook (2-layer HMAC + cancel flow)
+- Carousel PDF composition via TCPDF
+
+**Testing**: [`LinkedInPostFactory`](backend/database/factories/LinkedInPostFactory.php) + [`LinkedInPostSeeder`](backend/database/seeders/LinkedInPostSeeder.php) create 11 mock drafts across 6 FSM states. Seeder auto-creates fake "[LinkedIn Test]" blog posts when real posts are insufficient to satisfy the "one live draft per post" invariant. Run `php artisan db:seed --class=LinkedInPostSeeder`.
+
+**Full design doc**: [docs/plans/2026-04-23-linkedin-admin-ui.md](docs/plans/2026-04-23-linkedin-admin-ui.md) — covers FSM, schema, UI views, OAuth flow, multi-platform pivot history.
+
 ### Named Entity Cover Generation (April 20-21, 2026) — UPDATED
 
 Fixes a major bug where blog covers about public figures (Dario Amodei, Elon Musk) or famous landmarks (White House, Capitol) silently used Ali's face instead of the real subject.
@@ -369,6 +446,9 @@ DELETE /api/newsletter/unsubscribe
 /api/admin/automation/tokens (CRUD) + /api/admin/automation/logs (list, clear)
 /api/admin/carousel-drafts (list, show, approve, reject, schedule, slide status)
 /api/admin/content-engine/* (see Content Engine section below)
+/api/admin/linkedin-drafts/* (see LinkedIn Admin Routes section below)
+/api/admin/linkedin/* (OAuth: connect, callback, account list, test, disconnect)
+/api/admin/settings/linkedin (GET, PUT — operator-facing publishing flags)
 ```
 
 ### Admin Content Engine Routes (auth:sanctum, 19 endpoints)
@@ -400,6 +480,25 @@ POST   /api/admin/content-engine/ideas/{id}/upload-entity-reference # Gate 2: Ma
 POST   /api/admin/content-engine/ideas/{id}/skip-entity-reference   # Gate 2: Drop a manifest-flagged entity
 POST   /api/admin/content-engine/ideas/{id}/translate-article # Pre-publish: translate primary → secondary language (sync, FSM-gated)
 POST   /api/admin/content-engine/ideas/{id}/publish           # Gate 2: Approve images & publish
+```
+
+### Admin LinkedIn Routes (auth:sanctum, 12 endpoints)
+```
+# Draft CRUD (matches plugin design §4.5)
+GET    /api/admin/linkedin-drafts              # List (filter: ?status, ?format, ?scope=feed|queue, ?per_page)
+GET    /api/admin/linkedin-drafts/{id}         # Show with eager-loaded post.translations + state_log
+PUT    /api/admin/linkedin-drafts/{id}         # Edit content + link_comment + hashtags + carousel_slides (saves, no FSM transition — re-validate via plugin Phase D3)
+POST   /api/admin/linkedin-drafts/{id}/regenerate    # Soft-delete current + create new pending_generation row (409 if duplicate live)
+POST   /api/admin/linkedin-drafts/{id}/approve       # manual_review → awaiting_publish (sets scheduled_at + cancel_window_ends_at per linkedin_cancel_window_minutes)
+POST   /api/admin/linkedin-drafts/{id}/cancel        # Any non-terminal → cancelled
+POST   /api/admin/linkedin-drafts/{id}/publish-now   # awaiting_publish → published (via LinkedInPublishService; 503 until OAuth configured + plugin content-gen wired)
+
+# OAuth (direct LinkedIn, not MixPost — plugin Addendum 3)
+GET    /api/admin/linkedin/connect             # Generate LinkedIn authorize URL + CSRF state token
+GET    /api/admin/linkedin/oauth/callback      # PUBLIC (no auth) — LinkedIn redirects here; exchanges code for tokens
+GET    /api/admin/linkedin/account             # List connected accounts + oauth_configured flag
+POST   /api/admin/linkedin/account/{id}/test   # Ping /v2/me to verify token still works
+DELETE /api/admin/linkedin/account/{id}        # Disconnect (delete row; LinkedIn has no revoke endpoint)
 ```
 
 ### Automation Routes
@@ -1066,7 +1165,7 @@ ARTICLE_GEN_USE_TRANSLATE_PHASE=false
 
 ---
 
-**Last Updated:** April 23, 2026 — Translation dual-storage mirror fix: automation-path `saveTranslation` now mirrors translated fields into `content_ideas.generated_article.{locale}` so the admin Finalize tab matches what the blog renders, WITH two safety rails preventing data corruption — (1) never writes the primary-language slot (authored raw content is sacrosanct), (2) strips `<figure>` blocks via new `App\Support\HtmlFigureStripper` since `post_translations` stores rendered content while `generated_article` stores raw body (Finalize re-injects figures at render time, so mirroring without the strip would cause double-rendering). New artisan backfill `content-engine:sync-translation-mirrors` for historical ideas applies the same three guardrails: skip primary slot, skip already-legit content, strip figures. Earlier (April 21): Page Sections wiring fixes: `<LatestBlog>` mounted on Home (was never rendered despite component existing); `<CTASection>` moved from Blog list → BlogDetail (admin "Blog Page → Call to Action" controls article detail, not index); `LatestBlog` side cards now render `featured_image` thumbnails (40/60 horizontal split) matching the large card; `usePageSections` cache staleTime 10min → 30s + `refetchOnMount:'always'` so admin toggles surface on public pages within next navigation. Added "Page Sections Mapping" reference table in this CLAUDE.md to prevent ghost-toggle confusion. Earlier same day: Pipeline State Machine foundation (`ContentIdeaStatus` enum + `HasStatusTransitions` trait + `PipelineGuard`, strict adjacency map with audit log), Segment Retry Pipeline (auto retry job + manual retry/skip endpoints + replace-variation), Translate-Before-Publish Gate (sync SSH preflight, 3 auto retries, Telegram exhaustion alert), meta_keywords body-lede synthesis with broad-topic anchor (web SEO best practice — short entity tokens), backend auto-resolve person entity via Wikidata at every cover dispatch (no manual Regen Prompt needed), Replace-variation hover icon on done thumbnails, `completed` status added to syncToContentIdea + findIdeaIdForJobUuid + regenerateImagePrompts whitelists, `content-engine:resync-stuck-variations` artisan backfill, plugin v2.7.2 with hard pre-save SEO field audit + lede + role-resolution. Earlier (April 18): Creator Brand system — auto-inject cover face + VD rewrite, prompt-injection watermark, branded filenames `alisadikinma-{keyword}-{segment}.png`, per-type image captions, `creator_brand` Settings group + AboutSettings card.
+**Last Updated:** April 23, 2026 (session 2) — **LinkedIn Admin UI shipped** (full-stack): new `linkedin_accounts` + `linkedin_posts` tables (24 cols, 8-state FSM), [`LinkedInPostStatus`](backend/app/Enums/LinkedInPostStatus.php) enum, [`LinkedInAccount`](backend/app/Models/LinkedInAccount.php) + [`LinkedInPost`](backend/app/Models/LinkedInPost.php) models, [`LinkedInOAuthService`](backend/app/Services/LinkedInOAuthService.php) (authorize URL + token exchange + refresh + /v2/me profile fetch) + [`LinkedInPublishService`](backend/app/Services/LinkedInPublishService.php) (stubs until plugin content-gen wired), [`LinkedInOAuthController`](backend/app/Http/Controllers/Api/LinkedInOAuthController.php) (5 endpoints) + [`Admin\LinkedInDraftController`](backend/app/Http/Controllers/Api/Admin/LinkedInDraftController.php) (7 endpoints). **FSM infrastructure refactored to be enum-class-generic**: [`HasStatusTransitions`](backend/app/Traits/HasStatusTransitions.php) + [`PipelineGuard`](backend/app/Services/PipelineGuard.php) now accept any BackedEnum via `statusEnumClass()` abstract method on models; ContentIdea tests still pass. New `linkedin` settings group (7 keys) + extends `telegram` group with 3 linkedin notify toggles. Frontend: [`useLinkedInDrafts.js`](frontend/src/composables/useLinkedInDrafts.js) TanStack Query composable + 3 views ([`LinkedInPostsList`](frontend/src/views/admin/LinkedInPostsList.vue) success feed + [`LinkedInQueueList`](frontend/src/views/admin/LinkedInQueueList.vue) triage + [`LinkedInDraftDetail`](frontend/src/views/admin/LinkedInDraftDetail.vue) detail with edit mode + LinkedIn-style card mockup + carousel slide viewer + state timeline). Sidebar gains "LinkedIn" section. AboutSettings gets "LinkedIn Integration — Direct OAuth" card (3-state UX: OAuth not configured / installed-not-connected / connected). Plugin pivoted from MixPost to direct LinkedIn OAuth after verification that MixPost OSS supports only Facebook + Twitter + Mastodon (not LinkedIn). Plugin owns content generation only; admin UI owns OAuth, publish, schedule, FSM, cancel window. Full design: [docs/plans/2026-04-23-linkedin-admin-ui.md](docs/plans/2026-04-23-linkedin-admin-ui.md). Earlier same day (session 1): Translation dual-storage mirror fix: automation-path `saveTranslation` now mirrors translated fields into `content_ideas.generated_article.{locale}` so the admin Finalize tab matches what the blog renders, WITH two safety rails preventing data corruption — (1) never writes the primary-language slot (authored raw content is sacrosanct), (2) strips `<figure>` blocks via new `App\Support\HtmlFigureStripper` since `post_translations` stores rendered content while `generated_article` stores raw body (Finalize re-injects figures at render time, so mirroring without the strip would cause double-rendering). New artisan backfill `content-engine:sync-translation-mirrors` for historical ideas applies the same three guardrails: skip primary slot, skip already-legit content, strip figures. Earlier (April 21): Page Sections wiring fixes: `<LatestBlog>` mounted on Home (was never rendered despite component existing); `<CTASection>` moved from Blog list → BlogDetail (admin "Blog Page → Call to Action" controls article detail, not index); `LatestBlog` side cards now render `featured_image` thumbnails (40/60 horizontal split) matching the large card; `usePageSections` cache staleTime 10min → 30s + `refetchOnMount:'always'` so admin toggles surface on public pages within next navigation. Added "Page Sections Mapping" reference table in this CLAUDE.md to prevent ghost-toggle confusion. Earlier same day: Pipeline State Machine foundation (`ContentIdeaStatus` enum + `HasStatusTransitions` trait + `PipelineGuard`, strict adjacency map with audit log), Segment Retry Pipeline (auto retry job + manual retry/skip endpoints + replace-variation), Translate-Before-Publish Gate (sync SSH preflight, 3 auto retries, Telegram exhaustion alert), meta_keywords body-lede synthesis with broad-topic anchor (web SEO best practice — short entity tokens), backend auto-resolve person entity via Wikidata at every cover dispatch (no manual Regen Prompt needed), Replace-variation hover icon on done thumbnails, `completed` status added to syncToContentIdea + findIdeaIdForJobUuid + regenerateImagePrompts whitelists, `content-engine:resync-stuck-variations` artisan backfill, plugin v2.7.2 with hard pre-save SEO field audit + lede + role-resolution. Earlier (April 18): Creator Brand system — auto-inject cover face + VD rewrite, prompt-injection watermark, branded filenames `alisadikinma-{keyword}-{segment}.png`, per-type image captions, `creator_brand` Settings group + AboutSettings card.
 **Maintainer:** Ali Sadikin (ali.sadikincom85@gmail.com)
 **Environment:** Windows 11, D:\Projects\Portfolio_v2
 **PHP:** D:\xampp\php\php.exe (8.2.12) — use full path, not in system PATH

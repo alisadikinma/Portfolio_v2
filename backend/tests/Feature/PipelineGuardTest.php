@@ -41,7 +41,7 @@ class PipelineGuardTest extends TestCase
 
         Log::shouldHaveReceived('info')
             ->withArgs(function ($message, $context) use ($idea) {
-                return str_contains($message, "idea #{$idea->id}")
+                return str_contains($message, "ContentIdea #{$idea->id}")
                     && str_contains($message, 'auto_pipeline_start')
                     && str_contains($message, 'draft → researching');
             })

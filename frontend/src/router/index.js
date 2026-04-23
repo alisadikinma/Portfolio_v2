@@ -451,6 +451,38 @@ const routes = [
     }
   },
 
+  // LinkedIn admin views — success feed + triage queue + shared detail
+  {
+    path: '/admin/linkedin-posts',
+    name: 'admin-linkedin-posts',
+    component: () => import('@/views/admin/LinkedInPostsList.vue'),
+    meta: {
+      title: 'LinkedIn Posts - Admin',
+      requiresAuth: true,
+      layout: 'admin'
+    }
+  },
+  {
+    path: '/admin/linkedin-queue',
+    name: 'admin-linkedin-queue',
+    component: () => import('@/views/admin/LinkedInQueueList.vue'),
+    meta: {
+      title: 'LinkedIn Queue - Admin',
+      requiresAuth: true,
+      layout: 'admin'
+    }
+  },
+  {
+    path: '/admin/linkedin-drafts/:id',
+    name: 'admin-linkedin-draft-detail',
+    component: () => import('@/views/admin/LinkedInDraftDetail.vue'),
+    meta: {
+      title: 'LinkedIn Draft - Admin',
+      requiresAuth: true,
+      layout: 'admin'
+    }
+  },
+
   {
     path: '/:pathMatch(.*)*',
     name: 'not-found',

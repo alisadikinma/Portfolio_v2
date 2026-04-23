@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ContentIdeaStatus;
 use App\Traits\HasStatusTransitions;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -11,6 +12,11 @@ class ContentIdea extends Model
 {
     use HasFactory;
     use HasStatusTransitions;
+
+    protected function statusEnumClass(): string
+    {
+        return ContentIdeaStatus::class;
+    }
 
     protected $fillable = [
         'title',

@@ -591,7 +591,7 @@ class SettingsController extends Controller
                 $data[$setting->key] = $setting->value;
             }
 
-            // Apply defaults for any missing rows (seeder should cover all 9
+            // Apply defaults for any missing rows (seeder should cover all 12
             // but be defensive for fresh DBs that haven't run the seeder yet).
             $data = array_merge([
                 'telegram_bot_token' => null,
@@ -603,6 +603,11 @@ class SettingsController extends Controller
                 'telegram_notify_segment_failed' => 'true',
                 'telegram_notify_cover_critical' => 'true',
                 'telegram_notify_translate_failed' => 'true',
+                // LinkedIn notification toggles (per Decision #9 — live in
+                // telegram group so TelegramNotificationService reads one source)
+                'telegram_notify_linkedin_preview' => 'true',
+                'telegram_notify_linkedin_depth_failed' => 'true',
+                'telegram_notify_linkedin_published' => 'true',
             ], $data);
 
             $data['telegram_bot_token'] = $this->maskBotToken($data['telegram_bot_token']);
@@ -638,6 +643,10 @@ class SettingsController extends Controller
             'telegram_notify_segment_failed' => ['nullable', 'in:true,false,1,0'],
             'telegram_notify_cover_critical' => ['nullable', 'in:true,false,1,0'],
             'telegram_notify_translate_failed' => ['nullable', 'in:true,false,1,0'],
+            // LinkedIn notification toggles (Decision #9 — same group)
+            'telegram_notify_linkedin_preview' => ['nullable', 'in:true,false,1,0'],
+            'telegram_notify_linkedin_depth_failed' => ['nullable', 'in:true,false,1,0'],
+            'telegram_notify_linkedin_published' => ['nullable', 'in:true,false,1,0'],
         ]);
 
         DB::beginTransaction();
@@ -659,6 +668,9 @@ class SettingsController extends Controller
                 'telegram_notify_segment_failed',
                 'telegram_notify_cover_critical',
                 'telegram_notify_translate_failed',
+                'telegram_notify_linkedin_preview',
+                'telegram_notify_linkedin_depth_failed',
+                'telegram_notify_linkedin_published',
             ] as $boolKey) {
                 if (isset($validated[$boolKey])) {
                     $validated[$boolKey] = in_array($validated[$boolKey], [true, 'true', 1, '1'], true) ? 'true' : 'false';
@@ -736,5 +748,97 @@ class SettingsController extends Controller
         }
 
         return substr($token, 0, 4) . '****' . substr($token, -4);
+    }
+
+    /**
+     * GET /api/admin/settings/linkedin
+     *
+     * Returns the `linkedin` settings group (operator-facing publishing flags)
+     * + OAuth configuration status. Used by the LinkedIn Integration card on
+     * /admin/settings/about.
+     */
+    public function getLinkedInSettings(): \Illuminate\Http\JsonResponse
+    {
+        try {
+            $settings = Setting::byGroup('linkedin')->get();
+
+            $data = [];
+            foreach ($settings as $setting) {
+                $data[$setting->key] = $setting->value;
+            }
+
+            $data = array_merge([
+                'linkedin_auto_publish' => 'false',
+                'linkedin_depth_score_threshold' => '80',
+                'linkedin_cancel_window_minutes' => '15',
+                'linkedin_first_comment_enabled' => 'true',
+                'linkedin_first_comment_delay_seconds' => '30',
+                'linkedin_last_test_connection_at' => null,
+                'linkedin_last_test_connection_result' => null,
+            ], $data);
+
+            // Append runtime flags the UI needs to render the OAuth section
+            $data['oauth_configured'] = !empty(config('linkedin.oauth.client_id'))
+                && !empty(config('linkedin.oauth.client_secret'));
+
+            return response()->json([
+                'success' => true,
+                'data' => $data,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to fetch linkedin settings', ['error' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch linkedin settings',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred',
+            ], 500);
+        }
+    }
+
+    /**
+     * PUT /api/admin/settings/linkedin
+     *
+     * Update the `linkedin` settings group. All fields optional — omit a key
+     * to leave it unchanged. Booleans normalized to 'true'/'false' strings.
+     */
+    public function updateLinkedInSettings(\Illuminate\Http\Request $request): \Illuminate\Http\JsonResponse
+    {
+        $validated = $request->validate([
+            'linkedin_auto_publish' => ['nullable', 'in:true,false,1,0'],
+            'linkedin_depth_score_threshold' => ['nullable', 'integer', 'between:0,100'],
+            'linkedin_cancel_window_minutes' => ['nullable', 'integer', 'between:1,1440'],
+            'linkedin_first_comment_enabled' => ['nullable', 'in:true,false,1,0'],
+            'linkedin_first_comment_delay_seconds' => ['nullable', 'integer', 'between:0,3600'],
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+            // Normalize booleans to canonical 'true'/'false' strings
+            foreach (['linkedin_auto_publish', 'linkedin_first_comment_enabled'] as $boolKey) {
+                if (isset($validated[$boolKey])) {
+                    $validated[$boolKey] = in_array($validated[$boolKey], [true, 'true', 1, '1'], true) ? 'true' : 'false';
+                }
+            }
+
+            foreach ($validated as $key => $value) {
+                Setting::updateOrCreate(
+                    ['key' => $key, 'group' => 'linkedin'],
+                    ['value' => (string) $value, 'type' => 'text']
+                );
+            }
+
+            DB::commit();
+
+            return $this->getLinkedInSettings();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Failed to update linkedin settings', ['error' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update linkedin settings',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred',
+            ], 500);
+        }
     }
 }
