@@ -7,7 +7,6 @@ use App\Services\TopicDedupService;
 use App\Services\TrendingTopicService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 
 class PullTrendingDaily extends Command
 {
@@ -52,7 +51,6 @@ class PullTrendingDaily extends Command
 
                 ContentIdea::create([
                     'title' => $title,
-                    'slug' => Str::slug($title),
                     'source' => $trend['source'] ?? 'trending',
                     'pillar' => 'general',
                     'status' => 'draft',
