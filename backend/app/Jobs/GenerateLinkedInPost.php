@@ -30,9 +30,12 @@ class GenerateLinkedInPost implements ShouldQueue
     public int $tries = 2;
     public array $backoff = [60, 300];
 
-    // Timeout slightly above service timeout so the job doesn't get killed
-    // mid-SSH. Service timeout = 300s by default; job timeout = 360s.
-    public int $timeout = 360;
+    // Timeout sits above the service's SSH timeout so the job doesn't get
+    // killed mid-Sonnet. Service default raised to 600s after a production
+    // run on blog #24 measured 369s wall — see config/linkedin.php for the
+    // analysis. Job gets 60s extra to handle parsing + persistence after
+    // SSH returns.
+    public int $timeout = 660;
 
     public function __construct(public int $draftId)
     {

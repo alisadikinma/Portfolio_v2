@@ -265,8 +265,14 @@ class LinkedInGenerationService
             return ['success' => false, 'stdout' => '', 'error' => 'SSH prompt write failed: ' . $writeResult->errorOutput()];
         }
 
-        // Step B: invoke claude CLI synchronously; tee stdout back over SSH
-        $remoteCmd = "bash -lc 'source ~/.profile 2>/dev/null; {$claudePath} -p \"\$(cat {$promptFile})\" --model {$model} {$refsFlags} --dangerously-skip-permissions; rm -f {$promptFile} 2>/dev/null || true'";
+        // Step B: invoke claude CLI synchronously; tee stdout back over SSH.
+        // The remote `timeout` wrapper self-kills the claude process if it
+        // exceeds budget — without it, Symfony's local Process::timeout would
+        // tear down the SSH client but leave bash + claude orphaned on the
+        // remote (verified in production on draft #1, post #24). Reserve 20s
+        // for SSH connect + cleanup so the local timeout never trips first.
+        $remoteTimeout = max(30, $timeout - 20);
+        $remoteCmd = "bash -lc 'source ~/.profile 2>/dev/null; timeout --kill-after=10s {$remoteTimeout} {$claudePath} -p \"\$(cat {$promptFile})\" --model {$model} {$refsFlags} --dangerously-skip-permissions; STATUS=\$?; rm -f {$promptFile} 2>/dev/null || true; exit \$STATUS'";
         $runCmd = $sshPrefix . escapeshellarg($remoteCmd);
 
         $result = Process::timeout($timeout)->run($runCmd);

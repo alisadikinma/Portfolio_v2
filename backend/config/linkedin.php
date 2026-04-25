@@ -64,8 +64,12 @@ return [
         'refs_templates' => env('LINKEDIN_GEN_REFS_TEMPLATES', '/home/claudesn/refs-linkedin-templates.md'),
         'refs_formats' => env('LINKEDIN_GEN_REFS_FORMATS', '/home/claudesn/refs-linkedin-formats.md'),
         'refs_carousel' => env('LINKEDIN_GEN_REFS_CAROUSEL', '/home/claudesn/refs-linkedin-carousel.md'),
-        // Sync execution timeout — plugin runs brief+convert+validate in ~30-60s,
-        // carousel path ~60-90s. 300s matches nginx fastcgi_read_timeout.
-        'timeout_seconds' => (int) env('LINKEDIN_GEN_TIMEOUT_SECONDS', 300),
+        // Sync execution timeout for the SSH→Sonnet→plugin chain. Production
+        // measurement on a real blog (post #24, ~8KB content, 4 system prompt
+        // refs, carousel format) clocked at 369s wall — the prior 300s default
+        // caused job timeout, orphan SSH, and runaway retries. 600s gives
+        // ~62% headroom over observed worst case while staying well clear of
+        // PHP-FPM and queue retry_after ceilings.
+        'timeout_seconds' => (int) env('LINKEDIN_GEN_TIMEOUT_SECONDS', 600),
     ],
 ];
