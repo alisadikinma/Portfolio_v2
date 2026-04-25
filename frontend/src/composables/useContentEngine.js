@@ -68,9 +68,13 @@ export function useContentEngine() {
 
   const scoreBatchTrending = (source = '') => {
     const body = source ? { source } : {}
-    // Batch virality scoring can run Claude CLI over many topics; same rationale
-    // as pullTrending — lift the ceiling so it doesn't die at 30s.
-    return request('post', '/admin/content-engine/trending/score-batch', body, null, { timeout: 120000 })
+    // Batch virality scoring runs 3 sequential Sonnet sync calls
+    // (60 topics ÷ batch of 20) on top of ~15s of external feed aggregation.
+    // Real-world latency lands at 105-135s — production nginx logs status
+    // 499 (client closed) at exactly 119s, meaning axios was bailing one
+    // batch before Sonnet finished. 240s gives ~80s headroom over the
+    // observed worst case without sitting on a request indefinitely.
+    return request('post', '/admin/content-engine/trending/score-batch', body, null, { timeout: 240000 })
   }
 
   const importTrending = (topics) => request('post', '/admin/content-engine/trending/import', { topics })
