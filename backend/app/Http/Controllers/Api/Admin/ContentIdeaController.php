@@ -293,6 +293,15 @@ class ContentIdeaController extends Controller
      */
     public function pullTrending(Request $request): JsonResponse
     {
+        // Lifts PHP-FPM's default max_execution_time=30s ceiling. Aggregating
+        // 4 external feeds (Google News × 5 RSS, Google Trends × 2 regions,
+        // TikTok scrape, 3 YouTube Piped instances mostly dead) routinely
+        // burns ~15s of curl time alone — and FPM kills the worker before
+        // the response ships, surfacing in the browser as
+        // "Network error - no response received". nginx fastcgi_read_timeout
+        // is already 300s; this brings PHP in line.
+        set_time_limit(0);
+
         $source = $request->query('source');
         $trends = $this->trending->getAllTrends($source);
 
@@ -339,6 +348,13 @@ class ContentIdeaController extends Controller
      */
     public function scoreTrendingBatch(Request $request): JsonResponse
     {
+        // Same rationale as pullTrending(), but with stricter need: this
+        // path layers 3 sequential Sonnet sync calls (60 topics ÷ batch of 20)
+        // on top of the same external aggregation, taking 100-150s end to end.
+        // Without lifting max_execution_time, PHP-FPM kills the worker and
+        // the browser sees "Network error - no response received".
+        set_time_limit(0);
+
         // Request::input() reads from both body and query string by default,
         // so this handles the composable's POST-body call and any future
         // ?source=... query-string call with a single lookup.
