@@ -184,6 +184,18 @@ const carouselSlides = computed(() =>
   Array.isArray(draft.value?.carousel_slides) ? draft.value.carousel_slides : []
 )
 
+// Plugin v0.4.6+ splits per-slide text into copy_id (Indonesian, main headline)
+// + copy_en (English, subtitle). Older drafts (v0.4.5 and below) only have a
+// single `copy` field. These helpers prefer the new fields, fall back to copy.
+function slideCopyId(slide) {
+  if (!slide) return ''
+  return slide.copy_id || slide.copy || ''
+}
+function slideCopyEn(slide) {
+  if (!slide) return ''
+  return slide.copy_en || slide.copy || ''
+}
+
 function prevSlide() {
   if (activeSlideIndex.value > 0) activeSlideIndex.value--
 }
@@ -421,7 +433,14 @@ async function regenerateSingleSlide(slideIndex) {
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v3a5 5 0 00-5 5H4z" />
                   </svg>
                   <p class="text-cyan-300 text-xs uppercase tracking-wider mb-2">Rendering with GeminiGen…</p>
-                  <p class="text-white text-sm font-semibold max-w-md">{{ carouselSlides[activeSlideIndex]?.copy }}</p>
+                  <!-- Indonesian main headline -->
+                  <p class="text-white text-base font-bold uppercase tracking-tight max-w-md mb-1">
+                    {{ slideCopyId(carouselSlides[activeSlideIndex]) }}
+                  </p>
+                  <!-- English subtitle (golden, smaller) -->
+                  <p class="text-amber-400 text-xs italic max-w-md">
+                    {{ slideCopyEn(carouselSlides[activeSlideIndex]) }}
+                  </p>
                 </div>
 
                 <!-- Failed placeholder (with retry button) -->
@@ -440,25 +459,44 @@ async function regenerateSingleSlide(slideIndex) {
                   </button>
                 </div>
 
-                <!-- Pending / no-status placeholder (copy text preview) -->
+                <!-- Pending / no-status placeholder (copy text preview, bilingual) -->
                 <div v-else class="absolute inset-0 flex flex-col items-center justify-center text-center text-neutral-400 p-6">
                   <p class="text-xs uppercase tracking-wider mb-2">
                     {{ carouselSlides[activeSlideIndex]?.layout_hint || 'Image placeholder' }}
                   </p>
-                  <p class="text-white font-semibold max-w-md">{{ carouselSlides[activeSlideIndex]?.copy }}</p>
+                  <!-- Indonesian main headline (white, bold, uppercase) -->
+                  <p class="text-white text-lg font-bold uppercase tracking-tight max-w-md mb-2">
+                    {{ slideCopyId(carouselSlides[activeSlideIndex]) }}
+                  </p>
+                  <!-- English subtitle (golden, smaller, italic) -->
+                  <p class="text-amber-400 text-sm italic max-w-md">
+                    {{ slideCopyEn(carouselSlides[activeSlideIndex]) }}
+                  </p>
                 </div>
               </div>
 
-              <!-- Slide metadata + copy preview (sits BELOW the 3:4 frame so the image dominates).
-                   max-width matches the slide viewer's 60vh so the metadata bar aligns under the image. -->
-              <div class="mt-3 mx-auto rounded-lg bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 p-3"
+              <!-- Slide metadata + bilingual copy preview (sits BELOW the 3:4 frame so the image dominates).
+                   max-width matches the slide viewer's 60vh so the metadata bar aligns under the image.
+                   Shows both copy_id (Indonesian, headline) + copy_en (English, subtitle) per v0.4.6 schema. -->
+              <div class="mt-3 mx-auto rounded-lg bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 p-3 space-y-2"
                    style="max-width: min(100%, 60vh);">
-                <p class="text-[10px] uppercase tracking-wider text-neutral-500 mb-1">
+                <p class="text-[10px] uppercase tracking-wider text-neutral-500">
                   {{ carouselSlides[activeSlideIndex]?.layout_hint || 'body' }}
                 </p>
-                <p class="text-sm text-neutral-800 dark:text-neutral-200 leading-relaxed">
-                  {{ carouselSlides[activeSlideIndex]?.copy || '—' }}
-                </p>
+                <!-- ID label + Indonesian copy -->
+                <div>
+                  <span class="inline-block text-[9px] font-mono uppercase tracking-wider text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded bg-emerald-500/10 mr-2">ID</span>
+                  <span class="text-sm font-semibold text-neutral-900 dark:text-neutral-100 leading-relaxed">
+                    {{ slideCopyId(carouselSlides[activeSlideIndex]) || '—' }}
+                  </span>
+                </div>
+                <!-- EN label + English copy -->
+                <div>
+                  <span class="inline-block text-[9px] font-mono uppercase tracking-wider text-cyan-600 dark:text-cyan-400 px-1.5 py-0.5 rounded bg-cyan-500/10 mr-2">EN</span>
+                  <span class="text-sm text-neutral-700 dark:text-neutral-300 italic leading-relaxed">
+                    {{ slideCopyEn(carouselSlides[activeSlideIndex]) || '—' }}
+                  </span>
+                </div>
               </div>
 
               <!-- Image generation summary line -->

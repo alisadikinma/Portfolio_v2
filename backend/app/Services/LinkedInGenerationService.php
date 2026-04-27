@@ -220,21 +220,21 @@ class LinkedInGenerationService
         $promptFile = $tmpDir . DIRECTORY_SEPARATOR . 'linkedin-gen-' . uniqid() . '.txt';
         file_put_contents($promptFile, $prompt);
 
-        // --effort max: raise Sonnet's output token budget to the model
-        // ceiling (~64K). Carousel JSON for a 9-slide deck routinely needs
-        // 16-24K tokens (9 × ~1500 char image_prompt + caption 1100-1300
-        // + slides metadata + brief + validation envelope) — default
-        // effort silently truncates and the post-body fields drop off.
-        // Verified on draft #30 production failure: caption + hashtags +
-        // link_comment all empty because output was cut off mid-emission.
+        // Reverted --effort max: production-tested on draft #31, Sonnet hung
+        // past the 880s SSH timeout cap with no output. Default effort
+        // generates carousel JSON in 2-3 min reliably; the truncation issue
+        // (caption/hashtags/link_comment dropped on draft #30) is being
+        // solved structurally in plugin v0.4.6 by tightening per-layout
+        // copy length invariants (so each slide is shorter, freeing tokens
+        // for the post-body fields).
         try {
             if ($isWindows) {
-                $cmd = "& \"{$claudePath}\" -p (Get-Content -Raw \"{$promptFile}\") --model {$model} --effort max {$refsFlags} --dangerously-skip-permissions";
+                $cmd = "& \"{$claudePath}\" -p (Get-Content -Raw \"{$promptFile}\") --model {$model} {$refsFlags} --dangerously-skip-permissions";
                 $result = Process::timeout($timeout)->run(['powershell', '-Command', $cmd]);
             } else {
                 $result = Process::timeout($timeout)->run([
                     'bash', '-lc',
-                    "{$claudePath} -p \"\$(cat " . escapeshellarg($promptFile) . ")\" --model {$model} --effort max {$refsFlags} --dangerously-skip-permissions",
+                    "{$claudePath} -p \"\$(cat " . escapeshellarg($promptFile) . ")\" --model {$model} {$refsFlags} --dangerously-skip-permissions",
                 ]);
             }
         } finally {
@@ -279,8 +279,8 @@ class LinkedInGenerationService
         // remote (verified in production on draft #1, post #24). Reserve 20s
         // for SSH connect + cleanup so the local timeout never trips first.
         $remoteTimeout = max(30, $timeout - 20);
-        // --effort max: see comment in executeLocal() for rationale.
-        $remoteCmd = "bash -lc 'source ~/.profile 2>/dev/null; timeout --kill-after=10s {$remoteTimeout} {$claudePath} -p \"\$(cat {$promptFile})\" --model {$model} --effort max {$refsFlags} --dangerously-skip-permissions; STATUS=\$?; rm -f {$promptFile} 2>/dev/null || true; exit \$STATUS'";
+        // Reverted --effort max: see executeLocal() comment for rationale.
+        $remoteCmd = "bash -lc 'source ~/.profile 2>/dev/null; timeout --kill-after=10s {$remoteTimeout} {$claudePath} -p \"\$(cat {$promptFile})\" --model {$model} {$refsFlags} --dangerously-skip-permissions; STATUS=\$?; rm -f {$promptFile} 2>/dev/null || true; exit \$STATUS'";
         $runCmd = $sshPrefix . escapeshellarg($remoteCmd);
 
         $result = Process::timeout($timeout)->run($runCmd);
@@ -395,16 +395,21 @@ class LinkedInGenerationService
 
             // Plugin v0.4.3+ emits caption + hashtags + link_comment at the
             // carousel root (full LinkedIn post body — swipe teaser, hashtag
-            // mix, link-in-comment bridge). Older plugin versions don't emit
-            // these fields, so we fall back to:
-            //   caption     → cover slide copy (just a hook headline, weak)
-            //   hashtags    → brief.hashtags (often empty for carousels)
-            //   link_comment → brief.pull_quote (no URL — fails depth gate)
+            // mix, link-in-comment bridge). Plugin v0.4.6+ splits per-slide
+            // copy into copy_id (Indonesian, main headline) + copy_en
+            // (English, subtitle); older plugins use single `copy` field.
+            //
+            // Fallback chain (from best to worst, each may be missing):
+            //   caption     → carousel.caption ?? cover_slide.copy_en ??
+            //                 cover_slide.copy ?? ''
+            //   hashtags    → carousel.hashtags ?? brief.hashtags ?? []
+            //   link_comment → carousel.link_comment ?? brief.pull_quote ?? ''
             $coverSlide = collect($carousel['slides'] ?? [])->firstWhere('is_cover', true)
                 ?? ($carousel['slides'][0] ?? []);
 
             $updates['content'] = (string) (
                 $carousel['caption']
+                ?? $coverSlide['copy_en']
                 ?? $coverSlide['copy']
                 ?? ''
             );
