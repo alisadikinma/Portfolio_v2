@@ -384,11 +384,30 @@ class LinkedInGenerationService
         if ($format === 'carousel' && is_array($parsed['carousel'] ?? null)) {
             $carousel = $parsed['carousel'];
             $updates['carousel_slides'] = $carousel['slides'] ?? [];
-            // Cover slide copy is the "caption" equivalent for carousels
-            $coverSlide = collect($carousel['slides'] ?? [])->firstWhere('is_cover', true) ?? ($carousel['slides'][0] ?? []);
-            $updates['content'] = (string) ($carousel['caption'] ?? $coverSlide['copy'] ?? '');
-            $updates['link_comment'] = (string) ($parsed['brief']['pull_quote'] ?? '');
-            $updates['hashtags'] = $parsed['brief']['hashtags'] ?? [];
+
+            // Plugin v0.4.3+ emits caption + hashtags + link_comment at the
+            // carousel root (full LinkedIn post body — swipe teaser, hashtag
+            // mix, link-in-comment bridge). Older plugin versions don't emit
+            // these fields, so we fall back to:
+            //   caption     → cover slide copy (just a hook headline, weak)
+            //   hashtags    → brief.hashtags (often empty for carousels)
+            //   link_comment → brief.pull_quote (no URL — fails depth gate)
+            $coverSlide = collect($carousel['slides'] ?? [])->firstWhere('is_cover', true)
+                ?? ($carousel['slides'][0] ?? []);
+
+            $updates['content'] = (string) (
+                $carousel['caption']
+                ?? $coverSlide['copy']
+                ?? ''
+            );
+            $updates['hashtags'] = is_array($carousel['hashtags'] ?? null)
+                ? $carousel['hashtags']
+                : ($parsed['brief']['hashtags'] ?? []);
+            $updates['link_comment'] = (string) (
+                $carousel['link_comment']
+                ?? $parsed['brief']['pull_quote']
+                ?? ''
+            );
         } else {
             // Text path
             $post = $parsed['post'] ?? [];

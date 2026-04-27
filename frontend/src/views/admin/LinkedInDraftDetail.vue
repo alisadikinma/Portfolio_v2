@@ -356,11 +356,21 @@ async function regenerateSingleSlide(slideIndex) {
               No slides generated yet.
             </div>
             <div v-else>
-              <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
                 <p class="text-sm font-medium text-neutral-700 dark:text-neutral-300">
                   Slide {{ activeSlideIndex + 1 }} / {{ carouselSlides.length }}
                 </p>
                 <div class="flex gap-2">
+                  <!-- Per-slide regen — always available so operators can re-render
+                       any slide that doesn't meet expectations, not just failed ones -->
+                  <button
+                    @click="regenerateSingleSlide(activeSlideIndex)"
+                    :disabled="regenerateSlideMutation.isPending.value"
+                    class="px-3 py-1 text-xs rounded bg-amber-500/10 border border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 disabled:opacity-30"
+                    title="Re-render this slide (replaces existing image when GeminiGen finishes)"
+                  >
+                    {{ regenerateSlideMutation.isPending.value ? '↻ Queueing…' : '↻ Regen this slide' }}
+                  </button>
                   <button
                     @click="prevSlide"
                     :disabled="activeSlideIndex === 0"
