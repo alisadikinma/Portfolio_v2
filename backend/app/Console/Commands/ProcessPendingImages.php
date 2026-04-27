@@ -56,8 +56,13 @@ class ProcessPendingImages extends Command
                         $reason = "GeminiGen HTTP {$response->status()} after {$ageMinutes}min — treating as failed";
                         $job->update(['status' => 'failed', 'error_message' => $reason]);
                         $this->warn("    TIMEOUT: {$reason}");
-                        $this->syncToContentIdea($job, null, true);
-                        $imageService->handleSegmentFailure($job, $reason);
+                        if ($job->type === 'carousel_slide') {
+                            app(\App\Services\LinkedInCarouselImageService::class)
+                                ->handleWebhook($job->uuid, 'IMAGE_GENERATION_FAILED', ['error_message' => $reason]);
+                        } else {
+                            $this->syncToContentIdea($job, null, true);
+                            $imageService->handleSegmentFailure($job, $reason);
+                        }
                     } else {
                         $this->warn("    HTTP {$response->status()} (age={$ageMinutes}min) — skipping this tick");
                     }
@@ -77,6 +82,20 @@ class ProcessPendingImages extends Command
 
                 if ($status === 2 && $remoteUrl) {
                     $this->info("    Image ready! Downloading...");
+
+                    // LinkedIn carousel slide jobs: delegate to the dedicated
+                    // service which handles correct storage path
+                    // (linkedin-carousel/ + planned_filename), updates the job
+                    // row, and mirrors image_status onto LinkedInPost
+                    // .carousel_slides JSON. Mirrors the early-routing in
+                    // ImageGenerationService::handleWebhook so the polling
+                    // path and webhook path stay symmetric.
+                    if ($job->type === 'carousel_slide') {
+                        app(\App\Services\LinkedInCarouselImageService::class)
+                            ->handleWebhook($job->uuid, 'IMAGE_GENERATION_COMPLETED', ['media_url' => $remoteUrl]);
+                        $this->info("    Carousel slide mirrored for draft {$job->linkedin_post_id} slide {$job->slide_index}");
+                        continue;
+                    }
 
                     $localUrl = $imageService->downloadAndStore($remoteUrl);
 
@@ -108,6 +127,16 @@ class ProcessPendingImages extends Command
                     ]);
                     $this->error("    FAILED: " . $reason);
 
+                    // LinkedIn carousel slide failure: mirror status to slide
+                    // JSON so the UI flips from generating → failed and the
+                    // operator can retry. ContentIdea sync only matters for
+                    // article jobs.
+                    if ($job->type === 'carousel_slide') {
+                        app(\App\Services\LinkedInCarouselImageService::class)
+                            ->handleWebhook($job->uuid, 'IMAGE_GENERATION_FAILED', ['error_message' => $reason]);
+                        continue;
+                    }
+
                     // Sync failure to content_ideas (advance-rule update + variation mirror)
                     $this->syncToContentIdea($job, null, true);
                     // Drive the segment retry state machine: bump retry_count,
@@ -133,8 +162,15 @@ class ProcessPendingImages extends Command
                         ]);
                         $this->warn("    TIMEOUT: {$reason}");
 
-                        $this->syncToContentIdea($job, null, true);
-                        $imageService->handleSegmentFailure($job, $reason);
+                        // LinkedIn carousel slide stuck-timeout: mirror failed
+                        // status onto the slide JSON so the UI flips to failed.
+                        if ($job->type === 'carousel_slide') {
+                            app(\App\Services\LinkedInCarouselImageService::class)
+                                ->handleWebhook($job->uuid, 'IMAGE_GENERATION_FAILED', ['error_message' => $reason]);
+                        } else {
+                            $this->syncToContentIdea($job, null, true);
+                            $imageService->handleSegmentFailure($job, $reason);
+                        }
                     } else {
                         $this->line("    Still processing (status={$status}, age={$ageMinutes}min)");
                     }
