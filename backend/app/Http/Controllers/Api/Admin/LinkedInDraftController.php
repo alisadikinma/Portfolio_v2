@@ -7,6 +7,7 @@ use App\Exceptions\InvalidStateTransitionException;
 use App\Http\Controllers\Controller;
 use App\Jobs\GenerateLinkedInPost;
 use App\Models\LinkedInPost;
+use App\Services\LinkedInCarouselImageService;
 use App\Services\LinkedInPublishService;
 use App\Services\PipelineGuard;
 use Illuminate\Http\JsonResponse;
@@ -34,6 +35,7 @@ class LinkedInDraftController extends Controller
     public function __construct(
         private readonly PipelineGuard $guard,
         private readonly LinkedInPublishService $publisher,
+        private readonly LinkedInCarouselImageService $carouselImages,
     ) {
     }
 
@@ -311,6 +313,93 @@ class LinkedInDraftController extends Controller
             'success' => true,
             'data' => $draft->fresh(['post.translations', 'account']),
             'message' => 'Published to LinkedIn.',
+        ]);
+    }
+
+    /**
+     * POST /admin/linkedin-drafts/{id}/regenerate-images
+     * Re-dispatches GeminiGen for every slide that doesn't yet have a 'done'
+     * image. Used when the operator wants to re-render after editing slides
+     * or after a partial-failure batch.
+     */
+    public function regenerateAllImages(int $id): JsonResponse
+    {
+        $draft = LinkedInPost::find($id);
+        if ($draft === null) {
+            return $this->notFound();
+        }
+
+        if ($draft->format !== 'carousel') {
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'not_carousel',
+                    'message' => 'Image regeneration is only valid for carousel drafts.',
+                ],
+            ], 422);
+        }
+
+        $count = $this->carouselImages->dispatchAllSlides($draft);
+
+        return response()->json([
+            'success' => true,
+            'data' => $draft->fresh(['post.translations', 'account']),
+            'message' => "Dispatched {$count} slide image generation jobs.",
+            'dispatched' => $count,
+        ]);
+    }
+
+    /**
+     * POST /admin/linkedin-drafts/{id}/slides/{slideIndex}/regenerate-image
+     * Re-dispatches a single slide. Used by the retry-this-slide hover button.
+     * slideIndex is 0-based (matches carousel_slides array index).
+     */
+    public function regenerateSlideImage(int $id, int $slideIndex): JsonResponse
+    {
+        $draft = LinkedInPost::find($id);
+        if ($draft === null) {
+            return $this->notFound();
+        }
+
+        if ($draft->format !== 'carousel') {
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'not_carousel',
+                    'message' => 'Image regeneration is only valid for carousel drafts.',
+                ],
+            ], 422);
+        }
+
+        $slides = $draft->carousel_slides ?? [];
+        if (! isset($slides[$slideIndex])) {
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'slide_out_of_range',
+                    'message' => "Slide index {$slideIndex} out of range (0.." . (count($slides) - 1) . ').',
+                ],
+            ], 422);
+        }
+
+        $uuid = $this->carouselImages->dispatchSingleSlide($draft, $slideIndex);
+
+        if ($uuid === null) {
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'dispatch_failed',
+                    'message' => 'GeminiGen dispatch returned no UUID. Check logs.',
+                ],
+                'data' => $draft->fresh(['post.translations', 'account']),
+            ], 503);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $draft->fresh(['post.translations', 'account']),
+            'message' => "Slide {$slideIndex} re-dispatched.",
+            'job_uuid' => $uuid,
         ]);
     }
 

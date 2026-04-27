@@ -445,6 +445,27 @@ class LinkedInGenerationService
             ]);
         }
 
+        // Dispatch carousel image rendering for either AwaitingPublish or
+        // ManualReview — operators want to SEE the rendered slides during
+        // manual review, not just the slide copy. Idempotent: the service
+        // skips slides already done.
+        if ($format === 'carousel') {
+            try {
+                \App\Jobs\GenerateLinkedInCarouselImages::dispatch($draft->id);
+                Log::info('[LinkedInGeneration] dispatched carousel image job', [
+                    'draft_id' => $draft->id,
+                    'next_state' => $nextState->value,
+                ]);
+            } catch (\Throwable $e) {
+                Log::error('[LinkedInGeneration] carousel image dispatch failed', [
+                    'draft_id' => $draft->id,
+                    'error' => $e->getMessage(),
+                ]);
+                // Do not fail the whole pipeline — admin can manually trigger
+                // regenerate-all from the UI.
+            }
+        }
+
         return [
             'success' => true,
             'draft_id' => $draft->id,

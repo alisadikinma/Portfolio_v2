@@ -8,6 +8,8 @@ import {
   useCancelLinkedInDraft,
   usePublishLinkedInDraftNow,
   useRegenerateLinkedInDraft,
+  useRegenerateAllCarouselImages,
+  useRegenerateSlideImage,
   postTitle,
 } from '@/composables/useLinkedInDrafts'
 
@@ -23,6 +25,8 @@ const approveMutation = useApproveLinkedInDraft()
 const cancelMutation = useCancelLinkedInDraft()
 const publishNowMutation = usePublishLinkedInDraftNow()
 const regenerateMutation = useRegenerateLinkedInDraft()
+const regenerateAllImagesMutation = useRegenerateAllCarouselImages()
+const regenerateSlideMutation = useRegenerateSlideImage()
 
 // Edit mode state — seeded from draft when entering edit mode
 const isEditing = ref(false)
@@ -186,6 +190,62 @@ function prevSlide() {
 function nextSlide() {
   if (activeSlideIndex.value < carouselSlides.value.length - 1) activeSlideIndex.value++
 }
+
+// ============================================================================
+// Carousel image generation status + retry actions
+// ============================================================================
+
+const slidesWithImageStatus = computed(() => {
+  const tally = { done: 0, generating: 0, pending: 0, failed: 0, total: 0 }
+  for (const slide of carouselSlides.value) {
+    tally.total++
+    const status = slide?.image_status
+    if (status === 'done') tally.done++
+    else if (status === 'generating') tally.generating++
+    else if (status === 'failed') tally.failed++
+    else tally.pending++
+  }
+  return tally
+})
+
+function imageStatusBadge(status) {
+  return {
+    done: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40',
+    generating: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/40 animate-pulse',
+    failed: 'bg-red-500/20 text-red-400 border-red-500/40',
+    pending: 'bg-neutral-500/20 text-neutral-400 border-neutral-500/40',
+  }[status] || 'bg-neutral-500/20 text-neutral-400 border-neutral-500/40'
+}
+
+function imageStatusLabel(status) {
+  return {
+    done: 'Ready',
+    generating: 'Generating…',
+    failed: 'Failed',
+    pending: 'Pending',
+  }[status] || 'Pending'
+}
+
+async function regenerateAllImages() {
+  if (!draft.value) return
+  if (!confirm(`Regenerate ALL ${carouselSlides.value.length} slide images? This will re-dispatch every slide that isn't already done.`)) return
+  try {
+    await regenerateAllImagesMutation.mutateAsync(draftId.value)
+    refetch()
+  } catch (err) {
+    alert(err?.response?.data?.error?.message || 'Image regeneration failed')
+  }
+}
+
+async function regenerateSingleSlide(slideIndex) {
+  if (!confirm(`Re-render slide ${slideIndex + 1}? Existing image will be replaced when GeminiGen finishes (~30s).`)) return
+  try {
+    await regenerateSlideMutation.mutateAsync({ id: draftId.value, slideIndex })
+    refetch()
+  } catch (err) {
+    alert(err?.response?.data?.error?.message || 'Slide retry failed')
+  }
+}
 </script>
 
 <template>
@@ -319,13 +379,50 @@ function nextSlide() {
               </div>
 
               <div class="aspect-[4/5] rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden bg-neutral-50 dark:bg-neutral-800 flex flex-col">
-                <div class="flex-1 flex items-center justify-center p-6 bg-gradient-to-br from-neutral-900 to-neutral-700">
+                <div class="flex-1 flex items-center justify-center p-6 bg-gradient-to-br from-neutral-900 to-neutral-700 relative">
+                  <!-- Status pill overlay (top-right) -->
+                  <span
+                    v-if="carouselSlides[activeSlideIndex]?.image_status"
+                    class="absolute top-3 right-3 px-2.5 py-1 rounded-full text-[11px] font-medium uppercase tracking-wider border"
+                    :class="imageStatusBadge(carouselSlides[activeSlideIndex].image_status)"
+                  >
+                    {{ imageStatusLabel(carouselSlides[activeSlideIndex].image_status) }}
+                  </span>
+
+                  <!-- Rendered slide image (when done) -->
                   <img
                     v-if="carouselSlides[activeSlideIndex]?.image_url"
                     :src="carouselSlides[activeSlideIndex].image_url"
                     :alt="`Slide ${activeSlideIndex + 1}`"
                     class="max-w-full max-h-full object-contain"
                   >
+
+                  <!-- Generating placeholder (spinner + copy text preview) -->
+                  <div v-else-if="carouselSlides[activeSlideIndex]?.image_status === 'generating'" class="text-center">
+                    <svg class="animate-spin w-12 h-12 text-cyan-400 mx-auto mb-3" viewBox="0 0 24 24" fill="none">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" />
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v3a5 5 0 00-5 5H4z" />
+                    </svg>
+                    <p class="text-cyan-300 text-xs uppercase tracking-wider mb-2">Rendering with GeminiGen…</p>
+                    <p class="text-white text-sm font-semibold max-w-md mx-auto">{{ carouselSlides[activeSlideIndex]?.copy }}</p>
+                  </div>
+
+                  <!-- Failed placeholder (with retry button) -->
+                  <div v-else-if="carouselSlides[activeSlideIndex]?.image_status === 'failed'" class="text-center">
+                    <p class="text-red-400 text-xs uppercase tracking-wider mb-2">Render failed</p>
+                    <p class="text-red-200 text-xs mb-3 max-w-md mx-auto">
+                      {{ carouselSlides[activeSlideIndex]?.image_error || 'Unknown error from GeminiGen' }}
+                    </p>
+                    <button
+                      @click="regenerateSingleSlide(activeSlideIndex)"
+                      :disabled="regenerateSlideMutation.isPending.value"
+                      class="px-3 py-1.5 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 disabled:opacity-50"
+                    >
+                      ↻ Retry this slide
+                    </button>
+                  </div>
+
+                  <!-- Pending / no-status placeholder (copy text preview) -->
                   <div v-else class="text-neutral-400 text-center">
                     <p class="text-xs uppercase tracking-wider mb-2">
                       {{ carouselSlides[activeSlideIndex]?.layout_hint || 'Image placeholder' }}
@@ -343,20 +440,61 @@ function nextSlide() {
                 </div>
               </div>
 
-              <!-- Thumbnail strip -->
+              <!-- Image generation summary line -->
+              <div
+                v-if="slidesWithImageStatus.total > 0"
+                class="mt-3 flex items-center justify-between text-xs text-neutral-500"
+              >
+                <div class="flex flex-wrap gap-x-3 gap-y-1 font-mono">
+                  <span class="text-emerald-500">✓ {{ slidesWithImageStatus.done }}</span>
+                  <span v-if="slidesWithImageStatus.generating > 0" class="text-cyan-500 animate-pulse">
+                    ↻ {{ slidesWithImageStatus.generating }} generating
+                  </span>
+                  <span v-if="slidesWithImageStatus.pending > 0" class="text-neutral-500">
+                    · {{ slidesWithImageStatus.pending }} pending
+                  </span>
+                  <span v-if="slidesWithImageStatus.failed > 0" class="text-red-500">
+                    ✕ {{ slidesWithImageStatus.failed }} failed
+                  </span>
+                  <span class="text-neutral-400">/ {{ slidesWithImageStatus.total }} total</span>
+                </div>
+              </div>
+
+              <!-- Thumbnail strip with per-slide image status indicator dots -->
               <div class="mt-3 flex gap-2 overflow-x-auto pb-2">
                 <button
                   v-for="(slide, i) in carouselSlides"
                   :key="i"
                   @click="activeSlideIndex = i"
                   :class="[
-                    'flex-shrink-0 w-14 h-14 rounded-md border-2 text-[10px] font-mono flex items-center justify-center transition-all',
+                    'flex-shrink-0 w-14 h-14 rounded-md border-2 text-[10px] font-mono flex items-center justify-center transition-all relative overflow-hidden',
                     i === activeSlideIndex
                       ? 'border-amber-500 bg-amber-500/20 text-amber-600'
                       : 'border-neutral-300 dark:border-neutral-700 text-neutral-500 hover:border-amber-500/50',
                   ]"
                 >
-                  {{ i + 1 }}
+                  <!-- Thumbnail image when ready -->
+                  <img
+                    v-if="slide?.image_url"
+                    :src="slide.image_url"
+                    :alt="`Slide ${i + 1}`"
+                    class="absolute inset-0 w-full h-full object-cover opacity-60"
+                  >
+                  <!-- Status dot -->
+                  <span
+                    v-if="slide?.image_status"
+                    :class="[
+                      'absolute top-0 right-0 w-2 h-2 rounded-full m-0.5',
+                      slide.image_status === 'done' && 'bg-emerald-500',
+                      slide.image_status === 'generating' && 'bg-cyan-500 animate-pulse',
+                      slide.image_status === 'failed' && 'bg-red-500',
+                      slide.image_status === 'pending' && 'bg-neutral-400',
+                    ]"
+                  />
+                  <!-- Slide number on top of any thumbnail backdrop -->
+                  <span class="relative z-10 font-bold text-shadow drop-shadow-md">
+                    {{ i + 1 }}
+                  </span>
                 </button>
               </div>
             </div>
@@ -605,7 +743,17 @@ function nextSlide() {
               :disabled="regenerateMutation.isPending.value"
               class="w-full px-3 py-2 rounded-lg border border-cyan-500 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/10 text-sm font-medium disabled:opacity-50"
             >
-              {{ regenerateMutation.isPending.value ? 'Queueing…' : '↻ Regenerate' }}
+              {{ regenerateMutation.isPending.value ? 'Queueing…' : '↻ Regenerate copy' }}
+            </button>
+
+            <!-- Carousel-only: regenerate all slide images (re-dispatches GeminiGen for every non-done slide) -->
+            <button
+              v-if="draft.format === 'carousel' && carouselSlides.length > 0"
+              @click="regenerateAllImages"
+              :disabled="regenerateAllImagesMutation.isPending.value"
+              class="w-full px-3 py-2 rounded-lg border border-amber-500 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 text-sm font-medium disabled:opacity-50"
+            >
+              {{ regenerateAllImagesMutation.isPending.value ? 'Dispatching…' : '🖼 Regenerate all images' }}
             </button>
 
             <button

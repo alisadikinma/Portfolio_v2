@@ -61,7 +61,10 @@ export function useLinkedInDraftsList(filters) {
 
 /**
  * Detail query. Polls every 3s when status is in-progress (pending_generation,
- * generating, validating) to reflect plugin progress in real time.
+ * generating, validating) to reflect plugin progress in real time. Also polls
+ * every 5s when this is a carousel draft with at least one slide whose
+ * image_status is 'generating' or 'pending' — so the operator sees freshly-
+ * rendered slide PNGs without manual refresh.
  */
 export function useLinkedInDraft(id) {
   const query = useQuery({
@@ -71,8 +74,18 @@ export function useLinkedInDraft(id) {
     staleTime: 30_000,
     refetchOnMount: 'always',
     refetchInterval: (q) => {
-      const status = q.state.data?.data?.status
-      return ['pending_generation', 'generating', 'validating'].includes(status) ? 3_000 : false
+      const data = q.state.data?.data
+      const status = data?.status
+      if (['pending_generation', 'generating', 'validating'].includes(status)) {
+        return 3_000
+      }
+      // Carousel slide image polling — 5s while any slide is mid-flight.
+      // Webhooks land server-side; this poll picks them up on the client.
+      const slides = Array.isArray(data?.carousel_slides) ? data.carousel_slides : []
+      const anyMidFlight = slides.some(s =>
+        s?.image_status === 'generating' || s?.image_status === 'pending'
+      )
+      return anyMidFlight ? 5_000 : false
     },
   })
 
@@ -84,6 +97,32 @@ export function useLinkedInDraft(id) {
     error: query.error,
     refetch: query.refetch,
   }
+}
+
+/** POST /admin/linkedin-drafts/{id}/regenerate-images — bulk re-dispatch */
+export function useRegenerateAllCarouselImages() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) =>
+      api.post(`/admin/linkedin-drafts/${id}/regenerate-images`).then(r => r.data),
+    onSuccess: (_, id) => {
+      qc.invalidateQueries({ queryKey: [LIST_KEY] })
+      qc.invalidateQueries({ queryKey: [LIST_KEY, id] })
+    },
+  })
+}
+
+/** POST /admin/linkedin-drafts/{id}/slides/{slideIndex}/regenerate-image — single slide retry */
+export function useRegenerateSlideImage() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, slideIndex }) =>
+      api.post(`/admin/linkedin-drafts/${id}/slides/${slideIndex}/regenerate-image`).then(r => r.data),
+    onSuccess: (_, { id }) => {
+      qc.invalidateQueries({ queryKey: [LIST_KEY] })
+      qc.invalidateQueries({ queryKey: [LIST_KEY, id] })
+    },
+  })
 }
 
 /** PUT /admin/linkedin-drafts/{id} — saves content edits */

@@ -306,6 +306,12 @@ Route::prefix('automation')->group(function () {
     // GeminiGen image webhook (public, no auth — called by GeminiGen servers)
     Route::post('/blog/image-webhook', [\App\Http\Controllers\Api\BlogPipelineController::class, 'imageWebhook']);
 
+    // GeminiGen webhook for LinkedIn carousel slide PNGs. Routes the same payload
+    // shape ({event, uuid, data}) to LinkedInCarouselImageService — kept on its
+    // own URL because the matching/persistence path is different (LinkedInPost
+    // carousel_slides JSON column, not Post.featured_image / ContentIdea).
+    Route::post('/linkedin/carousel-image-webhook', \App\Http\Controllers\Api\LinkedInCarouselImageWebhookController::class);
+
     // Carousel webhook (Content Engine calls this to save carousel draft)
     Route::post('/carousel/save-draft', [CarouselDraftController::class, 'saveDraft']);
 });
@@ -1200,7 +1206,7 @@ Route::middleware(['auth:sanctum'])->prefix('admin/content-engine')->group(funct
 // publish, schedule. Plugin (WIP) generates content only.
 // ============================================================================
 
-// Admin draft CRUD (7 endpoints per plugin design §4.5)
+// Admin draft CRUD (7 endpoints per plugin design §4.5 + 2 carousel image endpoints)
 Route::middleware(['auth:sanctum'])->prefix('admin/linkedin-drafts')->group(function () {
     Route::get('/', [LinkedInDraftController::class, 'index']);
     Route::get('/{id}', [LinkedInDraftController::class, 'show']);
@@ -1209,6 +1215,11 @@ Route::middleware(['auth:sanctum'])->prefix('admin/linkedin-drafts')->group(func
     Route::post('/{id}/approve', [LinkedInDraftController::class, 'approve']);
     Route::post('/{id}/cancel', [LinkedInDraftController::class, 'cancel']);
     Route::post('/{id}/publish-now', [LinkedInDraftController::class, 'publishNow']);
+    // Carousel image dispatch — bulk + per-slide retry. Both endpoints fire
+    // synchronously into LinkedInCarouselImageService (HTTP to GeminiGen).
+    // Webhook completes asynchronously; frontend polls draft.show for status.
+    Route::post('/{id}/regenerate-images', [LinkedInDraftController::class, 'regenerateAllImages']);
+    Route::post('/{id}/slides/{slideIndex}/regenerate-image', [LinkedInDraftController::class, 'regenerateSlideImage']);
 });
 
 // OAuth flow. `connect` is admin-only; `callback` is public (LinkedIn
