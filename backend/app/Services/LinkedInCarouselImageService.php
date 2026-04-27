@@ -160,10 +160,17 @@ class LinkedInCarouselImageService
             $finalPrompt .= '. Reference the provided brand logo image for the centered watermark badge — use the exact logo, do not generate a new one.';
         }
 
+        // GeminiGen / nano-banana-pro silently rejects non-standard aspect
+        // ratios (verified — '4:5' fell back to '16:9' default in production
+        // on draft #28's first render). Only Imagen-native ratios work:
+        // 1:1, 16:9, 9:16, 4:3, 3:4. We use 1:1 (1080x1080 square) for
+        // LinkedIn carousels — universally supported, document-share native,
+        // mobile-safe, gives bilingual headline + visual hook enough room
+        // without the ratio gamble.
         $multipart = [
             ['name' => 'prompt', 'contents' => $finalPrompt],
             ['name' => 'model', 'contents' => $this->resolveModel()],
-            ['name' => 'aspect_ratio', 'contents' => '4:5'],
+            ['name' => 'aspect_ratio', 'contents' => '1:1'],
             ['name' => 'style', 'contents' => 'Photorealistic'],
             ['name' => 'webhook', 'contents' => $webhookUrl],
             ['name' => 'webhook_url', 'contents' => $webhookUrl],

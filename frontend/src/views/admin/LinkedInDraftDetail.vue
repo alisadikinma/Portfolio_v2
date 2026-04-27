@@ -382,7 +382,7 @@ async function regenerateSingleSlide(slideIndex) {
                    Native render is 1080x1350 (4:5 portrait), so the frame ratio
                    matches the image ratio and there is no letterboxing. -->
               <div class="rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden bg-gradient-to-br from-neutral-900 to-neutral-700 mx-auto relative"
-                   style="aspect-ratio: 4 / 5; max-height: 65vh; max-width: min(100%, calc(65vh * 0.8));">
+                   style="aspect-ratio: 1 / 1; max-height: 70vh; max-width: min(100%, 70vh);">
                 <!-- Status pill overlay (top-right) -->
                 <span
                   v-if="carouselSlides[activeSlideIndex]?.image_status"
@@ -436,9 +436,9 @@ async function regenerateSingleSlide(slideIndex) {
                 </div>
               </div>
 
-              <!-- Slide metadata + copy preview (sits OUTSIDE the 4:5 frame so the image dominates) -->
+              <!-- Slide metadata + copy preview (sits OUTSIDE the square frame so the image dominates) -->
               <div class="mt-3 mx-auto rounded-lg bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 p-3"
-                   style="max-width: min(100%, calc(65vh * 0.8));">
+                   style="max-width: min(100%, 70vh);">
                 <p class="text-[10px] uppercase tracking-wider text-neutral-500 mb-1">
                   {{ carouselSlides[activeSlideIndex]?.layout_hint || 'body' }}
                 </p>
