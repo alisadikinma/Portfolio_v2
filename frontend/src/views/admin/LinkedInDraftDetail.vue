@@ -378,67 +378,73 @@ async function regenerateSingleSlide(slideIndex) {
                 </div>
               </div>
 
-              <div class="rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden bg-neutral-50 dark:bg-neutral-800 flex flex-col mx-auto"
+              <!-- Image-only 4:5 frame — slide PNG fills the entire container.
+                   Native render is 1080x1350 (4:5 portrait), so the frame ratio
+                   matches the image ratio and there is no letterboxing. -->
+              <div class="rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden bg-gradient-to-br from-neutral-900 to-neutral-700 mx-auto relative"
                    style="aspect-ratio: 4 / 5; max-height: 65vh; max-width: min(100%, calc(65vh * 0.8));">
-                <div class="flex-1 flex items-center justify-center p-4 bg-gradient-to-br from-neutral-900 to-neutral-700 relative overflow-hidden">
-                  <!-- Status pill overlay (top-right) -->
-                  <span
-                    v-if="carouselSlides[activeSlideIndex]?.image_status"
-                    class="absolute top-3 right-3 px-2.5 py-1 rounded-full text-[11px] font-medium uppercase tracking-wider border"
-                    :class="imageStatusBadge(carouselSlides[activeSlideIndex].image_status)"
-                  >
-                    {{ imageStatusLabel(carouselSlides[activeSlideIndex].image_status) }}
-                  </span>
+                <!-- Status pill overlay (top-right) -->
+                <span
+                  v-if="carouselSlides[activeSlideIndex]?.image_status"
+                  class="absolute top-3 right-3 z-10 px-2.5 py-1 rounded-full text-[11px] font-medium uppercase tracking-wider border"
+                  :class="imageStatusBadge(carouselSlides[activeSlideIndex].image_status)"
+                >
+                  {{ imageStatusLabel(carouselSlides[activeSlideIndex].image_status) }}
+                </span>
 
-                  <!-- Rendered slide image (when done) -->
-                  <img
-                    v-if="carouselSlides[activeSlideIndex]?.image_url"
-                    :src="carouselSlides[activeSlideIndex].image_url"
-                    :alt="`Slide ${activeSlideIndex + 1}`"
-                    class="max-w-full max-h-full object-contain"
-                  >
+                <!-- Rendered slide image (when done) — full bleed, fills the 4:5 frame -->
+                <img
+                  v-if="carouselSlides[activeSlideIndex]?.image_url"
+                  :src="carouselSlides[activeSlideIndex].image_url"
+                  :alt="`Slide ${activeSlideIndex + 1}`"
+                  class="absolute inset-0 w-full h-full object-cover"
+                >
 
-                  <!-- Generating placeholder (spinner + copy text preview) -->
-                  <div v-else-if="carouselSlides[activeSlideIndex]?.image_status === 'generating'" class="text-center">
-                    <svg class="animate-spin w-12 h-12 text-cyan-400 mx-auto mb-3" viewBox="0 0 24 24" fill="none">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" />
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v3a5 5 0 00-5 5H4z" />
-                    </svg>
-                    <p class="text-cyan-300 text-xs uppercase tracking-wider mb-2">Rendering with GeminiGen…</p>
-                    <p class="text-white text-sm font-semibold max-w-md mx-auto">{{ carouselSlides[activeSlideIndex]?.copy }}</p>
-                  </div>
-
-                  <!-- Failed placeholder (with retry button) -->
-                  <div v-else-if="carouselSlides[activeSlideIndex]?.image_status === 'failed'" class="text-center">
-                    <p class="text-red-400 text-xs uppercase tracking-wider mb-2">Render failed</p>
-                    <p class="text-red-200 text-xs mb-3 max-w-md mx-auto">
-                      {{ carouselSlides[activeSlideIndex]?.image_error || 'Unknown error from GeminiGen' }}
-                    </p>
-                    <button
-                      @click="regenerateSingleSlide(activeSlideIndex)"
-                      :disabled="regenerateSlideMutation.isPending.value"
-                      class="px-3 py-1.5 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 disabled:opacity-50"
-                    >
-                      ↻ Retry this slide
-                    </button>
-                  </div>
-
-                  <!-- Pending / no-status placeholder (copy text preview) -->
-                  <div v-else class="text-neutral-400 text-center">
-                    <p class="text-xs uppercase tracking-wider mb-2">
-                      {{ carouselSlides[activeSlideIndex]?.layout_hint || 'Image placeholder' }}
-                    </p>
-                    <p class="text-white font-semibold">{{ carouselSlides[activeSlideIndex]?.copy }}</p>
-                  </div>
+                <!-- Generating placeholder (spinner + copy text preview) -->
+                <div v-else-if="carouselSlides[activeSlideIndex]?.image_status === 'generating'"
+                     class="absolute inset-0 flex flex-col items-center justify-center text-center p-6">
+                  <svg class="animate-spin w-12 h-12 text-cyan-400 mb-3" viewBox="0 0 24 24" fill="none">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" />
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v3a5 5 0 00-5 5H4z" />
+                  </svg>
+                  <p class="text-cyan-300 text-xs uppercase tracking-wider mb-2">Rendering with GeminiGen…</p>
+                  <p class="text-white text-sm font-semibold max-w-md">{{ carouselSlides[activeSlideIndex]?.copy }}</p>
                 </div>
-                <div class="p-4 bg-white dark:bg-neutral-900 border-t border-neutral-200 dark:border-neutral-700">
-                  <p class="text-[10px] uppercase tracking-wider text-neutral-500 mb-1">
-                    {{ carouselSlides[activeSlideIndex]?.layout_hint || 'body' }}
+
+                <!-- Failed placeholder (with retry button) -->
+                <div v-else-if="carouselSlides[activeSlideIndex]?.image_status === 'failed'"
+                     class="absolute inset-0 flex flex-col items-center justify-center text-center p-6">
+                  <p class="text-red-400 text-xs uppercase tracking-wider mb-2">Render failed</p>
+                  <p class="text-red-200 text-xs mb-3 max-w-md">
+                    {{ carouselSlides[activeSlideIndex]?.image_error || 'Unknown error from GeminiGen' }}
                   </p>
-                  <p class="text-sm text-neutral-800 dark:text-neutral-200">
-                    {{ carouselSlides[activeSlideIndex]?.copy || '—' }}
-                  </p>
+                  <button
+                    @click="regenerateSingleSlide(activeSlideIndex)"
+                    :disabled="regenerateSlideMutation.isPending.value"
+                    class="px-3 py-1.5 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 disabled:opacity-50"
+                  >
+                    ↻ Retry this slide
+                  </button>
                 </div>
+
+                <!-- Pending / no-status placeholder (copy text preview) -->
+                <div v-else class="absolute inset-0 flex flex-col items-center justify-center text-center text-neutral-400 p-6">
+                  <p class="text-xs uppercase tracking-wider mb-2">
+                    {{ carouselSlides[activeSlideIndex]?.layout_hint || 'Image placeholder' }}
+                  </p>
+                  <p class="text-white font-semibold max-w-md">{{ carouselSlides[activeSlideIndex]?.copy }}</p>
+                </div>
+              </div>
+
+              <!-- Slide metadata + copy preview (sits OUTSIDE the 4:5 frame so the image dominates) -->
+              <div class="mt-3 mx-auto rounded-lg bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 p-3"
+                   style="max-width: min(100%, calc(65vh * 0.8));">
+                <p class="text-[10px] uppercase tracking-wider text-neutral-500 mb-1">
+                  {{ carouselSlides[activeSlideIndex]?.layout_hint || 'body' }}
+                </p>
+                <p class="text-sm text-neutral-800 dark:text-neutral-200 leading-relaxed">
+                  {{ carouselSlides[activeSlideIndex]?.copy || '—' }}
+                </p>
               </div>
 
               <!-- Image generation summary line -->
