@@ -388,11 +388,14 @@ async function regenerateSingleSlide(slideIndex) {
                 </div>
               </div>
 
-              <!-- Image-only 4:5 frame — slide PNG fills the entire container.
-                   Native render is 1080x1350 (4:5 portrait), so the frame ratio
-                   matches the image ratio and there is no letterboxing. -->
+              <!-- Image-only 3:4 frame — slide PNG fills the entire container.
+                   Native render is 1080x1440 (3:4 portrait — Imagen-native ratio
+                   chosen for cross-platform reuse: full-bleed on LinkedIn,
+                   center-crops cleanly to 4:5 on Instagram Feed, centers with
+                   minor letterbox on TikTok). Frame ratio matches the image
+                   ratio so there is no letterboxing in this admin viewer. -->
               <div class="rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden bg-gradient-to-br from-neutral-900 to-neutral-700 mx-auto relative"
-                   style="aspect-ratio: 1 / 1; max-height: 70vh; max-width: min(100%, 70vh);">
+                   style="aspect-ratio: 3 / 4; max-height: 80vh; max-width: min(100%, 60vh);">
                 <!-- Status pill overlay (top-right) -->
                 <span
                   v-if="carouselSlides[activeSlideIndex]?.image_status"
@@ -446,9 +449,10 @@ async function regenerateSingleSlide(slideIndex) {
                 </div>
               </div>
 
-              <!-- Slide metadata + copy preview (sits OUTSIDE the square frame so the image dominates) -->
+              <!-- Slide metadata + copy preview (sits BELOW the 3:4 frame so the image dominates).
+                   max-width matches the slide viewer's 60vh so the metadata bar aligns under the image. -->
               <div class="mt-3 mx-auto rounded-lg bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 p-3"
-                   style="max-width: min(100%, 70vh);">
+                   style="max-width: min(100%, 60vh);">
                 <p class="text-[10px] uppercase tracking-wider text-neutral-500 mb-1">
                   {{ carouselSlides[activeSlideIndex]?.layout_hint || 'body' }}
                 </p>
