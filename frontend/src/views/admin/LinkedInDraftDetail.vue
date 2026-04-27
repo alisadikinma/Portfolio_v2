@@ -378,8 +378,9 @@ async function regenerateSingleSlide(slideIndex) {
                 </div>
               </div>
 
-              <div class="aspect-[4/5] rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden bg-neutral-50 dark:bg-neutral-800 flex flex-col">
-                <div class="flex-1 flex items-center justify-center p-6 bg-gradient-to-br from-neutral-900 to-neutral-700 relative">
+              <div class="rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden bg-neutral-50 dark:bg-neutral-800 flex flex-col mx-auto"
+                   style="aspect-ratio: 4 / 5; max-height: 65vh; max-width: min(100%, calc(65vh * 0.8));">
+                <div class="flex-1 flex items-center justify-center p-4 bg-gradient-to-br from-neutral-900 to-neutral-700 relative overflow-hidden">
                   <!-- Status pill overlay (top-right) -->
                   <span
                     v-if="carouselSlides[activeSlideIndex]?.image_status"

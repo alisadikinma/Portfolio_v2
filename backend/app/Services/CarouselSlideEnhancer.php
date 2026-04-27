@@ -165,6 +165,22 @@ class CarouselSlideEnhancer
         return rtrim($body) . $chrome;
     }
 
+    /**
+     * Resolve the LinkedIn handle to bake into slide watermarks.
+     *
+     * Priority order:
+     *   1. Explicit `linkedin.creator_handle` setting (operator override, not
+     *      yet exposed in admin UI but supported)
+     *   2. Derived from `creator_brand_tagline` — strip TLD (.com / .id /
+     *      .me / etc.), prefix @. Tagline is the canonical brand identity
+     *      configured in the About admin page (e.g. "alisadikinma.com" →
+     *      "@alisadikinma")
+     *   3. Hardcoded fallback `@alisadikinma`
+     *
+     * NOTE: `creator_brand_slug` is NOT used here — it's the filename slug
+     * (often kebab-case like "creator-brand") which produces an incorrect
+     * `@creator-brand` watermark. We deliberately fall through past it.
+     */
     private function resolveHandle(): string
     {
         $value = Setting::where('group', 'linkedin')
@@ -175,16 +191,36 @@ class CarouselSlideEnhancer
             return $this->normaliseHandle($value);
         }
 
-        // Fallback: derive from creator_brand_slug, prefixed with @
-        $slug = Setting::where('group', 'creator_brand')
-            ->where('key', 'creator_brand_slug')
+        $tagline = Setting::where('group', 'creator_brand')
+            ->where('key', 'creator_brand_tagline')
             ->value('value');
 
-        if (is_string($slug) && trim($slug) !== '') {
-            return $this->normaliseHandle($slug);
+        if (is_string($tagline) && trim($tagline) !== '') {
+            return $this->normaliseHandle($this->stripDomainSuffix($tagline));
         }
 
         return '@alisadikinma';
+    }
+
+    /**
+     * Strip a TLD from a domain string so it can be used as a social handle.
+     *
+     * Examples:
+     *   alisadikinma.com  → alisadikinma
+     *   alisadikinma.co.id → alisadikinma
+     *   www.alisadikinma.com → alisadikinma
+     *   @alisadikinma     → alisadikinma   (already a handle, just normalize)
+     */
+    private function stripDomainSuffix(string $tagline): string
+    {
+        $trimmed = trim($tagline);
+        $trimmed = ltrim($trimmed, '@');
+        $trimmed = preg_replace('#^https?://#i', '', $trimmed);
+        $trimmed = preg_replace('/^www\./i', '', (string) $trimmed);
+        // Strip everything from the first dot onward (covers .com / .co.id /
+        // .me / .io etc.)
+        $trimmed = preg_replace('/\..+$/', '', (string) $trimmed);
+        return (string) $trimmed;
     }
 
     private function normaliseHandle(string $handle): string
@@ -196,6 +232,15 @@ class CarouselSlideEnhancer
         return str_starts_with($trimmed, '@') ? $trimmed : '@' . ltrim($trimmed, '@');
     }
 
+    /**
+     * Resolve portfolio URL for the CTA slide social block.
+     *
+     * Priority:
+     *   1. Explicit `about.website_url` setting
+     *   2. Derived from `creator_brand_tagline` (the bare domain stored in
+     *      About admin) — prepend https:// if missing
+     *   3. Laravel app.url config
+     */
     private function resolvePortfolioUrl(): string
     {
         $value = Setting::where('group', 'about')
@@ -204,6 +249,18 @@ class CarouselSlideEnhancer
 
         if (is_string($value) && trim($value) !== '') {
             return rtrim(trim($value), '/');
+        }
+
+        $tagline = Setting::where('group', 'creator_brand')
+            ->where('key', 'creator_brand_tagline')
+            ->value('value');
+
+        if (is_string($tagline) && trim($tagline) !== '') {
+            $clean = trim($tagline);
+            if (! preg_match('#^https?://#i', $clean)) {
+                $clean = 'https://' . preg_replace('/^www\./i', '', $clean);
+            }
+            return rtrim($clean, '/');
         }
 
         return rtrim((string) config('app.url', 'https://alisadikinma.com'), '/');
