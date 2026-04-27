@@ -163,14 +163,16 @@ class LinkedInCarouselImageService
         // GeminiGen / nano-banana-pro silently rejects non-standard aspect
         // ratios (verified — '4:5' fell back to '16:9' default in production
         // on draft #28's first render). Only Imagen-native ratios work:
-        // 1:1, 16:9, 9:16, 4:3, 3:4. We use 1:1 (1080x1080 square) for
-        // LinkedIn carousels — universally supported, document-share native,
-        // mobile-safe, gives bilingual headline + visual hook enough room
-        // without the ratio gamble.
+        // 1:1, 16:9, 9:16, 4:3, 3:4. We use 3:4 (1080x1440 portrait) for
+        // LinkedIn carousels — Imagen-native, taller than 1:1 so bilingual
+        // headline + visual hook get more vertical real estate, and the
+        // same image reuses cleanly on Instagram (will crop to 4:5 on Feed
+        // but no letterbox) and TikTok photo carousel (centered with
+        // minimal letterbox).
         $multipart = [
             ['name' => 'prompt', 'contents' => $finalPrompt],
             ['name' => 'model', 'contents' => $this->resolveModel()],
-            ['name' => 'aspect_ratio', 'contents' => '1:1'],
+            ['name' => 'aspect_ratio', 'contents' => '3:4'],
             ['name' => 'style', 'contents' => 'Photorealistic'],
             ['name' => 'webhook', 'contents' => $webhookUrl],
             ['name' => 'webhook_url', 'contents' => $webhookUrl],
