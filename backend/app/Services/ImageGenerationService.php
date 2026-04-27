@@ -267,6 +267,14 @@ class ImageGenerationService
     /**
      * Handle GeminiGen webhook callback.
      * Called when image generation completes or fails.
+     *
+     * Routing: GeminiGen ignores per-request webhook URLs and posts every
+     * callback to the globally-configured endpoint (/automation/blog/image-webhook).
+     * To keep all GeminiGen webhooks landing in one place, this method routes
+     * carousel_slide jobs over to LinkedInCarouselImageService::handleWebhook —
+     * which knows how to download to linkedin-carousel/{planned_filename}.png
+     * and mirror status onto LinkedInPost.carousel_slides JSON. Article hero/
+     * inline jobs continue through the existing flow.
      */
     public function handleWebhook(string $uuid, string $event, array $data): bool
     {
@@ -275,6 +283,13 @@ class ImageGenerationService
         if (!$job) {
             Log::warning("[ImageGen] Webhook: unknown UUID {$uuid}");
             return false;
+        }
+
+        // LinkedIn carousel jobs route to their dedicated handler — keeps article
+        // pipeline isolated from carousel-specific mirror logic + storage path.
+        if ($job->type === 'carousel_slide') {
+            return app(\App\Services\LinkedInCarouselImageService::class)
+                ->handleWebhook($uuid, $event, $data);
         }
 
         if ($event === 'IMAGE_GENERATION_COMPLETED') {

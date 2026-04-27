@@ -339,14 +339,41 @@ class LinkedInDraftController extends Controller
             ], 422);
         }
 
-        $count = $this->carouselImages->dispatchAllSlides($draft);
+        $slides = $draft->carousel_slides ?? [];
+        $pending = collect($slides)->filter(
+            fn ($s) => ($s['image_status'] ?? null) !== 'done' || empty($s['image_url'])
+        )->count();
+
+        // Optimistically mark slides 'pending' so the frontend status pills
+        // flip immediately — the queue worker will move them to 'generating'
+        // as it dispatches each one (~5-15s per slide for the GeminiGen
+        // multipart POST handshake). Synchronous in-request dispatch was
+        // hitting the axios 15s timeout on 7-10 slide carousels.
+        $touched = false;
+        foreach ($slides as $i => $slide) {
+            if (($slide['image_status'] ?? null) !== 'done' || empty($slide['image_url'])) {
+                $slides[$i]['image_status'] = 'pending';
+                $slides[$i]['image_error'] = null;
+                $touched = true;
+            }
+        }
+        if ($touched) {
+            $draft->update(['carousel_slides' => $slides]);
+        }
+
+        \App\Jobs\GenerateLinkedInCarouselImages::dispatch($draft->id);
+
+        Log::info('[LinkedInDraft] regenerate-images queued', [
+            'draft_id' => $draft->id,
+            'pending_count' => $pending,
+        ]);
 
         return response()->json([
             'success' => true,
             'data' => $draft->fresh(['post.translations', 'account']),
-            'message' => "Dispatched {$count} slide image generation jobs.",
-            'dispatched' => $count,
-        ]);
+            'message' => "Queued image regeneration for {$pending} slide(s). Webhook will populate URLs as renders complete.",
+            'queued' => $pending,
+        ], 202);
     }
 
     /**
