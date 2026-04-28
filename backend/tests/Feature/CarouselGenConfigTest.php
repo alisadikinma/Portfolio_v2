@@ -13,12 +13,13 @@ class CarouselGenConfigTest extends TestCase
     }
 
     /** @test */
-    public function it_returns_300_as_default_timeout_seconds_int(): void
+    public function it_returns_600_as_default_timeout_seconds_int(): void
     {
+        // 600s mirrors LINKEDIN_GEN_TIMEOUT_SECONDS (production-validated on
+        // post #24 wall=369s). See config/carousel-gen.php for full rationale.
         $value = config('carousel-gen.timeout_seconds');
 
-        $this->assertSame(300, $value);
-        $this->assertIsInt($value);
+        $this->assertSame(600, $value);
     }
 
     /** @test */

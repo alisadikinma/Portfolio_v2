@@ -49,6 +49,14 @@ return [
     // PDF temp dir for carousel composition
     'pdf_temp_dir' => env('LINKEDIN_PDF_TEMP_DIR', storage_path('app/tmp/linkedin-pdfs')),
 
+    // Phase A — feature flag for carousel-gen engine cutover (default OFF).
+    // When true, LinkedInGenerationService routes carousel-format drafts to
+    // the /carousel-gen skill (ai-image-carousel-prompt-gen plugin) via SSH
+    // instead of the legacy /linkedin-carousel skill. Phase B cutover flips
+    // this to true after smoke-testing one manual draft. See
+    // docs/plans/2026-04-28-linkedin-carousel-engine-decoupling.md.
+    'use_carousel_gen_engine' => env('LINKEDIN_USE_CAROUSEL_GEN_ENGINE', false),
+
     // Generation bridge — SSH to VPS `claudesn` user + run `claude -p "/linkedin-gen ..."`.
     // Same pattern as article generation (see config/services.php article_generation).
     // Plugin v0.2.0+ at https://github.com/alisadikinma/linkedin-post-writer.
