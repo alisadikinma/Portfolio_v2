@@ -45,7 +45,7 @@ class LinkedInDraftController extends Controller
             'status' => ['nullable', 'string'],
             'format' => ['nullable', Rule::in(['text', 'carousel'])],
             'scope' => ['nullable', Rule::in(['feed', 'queue', 'all'])],
-            'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:200'],
         ]);
 
         $query = LinkedInPost::with(['post.translations', 'account'])
