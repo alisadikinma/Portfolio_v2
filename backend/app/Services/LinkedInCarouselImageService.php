@@ -325,10 +325,144 @@ class LinkedInCarouselImageService
                 'slide_index' => $job->slide_index,
                 'reason' => $reason,
             ]);
+
+            // Safety-aware auto-retry. GeminiGen refuses prompts naming public
+            // figures, minors, brands, or unsafe content — retrying the same
+            // prompt is futile. Detect, sanitize, redispatch. Idempotent via
+            // image_prompt_pre_safety sentinel — only rewrites once per slide
+            // so a sanitized-prompt-still-failing scenario doesn't loop.
+            $this->maybeAutoRetryOnSafety($job, $reason);
+
             return false;
         }
 
         return false;
+    }
+
+    /**
+     * If the failure looks like a GeminiGen safety policy refusal AND we
+     * haven't already rewritten this slide, rewrite the image_prompt via
+     * Sonnet (text-only sync, ~10-15s) and re-dispatch the slide.
+     *
+     * Drops face_refs implicitly because the redispatch goes through
+     * dispatchSingleSlide → CarouselSlideEnhancer, which re-resolves face
+     * URLs from layout_hint. For at-risk human-fingerprint/cover slides
+     * the rewriter strips identifiable proper nouns from the prompt body
+     * so the enhancer's face injection no longer collides with safety
+     * policy.
+     *
+     * Gated by ARTICLE_GEN_USE_SAFETY_REWRITE (default true). Failures
+     * are logged but never thrown — the slide stays in 'failed' state and
+     * the operator can use the per-slide Retry button manually.
+     */
+    private function maybeAutoRetryOnSafety(ImageGenerationJob $job, string $reason): void
+    {
+        $imgSvc = app(\App\Services\ImageGenerationService::class);
+        if (!$imgSvc->isSafetyError($reason)) {
+            return;
+        }
+
+        if (!config('services.article_generation.use_safety_rewrite', true)) {
+            return;
+        }
+
+        $draftId = $job->linkedin_post_id;
+        $slideIndex = $job->slide_index;
+        if ($draftId === null || $slideIndex === null) {
+            return;
+        }
+
+        $draft = LinkedInPost::find($draftId);
+        if (!$draft) {
+            return;
+        }
+
+        $slides = $draft->carousel_slides ?? [];
+        if (!isset($slides[$slideIndex])) {
+            return;
+        }
+
+        $slide = $slides[$slideIndex];
+
+        // Idempotency: skip if we already rewrote this slide's prompt.
+        if (!empty($slide['image_prompt_pre_safety'])) {
+            Log::info('[LinkedInCarouselImage] safety-rewrite skipped (already rewritten once)', [
+                'draft_id' => $draftId,
+                'slide_index' => $slideIndex,
+            ]);
+            return;
+        }
+
+        $originalPrompt = (string) ($slide['image_prompt'] ?? '');
+        if (trim($originalPrompt) === '') {
+            return;
+        }
+
+        try {
+            $articleGen = app(\App\Services\ArticleGenerationService::class);
+            $result = $articleGen->rewriteVisualDirectionForSafety(
+                $originalPrompt,
+                $reason,
+                [
+                    'label' => (string) ($slide['layout_hint'] ?? 'body'),
+                    'concept' => (string) ($slide['copy'] ?? $slide['copy_id'] ?? ''),
+                ]
+            );
+        } catch (\Throwable $e) {
+            Log::error('[LinkedInCarouselImage] safety rewrite threw', [
+                'draft_id' => $draftId,
+                'slide_index' => $slideIndex,
+                'error' => $e->getMessage(),
+            ]);
+            return;
+        }
+
+        if (!($result['success'] ?? false) || empty($result['rewritten_vd'])) {
+            Log::warning('[LinkedInCarouselImage] safety rewrite returned no output', [
+                'draft_id' => $draftId,
+                'slide_index' => $slideIndex,
+                'error' => $result['error'] ?? 'unknown',
+            ]);
+            return;
+        }
+
+        $rewritten = (string) $result['rewritten_vd'];
+
+        // Persist the rewrite + clear status so dispatchSingleSlide can run.
+        DB::transaction(function () use ($draftId, $slideIndex, $rewritten, $originalPrompt) {
+            $locked = LinkedInPost::lockForUpdate()->find($draftId);
+            if (!$locked) return;
+            $s = $locked->carousel_slides ?? [];
+            if (!isset($s[$slideIndex])) return;
+
+            $s[$slideIndex]['image_prompt_pre_safety'] = $originalPrompt;
+            $s[$slideIndex]['image_prompt'] = $rewritten;
+            $s[$slideIndex]['image_status'] = 'pending';
+            $s[$slideIndex]['image_error'] = null;
+            $s[$slideIndex]['image_job_uuid'] = null;
+            // Drop face_refs from human_fingerprint specifically — that
+            // layout's whole purpose is "creator face holding a callout",
+            // and when paired with named-entity copy GeminiGen refuses.
+            // Cover/CTA still get the face injected by enhancer because
+            // those are brand-defining slides where we want Ali shown.
+            if (($s[$slideIndex]['layout_hint'] ?? null) === 'human_fingerprint') {
+                $s[$slideIndex]['layout_hint'] = 'body';
+            }
+            $locked->update(['carousel_slides' => $s]);
+        });
+
+        // Re-dispatch with sanitized prompt. dispatchSingleSlide re-runs
+        // CarouselSlideEnhancer which adds chrome + (now appropriate) face
+        // refs for the new layout_hint.
+        $newDraft = LinkedInPost::find($draftId);
+        if ($newDraft) {
+            $newUuid = $this->dispatchSingleSlide($newDraft, $slideIndex);
+            Log::info('[LinkedInCarouselImage] safety auto-retry dispatched', [
+                'draft_id' => $draftId,
+                'slide_index' => $slideIndex,
+                'new_uuid' => $newUuid,
+            ]);
+        }
     }
 
     /**

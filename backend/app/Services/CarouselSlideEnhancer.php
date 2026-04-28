@@ -162,6 +162,16 @@ class CarouselSlideEnhancer
             $chrome .= "Lower third of the canvas centered horizontally, render three small social media icons (Instagram logo, TikTok logo, LinkedIn logo) arranged in a single horizontal row with the literal text \"{$handle}\" in white beside the icons row. Below the icons row, render the literal text \"{$portfolioUrl}\" in white at slightly smaller size.\n";
         }
 
+        // Bilingual font hierarchy (hard rule). Indonesian dominates visually,
+        // English is a smaller supporting subtitle. This is the single source of
+        // truth for sizing — applied to every slide so plugin authors don't
+        // have to repeat the rule per prompt. Specs derived from the canonical
+        // reference covers (alisadikinma WW3 series).
+        $chrome .= "\nBilingual headline hierarchy (HARD RULE — apply on every slide that has both languages):\n";
+        $chrome .= "The Indonesian headline must be visually dominant. Render it in large bold uppercase white sans-serif typography (target ninety to one hundred ten pixels tall on a 1080x1440 canvas), tight letter-spacing, condensed weight, two to three lines maximum. Within the Indonesian headline, render two to four key emphasis words (numbers, intensifiers, named subjects) in warm amber/gold #F5A623 to draw the eye; the remaining words stay pure white.\n";
+        $chrome .= "The English subtitle must be clearly smaller and secondary. Render it on a single line directly below the Indonesian headline at approximately forty percent of the Indonesian headline's font size (target thirty-five to forty-two pixels tall), in clean regular-weight white sans-serif (NOT bold, NOT italic, NOT uppercase — sentence case only), never wider than the Indonesian headline above it. The English subtitle is white — never amber — and never visually rivals the Indonesian headline.\n";
+        $chrome .= "Both copies must be short, punchy, and editorial — under twelve words for the Indonesian headline and under fourteen words for the English subtitle. Do not paraphrase or pad. Tight typographic rhythm. The Indonesian headline is roughly two-and-a-half times the visual size of the English subtitle.\n";
+
         return rtrim($body) . $chrome;
     }
 
