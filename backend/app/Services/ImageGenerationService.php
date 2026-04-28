@@ -767,19 +767,43 @@ class ImageGenerationService
             $priorCount = (int) ($segment['retry_count'] ?? 0);
             $newCount = $priorCount + 1;
 
+            $effectiveReason = $reason ?? $job->error_message ?? 'unknown';
+            $isSafety = $this->isSafetyError($effectiveReason);
+            $rewriteApplied = false;
+
+            // Safety-aware prompt rewrite. GeminiGen refuses prompts naming
+            // public figures, minors, or unsafe content — retrying the same
+            // prompt is deterministically futile. Mutate the segment so the
+            // next attempt (auto or manual) uses a sanitized version. We
+            // also drop face_refs because a public-figure entity_ref is the
+            // most common trigger and the new generic VD won't match it.
+            if (
+                $isSafety
+                && $newCount < self::MAX_SEGMENT_ATTEMPTS
+                && config('services.article_generation.use_safety_rewrite', true)
+            ) {
+                $rewriteResult = $this->rewriteSegmentForSafety($segment, $effectiveReason, $idea->id, $matchIndex);
+                if ($rewriteResult !== null) {
+                    $segment = $rewriteResult;
+                    $rewriteApplied = true;
+                }
+            }
+
             $segment['retry_count'] = $newCount;
             $segment['failure_history'] = $segment['failure_history'] ?? [];
             $segment['failure_history'][] = [
                 'attempt' => $priorCount,
                 'uuid' => $job->uuid,
-                'reason' => $reason ?? $job->error_message ?? 'unknown',
+                'reason' => $effectiveReason,
                 'timestamp' => now()->toIso8601String(),
+                'safety_detected' => $isSafety,
+                'rewritten_for_safety' => $rewriteApplied,
             ];
 
             foreach ($segment['variations'] ?? [] as $vi => $v) {
                 if (($v['job_uuid'] ?? null) === $job->uuid) {
                     $segment['variations'][$vi]['status'] = 'failed';
-                    $segment['variations'][$vi]['error'] = $reason ?? 'unknown';
+                    $segment['variations'][$vi]['error'] = $effectiveReason;
                 }
             }
             $segment['status'] = 'failed';
@@ -805,7 +829,7 @@ class ImageGenerationService
                 \App\Jobs\RetryImageSegmentJob::dispatch($idea->id, $matchIndex)
                     ->delay(now()->addSeconds(60));
 
-                Log::info("[ImageGen] Scheduled auto-retry for idea #{$idea->id} segment {$matchIndex} (attempt {$newCount}/" . self::MAX_SEGMENT_ATTEMPTS . ')');
+                Log::info("[ImageGen] Scheduled auto-retry for idea #{$idea->id} segment {$matchIndex} (attempt {$newCount}/" . self::MAX_SEGMENT_ATTEMPTS . ')' . ($rewriteApplied ? ' [safety-rewritten]' : ''));
             }
 
             $prompts[$matchIndex] = $segment;
@@ -813,5 +837,109 @@ class ImageGenerationService
             $idea->generated_article = $article;
             $idea->save();
         });
+    }
+
+    /**
+     * Detect GeminiGen safety-policy refusals from the error string.
+     *
+     * Matches against known error codes (PUBLIC_ERROR_PROMINENT_PEOPLE_UPLOAD,
+     * etc.) plus free-text refusal language ("prominent people", "minors",
+     * "unsafe content", "sexual content"). Case-insensitive substring match
+     * — defensive against minor wording drift in the API's error messages.
+     */
+    public function isSafetyError(?string $reason): bool
+    {
+        if ($reason === null || trim($reason) === '') {
+            return false;
+        }
+
+        $needle = strtolower($reason);
+        $patterns = [
+            'public_error_prominent_people_upload',
+            'public_error_prominent_people',
+            'public_error_minor',
+            'public_error_unsafe',
+            'public_error_sexual',
+            'prominent people',
+            'prominent person',
+            'minors',
+            'unsafe content',
+            'sexual content',
+            'do not allow uploading images',
+            'safety filter',
+            'content policy',
+        ];
+
+        foreach ($patterns as $p) {
+            if (str_contains($needle, $p)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Apply a safety rewrite to one segment in-place. Returns the mutated
+     * segment array on success, or null if the rewrite couldn't be done
+     * (no source VD, ArticleGenerationService failure). On null the caller
+     * proceeds with the unrewritten segment so the retry path still runs
+     * — the next attempt will fail the same way and either rewrite again
+     * or hit the terminal cap. We never throw from here because failure
+     * to rewrite must not break the FSM.
+     *
+     * Drops face_refs because the most common safety trigger is a public-
+     * figure entity_ref, and after the rewrite the generic VD won't match
+     * a specific person's face anyway. Keeps style_refs intact (they don't
+     * trigger person filters).
+     */
+    private function rewriteSegmentForSafety(array $segment, string $safetyReason, int $ideaId, int $segmentIndex): ?array
+    {
+        $originalVd = $segment['visual_direction'] ?? $segment['prompt_text'] ?? $segment['prompt'] ?? '';
+        if (trim($originalVd) === '') {
+            Log::warning("[ImageGen] Safety rewrite skipped — no source VD on idea #{$ideaId} segment {$segmentIndex}");
+            return null;
+        }
+
+        $context = [
+            'label' => $segment['label'] ?? $segment['type'] ?? '',
+            'concept' => $segment['concept'] ?? $segment['image_concept'] ?? '',
+        ];
+
+        try {
+            $articleGen = app(\App\Services\ArticleGenerationService::class);
+            $result = $articleGen->rewriteVisualDirectionForSafety($originalVd, $safetyReason, $context);
+        } catch (\Throwable $e) {
+            Log::error("[ImageGen] Safety rewrite threw on idea #{$ideaId} segment {$segmentIndex}: {$e->getMessage()}");
+            return null;
+        }
+
+        if (!($result['success'] ?? false) || empty($result['rewritten_vd'])) {
+            Log::warning("[ImageGen] Safety rewrite returned no output on idea #{$ideaId} segment {$segmentIndex}: " . ($result['error'] ?? 'unknown'));
+            return null;
+        }
+
+        $rewritten = $result['rewritten_vd'];
+
+        // Preserve original VD once (idempotent) so the operator can see
+        // what was rewritten and so we don't lose authored content if
+        // safety-rewrite gets re-applied on a later attempt.
+        if (empty($segment['visual_direction_pre_safety'])) {
+            $segment['visual_direction_pre_safety'] = $originalVd;
+        }
+
+        $segment['visual_direction'] = $rewritten;
+        $segment['prompt_text'] = $rewritten;
+        // Legacy field — some seeds use 'prompt' instead of 'prompt_text'.
+        $segment['prompt'] = $rewritten;
+
+        // Drop face refs — the most common GeminiGen safety trigger is a
+        // public-figure entity_ref. Keep style_refs (environment/style)
+        // since those don't trigger person-policy filters.
+        $segment['face_refs'] = [];
+        $segment['entity_refs'] = [];
+
+        Log::info("[ImageGen] Safety rewrite applied on idea #{$ideaId} segment {$segmentIndex} (reason: {$safetyReason})");
+
+        return $segment;
     }
 }

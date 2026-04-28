@@ -87,6 +87,7 @@ return [
         'use_images_phase' => env('ARTICLE_GEN_USE_IMAGES_PHASE', false),
         'use_translate_phase' => env('ARTICLE_GEN_USE_TRANSLATE_PHASE', false),
         'use_score_phase' => env('ARTICLE_GEN_USE_SCORE_PHASE', false),
+        'use_safety_rewrite' => env('ARTICLE_GEN_USE_SAFETY_REWRITE', true),
     ],
 
 ];

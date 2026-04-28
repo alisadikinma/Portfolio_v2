@@ -30,11 +30,15 @@ return new class extends Migration
     {
         // Step 1: widen the `type` enum to include 'carousel_slide'.
         // MySQL ENUMs require a raw ALTER since Laravel's schema builder
-        // can't redefine an enum cleanly without doctrine/dbal.
-        DB::statement(
-            "ALTER TABLE image_generation_jobs MODIFY COLUMN `type` "
-            . "ENUM('hero', 'inline', 'carousel_slide') NOT NULL DEFAULT 'hero'"
-        );
+        // can't redefine an enum cleanly without doctrine/dbal. SQLite
+        // (used by the test suite) has no real ENUM type — values are
+        // stored as TEXT — so the MODIFY is a no-op there.
+        if (DB::connection()->getDriverName() === 'mysql') {
+            DB::statement(
+                "ALTER TABLE image_generation_jobs MODIFY COLUMN `type` "
+                . "ENUM('hero', 'inline', 'carousel_slide') NOT NULL DEFAULT 'hero'"
+            );
+        }
 
         Schema::table('image_generation_jobs', function (Blueprint $table) {
             $table->unsignedBigInteger('linkedin_post_id')->nullable()->after('post_id');
@@ -59,9 +63,11 @@ return new class extends Migration
             $table->dropColumn(['linkedin_post_id', 'slide_index', 'slide_image_role']);
         });
 
-        DB::statement(
-            "ALTER TABLE image_generation_jobs MODIFY COLUMN `type` "
-            . "ENUM('hero', 'inline') NOT NULL DEFAULT 'hero'"
-        );
+        if (DB::connection()->getDriverName() === 'mysql') {
+            DB::statement(
+                "ALTER TABLE image_generation_jobs MODIFY COLUMN `type` "
+                . "ENUM('hero', 'inline') NOT NULL DEFAULT 'hero'"
+            );
+        }
     }
 };

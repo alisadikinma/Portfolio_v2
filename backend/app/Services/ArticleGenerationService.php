@@ -315,6 +315,67 @@ class ArticleGenerationService
     }
 
     /**
+     * Rewrite a Visual Direction so it sidesteps a GeminiGen safety refusal.
+     *
+     * GeminiGen rejects prompts naming prominent public figures, minors,
+     * brands/logos in trademarked composition, and unsafe content. The retry
+     * loop is useless against these refusals because the same prompt yields
+     * the same refusal — we have to mutate the prompt before the next attempt.
+     *
+     * Strategy: synchronous Sonnet call that takes the original VD + the
+     * GeminiGen reason string and returns a sanitized VD that:
+     *   - Removes proper names (persons, landmarks, brands, products)
+     *   - Replaces them with generic descriptors that preserve the article
+     *     concept (e.g., "Mark Zuckerberg" -> "a tech CEO in his 40s with
+     *     short curly hair, hooded sweatshirt, focused expression")
+     *   - Keeps scene, setting, lighting, mood, composition intact
+     *
+     * @param string $originalVd  Original Visual Direction text
+     * @param string $safetyReason GeminiGen error_message ("PUBLIC_ERROR_PROMINENT_PEOPLE_UPLOAD ...")
+     * @param array  $segmentContext Optional segment metadata (label, concept, style)
+     * @return array{success: bool, rewritten_vd: string|null, error: string|null}
+     */
+    public function rewriteVisualDirectionForSafety(
+        string $originalVd,
+        string $safetyReason,
+        array $segmentContext = []
+    ): array {
+        if (trim($originalVd) === '') {
+            return ['success' => false, 'rewritten_vd' => null, 'error' => 'Missing original VD'];
+        }
+
+        $model = config('services.article_generation.model_vd_rewrite', 'sonnet');
+
+        try {
+            $prompt = $this->buildSafetyRewritePrompt($originalVd, $safetyReason, $segmentContext);
+            $result = $this->executeSyncPrompt($prompt, 'vd-safety-rewrite', $model);
+        } catch (\Exception $e) {
+            Log::error('[ArticleGeneration] Safety VD rewrite failed', [
+                'error' => $e->getMessage(),
+                'safety_reason' => $safetyReason,
+            ]);
+            return ['success' => false, 'rewritten_vd' => null, 'error' => $e->getMessage()];
+        }
+
+        if (!$result['success']) {
+            return ['success' => false, 'rewritten_vd' => null, 'error' => $result['error']];
+        }
+
+        $rewritten = $this->parseVdRewriteOutput($result['output']);
+        if ($rewritten === null || $rewritten === '') {
+            return ['success' => false, 'rewritten_vd' => null, 'error' => 'Empty rewrite output'];
+        }
+
+        Log::info('[ArticleGeneration] VD rewritten for safety refusal', [
+            'safety_reason' => $safetyReason,
+            'original_len' => strlen($originalVd),
+            'rewritten_len' => strlen($rewritten),
+        ]);
+
+        return ['success' => true, 'rewritten_vd' => $rewritten, 'error' => null];
+    }
+
+    /**
      * Translate an Indonesian article JSON to US English in one synchronous call.
      * Returns the translated fields: title, content (HTML preserved), excerpt,
      * meta_title, meta_description, og_title, og_description, ai_summary.
@@ -568,6 +629,56 @@ Instructions:
 {$originalVd}
 
 Rewritten Visual Direction:
+PROMPT;
+    }
+
+    /**
+     * Build the 1-shot prompt for safety-aware Visual Direction rewrite.
+     * Text-only — no image input. The LLM strips any named entity that
+     * could be tripping GeminiGen's safety filters.
+     */
+    private function buildSafetyRewritePrompt(string $originalVd, string $safetyReason, array $segmentContext): string
+    {
+        $contextLine = '';
+        if (!empty($segmentContext['label']) || !empty($segmentContext['concept'])) {
+            $label = $segmentContext['label'] ?? '';
+            $concept = $segmentContext['concept'] ?? '';
+            $contextLine = "Segment: {$label} — {$concept}\n";
+        }
+
+        $reason = trim($safetyReason) !== '' ? $safetyReason : 'unsafe content';
+
+        return <<<PROMPT
+You are rewriting an AI image generation prompt that was REJECTED by the image API for a safety/policy reason.
+
+Rejection reason from the image API:
+{$reason}
+
+Common triggers:
+- Named public figures (CEOs, politicians, celebrities — e.g., "Mark Zuckerberg", "Elon Musk")
+- Named minors or any minor (under-18) reference
+- Brand logos, trademarked products, or recognizable copyrighted characters
+- Named landmarks where the rendering implies endorsement
+- Sexual, violent, or otherwise unsafe content
+
+Your job: rewrite the Visual Direction so the same scene can be generated WITHOUT triggering the policy.
+
+Rules:
+1. Remove ALL proper nouns (person names, brand names, product names, landmark names).
+2. Replace each removed entity with a generic descriptor that preserves the article's concept:
+   - Person name -> generic role + descriptive features ("a tech CEO in his early 40s with short curly hair and a hooded sweatshirt, focused expression")
+   - Brand name -> generic product type ("a modern AI agent dashboard interface")
+   - Landmark -> generic locale ("a modern corporate headquarters lobby")
+3. Keep scene, setting, lighting, mood, camera angle, composition, and visual style EXACTLY as in the original.
+4. Do not add any new concept that wasn't in the original.
+5. Do not add disclaimers, safety notes, or meta-commentary.
+6. Output ONLY the rewritten Visual Direction paragraph.
+7. No preamble, no explanation, no quotes, no markdown, no labels.
+
+{$contextLine}Original Visual Direction (rejected):
+{$originalVd}
+
+Rewritten Visual Direction (safety-compliant):
 PROMPT;
     }
 
