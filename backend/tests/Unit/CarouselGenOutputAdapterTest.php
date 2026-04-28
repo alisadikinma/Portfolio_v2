@@ -17,8 +17,6 @@ use PHPUnit\Framework\TestCase;
  * The schema is a discriminated union on `status`:
  *   - status=complete  → array of fully-shaped slide rows
  *   - status=failed    → throws CarouselGenAdapterException
- *
- * @covers \App\Services\CarouselGenOutputAdapter
  */
 class CarouselGenOutputAdapterTest extends TestCase
 {
@@ -224,5 +222,27 @@ class CarouselGenOutputAdapterTest extends TestCase
                 "Adapter must preserve gapless 1..N slide_number ordering"
             );
         }
+    }
+
+    public function test_it_throws_when_status_complete_with_empty_slides_array(): void
+    {
+        // Defense-in-depth: plugin's Zod schema enforces slides.min(5), but
+        // an empty array bypassing validation should still fail loudly at
+        // the adapter rather than silently returning [].
+        $input = [
+            'status' => 'complete',
+            'format' => 'carousel',
+            'total_slides' => 0,
+            'aspect_ratio' => '4:5',
+            'bilingual' => true,
+            'narrative' => '5act',
+            'slides' => [],
+            'generated_at' => '2026-04-28T10:00:00Z',
+        ];
+
+        $this->expectException(CarouselGenAdapterException::class);
+        $this->expectExceptionMessageMatches('/empty slides array/');
+
+        $this->adapter()->adapt($input);
     }
 }

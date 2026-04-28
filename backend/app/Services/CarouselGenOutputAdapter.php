@@ -87,6 +87,17 @@ class CarouselGenOutputAdapter
         $bilingual = (bool) ($carouselGenJson['bilingual'] ?? false);
         $sourceSlides = $carouselGenJson['slides'] ?? [];
 
+        // The plugin's Zod schema enforces slides.min(5) on complete envelopes,
+        // but defense-in-depth at the adapter layer guards against payloads
+        // that bypassed validation (e.g., manual operator-injected JSON during
+        // debugging, or a future schema-drift bug). A complete carousel with
+        // zero slides is definitionally malformed.
+        if (count($sourceSlides) === 0) {
+            throw new CarouselGenAdapterException(
+                'carousel-gen returned status=complete with empty slides array'
+            );
+        }
+
         $adapted = [];
         foreach ($sourceSlides as $slide) {
             [$copyId, $copyEn] = $this->resolveCopy($slide, $bilingual);
