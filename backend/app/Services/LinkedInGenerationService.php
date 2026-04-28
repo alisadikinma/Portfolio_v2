@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\LinkedInPostStatus;
+use App\Exceptions\CarouselGenAdapterException;
 use App\Models\LinkedInPost;
 use App\Models\PostTranslation;
 use Illuminate\Support\Facades\Log;
@@ -29,8 +30,10 @@ use RuntimeException;
  */
 class LinkedInGenerationService
 {
-    public function __construct(private readonly PipelineGuard $guard)
-    {
+    public function __construct(
+        private readonly PipelineGuard $guard,
+        private readonly CarouselGenOutputAdapter $carouselAdapter = new CarouselGenOutputAdapter(),
+    ) {
     }
 
     /**
@@ -111,6 +114,25 @@ class LinkedInGenerationService
                 'draft_id' => $draft->id,
                 'status' => 'failed',
                 'error' => $errMsg,
+            ];
+        }
+
+        // Step 5.5: Phase A6 — when feature flag ON + format=carousel,
+        // re-author slides via the universal /carousel-gen engine and apply
+        // the CarouselGenOutputAdapter. Brief + validation from /linkedin-gen
+        // are preserved (Depth Score gate still applies). Phase C will modify
+        // the plugin's /linkedin-gen orchestrator to short-circuit at brief
+        // stage for carousel format, eliminating the wasted SSH call; until
+        // then both paths run sequentially when flag is ON.
+        try {
+            $parsed = $this->applyCarouselGenAdapter($parsed, $blog['url'], $draft->id);
+        } catch (CarouselGenAdapterException $e) {
+            $this->markFailed($draft, "carousel-gen adapter failed: {$e->getMessage()}");
+            return [
+                'success' => false,
+                'draft_id' => $draft->id,
+                'status' => 'failed',
+                'error' => $e->getMessage(),
             ];
         }
 
@@ -504,6 +526,231 @@ class LinkedInGenerationService
             'status' => $draft->fresh()->status,
             'depth_score' => $depthScore,
         ];
+    }
+
+    /**
+     * Phase A6 router: when feature flag ON + carousel format, replace the
+     * /linkedin-gen-authored slides with adapter output from /carousel-gen.
+     *
+     * Behavior matrix:
+     *   flag OFF                          → return $parsed unchanged
+     *   flag ON  + format='text'           → return $parsed unchanged
+     *   flag ON  + format='carousel'       → dispatch /carousel-gen, run adapter,
+     *                                         REPLACE $parsed.carousel.slides
+     *
+     * Brief + validation from /linkedin-gen are preserved (Depth Score gate
+     * still applies to the carousel narrative authored upstream by /linkedin-gen).
+     *
+     * @throws CarouselGenAdapterException When /carousel-gen returns null,
+     *                                      empty, or status=failed. Caller
+     *                                      catches and routes to FSM Failed.
+     */
+    public function applyCarouselGenAdapter(array $parsed, string $blogUrl, int $draftId): array
+    {
+        $flagEnabled = (bool) config('linkedin.use_carousel_gen_engine', false);
+        if (!$flagEnabled) {
+            return $parsed;
+        }
+
+        $format = $parsed['format'] ?? null;
+        if ($format !== 'carousel') {
+            return $parsed;
+        }
+
+        $brief = is_array($parsed['brief'] ?? null) ? $parsed['brief'] : [];
+
+        Log::info('[LinkedInGeneration] dispatching /carousel-gen engine', [
+            'draft_id' => $draftId,
+            'blog_url' => $blogUrl,
+            'brief_hook' => $brief['hook_framework'] ?? null,
+            'brief_pillar' => $brief['pillar'] ?? null,
+        ]);
+
+        $carouselGenJson = $this->dispatchCarouselGenEngine($brief, $blogUrl, $draftId);
+
+        if ($carouselGenJson === null) {
+            throw new CarouselGenAdapterException(
+                'carousel-gen dispatch failed or returned null/empty stdout'
+            );
+        }
+
+        // Adapter throws on status=failed and on any other unexpected status.
+        // The slides[] returned here matches the linkedin_posts.carousel_slides
+        // JSON shape (with image_status='pending' lifecycle fields initialized).
+        $adaptedSlides = $this->carouselAdapter->adapt($carouselGenJson);
+
+        // Preserve everything else from the /linkedin-gen output (brief,
+        // validation, depth_score, format) — only the slides array changes.
+        $parsed['carousel'] = $parsed['carousel'] ?? [];
+        $parsed['carousel']['slides'] = $adaptedSlides;
+        // Forward useful metadata from the carousel-gen envelope so downstream
+        // can attribute slide quality (bilingual mode, narrative style).
+        if (isset($carouselGenJson['bilingual'])) {
+            $parsed['carousel']['bilingual'] = (bool) $carouselGenJson['bilingual'];
+        }
+        if (isset($carouselGenJson['narrative'])) {
+            $parsed['carousel']['narrative'] = (string) $carouselGenJson['narrative'];
+        }
+
+        Log::info('[LinkedInGeneration] /carousel-gen adapter applied', [
+            'draft_id' => $draftId,
+            'slide_count' => count($adaptedSlides),
+            'bilingual' => $carouselGenJson['bilingual'] ?? null,
+        ]);
+
+        return $parsed;
+    }
+
+    /**
+     * SSH-invoke `claude -p "/carousel-gen --pipeline --blog-source=<url> ..."` on the
+     * VPS and parse stdout via the existing balanced-brace scanner. Returns
+     * the decoded JSON envelope (matching CarouselGenOutputSchema), or null
+     * if the SSH call failed or stdout could not be parsed.
+     *
+     * Public so it can be Mockery-mocked in unit tests without booting the
+     * full SSH stack.
+     */
+    public function dispatchCarouselGenEngine(array $brief, string $blogUrl, int $draftId): ?array
+    {
+        $driver = (string) config('carousel-gen.driver', 'ssh');
+        $model = (string) config('carousel-gen.model', 'sonnet');
+        $timeout = (int) config('carousel-gen.timeout_seconds', 600);
+        $refsPath = (string) config('carousel-gen.refs_pipeline', '');
+
+        // Decide bilingual + target_slides from brief if available.
+        // /linkedin-gen carousel briefs default to bilingual ID/EN (LinkedIn
+        // pillar) so we mirror that.
+        $bilingual = 'id,en';
+        $narrative = '5act';
+        $targetSlides = $this->inferTargetSlides($brief);
+
+        $flags = [
+            '--pipeline',
+            '--blog-source=' . escapeshellarg($blogUrl),
+            '--bilingual=' . $bilingual,
+            '--narrative=' . $narrative,
+            '--target-slides=' . $targetSlides,
+        ];
+        $flagString = implode(' ', $flags);
+
+        $refsFlag = $refsPath !== ''
+            ? '--append-system-prompt-file ' . escapeshellarg($refsPath)
+            : '';
+
+        $prompt = "/carousel-gen {$flagString}";
+
+        if ($driver === 'local') {
+            $result = $this->executeCarouselGenLocal($prompt, $model, $refsFlag, $timeout);
+        } else {
+            $result = $this->executeCarouselGenSSH($prompt, $model, $refsFlag, $timeout, $draftId);
+        }
+
+        if (!$result['success']) {
+            Log::error('[LinkedInGeneration] /carousel-gen invocation failed', [
+                'draft_id' => $draftId,
+                'driver' => $driver,
+                'error' => $result['error'],
+            ]);
+            return null;
+        }
+
+        $parsed = $this->parseOrchestratorOutput($result['stdout']);
+        if ($parsed === null) {
+            Log::error('[LinkedInGeneration] /carousel-gen stdout could not be parsed', [
+                'draft_id' => $draftId,
+                'stdout_preview' => substr($result['stdout'], 0, 500),
+            ]);
+            return null;
+        }
+
+        return $parsed;
+    }
+
+    /**
+     * Heuristic: pick target slide count from brief signal. Listicle (PAS,
+     * loss_aversion frameworks) leans 9, framework leans 6-7, case study
+     * leans 8-10. Defaults to 9 (the canonical /linkedin-carousel default
+     * before this refactor).
+     */
+    private function inferTargetSlides(array $brief): int
+    {
+        $framework = $brief['hook_framework'] ?? null;
+        return match ($framework) {
+            'before_after' => 8,
+            'AIDA' => 7,
+            'contrarian' => 8,
+            default => 9,
+        };
+    }
+
+    private function executeCarouselGenLocal(string $prompt, string $model, string $refsFlag, int $timeout): array
+    {
+        $claudePath = (string) config('carousel-gen.claude_path', 'claude');
+        $isWindows = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
+        $tmpDir = sys_get_temp_dir();
+        $promptFile = $tmpDir . DIRECTORY_SEPARATOR . 'carousel-gen-' . uniqid() . '.txt';
+        file_put_contents($promptFile, $prompt);
+
+        try {
+            if ($isWindows) {
+                $cmd = "& \"{$claudePath}\" -p (Get-Content -Raw \"{$promptFile}\") --model {$model} {$refsFlag} --dangerously-skip-permissions";
+                $result = Process::timeout($timeout)->run(['powershell', '-Command', $cmd]);
+            } else {
+                $result = Process::timeout($timeout)->run([
+                    'bash', '-lc',
+                    "{$claudePath} -p \"\$(cat " . escapeshellarg($promptFile) . ")\" --model {$model} {$refsFlag} --dangerously-skip-permissions",
+                ]);
+            }
+        } finally {
+            @unlink($promptFile);
+        }
+
+        if (!$result->successful()) {
+            return [
+                'success' => false,
+                'stdout' => $result->output(),
+                'error' => 'carousel-gen local exec failed: ' . ($result->errorOutput() ?: 'exit ' . $result->exitCode()),
+            ];
+        }
+
+        return ['success' => true, 'stdout' => $result->output(), 'error' => null];
+    }
+
+    private function executeCarouselGenSSH(string $prompt, string $model, string $refsFlag, int $timeout, int $draftId): array
+    {
+        $sshHost = (string) config('carousel-gen.ssh_host');
+        $sshUser = (string) config('carousel-gen.ssh_user');
+        $sshKey = (string) config('carousel-gen.ssh_key');
+        $claudePath = (string) config('carousel-gen.claude_path', 'claude');
+
+        $promptFile = "/tmp/carousel-gen-{$draftId}-" . uniqid() . '.txt';
+        $base64Prompt = base64_encode($prompt);
+
+        $keyOpt = $sshKey ? "-i " . escapeshellarg($sshKey) : '';
+        $sshPrefix = "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 {$keyOpt} {$sshUser}@{$sshHost} ";
+
+        $writeCmd = $sshPrefix . escapeshellarg("echo {$base64Prompt} | base64 -d > {$promptFile}");
+        $writeResult = Process::timeout(15)->run($writeCmd);
+        if (!$writeResult->successful()) {
+            return ['success' => false, 'stdout' => '', 'error' => 'SSH prompt write failed: ' . $writeResult->errorOutput()];
+        }
+
+        // Reserve 20s for SSH connect + cleanup.
+        $remoteTimeout = max(30, $timeout - 20);
+        $remoteCmd = "bash -lc 'source ~/.profile 2>/dev/null; timeout --kill-after=10s {$remoteTimeout} {$claudePath} -p \"\$(cat {$promptFile})\" --model {$model} {$refsFlag} --dangerously-skip-permissions; STATUS=\$?; rm -f {$promptFile} 2>/dev/null || true; exit \$STATUS'";
+        $runCmd = $sshPrefix . escapeshellarg($remoteCmd);
+
+        $result = Process::timeout($timeout)->run($runCmd);
+
+        if (!$result->successful()) {
+            return [
+                'success' => false,
+                'stdout' => $result->output(),
+                'error' => 'SSH carousel-gen exec failed: ' . ($result->errorOutput() ?: 'exit ' . $result->exitCode()),
+            ];
+        }
+
+        return ['success' => true, 'stdout' => $result->output(), 'error' => null];
     }
 
     private function markFailed(LinkedInPost $draft, string $reason): void
