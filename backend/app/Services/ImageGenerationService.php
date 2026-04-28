@@ -777,9 +777,16 @@ class ImageGenerationService
             // next attempt (auto or manual) uses a sanitized version. We
             // also drop face_refs because a public-figure entity_ref is the
             // most common trigger and the new generic VD won't match it.
+            //
+            // Runs even past MAX_SEGMENT_ATTEMPTS so segments stuck at the
+            // cap can still be unstuck by a manual Retry click — the rewrite
+            // is idempotent (preserves visual_direction_pre_safety once) and
+            // cheap (~10s sync Sonnet call). Skipped if already rewritten on
+            // a prior failure to avoid re-running on every webhook.
+            $alreadyRewritten = !empty($segment['visual_direction_pre_safety']);
             if (
                 $isSafety
-                && $newCount < self::MAX_SEGMENT_ATTEMPTS
+                && !$alreadyRewritten
                 && config('services.article_generation.use_safety_rewrite', true)
             ) {
                 $rewriteResult = $this->rewriteSegmentForSafety($segment, $effectiveReason, $idea->id, $matchIndex);
@@ -876,6 +883,67 @@ class ImageGenerationService
             }
         }
         return false;
+    }
+
+    /**
+     * Public on-demand safety rewrite for a single segment. Persists the
+     * result back to the idea. Used by the manual retry endpoint when an
+     * operator clicks Retry on a segment stuck at the cap with a safety
+     * refusal as its last failure.
+     *
+     * Returns true if the segment was rewritten and saved, false otherwise.
+     */
+    public function applySafetyRewrite(ContentIdea $idea, int $segmentIndex, string $safetyReason): bool
+    {
+        return DB::transaction(function () use ($idea, $segmentIndex, $safetyReason) {
+            $locked = ContentIdea::lockForUpdate()->find($idea->id);
+            if (!$locked) return false;
+
+            $article = $locked->generated_article ?? [];
+            $prompts = $article['image_prompts'] ?? [];
+            if (!isset($prompts[$segmentIndex])) return false;
+
+            $rewritten = $this->rewriteSegmentForSafety(
+                $prompts[$segmentIndex],
+                $safetyReason,
+                $locked->id,
+                $segmentIndex
+            );
+            if ($rewritten === null) return false;
+
+            $prompts[$segmentIndex] = $rewritten;
+            $article['image_prompts'] = $prompts;
+            $locked->generated_article = $article;
+            $locked->save();
+            return true;
+        });
+    }
+
+    /**
+     * Reset retry_count + terminal_at for a single segment so a sanitized
+     * prompt can run with a fresh 3-attempt budget. Preserves failure_history
+     * for audit. Manual escape hatch — only called from the controller's
+     * safety-rewrite-and-restart path; never from the auto-retry pipeline.
+     */
+    public function resetSegmentRetryBudget(ContentIdea $idea, int $segmentIndex): bool
+    {
+        return DB::transaction(function () use ($idea, $segmentIndex) {
+            $locked = ContentIdea::lockForUpdate()->find($idea->id);
+            if (!$locked) return false;
+
+            $article = $locked->generated_article ?? [];
+            $prompts = $article['image_prompts'] ?? [];
+            if (!isset($prompts[$segmentIndex])) return false;
+
+            $prompts[$segmentIndex]['retry_count'] = 0;
+            $prompts[$segmentIndex]['terminal_at'] = null;
+            $prompts[$segmentIndex]['status'] = 'pending';
+
+            $article['image_prompts'] = $prompts;
+            $locked->generated_article = $article;
+            $locked->save();
+            return true;
+        });
     }
 
     /**

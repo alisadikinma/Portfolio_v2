@@ -1123,16 +1123,50 @@ class ContentIdeaController extends Controller
             return response()->json(['success' => false, 'message' => 'Segment index out of range.'], 404);
         }
 
-        $retryCount = (int) ($prompts[$i]['retry_count'] ?? 0);
+        $segment = $prompts[$i];
+        $retryCount = (int) ($segment['retry_count'] ?? 0);
+
+        // Safety-rewrite escape hatch. If the segment is at-cap because of
+        // GeminiGen safety refusals (PUBLIC_ERROR_PROMINENT_PEOPLE_UPLOAD,
+        // etc.) and we haven't already rewritten the prompt, do it now and
+        // reset the retry counter — the sanitized prompt is effectively a
+        // new prompt and deserves a fresh budget. This is the operator's
+        // "unstuck me" button for stuck-named-entity covers.
+        $imgSvc = app(\App\Services\ImageGenerationService::class);
+        $fh = $segment['failure_history'] ?? [];
+        $lastFailure = !empty($fh) ? $fh[count($fh) - 1] : null;
+        $lastWasSafety = $lastFailure
+            && (($lastFailure['safety_detected'] ?? false) || $imgSvc->isSafetyError($lastFailure['reason'] ?? null));
+        $alreadyRewritten = !empty($segment['visual_direction_pre_safety']);
+
         if ($retryCount >= \App\Services\ImageGenerationService::MAX_SEGMENT_ATTEMPTS) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Segment retry cap reached.',
-                'retry_count' => $retryCount,
-            ], 409);
+            if (!$lastWasSafety) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Segment retry cap reached.',
+                    'retry_count' => $retryCount,
+                ], 409);
+            }
+
+            // At-cap + safety: apply rewrite (if not already) and reset.
+            if (!$alreadyRewritten && config('services.article_generation.use_safety_rewrite', true)) {
+                $rewritten = $imgSvc->applySafetyRewrite($idea, $i, $lastFailure['reason'] ?? 'safety refusal');
+                if (!$rewritten) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Safety rewrite failed — check ArticleGeneration logs.',
+                    ], 500);
+                }
+                $idea->refresh();
+            }
+
+            // Reset cap so the sanitized prompt gets a fresh 3-attempt budget.
+            $imgSvc->resetSegmentRetryBudget($idea, $i);
+            $idea->refresh();
+            $retryCount = 0;
         }
 
-        $uuid = app(\App\Services\ImageGenerationService::class)->retrySegment($idea, $i);
+        $uuid = $imgSvc->retrySegment($idea, $i);
 
         if (!$uuid) {
             return response()->json([
