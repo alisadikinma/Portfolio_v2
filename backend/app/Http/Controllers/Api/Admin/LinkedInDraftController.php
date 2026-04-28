@@ -226,6 +226,32 @@ class LinkedInDraftController extends Controller
                 'cancel_window_ends_at' => now()->addMinutes($windowMinutes),
             ]);
 
+            // Self-heal: a carousel draft can land in manual_review with non-done
+            // slides if the original Scenario-C dispatch in persistAndRoute
+            // silently failed (logged but swallowed) or if the draft predates
+            // the April 27 image-rendering shipped. Approving without rendered
+            // slides would queue a publish that produces nothing, so dispatch
+            // image generation here. Job is idempotent — slides already 'done'
+            // are skipped.
+            if ($draft->format === 'carousel') {
+                $needsImages = collect($draft->carousel_slides ?? [])->contains(
+                    fn ($s) => ($s['image_status'] ?? null) !== 'done' || empty($s['image_url'])
+                );
+                if ($needsImages) {
+                    try {
+                        \App\Jobs\GenerateLinkedInCarouselImages::dispatch($draft->id);
+                        Log::info('[LinkedInDraft] approve auto-dispatched carousel images', [
+                            'draft_id' => $draft->id,
+                        ]);
+                    } catch (\Throwable $e) {
+                        Log::warning('[LinkedInDraft] approve image dispatch failed (non-fatal)', [
+                            'draft_id' => $draft->id,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+            }
+
             return response()->json([
                 'success' => true,
                 'data' => $draft->fresh(['post.translations', 'account']),
@@ -407,6 +433,22 @@ class LinkedInDraftController extends Controller
                     'message' => "Slide index {$slideIndex} out of range (0.." . (count($slides) - 1) . ').',
                 ],
             ], 422);
+        }
+
+        // If the previous failure was a GeminiGen safety refusal, the same
+        // prompt will fail again. Sanitize it FIRST (strip proper nouns,
+        // demote layout) so the manual retry has a real chance to succeed.
+        // Idempotent — short-circuits on `image_prompt_pre_safety` sentinel.
+        // Returns true only when a rewrite happened; either way we fall
+        // through to dispatchSingleSlide so non-safety failures still retry
+        // with the original prompt.
+        $rewritten = $this->carouselImages->applySafetyRewriteIfNeeded($draft, $slideIndex);
+        if ($rewritten) {
+            $draft = $draft->fresh();
+            Log::info('[LinkedInDraft] manual retry applied safety rewrite', [
+                'draft_id' => $draft->id,
+                'slide_index' => $slideIndex,
+            ]);
         }
 
         $uuid = $this->carouselImages->dispatchSingleSlide($draft, $slideIndex);

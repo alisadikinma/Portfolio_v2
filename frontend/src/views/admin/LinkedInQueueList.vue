@@ -13,29 +13,72 @@ const router = useRouter()
 
 const activeTab = ref('manual_review') // 'manual_review' | 'failed' | 'in_progress' | 'all'
 
-const statusFilter = computed(() => {
-  if (activeTab.value === 'manual_review') return 'manual_review'
-  if (activeTab.value === 'failed') return 'failed'
-  if (activeTab.value === 'in_progress') return null // handled via scope
-  return null
-})
-
+// Always fetch the full queue (no server-side status filter) so client-side
+// classification can re-route carousel drafts whose slide rendering is still
+// in flight or has terminal-failed. A draft sitting at status='manual_review'
+// with zero rendered slides is NOT actually reviewable — it belongs in
+// In Progress (still rendering) or Failed (all slides rejected).
 const filters = computed(() => ({
-  status: statusFilter.value || undefined,
-  scope: activeTab.value === 'in_progress' || activeTab.value === 'all' ? 'queue' : undefined,
-  per_page: 50,
+  scope: 'queue',
+  per_page: 100,
 }))
 
 const { drafts: allDrafts, isLoading, error } = useLinkedInDraftsList(filters)
 
-// Client-side subfilter for in_progress tab (not a single status)
-const drafts = computed(() => {
-  if (activeTab.value === 'in_progress') {
-    return allDrafts.value.filter((d) =>
-      ['pending_generation', 'generating', 'validating'].includes(d.status)
-    )
+/**
+ * Inspect carousel slide image_status[] and return one of:
+ *   'ready'      — all slides have a rendered PNG
+ *   'partial'    — some slides done, rest failed/pending (operator can review)
+ *   'generating' — at least one slide pending or generating (still in flight)
+ *   'failed'     — every slide is failed (terminal — no rendered images at all)
+ *   'pending'    — no slides have been dispatched yet (legacy / never queued)
+ */
+function carouselImageState(draft) {
+  if (draft.format !== 'carousel') return 'ready'
+  const slides = Array.isArray(draft.carousel_slides) ? draft.carousel_slides : []
+  if (slides.length === 0) return 'failed' // empty carousel ≈ parse failure
+
+  let done = 0
+  let inFlight = 0
+  let failed = 0
+  for (const slide of slides) {
+    const s = slide?.image_status
+    if (s === 'done' && slide?.image_url) done++
+    else if (s === 'pending' || s === 'generating') inFlight++
+    else if (s === 'failed') failed++
   }
-  return allDrafts.value
+
+  if (done === slides.length) return 'ready'
+  if (inFlight > 0) return 'generating'
+  if (done > 0) return 'partial'
+  if (failed === slides.length) return 'failed'
+  return 'pending' // none dispatched (legacy carousel pre-Apr 27)
+}
+
+/**
+ * Returns one of: 'manual_review' | 'in_progress' | 'failed' | null
+ * — null means the draft does not belong in the operator queue at all.
+ */
+function classifyForQueue(draft) {
+  if (['pending_generation', 'generating', 'validating'].includes(draft.status)) {
+    return 'in_progress'
+  }
+  if (draft.status === 'failed') return 'failed'
+
+  if (draft.status === 'manual_review') {
+    if (draft.format === 'text') return 'manual_review'
+    const imgState = carouselImageState(draft)
+    if (imgState === 'pending' || imgState === 'generating') return 'in_progress'
+    if (imgState === 'failed') return 'failed'
+    return 'manual_review' // ready or partial — operator can review what we've got
+  }
+
+  return null
+}
+
+const drafts = computed(() => {
+  if (activeTab.value === 'all') return allDrafts.value
+  return allDrafts.value.filter((d) => classifyForQueue(d) === activeTab.value)
 })
 
 const cancelMutation = useCancelLinkedInDraft()
@@ -74,6 +117,22 @@ function statusLabel(status) {
 }
 
 function issueSummary(draft) {
+  // Carousel-specific image-state hints take precedence — they explain WHY a
+  // manual_review draft is showing in the In Progress or Failed bucket.
+  if (draft.format === 'carousel' && draft.status === 'manual_review') {
+    const slides = Array.isArray(draft.carousel_slides) ? draft.carousel_slides : []
+    if (slides.length > 0) {
+      const imgState = carouselImageState(draft)
+      const inFlight = slides.filter((s) => ['pending', 'generating'].includes(s?.image_status)).length
+      const failed = slides.filter((s) => s?.image_status === 'failed').length
+      const done = slides.filter((s) => s?.image_status === 'done' && s?.image_url).length
+      if (imgState === 'generating') return `Rendering ${inFlight} of ${slides.length} slides…`
+      if (imgState === 'pending') return `${slides.length} slides queued, awaiting dispatch`
+      if (imgState === 'failed') return `All ${slides.length} slides rejected — see detail`
+      if (imgState === 'partial') return `${done} done · ${failed} failed (review and retry)`
+    }
+  }
+
   if (draft.last_error) {
     return draft.last_error.slice(0, 60) + (draft.last_error.length > 60 ? '…' : '')
   }
@@ -124,9 +183,8 @@ const emptyMessage = computed(() => {
 const counts = computed(() => {
   const c = { manual_review: 0, failed: 0, in_progress: 0 }
   for (const d of allDrafts.value) {
-    if (d.status === 'manual_review') c.manual_review++
-    else if (d.status === 'failed') c.failed++
-    else if (['pending_generation', 'generating', 'validating'].includes(d.status)) c.in_progress++
+    const bucket = classifyForQueue(d)
+    if (bucket && c[bucket] !== undefined) c[bucket]++
   }
   return c
 })

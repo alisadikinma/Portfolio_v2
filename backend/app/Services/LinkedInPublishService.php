@@ -119,14 +119,35 @@ class LinkedInPublishService
 
         $author = "urn:li:person:{$account->person_urn}";
 
+        // Resolve thumbnail asset URN. Reuse blog's featured_image (already 16:9,
+        // CDN-served, operator-approved). Pure text posts ("wall of text")
+        // tank reach on LinkedIn — IMAGE-category posts with a thumbnail get
+        // ~2x the dwell time. Idempotent via stored thumbnail_asset_urn so
+        // publish-now retries don't double-upload.
+        $draft->loadMissing(['post.translations']);
+        $thumbnailUrn = $this->resolveThumbnailAssetUrn($draft, $account);
+        $blogTitle = (string) ($draft->post?->translations->first()?->title ?? '');
+
+        $shareContent = $thumbnailUrn !== null
+            ? [
+                'shareCommentary' => ['text' => $body],
+                'shareMediaCategory' => 'IMAGE',
+                'media' => [[
+                    'status' => 'READY',
+                    'media' => $thumbnailUrn,
+                    'title' => ['text' => mb_substr($blogTitle ?: 'Blog post', 0, 200)],
+                ]],
+            ]
+            : [
+                'shareCommentary' => ['text' => $body],
+                'shareMediaCategory' => 'NONE',
+            ];
+
         $payload = [
             'author' => $author,
             'lifecycleState' => 'PUBLISHED',
             'specificContent' => [
-                'com.linkedin.ugc.ShareContent' => [
-                    'shareCommentary' => ['text' => $body],
-                    'shareMediaCategory' => 'NONE',
-                ],
+                'com.linkedin.ugc.ShareContent' => $shareContent,
             ],
             'visibility' => [
                 'com.linkedin.ugc.MemberNetworkVisibility' => 'PUBLIC',
@@ -310,5 +331,152 @@ class LinkedInPublishService
             return (string) ($json['message'] ?? $json['error_description'] ?? $json['error'] ?? $response->body());
         }
         return mb_substr((string) $response->body(), 0, 300);
+    }
+
+    /**
+     * Resolve the thumbnail asset URN for a text-format draft. Returns the
+     * existing `thumbnail_asset_urn` if already uploaded, otherwise tries to
+     * upload the blog's `posts.featured_image` to LinkedIn DigitalMedia and
+     * persists the URN. Returns null on any failure (caller falls back to
+     * shareMediaCategory=NONE — a thumbnail-less post still publishes).
+     */
+    private function resolveThumbnailAssetUrn(LinkedInPost $draft, LinkedInAccount $account): ?string
+    {
+        $existing = trim((string) ($draft->thumbnail_asset_urn ?? ''));
+        if ($existing !== '') {
+            return $existing;
+        }
+
+        $featuredImage = trim((string) ($draft->post?->featured_image ?? ''));
+        if ($featuredImage === '') {
+            return null;
+        }
+
+        $assetUrn = $this->registerAndUploadImage($featuredImage, $account);
+        if ($assetUrn === null) {
+            return null;
+        }
+
+        $draft->update(['thumbnail_asset_urn' => $assetUrn]);
+        return $assetUrn;
+    }
+
+    /**
+     * 3-step LinkedIn DigitalMedia image upload:
+     *   1. POST /v2/assets?action=registerUpload — get uploadUrl + asset URN
+     *   2. GET source bytes from $sourceImageUrl
+     *   3. PUT bytes to uploadUrl with Bearer auth
+     *
+     * Returns the asset URN on success, null on any failure (logged).
+     * The asset URN can be used in UGC post payloads as media[].media.
+     */
+    public function registerAndUploadImage(string $sourceImageUrl, LinkedInAccount $account): ?string
+    {
+        $baseUrl = rtrim((string) config('linkedin.api.base_url', 'https://api.linkedin.com/v2'), '/');
+        $registerUrl = $baseUrl . '/assets?action=registerUpload';
+
+        $registerPayload = [
+            'registerUploadRequest' => [
+                'recipes' => ['urn:li:digitalmediaRecipe:feedshare-image'],
+                'owner' => "urn:li:person:{$account->person_urn}",
+                'serviceRelationships' => [[
+                    'relationshipType' => 'OWNER',
+                    'identifier' => 'urn:li:userGeneratedContent',
+                ]],
+            ],
+        ];
+
+        // Step 1: register upload
+        try {
+            $registerResponse = Http::withToken($account->access_token)
+                ->withHeaders([
+                    'X-Restli-Protocol-Version' => '2.0.0',
+                    'Content-Type' => 'application/json',
+                    'LinkedIn-Version' => (string) config('linkedin.api.version', '202405'),
+                ])
+                ->timeout(30)
+                ->post($registerUrl, $registerPayload);
+        } catch (\Throwable $e) {
+            Log::error('[LinkedInPublish] registerUpload exception', ['error' => $e->getMessage()]);
+            return null;
+        }
+
+        if (!$registerResponse->successful()) {
+            Log::warning('[LinkedInPublish] registerUpload failed', [
+                'status' => $registerResponse->status(),
+                'body' => mb_substr((string) $registerResponse->body(), 0, 300),
+            ]);
+            return null;
+        }
+
+        $registerJson = $registerResponse->json();
+        $mechanism = $registerJson['value']['uploadMechanism'] ?? [];
+        // Note: LinkedIn key contains literal dots, so direct array access only.
+        $mediaUploadKey = 'com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest';
+        $uploadUrl = $mechanism[$mediaUploadKey]['uploadUrl'] ?? null;
+        $assetUrn = $registerJson['value']['asset'] ?? null;
+
+        if (!$uploadUrl || !$assetUrn) {
+            Log::warning('[LinkedInPublish] registerUpload missing uploadUrl or asset', [
+                'response' => $registerJson,
+            ]);
+            return null;
+        }
+
+        // Step 2: fetch source image bytes
+        try {
+            $imageResponse = Http::timeout(30)->get($sourceImageUrl);
+        } catch (\Throwable $e) {
+            Log::error('[LinkedInPublish] image source fetch exception', [
+                'url' => $sourceImageUrl,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+
+        if (!$imageResponse->successful()) {
+            Log::warning('[LinkedInPublish] image source fetch failed', [
+                'url' => $sourceImageUrl,
+                'status' => $imageResponse->status(),
+            ]);
+            return null;
+        }
+
+        $imageBytes = $imageResponse->body();
+        if (strlen($imageBytes) === 0) {
+            Log::warning('[LinkedInPublish] image source returned empty bytes', ['url' => $sourceImageUrl]);
+            return null;
+        }
+
+        // Step 3: PUT bytes to LinkedIn upload URL
+        try {
+            $uploadResponse = Http::withToken($account->access_token)
+                ->timeout(60)
+                ->withBody($imageBytes, 'application/octet-stream')
+                ->put($uploadUrl);
+        } catch (\Throwable $e) {
+            Log::error('[LinkedInPublish] image upload exception', [
+                'asset_urn' => $assetUrn,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+
+        if (!$uploadResponse->successful()) {
+            Log::warning('[LinkedInPublish] image upload PUT failed', [
+                'asset_urn' => $assetUrn,
+                'status' => $uploadResponse->status(),
+                'body' => mb_substr((string) $uploadResponse->body(), 0, 300),
+            ]);
+            return null;
+        }
+
+        Log::info('[LinkedInPublish] image upload success', [
+            'asset_urn' => $assetUrn,
+            'source' => $sourceImageUrl,
+            'bytes' => strlen($imageBytes),
+        ]);
+
+        return $assetUrn;
     }
 }

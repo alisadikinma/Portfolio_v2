@@ -338,6 +338,27 @@ async function regenerateSingleSlide(slideIndex) {
               {{ draft.content }}
             </div>
 
+            <!-- 16:9 thumbnail (blog featured_image, becomes IMAGE-category share on publish).
+                 Stops the post from being a wall of text — IMAGE-category posts get ~2x dwell time. -->
+            <figure
+              v-if="draft.post?.featured_image"
+              class="-mx-5 border-y border-neutral-200 dark:border-neutral-700 overflow-hidden bg-neutral-100 dark:bg-neutral-800"
+            >
+              <img
+                :src="draft.post.featured_image"
+                :alt="draft.post.translations?.[0]?.title || 'Blog thumbnail'"
+                class="w-full h-auto block"
+                style="aspect-ratio: 16 / 9; object-fit: cover;"
+                loading="lazy"
+              >
+              <figcaption
+                v-if="!draft.thumbnail_asset_urn"
+                class="px-5 py-2 text-[10px] font-mono uppercase tracking-wider text-amber-600 dark:text-amber-400 bg-amber-500/5"
+              >
+                Will upload to LinkedIn on publish (no asset URN yet)
+              </figcaption>
+            </figure>
+
             <div v-if="Array.isArray(draft.hashtags) && draft.hashtags.length > 0" class="flex flex-wrap gap-2">
               <span
                 v-for="tag in draft.hashtags"
@@ -469,27 +490,6 @@ async function regenerateSingleSlide(slideIndex) {
                   <p class="text-white/80 text-xs max-w-md">
                     {{ slideCopyEn(carouselSlides[activeSlideIndex]) }}
                   </p>
-                </div>
-              </div>
-
-              <!-- Slide metadata + bilingual copy preview (sits BELOW the 3:4 frame so the image dominates).
-                   max-width matches the slide viewer's 60vh so the metadata bar aligns under the image.
-                   Shows both copy_id (Indonesian, headline) + copy_en (English, subtitle) per v0.4.6 schema. -->
-              <div class="mt-3 mx-auto rounded-lg bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 p-3 space-y-2"
-                   style="max-width: min(100%, 60vh);">
-                <!-- ID label + Indonesian copy (dominant — larger, bold) -->
-                <div>
-                  <span class="inline-block text-[9px] font-mono uppercase tracking-wider text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded bg-emerald-500/10 mr-2">ID</span>
-                  <span class="text-base font-bold text-neutral-900 dark:text-neutral-100 leading-snug">
-                    {{ slideCopyId(carouselSlides[activeSlideIndex]) || '—' }}
-                  </span>
-                </div>
-                <!-- EN label + English copy (secondary — smaller, regular weight, sentence case) -->
-                <div>
-                  <span class="inline-block text-[9px] font-mono uppercase tracking-wider text-cyan-600 dark:text-cyan-400 px-1.5 py-0.5 rounded bg-cyan-500/10 mr-2">EN</span>
-                  <span class="text-xs text-neutral-700 dark:text-neutral-300 leading-relaxed">
-                    {{ slideCopyEn(carouselSlides[activeSlideIndex]) || '—' }}
-                  </span>
                 </div>
               </div>
 

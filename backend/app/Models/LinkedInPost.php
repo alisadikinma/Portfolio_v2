@@ -34,6 +34,7 @@ class LinkedInPost extends Model
         'published_at',
         'linkedin_post_urn',
         'linkedin_asset_urn',
+        'thumbnail_asset_urn',
         'linkedin_post_url',
         'status',
         'pipeline_state_log',

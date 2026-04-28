@@ -357,29 +357,76 @@ class LinkedInCarouselImageService
      */
     private function maybeAutoRetryOnSafety(ImageGenerationJob $job, string $reason): void
     {
-        $imgSvc = app(\App\Services\ImageGenerationService::class);
-        if (!$imgSvc->isSafetyError($reason)) {
-            return;
-        }
-
-        if (!config('services.article_generation.use_safety_rewrite', true)) {
-            return;
-        }
-
         $draftId = $job->linkedin_post_id;
         $slideIndex = $job->slide_index;
         if ($draftId === null || $slideIndex === null) {
             return;
         }
 
+        if (!$this->rewriteSlidePromptIfSafetyError($draftId, $slideIndex, $reason)) {
+            return;
+        }
+
+        // Re-dispatch with sanitized prompt. dispatchSingleSlide re-runs
+        // CarouselSlideEnhancer which adds chrome + (now appropriate) face
+        // refs for the new layout_hint.
+        $newDraft = LinkedInPost::find($draftId);
+        if ($newDraft) {
+            $newUuid = $this->dispatchSingleSlide($newDraft, $slideIndex);
+            Log::info('[LinkedInCarouselImage] safety auto-retry dispatched', [
+                'draft_id' => $draftId,
+                'slide_index' => $slideIndex,
+                'new_uuid' => $newUuid,
+            ]);
+        }
+    }
+
+    /**
+     * Public entry for manual-retry path. Inspects the slide's existing
+     * `image_error` and applies the safety rewrite if it matches the
+     * safety-error class. Returns true when the prompt was rewritten so
+     * the caller knows the next dispatchSingleSlide will use the
+     * sanitized version.
+     *
+     * Idempotent — short-circuits on the `image_prompt_pre_safety` sentinel.
+     */
+    public function applySafetyRewriteIfNeeded(LinkedInPost $draft, int $slideIndex): bool
+    {
+        $slides = $draft->carousel_slides ?? [];
+        if (!isset($slides[$slideIndex])) {
+            return false;
+        }
+        $reason = (string) ($slides[$slideIndex]['image_error'] ?? '');
+        if ($reason === '') {
+            return false;
+        }
+        return $this->rewriteSlidePromptIfSafetyError($draft->id, $slideIndex, $reason);
+    }
+
+    /**
+     * Pure rewrite (no dispatch). Detects safety errors, calls Sonnet to
+     * sanitize the prompt, persists with idempotency sentinel + layout
+     * demotion. Returns true if the slide's image_prompt was mutated.
+     */
+    private function rewriteSlidePromptIfSafetyError(int $draftId, int $slideIndex, string $reason): bool
+    {
+        $imgSvc = app(\App\Services\ImageGenerationService::class);
+        if (!$imgSvc->isSafetyError($reason)) {
+            return false;
+        }
+
+        if (!config('services.article_generation.use_safety_rewrite', true)) {
+            return false;
+        }
+
         $draft = LinkedInPost::find($draftId);
         if (!$draft) {
-            return;
+            return false;
         }
 
         $slides = $draft->carousel_slides ?? [];
         if (!isset($slides[$slideIndex])) {
-            return;
+            return false;
         }
 
         $slide = $slides[$slideIndex];
@@ -390,12 +437,12 @@ class LinkedInCarouselImageService
                 'draft_id' => $draftId,
                 'slide_index' => $slideIndex,
             ]);
-            return;
+            return false;
         }
 
         $originalPrompt = (string) ($slide['image_prompt'] ?? '');
         if (trim($originalPrompt) === '') {
-            return;
+            return false;
         }
 
         try {
@@ -414,7 +461,7 @@ class LinkedInCarouselImageService
                 'slide_index' => $slideIndex,
                 'error' => $e->getMessage(),
             ]);
-            return;
+            return false;
         }
 
         if (!($result['success'] ?? false) || empty($result['rewritten_vd'])) {
@@ -423,7 +470,7 @@ class LinkedInCarouselImageService
                 'slide_index' => $slideIndex,
                 'error' => $result['error'] ?? 'unknown',
             ]);
-            return;
+            return false;
         }
 
         $rewritten = (string) $result['rewritten_vd'];
@@ -451,18 +498,7 @@ class LinkedInCarouselImageService
             $locked->update(['carousel_slides' => $s]);
         });
 
-        // Re-dispatch with sanitized prompt. dispatchSingleSlide re-runs
-        // CarouselSlideEnhancer which adds chrome + (now appropriate) face
-        // refs for the new layout_hint.
-        $newDraft = LinkedInPost::find($draftId);
-        if ($newDraft) {
-            $newUuid = $this->dispatchSingleSlide($newDraft, $slideIndex);
-            Log::info('[LinkedInCarouselImage] safety auto-retry dispatched', [
-                'draft_id' => $draftId,
-                'slide_index' => $slideIndex,
-                'new_uuid' => $newUuid,
-            ]);
-        }
+        return true;
     }
 
     /**
