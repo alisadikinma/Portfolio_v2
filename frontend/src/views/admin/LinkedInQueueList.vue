@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   useLinkedInDraftsList,
@@ -8,16 +8,31 @@ import {
   useRegenerateLinkedInDraft,
   postTitle,
 } from '@/composables/useLinkedInDrafts'
+import {
+  statusMeta,
+  MOOD_CLASSES,
+  formatChip,
+  relativeTime,
+  QUEUE_TAB_KEY,
+  ICON,
+} from './linkedinHelpers'
 
 const router = useRouter()
 
-const activeTab = ref('manual_review') // 'manual_review' | 'failed' | 'in_progress' | 'all'
+// --- Tab persistence: restore the active tab on mount, save on change.
+// Lets the operator come back from a draft detail and land on the same tab.
+const activeTab = ref('manual_review')
+onMounted(() => {
+  const saved = sessionStorage.getItem(QUEUE_TAB_KEY)
+  if (saved && ['manual_review', 'failed', 'in_progress', 'all'].includes(saved)) {
+    activeTab.value = saved
+  }
+})
+watch(activeTab, (v) => sessionStorage.setItem(QUEUE_TAB_KEY, v))
 
 // Always fetch the full queue (no server-side status filter) so client-side
 // classification can re-route carousel drafts whose slide rendering is still
-// in flight or has terminal-failed. A draft sitting at status='manual_review'
-// with zero rendered slides is NOT actually reviewable — it belongs in
-// In Progress (still rendering) or Failed (all slides rejected).
+// in flight or has terminal-failed.
 const filters = computed(() => ({
   scope: 'queue',
   per_page: 100,
@@ -25,40 +40,26 @@ const filters = computed(() => ({
 
 const { drafts: allDrafts, isLoading, error } = useLinkedInDraftsList(filters)
 
-/**
- * Inspect carousel slide image_status[] and return one of:
- *   'ready'      — all slides have a rendered PNG
- *   'partial'    — some slides done, rest failed/pending (operator can review)
- *   'generating' — at least one slide pending or generating (still in flight)
- *   'failed'     — every slide is failed (terminal — no rendered images at all)
- *   'pending'    — no slides have been dispatched yet (legacy / never queued)
- */
+// Carousel slide image-state inspection — see classifyForQueue below.
 function carouselImageState(draft) {
   if (draft.format !== 'carousel') return 'ready'
   const slides = Array.isArray(draft.carousel_slides) ? draft.carousel_slides : []
-  if (slides.length === 0) return 'failed' // empty carousel ≈ parse failure
+  if (slides.length === 0) return 'failed'
 
-  let done = 0
-  let inFlight = 0
-  let failed = 0
+  let done = 0, inFlight = 0, failed = 0
   for (const slide of slides) {
     const s = slide?.image_status
     if (s === 'done' && slide?.image_url) done++
     else if (s === 'pending' || s === 'generating') inFlight++
     else if (s === 'failed') failed++
   }
-
   if (done === slides.length) return 'ready'
   if (inFlight > 0) return 'generating'
   if (done > 0) return 'partial'
   if (failed === slides.length) return 'failed'
-  return 'pending' // none dispatched (legacy carousel pre-Apr 27)
+  return 'pending'
 }
 
-/**
- * Returns one of: 'manual_review' | 'in_progress' | 'failed' | null
- * — null means the draft does not belong in the operator queue at all.
- */
 function classifyForQueue(draft) {
   if (['pending_generation', 'generating', 'validating'].includes(draft.status)) {
     return 'in_progress'
@@ -70,114 +71,14 @@ function classifyForQueue(draft) {
     const imgState = carouselImageState(draft)
     if (imgState === 'pending' || imgState === 'generating') return 'in_progress'
     if (imgState === 'failed') return 'failed'
-    return 'manual_review' // ready or partial — operator can review what we've got
+    return 'manual_review'
   }
-
   return null
 }
 
 const drafts = computed(() => {
   if (activeTab.value === 'all') return allDrafts.value
   return allDrafts.value.filter((d) => classifyForQueue(d) === activeTab.value)
-})
-
-const cancelMutation = useCancelLinkedInDraft()
-const approveMutation = useApproveLinkedInDraft()
-const regenerateMutation = useRegenerateLinkedInDraft()
-
-const tabs = [
-  { key: 'manual_review', label: 'Manual Review' },
-  { key: 'failed', label: 'Failed' },
-  { key: 'in_progress', label: 'In Progress' },
-  { key: 'all', label: 'All' },
-]
-
-function openDetail(id) {
-  router.push({ name: 'admin-linkedin-draft-detail', params: { id } })
-}
-
-function statusBadgeClass(status) {
-  return {
-    manual_review: 'bg-amber-500/20 text-amber-400 border-amber-500/40',
-    failed: 'bg-red-500/20 text-red-400 border-red-500/40',
-    pending_generation: 'bg-neutral-500/20 text-neutral-400 border-neutral-500/40',
-    generating: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/40',
-    validating: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/40',
-  }[status] || 'bg-neutral-500/20 text-neutral-400'
-}
-
-function statusLabel(status) {
-  return {
-    manual_review: 'Manual Review',
-    failed: 'Failed',
-    pending_generation: 'Pending',
-    generating: 'Generating…',
-    validating: 'Validating…',
-  }[status] || status
-}
-
-function issueSummary(draft) {
-  // Carousel-specific image-state hints take precedence — they explain WHY a
-  // manual_review draft is showing in the In Progress or Failed bucket.
-  if (draft.format === 'carousel' && draft.status === 'manual_review') {
-    const slides = Array.isArray(draft.carousel_slides) ? draft.carousel_slides : []
-    if (slides.length > 0) {
-      const imgState = carouselImageState(draft)
-      const inFlight = slides.filter((s) => ['pending', 'generating'].includes(s?.image_status)).length
-      const failed = slides.filter((s) => s?.image_status === 'failed').length
-      const done = slides.filter((s) => s?.image_status === 'done' && s?.image_url).length
-      if (imgState === 'generating') return `Rendering ${inFlight} of ${slides.length} slides…`
-      if (imgState === 'pending') return `${slides.length} slides queued, awaiting dispatch`
-      if (imgState === 'failed') return `All ${slides.length} slides rejected — see detail`
-      if (imgState === 'partial') return `${done} done · ${failed} failed (review and retry)`
-    }
-  }
-
-  if (draft.last_error) {
-    return draft.last_error.slice(0, 60) + (draft.last_error.length > 60 ? '…' : '')
-  }
-  const firstFailure = draft.validation_log?.failures?.[0]
-  if (firstFailure) {
-    return firstFailure.message || firstFailure.rule
-  }
-  return '—'
-}
-
-function depthDisplay(score) {
-  if (score === null || score === undefined) return '—'
-  return score
-}
-
-function relativeTime(datetime) {
-  if (!datetime) return ''
-  const diff = Date.now() - new Date(datetime).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}h ago`
-  return `${Math.floor(hours / 24)}d ago`
-}
-
-async function doApprove(id) {
-  await approveMutation.mutateAsync(id)
-}
-
-async function doCancel(id) {
-  if (!confirm('Cancel this draft?')) return
-  await cancelMutation.mutateAsync(id)
-}
-
-async function doRegenerate(id) {
-  if (!confirm('Regenerate from scratch? This archives the current draft and queues a new generation.')) return
-  await regenerateMutation.mutateAsync(id)
-}
-
-const emptyMessage = computed(() => {
-  if (activeTab.value === 'manual_review') return 'No drafts need attention.'
-  if (activeTab.value === 'failed') return 'No failures in the last 7 days.'
-  if (activeTab.value === 'in_progress') return 'No drafts currently being generated.'
-  return 'Queue is clear.'
 })
 
 const counts = computed(() => {
@@ -188,154 +89,247 @@ const counts = computed(() => {
   }
   return c
 })
+
+const cancelMutation = useCancelLinkedInDraft()
+const approveMutation = useApproveLinkedInDraft()
+const regenerateMutation = useRegenerateLinkedInDraft()
+
+const tabs = [
+  { key: 'manual_review', label: 'Needs review', accent: 'text-amber-400' },
+  { key: 'in_progress', label: 'In progress', accent: 'text-cyan-400' },
+  { key: 'failed', label: 'Failed', accent: 'text-red-400' },
+  { key: 'all', label: 'Everything', accent: 'text-neutral-300' },
+]
+
+function openDetail(id) {
+  // Tag origin so the detail page's back button knows where to return.
+  sessionStorage.setItem('linkedin:detail:origin', 'queue')
+  router.push({ name: 'admin-linkedin-draft-detail', params: { id } })
+}
+
+function depthTone(score) {
+  if (score === null || score === undefined) return 'text-neutral-500'
+  if (score >= 80) return 'text-emerald-400'
+  if (score >= 70) return 'text-amber-400'
+  return 'text-red-400'
+}
+
+function issueSummary(draft) {
+  if (draft.format === 'carousel' && draft.status === 'manual_review') {
+    const slides = Array.isArray(draft.carousel_slides) ? draft.carousel_slides : []
+    if (slides.length > 0) {
+      const imgState = carouselImageState(draft)
+      const inFlight = slides.filter((s) => ['pending', 'generating'].includes(s?.image_status)).length
+      const failed = slides.filter((s) => s?.image_status === 'failed').length
+      const done = slides.filter((s) => s?.image_status === 'done' && s?.image_url).length
+      if (imgState === 'generating') return `Rendering ${inFlight} of ${slides.length} slides`
+      if (imgState === 'pending') return `${slides.length} slides queued`
+      if (imgState === 'failed') return `All ${slides.length} slides rejected`
+      if (imgState === 'partial') return `${done} done, ${failed} failed`
+    }
+  }
+  if (draft.last_error) {
+    return draft.last_error.length > 60
+      ? draft.last_error.slice(0, 60) + '…'
+      : draft.last_error
+  }
+  const f = draft.validation_log?.failures?.[0]
+  if (f) return f.message || f.rule
+  return '—'
+}
+
+async function doApprove(id) {
+  await approveMutation.mutateAsync(id)
+}
+async function doCancel(id) {
+  if (!confirm('Cancel this draft?')) return
+  await cancelMutation.mutateAsync(id)
+}
+async function doRegenerate(id) {
+  if (!confirm('Regenerate from scratch? This archives the current draft and queues a new generation.')) return
+  await regenerateMutation.mutateAsync(id)
+}
+
+const emptyMessage = computed(() => ({
+  manual_review: { title: 'Inbox zero', body: 'Nothing waiting on your call. New drafts will land here when validation flags them.' },
+  in_progress: { title: 'Quiet on the wire', body: 'No drafts being generated right now.' },
+  failed: { title: 'Nothing broken', body: 'No failed runs in the queue.' },
+  all: { title: 'Queue is clear', body: 'No drafts in the pipeline.' },
+}[activeTab.value]))
 </script>
 
 <template>
-  <div class="p-6 max-w-7xl mx-auto">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
     <!-- Header -->
-    <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+    <header class="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <h1 class="text-3xl font-display font-semibold text-neutral-900 dark:text-neutral-100">
-          LinkedIn Queue
+        <p class="text-[11px] font-mono uppercase tracking-[0.18em] text-amber-400/80 mb-1">LinkedIn pipeline</p>
+        <h1 class="text-3xl sm:text-4xl font-display font-semibold tracking-tight text-neutral-100">
+          Queue
         </h1>
-        <p class="text-sm text-neutral-600 dark:text-neutral-400 mt-1">
-          Drafts needing attention. For successfully shipped posts, see
-          <router-link to="/admin/linkedin-posts" class="text-amber-600 hover:underline">Posts</router-link>.
+        <p class="text-sm text-neutral-400 mt-2 max-w-xl">
+          Drafts that need a decision, are mid-generation, or hit an error. Successfully shipped posts live in
+          <router-link to="/admin/linkedin-posts" class="text-amber-400 hover:underline">Posts</router-link>.
         </p>
       </div>
       <router-link
         to="/admin/linkedin-posts"
-        class="px-4 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-300 border border-neutral-300 dark:border-neutral-600 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700"
+        class="inline-flex items-center gap-2 px-3.5 py-2 text-sm text-neutral-300 border border-neutral-800 rounded-lg hover:border-amber-500/40 hover:bg-amber-500/5 hover:text-amber-300 transition"
       >
-        ← Go to Posts
+        <svg viewBox="0 0 24 24" fill="currentColor" class="w-3.5 h-3.5 text-[#0077B5]">
+          <path :d="ICON.linkedin" />
+        </svg>
+        View shipped posts
       </router-link>
-    </div>
+    </header>
 
-    <!-- Filter tabs with counts -->
-    <div class="mb-4 flex flex-wrap gap-2 border-b border-neutral-200 dark:border-neutral-700 pb-2">
+    <!-- Tab rail (segmented control style, not generic pills) -->
+    <nav class="flex flex-wrap gap-1 p-1 rounded-xl bg-neutral-900/50 border border-neutral-800/80 w-max max-w-full">
       <button
         v-for="tab in tabs"
         :key="tab.key"
         @click="activeTab = tab.key"
         :class="[
-          'px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2',
+          'inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all',
           activeTab === tab.key
-            ? 'bg-amber-500/20 text-amber-700 dark:text-amber-400'
-            : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800',
+            ? 'bg-neutral-800 text-neutral-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]'
+            : 'text-neutral-400 hover:text-neutral-200',
         ]"
       >
-        {{ tab.label }}
+        <span :class="activeTab === tab.key ? tab.accent : ''">{{ tab.label }}</span>
         <span
           v-if="tab.key !== 'all' && counts[tab.key] > 0"
-          class="text-[10px] px-1.5 py-0.5 rounded-full bg-neutral-500/20 text-neutral-600 dark:text-neutral-400"
+          class="text-[10px] font-mono px-1.5 py-0.5 rounded-full"
+          :class="activeTab === tab.key ? 'bg-neutral-700 text-neutral-200' : 'bg-neutral-800 text-neutral-500'"
         >
           {{ counts[tab.key] }}
         </span>
       </button>
+    </nav>
+
+    <!-- Loading -->
+    <div v-if="isLoading" class="space-y-2">
+      <div v-for="i in 6" :key="i" class="h-14 rounded-xl bg-neutral-900/40 animate-pulse" />
     </div>
 
-    <!-- Loading / error / empty -->
-    <div v-if="isLoading" class="py-12 text-center text-neutral-500">
-      Loading queue…
-    </div>
-    <div v-else-if="error" class="py-12 text-center">
-      <p class="text-red-500">Failed to load queue</p>
-      <p class="text-xs text-neutral-500 mt-1">{{ error.message || 'Unknown error' }}</p>
-    </div>
-    <div v-else-if="drafts.length === 0" class="py-16 text-center text-neutral-500">
-      {{ emptyMessage }}
+    <!-- Error -->
+    <div v-else-if="error" class="rounded-2xl border border-red-500/30 bg-red-500/5 p-8 text-center">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-10 h-10 text-red-400 mx-auto mb-3">
+        <path :d="ICON.alertCircle" />
+      </svg>
+      <p class="text-red-300 font-medium">Failed to load queue</p>
+      <p class="text-xs text-neutral-500 mt-2 font-mono">{{ error.message || 'Unknown error' }}</p>
     </div>
 
-    <!-- Table -->
-    <div v-else class="overflow-x-auto rounded-xl border border-neutral-200 dark:border-neutral-700">
-      <table class="w-full text-sm">
-        <thead class="bg-neutral-50 dark:bg-neutral-800 text-left">
-          <tr>
-            <th class="px-4 py-3 font-semibold text-neutral-700 dark:text-neutral-300">Blog source</th>
-            <th class="px-4 py-3 font-semibold text-neutral-700 dark:text-neutral-300">Status</th>
-            <th class="px-4 py-3 font-semibold text-neutral-700 dark:text-neutral-300">Format</th>
-            <th class="px-4 py-3 font-semibold text-neutral-700 dark:text-neutral-300 text-right">Depth</th>
-            <th class="px-4 py-3 font-semibold text-neutral-700 dark:text-neutral-300">Issue</th>
-            <th class="px-4 py-3 font-semibold text-neutral-700 dark:text-neutral-300 text-right">Retries</th>
-            <th class="px-4 py-3 font-semibold text-neutral-700 dark:text-neutral-300">Updated</th>
-            <th class="px-4 py-3 font-semibold text-neutral-700 dark:text-neutral-300 text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="draft in drafts"
-            :key="draft.id"
-            @click="openDetail(draft.id)"
-            class="border-t border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 cursor-pointer"
-          >
-            <td class="px-4 py-3 text-neutral-800 dark:text-neutral-200 max-w-[260px]">
-              <div class="truncate font-medium">
-                {{ postTitle(draft) }}
-              </div>
-              <div class="text-[11px] text-neutral-500 truncate">#{{ draft.id }}</div>
-            </td>
-            <td class="px-4 py-3">
-              <span
-                class="px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wider border"
-                :class="statusBadgeClass(draft.status)"
+    <!-- Empty -->
+    <div
+      v-else-if="drafts.length === 0"
+      class="rounded-2xl border border-dashed border-neutral-800 p-12 text-center"
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" class="w-12 h-12 text-neutral-700 mx-auto mb-3">
+        <path :d="ICON.inbox" />
+      </svg>
+      <p class="text-base text-neutral-300 font-medium">{{ emptyMessage.title }}</p>
+      <p class="text-sm text-neutral-500 mt-1 max-w-sm mx-auto">{{ emptyMessage.body }}</p>
+    </div>
+
+    <!-- Table-list (cockpit, hairline dividers, no card boxes) -->
+    <div v-else class="rounded-2xl border border-neutral-800/80 bg-neutral-950/40 overflow-hidden">
+      <div class="hidden md:grid grid-cols-[1fr_120px_84px_1fr_100px_140px] px-5 py-2.5 text-[10px] font-mono uppercase tracking-[0.14em] text-neutral-500 border-b border-neutral-800/80">
+        <span>Source</span>
+        <span>Status</span>
+        <span class="text-right">Depth</span>
+        <span>Issue</span>
+        <span class="text-right">Updated</span>
+        <span class="text-right">Actions</span>
+      </div>
+
+      <div class="divide-y divide-neutral-800/60">
+        <article
+          v-for="draft in drafts"
+          :key="draft.id"
+          @click="openDetail(draft.id)"
+          class="group relative px-5 py-3.5 grid md:grid-cols-[1fr_120px_84px_1fr_100px_140px] gap-y-2 gap-x-4 cursor-pointer hover:bg-neutral-900/40 transition-colors"
+        >
+          <!-- Source -->
+          <div class="min-w-0">
+            <p class="text-sm text-neutral-200 truncate font-medium">{{ postTitle(draft) }}</p>
+            <p class="text-[11px] font-mono text-neutral-600">#{{ draft.id }} · {{ formatChip(draft.format) }}<template v-if="draft.format === 'carousel' && Array.isArray(draft.carousel_slides)"> · {{ draft.carousel_slides.length }} slides</template></p>
+          </div>
+
+          <!-- Status -->
+          <div class="md:self-center">
+            <span
+              class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono uppercase tracking-[0.12em]"
+              :class="MOOD_CLASSES[statusMeta(draft.status).mood]?.chip"
+            >
+              <span class="w-1 h-1 rounded-full" :class="MOOD_CLASSES[statusMeta(draft.status).mood]?.dot" />
+              {{ statusMeta(draft.status).short }}
+            </span>
+          </div>
+
+          <!-- Depth -->
+          <div class="md:self-center md:text-right">
+            <span
+              v-if="draft.depth_score !== null && draft.depth_score !== undefined"
+              class="text-sm font-mono font-bold"
+              :class="depthTone(draft.depth_score)"
+            >
+              {{ draft.depth_score }}
+            </span>
+            <span v-else class="text-sm text-neutral-600 font-mono">—</span>
+          </div>
+
+          <!-- Issue -->
+          <div class="md:self-center text-xs text-neutral-400 truncate min-w-0">
+            {{ issueSummary(draft) }}
+          </div>
+
+          <!-- Updated -->
+          <div class="md:self-center md:text-right text-xs text-neutral-500 font-mono whitespace-nowrap">
+            {{ relativeTime(draft.updated_at) }}
+          </div>
+
+          <!-- Actions -->
+          <div class="md:self-center md:text-right" @click.stop>
+            <div class="inline-flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+              <button
+                v-if="draft.status === 'manual_review' && classifyForQueue(draft) === 'manual_review'"
+                @click="doApprove(draft.id)"
+                :disabled="approveMutation.isPending.value"
+                title="Approve"
+                class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 ring-1 ring-emerald-500/30 disabled:opacity-50"
               >
-                {{ statusLabel(draft.status) }}
-              </span>
-            </td>
-            <td class="px-4 py-3 text-neutral-600 dark:text-neutral-400 font-mono text-xs uppercase">
-              {{ draft.format }}
-            </td>
-            <td class="px-4 py-3 text-right font-mono" :class="{
-              'text-red-400': draft.depth_score !== null && draft.depth_score < 70,
-              'text-yellow-500': draft.depth_score >= 70 && draft.depth_score < 80,
-              'text-amber-400': draft.depth_score >= 80,
-              'text-neutral-500': draft.depth_score === null || draft.depth_score === undefined,
-            }">
-              {{ depthDisplay(draft.depth_score) }}
-            </td>
-            <td class="px-4 py-3 text-neutral-700 dark:text-neutral-300 text-xs max-w-[280px]">
-              <span class="truncate block">{{ issueSummary(draft) }}</span>
-            </td>
-            <td class="px-4 py-3 text-right text-neutral-600 dark:text-neutral-400 font-mono text-xs">
-              {{ draft.retry_count }}/3
-            </td>
-            <td class="px-4 py-3 text-neutral-500 text-xs whitespace-nowrap">
-              {{ relativeTime(draft.updated_at) }}
-            </td>
-            <td class="px-4 py-3 text-right whitespace-nowrap">
-              <div class="inline-flex gap-1">
-                <button
-                  v-if="draft.status === 'manual_review'"
-                  @click.stop="doApprove(draft.id)"
-                  :disabled="approveMutation.isPending.value"
-                  title="Approve"
-                  class="px-2 py-1 text-[11px] rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/30 disabled:opacity-50"
-                >
-                  Approve
-                </button>
-                <button
-                  v-if="['manual_review', 'failed', 'cancelled'].includes(draft.status)"
-                  @click.stop="doRegenerate(draft.id)"
-                  :disabled="regenerateMutation.isPending.value"
-                  title="Regenerate"
-                  class="px-2 py-1 text-[11px] rounded bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/30 disabled:opacity-50"
-                >
-                  Regen
-                </button>
-                <button
-                  v-if="!['cancelled', 'published'].includes(draft.status)"
-                  @click.stop="doCancel(draft.id)"
-                  :disabled="cancelMutation.isPending.value"
-                  title="Cancel"
-                  class="px-2 py-1 text-[11px] rounded bg-neutral-500/20 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-500/30 disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5">
+                  <path :d="ICON.check" />
+                </svg>
+              </button>
+              <button
+                v-if="['manual_review', 'failed'].includes(draft.status)"
+                @click="doRegenerate(draft.id)"
+                :disabled="regenerateMutation.isPending.value"
+                title="Regenerate"
+                class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 ring-1 ring-cyan-500/30 disabled:opacity-50"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5">
+                  <path :d="ICON.refresh" />
+                </svg>
+              </button>
+              <button
+                v-if="!['cancelled', 'published'].includes(draft.status)"
+                @click="doCancel(draft.id)"
+                :disabled="cancelMutation.isPending.value"
+                title="Cancel"
+                class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-neutral-800/70 text-neutral-400 hover:bg-red-500/15 hover:text-red-400 ring-1 ring-neutral-800 hover:ring-red-500/30 disabled:opacity-50"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5">
+                  <path :d="ICON.x" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </article>
+      </div>
     </div>
   </div>
 </template>

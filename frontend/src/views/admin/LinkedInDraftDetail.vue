@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   useLinkedInDraft,
@@ -12,12 +12,22 @@ import {
   useRegenerateSlideImage,
   postTitle,
 } from '@/composables/useLinkedInDrafts'
+import {
+  statusMeta,
+  MOOD_CLASSES,
+  transitionSummary,
+  reasonLabel,
+  formatChip,
+  relativeTime,
+  countdownTo,
+  formatDateTime,
+  ICON,
+} from './linkedinHelpers'
 
 const route = useRoute()
 const router = useRouter()
 
 const draftId = computed(() => Number(route.params.id))
-
 const { draft, isLoading, error, refetch } = useLinkedInDraft(draftId)
 
 const updateMutation = useUpdateLinkedInDraft()
@@ -28,7 +38,24 @@ const regenerateMutation = useRegenerateLinkedInDraft()
 const regenerateAllImagesMutation = useRegenerateAllCarouselImages()
 const regenerateSlideMutation = useRegenerateSlideImage()
 
-// Edit mode state — seeded from draft when entering edit mode
+// --- Smart back navigation: read the referring origin (queue vs feed) from
+// sessionStorage so "Back" returns to the right list view, with the tab
+// the operator was on. Falls back to /admin/linkedin-queue.
+const backTarget = ref({ name: 'admin-linkedin-queue', label: 'Queue' })
+onMounted(() => {
+  const origin = sessionStorage.getItem('linkedin:detail:origin')
+  if (origin === 'feed') {
+    backTarget.value = { name: 'admin-linkedin-posts', label: 'Posts' }
+  } else {
+    backTarget.value = { name: 'admin-linkedin-queue', label: 'Queue' }
+  }
+})
+
+function goBack() {
+  router.push({ name: backTarget.value.name })
+}
+
+// --- Edit mode -------------------------------------------------------------
 const isEditing = ref(false)
 const editForm = ref({ content: '', link_comment: '', hashtags: [] })
 const newHashtagInput = ref('')
@@ -62,12 +89,14 @@ function cancelEdit() {
 }
 
 async function saveEdit() {
-  const payload = {
-    content: editForm.value.content,
-    link_comment: editForm.value.link_comment,
-    hashtags: editForm.value.hashtags,
-  }
-  const result = await updateMutation.mutateAsync({ id: draftId.value, payload })
+  const result = await updateMutation.mutateAsync({
+    id: draftId.value,
+    payload: {
+      content: editForm.value.content,
+      link_comment: editForm.value.link_comment,
+      hashtags: editForm.value.hashtags,
+    },
+  })
   updateWarnings.value = result?.warnings || []
   isEditing.value = false
   refetch()
@@ -77,10 +106,7 @@ function addHashtag() {
   const raw = newHashtagInput.value.trim()
   if (!raw) return
   const tag = raw.startsWith('#') ? raw : `#${raw}`
-  if (editForm.value.hashtags.length >= 5) {
-    alert('Max 5 hashtags')
-    return
-  }
+  if (editForm.value.hashtags.length >= 5) return
   if (!editForm.value.hashtags.includes(tag)) {
     editForm.value.hashtags.push(tag)
   }
@@ -92,23 +118,58 @@ function removeHashtag(tag) {
 }
 
 const charCount = computed(() => editForm.value.content.length)
-const charCountClass = computed(() => {
-  if (charCount.value < 800 || charCount.value > 1400) return 'text-red-500'
-  if (charCount.value < 1100 || charCount.value > 1300) return 'text-yellow-500'
-  return 'text-amber-500'
+const charCountTone = computed(() => {
+  const c = charCount.value
+  if (c < 800 || c > 1400) return 'text-red-400'
+  if (c < 1100 || c > 1300) return 'text-yellow-400'
+  return 'text-emerald-400'
 })
 
 const hashtagCountValid = computed(() =>
   editForm.value.hashtags.length >= 3 && editForm.value.hashtags.length <= 5
 )
 
-// Actions
+// --- Status mood + sentence + actions -------------------------------------
+const meta = computed(() => statusMeta(draft.value?.status))
+const mood = computed(() => MOOD_CLASSES[meta.value.mood] || MOOD_CLASSES.pending)
+const isInProgress = computed(() =>
+  ['pending_generation', 'generating', 'validating'].includes(draft.value?.status)
+)
+const isTerminalGood = computed(() => draft.value?.status === 'published')
+const isTerminalBad = computed(() => draft.value?.status === 'failed')
+const showLastError = computed(() =>
+  // Only relevant when current status is failed OR manual_review.
+  // Hides stale errors lingering after a successful retry.
+  Boolean(
+    draft.value?.last_error &&
+      ['failed', 'manual_review'].includes(draft.value?.status)
+  )
+)
+
+// --- Live countdown ticker for awaiting_publish so the seconds tick visibly
+const tick = ref(0)
+let tickerInterval
+onMounted(() => {
+  tickerInterval = setInterval(() => { tick.value++ }, 1000)
+})
+onBeforeUnmount(() => {
+  if (tickerInterval) clearInterval(tickerInterval)
+})
+const liveCountdown = computed(() => {
+  // Re-read tick.value to force reactivity each second
+  void tick.value
+  return draft.value?.cancel_window_ends_at
+    ? countdownTo(draft.value.cancel_window_ends_at)
+    : ''
+})
+
+// --- Action handlers -------------------------------------------------------
 async function doApprove() {
   await approveMutation.mutateAsync(draftId.value)
   refetch()
 }
 async function doCancel() {
-  if (!confirm('Cancel this draft?')) return
+  if (!confirm('Cancel this draft? You can regenerate later.')) return
   await cancelMutation.mutateAsync(draftId.value)
   refetch()
 }
@@ -128,65 +189,11 @@ async function doRegenerate() {
   if (newId) router.push({ name: 'admin-linkedin-draft-detail', params: { id: newId } })
 }
 
-// Helpers
-function statusBadgeClass(status) {
-  return {
-    published: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40',
-    awaiting_publish: 'bg-amber-500/20 text-amber-400 border-amber-500/40',
-    manual_review: 'bg-amber-500/20 text-amber-400 border-amber-500/40',
-    cancelled: 'bg-neutral-500/20 text-neutral-400 border-neutral-500/40',
-    failed: 'bg-red-500/20 text-red-400 border-red-500/40',
-    generating: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/40',
-    validating: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/40',
-    pending_generation: 'bg-neutral-500/20 text-neutral-400 border-neutral-500/40',
-  }[status] || 'bg-neutral-500/20 text-neutral-400'
-}
-
-function statusLabel(status) {
-  return {
-    published: 'Published',
-    awaiting_publish: 'Awaiting Publish',
-    manual_review: 'Manual Review',
-    cancelled: 'Cancelled',
-    failed: 'Failed',
-    generating: 'Generating',
-    validating: 'Validating',
-    pending_generation: 'Pending',
-  }[status] || status
-}
-
-function depthScoreClass(score) {
-  if (score === null || score === undefined) return 'text-neutral-500'
-  if (score >= 80) return 'text-amber-400'
-  if (score >= 70) return 'text-yellow-500'
-  return 'text-red-400'
-}
-
-function formatDateTime(dt) {
-  if (!dt) return '—'
-  return new Date(dt).toLocaleString()
-}
-
-function countdownTo(dt) {
-  if (!dt) return ''
-  const diff = new Date(dt).getTime() - Date.now()
-  if (diff < 0) return 'publishing…'
-  const mins = Math.floor(diff / 60000)
-  const secs = Math.floor((diff % 60000) / 1000)
-  return `in ${mins}m ${secs}s`
-}
-
-const showEdit = computed(() =>
-  draft.value && ['awaiting_publish', 'manual_review'].includes(draft.value.status)
-)
-
+// --- Carousel slides + image actions --------------------------------------
 const carouselSlides = computed(() =>
   Array.isArray(draft.value?.carousel_slides) ? draft.value.carousel_slides : []
 )
 
-// Plugin v0.4.6+ splits per-slide text into copy_id (Indonesian, main headline)
-// + copy_en (English, subtitle). Older drafts (v0.4.5 and below) only have a
-// single `copy` field. These helpers prefer the new fields, fall back to copy.
 function slideCopyId(slide) {
   if (!slide) return ''
   return slide.copy_id || slide.copy || ''
@@ -203,44 +210,22 @@ function nextSlide() {
   if (activeSlideIndex.value < carouselSlides.value.length - 1) activeSlideIndex.value++
 }
 
-// ============================================================================
-// Carousel image generation status + retry actions
-// ============================================================================
-
-const slidesWithImageStatus = computed(() => {
-  const tally = { done: 0, generating: 0, pending: 0, failed: 0, total: 0 }
-  for (const slide of carouselSlides.value) {
-    tally.total++
-    const status = slide?.image_status
-    if (status === 'done') tally.done++
-    else if (status === 'generating') tally.generating++
-    else if (status === 'failed') tally.failed++
-    else tally.pending++
+const slideTally = computed(() => {
+  const t = { done: 0, generating: 0, pending: 0, failed: 0, total: 0 }
+  for (const s of carouselSlides.value) {
+    t.total++
+    const st = s?.image_status
+    if (st === 'done') t.done++
+    else if (st === 'generating') t.generating++
+    else if (st === 'failed') t.failed++
+    else t.pending++
   }
-  return tally
+  return t
 })
-
-function imageStatusBadge(status) {
-  return {
-    done: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40',
-    generating: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/40 animate-pulse',
-    failed: 'bg-red-500/20 text-red-400 border-red-500/40',
-    pending: 'bg-neutral-500/20 text-neutral-400 border-neutral-500/40',
-  }[status] || 'bg-neutral-500/20 text-neutral-400 border-neutral-500/40'
-}
-
-function imageStatusLabel(status) {
-  return {
-    done: 'Ready',
-    generating: 'Generating…',
-    failed: 'Failed',
-    pending: 'Pending',
-  }[status] || 'Pending'
-}
 
 async function regenerateAllImages() {
   if (!draft.value) return
-  if (!confirm(`Regenerate ALL ${carouselSlides.value.length} slide images? This will re-dispatch every slide that isn't already done.`)) return
+  if (!confirm(`Regenerate all ${carouselSlides.value.length} slide images? Already-rendered slides are skipped.`)) return
   try {
     await regenerateAllImagesMutation.mutateAsync(draftId.value)
     refetch()
@@ -250,7 +235,7 @@ async function regenerateAllImages() {
 }
 
 async function regenerateSingleSlide(slideIndex) {
-  if (!confirm(`Re-render slide ${slideIndex + 1}? Existing image will be replaced when GeminiGen finishes (~30s).`)) return
+  if (!confirm(`Re-render slide ${slideIndex + 1}? It will replace the existing image.`)) return
   try {
     await regenerateSlideMutation.mutateAsync({ id: draftId.value, slideIndex })
     refetch()
@@ -258,595 +243,747 @@ async function regenerateSingleSlide(slideIndex) {
     alert(err?.response?.data?.error?.message || 'Slide retry failed')
   }
 }
+
+// --- Validation surfacing --------------------------------------------------
+const hasValidationContent = computed(() => {
+  const v = draft.value?.validation_log
+  return Boolean(v && (v.failures?.length || v.suggestions?.length))
+})
+
+// --- Depth score color
+function depthTone(score) {
+  if (score === null || score === undefined) return 'text-neutral-500'
+  if (score >= 80) return 'text-emerald-400'
+  if (score >= 70) return 'text-amber-400'
+  return 'text-red-400'
+}
+
+// --- Show thumbnail upload caption gate (Q3 / fix from review)
+// Caption only fires when the post is actually heading toward publish AND no
+// asset URN exists yet. Stays silent during generation/validation/published/etc.
+const showThumbnailUploadCaption = computed(() =>
+  Boolean(
+    draft.value?.format === 'text' &&
+      draft.value?.post?.featured_image &&
+      !draft.value?.thumbnail_asset_urn &&
+      ['manual_review', 'awaiting_publish'].includes(draft.value?.status)
+  )
+)
 </script>
 
 <template>
-  <div class="p-6 max-w-7xl mx-auto">
-    <!-- Back + Loading/Error -->
-    <div class="mb-4">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+    <!-- Back rail + source breadcrumb -->
+    <div class="flex flex-wrap items-center justify-between gap-3">
       <button
-        @click="router.back()"
-        class="text-sm text-neutral-500 hover:text-amber-600 flex items-center gap-1"
+        @click="goBack"
+        class="group inline-flex items-center gap-2 text-sm text-neutral-400 hover:text-amber-400 transition-colors"
       >
-        ← Back
+        <svg viewBox="0 0 24 24" fill="none" :stroke="'currentColor'" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 transition-transform group-hover:-translate-x-0.5">
+          <path :d="ICON.arrowLeft" />
+        </svg>
+        <span>Back to {{ backTarget.label }}</span>
       </button>
+      <div v-if="draft" class="flex items-center gap-2 text-xs text-neutral-500 truncate max-w-md">
+        <svg viewBox="0 0 24 24" fill="currentColor" class="w-3.5 h-3.5 text-[#0077B5] shrink-0">
+          <path :d="ICON.linkedin" />
+        </svg>
+        <span class="truncate">From: {{ postTitle(draft) }}</span>
+      </div>
     </div>
 
-    <div v-if="isLoading" class="py-12 text-center text-neutral-500">Loading draft…</div>
-    <div v-else-if="error" class="py-12 text-center">
-      <p class="text-red-500">Failed to load draft</p>
-      <p class="text-xs text-neutral-500 mt-1">{{ error.message || 'Unknown error' }}</p>
+    <!-- Loading -->
+    <div v-if="isLoading" class="space-y-4">
+      <div class="h-32 rounded-2xl bg-neutral-900/40 animate-pulse" />
+      <div class="grid lg:grid-cols-[1fr_360px] gap-6">
+        <div class="h-96 rounded-2xl bg-neutral-900/40 animate-pulse" />
+        <div class="space-y-3">
+          <div class="h-24 rounded-2xl bg-neutral-900/40 animate-pulse" />
+          <div class="h-32 rounded-2xl bg-neutral-900/40 animate-pulse" />
+          <div class="h-48 rounded-2xl bg-neutral-900/40 animate-pulse" />
+        </div>
+      </div>
     </div>
-    <div v-else-if="!draft" class="py-12 text-center text-neutral-500">
+
+    <!-- Error -->
+    <div v-else-if="error" class="rounded-2xl border border-red-500/30 bg-red-500/5 p-8 text-center">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-10 h-10 text-red-400 mx-auto mb-3">
+        <path :d="ICON.alertCircle" />
+      </svg>
+      <p class="text-red-300 font-medium">Failed to load draft</p>
+      <p class="text-xs text-neutral-500 mt-2 font-mono">{{ error.message || 'Unknown error' }}</p>
+    </div>
+
+    <!-- Not found -->
+    <div v-else-if="!draft" class="rounded-2xl border border-neutral-800 p-8 text-center text-neutral-500">
       Draft not found.
     </div>
 
-    <!-- Main layout -->
-    <div v-else class="grid gap-6 lg:grid-cols-[1fr_360px]">
-      <!-- Left column: content preview / editor -->
-      <div class="space-y-4">
-        <!-- Header -->
-        <div class="flex flex-wrap items-center gap-3">
-          <span
-            class="px-3 py-1 rounded-full text-xs font-medium uppercase tracking-wider border"
-            :class="statusBadgeClass(draft.status)"
-          >
-            {{ statusLabel(draft.status) }}
-          </span>
-          <span class="text-xs font-mono text-neutral-500 uppercase tracking-wider">
-            {{ draft.format }}
-          </span>
-          <span v-if="draft.carousel_slides" class="text-xs text-neutral-500">
-            · {{ carouselSlides.length }} slides
-          </span>
-        </div>
-
-        <!-- Update warnings (from PUT 200 response) -->
+    <!-- ====================================================================
+         Main layout
+         ==================================================================== -->
+    <template v-else>
+      <!-- ============== STATUS HERO PANEL ============== -->
+      <section
+        class="relative overflow-hidden rounded-2xl border border-neutral-800/80 bg-neutral-950/40"
+        :class="['ring-1', mood.chip.split(' ').filter(c => c.startsWith('ring-')).join(' ')]"
+      >
+        <!-- Mood gradient rail (left side, ~3px) -->
         <div
-          v-if="updateWarnings.length > 0"
-          class="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm"
-        >
-          <p class="font-semibold text-amber-700 dark:text-amber-400 mb-1">Heads up:</p>
-          <ul class="list-disc list-inside text-amber-700 dark:text-amber-400 space-y-0.5">
-            <li v-for="w in updateWarnings" :key="w">{{ w }}</li>
-          </ul>
-        </div>
+          class="absolute left-0 top-0 bottom-0 w-[3px] bg-gradient-to-b"
+          :class="mood.rail"
+        />
 
-        <!-- CONTENT PREVIEW (read mode) -->
-        <div
-          v-if="!isEditing"
-          class="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900"
-        >
-          <!-- Text format -->
-          <div v-if="draft.format === 'text'" class="p-5 space-y-4">
-            <div class="flex items-start gap-3 pb-3 border-b border-neutral-200 dark:border-neutral-700">
-              <div class="w-12 h-12 rounded-full bg-gradient-to-br from-amber-500 to-cyan-500 flex items-center justify-center text-white font-bold">
-                AS
-              </div>
-              <div class="flex-1">
-                <p class="font-semibold text-neutral-900 dark:text-neutral-100">
-                  Ali Sadikin Ma
-                </p>
-                <p class="text-xs text-neutral-500">AI Generalist Expert · now</p>
-              </div>
-              <svg class="w-6 h-6 text-[#0077B5]" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.063 2.063 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+        <div class="relative p-6 sm:p-7 grid gap-5 lg:grid-cols-[1fr_auto] lg:items-start">
+          <div class="space-y-3">
+            <!-- Chip row -->
+            <div class="flex flex-wrap items-center gap-2.5">
+              <span
+                class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-mono font-medium uppercase tracking-[0.12em]"
+                :class="mood.chip"
+              >
+                <span class="w-1.5 h-1.5 rounded-full" :class="mood.dot" />
+                {{ meta.label }}
+              </span>
+              <span class="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-500">
+                {{ formatChip(draft.format) }}
+                <template v-if="draft.format === 'carousel'"> · {{ carouselSlides.length }} slides</template>
+              </span>
+              <span v-if="draft.depth_score !== null && draft.depth_score !== undefined" class="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-500">
+                Depth <span class="font-bold ml-0.5" :class="depthTone(draft.depth_score)">{{ draft.depth_score }}</span>
+              </span>
+            </div>
+
+            <!-- Operator-facing sentence -->
+            <p class="text-base text-neutral-300 leading-relaxed max-w-2xl">
+              {{ meta.sentence }}
+            </p>
+
+            <!-- Live countdown for awaiting_publish -->
+            <div v-if="draft.status === 'awaiting_publish' && draft.cancel_window_ends_at" class="inline-flex items-center gap-2 text-sm">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-amber-400">
+                <path :d="ICON.clock" />
               </svg>
+              <span class="text-neutral-400">Publishes in</span>
+              <span class="font-mono font-bold text-amber-400 text-base">{{ liveCountdown }}</span>
             </div>
 
-            <div class="whitespace-pre-wrap text-neutral-800 dark:text-neutral-200 leading-relaxed">
-              {{ draft.content }}
-            </div>
-
-            <!-- 16:9 thumbnail (blog featured_image, becomes IMAGE-category share on publish).
-                 Stops the post from being a wall of text — IMAGE-category posts get ~2x dwell time. -->
-            <figure
-              v-if="draft.post?.featured_image"
-              class="-mx-5 border-y border-neutral-200 dark:border-neutral-700 overflow-hidden bg-neutral-100 dark:bg-neutral-800"
-            >
-              <img
-                :src="draft.post.featured_image"
-                :alt="draft.post.translations?.[0]?.title || 'Blog thumbnail'"
-                class="w-full h-auto block"
-                style="aspect-ratio: 16 / 9; object-fit: cover;"
-                loading="lazy"
-              >
-              <figcaption
-                v-if="!draft.thumbnail_asset_urn"
-                class="px-5 py-2 text-[10px] font-mono uppercase tracking-wider text-amber-600 dark:text-amber-400 bg-amber-500/5"
-              >
-                Will upload to LinkedIn on publish (no asset URN yet)
-              </figcaption>
-            </figure>
-
-            <div v-if="Array.isArray(draft.hashtags) && draft.hashtags.length > 0" class="flex flex-wrap gap-2">
-              <span
-                v-for="tag in draft.hashtags"
-                :key="tag"
-                class="text-[#0077B5] dark:text-cyan-400 text-sm hover:underline"
-              >
-                {{ tag }}
-              </span>
-            </div>
-
-            <!-- First-comment bubble -->
+            <!-- Last error (only when status terminal-bad or stuck-in-review) -->
             <div
-              v-if="draft.link_comment"
-              class="mt-4 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border-l-4 border-[#0077B5]"
+              v-if="showLastError"
+              class="mt-1 flex items-start gap-3 rounded-lg border border-red-500/30 bg-red-500/5 px-4 py-3"
             >
-              <p class="text-[11px] text-[#0077B5] dark:text-cyan-400 font-semibold uppercase tracking-wider mb-1">
-                First comment
-              </p>
-              <p class="text-sm text-neutral-700 dark:text-neutral-300">
-                {{ draft.link_comment }}
-              </p>
-            </div>
-          </div>
-
-          <!-- Carousel format -->
-          <div v-else-if="draft.format === 'carousel'" class="p-5 space-y-4">
-            <div v-if="carouselSlides.length === 0" class="text-center py-8 text-neutral-500">
-              No slides generated yet.
-            </div>
-            <div v-else>
-              <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
-                <p class="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                  Slide {{ activeSlideIndex + 1 }} / {{ carouselSlides.length }}
-                </p>
-                <div class="flex gap-2">
-                  <!-- Per-slide regen — always available so operators can re-render
-                       any slide that doesn't meet expectations, not just failed ones -->
-                  <button
-                    @click="regenerateSingleSlide(activeSlideIndex)"
-                    :disabled="regenerateSlideMutation.isPending.value"
-                    class="px-3 py-1 text-xs rounded bg-amber-500/10 border border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 disabled:opacity-30"
-                    title="Re-render this slide (replaces existing image when GeminiGen finishes)"
-                  >
-                    {{ regenerateSlideMutation.isPending.value ? '↻ Queueing…' : '↻ Regen this slide' }}
-                  </button>
-                  <button
-                    @click="prevSlide"
-                    :disabled="activeSlideIndex === 0"
-                    class="px-3 py-1 text-xs rounded bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 disabled:opacity-30"
-                  >
-                    ← Prev
-                  </button>
-                  <button
-                    @click="nextSlide"
-                    :disabled="activeSlideIndex === carouselSlides.length - 1"
-                    class="px-3 py-1 text-xs rounded bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 disabled:opacity-30"
-                  >
-                    Next →
-                  </button>
-                </div>
-              </div>
-
-              <!-- Image-only 3:4 frame — slide PNG fills the entire container.
-                   Native render is 1080x1440 (3:4 portrait — Imagen-native ratio
-                   chosen for cross-platform reuse: full-bleed on LinkedIn,
-                   center-crops cleanly to 4:5 on Instagram Feed, centers with
-                   minor letterbox on TikTok). Frame ratio matches the image
-                   ratio so there is no letterboxing in this admin viewer. -->
-              <div class="rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden bg-gradient-to-br from-neutral-900 to-neutral-700 mx-auto relative"
-                   style="aspect-ratio: 3 / 4; max-height: 80vh; max-width: min(100%, 60vh);">
-                <!-- Status pill overlay (top-right) -->
-                <span
-                  v-if="carouselSlides[activeSlideIndex]?.image_status"
-                  class="absolute top-3 right-3 z-10 px-2.5 py-1 rounded-full text-[11px] font-medium uppercase tracking-wider border"
-                  :class="imageStatusBadge(carouselSlides[activeSlideIndex].image_status)"
-                >
-                  {{ imageStatusLabel(carouselSlides[activeSlideIndex].image_status) }}
-                </span>
-
-                <!-- Rendered slide image (when done) — full bleed, fills the 4:5 frame -->
-                <img
-                  v-if="carouselSlides[activeSlideIndex]?.image_url"
-                  :src="carouselSlides[activeSlideIndex].image_url"
-                  :alt="`Slide ${activeSlideIndex + 1}`"
-                  class="absolute inset-0 w-full h-full object-cover"
-                >
-
-                <!-- Generating placeholder (spinner + copy text preview) -->
-                <div v-else-if="carouselSlides[activeSlideIndex]?.image_status === 'generating'"
-                     class="absolute inset-0 flex flex-col items-center justify-center text-center p-6">
-                  <svg class="animate-spin w-12 h-12 text-cyan-400 mb-3" viewBox="0 0 24 24" fill="none">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" />
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v3a5 5 0 00-5 5H4z" />
-                  </svg>
-                  <p class="text-cyan-300 text-xs uppercase tracking-wider mb-2">Rendering with GeminiGen…</p>
-                  <!-- Indonesian main headline -->
-                  <p class="text-white text-base font-bold uppercase tracking-tight max-w-md mb-1">
-                    {{ slideCopyId(carouselSlides[activeSlideIndex]) }}
-                  </p>
-                  <!-- English subtitle (golden, smaller) -->
-                  <p class="text-amber-400 text-xs italic max-w-md">
-                    {{ slideCopyEn(carouselSlides[activeSlideIndex]) }}
-                  </p>
-                </div>
-
-                <!-- Failed placeholder (with retry button) -->
-                <div v-else-if="carouselSlides[activeSlideIndex]?.image_status === 'failed'"
-                     class="absolute inset-0 flex flex-col items-center justify-center text-center p-6">
-                  <p class="text-red-400 text-xs uppercase tracking-wider mb-2">Render failed</p>
-                  <p class="text-red-200 text-xs mb-3 max-w-md">
-                    {{ carouselSlides[activeSlideIndex]?.image_error || 'Unknown error from GeminiGen' }}
-                  </p>
-                  <button
-                    @click="regenerateSingleSlide(activeSlideIndex)"
-                    :disabled="regenerateSlideMutation.isPending.value"
-                    class="px-3 py-1.5 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 disabled:opacity-50"
-                  >
-                    ↻ Retry this slide
-                  </button>
-                </div>
-
-                <!-- Pending / no-status placeholder (copy text preview, bilingual).
-                     Mirrors the rendered slide spec: Indonesian dominant uppercase
-                     white bold, English subtitle smaller white sentence-case regular. -->
-                <div v-else class="absolute inset-0 flex flex-col items-center justify-center text-center text-neutral-400 p-6">
-                  <p class="text-white text-2xl font-bold uppercase tracking-tight max-w-md mb-2 leading-tight">
-                    {{ slideCopyId(carouselSlides[activeSlideIndex]) }}
-                  </p>
-                  <p class="text-white/80 text-xs max-w-md">
-                    {{ slideCopyEn(carouselSlides[activeSlideIndex]) }}
-                  </p>
-                </div>
-              </div>
-
-              <!-- Image generation summary line -->
-              <div
-                v-if="slidesWithImageStatus.total > 0"
-                class="mt-3 flex items-center justify-between text-xs text-neutral-500"
-              >
-                <div class="flex flex-wrap gap-x-3 gap-y-1 font-mono">
-                  <span class="text-emerald-500">✓ {{ slidesWithImageStatus.done }}</span>
-                  <span v-if="slidesWithImageStatus.generating > 0" class="text-cyan-500 animate-pulse">
-                    ↻ {{ slidesWithImageStatus.generating }} generating
-                  </span>
-                  <span v-if="slidesWithImageStatus.pending > 0" class="text-neutral-500">
-                    · {{ slidesWithImageStatus.pending }} pending
-                  </span>
-                  <span v-if="slidesWithImageStatus.failed > 0" class="text-red-500">
-                    ✕ {{ slidesWithImageStatus.failed }} failed
-                  </span>
-                  <span class="text-neutral-400">/ {{ slidesWithImageStatus.total }} total</span>
-                </div>
-              </div>
-
-              <!-- Thumbnail strip with per-slide image status indicator dots -->
-              <div class="mt-3 flex gap-2 overflow-x-auto pb-2">
-                <button
-                  v-for="(slide, i) in carouselSlides"
-                  :key="i"
-                  @click="activeSlideIndex = i"
-                  :class="[
-                    'flex-shrink-0 w-14 h-14 rounded-md border-2 text-[10px] font-mono flex items-center justify-center transition-all relative overflow-hidden',
-                    i === activeSlideIndex
-                      ? 'border-amber-500 bg-amber-500/20 text-amber-600'
-                      : 'border-neutral-300 dark:border-neutral-700 text-neutral-500 hover:border-amber-500/50',
-                  ]"
-                >
-                  <!-- Thumbnail image when ready -->
-                  <img
-                    v-if="slide?.image_url"
-                    :src="slide.image_url"
-                    :alt="`Slide ${i + 1}`"
-                    class="absolute inset-0 w-full h-full object-cover opacity-60"
-                  >
-                  <!-- Status dot -->
-                  <span
-                    v-if="slide?.image_status"
-                    :class="[
-                      'absolute top-0 right-0 w-2 h-2 rounded-full m-0.5',
-                      slide.image_status === 'done' && 'bg-emerald-500',
-                      slide.image_status === 'generating' && 'bg-cyan-500 animate-pulse',
-                      slide.image_status === 'failed' && 'bg-red-500',
-                      slide.image_status === 'pending' && 'bg-neutral-400',
-                    ]"
-                  />
-                  <!-- Slide number on top of any thumbnail backdrop -->
-                  <span class="relative z-10 font-bold text-shadow drop-shadow-md">
-                    {{ i + 1 }}
-                  </span>
-                </button>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-red-400 shrink-0 mt-0.5">
+                <path :d="ICON.alertTriangle" />
+              </svg>
+              <div class="min-w-0">
+                <p class="text-[11px] uppercase tracking-[0.14em] text-red-400 font-medium mb-0.5">Last error</p>
+                <p class="text-sm text-red-200 font-mono break-words">{{ draft.last_error }}</p>
               </div>
             </div>
 
-            <!-- Hashtags + link_comment below carousel -->
-            <div v-if="Array.isArray(draft.hashtags) && draft.hashtags.length > 0" class="flex flex-wrap gap-2 pt-3 border-t border-neutral-200 dark:border-neutral-700">
-              <span
-                v-for="tag in draft.hashtags"
-                :key="tag"
-                class="text-[#0077B5] dark:text-cyan-400 text-sm"
-              >
-                {{ tag }}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <!-- EDIT MODE -->
-        <div
-          v-else
-          class="rounded-xl border border-amber-500/50 bg-white dark:bg-neutral-900 p-5 space-y-4"
-        >
-          <p class="text-xs font-mono uppercase tracking-wider text-amber-600">Editing draft</p>
-
-          <div>
-            <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-              Content
-              <span class="ml-2 text-xs font-normal" :class="charCountClass">
-                {{ charCount }} chars · sweet spot 1100-1300
-              </span>
-            </label>
-            <textarea
-              v-model="editForm.content"
-              rows="12"
-              class="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-amber-500 font-mono text-sm"
-            />
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-              Link comment
-              <span class="text-xs font-normal text-neutral-500">— posted as first comment after publish</span>
-            </label>
-            <input
-              v-model="editForm.link_comment"
-              type="text"
-              placeholder="Full article: https://alisadikinma.com/blog/..."
-              class="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-amber-500"
-            >
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-              Hashtags
-              <span class="text-xs font-normal" :class="hashtagCountValid ? 'text-neutral-500' : 'text-red-500'">
-                {{ editForm.hashtags.length }}/5 (min 3)
-              </span>
-            </label>
-            <div class="flex flex-wrap gap-2 mb-2">
-              <span
-                v-for="tag in editForm.hashtags"
-                :key="tag"
-                class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 text-sm"
-              >
-                {{ tag }}
-                <button
-                  @click="removeHashtag(tag)"
-                  class="hover:text-red-500"
-                  aria-label="Remove hashtag"
-                >×</button>
-              </span>
-            </div>
-            <div class="flex gap-2">
-              <input
-                v-model="newHashtagInput"
-                @keydown.enter.prevent="addHashtag"
-                type="text"
-                placeholder="#NewHashtag (enter to add)"
-                class="flex-1 px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-sm focus:outline-none focus:border-amber-500"
-              >
-              <button
-                @click="addHashtag"
-                class="px-3 py-2 rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-400 hover:bg-amber-500/30 text-sm"
-              >
-                Add
-              </button>
-            </div>
-          </div>
-
-          <div class="flex gap-2 pt-3 border-t border-neutral-200 dark:border-neutral-700">
-            <button
-              @click="saveEdit"
-              :disabled="updateMutation.isPending.value || !hashtagCountValid"
-              class="px-4 py-2 rounded-lg bg-amber-500 text-white font-medium hover:bg-amber-600 disabled:opacity-50"
-            >
-              {{ updateMutation.isPending.value ? 'Saving…' : 'Save' }}
-            </button>
-            <button
-              @click="cancelEdit"
-              class="px-4 py-2 rounded-lg border border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-
-        <!-- Validation panel -->
-        <div
-          v-if="!isEditing && draft.validation_log && (draft.validation_log.failures?.length || draft.validation_log.suggestions?.length)"
-          class="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-5"
-        >
-          <h3 class="text-sm font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-3">
-            Validation
-          </h3>
-
-          <div v-if="draft.validation_log.failures?.length" class="space-y-2 mb-4">
-            <p class="text-xs font-medium text-red-500 uppercase tracking-wider">Failures</p>
+            <!-- Update warnings (after edit-save) -->
             <div
-              v-for="(f, i) in draft.validation_log.failures"
-              :key="i"
-              class="flex gap-3 p-2 rounded bg-red-500/10 border border-red-500/30"
+              v-if="updateWarnings.length > 0"
+              class="mt-1 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm"
             >
-              <span class="font-mono text-xs text-red-500 whitespace-nowrap">{{ f.deduction }} pts</span>
-              <div>
-                <p class="text-sm text-neutral-800 dark:text-neutral-200">{{ f.message }}</p>
-                <p class="text-xs text-neutral-500 font-mono">rule: {{ f.rule }}</p>
-              </div>
+              <p class="text-[11px] uppercase tracking-[0.14em] text-amber-400 font-medium mb-1">Heads up</p>
+              <ul class="text-amber-200 space-y-0.5 list-disc list-inside">
+                <li v-for="w in updateWarnings" :key="w">{{ w }}</li>
+              </ul>
             </div>
           </div>
 
-          <div v-if="draft.validation_log.suggestions?.length">
-            <p class="text-xs font-medium text-amber-500 uppercase tracking-wider mb-2">Suggestions</p>
-            <ul class="text-sm space-y-1 text-neutral-700 dark:text-neutral-300 list-disc list-inside">
-              <li v-for="(s, i) in draft.validation_log.suggestions" :key="i">{{ s }}</li>
-            </ul>
-          </div>
-        </div>
-
-        <!-- Last error (for failed status) -->
-        <div
-          v-if="!isEditing && draft.last_error"
-          class="rounded-xl border border-red-500/40 bg-red-500/10 p-4"
-        >
-          <p class="text-xs font-medium text-red-500 uppercase tracking-wider mb-1">Last error</p>
-          <p class="text-sm text-red-700 dark:text-red-400 font-mono break-words">
-            {{ draft.last_error }}
-          </p>
-        </div>
-      </div>
-
-      <!-- Right column: metadata + timeline + actions -->
-      <div class="space-y-4">
-        <!-- Metadata -->
-        <div class="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-4 space-y-3 text-sm">
-          <div class="pb-3 border-b border-neutral-200 dark:border-neutral-700">
-            <p class="text-xs uppercase tracking-wider text-neutral-500 mb-1">From blog</p>
-            <p class="font-medium text-neutral-800 dark:text-neutral-200">
-              {{ postTitle(draft) }}
-            </p>
-          </div>
-
-          <div v-if="draft.depth_score !== null && draft.depth_score !== undefined">
-            <p class="text-xs uppercase tracking-wider text-neutral-500">Depth score</p>
-            <p class="text-3xl font-mono font-bold" :class="depthScoreClass(draft.depth_score)">
-              {{ draft.depth_score }}
-              <span class="text-sm text-neutral-500 font-normal">/ 100</span>
-            </p>
-          </div>
-
-          <div v-if="draft.scheduled_at">
-            <p class="text-xs uppercase tracking-wider text-neutral-500">Scheduled</p>
-            <p class="text-neutral-800 dark:text-neutral-200">{{ formatDateTime(draft.scheduled_at) }}</p>
-          </div>
-
-          <div v-if="draft.cancel_window_ends_at && draft.status === 'awaiting_publish'">
-            <p class="text-xs uppercase tracking-wider text-neutral-500">Publishes</p>
-            <p class="text-amber-500 font-mono font-semibold">
-              {{ countdownTo(draft.cancel_window_ends_at) }}
-            </p>
-            <p class="text-xs text-neutral-500">{{ formatDateTime(draft.cancel_window_ends_at) }}</p>
-          </div>
-
-          <div v-if="draft.published_at">
-            <p class="text-xs uppercase tracking-wider text-neutral-500">Published</p>
-            <p class="text-neutral-800 dark:text-neutral-200">{{ formatDateTime(draft.published_at) }}</p>
-            <a
-              v-if="draft.linkedin_post_url"
-              :href="draft.linkedin_post_url"
-              target="_blank"
-              rel="noopener"
-              class="text-xs text-amber-600 hover:underline break-all"
-            >
-              {{ draft.linkedin_post_url }} ↗
-            </a>
-          </div>
-
-          <div v-if="draft.retry_count > 0">
-            <p class="text-xs uppercase tracking-wider text-neutral-500">Retries</p>
-            <p class="font-mono text-neutral-800 dark:text-neutral-200">{{ draft.retry_count }} / 3</p>
-          </div>
-        </div>
-
-        <!-- Actions -->
-        <div class="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-4">
-          <p class="text-xs uppercase tracking-wider text-neutral-500 mb-3">Actions</p>
-          <div class="flex flex-col gap-2">
-            <button
-              v-if="showEdit && !isEditing"
-              @click="startEdit"
-              class="w-full px-3 py-2 rounded-lg bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-sm font-medium text-neutral-800 dark:text-neutral-200"
-            >
-              ✎ Edit content
-            </button>
-
+          <!-- Primary action cluster (top-right on lg+, full-width below on mobile) -->
+          <div class="flex flex-wrap gap-2 lg:justify-end lg:min-w-[200px]">
+            <!-- Manual review: approve is primary -->
             <button
               v-if="draft.status === 'manual_review'"
               @click="doApprove"
               :disabled="approveMutation.isPending.value"
-              class="w-full px-3 py-2 rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 text-sm font-medium disabled:opacity-50"
+              class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-500 text-emerald-950 hover:bg-emerald-400 active:scale-[0.98] text-sm font-semibold transition disabled:opacity-50 disabled:cursor-wait shadow-[0_8px_24px_-12px_rgba(16,185,129,0.5)]"
             >
-              {{ approveMutation.isPending.value ? 'Approving…' : '✓ Approve' }}
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
+                <path :d="ICON.check" />
+              </svg>
+              {{ approveMutation.isPending.value ? 'Approving…' : 'Approve' }}
             </button>
 
+            <!-- Awaiting publish: publish-now is primary -->
             <button
               v-if="draft.status === 'awaiting_publish'"
               @click="doPublishNow"
               :disabled="publishNowMutation.isPending.value"
-              class="w-full px-3 py-2 rounded-lg bg-amber-500 text-white hover:bg-amber-600 text-sm font-medium disabled:opacity-50"
+              class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-amber-500 text-amber-950 hover:bg-amber-400 active:scale-[0.98] text-sm font-semibold transition disabled:opacity-50 disabled:cursor-wait shadow-[0_8px_24px_-12px_rgba(212,168,67,0.5)]"
             >
-              {{ publishNowMutation.isPending.value ? 'Publishing…' : '🚀 Publish now' }}
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
+                <path :d="ICON.send" />
+              </svg>
+              {{ publishNowMutation.isPending.value ? 'Publishing…' : 'Publish now' }}
             </button>
 
+            <!-- Published: external link is primary -->
             <a
-              v-if="draft.status === 'published' && draft.linkedin_post_url"
+              v-if="isTerminalGood && draft.linkedin_post_url"
               :href="draft.linkedin_post_url"
               target="_blank"
               rel="noopener"
-              class="w-full px-3 py-2 rounded-lg bg-[#0077B5] text-white hover:bg-[#005f8e] text-sm font-medium text-center"
+              class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#0077B5] text-white hover:bg-[#005f8e] active:scale-[0.98] text-sm font-semibold transition"
             >
-              Open on LinkedIn ↗
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
+                <path :d="ICON.externalLink" />
+              </svg>
+              Open on LinkedIn
             </a>
 
+            <!-- Failed/cancelled: regenerate is primary -->
             <button
-              v-if="['manual_review', 'failed', 'cancelled', 'published'].includes(draft.status)"
+              v-if="['failed', 'cancelled'].includes(draft.status)"
               @click="doRegenerate"
               :disabled="regenerateMutation.isPending.value"
-              class="w-full px-3 py-2 rounded-lg border border-cyan-500 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/10 text-sm font-medium disabled:opacity-50"
+              class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-cyan-500 text-cyan-950 hover:bg-cyan-400 active:scale-[0.98] text-sm font-semibold transition disabled:opacity-50 disabled:cursor-wait"
             >
-              {{ regenerateMutation.isPending.value ? 'Queueing…' : '↻ Regenerate copy' }}
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
+                <path :d="ICON.refresh" />
+              </svg>
+              {{ regenerateMutation.isPending.value ? 'Queueing…' : 'Regenerate' }}
             </button>
 
-            <!-- Carousel-only: regenerate all slide images (re-dispatches GeminiGen for every non-done slide) -->
+            <!-- In-progress states: cancel is the only meaningful action -->
             <button
-              v-if="draft.format === 'carousel' && carouselSlides.length > 0"
-              @click="regenerateAllImages"
-              :disabled="regenerateAllImagesMutation.isPending.value"
-              class="w-full px-3 py-2 rounded-lg border border-amber-500 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 text-sm font-medium disabled:opacity-50"
-            >
-              {{ regenerateAllImagesMutation.isPending.value ? 'Dispatching…' : '🖼 Regenerate all images' }}
-            </button>
-
-            <button
-              v-if="!['cancelled', 'published'].includes(draft.status)"
+              v-if="isInProgress"
               @click="doCancel"
               :disabled="cancelMutation.isPending.value"
-              class="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-sm font-medium disabled:opacity-50"
+              class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-neutral-700 text-neutral-300 hover:border-red-500/50 hover:text-red-400 active:scale-[0.98] text-sm font-medium transition disabled:opacity-50"
             >
-              ✕ Cancel
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
+                <path :d="ICON.x" />
+              </svg>
+              Cancel run
             </button>
           </div>
         </div>
 
-        <!-- Timeline -->
-        <div
-          v-if="Array.isArray(draft.pipeline_state_log) && draft.pipeline_state_log.length > 0"
-          class="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-4"
-        >
-          <p class="text-xs uppercase tracking-wider text-neutral-500 mb-3">Timeline</p>
-          <div class="space-y-2.5">
-            <div
-              v-for="(entry, i) in draft.pipeline_state_log.slice().reverse()"
-              :key="i"
-              class="text-xs border-l-2 border-neutral-300 dark:border-neutral-700 pl-3 py-0.5"
-            >
-              <p class="font-mono text-neutral-600 dark:text-neutral-400">
-                <span class="text-neutral-500">{{ entry.from }}</span>
-                →
-                <span class="text-neutral-800 dark:text-neutral-200 font-semibold">{{ entry.to }}</span>
-              </p>
-              <p v-if="entry.reason" class="text-[11px] text-amber-600 dark:text-amber-400 mt-0.5">
-                {{ entry.reason }}
-              </p>
-              <p class="text-[10px] text-neutral-500 font-mono mt-0.5">
-                {{ formatDateTime(entry.timestamp) }}
+        <!-- Loading shimmer at the bottom for in-progress states -->
+        <div v-if="isInProgress" class="h-[2px] w-full overflow-hidden bg-neutral-800/50">
+          <div
+            class="h-full w-1/3 bg-gradient-to-r from-transparent via-cyan-400 to-transparent animate-[slide_2s_ease-in-out_infinite]"
+          />
+        </div>
+      </section>
+
+      <!-- ============== Body grid ============== -->
+      <div class="grid gap-6 lg:grid-cols-[1fr_360px]">
+        <!-- LEFT: preview / editor / validation -->
+        <div class="space-y-5">
+          <!-- LinkedIn-style preview (read mode) -->
+          <article
+            v-if="!isEditing"
+            class="rounded-2xl border border-neutral-800/80 bg-neutral-950/40 overflow-hidden"
+          >
+            <!-- TEXT format -->
+            <div v-if="draft.format === 'text'" class="px-6 py-5 space-y-4">
+              <header class="flex items-start gap-3 pb-4 border-b border-neutral-800/60">
+                <div class="w-11 h-11 rounded-full bg-gradient-to-br from-amber-500 to-cyan-500 flex items-center justify-center text-neutral-950 font-bold text-sm">
+                  AS
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="font-semibold text-neutral-100 text-sm">Ali Sadikin Ma</p>
+                  <p class="text-xs text-neutral-500">AI Generalist Expert · now · <span class="font-mono">PUBLIC</span></p>
+                </div>
+                <svg viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 text-[#0077B5] shrink-0">
+                  <path :d="ICON.linkedin" />
+                </svg>
+              </header>
+
+              <div class="whitespace-pre-wrap text-neutral-200 leading-relaxed text-[15px]">
+                {{ draft.content || '—' }}
+              </div>
+
+              <!-- 16:9 thumbnail -->
+              <figure
+                v-if="draft.post?.featured_image"
+                class="-mx-6 border-y border-neutral-800/60 overflow-hidden bg-neutral-900"
+              >
+                <img
+                  :src="draft.post.featured_image"
+                  :alt="draft.post.translations?.[0]?.title || 'Blog thumbnail'"
+                  class="w-full h-auto block"
+                  style="aspect-ratio: 16 / 9; object-fit: cover;"
+                  loading="lazy"
+                >
+                <figcaption
+                  v-if="showThumbnailUploadCaption"
+                  class="px-6 py-2 text-[10px] font-mono uppercase tracking-[0.14em] text-amber-400/80 bg-amber-500/[0.04] border-t border-amber-500/15"
+                >
+                  Will upload to LinkedIn on publish
+                </figcaption>
+              </figure>
+
+              <div v-if="Array.isArray(draft.hashtags) && draft.hashtags.length > 0" class="flex flex-wrap gap-x-2 gap-y-1">
+                <span
+                  v-for="tag in draft.hashtags"
+                  :key="tag"
+                  class="text-cyan-400 text-sm hover:underline cursor-default"
+                >
+                  {{ tag }}
+                </span>
+              </div>
+
+              <div
+                v-if="draft.link_comment"
+                class="mt-4 p-3 rounded-lg border border-cyan-500/20 bg-cyan-500/5"
+              >
+                <p class="text-[10px] text-cyan-400 font-mono uppercase tracking-[0.14em] mb-1">First comment</p>
+                <p class="text-sm text-neutral-300">{{ draft.link_comment }}</p>
+              </div>
+            </div>
+
+            <!-- CAROUSEL format -->
+            <div v-else-if="draft.format === 'carousel'" class="px-6 py-5 space-y-4">
+              <div v-if="carouselSlides.length === 0" class="text-center py-12">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-10 h-10 text-neutral-600 mx-auto mb-2">
+                  <path :d="ICON.image" />
+                </svg>
+                <p class="text-sm text-neutral-500">No slides authored yet.</p>
+              </div>
+              <div v-else>
+                <!-- Slide nav -->
+                <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+                  <p class="text-xs font-mono uppercase tracking-[0.14em] text-neutral-400">
+                    Slide <span class="text-neutral-100 font-bold">{{ activeSlideIndex + 1 }}</span> / {{ carouselSlides.length }}
+                  </p>
+                  <div class="flex gap-1.5">
+                    <button
+                      @click="regenerateSingleSlide(activeSlideIndex)"
+                      :disabled="regenerateSlideMutation.isPending.value"
+                      class="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] rounded-md bg-amber-500/10 ring-1 ring-amber-500/30 text-amber-300 hover:bg-amber-500/20 disabled:opacity-30 transition"
+                      title="Re-render this slide"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3">
+                        <path :d="ICON.refresh" />
+                      </svg>
+                      Regen slide
+                    </button>
+                    <button
+                      @click="prevSlide"
+                      :disabled="activeSlideIndex === 0"
+                      class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30 transition"
+                      aria-label="Previous slide"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5 text-neutral-300">
+                        <path :d="ICON.chevronLeft" />
+                      </svg>
+                    </button>
+                    <button
+                      @click="nextSlide"
+                      :disabled="activeSlideIndex === carouselSlides.length - 1"
+                      class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30 transition"
+                      aria-label="Next slide"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5 text-neutral-300">
+                        <path :d="ICON.chevronRight" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Slide frame (3:4) -->
+                <div
+                  class="rounded-xl border border-neutral-800/80 overflow-hidden bg-gradient-to-br from-neutral-950 to-neutral-900 mx-auto relative"
+                  style="aspect-ratio: 3 / 4; max-height: 80vh; max-width: min(100%, 60vh);"
+                >
+                  <!-- Status pill -->
+                  <span
+                    v-if="carouselSlides[activeSlideIndex]?.image_status"
+                    class="absolute top-3 right-3 z-10 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono uppercase tracking-[0.14em]"
+                    :class="{
+                      'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30': carouselSlides[activeSlideIndex].image_status === 'done',
+                      'bg-cyan-500/15 text-cyan-300 ring-1 ring-cyan-500/30': carouselSlides[activeSlideIndex].image_status === 'generating',
+                      'bg-red-500/15 text-red-300 ring-1 ring-red-500/30': carouselSlides[activeSlideIndex].image_status === 'failed',
+                      'bg-neutral-500/15 text-neutral-400 ring-1 ring-neutral-500/30': carouselSlides[activeSlideIndex].image_status === 'pending',
+                    }"
+                  >
+                    <span
+                      v-if="carouselSlides[activeSlideIndex].image_status === 'generating'"
+                      class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"
+                    />
+                    {{ {
+                      done: 'Ready',
+                      generating: 'Rendering',
+                      failed: 'Failed',
+                      pending: 'Pending',
+                    }[carouselSlides[activeSlideIndex].image_status] || 'Pending' }}
+                  </span>
+
+                  <img
+                    v-if="carouselSlides[activeSlideIndex]?.image_url"
+                    :src="carouselSlides[activeSlideIndex].image_url"
+                    :alt="`Slide ${activeSlideIndex + 1}`"
+                    class="absolute inset-0 w-full h-full object-cover"
+                  >
+
+                  <div
+                    v-else-if="carouselSlides[activeSlideIndex]?.image_status === 'generating'"
+                    class="absolute inset-0 flex flex-col items-center justify-center text-center p-6"
+                  >
+                    <svg class="animate-spin w-10 h-10 text-cyan-400 mb-3" viewBox="0 0 24 24" fill="none">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" />
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v3a5 5 0 00-5 5H4z" />
+                    </svg>
+                    <p class="text-cyan-300 text-[10px] uppercase tracking-[0.18em] font-mono mb-3">Rendering with GeminiGen</p>
+                    <p class="text-white text-base font-bold uppercase tracking-tight max-w-md mb-1 leading-tight">{{ slideCopyId(carouselSlides[activeSlideIndex]) }}</p>
+                    <p class="text-amber-400 text-xs italic max-w-md">{{ slideCopyEn(carouselSlides[activeSlideIndex]) }}</p>
+                  </div>
+
+                  <div
+                    v-else-if="carouselSlides[activeSlideIndex]?.image_status === 'failed'"
+                    class="absolute inset-0 flex flex-col items-center justify-center text-center p-6"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-9 h-9 text-red-400 mb-2">
+                      <path :d="ICON.alertTriangle" />
+                    </svg>
+                    <p class="text-red-300 text-[10px] uppercase tracking-[0.18em] font-mono mb-2">Render failed</p>
+                    <p class="text-red-200 text-xs mb-4 max-w-md font-mono">{{ carouselSlides[activeSlideIndex]?.image_error || 'Unknown error' }}</p>
+                    <button
+                      @click="regenerateSingleSlide(activeSlideIndex)"
+                      :disabled="regenerateSlideMutation.isPending.value"
+                      class="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-amber-500 text-amber-950 hover:bg-amber-400 active:scale-[0.98] text-sm font-semibold transition disabled:opacity-50"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5">
+                        <path :d="ICON.refresh" />
+                      </svg>
+                      Retry this slide
+                    </button>
+                  </div>
+
+                  <div
+                    v-else
+                    class="absolute inset-0 flex flex-col items-center justify-center text-center text-neutral-400 p-6"
+                  >
+                    <p class="text-white text-2xl font-bold uppercase tracking-tight max-w-md mb-2 leading-tight">{{ slideCopyId(carouselSlides[activeSlideIndex]) }}</p>
+                    <p class="text-white/80 text-xs max-w-md">{{ slideCopyEn(carouselSlides[activeSlideIndex]) }}</p>
+                  </div>
+                </div>
+
+                <!-- Image generation tally -->
+                <div v-if="slideTally.total > 0" class="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] font-mono">
+                  <span class="text-emerald-400">
+                    <span class="text-neutral-500">Ready</span> {{ slideTally.done }}
+                  </span>
+                  <span v-if="slideTally.generating > 0" class="text-cyan-400">
+                    <span class="text-neutral-500">Rendering</span> {{ slideTally.generating }}
+                  </span>
+                  <span v-if="slideTally.pending > 0" class="text-neutral-400">
+                    <span class="text-neutral-500">Pending</span> {{ slideTally.pending }}
+                  </span>
+                  <span v-if="slideTally.failed > 0" class="text-red-400">
+                    <span class="text-neutral-500">Failed</span> {{ slideTally.failed }}
+                  </span>
+                  <span class="text-neutral-500 ml-auto">{{ slideTally.total }} total</span>
+                </div>
+
+                <!-- Thumbnail strip -->
+                <div class="mt-3 flex gap-2 overflow-x-auto pb-2">
+                  <button
+                    v-for="(slide, i) in carouselSlides"
+                    :key="i"
+                    @click="activeSlideIndex = i"
+                    :class="[
+                      'shrink-0 w-12 h-12 rounded-md text-[10px] font-mono flex items-center justify-center transition-all relative overflow-hidden ring-1',
+                      i === activeSlideIndex
+                        ? 'ring-amber-400 bg-amber-500/15'
+                        : 'ring-neutral-800 hover:ring-neutral-600',
+                    ]"
+                  >
+                    <img
+                      v-if="slide?.image_url"
+                      :src="slide.image_url"
+                      :alt="`Slide ${i + 1}`"
+                      class="absolute inset-0 w-full h-full object-cover opacity-60"
+                    >
+                    <span
+                      v-if="slide?.image_status"
+                      :class="[
+                        'absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full',
+                        slide.image_status === 'done' && 'bg-emerald-400',
+                        slide.image_status === 'generating' && 'bg-cyan-400 animate-pulse',
+                        slide.image_status === 'failed' && 'bg-red-400',
+                        slide.image_status === 'pending' && 'bg-neutral-500',
+                      ]"
+                    />
+                    <span class="relative z-10 font-bold text-white drop-shadow-md">{{ i + 1 }}</span>
+                  </button>
+                </div>
+              </div>
+
+              <div v-if="Array.isArray(draft.hashtags) && draft.hashtags.length > 0" class="flex flex-wrap gap-x-2 gap-y-1 pt-3 border-t border-neutral-800/60">
+                <span v-for="tag in draft.hashtags" :key="tag" class="text-cyan-400 text-sm">{{ tag }}</span>
+              </div>
+            </div>
+          </article>
+
+          <!-- ============== EDIT MODE ============== -->
+          <article
+            v-else
+            class="rounded-2xl border border-amber-500/40 bg-neutral-950/40 p-6 space-y-5"
+          >
+            <header class="flex items-center justify-between flex-wrap gap-2">
+              <p class="text-[11px] font-mono uppercase tracking-[0.14em] text-amber-400">Editing draft</p>
+              <p class="text-xs text-neutral-500">Saving does not re-validate (validation gate stays as it was)</p>
+            </header>
+
+            <div>
+              <label class="flex items-center justify-between text-sm font-medium text-neutral-300 mb-1.5">
+                <span>Body</span>
+                <span class="text-[11px] font-mono" :class="charCountTone">
+                  {{ charCount }} / sweet spot 1100-1300
+                </span>
+              </label>
+              <textarea
+                v-model="editForm.content"
+                rows="14"
+                class="w-full px-3.5 py-3 rounded-lg border border-neutral-800 bg-neutral-900/50 text-neutral-100 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/30 font-mono text-sm leading-relaxed"
+              />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-neutral-300 mb-1.5">
+                Link comment
+                <span class="ml-2 text-[11px] font-normal text-neutral-500">posted as first comment after publish</span>
+              </label>
+              <input
+                v-model="editForm.link_comment"
+                type="text"
+                placeholder="Full article: https://alisadikinma.com/blog/..."
+                class="w-full px-3.5 py-2.5 rounded-lg border border-neutral-800 bg-neutral-900/50 text-neutral-100 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/30 text-sm"
+              >
+            </div>
+
+            <div>
+              <label class="flex items-center justify-between text-sm font-medium text-neutral-300 mb-1.5">
+                <span>Hashtags</span>
+                <span class="text-[11px] font-mono" :class="hashtagCountValid ? 'text-emerald-400' : 'text-red-400'">
+                  {{ editForm.hashtags.length }} / 3-5
+                </span>
+              </label>
+              <div class="flex flex-wrap gap-2 mb-2">
+                <span
+                  v-for="tag in editForm.hashtags"
+                  :key="tag"
+                  class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/15 ring-1 ring-amber-500/30 text-amber-300 text-sm"
+                >
+                  {{ tag }}
+                  <button @click="removeHashtag(tag)" class="hover:text-red-400 leading-none ml-0.5" aria-label="Remove">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3">
+                      <path :d="ICON.x" />
+                    </svg>
+                  </button>
+                </span>
+              </div>
+              <div class="flex gap-2">
+                <input
+                  v-model="newHashtagInput"
+                  @keydown.enter.prevent="addHashtag"
+                  type="text"
+                  placeholder="#NewTag (Enter to add)"
+                  class="flex-1 px-3.5 py-2 rounded-lg border border-neutral-800 bg-neutral-900/50 text-sm focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/30"
+                >
+                <button
+                  @click="addHashtag"
+                  class="px-3.5 py-2 rounded-lg bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 text-sm font-medium ring-1 ring-amber-500/30"
+                >
+                  Add
+                </button>
+              </div>
+            </div>
+
+            <div class="flex gap-2 pt-4 border-t border-neutral-800">
+              <button
+                @click="saveEdit"
+                :disabled="updateMutation.isPending.value || !hashtagCountValid"
+                class="px-4 py-2.5 rounded-lg bg-amber-500 text-amber-950 font-semibold hover:bg-amber-400 active:scale-[0.98] disabled:opacity-50 transition text-sm"
+              >
+                {{ updateMutation.isPending.value ? 'Saving…' : 'Save changes' }}
+              </button>
+              <button
+                @click="cancelEdit"
+                class="px-4 py-2.5 rounded-lg border border-neutral-700 text-neutral-300 hover:bg-neutral-800 text-sm font-medium"
+              >
+                Discard
+              </button>
+            </div>
+          </article>
+
+          <!-- Validation panel (failures + suggestions) -->
+          <article
+            v-if="!isEditing && hasValidationContent"
+            class="rounded-2xl border border-neutral-800/80 bg-neutral-950/40 p-6"
+          >
+            <h3 class="text-[11px] font-mono uppercase tracking-[0.14em] text-neutral-400 mb-4">Validation</h3>
+            <div v-if="draft.validation_log.failures?.length" class="space-y-2 mb-5">
+              <p class="text-[11px] font-mono uppercase tracking-[0.14em] text-red-400">Failures</p>
+              <div
+                v-for="(f, i) in draft.validation_log.failures"
+                :key="i"
+                class="flex gap-3 px-3 py-2.5 rounded-lg bg-red-500/5 ring-1 ring-red-500/25"
+              >
+                <span class="font-mono text-[11px] text-red-400 whitespace-nowrap pt-0.5">−{{ f.deduction }}pts</span>
+                <div class="min-w-0">
+                  <p class="text-sm text-neutral-200">{{ f.message }}</p>
+                  <p class="text-[11px] text-neutral-500 font-mono mt-0.5">{{ f.rule }}</p>
+                </div>
+              </div>
+            </div>
+            <div v-if="draft.validation_log.suggestions?.length">
+              <p class="text-[11px] font-mono uppercase tracking-[0.14em] text-amber-400 mb-2">Suggestions</p>
+              <ul class="text-sm space-y-1 text-neutral-300 list-disc list-outside ml-5 marker:text-amber-400/60">
+                <li v-for="(s, i) in draft.validation_log.suggestions" :key="i">{{ s }}</li>
+              </ul>
+            </div>
+          </article>
+        </div>
+
+        <!-- RIGHT: details + secondary actions + timeline -->
+        <aside class="space-y-4">
+          <!-- Details -->
+          <section class="rounded-2xl border border-neutral-800/80 bg-neutral-950/40 p-5 space-y-4">
+            <h3 class="text-[11px] font-mono uppercase tracking-[0.14em] text-neutral-400">Details</h3>
+
+            <div v-if="draft.depth_score !== null && draft.depth_score !== undefined">
+              <p class="text-[11px] font-mono uppercase tracking-[0.14em] text-neutral-500 mb-1">Depth score</p>
+              <p class="text-3xl font-bold tracking-tight" :class="depthTone(draft.depth_score)">
+                {{ draft.depth_score }}<span class="text-sm text-neutral-600 font-normal ml-1">/ 100</span>
               </p>
             </div>
-          </div>
-        </div>
+
+            <div v-if="draft.scheduled_at" class="text-sm">
+              <p class="text-[11px] font-mono uppercase tracking-[0.14em] text-neutral-500 mb-0.5">Approved at</p>
+              <p class="text-neutral-200 font-mono">{{ formatDateTime(draft.scheduled_at) }}</p>
+            </div>
+
+            <div v-if="draft.cancel_window_ends_at && draft.status === 'awaiting_publish'" class="text-sm">
+              <p class="text-[11px] font-mono uppercase tracking-[0.14em] text-neutral-500 mb-0.5">Publish at</p>
+              <p class="text-neutral-200 font-mono">{{ formatDateTime(draft.cancel_window_ends_at) }}</p>
+            </div>
+
+            <div v-if="draft.published_at" class="text-sm">
+              <p class="text-[11px] font-mono uppercase tracking-[0.14em] text-neutral-500 mb-0.5">Published</p>
+              <p class="text-neutral-200 font-mono">{{ formatDateTime(draft.published_at) }}</p>
+              <a
+                v-if="draft.linkedin_post_url"
+                :href="draft.linkedin_post_url"
+                target="_blank"
+                rel="noopener"
+                class="inline-flex items-center gap-1 mt-1 text-xs text-amber-400 hover:underline break-all"
+              >
+                View post
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3 shrink-0">
+                  <path :d="ICON.arrowUpRight" />
+                </svg>
+              </a>
+            </div>
+
+            <div v-if="draft.retry_count > 0" class="text-sm">
+              <p class="text-[11px] font-mono uppercase tracking-[0.14em] text-neutral-500 mb-0.5">Retries</p>
+              <p class="font-mono text-neutral-200">{{ draft.retry_count }} of 3</p>
+            </div>
+          </section>
+
+          <!-- Secondary actions -->
+          <section class="rounded-2xl border border-neutral-800/80 bg-neutral-950/40 p-5">
+            <h3 class="text-[11px] font-mono uppercase tracking-[0.14em] text-neutral-400 mb-3">Actions</h3>
+            <div class="flex flex-col gap-2">
+              <button
+                v-if="['awaiting_publish', 'manual_review'].includes(draft.status) && !isEditing"
+                @click="startEdit"
+                class="inline-flex items-center justify-between px-3 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-sm font-medium text-neutral-200 ring-1 ring-neutral-800 transition group"
+              >
+                <span class="inline-flex items-center gap-2">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-neutral-400 group-hover:text-amber-400 transition-colors">
+                    <path :d="ICON.pencil" />
+                  </svg>
+                  Edit content
+                </span>
+              </button>
+
+              <button
+                v-if="['manual_review', 'failed', 'cancelled', 'published'].includes(draft.status)"
+                @click="doRegenerate"
+                :disabled="regenerateMutation.isPending.value"
+                class="inline-flex items-center justify-between px-3 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-sm font-medium text-neutral-200 ring-1 ring-neutral-800 transition group disabled:opacity-50"
+              >
+                <span class="inline-flex items-center gap-2">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-neutral-400 group-hover:text-cyan-400 transition-colors">
+                    <path :d="ICON.refresh" />
+                  </svg>
+                  {{ regenerateMutation.isPending.value ? 'Queueing…' : 'Regenerate copy' }}
+                </span>
+              </button>
+
+              <button
+                v-if="draft.format === 'carousel' && carouselSlides.length > 0"
+                @click="regenerateAllImages"
+                :disabled="regenerateAllImagesMutation.isPending.value"
+                class="inline-flex items-center justify-between px-3 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-sm font-medium text-neutral-200 ring-1 ring-neutral-800 transition group disabled:opacity-50"
+              >
+                <span class="inline-flex items-center gap-2">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-neutral-400 group-hover:text-amber-400 transition-colors">
+                    <path :d="ICON.image" />
+                  </svg>
+                  {{ regenerateAllImagesMutation.isPending.value ? 'Dispatching…' : 'Regenerate all images' }}
+                </span>
+              </button>
+
+              <button
+                v-if="!['cancelled', 'published'].includes(draft.status) && !isInProgress"
+                @click="doCancel"
+                :disabled="cancelMutation.isPending.value"
+                class="inline-flex items-center justify-between px-3 py-2 rounded-lg bg-neutral-900 hover:bg-red-500/10 text-sm font-medium text-neutral-300 hover:text-red-400 ring-1 ring-neutral-800 hover:ring-red-500/30 transition group disabled:opacity-50"
+              >
+                <span class="inline-flex items-center gap-2">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
+                    <path :d="ICON.x" />
+                  </svg>
+                  Cancel draft
+                </span>
+              </button>
+            </div>
+          </section>
+
+          <!-- Humanized timeline -->
+          <section
+            v-if="Array.isArray(draft.pipeline_state_log) && draft.pipeline_state_log.length > 0"
+            class="rounded-2xl border border-neutral-800/80 bg-neutral-950/40 p-5"
+          >
+            <h3 class="text-[11px] font-mono uppercase tracking-[0.14em] text-neutral-400 mb-4">Timeline</h3>
+            <ol class="relative space-y-4 before:absolute before:left-[5px] before:top-1.5 before:bottom-1.5 before:w-px before:bg-neutral-800">
+              <li
+                v-for="(entry, i) in [...draft.pipeline_state_log].reverse()"
+                :key="i"
+                class="relative pl-6"
+              >
+                <span
+                  class="absolute left-0 top-1 w-[11px] h-[11px] rounded-full ring-2 ring-neutral-950"
+                  :class="MOOD_CLASSES[statusMeta(entry.to).mood]?.dot || 'bg-neutral-500'"
+                />
+                <p class="text-sm text-neutral-200 leading-snug">{{ transitionSummary(entry) }}</p>
+                <p v-if="entry.reason && !['cron_scan_detected_new_post','plugin_dispatch_start','plugin_validate_start','plugin_passed_gate','admin_approve','admin_cancel','kill_switch_demotion'].includes(entry.reason)" class="text-[11px] text-neutral-500 mt-0.5">
+                  {{ reasonLabel(entry.reason) }}
+                </p>
+                <p class="text-[10px] font-mono text-neutral-600 mt-0.5">{{ formatDateTime(entry.timestamp) }}</p>
+              </li>
+            </ol>
+          </section>
+        </aside>
       </div>
-    </div>
+    </template>
   </div>
 </template>
+
+<style scoped>
+@keyframes slide {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+</style>
