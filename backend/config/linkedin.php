@@ -49,17 +49,14 @@ return [
     // PDF temp dir for carousel composition
     'pdf_temp_dir' => env('LINKEDIN_PDF_TEMP_DIR', storage_path('app/tmp/linkedin-pdfs')),
 
-    // Phase A — feature flag for carousel-gen engine cutover (default OFF).
-    // When true, LinkedInGenerationService routes carousel-format drafts to
-    // the /carousel-gen skill (ai-image-carousel-prompt-gen plugin) via SSH
-    // instead of the legacy /linkedin-carousel skill. Phase B cutover flips
-    // this to true after smoke-testing one manual draft. See
-    // docs/plans/2026-04-28-linkedin-carousel-engine-decoupling.md.
-    'use_carousel_gen_engine' => env('LINKEDIN_USE_CAROUSEL_GEN_ENGINE', false),
-
     // Generation bridge — SSH to VPS `claudesn` user + run `claude -p "/linkedin-gen ..."`.
     // Same pattern as article generation (see config/services.php article_generation).
-    // Plugin v0.2.0+ at https://github.com/alisadikinma/linkedin-post-writer.
+    // Plugin v0.5.0+ at https://github.com/alisadikinma/linkedin-post-writer.
+    //
+    // Post plugin v0.5.0 the orchestrator authors text only; carousel format
+    // emits status=route_to_carousel_gen and the LinkedInGenerationService
+    // dispatches /carousel-gen separately (see config/carousel-gen.php).
+    // No feature flag — /carousel-gen is the only carousel path.
     'generation' => [
         'driver' => env('LINKEDIN_GEN_DRIVER', 'ssh'), // 'ssh' or 'local'
         'ssh_host' => env('LINKEDIN_GEN_SSH_HOST', 'localhost'),
@@ -67,11 +64,11 @@ return [
         'ssh_key' => env('LINKEDIN_GEN_SSH_KEY', '/var/www/.ssh/id_ed25519'),
         'claude_path' => env('LINKEDIN_GEN_CLAUDE_PATH', 'claude'),
         'model' => env('LINKEDIN_GEN_MODEL', 'sonnet'),
-        // 4 compiled reference bundles (paths on VPS, created by plugin's compile-refs.ts)
+        // 3 compiled reference bundles for /linkedin-gen text path (post v0.5.0).
+        // refs_carousel retired — carousel design specs live in /carousel-gen plugin.
         'refs_playbook' => env('LINKEDIN_GEN_REFS_PLAYBOOK', '/home/claudesn/refs-linkedin-playbook.md'),
         'refs_templates' => env('LINKEDIN_GEN_REFS_TEMPLATES', '/home/claudesn/refs-linkedin-templates.md'),
         'refs_formats' => env('LINKEDIN_GEN_REFS_FORMATS', '/home/claudesn/refs-linkedin-formats.md'),
-        'refs_carousel' => env('LINKEDIN_GEN_REFS_CAROUSEL', '/home/claudesn/refs-linkedin-carousel.md'),
         // Sync execution timeout for the SSH→Sonnet→plugin chain. Production
         // measurement on a real blog (post #24, ~8KB content, 4 system prompt
         // refs, carousel format) clocked at 369s wall — the prior 300s default

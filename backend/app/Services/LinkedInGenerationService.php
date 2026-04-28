@@ -117,13 +117,11 @@ class LinkedInGenerationService
             ];
         }
 
-        // Step 5.5: Phase A6 — when feature flag ON + format=carousel,
-        // re-author slides via the universal /carousel-gen engine and apply
-        // the CarouselGenOutputAdapter. Brief + validation from /linkedin-gen
-        // are preserved (Depth Score gate still applies). Phase C will modify
-        // the plugin's /linkedin-gen orchestrator to short-circuit at brief
-        // stage for carousel format, eliminating the wasted SSH call; until
-        // then both paths run sequentially when flag is ON.
+        // Step 5.5: Plugin v0.5.0 — for carousel format, /linkedin-gen
+        // emits status='route_to_carousel_gen' (brief only, all other slots
+        // null). Dispatch /carousel-gen, run the adapter, and assemble the
+        // final carousel into $parsed.carousel.slides. No feature flag —
+        // /carousel-gen is the only carousel path post-v0.5.0.
         try {
             $parsed = $this->applyCarouselGenAdapter($parsed, $blog['url'], $draft->id);
         } catch (CarouselGenAdapterException $e) {
@@ -224,8 +222,10 @@ class LinkedInGenerationService
 
     private function buildRefsFlags(): string
     {
+        // Plugin v0.5.0 retired refs_carousel — carousel design specs live in
+        // /carousel-gen plugin, not /linkedin-gen.
         $flags = [];
-        foreach (['refs_playbook', 'refs_templates', 'refs_formats', 'refs_carousel'] as $key) {
+        foreach (['refs_playbook', 'refs_templates', 'refs_formats'] as $key) {
             $path = (string) config("linkedin.generation.{$key}", '');
             if ($path !== '') {
                 $flags[] = '--append-system-prompt-file ' . escapeshellarg($path);
@@ -529,17 +529,22 @@ class LinkedInGenerationService
     }
 
     /**
-     * Phase A6 router: when feature flag ON + carousel format, replace the
-     * /linkedin-gen-authored slides with adapter output from /carousel-gen.
+     * Carousel router (post plugin v0.5.0).
      *
      * Behavior matrix:
-     *   flag OFF                          → return $parsed unchanged
-     *   flag ON  + format='text'           → return $parsed unchanged
-     *   flag ON  + format='carousel'       → dispatch /carousel-gen, run adapter,
-     *                                         REPLACE $parsed.carousel.slides
+     *   format='text'                          → return $parsed unchanged
+     *   status='route_to_carousel_gen'         → dispatch /carousel-gen, build
+     *                                             carousel slot from adapter output
+     *   format='carousel' + 'complete' (legacy) → still dispatch /carousel-gen and
+     *                                              REPLACE $parsed.carousel.slides
+     *                                              (handles old envelopes during
+     *                                              the brief transition window)
      *
-     * Brief + validation from /linkedin-gen are preserved (Depth Score gate
-     * still applies to the carousel narrative authored upstream by /linkedin-gen).
+     * Plugin v0.5.0 short-circuits at the brief stage for carousel format —
+     * /linkedin-gen emits status='route_to_carousel_gen' with carousel=null
+     * and validation=null. The backend builds the carousel slot from the
+     * /carousel-gen adapter output. Validation does not apply to carousels
+     * (the /carousel-gen schema enforces structural quality).
      *
      * @throws CarouselGenAdapterException When /carousel-gen returns null,
      *                                      empty, or status=failed. Caller
@@ -547,21 +552,18 @@ class LinkedInGenerationService
      */
     public function applyCarouselGenAdapter(array $parsed, string $blogUrl, int $draftId): array
     {
-        $flagEnabled = (bool) config('linkedin.use_carousel_gen_engine', false);
-        if (!$flagEnabled) {
-            return $parsed;
-        }
-
         $format = $parsed['format'] ?? null;
         if ($format !== 'carousel') {
             return $parsed;
         }
 
         $brief = is_array($parsed['brief'] ?? null) ? $parsed['brief'] : [];
+        $status = $parsed['status'] ?? null;
 
         Log::info('[LinkedInGeneration] dispatching /carousel-gen engine', [
             'draft_id' => $draftId,
             'blog_url' => $blogUrl,
+            'orchestrator_status' => $status,
             'brief_hook' => $brief['hook_framework'] ?? null,
             'brief_pillar' => $brief['pillar'] ?? null,
         ]);
@@ -579,17 +581,23 @@ class LinkedInGenerationService
         // JSON shape (with image_status='pending' lifecycle fields initialized).
         $adaptedSlides = $this->carouselAdapter->adapt($carouselGenJson);
 
-        // Preserve everything else from the /linkedin-gen output (brief,
-        // validation, depth_score, format) — only the slides array changes.
-        $parsed['carousel'] = $parsed['carousel'] ?? [];
+        // Build (or replace) the carousel slot. Plugin v0.5.0 sends carousel=null
+        // so we always start fresh; legacy envelopes had inline slides that we
+        // overwrite. Either way the result has only adapter-authored slides.
+        $parsed['carousel'] = is_array($parsed['carousel'] ?? null) ? $parsed['carousel'] : [];
         $parsed['carousel']['slides'] = $adaptedSlides;
-        // Forward useful metadata from the carousel-gen envelope so downstream
-        // can attribute slide quality (bilingual mode, narrative style).
         if (isset($carouselGenJson['bilingual'])) {
             $parsed['carousel']['bilingual'] = (bool) $carouselGenJson['bilingual'];
         }
         if (isset($carouselGenJson['narrative'])) {
             $parsed['carousel']['narrative'] = (string) $carouselGenJson['narrative'];
+        }
+
+        // Promote route_to_carousel_gen to complete now that the carousel
+        // is materialized. Downstream persistAndRoute treats status=complete
+        // as the FSM advance trigger.
+        if ($status === 'route_to_carousel_gen') {
+            $parsed['status'] = 'complete';
         }
 
         Log::info('[LinkedInGeneration] /carousel-gen adapter applied', [
