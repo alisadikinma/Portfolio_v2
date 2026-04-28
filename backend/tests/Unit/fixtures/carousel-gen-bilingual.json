@@ -1,0 +1,93 @@
+{
+  "status": "complete",
+  "format": "carousel",
+  "total_slides": 9,
+  "aspect_ratio": "4:5",
+  "bilingual": true,
+  "narrative": "5act",
+  "generated_at": "2026-04-28T10:30:00Z",
+  "slides": [
+    {
+      "slide_number": 1,
+      "layout_hint": "cover",
+      "copy_id": "AI Bukan Pengganti, Tapi Pendamping Anda",
+      "copy_en": "AI is your co-pilot, not your replacement",
+      "image_prompt": "Cinematic medium shot of a confident Indonesian creator in their late twenties, hyperrealistic skin texture with visible pores and a gentle catchlight in the eyes, photographed at golden hour through a soft window-light setup with a 35mm equivalent lens at f/2.8 in a warm modern Jakarta workspace. The subject leans slightly forward toward the viewer, one hand resting on a glowing laptop, the other gesturing open and welcoming. Behind them, a softly bokeh-blurred wall of post-it notes, sketches and a holographic AI assistant floats with a translucent cyan glow. Visual hook: an absurdist surreal touch where the laptop screen dissolves into a butterfly emerging mid-flight, symbolizing the metamorphosis of the creator-AI partnership. The headline {{PAGE_INDICATOR}} sits at the top-left in white sans-serif. Centered headline text reads bilingual: main Indonesian line in pure white with two accent keywords highlighted in warm gold, English subtitle in warm gold below, never crammed at the very bottom. {{SWIPE_TEXT}} appears beneath the headline in small white type. Brand chrome stack centered at thirty percent opacity: {{BRAND_LOGO}} icon as a small circular badge, with {{HANDLE}} watermark in white directly below. The creator's face matches {{CREATOR_FACE}} reference exactly. Subtle volumetric atmosphere, anti-AI-look natural imperfection, mobile-safe top and bottom margins respected. Subtitle must not be white. Portfolio domain {{PORTFOLIO_URL}} is reserved for the CTA slide and not rendered here.",
+      "is_cover": true,
+      "is_cta": false
+    },
+    {
+      "slide_number": 2,
+      "layout_hint": "body",
+      "copy_id": "Banyak orang takut digantikan oleh AI",
+      "copy_en": "Many fear being replaced by AI",
+      "image_prompt": "Wide editorial photograph in muted documentary tones, captured at f/4 with a 50mm lens during overcast late afternoon light. A diverse group of four office workers stand in a softly lit open-plan workspace, each frozen in a small moment of anxiety as they stare at glowing screens. The composition uses a slight low-angle to emphasize the vastness of the looming AI presence rendered as a translucent blueish data-mesh pouring down from the ceiling. Skin texture is hyperreal, hair has flyaways, fabric shows real weave. Visual storytelling beat: one worker's coffee mug steams with binary symbols rising as steam, an absurd literal touch reinforcing the fear-of-AI theme without becoming cartoonish. {{PAGE_INDICATOR}} top-left in white. Bilingual text-overlay positioned starting from the vertical center: main Indonesian phrase in white with one gold accent keyword, English subtitle in warm gold underneath. {{SWIPE_TEXT}} beneath the headline. Brand chrome stack centered at thirty percent opacity: {{BRAND_LOGO}} circular icon and {{HANDLE}} watermark. The provided reference {{CREATOR_FACE}} is not the focus here. Domain {{PORTFOLIO_URL}} is reserved for CTA. Subtitle must not be white. Mobile dead zones top 150px bottom 200px enforced.",
+      "is_cover": false,
+      "is_cta": false
+    },
+    {
+      "slide_number": 3,
+      "layout_hint": "body",
+      "copy_id": "Tapi data 2026 berkata sebaliknya",
+      "copy_en": "But the 2026 data says otherwise",
+      "image_prompt": "Cinematic over-the-shoulder shot of two hands cradling a holographic floating chart that visibly grows upward in a bright cyan-to-gold gradient. Shot at 50mm equivalent f/2.0 with shallow depth of field on a clean dark workspace, real wood grain visible, dust motes drifting in a beam of side light. The chart is rendered with semi-translucent volumetric glow, every data point reading as glass-like and tactile, not flat infographic. An absurd literal element: a tiny paper boat made of receipts sails up the rising line of the chart, anchoring the abstract growth in a tangible human metaphor. {{PAGE_INDICATOR}} sits top-left in white. Bilingual text overlay positioned starting from the vertical center: Indonesian main in white with two gold accent keywords, English subtitle in warm gold below, remaining text in white. {{SWIPE_TEXT}} small white type beneath the headline. Brand chrome stack centered at thirty percent opacity: {{BRAND_LOGO}} small circular badge and {{HANDLE}} watermark. {{CREATOR_FACE}} is not in this scene. {{PORTFOLIO_URL}} reserved for CTA only. Subtitle must not be white. Hyperrealistic anti-AI-look, mobile dead zones respected.",
+      "is_cover": false,
+      "is_cta": false
+    },
+    {
+      "slide_number": 4,
+      "layout_hint": "human_fingerprint",
+      "copy_id": "Saya membuktikannya sendiri di proyek terakhir",
+      "copy_en": "I proved it on my last project",
+      "image_prompt": "Intimate close-up portrait of the creator at their desk under a warm tungsten desk lamp at night, captured at f/1.8 with a 50mm lens, only the catchlight reflecting from a laptop screen visible in their eyes. The subject has visible skin texture, fine stubble, hair slightly disheveled from a long working session, one tea mug half-empty beside the keyboard. The mood is reflective, slightly tired but proud. Visual hook: scattered crumpled paper around the desk shows handwritten notes that subtly form the silhouette of a butterfly when seen at a distance, a quiet absurdist literal nod to creative metamorphosis. {{PAGE_INDICATOR}} top-left in white. Bilingual headline positioned starting from the vertical center: Indonesian main in pure white with one gold accent keyword, English subtitle in warm gold below, remaining text in white. {{SWIPE_TEXT}} appears in small white type beneath the headline. Brand chrome stack centered at thirty percent opacity: {{BRAND_LOGO}} small circular icon and {{HANDLE}} watermark in white. The creator's face must match {{CREATOR_FACE}} reference exactly. {{PORTFOLIO_URL}} reserved for CTA only. Subtitle must not be white. Mobile dead zones enforced.",
+      "is_cover": false,
+      "is_cta": false
+    },
+    {
+      "slide_number": 5,
+      "layout_hint": "body",
+      "copy_id": "Saya delegasikan tugas berulang ke AI",
+      "copy_en": "I delegated repetitive tasks to AI",
+      "image_prompt": "Top-down flat-lay editorial shot of a wooden desk at f/4 with even daylight, a real human hand on the right side passing a small folded paper note labeled with a hand-drawn task list to a translucent holographic robotic hand on the left. Around the handoff are physical objects: a real notebook with a pen mid-stroke, a steaming espresso cup, a worn analog stopwatch, and a stack of post-it notes with markers. The hyperreal grain of the wood and the soft lift of paper edges keep the scene grounded in the physical world. Absurd literal beat: tiny paper airplanes made of to-do items fly out of the notepad toward the holographic hand, a playful metaphor for delegation. {{PAGE_INDICATOR}} top-left white. Bilingual headline positioned starting from the vertical center: Indonesian main in pure white with one gold accent keyword, English subtitle in warm gold below. {{SWIPE_TEXT}} small white type beneath the headline. Brand chrome stack centered at thirty percent opacity: {{BRAND_LOGO}} circular icon and {{HANDLE}} watermark in white. {{CREATOR_FACE}} not present here. {{PORTFOLIO_URL}} reserved for CTA. Subtitle must not be white.",
+      "is_cover": false,
+      "is_cta": false
+    },
+    {
+      "slide_number": 6,
+      "layout_hint": "body",
+      "copy_id": "Saya gunakan waktu untuk strategi kreatif",
+      "copy_en": "I used the time for creative strategy",
+      "image_prompt": "Cinematic side-profile shot of the creator standing in front of a floor-to-ceiling whiteboard covered in colorful sticky notes, hand-drawn arrows, and rough strategy sketches, captured at 35mm equivalent f/2.8 with cool morning daylight raking in from the left window. Skin texture and clothing wrinkles read hyperreal. The board displays real paper texture and uneven marker strokes; one cluster of post-its visibly forms an upward arrow. Visual hook: a single sticky note physically peels away and floats mid-air as a small kite, absurdly literal but cinematic. {{PAGE_INDICATOR}} top-left in white. Bilingual text overlay positioned starting from the vertical center: Indonesian main in pure white with two gold accent keywords, English subtitle in warm gold below. {{SWIPE_TEXT}} small white type beneath the headline. Brand chrome stack centered at thirty percent opacity: {{BRAND_LOGO}} small circular badge and {{HANDLE}} watermark in white. The creator's face matches {{CREATOR_FACE}} reference. {{PORTFOLIO_URL}} reserved for CTA. Subtitle must not be white. Mobile dead zones enforced.",
+      "is_cover": false,
+      "is_cta": false
+    },
+    {
+      "slide_number": 7,
+      "layout_hint": "body",
+      "copy_id": "Hasil: produktivitas 3x dengan kualitas tetap",
+      "copy_en": "Result: 3x productivity, same quality",
+      "image_prompt": "Wide editorial photograph showing a split scene: on the left, a single creator surrounded by stacks of work in dim moody light at f/2.8; on the right, the same workspace bathed in golden morning light with three translucent holographic doppelgangers handling separate tasks in parallel. A 50mm equivalent lens, mid-distance composition, real spatial geometry, soft shadows, hyperrealistic skin and fabric. Absurd literal touch: a single coffee cup on the dividing line steams upward with one stream of vapor that splits cleanly into three streams above the holograms, anchoring the 3x productivity metaphor in a tangible visual rhythm. {{PAGE_INDICATOR}} top-left white. Bilingual text overlay positioned starting from the vertical center: Indonesian main in pure white with one gold accent keyword highlighted, English subtitle in warm gold below. {{SWIPE_TEXT}} small white type beneath the headline. Brand chrome stack centered at thirty percent opacity: {{BRAND_LOGO}} small circular badge, {{HANDLE}} watermark in white. The creator face matches {{CREATOR_FACE}}. {{PORTFOLIO_URL}} reserved for CTA. Subtitle must not be white.",
+      "is_cover": false,
+      "is_cta": false
+    },
+    {
+      "slide_number": 8,
+      "layout_hint": "direct_answer",
+      "copy_id": "Jadi, mulai darimana?",
+      "copy_en": "So, where do you start?",
+      "image_prompt": "Cinematic medium close-up of a hand drawing a clean three-step roadmap on a clean white sheet of A4 paper at f/2.5 with a 50mm equivalent lens, soft directional daylight from the upper left. The hand has natural skin texture, the pen is a fine-tipped black marker, the paper has visible fiber. Each numbered step is connected by hand-drawn arrows. To the side of the page, a small steaming espresso cup grounds the scene in the everyday creator workflow. Visual hook: the third step on the page glows faintly gold, lifting a few millimeters off the paper as if it has its own gentle gravity, an absurd literal moment of an idea coming alive. {{PAGE_INDICATOR}} top-left white. Direct answer text overlay positioned starting from the vertical center, structured as a three-line numbered list: each line bilingual (Indonesian main in pure white with gold accent number, English subtitle in warm gold below). Remaining text in white. {{SWIPE_TEXT}} small white type beneath the answer block. Brand chrome stack centered at thirty percent opacity: {{BRAND_LOGO}} circular icon and {{HANDLE}} watermark. {{CREATOR_FACE}} not in this scene. {{PORTFOLIO_URL}} reserved for CTA. Subtitle must not be white.",
+      "is_cover": false,
+      "is_cta": false,
+      "direct_answer_block": "1. Identifikasi 3 tugas paling berulang minggu ini. 2. Pilih satu tugas dan delegasikan ke AI selama 7 hari. 3. Ukur waktu yang dihemat dan reinvestasikan ke pekerjaan strategis. Mulai kecil, ukur, lalu skalakan."
+    },
+    {
+      "slide_number": 9,
+      "layout_hint": "cta",
+      "copy_id": "Ikuti untuk strategi AI yang praktis",
+      "copy_en": "Follow for practical AI playbooks",
+      "image_prompt": "Cinematic medium shot of the creator facing the camera directly with a calm confident smile, captured at f/2.5 with 50mm equivalent lens during late golden-hour light. Hyperreal skin texture, gentle catchlight in eyes, soft directional warm light from camera left. Background is a softly bokeh-blurred warm Jakarta evening cityscape with subtle gold accents. The subject is centered and grounded, body slightly angled toward the viewer in an inviting open posture. Visual hook removed for the CTA slide so the human connection is the focus. {{PAGE_INDICATOR}} top-left white. Bilingual text overlay positioned starting from the vertical center: Indonesian main in pure white with two gold accent keywords, English subtitle in warm gold below. Note: no swipe indicator on the CTA slide; {{SWIPE_TEXT}} resolves to empty string and is therefore not rendered. Lower third social block centered: three small social-media icons (Instagram logo, TikTok logo, LinkedIn logo) in a single horizontal row beside {{HANDLE}} text in white. Below the icons row, the literal portfolio domain {{PORTFOLIO_URL}} in white at slightly smaller size. The creator's face matches {{CREATOR_FACE}} reference exactly. Brand chrome stack centered at thirty percent opacity: {{BRAND_LOGO}} circular icon and {{HANDLE}} watermark in white. Subtitle must not be white. Mobile dead zones enforced.",
+      "is_cover": false,
+      "is_cta": true
+    }
+  ]
+}

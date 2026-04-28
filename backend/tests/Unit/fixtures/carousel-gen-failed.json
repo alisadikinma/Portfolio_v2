@@ -1,0 +1,6 @@
+{
+  "status": "failed",
+  "format": "carousel",
+  "error": "depth gate failed: 4/9 slides scored below threshold (avg 62, min required 75). Cover slide lacks visual hook; direct_answer_block exceeds 600 chars; CTA slide missing social block reference.",
+  "generated_at": "2026-04-28T12:00:00Z"
+}
