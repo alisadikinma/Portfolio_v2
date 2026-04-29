@@ -237,7 +237,7 @@ async function doPublishNow() {
   }
 }
 async function doRegenerate() {
-  if (!confirm('Regenerate from scratch? The current draft will be archived.')) return
+  if (!confirm('Restart from the blog post?\n\nThis draft will be archived and a brand-new one built from scratch (new draft ID, fresh caption + slides). Runtime ~5-7 min.')) return
   const result = await regenerateMutation.mutateAsync(draftId.value)
   const newId = result?.data?.id
   if (newId) router.push({ name: 'admin-linkedin-draft-detail', params: { id: newId } })
@@ -509,17 +509,18 @@ const showThumbnailUploadCaption = computed(() =>
               Open on LinkedIn
             </a>
 
-            <!-- Failed/cancelled: regenerate is primary -->
+            <!-- Failed/cancelled: restart-from-blog is primary -->
             <button
               v-if="['failed', 'cancelled'].includes(draft.status)"
               @click="doRegenerate"
               :disabled="regenerateMutation.isPending.value"
+              title="Discard this draft and rebuild from the blog post (creates new draft, ~5-7 min)"
               class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-cyan-500 text-cyan-950 hover:bg-cyan-400 active:scale-[0.98] text-sm font-semibold transition disabled:opacity-50 disabled:cursor-wait"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
                 <path :d="ICON.refresh" />
               </svg>
-              {{ regenerateMutation.isPending.value ? 'Queueing…' : 'Regenerate' }}
+              {{ regenerateMutation.isPending.value ? 'Queueing…' : 'Restart from blog' }}
             </button>
 
             <!-- In-progress states: cancel is the only meaningful action -->
@@ -689,12 +690,12 @@ const showThumbnailUploadCaption = computed(() =>
                       @click="regenerateSingleSlide(activeSlideIndex)"
                       :disabled="regenerateSlideMutation.isPending.value"
                       class="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] rounded-md bg-amber-500/10 ring-1 ring-amber-500/30 text-amber-300 hover:bg-amber-500/20 disabled:opacity-30 transition"
-                      title="Re-render this slide"
+                      title="Re-render only this slide's image (~30-60s, same prompt)"
                     >
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3">
                         <path :d="ICON.refresh" />
                       </svg>
-                      Regen slide
+                      Re-render image
                     </button>
                     <button
                       @click="prevSlide"
@@ -1064,13 +1065,14 @@ const showThumbnailUploadCaption = computed(() =>
                 v-if="['manual_review', 'failed', 'cancelled', 'published'].includes(draft.status)"
                 @click="doRegenerate"
                 :disabled="regenerateMutation.isPending.value"
+                title="Discard this draft and rebuild from the blog post (creates new draft, ~5-7 min)"
                 class="inline-flex items-center justify-between px-3 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-sm font-medium text-neutral-200 ring-1 ring-neutral-800 transition group disabled:opacity-50"
               >
                 <span class="inline-flex items-center gap-2">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-neutral-400 group-hover:text-cyan-400 transition-colors">
                     <path :d="ICON.refresh" />
                   </svg>
-                  {{ regenerateMutation.isPending.value ? 'Queueing…' : 'Regenerate copy' }}
+                  {{ regenerateMutation.isPending.value ? 'Queueing…' : 'Restart from blog' }}
                 </span>
               </button>
 
@@ -1078,13 +1080,14 @@ const showThumbnailUploadCaption = computed(() =>
                 v-if="draft.format === 'carousel' && carouselSlides.length > 0"
                 @click="regenerateAllImages"
                 :disabled="regenerateAllImagesMutation.isPending.value"
+                title="Re-author all slide copy + images via /carousel-gen (~5-7 min, keeps draft ID)"
                 class="inline-flex items-center justify-between px-3 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-sm font-medium text-neutral-200 ring-1 ring-neutral-800 transition group disabled:opacity-50"
               >
                 <span class="inline-flex items-center gap-2">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-neutral-400 group-hover:text-amber-400 transition-colors">
                     <path :d="ICON.image" />
                   </svg>
-                  {{ regenerateAllImagesMutation.isPending.value ? 'Dispatching…' : 'Regenerate all images' }}
+                  {{ regenerateAllImagesMutation.isPending.value ? 'Dispatching…' : 'Re-author all slides' }}
                 </span>
               </button>
 
