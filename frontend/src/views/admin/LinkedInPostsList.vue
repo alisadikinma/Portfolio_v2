@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   useLinkedInDraftsList,
@@ -14,9 +14,28 @@ import {
   formatChip,
   relativeTime,
   countdownTo,
+  formatDateTime,
   FEED_TAB_KEY,
   ICON,
 } from './linkedinHelpers'
+
+// Live ticker — re-renders countdown every second so "in 14m 25s" actually
+// counts down instead of being a frozen value computed once on mount.
+const tick = ref(0)
+let tickerInterval
+onMounted(() => {
+  tickerInterval = setInterval(() => { tick.value++ }, 1000)
+})
+onBeforeUnmount(() => {
+  if (tickerInterval) clearInterval(tickerInterval)
+})
+
+// Wrap countdownTo so reading it depends on `tick` — Vue will recompute
+// each scheduled card's display every second.
+function liveCountdown(datetime) {
+  void tick.value
+  return countdownTo(datetime)
+}
 
 const router = useRouter()
 
@@ -199,18 +218,21 @@ const emptyMessage = computed(() => ({
             <span class="text-neutral-600">From: </span>{{ postTitle(draft) }}
           </div>
 
-          <!-- Footer: depth + time -->
-          <div class="flex items-center justify-between text-xs pt-3 border-t border-neutral-800/60">
-            <span v-if="draft.depth_score" :class="['font-mono font-bold', depthTone(draft.depth_score)]">
+          <!-- Footer: depth + time. Scheduled cards show absolute time on top
+               (so operator knows exactly when this fires) + live-ticking
+               countdown below (in 14m 25s → 14m 24s → 14m 23s …). -->
+          <div class="flex items-start justify-between text-xs pt-3 border-t border-neutral-800/60 gap-2">
+            <span v-if="draft.depth_score" :class="['font-mono font-bold whitespace-nowrap', depthTone(draft.depth_score)]">
               Depth {{ draft.depth_score }}
             </span>
             <span v-else class="text-neutral-600 font-mono">—</span>
-            <span class="text-neutral-500 font-mono">
+            <span class="text-right text-neutral-500 font-mono">
               <template v-if="draft.status === 'published' && draft.published_at">
                 {{ relativeTime(draft.published_at) }}
               </template>
               <template v-else-if="draft.status === 'awaiting_publish' && draft.cancel_window_ends_at">
-                in {{ countdownTo(draft.cancel_window_ends_at) }}
+                <span class="block text-neutral-300">{{ formatDateTime(draft.cancel_window_ends_at) }}</span>
+                <span class="block text-amber-400 mt-0.5">in {{ liveCountdown(draft.cancel_window_ends_at) }}</span>
               </template>
               <template v-else>{{ relativeTime(draft.updated_at) }}</template>
             </span>

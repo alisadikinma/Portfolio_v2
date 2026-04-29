@@ -138,13 +138,26 @@ export function useUpdateLinkedInDraft() {
   })
 }
 
-/** POST /admin/linkedin-drafts/{id}/approve */
+/**
+ * POST /admin/linkedin-drafts/{id}/approve
+ *
+ * mutate(id) → fires after default cancel_window_minutes
+ * mutate({ id, publishAt }) → fires at the exact ISO datetime
+ *
+ * For drafts already in awaiting_publish, this endpoint reschedules
+ * (no FSM transition, just updates cancel_window_ends_at).
+ */
 export function useApproveLinkedInDraft() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id) =>
-      api.post(`/admin/linkedin-drafts/${id}/approve`).then(r => r.data),
-    onSuccess: (_, id) => {
+    mutationFn: (input) => {
+      const id = typeof input === 'object' ? input.id : input
+      const publishAt = typeof input === 'object' ? input.publishAt : undefined
+      const payload = publishAt ? { publish_at: publishAt } : {}
+      return api.post(`/admin/linkedin-drafts/${id}/approve`, payload).then(r => r.data)
+    },
+    onSuccess: (_, input) => {
+      const id = typeof input === 'object' ? input.id : input
       qc.invalidateQueries({ queryKey: [LIST_KEY] })
       qc.invalidateQueries({ queryKey: [LIST_KEY, id] })
     },

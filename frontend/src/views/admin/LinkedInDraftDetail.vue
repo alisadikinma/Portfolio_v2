@@ -163,6 +163,60 @@ const liveCountdown = computed(() => {
     : ''
 })
 
+// --- Schedule picker ------------------------------------------------------
+// `isScheduling` toggles the inline datetime-local input. `scheduleAt` is
+// the datetime-local value (browser-formatted "YYYY-MM-DDTHH:mm" — no
+// timezone offset; we send it as-is and let Carbon parse in local server tz).
+const isScheduling = ref(false)
+const scheduleAt = ref('')
+
+function openScheduler() {
+  // Default to current cancel_window_ends_at if already scheduled, else
+  // suggest "tomorrow at 9am" — peak engagement hour for B2B LinkedIn.
+  const existing = draft.value?.cancel_window_ends_at
+  const seed = existing ? new Date(existing) : (() => {
+    const d = new Date()
+    d.setDate(d.getDate() + 1)
+    d.setHours(9, 0, 0, 0)
+    return d
+  })()
+  // Format as YYYY-MM-DDTHH:mm in local time
+  const pad = (n) => String(n).padStart(2, '0')
+  scheduleAt.value =
+    `${seed.getFullYear()}-${pad(seed.getMonth() + 1)}-${pad(seed.getDate())}T${pad(seed.getHours())}:${pad(seed.getMinutes())}`
+  isScheduling.value = true
+}
+
+function closeScheduler() {
+  isScheduling.value = false
+  scheduleAt.value = ''
+}
+
+async function submitSchedule() {
+  if (!scheduleAt.value) return
+  // Convert datetime-local (no tz) to ISO with local-tz offset so backend
+  // parses to the expected wall-clock time.
+  const local = new Date(scheduleAt.value)
+  if (Number.isNaN(local.getTime())) {
+    alert('Invalid date/time')
+    return
+  }
+  if (local.getTime() <= Date.now()) {
+    alert('Schedule time must be in the future')
+    return
+  }
+  try {
+    await approveMutation.mutateAsync({
+      id: draftId.value,
+      publishAt: local.toISOString(),
+    })
+    closeScheduler()
+    refetch()
+  } catch (err) {
+    alert(err?.response?.data?.error?.message || 'Schedule failed')
+  }
+}
+
 // --- Action handlers -------------------------------------------------------
 async function doApprove() {
   await approveMutation.mutateAsync(draftId.value)
@@ -396,7 +450,7 @@ const showThumbnailUploadCaption = computed(() =>
 
           <!-- Primary action cluster (top-right on lg+, full-width below on mobile) -->
           <div class="flex flex-wrap gap-2 lg:justify-end lg:min-w-[200px]">
-            <!-- Manual review: approve is primary -->
+            <!-- Manual review: approve (in cancel window) is primary -->
             <button
               v-if="draft.status === 'manual_review'"
               @click="doApprove"
@@ -407,6 +461,18 @@ const showThumbnailUploadCaption = computed(() =>
                 <path :d="ICON.check" />
               </svg>
               {{ approveMutation.isPending.value ? 'Approving…' : 'Approve' }}
+            </button>
+
+            <!-- Schedule for later (manual_review + awaiting_publish) -->
+            <button
+              v-if="['manual_review', 'awaiting_publish'].includes(draft.status)"
+              @click="openScheduler"
+              class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-amber-500/40 text-amber-300 hover:bg-amber-500/10 active:scale-[0.98] text-sm font-medium transition"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
+                <path :d="ICON.clock" />
+              </svg>
+              {{ draft.status === 'awaiting_publish' ? 'Reschedule' : 'Schedule for later' }}
             </button>
 
             <!-- Awaiting publish: publish-now is primary -->
@@ -461,6 +527,48 @@ const showThumbnailUploadCaption = computed(() =>
               </svg>
               Cancel run
             </button>
+          </div>
+        </div>
+
+        <!-- Inline scheduler — opens when operator clicks Schedule/Reschedule.
+             Native datetime-local input keeps deps zero. The form submits to
+             approveMutation with publishAt; backend Carbon parses local-tz ISO. -->
+        <div
+          v-if="isScheduling"
+          class="relative px-6 sm:px-7 py-5 border-t border-amber-500/20 bg-amber-500/[0.04]"
+        >
+          <div class="flex flex-wrap items-end gap-3 max-w-3xl">
+            <div class="flex-1 min-w-[260px]">
+              <label class="block text-[11px] font-mono uppercase tracking-[0.14em] text-amber-300 mb-1.5">
+                Publish at (your local time)
+              </label>
+              <input
+                v-model="scheduleAt"
+                type="datetime-local"
+                class="w-full px-3.5 py-2.5 rounded-lg border border-amber-500/30 bg-neutral-900/60 text-neutral-100 focus:outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/40 text-sm font-mono"
+              >
+              <p class="text-[11px] text-neutral-500 mt-1.5">
+                Pick any future moment. Pro tip: Tuesday-Thursday, 9-11am local for B2B reach.
+              </p>
+            </div>
+            <div class="flex gap-2">
+              <button
+                @click="submitSchedule"
+                :disabled="approveMutation.isPending.value"
+                class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-amber-500 text-amber-950 hover:bg-amber-400 active:scale-[0.98] text-sm font-semibold transition disabled:opacity-50"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
+                  <path :d="ICON.check" />
+                </svg>
+                {{ approveMutation.isPending.value ? 'Saving…' : (draft.status === 'awaiting_publish' ? 'Reschedule' : 'Approve & schedule') }}
+              </button>
+              <button
+                @click="closeScheduler"
+                class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-neutral-700 text-neutral-300 hover:bg-neutral-800 text-sm font-medium transition"
+              >
+                Discard
+              </button>
+            </div>
           </div>
         </div>
 

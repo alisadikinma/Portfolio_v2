@@ -202,28 +202,46 @@ class LinkedInDraftController extends Controller
         ], 201);
     }
 
-    public function approve(int $id): JsonResponse
+    public function approve(int $id, Request $request): JsonResponse
     {
         $draft = LinkedInPost::find($id);
         if ($draft === null) {
             return $this->notFound();
         }
 
+        // Optional `publish_at` lets the operator pick an exact future
+        // datetime for the post to fire, instead of using the default
+        // cancel-window. Useful for scheduling posts at peak engagement
+        // hours (Tuesday 9am, etc.). When omitted, fall back to the
+        // legacy "now + cancel_window_minutes" behaviour.
+        $validated = $request->validate([
+            'publish_at' => ['nullable', 'date', 'after:now'],
+        ]);
+
         try {
             $windowMinutes = (int) config('linkedin.cancel_window_minutes', 15);
-            $this->guard->advance(
-                $draft,
-                LinkedInPostStatus::AwaitingPublish,
-                'admin_approve',
-                ['draft_id' => $draft->id]
-            );
+            $publishAt = ! empty($validated['publish_at'])
+                ? \Carbon\Carbon::parse($validated['publish_at'])
+                : now()->addMinutes($windowMinutes);
 
-            // Set scheduling timestamps — per review fix, scheduled_at is the
-            // moment the preview went out, cancel_window_ends_at is when
-            // publish fires.
+            // For drafts already in awaiting_publish, this endpoint becomes
+            // a "reschedule" — only update timestamps without an FSM
+            // transition. PipelineGuard would reject same-state transitions.
+            if ($draft->status !== LinkedInPostStatus::AwaitingPublish->value) {
+                $this->guard->advance(
+                    $draft,
+                    LinkedInPostStatus::AwaitingPublish,
+                    'admin_approve',
+                    ['draft_id' => $draft->id, 'publish_at' => $publishAt->toIso8601String()]
+                );
+            }
+
+            // scheduled_at = when the operator approved/scheduled (immutable
+            // record of operator action). cancel_window_ends_at = when
+            // publish actually fires (the cron checks this).
             $draft->update([
                 'scheduled_at' => now(),
-                'cancel_window_ends_at' => now()->addMinutes($windowMinutes),
+                'cancel_window_ends_at' => $publishAt,
             ]);
 
             // Self-heal: a carousel draft can land in manual_review with non-done
@@ -255,7 +273,7 @@ class LinkedInDraftController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => $draft->fresh(['post.translations', 'account']),
-                'message' => "Approved. Publish scheduled in {$windowMinutes} minutes.",
+                'message' => 'Scheduled for ' . $publishAt->toIso8601String(),
             ]);
         } catch (InvalidStateTransitionException $e) {
             return $this->illegalTransition($e);
