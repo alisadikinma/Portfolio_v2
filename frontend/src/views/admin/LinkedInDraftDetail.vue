@@ -279,10 +279,12 @@ const slideTally = computed(() => {
 
 async function regenerateAllImages() {
   if (!draft.value) return
-  if (!confirm(`Regenerate all ${carouselSlides.value.length} slide images? Already-rendered slides are skipped.`)) return
+  const count = carouselSlides.value.length
+  if (!confirm(`Regenerate ALL ${count} slide images? Existing renders will be discarded and re-rendered from scratch (~30-60s for ${count} slides).`)) return
   try {
-    await regenerateAllImagesMutation.mutateAsync(draftId.value)
+    const res = await regenerateAllImagesMutation.mutateAsync(draftId.value)
     refetch()
+    alert(res?.message || `Re-rendering ${count} slides — webhooks will update them as each finishes.`)
   } catch (err) {
     alert(err?.response?.data?.error?.message || 'Image regeneration failed')
   }

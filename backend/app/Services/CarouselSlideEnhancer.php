@@ -83,7 +83,21 @@ class CarouselSlideEnhancer
             '{{SWIPE_TEXT}}' => $swipeText,
         ]);
 
-        // 3. Append brand chrome instruction (idempotent — skip when plugin
+        // 3. Mandate creator face on cover / human_fingerprint / CTA when the
+        //    plugin's prose hasn't already requested it. Plugin-authored prompts
+        //    routinely describe abstract scenes (terminals, courtrooms, neural
+        //    networks) without reserving canvas space for the creator's face,
+        //    which leaves GeminiGen rendering generic icons or stock figures
+        //    even when face_refs is supplied. Prepending an explicit "PRIMARY
+        //    SUBJECT" instruction nudges the model to treat the face reference
+        //    as the hero of the composition rather than a decorative input.
+        $promptText = $this->prependCreatorFaceMandate(
+            $promptText,
+            $layoutHint,
+            $creatorFaceUrl
+        );
+
+        // 4. Append brand chrome instruction (idempotent — skip when plugin
         //    already baked the literal markers in)
         $promptText = $this->appendBrandChrome(
             $promptText,
@@ -95,7 +109,7 @@ class CarouselSlideEnhancer
             $opacityWord
         );
 
-        // 4. Build face_refs: creator face for required layouts
+        // 5. Build face_refs: creator face for required layouts
         $faceRefs = [];
         $needsFace = in_array($layoutHint, self::FACE_REQUIRED_LAYOUTS, true);
         if ($needsFace && $creatorFaceUrl !== null) {
@@ -124,6 +138,49 @@ class CarouselSlideEnhancer
     private function replacePlaceholders(string $body, array $map): string
     {
         return strtr($body, $map);
+    }
+
+    /**
+     * Prepend an explicit "PRIMARY SUBJECT" instruction that demands the
+     * creator's face from the supplied face reference image be rendered as a
+     * key visual element of the slide. Layout-specific positioning so the
+     * mandate fits the slide's narrative role:
+     *
+     *   - cover: head-and-shoulders portrait in the right or center third,
+     *     visually paired with the headline (the personal-brand hook)
+     *   - human_fingerprint: creator IS the human figure in the described
+     *     scene, never a generic stock person
+     *   - cta: small circular portrait beside the social block, signing the
+     *     carousel before the swipe-end
+     *
+     * Idempotent — skipped when the plugin already baked a {{CREATOR_FACE}}
+     * placeholder (handled by replacePlaceholders → "the provided creator
+     * face reference image"), or when face_url is unresolvable. Returns the
+     * body unchanged for layouts that aren't FACE_REQUIRED.
+     */
+    private function prependCreatorFaceMandate(string $body, string $layoutHint, ?string $faceUrl): string
+    {
+        if (!in_array($layoutHint, self::FACE_REQUIRED_LAYOUTS, true)) {
+            return $body;
+        }
+        if ($faceUrl === null) {
+            return $body;
+        }
+        // Idempotency guard — plugin already wired in the placeholder
+        if (str_contains($body, 'the provided creator face reference image')
+            || str_contains($body, "creator's face")
+            || str_contains($body, 'creator face from the')) {
+            return $body;
+        }
+
+        $instruction = match ($layoutHint) {
+            'cover' => "PRIMARY SUBJECT (mandatory): render the creator's face from the provided face reference image as a head-and-shoulders portrait, photographic and naturally lit, prominently positioned in the right third or center of the canvas as the personal-brand hook of this cover slide. Use the exact likeness from the face reference — do not generate a generic person, an avatar, or an icon. The face should occupy approximately twenty-five to thirty-five percent of the canvas height and visually anchor the headline. The headline text and any background scene composition described below must yield canvas space to accommodate the portrait.\n\n",
+            'human_fingerprint' => "PRIMARY SUBJECT (mandatory): the human figure in the scene IS the creator. Render their face from the provided face reference image, photographic and naturally lit, with their exact likeness. Do not generate a generic person, a stock model, or an avatar. The creator's face must be clearly recognizable.\n\n",
+            'cta' => "SECONDARY SUBJECT (mandatory): render a small circular portrait of the creator from the provided face reference image, approximately ninety to one hundred twenty pixels in diameter, positioned in the upper-center area of the canvas above the headline. Use the exact likeness from the face reference — do not generate a generic avatar.\n\n",
+            default => '',
+        };
+
+        return $instruction === '' ? $body : ($instruction . $body);
     }
 
     /**

@@ -409,6 +409,13 @@ class LinkedInGenerationService
             'format' => $format,
             'depth_score' => $depthScore,
             'validation_log' => $validation,
+            // Clear stale last_error from any prior failed attempt — the FSM has
+            // now reached Validating with valid parsed output, so any previously
+            // persisted parse-error / SSH-timeout / safety-rewrite message is no
+            // longer the truth about the draft. Without this clear, the admin UI
+            // surfaces a misleading "Could not parse orchestrator JSON" banner
+            // on drafts that subsequently regenerated successfully.
+            'last_error' => null,
         ];
 
         if ($format === 'carousel' && is_array($parsed['carousel'] ?? null)) {

@@ -384,39 +384,41 @@ class LinkedInDraftController extends Controller
         }
 
         $slides = $draft->carousel_slides ?? [];
-        $pending = collect($slides)->filter(
-            fn ($s) => ($s['image_status'] ?? null) !== 'done' || empty($s['image_url'])
-        )->count();
+        $slideCount = count($slides);
 
-        // Optimistically mark slides 'pending' so the frontend status pills
-        // flip immediately — the queue worker will move them to 'generating'
-        // as it dispatches each one (~5-15s per slide for the GeminiGen
-        // multipart POST handshake). Synchronous in-request dispatch was
-        // hitting the axios 15s timeout on 7-10 slide carousels.
-        $touched = false;
+        // Force-regenerate semantics. The button is labelled "Regenerate ALL
+        // images" and operators reasonably expect every slide to re-render —
+        // including ones currently `done`. Earlier behaviour skipped done
+        // slides, which produced a silent no-op when the operator wanted to
+        // reroll covers/CTAs after editing the underlying brief or after a
+        // creator-face mandate change. We now reset every slide to `pending`,
+        // clear image_url + image_error, and let the queue worker dispatch
+        // fresh GeminiGen runs. Stale slide_asset_urns are also cleared
+        // because LinkedIn assets registered against old image bytes are no
+        // longer ownable by the freshly-rendered images.
         foreach ($slides as $i => $slide) {
-            if (($slide['image_status'] ?? null) !== 'done' || empty($slide['image_url'])) {
-                $slides[$i]['image_status'] = 'pending';
-                $slides[$i]['image_error'] = null;
-                $touched = true;
-            }
+            $slides[$i]['image_status'] = 'pending';
+            $slides[$i]['image_url'] = '';
+            $slides[$i]['image_error'] = null;
+            $slides[$i]['image_job_uuid'] = null;
         }
-        if ($touched) {
-            $draft->update(['carousel_slides' => $slides]);
-        }
+        $draft->update([
+            'carousel_slides' => $slides,
+            'slide_asset_urns' => null,
+        ]);
 
         \App\Jobs\GenerateLinkedInCarouselImages::dispatch($draft->id);
 
-        Log::info('[LinkedInDraft] regenerate-images queued', [
+        Log::info('[LinkedInDraft] regenerate-images queued (force-all)', [
             'draft_id' => $draft->id,
-            'pending_count' => $pending,
+            'slide_count' => $slideCount,
         ]);
 
         return response()->json([
             'success' => true,
             'data' => $draft->fresh(['post.translations', 'account']),
-            'message' => "Queued image regeneration for {$pending} slide(s). Webhook will populate URLs as renders complete.",
-            'queued' => $pending,
+            'message' => "Queued image regeneration for {$slideCount} slide(s). Webhook will populate URLs as renders complete.",
+            'queued' => $slideCount,
         ], 202);
     }
 
