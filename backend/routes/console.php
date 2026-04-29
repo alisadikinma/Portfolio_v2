@@ -49,3 +49,12 @@ Schedule::command('linkedin:scan-blog --hours=24')
     ->dailyAt('03:00')
     ->timezone('Asia/Jakarta')
     ->withoutOverlapping(30);
+
+// LinkedIn: reap drafts stuck in generating/validating past the SSH+job
+// timeout budget. Without this, any worker crash or SSH timeout that bypassed
+// markFailed() leaves rows hanging in `generating` forever (the queue retry
+// path silent-skips rows past PendingGeneration). Every 5 min so a 20-min
+// stuck row gets cleared within ~25 min of going dark.
+Schedule::command('linkedin:reap-stuck')
+    ->everyFiveMinutes()
+    ->withoutOverlapping(5);
