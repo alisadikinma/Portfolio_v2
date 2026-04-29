@@ -986,7 +986,8 @@ class LinkedInGenerationService
     /**
      * Resolve hashtags. Plugin output > brief fallback > synthesized from
      * blog meta_keywords. Always returns 3-5 tags (LinkedIn validator rule)
-     * — pads with brand defaults if too few.
+     * — guarantees brand handles #alisadikinma + #aigeneralist appear on
+     * every post (drops the last non-mandatory tag if at the 5-cap).
      */
     private function resolveHashtags(?array $pluginHashtags, ?array $briefHashtags, LinkedInPost $draft): array
     {
@@ -1014,7 +1015,30 @@ class LinkedInGenerationService
             if (count($normalized) >= 5) break;
         }
 
-        // Pad with brand defaults if below the 3-tag minimum
+        // Mandatory brand handles — ALWAYS present. If at 5-cap, drop the
+        // last non-mandatory tag to make room. Order: append at the tail so
+        // they render last in the post (LinkedIn convention: branded handles
+        // close the hashtag stack).
+        $mandatory = ['#alisadikinma', '#aigeneralist'];
+        $mandatoryKeys = array_map('mb_strtolower', $mandatory);
+        foreach ($mandatory as $brand) {
+            $key = mb_strtolower($brand);
+            if (isset($seen[$key])) continue;
+            if (count($normalized) >= 5) {
+                // Walk backwards looking for the last non-mandatory tag to evict.
+                for ($i = count($normalized) - 1; $i >= 0; $i--) {
+                    if (!in_array(mb_strtolower($normalized[$i]), $mandatoryKeys, true)) {
+                        unset($seen[mb_strtolower($normalized[$i])]);
+                        array_splice($normalized, $i, 1);
+                        break;
+                    }
+                }
+            }
+            $normalized[] = $brand;
+            $seen[$key] = true;
+        }
+
+        // Pad with industry defaults if still below the 3-tag minimum
         $defaults = ['#AI', '#Engineering', '#TechIndonesia'];
         foreach ($defaults as $d) {
             if (count($normalized) >= 3) break;
