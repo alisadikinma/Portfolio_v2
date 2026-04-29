@@ -8,19 +8,21 @@ use App\Services\LinkedInOAuthService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /**
  * LinkedIn OAuth 2.0 authorization code flow.
  *
- *   GET  /api/admin/linkedin/connect       → redirect to LinkedIn authorize URL
+ *   GET  /api/admin/linkedin/connect       → return LinkedIn authorize URL
  *   GET  /api/admin/linkedin/oauth/callback → exchange code, store tokens
  *   DELETE /api/admin/linkedin/account/{id} → disconnect + drop row
  *
  * The "connect" route is authenticated (admin only). The "callback"
  * route is public — LinkedIn redirects the user's browser here with a
- * code. CSRF state is verified via cached session-keyed state token.
+ * code. CSRF state is single-use via cache (NOT session — API routes
+ * don't have session middleware enabled). 10-minute TTL.
  */
 class LinkedInOAuthController extends Controller
 {
@@ -32,7 +34,9 @@ class LinkedInOAuthController extends Controller
      * GET /api/admin/linkedin/connect
      *
      * Returns the LinkedIn authorize URL. Frontend opens it (window.location).
-     * Backend persists a CSRF state token in session to verify on callback.
+     * Backend persists a CSRF state token in cache (10-minute TTL) to verify
+     * on callback. Cache is keyed by the state itself so the public callback
+     * route can validate without needing the auth context.
      */
     public function connect(Request $request): JsonResponse
     {
@@ -47,7 +51,10 @@ class LinkedInOAuthController extends Controller
         }
 
         $state = $this->oauth->generateState();
-        $request->session()->put('linkedin_oauth_state', $state);
+        // Single-use marker — stored under the state key itself. Cache::pull
+        // in callback() deletes on read. 10 minutes covers the LinkedIn
+        // consent screen + any redirect lag.
+        Cache::put("linkedin_oauth_state:{$state}", (int) ($request->user()?->id ?? 0), now()->addMinutes(10));
 
         return response()->json([
             'success' => true,
@@ -89,9 +96,12 @@ class LinkedInOAuthController extends Controller
             return redirect()->away($settingsUrl . '?linkedin_oauth=error&message=missing_code_or_state');
         }
 
-        $expectedState = $request->session()->pull('linkedin_oauth_state');
-        if (!hash_equals((string) $expectedState, (string) $state)) {
-            return redirect()->away($settingsUrl . '?linkedin_oauth=error&message=state_mismatch');
+        // Single-use state lookup. Cache::pull deletes on read so the
+        // same state can't be replayed. Missing key = expired (>10min) or
+        // already consumed = treat as mismatch.
+        $cached = Cache::pull("linkedin_oauth_state:{$state}");
+        if ($cached === null) {
+            return redirect()->away($settingsUrl . '?linkedin_oauth=error&message=state_mismatch_or_expired');
         }
 
         try {
