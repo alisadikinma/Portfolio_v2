@@ -425,7 +425,7 @@ class LinkedInGenerationService
                 ?? ($carousel['slides'][0] ?? []);
 
             $pluginCaption = (string) ($carousel['caption'] ?? '');
-            $updates['content'] = $this->buildCarouselCaption($pluginCaption, $coverSlide, $parsed['brief'] ?? []);
+            $updates['content'] = $this->buildCarouselCaption($pluginCaption, $carousel, $parsed['brief'] ?? [], $draft);
             $updates['hashtags'] = $this->resolveHashtags(
                 $carousel['hashtags'] ?? null,
                 $parsed['brief']['hashtags'] ?? null,
@@ -814,41 +814,133 @@ class LinkedInGenerationService
     /**
      * Build the LinkedIn post body for a carousel draft.
      *
-     * Plugin v0.5.0+ /carousel-gen engine doesn't emit caption (visual
-     * focus only). Backend composes a 3-block caption:
-     *   1. Hook (cover slide Indonesian + English subtitle)
-     *   2. Body context (brief.pull_quote — single-sentence value prop)
-     *   3. CTAs (Swipe → see breakdown / Full article in comments ↓)
+     * Targets the 2026 LinkedIn carousel sweet spot: 800-1500 chars with a
+     * Hook → Setup → Insights → Question → Swipe → Link structure. Long-form
+     * captions sustain dwell time (61s+ correlates with 15.6% engagement vs
+     * 1.2% for sub-3s posts), and carousel posts hit 6.60% engagement when
+     * paired with story-driven captions.
      *
-     * If the plugin DID emit a non-empty caption (rare but possible for
-     * legacy envelopes), trust it.
+     * Plugin v0.5.0+ /carousel-gen engine doesn't emit caption (visual focus
+     * only). Backend composes a 7-block caption:
+     *   1. Hook (cover_id) — within first 210 chars (preview window)
+     *   2. Punchline subtitle (cover_en, if distinct)
+     *   3. Setup paragraph (blog excerpt or first body slide, ≤280 chars)
+     *   4. Pull-quote / data point (brief.pull_quote, if distinct)
+     *   5. Insight bullets (3 sharpest body slides as → bullets)
+     *   6. Engagement question + Swipe CTA
+     *   7. "Full article: link in comments ↓"
+     *
+     * Plugin captions ≥800 chars are trusted as-is (legacy v0.4.x envelopes).
      */
-    private function buildCarouselCaption(string $pluginCaption, array $coverSlide, array $brief): string
+    private function buildCarouselCaption(string $pluginCaption, array $carousel, array $brief, LinkedInPost $draft): string
     {
         $cleaned = trim($pluginCaption);
-        if ($cleaned !== '' && mb_strlen($cleaned) >= 200) {
+        if ($cleaned !== '' && mb_strlen($cleaned) >= 800) {
             return $cleaned;
         }
 
-        $coverId = trim((string) ($coverSlide['copy_id'] ?? $coverSlide['copy'] ?? ''));
-        $coverEn = trim((string) ($coverSlide['copy_en'] ?? ''));
+        $slides = is_array($carousel['slides'] ?? null) ? $carousel['slides'] : [];
+        $coverSlide = collect($slides)->firstWhere('is_cover', true) ?? ($slides[0] ?? []);
+
+        $hook = trim((string) ($coverSlide['copy_id'] ?? $coverSlide['copy'] ?? ''));
+        $subtitle = trim((string) ($coverSlide['copy_en'] ?? ''));
+        $setup = $this->extractSetupParagraph($draft, $slides);
         $pullQuote = trim((string) ($brief['pull_quote'] ?? ''));
+        $insights = $this->extractInsightsFromSlides($slides, 3);
+        $question = trim((string) ($brief['engagement_question'] ?? $brief['question'] ?? ''));
+        if ($question === '') {
+            $question = 'Apa yang sebenarnya terjadi di balik layar?';
+        }
 
         $parts = [];
-        if ($coverId !== '') {
-            $parts[] = $coverId;
+        if ($hook !== '') $parts[] = $hook;
+        if ($subtitle !== '' && mb_strtolower($subtitle) !== mb_strtolower($hook)) {
+            $parts[] = $subtitle;
         }
-        if ($coverEn !== '' && $coverEn !== $coverId) {
-            $parts[] = $coverEn;
-        }
-        if ($pullQuote !== '' && $pullQuote !== $coverId && $pullQuote !== $coverEn) {
+        if ($setup !== '') $parts[] = $setup;
+        if ($pullQuote !== '' && $pullQuote !== $setup && mb_stripos($setup, $pullQuote) === false) {
             $parts[] = $pullQuote;
         }
-        // Always end with the swipe + link-in-comments CTA pair.
-        $parts[] = "Swipe → for the full breakdown.";
-        $parts[] = "Full article: link in comments ↓";
+        if (!empty($insights)) {
+            $bullets = implode("\n", array_map(fn($i) => "→ {$i}", $insights));
+            $parts[] = "Yang nggak kelihatan dari permukaan:\n{$bullets}";
+        }
+        $parts[] = "{$question}\n\nSwipe → untuk breakdown lengkap.";
+        $parts[] = 'Full article: link in comments ↓';
 
-        return implode("\n\n", $parts);
+        $caption = implode("\n\n", $parts);
+
+        // Cap at 1900 chars (LinkedIn engagement sweet spot per 2026 data).
+        if (mb_strlen($caption) > 1900) {
+            $caption = mb_substr($caption, 0, 1897) . '...';
+        }
+
+        return $caption;
+    }
+
+    /**
+     * Pull a setup paragraph (60-280 chars) from blog excerpt → first
+     * non-cover/non-CTA slide → empty. The setup sits between the hook
+     * and insight bullets to give context for why this matters.
+     */
+    private function extractSetupParagraph(LinkedInPost $draft, array $slides): string
+    {
+        $post = $draft->post;
+        if ($post && $post->translations) {
+            $primary = $post->translations->where('language', 'id')->first()
+                ?? $post->translations->first();
+            if ($primary) {
+                $excerpt = trim((string) ($primary->excerpt ?? ''));
+                if ($excerpt !== '' && mb_strlen($excerpt) >= 60) {
+                    return mb_strlen($excerpt) > 280
+                        ? mb_substr($excerpt, 0, 277) . '...'
+                        : $excerpt;
+                }
+            }
+        }
+
+        // Fallback: first substantive non-cover/non-CTA slide
+        foreach ($slides as $s) {
+            if (!is_array($s)) continue;
+            if (($s['is_cover'] ?? false) || ($s['is_cta'] ?? false)) continue;
+            if (in_array(($s['layout_hint'] ?? ''), ['cover', 'cta'], true)) continue;
+            $copy = trim((string) ($s['copy_id'] ?? $s['copy'] ?? ''));
+            if ($copy !== '' && mb_strlen($copy) >= 60) {
+                return mb_strlen($copy) > 280
+                    ? mb_substr($copy, 0, 277) . '...'
+                    : $copy;
+            }
+        }
+        return '';
+    }
+
+    /**
+     * Extract up to N sharpest body slides as bullet-ready one-liners.
+     * Prefers headline_id (sharper) over copy_id, caps each at 110 chars
+     * for mobile single-line readability. Skips cover and CTA slides.
+     */
+    private function extractInsightsFromSlides(array $slides, int $max = 3): array
+    {
+        $insights = [];
+        foreach ($slides as $s) {
+            if (count($insights) >= $max) break;
+            if (!is_array($s)) continue;
+            if (($s['is_cover'] ?? false) || ($s['is_cta'] ?? false)) continue;
+            if (in_array(($s['layout_hint'] ?? ''), ['cover', 'cta'], true)) continue;
+
+            $line = trim((string) ($s['headline_id'] ?? $s['copy_id'] ?? $s['copy'] ?? $s['headline'] ?? ''));
+            if ($line === '') continue;
+
+            // First sentence only (mobile-readable single-line).
+            if (preg_match('/^(.+?[.!?])\s/u', $line, $m)) {
+                $line = $m[1];
+            }
+            if (mb_strlen($line) > 110) {
+                $line = mb_substr($line, 0, 107) . '...';
+            }
+            $insights[] = $line;
+        }
+        return $insights;
     }
 
     /**
