@@ -604,11 +604,8 @@ const showThumbnailUploadCaption = computed(() =>
                 </svg>
               </header>
 
-              <div class="whitespace-pre-wrap text-neutral-200 leading-relaxed text-[15px]">
-                {{ draft.content || '—' }}
-              </div>
-
-              <!-- 16:9 thumbnail -->
+              <!-- 16:9 thumbnail (rendered first, mirroring operator-preferred
+                   read order: visual first, then supporting copy, then tags). -->
               <figure
                 v-if="draft.post?.featured_image"
                 class="-mx-6 border-y border-neutral-800/60 overflow-hidden bg-neutral-900"
@@ -627,6 +624,10 @@ const showThumbnailUploadCaption = computed(() =>
                   Will upload to LinkedIn on publish
                 </figcaption>
               </figure>
+
+              <div class="whitespace-pre-wrap text-neutral-200 leading-relaxed text-[15px]">
+                {{ draft.content || '—' }}
+              </div>
 
               <div v-if="Array.isArray(draft.hashtags) && draft.hashtags.length > 0" class="flex flex-wrap gap-x-2 gap-y-1">
                 <span
