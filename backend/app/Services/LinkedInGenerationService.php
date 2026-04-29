@@ -945,11 +945,46 @@ class LinkedInGenerationService
         $slides = is_array($carousel['slides'] ?? null) ? $carousel['slides'] : [];
         $coverSlide = collect($slides)->firstWhere('is_cover', true) ?? ($slides[0] ?? []);
 
-        $hook = trim((string) ($coverSlide['copy_id'] ?? $coverSlide['copy'] ?? ''));
+        // /carousel-gen plugin v2.16+ emits cover.copy as multi-paragraph string:
+        //   paragraph 1 = the sharp hook line ("AI chatbot kasih ritual.")
+        //   paragraph 2 = pattern-interrupt subtitle ("Paku besi. Mazmur 91...")
+        //   paragraph 3 = stat / proof point ("3 dari 5 chatbot...")
+        // Old code took the entire trim() so all three bled into the hook
+        // slot, then setup/insights duplicated paragraph 3. Splitting on
+        // blank-line boundary lets each paragraph fill its intended caption
+        // role.
+        $coverParagraphs = $this->splitParagraphs(
+            (string) ($coverSlide['copy_id'] ?? $coverSlide['copy'] ?? '')
+        );
+        $hook = $coverParagraphs[0] ?? '';
+
+        // Subtitle: prefer plugin-authored copy_en (legacy v0.4.x bilingual
+        // schema). When absent (universal /carousel-gen path), fall back to
+        // the cover's second paragraph — it's authored as the pattern-
+        // interrupt line and reads as a natural subtitle.
         $subtitle = trim((string) ($coverSlide['copy_en'] ?? ''));
+        if ($subtitle === '' && isset($coverParagraphs[1])) {
+            $subtitle = $coverParagraphs[1];
+        }
+
+        // The cover's third paragraph (stat/proof) is high-signal — surface
+        // it as a stat line right under the subtitle so the hook block reads
+        // hook → subtitle → stat. Skip when missing or duplicate of subtitle.
+        $coverStat = $coverParagraphs[2] ?? '';
+        if ($coverStat !== '' && mb_strtolower($coverStat) === mb_strtolower($subtitle)) {
+            $coverStat = '';
+        }
+
         $setup = $this->extractSetupParagraph($draft, $slides);
         $pullQuote = trim((string) ($brief['pull_quote'] ?? ''));
-        $insights = $this->extractInsightsFromSlides($slides, 3);
+        // Skip insight slides that already appear in setup or hook block to
+        // avoid the "Studi 2026 dalam 60 Detik" duplicate the operator hit.
+        $skipFingerprints = array_filter([
+            $this->captionFingerprint($setup),
+            $this->captionFingerprint($hook),
+            $this->captionFingerprint($coverStat),
+        ]);
+        $insights = $this->extractInsightsFromSlides($slides, 3, $skipFingerprints);
         $question = trim((string) ($brief['engagement_question'] ?? $brief['question'] ?? ''));
         if ($question === '') {
             $question = 'Apa yang sebenarnya terjadi di balik layar?';
@@ -959,6 +994,9 @@ class LinkedInGenerationService
         if ($hook !== '') $parts[] = $hook;
         if ($subtitle !== '' && mb_strtolower($subtitle) !== mb_strtolower($hook)) {
             $parts[] = $subtitle;
+        }
+        if ($coverStat !== '' && mb_strtolower($coverStat) !== mb_strtolower($hook)) {
+            $parts[] = $coverStat;
         }
         if ($setup !== '') $parts[] = $setup;
         if ($pullQuote !== '' && $pullQuote !== $setup && mb_stripos($setup, $pullQuote) === false) {
@@ -982,9 +1020,49 @@ class LinkedInGenerationService
     }
 
     /**
+     * Split a /carousel-gen slide copy block on blank-line boundary into
+     * trimmed paragraphs. Plugin v2.16+ emits each slide.copy as a stack of
+     * paragraphs separated by `\n\n` — the first paragraph is typically the
+     * slide's headline/title and subsequent paragraphs are body copy.
+     */
+    private function splitParagraphs(string $copy): array
+    {
+        $copy = trim($copy);
+        if ($copy === '') return [];
+        $paragraphs = preg_split('/\n\s*\n/u', $copy) ?: [];
+        $out = [];
+        foreach ($paragraphs as $p) {
+            $p = trim($p);
+            if ($p !== '') $out[] = $p;
+        }
+        return $out;
+    }
+
+    /**
+     * Lower-cased + alpha-only signature of a caption fragment for de-dup.
+     * Lets us skip insight bullets whose first paragraph already appears in
+     * setup or the cover stat line (substring check is too loose, exact
+     * match too strict — fingerprint compares on normalized content).
+     */
+    private function captionFingerprint(string $text): string
+    {
+        $text = mb_strtolower(trim($text));
+        $text = preg_replace('/[^a-z0-9]+/u', '', $text) ?? '';
+        // Bound at first 60 chars — enough to identify the slide's
+        // headline without rejecting longer bodies that merely START
+        // with the same headline.
+        return mb_substr($text, 0, 60);
+    }
+
+    /**
      * Pull a setup paragraph (60-280 chars) from blog excerpt → first
      * non-cover/non-CTA slide → empty. The setup sits between the hook
      * and insight bullets to give context for why this matters.
+     *
+     * For /carousel-gen direct_answer slides, prefer the dedicated
+     * `direct_answer_block` field over `copy` — it's authored as
+     * stand-alone prose suited for caption use, while `copy` carries
+     * the on-slide infographic copy block.
      */
     private function extractSetupParagraph(LinkedInPost $draft, array $slides): string
     {
@@ -1007,11 +1085,25 @@ class LinkedInGenerationService
             if (!is_array($s)) continue;
             if (($s['is_cover'] ?? false) || ($s['is_cta'] ?? false)) continue;
             if (in_array(($s['layout_hint'] ?? ''), ['cover', 'cta'], true)) continue;
-            $copy = trim((string) ($s['copy_id'] ?? $s['copy'] ?? ''));
-            if ($copy !== '' && mb_strlen($copy) >= 60) {
-                return mb_strlen($copy) > 280
-                    ? mb_substr($copy, 0, 277) . '...'
-                    : $copy;
+
+            // /carousel-gen direct_answer layout has a richer prose block
+            // that reads naturally as a setup paragraph (vs the on-slide
+            // `copy` which is HIGH RISK / LOW RISK column labels).
+            $candidate = '';
+            if (($s['layout_hint'] ?? '') === 'direct_answer') {
+                $candidate = trim((string) ($s['direct_answer_block'] ?? ''));
+            }
+            if ($candidate === '') {
+                // Fall back: first 1-2 paragraphs of slide.copy joined by space.
+                $paragraphs = $this->splitParagraphs(
+                    (string) ($s['copy_id'] ?? $s['copy'] ?? '')
+                );
+                $candidate = trim(implode(' ', array_slice($paragraphs, 0, 2)));
+            }
+            if ($candidate !== '' && mb_strlen($candidate) >= 60) {
+                return mb_strlen($candidate) > 280
+                    ? mb_substr($candidate, 0, 277) . '...'
+                    : $candidate;
             }
         }
         return '';
@@ -1019,28 +1111,63 @@ class LinkedInGenerationService
 
     /**
      * Extract up to N sharpest body slides as bullet-ready one-liners.
-     * Prefers headline_id (sharper) over copy_id, caps each at 110 chars
-     * for mobile single-line readability. Skips cover and CTA slides.
+     *
+     * /carousel-gen plugin v2.16+ emits each slide.copy as a multi-paragraph
+     * block where paragraph 1 is the slide headline and subsequent
+     * paragraphs are body. Take paragraph 1 as the insight (it's already
+     * sharp and pre-authored as the slide title). Falls back to first
+     * sentence regex only when there's no paragraph break (legacy slides
+     * with single-paragraph copy).
+     *
+     * Skips slides whose first-paragraph fingerprint matches anything in
+     * $skipFingerprints — used to dedupe against setup + cover stat lines
+     * so the same headline doesn't appear twice in the same caption.
      */
-    private function extractInsightsFromSlides(array $slides, int $max = 3): array
+    private function extractInsightsFromSlides(array $slides, int $max = 3, array $skipFingerprints = []): array
     {
         $insights = [];
+        $seen = $skipFingerprints;
         foreach ($slides as $s) {
             if (count($insights) >= $max) break;
             if (!is_array($s)) continue;
             if (($s['is_cover'] ?? false) || ($s['is_cta'] ?? false)) continue;
             if (in_array(($s['layout_hint'] ?? ''), ['cover', 'cta'], true)) continue;
 
-            $line = trim((string) ($s['headline_id'] ?? $s['copy_id'] ?? $s['copy'] ?? $s['headline'] ?? ''));
-            if ($line === '') continue;
+            $copy = (string) ($s['headline_id'] ?? $s['copy_id'] ?? $s['copy'] ?? $s['headline'] ?? '');
+            if (trim($copy) === '') continue;
 
-            // First sentence only (mobile-readable single-line).
-            if (preg_match('/^(.+?[.!?])\s/u', $line, $m)) {
-                $line = $m[1];
+            $paragraphs = $this->splitParagraphs($copy);
+            $line = $paragraphs[0] ?? '';
+
+            // Defend against pathologically short first paragraphs (e.g. a
+            // standalone "Q:" or single emoji) — fall through to second
+            // paragraph when the headline alone is too thin to read.
+            if (mb_strlen($line) < 8 && isset($paragraphs[1])) {
+                $line = $paragraphs[1];
+            }
+
+            // Single-paragraph fallback: if still too long, slice on first
+            // sentence terminator. Flatten newlines first so the regex
+            // (whose `.` doesn't cross `\n` without `s` modifier) actually
+            // matches across the line.
+            if (mb_strlen($line) > 110) {
+                $flat = preg_replace('/\s+/u', ' ', $line) ?? $line;
+                if (preg_match('/^(.+?[.!?])(?:\s|$)/u', $flat, $m)) {
+                    $line = $m[1];
+                }
             }
             if (mb_strlen($line) > 110) {
                 $line = mb_substr($line, 0, 107) . '...';
             }
+            if ($line === '') continue;
+
+            // Skip duplicates of setup / cover stat lines so the bullet
+            // "→ Studi 2026 dalam 60 Detik" doesn't appear right after a
+            // setup paragraph that already opened with the same headline.
+            $fp = $this->captionFingerprint($line);
+            if ($fp !== '' && in_array($fp, $seen, true)) continue;
+            $seen[] = $fp;
+
             $insights[] = $line;
         }
         return $insights;
@@ -1149,12 +1276,26 @@ class LinkedInGenerationService
         $hashtags = [];
         foreach ($candidates as $c) {
             if (!is_string($c) || trim($c) === '') continue;
-            // Strip whitespace + non-word chars, CamelCase-ify
-            $clean = preg_replace('/[^a-zA-Z0-9\s]/u', '', $c);
-            $clean = ucwords(mb_strtolower(trim($clean)));
-            $clean = str_replace(' ', '', $clean);
-            if ($clean === '' || strlen($clean) < 2) continue;
-            $hashtags[] = '#' . $clean;
+            // Strip non-alphanumerics (keep letters/digits/spaces only).
+            $clean = preg_replace('/[^a-zA-Z0-9\s]/u', '', $c) ?? '';
+            $clean = trim($clean);
+            if ($clean === '') continue;
+
+            // Preserve all-caps acronyms (AI, GPT, IPO, NASA, SaaS-style mixed
+            // case). Default ucwords(strtolower()) destroys these — "AI" was
+            // ending up as "#Ai", "GPT" as "#Gpt", which looks amateurish on
+            // LinkedIn. Rule: when the candidate is a SHORT (≤6 char) single
+            // word with at least one uppercase letter, keep its original
+            // casing; for everything else, fall back to TitleCase.
+            $words = preg_split('/\s+/u', $clean) ?: [];
+            $hasMixedCase = preg_match('/[A-Z]/u', $clean) === 1;
+            if (count($words) === 1 && mb_strlen($clean) <= 6 && $hasMixedCase) {
+                $tag = $clean;
+            } else {
+                $tag = str_replace(' ', '', ucwords(mb_strtolower($clean)));
+            }
+            if ($tag === '' || strlen($tag) < 2) continue;
+            $hashtags[] = '#' . $tag;
             if (count($hashtags) >= 5) break;
         }
         return $hashtags;
