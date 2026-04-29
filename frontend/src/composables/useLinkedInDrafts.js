@@ -99,6 +99,50 @@ export function useLinkedInDraft(id) {
   }
 }
 
+/**
+ * Streaming progress query for a draft. Mirrors useContentEngine's
+ * getProgress pattern — returns {progress_percentage, current_step,
+ * progress_log[], process_alive, status, format, last_error}.
+ *
+ * Polls every 3s while process_alive=true, otherwise stops. Designed
+ * for the live progress modal/panel inside LinkedInDraftDetail.
+ */
+export function useLinkedInDraftProgress(id, options = {}) {
+  const enabled = options.enabled ?? computed(() => !!unref(id))
+
+  const query = useQuery({
+    queryKey: [LIST_KEY, id, 'progress'],
+    queryFn: () =>
+      api.get(`/admin/linkedin-drafts/${unref(id)}/progress`).then(r => r.data),
+    enabled,
+    staleTime: 0, // progress is always "stale" when re-opened
+    gcTime: 60_000,
+    refetchInterval: (q) => {
+      const data = q.state.data?.data
+      if (!data) return 3_000
+      return data.process_alive ? 3_000 : false
+    },
+  })
+
+  const progress = computed(() => query.data.value?.data || {
+    progress_percentage: 0,
+    current_step: null,
+    progress_log: [],
+    process_alive: true,
+    status: null,
+    format: null,
+    last_error: null,
+  })
+
+  return {
+    progress,
+    isLoading: query.isLoading,
+    isFetching: query.isFetching,
+    error: query.error,
+    refetch: query.refetch,
+  }
+}
+
 /** POST /admin/linkedin-drafts/{id}/regenerate-images — bulk re-dispatch */
 export function useRegenerateAllCarouselImages() {
   const qc = useQueryClient()

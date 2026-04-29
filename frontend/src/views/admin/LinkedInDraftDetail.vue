@@ -1,8 +1,9 @@
 <script setup>
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   useLinkedInDraft,
+  useLinkedInDraftProgress,
   useUpdateLinkedInDraft,
   useApproveLinkedInDraft,
   useCancelLinkedInDraft,
@@ -142,6 +143,217 @@ const mood = computed(() => MOOD_CLASSES[meta.value.mood] || MOOD_CLASSES.pendin
 const isInProgress = computed(() =>
   ['pending_generation', 'generating', 'validating'].includes(draft.value?.status)
 )
+
+// --- Streaming progress panel ---------------------------------------------
+// Mirrors ContentEngine's pipelinePhases pattern. Two variants:
+//   text     → 3 phases (Brief 0-60% · Validate 60-95% · Done 95-100%)
+//   carousel → 4 phases (Brief 0-25% · Carousel Gen 25-55% · Validate 55-65% · Render 65-100%)
+//
+// Step `name` matches the values emitted by LinkedInProgressEmitter from
+// the backend services. `pct` is the threshold that marks a step as "done"
+// once progress_percentage crosses it.
+const PHASES_TEXT = [
+  {
+    name: 'Brief',
+    skill: '/linkedin-gen',
+    model: 'Sonnet',
+    pctRange: '0–60%',
+    minPct: 0,
+    maxPct: 60,
+    steps: [
+      { name: 'plugin_dispatch', label: 'SSH Dispatch', pct: 5 },
+      { name: 'orchestrator_parsed', label: 'Plugin Done', pct: 50 },
+      { name: 'gates_evaluated', label: 'Validated', pct: 60 },
+    ],
+  },
+  {
+    name: 'Validate',
+    skill: 'depth-score',
+    model: 'Backend',
+    pctRange: '60–95%',
+    minPct: 60,
+    maxPct: 95,
+    steps: [
+      { name: 'gates_evaluated', label: 'Depth Score', pct: 75 },
+      { name: 'fsm_advanced', label: 'FSM Advanced', pct: 95 },
+    ],
+  },
+  {
+    name: 'Done',
+    skill: 'finalize',
+    model: '–',
+    pctRange: '95–100%',
+    minPct: 95,
+    maxPct: 100,
+    steps: [
+      { name: 'completed', label: 'Ready', pct: 100 },
+    ],
+  },
+]
+
+const PHASES_CAROUSEL = [
+  {
+    name: 'Brief',
+    skill: '/linkedin-gen',
+    model: 'Sonnet',
+    pctRange: '0–25%',
+    minPct: 0,
+    maxPct: 25,
+    steps: [
+      { name: 'plugin_dispatch', label: 'SSH Dispatch', pct: 5 },
+      { name: 'orchestrator_parsed', label: 'Route Carousel', pct: 25 },
+    ],
+  },
+  {
+    name: 'Carousel Gen',
+    skill: '/carousel-gen',
+    model: 'Sonnet',
+    pctRange: '25–55%',
+    minPct: 25,
+    maxPct: 55,
+    steps: [
+      { name: 'carousel_gen_dispatch', label: 'Dispatch', pct: 30 },
+      { name: 'slides_assembled', label: 'Slides Assembled', pct: 55 },
+    ],
+  },
+  {
+    name: 'Validate',
+    skill: 'structural',
+    model: 'Backend',
+    pctRange: '55–65%',
+    minPct: 55,
+    maxPct: 65,
+    steps: [
+      { name: 'structural_check', label: 'Structural', pct: 60 },
+      { name: 'fsm_advanced', label: 'FSM Advanced', pct: 65 },
+    ],
+  },
+  {
+    name: 'Render',
+    skill: 'GeminiGen',
+    model: '–',
+    pctRange: '65–100%',
+    minPct: 65,
+    maxPct: 100,
+    steps: [
+      { name: 'render_dispatching', label: 'Dispatching', pct: 68 },
+      { name: 'render_progress', label: 'Slides', pct: 90 },
+      { name: 'render_complete', label: 'Done', pct: 100 },
+    ],
+  },
+]
+
+const { progress: liveProgress } = useLinkedInDraftProgress(
+  draftId,
+  { enabled: computed(() => !!draftId.value) }
+)
+
+const progressPhases = computed(() => {
+  return draft.value?.format === 'carousel' ? PHASES_CAROUSEL : PHASES_TEXT
+})
+
+// Show the progress panel whenever the pipeline is doing something —
+// in-flight FSM states OR carousel slides still rendering OR explicit
+// progress_alive signal from the backend.
+const showProgressPanel = computed(() => {
+  if (!draft.value) return false
+  if (isInProgress.value) return true
+  if (liveProgress.value?.process_alive) return true
+  return false
+})
+
+const progressPct = computed(() => {
+  const p = liveProgress.value?.progress_percentage
+  if (typeof p === 'number') return Math.max(0, Math.min(100, p))
+  return 0
+})
+
+const progressLog = computed(() => liveProgress.value?.progress_log || [])
+const currentStepName = computed(() => liveProgress.value?.current_step || 'initializing')
+const isProgressFailed = computed(() => currentStepName.value === 'failed')
+
+function formatStepName(stepName) {
+  if (!stepName) return ''
+  return String(stepName)
+    .split('_')
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ')
+}
+
+function formatLogTime(ts) {
+  if (!ts) return ''
+  try {
+    const d = new Date(ts)
+    const pad = (n) => String(n).padStart(2, '0')
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  } catch (_e) { return '' }
+}
+
+function phaseStatus(phase) {
+  const pct = progressPct.value
+  if (isProgressFailed.value && pct >= phase.minPct && pct < phase.maxPct) return 'failed'
+  if (pct >= phase.maxPct) return 'done'
+  if (pct >= phase.minPct) return 'active'
+  return 'pending'
+}
+
+function phaseCardClass(phase) {
+  const s = phaseStatus(phase)
+  if (s === 'failed') return 'border-red-500/40 bg-red-500/[0.04]'
+  if (s === 'done') return 'border-emerald-500/30 bg-emerald-500/[0.04]'
+  if (s === 'active') return 'border-amber-500/40 bg-amber-500/[0.05] shadow-[0_0_24px_-12px_rgba(245,158,11,0.4)]'
+  return 'border-neutral-700 bg-neutral-900/40'
+}
+
+function phaseHeaderColor(phase) {
+  const s = phaseStatus(phase)
+  if (s === 'failed') return 'text-red-300'
+  if (s === 'done') return 'text-emerald-300'
+  if (s === 'active') return 'text-amber-300'
+  return 'text-neutral-500'
+}
+
+function phaseModelBadge(phase) {
+  const s = phaseStatus(phase)
+  if (s === 'active') return 'bg-amber-500/20 text-amber-300'
+  if (s === 'done') return 'bg-emerald-500/15 text-emerald-300'
+  if (s === 'failed') return 'bg-red-500/15 text-red-300'
+  return 'bg-neutral-800 text-neutral-500'
+}
+
+function phaseStatusLabel(phase) {
+  const s = phaseStatus(phase)
+  if (s === 'failed') return 'failed'
+  if (s === 'done') return '✓ done'
+  if (s === 'active') return 'active'
+  return 'wait'
+}
+
+function stepIsDone(step) {
+  return progressPct.value >= step.pct
+}
+
+function stepIsActive(step) {
+  // Active if percentage is between previous step (or 0) and this step's pct.
+  // Simple rule: active when current_step name matches OR pct is in range.
+  if (currentStepName.value === step.name) return true
+  return false
+}
+
+function stepChipClass(step) {
+  if (stepIsDone(step)) return 'bg-emerald-500/15 text-emerald-300'
+  if (stepIsActive(step)) return 'bg-amber-500/20 text-amber-200'
+  return 'bg-neutral-800 text-neutral-500'
+}
+
+// Auto-scroll log viewer to bottom when new entries arrive.
+const logContainer = ref(null)
+watch(progressLog, async (entries) => {
+  if (!logContainer.value || !entries.length) return
+  await nextTick()
+  logContainer.value.scrollTop = logContainer.value.scrollHeight
+}, { deep: true })
+
 const isTerminalGood = computed(() => draft.value?.status === 'published')
 const isTerminalBad = computed(() => draft.value?.status === 'failed')
 const showLastError = computed(() =>
@@ -473,10 +685,137 @@ const showThumbnailUploadCaption = computed(() =>
               </span>
             </div>
 
-            <!-- Operator-facing sentence -->
-            <p class="text-base text-neutral-300 leading-relaxed max-w-2xl">
+            <!-- Operator-facing sentence (suppressed when live progress panel is active) -->
+            <p
+              v-if="!showProgressPanel"
+              class="text-base text-neutral-300 leading-relaxed max-w-2xl"
+            >
               {{ meta.sentence }}
             </p>
+
+            <!-- Live progress panel — mirrors ContentEngine pattern: top-level
+                 bar + phase cards + terminal-style log viewer. Renders when
+                 the pipeline is in-flight (FSM state) OR carousel slides
+                 are mid-render. Polls every 3s via useLinkedInDraftProgress. -->
+            <div v-if="showProgressPanel" class="space-y-4 max-w-4xl">
+              <!-- Top bar -->
+              <div>
+                <div class="flex items-center justify-between mb-1.5">
+                  <span class="text-sm font-medium text-neutral-300">{{ formatStepName(currentStepName) }}</span>
+                  <span class="text-sm font-mono text-amber-300">{{ progressPct }}%</span>
+                </div>
+                <div class="w-full h-2.5 rounded-full bg-neutral-800/60 overflow-hidden">
+                  <div
+                    class="h-full rounded-full transition-all duration-700 ease-out"
+                    :class="isProgressFailed ? 'bg-red-500' : 'bg-gradient-to-r from-amber-500 to-amber-400'"
+                    :style="{ width: progressPct + '%' }"
+                  />
+                </div>
+              </div>
+
+              <!-- Phase cards: 3 (text) or 4 (carousel) -->
+              <div
+                class="grid gap-2.5"
+                :class="progressPhases.length === 4 ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 sm:grid-cols-3'"
+              >
+                <div
+                  v-for="phase in progressPhases"
+                  :key="phase.name"
+                  class="rounded-lg border px-3 py-2.5 transition-all min-w-0"
+                  :class="phaseCardClass(phase)"
+                >
+                  <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <span class="text-[11px] font-bold uppercase tracking-wide truncate" :class="phaseHeaderColor(phase)">
+                        {{ phase.name }}
+                      </span>
+                      <span class="text-[9px] font-mono px-1.5 py-0.5 rounded shrink-0" :class="phaseModelBadge(phase)">
+                        {{ phase.model }}
+                      </span>
+                    </div>
+                    <span class="text-[10px] font-mono font-medium shrink-0" :class="phaseHeaderColor(phase)">
+                      {{ phaseStatusLabel(phase) }}
+                    </span>
+                  </div>
+                  <div class="flex flex-wrap gap-1 mb-2">
+                    <span
+                      v-for="step in phase.steps"
+                      :key="step.name"
+                      class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium"
+                      :class="stepChipClass(step)"
+                    >
+                      <svg
+                        v-if="stepIsDone(step)"
+                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"
+                        class="w-2.5 h-2.5"
+                      >
+                        <path d="M4.5 12.75l6 6 9-13.5" />
+                      </svg>
+                      <svg
+                        v-else-if="stepIsActive(step)"
+                        viewBox="0 0 24 24" fill="none" class="animate-spin w-2.5 h-2.5"
+                      >
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" class="opacity-25"/>
+                        <path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" fill="currentColor" class="opacity-75"/>
+                      </svg>
+                      {{ step.label }}
+                    </span>
+                  </div>
+                  <div class="text-[9px] font-mono text-neutral-500 truncate">
+                    {{ phase.skill }} · {{ phase.pctRange }}
+                  </div>
+                </div>
+              </div>
+
+              <!-- Log viewer (terminal-style). Collapses when log is empty. -->
+              <div class="bg-neutral-950 rounded-lg overflow-hidden border border-neutral-800/80">
+                <div class="px-3 py-2 bg-neutral-900/80 border-b border-neutral-800 flex items-center justify-between">
+                  <span class="text-[11px] font-mono text-neutral-400">Generation Log</span>
+                  <span class="text-[10px] font-mono text-neutral-500">{{ progressLog.length }} entries</span>
+                </div>
+                <div
+                  ref="logContainer"
+                  class="overflow-y-auto p-3 space-y-1 font-mono text-xs"
+                  style="max-height: 240px; scroll-behavior: smooth;"
+                >
+                  <div v-if="!progressLog.length" class="text-neutral-500 py-3 text-center text-[11px]">
+                    Waiting for log entries…
+                  </div>
+                  <div
+                    v-for="(entry, i) in progressLog"
+                    :key="i"
+                    class="flex gap-2"
+                    :class="entry.step === 'failed' ? 'text-red-400' : 'text-neutral-300'"
+                  >
+                    <span class="text-neutral-600 shrink-0">{{ formatLogTime(entry.timestamp) }}</span>
+                    <span
+                      class="shrink-0"
+                      :class="entry.step === 'failed' ? 'text-red-400' : entry.step === 'completed' || entry.step === 'render_complete' ? 'text-emerald-400' : 'text-amber-400'"
+                    >[{{ entry.step }}]</span>
+                    <span class="break-words min-w-0">{{ entry.message }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Footer: pulsing dot + status text -->
+              <div class="flex items-center gap-2 text-xs text-neutral-500">
+                <span
+                  class="w-2 h-2 rounded-full"
+                  :class="
+                    progressPct >= 100 ? 'bg-emerald-500'
+                    : isProgressFailed ? 'bg-red-500'
+                    : 'bg-emerald-500 animate-pulse'
+                  "
+                />
+                <span :class="progressPct >= 100 ? 'text-emerald-400 font-medium' : ''">
+                  {{
+                    progressPct >= 100 ? 'Completed'
+                    : isProgressFailed ? 'Process failed'
+                    : 'Process running'
+                  }}
+                </span>
+              </div>
+            </div>
 
             <!-- Live countdown for awaiting_publish -->
             <div v-if="draft.status === 'awaiting_publish' && draft.cancel_window_ends_at" class="inline-flex items-center gap-2 text-sm">
