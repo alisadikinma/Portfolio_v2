@@ -6,6 +6,7 @@ use App\Enums\LinkedInPostStatus;
 use App\Exceptions\CarouselGenAdapterException;
 use App\Models\LinkedInPost;
 use App\Models\PostTranslation;
+use App\Support\LinkedInProgressEmitter;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 use RuntimeException;
@@ -59,6 +60,8 @@ class LinkedInGenerationService
         // Step 1: Advance to Generating (from PendingGeneration / Failed / Cancelled)
         try {
             $this->guard->advance($draft, LinkedInPostStatus::Generating, 'plugin_dispatch_start');
+            LinkedInProgressEmitter::reset($draft, 'pipeline_start');
+            LinkedInProgressEmitter::emit($draft, 'plugin_dispatch', 5, 'Dispatching /linkedin-gen plugin to VPS');
         } catch (\App\Exceptions\InvalidStateTransitionException $e) {
             return [
                 'success' => false,
@@ -104,6 +107,18 @@ class LinkedInGenerationService
             ];
         }
 
+        $detectedFormat = $parsed['format'] ?? 'unknown';
+        $isCarouselRoute = ($parsed['status'] ?? null) === 'route_to_carousel_gen';
+        $parsedPct = $detectedFormat === 'carousel' || $isCarouselRoute ? 25 : 50;
+        LinkedInProgressEmitter::emit(
+            $draft,
+            'orchestrator_parsed',
+            $parsedPct,
+            $isCarouselRoute
+                ? 'Plugin output parsed — routing to /carousel-gen engine'
+                : "Plugin output parsed — format={$detectedFormat}"
+        );
+
         // Step 5: Handle plugin-reported failure
         if (($parsed['status'] ?? null) === 'failed') {
             $errStep = $parsed['error']['step'] ?? 'unknown';
@@ -122,6 +137,9 @@ class LinkedInGenerationService
         // null). Dispatch /carousel-gen, run the adapter, and assemble the
         // final carousel into $parsed.carousel.slides. No feature flag —
         // /carousel-gen is the only carousel path post-v0.5.0.
+        if ($detectedFormat === 'carousel' || $isCarouselRoute) {
+            LinkedInProgressEmitter::emit($draft, 'carousel_gen_dispatch', 30, 'Dispatching /carousel-gen engine');
+        }
         try {
             $parsed = $this->applyCarouselGenAdapter($parsed, $blog['url'], $draft->id);
         } catch (CarouselGenAdapterException $e) {
@@ -132,6 +150,16 @@ class LinkedInGenerationService
                 'status' => 'failed',
                 'error' => $e->getMessage(),
             ];
+        }
+
+        if ($detectedFormat === 'carousel' || $isCarouselRoute) {
+            $slideCount = count($parsed['carousel']['slides'] ?? []);
+            LinkedInProgressEmitter::emit(
+                $draft,
+                'slides_assembled',
+                55,
+                "{$slideCount} slides assembled by /carousel-gen adapter"
+            );
         }
 
         // Step 6: Persist content + advance FSM
@@ -490,6 +518,18 @@ class LinkedInGenerationService
 
         $draft->update($updates);
 
+        if ($format === 'carousel') {
+            LinkedInProgressEmitter::emit($draft, 'structural_check', 60, 'Carousel structural validation passed');
+        } else {
+            $depthLabel = $depthScore !== null ? "depth_score={$depthScore}/100" : 'depth_score=n/a';
+            LinkedInProgressEmitter::emit(
+                $draft,
+                'gates_evaluated',
+                75,
+                "Validation complete · {$depthLabel} · " . ($passed ? 'passed' : 'manual review')
+            );
+        }
+
         // Advance: Generating → Validating
         try {
             $this->guard->advance($draft, LinkedInPostStatus::Validating, 'plugin_validate_start', [
@@ -534,6 +574,25 @@ class LinkedInGenerationService
                 'scheduled_at' => now(),
                 'cancel_window_ends_at' => now()->addMinutes($windowMinutes),
             ]);
+        }
+
+        // Carousel: FSM advanced, image rendering pending. Text: FSM advanced
+        // is the terminal step before publish, so progress can hit 100.
+        if ($format === 'carousel') {
+            LinkedInProgressEmitter::emit(
+                $draft,
+                'fsm_advanced',
+                65,
+                "FSM → {$nextState->value} · slide rendering pending"
+            );
+        } else {
+            LinkedInProgressEmitter::emit(
+                $draft,
+                'fsm_advanced',
+                95,
+                "FSM → {$nextState->value}"
+            );
+            LinkedInProgressEmitter::emit($draft, 'completed', 100, 'Text generation complete');
         }
 
         // Dispatch carousel image rendering for either AwaitingPublish or
@@ -821,6 +880,7 @@ class LinkedInGenerationService
                 'error' => $reason,
             ]);
             $draft->update(['last_error' => $reason]);
+            LinkedInProgressEmitter::fail($draft, $reason);
         } catch (\Throwable $e) {
             Log::error('[LinkedInGeneration] Could not mark failed', [
                 'draft_id' => $draft->id,

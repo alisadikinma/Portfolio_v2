@@ -1210,6 +1210,7 @@ Route::middleware(['auth:sanctum'])->prefix('admin/content-engine')->group(funct
 Route::middleware(['auth:sanctum'])->prefix('admin/linkedin-drafts')->group(function () {
     Route::get('/', [LinkedInDraftController::class, 'index']);
     Route::get('/{id}', [LinkedInDraftController::class, 'show']);
+    Route::get('/{id}/progress', [LinkedInDraftController::class, 'progress']);
     Route::put('/{id}', [LinkedInDraftController::class, 'update']);
     Route::post('/{id}/regenerate', [LinkedInDraftController::class, 'regenerate']);
     Route::post('/{id}/approve', [LinkedInDraftController::class, 'approve']);

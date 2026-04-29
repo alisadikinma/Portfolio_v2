@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\ImageGenerationJob;
 use App\Models\LinkedInPost;
 use App\Models\Setting;
+use App\Support\LinkedInProgressEmitter;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -306,6 +307,7 @@ class LinkedInCarouselImageService
             ]);
 
             $this->mirrorSlideStatus($job->linkedin_post_id, $uuid, 'done', $localUrl);
+            $this->emitSlideProgress($job->linkedin_post_id, $job->slide_index, 'done');
 
             Log::info('[LinkedInCarouselImage] webhook completed', [
                 'draft_id' => $job->linkedin_post_id,
@@ -319,6 +321,7 @@ class LinkedInCarouselImageService
             $reason = $data['error_message'] ?? 'Unknown error';
             $job->update(['status' => 'failed', 'error_message' => $reason]);
             $this->mirrorSlideStatus($job->linkedin_post_id, $uuid, 'failed', null, $reason);
+            $this->emitSlideProgress($job->linkedin_post_id, $job->slide_index, 'failed', $reason);
 
             Log::error('[LinkedInCarouselImage] webhook failed', [
                 'draft_id' => $job->linkedin_post_id,
@@ -506,6 +509,66 @@ class LinkedInCarouselImageService
      * column. Runs inside DB::transaction with row lock to keep concurrent
      * webhooks (multiple slides finishing at once) from clobbering each other.
      */
+    /**
+     * Compute and emit pipeline-level progress whenever a slide flips
+     * status. Renders a linear ramp from 72% (post-dispatch) → 100% based
+     * on done_count / total_slides. A slide failure flips current_step to
+     * mark the pipeline as needing attention but doesn't halt — operators
+     * can still publish a partial carousel via the per-slide retry button.
+     */
+    private function emitSlideProgress(?int $draftId, ?int $slideIndex, string $newStatus, ?string $reason = null): void
+    {
+        if ($draftId === null) {
+            return;
+        }
+
+        $draft = LinkedInPost::find($draftId);
+        if (! $draft || $draft->format !== 'carousel') {
+            return;
+        }
+
+        $slides = is_array($draft->carousel_slides) ? $draft->carousel_slides : [];
+        $total = count($slides);
+        if ($total === 0) {
+            return;
+        }
+
+        $done = 0;
+        $failed = 0;
+        foreach ($slides as $slide) {
+            $st = $slide['image_status'] ?? null;
+            if ($st === 'done') {
+                $done++;
+            } elseif ($st === 'failed') {
+                $failed++;
+            }
+        }
+
+        // Linear ramp 72 → 100 across done count.
+        $pct = (int) round(72 + (($done / $total) * 28));
+        $pct = max(72, min(100, $pct));
+
+        $oneBased = $slideIndex !== null ? $slideIndex + 1 : null;
+        if ($newStatus === 'done') {
+            $message = $oneBased !== null
+                ? "Slide {$oneBased}/{$total} rendered · {$done}/{$total} complete"
+                : "{$done}/{$total} slides complete";
+        } elseif ($newStatus === 'failed') {
+            $reasonShort = $reason !== null ? ' · ' . mb_strimwidth($reason, 0, 80, '…') : '';
+            $message = $oneBased !== null
+                ? "Slide {$oneBased}/{$total} failed · {$done}/{$total} done · {$failed} failed{$reasonShort}"
+                : "{$done}/{$total} done · {$failed} failed{$reasonShort}";
+        } else {
+            $message = "{$done}/{$total} slides complete";
+        }
+
+        $step = $done >= $total
+            ? 'render_complete'
+            : ($newStatus === 'failed' ? 'render_partial_failure' : 'render_progress');
+
+        LinkedInProgressEmitter::emit($draft, $step, $pct, $message);
+    }
+
     private function mirrorSlideStatus(?int $draftId, string $uuid, string $status, ?string $imageUrl = null, ?string $errorMessage = null): void
     {
         if ($draftId === null) {

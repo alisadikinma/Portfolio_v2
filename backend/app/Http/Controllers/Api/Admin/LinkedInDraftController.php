@@ -96,6 +96,53 @@ class LinkedInDraftController extends Controller
         ]);
     }
 
+    /**
+     * Streaming progress for an in-flight draft. Mirrors the ContentIdea
+     * progress endpoint shape so the LinkedInDraftDetail page can reuse
+     * the same modal pattern (phase cards + step pills + log viewer).
+     *
+     * Liveness signal:
+     *   process_alive=true while status ∈ {pending_generation, generating,
+     *   validating} OR any carousel slide has image_status ∈ {pending,
+     *   generating}. Otherwise false (terminal state reached).
+     */
+    public function progress(int $id): JsonResponse
+    {
+        $draft = LinkedInPost::find($id);
+        if ($draft === null) {
+            return $this->notFound();
+        }
+
+        $inFlightStatuses = ['pending_generation', 'generating', 'validating'];
+        $processAlive = in_array($draft->status, $inFlightStatuses, true);
+
+        // Carousel: slides still rendering counts as alive too, even if FSM
+        // is awaiting_publish / manual_review.
+        if (!$processAlive && $draft->format === 'carousel' && is_array($draft->carousel_slides)) {
+            foreach ($draft->carousel_slides as $slide) {
+                $st = $slide['image_status'] ?? null;
+                if ($st === 'pending' || $st === 'generating') {
+                    $processAlive = true;
+                    break;
+                }
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'id' => $draft->id,
+                'status' => $draft->status,
+                'format' => $draft->format,
+                'progress_percentage' => (int) ($draft->progress_percentage ?? 0),
+                'current_step' => $draft->current_step,
+                'progress_log' => $draft->progress_log ?? [],
+                'process_alive' => $processAlive,
+                'last_error' => $draft->last_error,
+            ],
+        ]);
+    }
+
     public function update(Request $request, int $id): JsonResponse
     {
         $draft = LinkedInPost::find($id);

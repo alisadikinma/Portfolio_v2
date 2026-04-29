@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\LinkedInPost;
 use App\Services\LinkedInCarouselImageService;
+use App\Support\LinkedInProgressEmitter;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -54,7 +55,22 @@ class GenerateLinkedInCarouselImages implements ShouldQueue
             return;
         }
 
+        $totalSlides = is_array($draft->carousel_slides) ? count($draft->carousel_slides) : 0;
+        LinkedInProgressEmitter::emit(
+            $draft,
+            'render_dispatching',
+            68,
+            "Dispatching {$totalSlides} slides to GeminiGen"
+        );
+
         $count = $service->dispatchAllSlides($draft);
+
+        LinkedInProgressEmitter::emit(
+            $draft,
+            'render_in_flight',
+            72,
+            "{$count} slide jobs queued · awaiting GeminiGen webhooks"
+        );
 
         Log::info('[GenerateLinkedInCarouselImages] dispatched', [
             'draft_id' => $this->draftId,
@@ -68,5 +84,10 @@ class GenerateLinkedInCarouselImages implements ShouldQueue
             'draft_id' => $this->draftId,
             'error' => $exception->getMessage(),
         ]);
+
+        $draft = LinkedInPost::find($this->draftId);
+        if ($draft) {
+            LinkedInProgressEmitter::fail($draft, 'Render dispatch failed: ' . $exception->getMessage());
+        }
     }
 }

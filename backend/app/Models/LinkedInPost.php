@@ -41,6 +41,9 @@ class LinkedInPost extends Model
         'pipeline_state_log',
         'last_error',
         'retry_count',
+        'progress_percentage',
+        'current_step',
+        'progress_log',
     ];
 
     protected $casts = [
@@ -49,6 +52,8 @@ class LinkedInPost extends Model
         'slide_asset_urns' => 'array',
         'validation_log' => 'array',
         'pipeline_state_log' => 'array',
+        'progress_log' => 'array',
+        'progress_percentage' => 'integer',
         'scheduled_at' => 'datetime',
         'cancel_window_ends_at' => 'datetime',
         'published_at' => 'datetime',
