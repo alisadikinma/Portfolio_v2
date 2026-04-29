@@ -450,8 +450,8 @@
           Connect a LinkedIn account so blog posts can auto-convert + auto-publish as algorithm-optimized LinkedIn posts.
           Register a LinkedIn Developer App at
           <a href="https://linkedin.com/developers" target="_blank" class="text-amber-600 dark:text-amber-400 hover:underline">linkedin.com/developers</a>
-          with scope <code class="text-xs bg-neutral-100 dark:bg-neutral-800 px-1 rounded">w_member_social,r_liteprofile</code>
-          then paste <code class="text-xs bg-neutral-100 dark:bg-neutral-800 px-1 rounded">LINKEDIN_OAUTH_CLIENT_ID</code> + <code class="text-xs bg-neutral-100 dark:bg-neutral-800 px-1 rounded">LINKEDIN_OAUTH_CLIENT_SECRET</code> into <code class="text-xs bg-neutral-100 dark:bg-neutral-800 px-1 rounded">.env</code>.
+          with products <strong>"Share on LinkedIn"</strong> + <strong>"Sign In with LinkedIn using OpenID Connect"</strong> (scope: <code class="text-xs bg-neutral-100 dark:bg-neutral-800 px-1 rounded">openid profile email w_member_social</code>),
+          then paste <code class="text-xs bg-neutral-100 dark:bg-neutral-800 px-1 rounded">LINKEDIN_OAUTH_CLIENT_ID</code> + <code class="text-xs bg-neutral-100 dark:bg-neutral-800 px-1 rounded">LINKEDIN_OAUTH_CLIENT_SECRET</code> into VPS <code class="text-xs bg-neutral-100 dark:bg-neutral-800 px-1 rounded">.env</code>.
         </p>
 
         <div v-if="linkedinLoading" class="py-6 text-center text-neutral-500">
