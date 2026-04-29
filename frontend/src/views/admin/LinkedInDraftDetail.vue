@@ -664,17 +664,6 @@ const showThumbnailUploadCaption = computed(() =>
                 </svg>
               </header>
 
-              <!-- Post body caption — what shows above the carousel attachment
-                   in LinkedIn feed. Operator sees the EXACT text + paragraph
-                   breaks that will publish. Empty fallback shows "—" with
-                   warning so operator knows caption is missing. -->
-              <div v-if="draft.content && draft.content.trim() !== ''" class="whitespace-pre-wrap text-neutral-200 leading-relaxed text-[15px]">
-                {{ draft.content }}
-              </div>
-              <div v-else class="rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-200">
-                <strong class="text-amber-300">No caption.</strong> The carousel will publish without a body — typically 50% lower reach. Click "Edit content" to add one.
-              </div>
-
               <div v-if="carouselSlides.length === 0" class="text-center py-12">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-10 h-10 text-neutral-600 mx-auto mb-2">
                   <path :d="ICON.image" />
@@ -851,7 +840,18 @@ const showThumbnailUploadCaption = computed(() =>
                 </div>
               </div>
 
-              <div v-if="Array.isArray(draft.hashtags) && draft.hashtags.length > 0" class="flex flex-wrap gap-x-2 gap-y-1 pt-3 border-t border-neutral-800/60">
+              <!-- Post body caption — sits between slides and hashtags, mirroring
+                   the operator-preferred read order: see the visual first, then
+                   the supporting copy, then tags. Empty fallback warns operator
+                   that the carousel will publish without a body. -->
+              <div v-if="draft.content && draft.content.trim() !== ''" class="whitespace-pre-wrap text-neutral-200 leading-relaxed text-[15px] pt-3 border-t border-neutral-800/60">
+                {{ draft.content }}
+              </div>
+              <div v-else class="rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-200">
+                <strong class="text-amber-300">No caption.</strong> The carousel will publish without a body — typically 50% lower reach. Click "Edit content" to add one.
+              </div>
+
+              <div v-if="Array.isArray(draft.hashtags) && draft.hashtags.length > 0" class="flex flex-wrap gap-x-2 gap-y-1">
                 <span v-for="tag in draft.hashtags" :key="tag" class="text-cyan-400 text-sm">{{ tag }}</span>
               </div>
 
