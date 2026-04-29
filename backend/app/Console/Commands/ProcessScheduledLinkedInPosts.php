@@ -8,6 +8,7 @@ use App\Models\LinkedInPost;
 use App\Models\Setting;
 use App\Services\LinkedInPublishService;
 use App\Services\PipelineGuard;
+use App\Services\TelegramNotificationService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 
@@ -28,7 +29,7 @@ class ProcessScheduledLinkedInPosts extends Command
     protected $signature = 'linkedin:process-scheduled';
     protected $description = 'Publish LinkedIn drafts whose cancel window has elapsed (awaiting_publish → published)';
 
-    public function handle(LinkedInPublishService $publisher, PipelineGuard $guard): int
+    public function handle(LinkedInPublishService $publisher, PipelineGuard $guard, TelegramNotificationService $telegram): int
     {
         $due = LinkedInPost::where('status', LinkedInPostStatus::AwaitingPublish->value)
             ->whereNotNull('cancel_window_ends_at')
@@ -100,6 +101,15 @@ class ProcessScheduledLinkedInPosts extends Command
                     'linkedin_post_url' => $result['post_url'] ?? null,
                 ]);
                 $this->info("    published: {$result['post_url']}");
+
+                try {
+                    $telegram->sendLinkedInPublishSuccess($draft->fresh(['post.translations']));
+                } catch (\Throwable $e) {
+                    Log::warning('[LinkedInScheduler] Telegram publish notification threw', [
+                        'draft_id' => $draft->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
             } catch (\Throwable $e) {
                 Log::error('[LinkedInScheduler] Could not mark published', [
                     'draft_id' => $draft->id,

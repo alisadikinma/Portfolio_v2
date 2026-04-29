@@ -10,6 +10,7 @@ use App\Models\LinkedInPost;
 use App\Services\LinkedInCarouselImageService;
 use App\Services\LinkedInPublishService;
 use App\Services\PipelineGuard;
+use App\Services\TelegramNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -36,6 +37,7 @@ class LinkedInDraftController extends Controller
         private readonly PipelineGuard $guard,
         private readonly LinkedInPublishService $publisher,
         private readonly LinkedInCarouselImageService $carouselImages,
+        private readonly TelegramNotificationService $telegram,
     ) {
     }
 
@@ -351,6 +353,15 @@ class LinkedInDraftController extends Controller
             ]);
         } catch (InvalidStateTransitionException $e) {
             return $this->illegalTransition($e);
+        }
+
+        try {
+            $this->telegram->sendLinkedInPublishSuccess($draft->fresh(['post.translations']));
+        } catch (\Throwable $e) {
+            Log::warning('[LinkedInDraftController] Telegram publish notification threw', [
+                'draft_id' => $draft->id,
+                'error' => $e->getMessage(),
+            ]);
         }
 
         return response()->json([

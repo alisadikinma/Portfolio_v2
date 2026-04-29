@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\ContentIdea;
+use App\Models\LinkedInPost;
 use App\Models\Setting;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -176,6 +177,55 @@ class TelegramNotificationService
             . "[View on site](" . config('app.url') . "/blog)";
 
         return $this->send($text);
+    }
+
+    /**
+     * Celebratory alert when a LinkedIn draft has been successfully posted to
+     * the LinkedIn feed. Includes the live LinkedIn URL so the operator can
+     * jump straight to the post (or to the comment thread to reply early).
+     *
+     * Toggle key: telegram_notify_linkedin_published.
+     */
+    public function sendLinkedInPublishSuccess(LinkedInPost $draft): bool
+    {
+        if (!$this->isEnabledFor('linkedin_published')) {
+            return false;
+        }
+
+        $title = $draft->post?->translations->where('language', 'id')->first()?->title
+            ?? $draft->post?->translations->first()?->title
+            ?? 'Untitled';
+
+        $format = strtoupper((string) ($draft->format ?? 'text'));
+        $url = $draft->linkedin_post_url ?? null;
+        $adminUrl = rtrim((string) config('app.url'), '/') . '/admin/linkedin-drafts/' . $draft->id;
+
+        $lines = [];
+        $lines[] = '✅ *Published to LinkedIn* — ' . $format;
+        $lines[] = '';
+        $lines[] = 'Post: _' . $this->escapeMarkdown($title) . '_';
+
+        if ($url) {
+            $lines[] = '';
+            $lines[] = '🔗 [Open on LinkedIn](' . $url . ')';
+        } else {
+            $lines[] = '';
+            $lines[] = '_(no LinkedIn URL captured — check admin)_';
+        }
+
+        $lines[] = '[Open in admin](' . $adminUrl . ')';
+
+        $keyboard = null;
+        if ($url) {
+            $keyboard = [
+                'inline_keyboard' => [[
+                    ['text' => '🔗 Open on LinkedIn', 'url' => $url],
+                    ['text' => '🛠 Admin', 'url' => $adminUrl],
+                ]],
+            ];
+        }
+
+        return $this->send(implode("\n", $lines), $keyboard);
     }
 
     /**
