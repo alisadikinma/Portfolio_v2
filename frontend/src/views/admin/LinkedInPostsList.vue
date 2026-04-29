@@ -223,7 +223,7 @@ const emptyMessage = computed(() => ({
                (so operator knows exactly when this fires) + live-ticking
                countdown below (in 14m 25s → 14m 24s → 14m 23s …). -->
           <div class="flex items-start justify-between text-xs pt-3 border-t border-neutral-800/60 gap-2">
-            <span v-if="draft.depth_score" :class="['font-mono font-bold whitespace-nowrap', depthTone(draft.depth_score)]">
+            <span v-if="draft.format !== 'carousel' && draft.depth_score" :class="['font-mono font-bold whitespace-nowrap', depthTone(draft.depth_score)]">
               Depth {{ draft.depth_score }}
             </span>
             <span v-else class="text-neutral-600 font-mono">—</span>

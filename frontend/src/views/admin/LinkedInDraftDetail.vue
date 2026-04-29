@@ -253,6 +253,31 @@ const carouselSlides = computed(() =>
   Array.isArray(draft.value?.carousel_slides) ? draft.value.carousel_slides : []
 )
 
+// Carousels can only be approved / scheduled / published when EVERY slide has
+// finished rendering. Approving with pending slides starts the cancel_window
+// timer immediately while GeminiGen is still generating images — the
+// `linkedin:process-scheduled` cron then fires publishCarousel which fails
+// the per-slide validation gate ("validate every slide has image_status=done")
+// and the operator only sees the failure 15+ minutes later. Block the action
+// at the UI layer so operator-intent matches operator-effect.
+const slidesReadyForPublish = computed(() => {
+  if (!draft.value) return false
+  if (draft.value.format !== 'carousel') return true
+  const slides = carouselSlides.value
+  if (slides.length === 0) return false
+  return slides.every(s => s?.image_status === 'done' && !!s?.image_url)
+})
+
+const slidesPendingMessage = computed(() => {
+  if (slidesReadyForPublish.value) return ''
+  const slides = carouselSlides.value
+  if (slides.length === 0) return 'No slides on this draft yet'
+  const done = slides.filter(s => s?.image_status === 'done' && s?.image_url).length
+  const failed = slides.filter(s => s?.image_status === 'failed').length
+  if (failed > 0) return `${failed} slide(s) failed to render — retry them before approving`
+  return `Wait for all slides to finish rendering (${done} of ${slides.length} done)`
+})
+
 function slideCopyId(slide) {
   if (!slide) return ''
   return slide.copy_id || slide.copy || ''
@@ -323,6 +348,18 @@ function depthTone(score) {
   if (score >= 70) return 'text-amber-400'
   return 'text-red-400'
 }
+
+// Depth Score is a 0-100 rubric scoped to format=text (hook, dwell, hashtag mix,
+// AI-slop, link-in-comment compliance). For carousel, the /linkedin-validate
+// branch is z.unknown() post plugin v0.5.0 — depth signal is not meaningful.
+// Legacy carousel rows from plugin v0.4.x were stamped with stub `100` values;
+// hide those instead of surfacing a misleading "perfect score".
+const showDepthScore = computed(() =>
+  draft.value
+    && draft.value.format !== 'carousel'
+    && draft.value.depth_score !== null
+    && draft.value.depth_score !== undefined
+)
 
 // --- Show thumbnail upload caption gate (Q3 / fix from review)
 // Caption only fires when the post is actually heading toward publish AND no
@@ -415,7 +452,7 @@ const showThumbnailUploadCaption = computed(() =>
                 {{ formatChip(draft.format) }}
                 <template v-if="draft.format === 'carousel'"> · {{ carouselSlides.length }} slides</template>
               </span>
-              <span v-if="draft.depth_score !== null && draft.depth_score !== undefined" class="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-500">
+              <span v-if="showDepthScore" class="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-500">
                 Depth <span class="font-bold ml-0.5" :class="depthTone(draft.depth_score)">{{ draft.depth_score }}</span>
               </span>
             </div>
@@ -448,6 +485,22 @@ const showThumbnailUploadCaption = computed(() =>
               </div>
             </div>
 
+            <!-- Slides-not-ready hint — surfaced when carousel publish actions
+                 are disabled so operator understands WHY the green button is
+                 dim. Sits above the chip warnings so it's the first thing read. -->
+            <div
+              v-if="['manual_review', 'awaiting_publish'].includes(draft.status) && draft.format === 'carousel' && !slidesReadyForPublish"
+              class="mt-1 flex items-start gap-3 rounded-lg border border-cyan-500/25 bg-cyan-500/[0.04] px-4 py-3"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-cyan-400 shrink-0 mt-0.5">
+                <path :d="ICON.clock" />
+              </svg>
+              <div class="min-w-0">
+                <p class="text-[11px] uppercase tracking-[0.14em] text-cyan-400 font-medium mb-0.5">Approval gated</p>
+                <p class="text-sm text-cyan-100/90">{{ slidesPendingMessage }}</p>
+              </div>
+            </div>
+
             <!-- Update warnings (after edit-save) -->
             <div
               v-if="updateWarnings.length > 0"
@@ -462,12 +515,16 @@ const showThumbnailUploadCaption = computed(() =>
 
           <!-- Primary action cluster (top-right on lg+, full-width below on mobile) -->
           <div class="flex flex-wrap gap-2 lg:justify-end lg:min-w-[200px]">
-            <!-- Manual review: approve (in cancel window) is primary -->
+            <!-- Manual review: approve (in cancel window) is primary.
+                 Disabled when carousel slides aren't all rendered yet —
+                 publishing with pending slides hits the per-slide validation
+                 gate in publishCarousel and fails after the cancel window.  -->
             <button
               v-if="draft.status === 'manual_review'"
               @click="doApprove"
-              :disabled="approveMutation.isPending.value"
-              class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-500 text-emerald-950 hover:bg-emerald-400 active:scale-[0.98] text-sm font-semibold transition disabled:opacity-50 disabled:cursor-wait shadow-[0_8px_24px_-12px_rgba(16,185,129,0.5)]"
+              :disabled="approveMutation.isPending.value || !slidesReadyForPublish"
+              :title="slidesReadyForPublish ? '' : slidesPendingMessage"
+              class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-500 text-emerald-950 hover:bg-emerald-400 active:scale-[0.98] text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-emerald-500 shadow-[0_8px_24px_-12px_rgba(16,185,129,0.5)]"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
                 <path :d="ICON.check" />
@@ -475,11 +532,15 @@ const showThumbnailUploadCaption = computed(() =>
               {{ approveMutation.isPending.value ? 'Approving…' : 'Approve' }}
             </button>
 
-            <!-- Schedule for later (manual_review + awaiting_publish) -->
+            <!-- Schedule for later (manual_review + awaiting_publish).
+                 Same readiness gate as Approve — scheduling a not-yet-rendered
+                 carousel for the future would also publish with blank slides. -->
             <button
               v-if="['manual_review', 'awaiting_publish'].includes(draft.status)"
               @click="openScheduler"
-              class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-amber-500/40 text-amber-300 hover:bg-amber-500/10 active:scale-[0.98] text-sm font-medium transition"
+              :disabled="!slidesReadyForPublish"
+              :title="slidesReadyForPublish ? '' : slidesPendingMessage"
+              class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-amber-500/40 text-amber-300 hover:bg-amber-500/10 active:scale-[0.98] text-sm font-medium transition disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
                 <path :d="ICON.clock" />
@@ -487,12 +548,13 @@ const showThumbnailUploadCaption = computed(() =>
               {{ draft.status === 'awaiting_publish' ? 'Reschedule' : 'Schedule for later' }}
             </button>
 
-            <!-- Awaiting publish: publish-now is primary -->
+            <!-- Awaiting publish: publish-now is primary. Same readiness gate. -->
             <button
               v-if="draft.status === 'awaiting_publish'"
               @click="doPublishNow"
-              :disabled="publishNowMutation.isPending.value"
-              class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-amber-500 text-amber-950 hover:bg-amber-400 active:scale-[0.98] text-sm font-semibold transition disabled:opacity-50 disabled:cursor-wait shadow-[0_8px_24px_-12px_rgba(212,168,67,0.5)]"
+              :disabled="publishNowMutation.isPending.value || !slidesReadyForPublish"
+              :title="slidesReadyForPublish ? '' : slidesPendingMessage"
+              class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-amber-500 text-amber-950 hover:bg-amber-400 active:scale-[0.98] text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-amber-500 shadow-[0_8px_24px_-12px_rgba(212,168,67,0.5)]"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
                 <path :d="ICON.send" />
@@ -567,8 +629,9 @@ const showThumbnailUploadCaption = computed(() =>
             <div class="flex gap-2">
               <button
                 @click="submitSchedule"
-                :disabled="approveMutation.isPending.value"
-                class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-amber-500 text-amber-950 hover:bg-amber-400 active:scale-[0.98] text-sm font-semibold transition disabled:opacity-50"
+                :disabled="approveMutation.isPending.value || !slidesReadyForPublish"
+                :title="slidesReadyForPublish ? '' : slidesPendingMessage"
+                class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-amber-500 text-amber-950 hover:bg-amber-400 active:scale-[0.98] text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-amber-500"
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
                   <path :d="ICON.check" />
@@ -1009,7 +1072,7 @@ const showThumbnailUploadCaption = computed(() =>
           <section class="rounded-2xl border border-neutral-800/80 bg-neutral-950/40 p-5 space-y-4">
             <h3 class="text-[11px] font-mono uppercase tracking-[0.14em] text-neutral-400">Details</h3>
 
-            <div v-if="draft.depth_score !== null && draft.depth_score !== undefined">
+            <div v-if="showDepthScore">
               <p class="text-[11px] font-mono uppercase tracking-[0.14em] text-neutral-500 mb-1">Depth score</p>
               <p class="text-3xl font-bold tracking-tight" :class="depthTone(draft.depth_score)">
                 {{ draft.depth_score }}<span class="text-sm text-neutral-600 font-normal ml-1">/ 100</span>

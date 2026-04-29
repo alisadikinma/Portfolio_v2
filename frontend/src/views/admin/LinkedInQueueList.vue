@@ -185,6 +185,17 @@ function issueSummary(draft) {
   return '—'
 }
 
+// Approve gate: same logic as detail page slidesReadyForPublish — block
+// quick-approve when format=carousel and any slide is still pending/generating/
+// failed. Text drafts always pass.
+function carouselReadyForApprove(draft) {
+  if (!draft) return false
+  if (draft.format !== 'carousel') return true
+  const slides = Array.isArray(draft.carousel_slides) ? draft.carousel_slides : []
+  if (slides.length === 0) return false
+  return slides.every(s => s?.image_status === 'done' && !!s?.image_url)
+}
+
 async function doApprove(id) {
   await approveMutation.mutateAsync(id)
 }
@@ -361,17 +372,20 @@ const emptyMessage = computed(() => ({
             </span>
           </div>
 
-          <!-- Depth -->
+          <!-- Depth — only meaningful for format=text. Carousels (post plugin
+               v0.5.0) skip /linkedin-validate's depth rubric, so the score is
+               either null (new drafts) or a legacy 100 stub from v0.4.x. Hide
+               either way so it doesn't distract from virality_score. -->
           <div class="md:self-center md:text-right">
             <span
-              v-if="draft.depth_score !== null && draft.depth_score !== undefined"
+              v-if="draft.format !== 'carousel' && draft.depth_score !== null && draft.depth_score !== undefined"
               class="text-sm font-mono font-bold"
               :class="depthTone(draft.depth_score)"
               :title="`LinkedIn depth score: ${draft.depth_score}/100`"
             >
               {{ draft.depth_score }}
             </span>
-            <span v-else class="text-sm text-neutral-600 font-mono">—</span>
+            <span v-else class="text-sm text-neutral-600 font-mono" :title="draft.format === 'carousel' ? 'Depth score does not apply to carousels' : 'No depth score'">—</span>
           </div>
 
           <!-- Issue -->
@@ -395,9 +409,9 @@ const emptyMessage = computed(() => ({
               <button
                 v-if="draft.status === 'manual_review' && classifyForQueue(draft) === 'manual_review'"
                 @click="doApprove(draft.id)"
-                :disabled="approveMutation.isPending.value"
-                title="Approve"
-                class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 ring-1 ring-emerald-500/30 disabled:opacity-50"
+                :disabled="approveMutation.isPending.value || !carouselReadyForApprove(draft)"
+                :title="carouselReadyForApprove(draft) ? 'Approve' : 'Carousel slides not all rendered yet'"
+                class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 ring-1 ring-emerald-500/30 disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5">
                   <path :d="ICON.check" />

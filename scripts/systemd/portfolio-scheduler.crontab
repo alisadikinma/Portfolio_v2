@@ -1,0 +1,17 @@
+# Laravel scheduler — runs `php artisan schedule:run` once per minute.
+#
+# Without this entry, every Schedule::command(...) in routes/console.php is
+# definitionally dead — Laravel never fires the cron internally. Symptoms:
+# `linkedin:process-scheduled` never publishes, `linkedin:scan-blog` never
+# ingests, `linkedin:reap-stuck-carousel-images` never re-dispatches.
+#
+# Install on VPS (as the user that owns the project — `claudesn`):
+#   crontab -u claudesn -e
+#   # Paste the line below, save, and verify:
+#   crontab -u claudesn -l
+#
+# Verify it's actually firing:
+#   tail -f /var/log/syslog | grep CRON
+#   tail -f /var/www/Portfolio_v2/backend/storage/logs/laravel.log
+#
+* * * * * cd /var/www/Portfolio_v2/backend && /usr/bin/php artisan schedule:run >> /dev/null 2>&1

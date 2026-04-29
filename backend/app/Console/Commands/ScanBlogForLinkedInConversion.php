@@ -6,6 +6,7 @@ use App\Enums\LinkedInPostStatus;
 use App\Jobs\GenerateLinkedInPost;
 use App\Models\LinkedInPost;
 use App\Models\Post;
+use App\Models\Setting;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 
@@ -24,7 +25,8 @@ class ScanBlogForLinkedInConversion extends Command
     protected $signature = 'linkedin:scan-blog
         {--hours=24 : Lookback window in hours}
         {--dry-run : Log candidates without creating drafts}
-        {--limit=20 : Max drafts to create per run (safety cap)}';
+        {--limit=20 : Max drafts to create per run (safety cap)}
+        {--min-virality= : Override linkedin_virality_min_score setting (0 disables the gate)}';
 
     protected $description = 'Scan recent blog posts and dispatch LinkedIn conversion jobs for those without a live draft';
 
@@ -34,18 +36,38 @@ class ScanBlogForLinkedInConversion extends Command
         $dryRun = (bool) $this->option('dry-run');
         $limit = max(1, (int) $this->option('limit'));
 
-        $candidates = Post::query()
+        // Virality gate (April 29, 2026): only ingest blog posts whose
+        // backing ContentIdea has a virality_score >= threshold. Posts
+        // without a linked ContentIdea (manual blog uploads) are skipped
+        // — operators can hand-create a LinkedInPost row if they want one
+        // for those. CLI flag overrides the setting for ad-hoc backfills.
+        $minVirality = $this->option('min-virality') !== null
+            ? max(0, (int) $this->option('min-virality'))
+            : (int) Setting::get('linkedin_virality_min_score', 60);
+
+        $query = Post::query()
             ->where('published', true)
             ->whereNotNull('published_at')
             ->where('published_at', '>=', now()->subHours($hours))
-            ->whereDoesntHave('linkedinPosts')
-            ->with('translations')
+            ->whereDoesntHave('linkedinPosts');
+
+        if ($minVirality > 0) {
+            $query->whereHas('contentIdea', function ($q) use ($minVirality) {
+                $q->where('virality_score', '>=', $minVirality);
+            });
+            $this->info("Virality gate active: requiring contentIdea.virality_score >= {$minVirality}");
+        } else {
+            $this->info('Virality gate disabled (min-virality=0).');
+        }
+
+        $candidates = $query
+            ->with(['translations', 'contentIdea:id,result_post_id,virality_score'])
             ->orderBy('published_at', 'desc')
             ->limit($limit)
             ->get();
 
         if ($candidates->isEmpty()) {
-            $this->info("No un-converted posts in the last {$hours}h.");
+            $this->info("No un-converted posts in the last {$hours}h passing the virality gate.");
             return 0;
         }
 
@@ -59,7 +81,9 @@ class ScanBlogForLinkedInConversion extends Command
                     ?? $post->translations->first()
             )->title ?? "(post #{$post->id})";
 
-            $this->line("  - #{$post->id}: {$title}");
+            $virality = $post->contentIdea?->virality_score;
+            $viralityChip = $virality !== null ? " v={$virality}" : '';
+            $this->line("  - #{$post->id}{$viralityChip}: {$title}");
 
             if ($dryRun) {
                 continue;

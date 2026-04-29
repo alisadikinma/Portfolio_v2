@@ -1,0 +1,46 @@
+[Unit]
+# Laravel queue worker for Portfolio_v2.
+#
+# Without this unit, jobs dispatched to QUEUE_CONNECTION=database (the project
+# default — see backend/.env.example:39) accumulate in the `jobs` MySQL table
+# but never run. This causes carousel image generation, LinkedIn scan jobs,
+# and `RegenerateLinkedInCarouselContent` runs to silently stall.
+#
+# Install on VPS:
+#   sudo cp scripts/systemd/portfolio-queue.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable portfolio-queue.service
+#   sudo systemctl start portfolio-queue.service
+#   sudo systemctl status portfolio-queue.service
+#
+# `php artisan queue:restart` (run by deploy.sh step 7) signals this worker
+# to gracefully reload after a deploy.
+Description=Portfolio_v2 Laravel queue worker
+After=network.target mysql.service
+
+[Service]
+Type=simple
+# Run as the same user that owns the Laravel project + has Claude CLI auth
+# for SSH-driven plugin invocations (LinkedInGenerationService et al).
+User=claudesn
+Group=claudesn
+WorkingDirectory=/var/www/Portfolio_v2/backend
+# --queue=default — single-queue dispatch (Laravel default). Add more queues
+#                     here if Portfolio_v2 ever splits high-priority lanes.
+# --sleep=3       — poll interval when queue is empty (3s = responsive but
+#                     not busy-loopy).
+# --tries=3       — match the per-job ::tries for jobs that don't override.
+# --max-time=3600 — recycle worker every hour to release accumulated memory.
+#                     systemd Restart=always brings it back instantly.
+# --backoff=60,300,900 — escalating retry delay; matches GenerateLinkedInPost
+#                          + RegenerateLinkedInCarouselContent class settings.
+ExecStart=/usr/bin/php artisan queue:work --queue=default --sleep=3 --tries=3 --max-time=3600 --backoff=60,300,900
+Restart=always
+RestartSec=10
+# Pipe stdout/stderr to journald — `journalctl -u portfolio-queue -f` to tail.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=portfolio-queue
+
+[Install]
+WantedBy=multi-user.target

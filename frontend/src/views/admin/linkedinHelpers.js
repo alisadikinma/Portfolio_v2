@@ -77,7 +77,7 @@ export const STATUS_META = {
     label: 'Awaiting render',
     short: 'Awaiting render',
     mood: 'decision',
-    sentence: 'Slide JSON is ready but images haven\'t been dispatched yet. Click Approve to start GeminiGen rendering.',
+    sentence: 'Slide JSON is ready. GeminiGen rendering should be in flight — refresh in ~30s. Approve unlocks once every slide finishes rendering.',
   },
   carousel_render_active: {
     label: 'Rendering slides',
