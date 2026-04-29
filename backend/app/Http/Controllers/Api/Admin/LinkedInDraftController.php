@@ -14,6 +14,7 @@ use App\Services\PipelineGuard;
 use App\Services\TelegramNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
@@ -408,6 +409,29 @@ class LinkedInDraftController extends Controller
                 'error' => [
                     'code' => 'regenerate_in_progress',
                     'message' => 'A generation is already in progress for this draft.',
+                ],
+            ], 409);
+        }
+
+        // Cache lock to prevent double-dispatch race. The FSM-status guard
+        // above doesn't catch this case because regenerate-images keeps the
+        // draft in manual_review throughout — clicking the button twice in
+        // quick succession would otherwise fire two /carousel-gen runs +
+        // two image-render chains (18 GeminiGen calls instead of 9 + last-
+        // writer-wins on carousel_slides JSON). TTL = 16 minutes covers the
+        // 880s /carousel-gen timeout + 60s grace; lock is also released by
+        // RegenerateLinkedInCarouselContent::handle()/failed() once the
+        // job exits so a fresh dispatch is allowed immediately afterwards
+        // (no need to wait out the full TTL on success).
+        $lockKey = "linkedin_regenerate_lock:{$draft->id}";
+        $acquired = Cache::add($lockKey, now()->toIso8601String(), now()->addSeconds(960));
+        if (! $acquired) {
+            $heldSince = Cache::get($lockKey);
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'regenerate_lock_held',
+                    'message' => 'A regeneration is already running for this draft. Wait for it to finish, or cancel and retry. (Lock acquired at ' . $heldSince . ')',
                 ],
             ], 409);
         }

@@ -10,6 +10,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -49,6 +50,20 @@ class RegenerateLinkedInCarouselContent implements ShouldQueue
     }
 
     public function handle(
+        LinkedInGenerationService $generation,
+        CarouselGenOutputAdapter $adapter
+    ): void {
+        try {
+            $this->run($generation, $adapter);
+        } finally {
+            // Always release the dispatch lock — the controller acquired it
+            // to prevent double-clicks; both success and failure must clear
+            // it so the operator can retry without waiting out the full TTL.
+            Cache::forget("linkedin_regenerate_lock:{$this->draftId}");
+        }
+    }
+
+    private function run(
         LinkedInGenerationService $generation,
         CarouselGenOutputAdapter $adapter
     ): void {
@@ -135,6 +150,12 @@ class RegenerateLinkedInCarouselContent implements ShouldQueue
 
     public function failed(\Throwable $exception): void
     {
+        // Release dispatch lock on terminal failure too — handle()'s finally
+        // covers in-job exceptions but Laravel may also call failed() on
+        // serialization errors / max-attempts exceeded before handle() ever
+        // runs, so we double up here.
+        Cache::forget("linkedin_regenerate_lock:{$this->draftId}");
+
         Log::error('[RegenerateCarouselContent] job failed', [
             'draft_id' => $this->draftId,
             'error' => $exception->getMessage(),
