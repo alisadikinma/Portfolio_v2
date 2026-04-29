@@ -9,6 +9,7 @@ import {
   usePublishLinkedInDraftNow,
   useRegenerateLinkedInDraft,
   useRegenerateAllCarouselImages,
+  useRegenerateCaption,
   useRegenerateSlideImage,
   postTitle,
 } from '@/composables/useLinkedInDrafts'
@@ -37,6 +38,7 @@ const cancelMutation = useCancelLinkedInDraft()
 const publishNowMutation = usePublishLinkedInDraftNow()
 const regenerateMutation = useRegenerateLinkedInDraft()
 const regenerateAllImagesMutation = useRegenerateAllCarouselImages()
+const regenerateCaptionMutation = useRegenerateCaption()
 const regenerateSlideMutation = useRegenerateSlideImage()
 
 // --- Smart back navigation: read the referring origin (queue vs feed) from
@@ -310,18 +312,32 @@ const slideTally = computed(() => {
 async function regenerateAllImages() {
   if (!draft.value) return
   const count = carouselSlides.value.length
-  const msg = `Re-author all ${count} slides via /carousel-gen plugin?\n\n` +
-    `This produces FRESH visual concepts (absurdist hooks, surreal metaphors per the visual-hook gate) — not just a re-render of the existing prompts. ` +
-    `Existing slide images are discarded.\n\n` +
-    `Caption + hashtags + draft ID are preserved.\n\n` +
+  const msg = `Regenerate all ${count} slide images via /carousel-gen plugin?\n\n` +
+    `This re-runs the plugin to produce FRESH visual concepts (absurdist hooks, surreal metaphors per the visual-hook gate) — not just a re-render of the existing prompts. Existing slide images are discarded.\n\n` +
+    `Caption + hashtags + draft ID are preserved (use "Regenerate caption" separately if those need refreshing).\n\n` +
     `Total runtime: ~5-7 min (2-3 min plugin authoring + 3-4 min image rendering).`
   if (!confirm(msg)) return
   try {
     const res = await regenerateAllImagesMutation.mutateAsync(draftId.value)
     refetch()
-    alert(res?.message || `Re-authoring queued for ${count} slides — slides will update live via webhooks as each renders.`)
+    alert(res?.message || `Queued for ${count} slides — slides will update live via webhooks as each renders.`)
   } catch (err) {
     alert(err?.response?.data?.error?.message || 'Image regeneration failed')
+  }
+}
+
+async function regenerateCaption() {
+  if (!draft.value) return
+  const msg = `Regenerate caption + hashtags from current slides?\n\n` +
+    `Slide images, draft ID, and FSM state are preserved. The 7-block caption synthesizer (hook → subtitle → setup → pull-quote → insight bullets → engagement question → link CTA) re-runs against the current slide content.\n\n` +
+    `Runtime: ~1 second (pure backend synthesis — no Claude/SSH).`
+  if (!confirm(msg)) return
+  try {
+    const res = await regenerateCaptionMutation.mutateAsync(draftId.value)
+    refetch()
+    alert(res?.message || 'Caption + hashtags regenerated.')
+  } catch (err) {
+    alert(err?.response?.data?.error?.message || 'Caption regeneration failed')
   }
 }
 
@@ -1145,17 +1161,32 @@ const showThumbnailUploadCaption = computed(() =>
               </button>
 
               <button
+                v-if="draft.format === 'carousel' && carouselSlides.length > 0 && !['pending_generation', 'generating', 'validating'].includes(draft.status)"
+                @click="regenerateCaption"
+                :disabled="regenerateCaptionMutation.isPending.value"
+                title="Re-synth caption + hashtags from current slides (~1s, slide images preserved)"
+                class="inline-flex items-center justify-between px-3 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-sm font-medium text-neutral-200 ring-1 ring-neutral-800 transition group disabled:opacity-50"
+              >
+                <span class="inline-flex items-center gap-2">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-neutral-400 group-hover:text-emerald-400 transition-colors">
+                    <path :d="ICON.pencil" />
+                  </svg>
+                  {{ regenerateCaptionMutation.isPending.value ? 'Synthesizing…' : 'Regenerate caption' }}
+                </span>
+              </button>
+
+              <button
                 v-if="draft.format === 'carousel' && carouselSlides.length > 0"
                 @click="regenerateAllImages"
                 :disabled="regenerateAllImagesMutation.isPending.value"
-                title="Re-author all slide copy + images via /carousel-gen (~5-7 min, keeps draft ID)"
+                title="Regenerate all slide images via /carousel-gen plugin (~5-7 min, keeps draft ID + caption)"
                 class="inline-flex items-center justify-between px-3 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-sm font-medium text-neutral-200 ring-1 ring-neutral-800 transition group disabled:opacity-50"
               >
                 <span class="inline-flex items-center gap-2">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-neutral-400 group-hover:text-amber-400 transition-colors">
                     <path :d="ICON.image" />
                   </svg>
-                  {{ regenerateAllImagesMutation.isPending.value ? 'Dispatching…' : 'Re-author all slides' }}
+                  {{ regenerateAllImagesMutation.isPending.value ? 'Dispatching…' : 'Regenerate All Images' }}
                 </span>
               </button>
 

@@ -112,6 +112,24 @@ export function useRegenerateAllCarouselImages() {
   })
 }
 
+/**
+ * POST /admin/linkedin-drafts/{id}/regenerate-caption — re-synth caption + hashtags
+ * from existing slide content. Synchronous (~1s, pure PHP), so the mutation
+ * resolves with the updated draft in the response. Carousel-only — text
+ * format's caption IS the post body and can't be regenerated independently.
+ */
+export function useRegenerateCaption() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) =>
+      api.post(`/admin/linkedin-drafts/${id}/regenerate-caption`).then(r => r.data),
+    onSuccess: (_, id) => {
+      qc.invalidateQueries({ queryKey: [LIST_KEY] })
+      qc.invalidateQueries({ queryKey: [LIST_KEY, id] })
+    },
+  })
+}
+
 /** POST /admin/linkedin-drafts/{id}/slides/{slideIndex}/regenerate-image — single slide retry */
 export function useRegenerateSlideImage() {
   const qc = useQueryClient()
