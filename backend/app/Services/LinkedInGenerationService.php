@@ -701,9 +701,23 @@ class LinkedInGenerationService
 
         $parsed = $this->parseOrchestratorOutput($result['stdout']);
         if ($parsed === null) {
+            // Dump full stdout to disk for forensics — production debugging
+            // requires the entire model output, but laravel.log entries are
+            // capped at log-line length. Path: storage/app/carousel-gen-debug/
+            $stdoutLength = strlen($result['stdout']);
+            $dumpPath = storage_path('app/carousel-gen-debug/draft-' . $draftId . '-' . date('YmdHis') . '.txt');
+            try {
+                @mkdir(dirname($dumpPath), 0755, true);
+                file_put_contents($dumpPath, $result['stdout']);
+            } catch (\Throwable $e) {
+                $dumpPath = '(dump write failed: ' . $e->getMessage() . ')';
+            }
             Log::error('[LinkedInGeneration] /carousel-gen stdout could not be parsed', [
                 'draft_id' => $draftId,
-                'stdout_preview' => substr($result['stdout'], 0, 500),
+                'stdout_length' => $stdoutLength,
+                'stdout_head_2k' => substr($result['stdout'], 0, 2000),
+                'stdout_tail_2k' => $stdoutLength > 4000 ? substr($result['stdout'], -2000) : null,
+                'dump_path' => $dumpPath,
             ]);
             return null;
         }
