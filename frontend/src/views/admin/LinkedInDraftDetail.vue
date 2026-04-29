@@ -280,11 +280,16 @@ const slideTally = computed(() => {
 async function regenerateAllImages() {
   if (!draft.value) return
   const count = carouselSlides.value.length
-  if (!confirm(`Regenerate ALL ${count} slide images? Existing renders will be discarded and re-rendered from scratch (~30-60s for ${count} slides).`)) return
+  const msg = `Re-author all ${count} slides via /carousel-gen plugin?\n\n` +
+    `This produces FRESH visual concepts (absurdist hooks, surreal metaphors per the visual-hook gate) — not just a re-render of the existing prompts. ` +
+    `Existing slide images are discarded.\n\n` +
+    `Caption + hashtags + draft ID are preserved.\n\n` +
+    `Total runtime: ~5-7 min (2-3 min plugin authoring + 3-4 min image rendering).`
+  if (!confirm(msg)) return
   try {
     const res = await regenerateAllImagesMutation.mutateAsync(draftId.value)
     refetch()
-    alert(res?.message || `Re-rendering ${count} slides — webhooks will update them as each finishes.`)
+    alert(res?.message || `Re-authoring queued for ${count} slides — slides will update live via webhooks as each renders.`)
   } catch (err) {
     alert(err?.response?.data?.error?.message || 'Image regeneration failed')
   }

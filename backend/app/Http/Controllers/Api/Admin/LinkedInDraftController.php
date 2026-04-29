@@ -386,16 +386,42 @@ class LinkedInDraftController extends Controller
         $slides = $draft->carousel_slides ?? [];
         $slideCount = count($slides);
 
-        // Force-regenerate semantics. The button is labelled "Regenerate ALL
-        // images" and operators reasonably expect every slide to re-render —
-        // including ones currently `done`. Earlier behaviour skipped done
-        // slides, which produced a silent no-op when the operator wanted to
-        // reroll covers/CTAs after editing the underlying brief or after a
-        // creator-face mandate change. We now reset every slide to `pending`,
-        // clear image_url + image_error, and let the queue worker dispatch
-        // fresh GeminiGen runs. Stale slide_asset_urns are also cleared
-        // because LinkedIn assets registered against old image bytes are no
-        // longer ownable by the freshly-rendered images.
+        // Block re-author when an in-flight FSM transition is still working —
+        // dispatching /carousel-gen on a draft that's currently generating
+        // would race with the existing pipeline.
+        if (in_array($draft->status, ['pending_generation', 'generating', 'validating'], true)) {
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'regenerate_in_progress',
+                    'message' => 'A generation is already in progress for this draft.',
+                ],
+            ], 409);
+        }
+
+        // Re-author semantics. The button is labelled "Regenerate all images"
+        // but the operator's actual intent is "give me fresh visual concepts"
+        // — earlier behaviour only re-rendered the existing legacy prompt text
+        // through GeminiGen, which produced the same conventional cover scene
+        // (terminal frames, courtroom shots) on every retry. Operators
+        // reasonably expect this button to fire the /carousel-gen plugin and
+        // produce mindblowing absurdist hooks per the visual-hook gate
+        // (wow_minimum 6/8, pattern interrupt, surreal scene metaphors).
+        //
+        // Flow:
+        //   1. Optimistically reset all slide image_status to 'pending' so the
+        //      UI status pills flip immediately (operator sees "Rendering..."
+        //      placeholders rather than the stale rendered images).
+        //   2. Clear slide_asset_urns + last_error — LinkedIn assets registered
+        //      against old image bytes are no longer ownable by fresh renders,
+        //      and any previously persisted error is no longer the truth.
+        //   3. Dispatch RegenerateLinkedInCarouselContent job which:
+        //        a) calls /carousel-gen plugin via SSH (~2-3 min)
+        //        b) replaces carousel_slides JSON with fresh prompts
+        //        c) chain-dispatches GenerateLinkedInCarouselImages to render
+        //
+        // Caption + hashtags + link_comment + draft ID + FSM state are all
+        // preserved across the re-author, so operator's caption work survives.
         foreach ($slides as $i => $slide) {
             $slides[$i]['image_status'] = 'pending';
             $slides[$i]['image_url'] = '';
@@ -405,11 +431,12 @@ class LinkedInDraftController extends Controller
         $draft->update([
             'carousel_slides' => $slides,
             'slide_asset_urns' => null,
+            'last_error' => null,
         ]);
 
-        \App\Jobs\GenerateLinkedInCarouselImages::dispatch($draft->id);
+        \App\Jobs\RegenerateLinkedInCarouselContent::dispatch($draft->id);
 
-        Log::info('[LinkedInDraft] regenerate-images queued (force-all)', [
+        Log::info('[LinkedInDraft] regenerate-images queued (re-author via /carousel-gen)', [
             'draft_id' => $draft->id,
             'slide_count' => $slideCount,
         ]);
@@ -417,7 +444,7 @@ class LinkedInDraftController extends Controller
         return response()->json([
             'success' => true,
             'data' => $draft->fresh(['post.translations', 'account']),
-            'message' => "Queued image regeneration for {$slideCount} slide(s). Webhook will populate URLs as renders complete.",
+            'message' => "Re-authoring {$slideCount} slide(s) via /carousel-gen plugin (~2-3 min) then rendering images (~3-4 min). Total ~5-7 min — webhooks will update slides live as each finishes.",
             'queued' => $slideCount,
         ], 202);
     }
