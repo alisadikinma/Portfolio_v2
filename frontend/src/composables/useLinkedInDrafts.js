@@ -177,12 +177,22 @@ export function useCancelLinkedInDraft() {
   })
 }
 
-/** POST /admin/linkedin-drafts/{id}/publish-now */
+/**
+ * POST /admin/linkedin-drafts/{id}/publish-now
+ *
+ * Carousel publishes upload N slide PNGs to LinkedIn DigitalMedia (3-step
+ * register → fetch bytes → PUT) before the ugcPosts call — typically 30-60s
+ * for 9 slides on a fresh upload. Override the global 15s axios timeout
+ * for this endpoint only so the operator doesn't see a misleading "Network
+ * error" while the backend keeps working (which then succeeds, leaving the
+ * UI out of sync with the published draft).
+ */
 export function usePublishLinkedInDraftNow() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id) =>
-      api.post(`/admin/linkedin-drafts/${id}/publish-now`).then(r => r.data),
+      api.post(`/admin/linkedin-drafts/${id}/publish-now`, {}, { timeout: 120000 })
+        .then(r => r.data),
     onSuccess: (_, id) => {
       qc.invalidateQueries({ queryKey: [LIST_KEY] })
       qc.invalidateQueries({ queryKey: [LIST_KEY, id] })
