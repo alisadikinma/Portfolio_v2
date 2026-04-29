@@ -65,6 +65,38 @@ export const STATUS_META = {
     mood: 'error',
     sentence: 'The plugin or pipeline hit a terminal error. Read the message, then regenerate.',
   },
+
+  // ---------------------------------------------------------------------------
+  // Synthetic statuses — not stored on the row; derived from
+  // (status='manual_review' + format='carousel' + slide image state) so the
+  // badge reflects what the operator actually needs to do, instead of a
+  // misleading "MANUAL REVIEW" while images haven't even started rendering.
+  // Resolved via effectiveStatusMeta() below.
+  // ---------------------------------------------------------------------------
+  carousel_render_pending: {
+    label: 'Awaiting render',
+    short: 'Awaiting render',
+    mood: 'decision',
+    sentence: 'Slide JSON is ready but images haven\'t been dispatched yet. Click Approve to start GeminiGen rendering.',
+  },
+  carousel_render_active: {
+    label: 'Rendering slides',
+    short: 'Rendering',
+    mood: 'progress',
+    sentence: 'GeminiGen is rendering the slide images. Each slide takes ~30-60s; the page polls every 5 seconds.',
+  },
+  carousel_render_failed: {
+    label: 'Render failed',
+    short: 'Render failed',
+    mood: 'error',
+    sentence: 'All slide image renders failed (typically GeminiGen safety refusal or rate limit). Restart from blog or retry individual slides.',
+  },
+  carousel_render_partial: {
+    label: 'Render partial',
+    short: 'Partial render',
+    mood: 'decision',
+    sentence: 'Some slides rendered, others failed. Retry failed slides individually before approving.',
+  },
 }
 
 export function statusMeta(status) {
@@ -74,6 +106,69 @@ export function statusMeta(status) {
     mood: 'pending',
     sentence: '',
   }
+}
+
+/**
+ * Inspect a carousel draft's slide image lifecycle. Returns one of:
+ *   'ready'      — every slide has image_status='done' + image_url
+ *   'pending'    — no slide has even started rendering (image_status='pending'
+ *                   or null on every slide)
+ *   'generating' — at least one slide is in flight (image_status='generating')
+ *   'partial'    — mix of done + failed (no in-flight)
+ *   'failed'     — all slides failed
+ *
+ * Returns 'ready' for non-carousel drafts (synthetic status doesn't apply).
+ */
+export function inspectCarouselRenderState(draft) {
+  if (!draft || draft.format !== 'carousel') return 'ready'
+  const slides = Array.isArray(draft.carousel_slides) ? draft.carousel_slides : []
+  if (slides.length === 0) return 'pending'
+
+  let done = 0
+  let inFlight = 0
+  let failed = 0
+  for (const slide of slides) {
+    const s = slide?.image_status
+    if (s === 'done' && slide?.image_url) done++
+    else if (s === 'generating') inFlight++
+    else if (s === 'failed') failed++
+    // 'pending' or null falls through — counted as not-yet-started below
+  }
+
+  if (done === slides.length) return 'ready'
+  if (inFlight > 0) return 'generating'
+  if (failed === slides.length) return 'failed'
+  if (done > 0 || failed > 0) return 'partial'
+  return 'pending'
+}
+
+/**
+ * Resolve the BADGE metadata for a draft, taking carousel image rendering
+ * state into account. Use this in queue / posts / detail badge renders
+ * instead of statusMeta(draft.status) directly — otherwise carousels in
+ * `manual_review` state with un-rendered slides show a misleading "MANUAL
+ * REVIEW" badge when the operator hasn't actually been asked to review
+ * anything yet.
+ */
+export function effectiveStatusMeta(draft) {
+  if (!draft) return statusMeta(null)
+
+  // Only carousel + manual_review needs the synthetic override. Other states
+  // (generating/validating/failed/awaiting_publish/published/cancelled) are
+  // unambiguous — keep the FSM-direct meta.
+  if (draft.format === 'carousel' && draft.status === 'manual_review') {
+    const renderState = inspectCarouselRenderState(draft)
+    switch (renderState) {
+      case 'pending':    return STATUS_META.carousel_render_pending
+      case 'generating': return STATUS_META.carousel_render_active
+      case 'failed':     return STATUS_META.carousel_render_failed
+      case 'partial':    return STATUS_META.carousel_render_partial
+      // 'ready' falls through — slides are rendered, operator legitimately
+      // needs to manual-review the now-visible carousel.
+    }
+  }
+
+  return statusMeta(draft.status)
 }
 
 // Tailwind class fragments per mood — kept short, applied via :class binding.

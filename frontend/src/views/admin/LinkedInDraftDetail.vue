@@ -14,6 +14,7 @@ import {
 } from '@/composables/useLinkedInDrafts'
 import {
   statusMeta,
+  effectiveStatusMeta,
   MOOD_CLASSES,
   transitionSummary,
   reasonLabel,
@@ -130,7 +131,11 @@ const hashtagCountValid = computed(() =>
 )
 
 // --- Status mood + sentence + actions -------------------------------------
-const meta = computed(() => statusMeta(draft.value?.status))
+// effectiveStatusMeta promotes carousel manual_review with un-rendered slides
+// to the synthetic "Awaiting render" / "Rendering" / etc. badge so the hero
+// panel sentence + chip + rail all reflect what the operator actually needs
+// to do, not the FSM-direct status.
+const meta = computed(() => effectiveStatusMeta(draft.value))
 const mood = computed(() => MOOD_CLASSES[meta.value.mood] || MOOD_CLASSES.pending)
 const isInProgress = computed(() =>
   ['pending_generation', 'generating', 'validating'].includes(draft.value?.status)

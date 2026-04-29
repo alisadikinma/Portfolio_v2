@@ -9,7 +9,8 @@ import {
   postTitle,
 } from '@/composables/useLinkedInDrafts'
 import {
-  statusMeta,
+  effectiveStatusMeta,
+  inspectCarouselRenderState,
   MOOD_CLASSES,
   formatChip,
   relativeTime,
@@ -40,26 +41,6 @@ const filters = computed(() => ({
 
 const { drafts: allDrafts, isLoading, error } = useLinkedInDraftsList(filters)
 
-// Carousel slide image-state inspection — see classifyForQueue below.
-function carouselImageState(draft) {
-  if (draft.format !== 'carousel') return 'ready'
-  const slides = Array.isArray(draft.carousel_slides) ? draft.carousel_slides : []
-  if (slides.length === 0) return 'failed'
-
-  let done = 0, inFlight = 0, failed = 0
-  for (const slide of slides) {
-    const s = slide?.image_status
-    if (s === 'done' && slide?.image_url) done++
-    else if (s === 'pending' || s === 'generating') inFlight++
-    else if (s === 'failed') failed++
-  }
-  if (done === slides.length) return 'ready'
-  if (inFlight > 0) return 'generating'
-  if (done > 0) return 'partial'
-  if (failed === slides.length) return 'failed'
-  return 'pending'
-}
-
 function classifyForQueue(draft) {
   if (['pending_generation', 'generating', 'validating'].includes(draft.status)) {
     return 'in_progress'
@@ -68,7 +49,7 @@ function classifyForQueue(draft) {
 
   if (draft.status === 'manual_review') {
     if (draft.format === 'text') return 'manual_review'
-    const imgState = carouselImageState(draft)
+    const imgState = inspectCarouselRenderState(draft)
     if (imgState === 'pending' || imgState === 'generating') return 'in_progress'
     if (imgState === 'failed') return 'failed'
     return 'manual_review'
@@ -118,12 +99,12 @@ function issueSummary(draft) {
   if (draft.format === 'carousel' && draft.status === 'manual_review') {
     const slides = Array.isArray(draft.carousel_slides) ? draft.carousel_slides : []
     if (slides.length > 0) {
-      const imgState = carouselImageState(draft)
-      const inFlight = slides.filter((s) => ['pending', 'generating'].includes(s?.image_status)).length
+      const imgState = inspectCarouselRenderState(draft)
+      const inFlight = slides.filter((s) => s?.image_status === 'generating').length
       const failed = slides.filter((s) => s?.image_status === 'failed').length
       const done = slides.filter((s) => s?.image_status === 'done' && s?.image_url).length
       if (imgState === 'generating') return `Rendering ${inFlight} of ${slides.length} slides`
-      if (imgState === 'pending') return `${slides.length} slides queued`
+      if (imgState === 'pending') return `Click Approve to render ${slides.length} slides`
       if (imgState === 'failed') return `All ${slides.length} slides rejected`
       if (imgState === 'partial') return `${done} done, ${failed} failed`
     }
@@ -257,14 +238,16 @@ const emptyMessage = computed(() => ({
             <p class="text-[11px] font-mono text-neutral-600">#{{ draft.id }} · {{ formatChip(draft.format) }}<template v-if="draft.format === 'carousel' && Array.isArray(draft.carousel_slides)"> · {{ draft.carousel_slides.length }} slides</template></p>
           </div>
 
-          <!-- Status -->
+          <!-- Status — uses effectiveStatusMeta so carousel rows in
+               manual_review with un-rendered slides show "Awaiting render"
+               instead of a misleading "Manual review". -->
           <div class="md:self-center">
             <span
               class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono uppercase tracking-[0.12em]"
-              :class="MOOD_CLASSES[statusMeta(draft.status).mood]?.chip"
+              :class="MOOD_CLASSES[effectiveStatusMeta(draft).mood]?.chip"
             >
-              <span class="w-1 h-1 rounded-full" :class="MOOD_CLASSES[statusMeta(draft.status).mood]?.dot" />
-              {{ statusMeta(draft.status).short }}
+              <span class="w-1 h-1 rounded-full" :class="MOOD_CLASSES[effectiveStatusMeta(draft).mood]?.dot" />
+              {{ effectiveStatusMeta(draft).short }}
             </span>
           </div>
 

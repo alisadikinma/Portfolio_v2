@@ -9,7 +9,7 @@ import {
   postTitle,
 } from '@/composables/useLinkedInDrafts'
 import {
-  statusMeta,
+  effectiveStatusMeta,
   MOOD_CLASSES,
   formatChip,
   relativeTime,
@@ -186,10 +186,11 @@ const emptyMessage = computed(() => ({
         @click="openDetail(draft.id)"
         class="group rounded-2xl border border-neutral-800/80 bg-neutral-950/40 overflow-hidden cursor-pointer transition-all hover:border-amber-500/40 hover:bg-neutral-900/40 hover:-translate-y-[1px]"
       >
-        <!-- Mood rail (top) -->
+        <!-- Mood rail (top) — uses effectiveStatusMeta for carousel
+             rendering-state awareness (see helper). -->
         <div
           class="h-[3px] w-full bg-gradient-to-r"
-          :class="MOOD_CLASSES[statusMeta(draft.status).mood]?.rail"
+          :class="MOOD_CLASSES[effectiveStatusMeta(draft).mood]?.rail"
         />
 
         <div class="p-5 space-y-4">
@@ -197,10 +198,10 @@ const emptyMessage = computed(() => ({
           <div class="flex items-center justify-between gap-3">
             <span
               class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono uppercase tracking-[0.12em]"
-              :class="MOOD_CLASSES[statusMeta(draft.status).mood]?.chip"
+              :class="MOOD_CLASSES[effectiveStatusMeta(draft).mood]?.chip"
             >
-              <span class="w-1 h-1 rounded-full" :class="MOOD_CLASSES[statusMeta(draft.status).mood]?.dot" />
-              {{ statusMeta(draft.status).short }}
+              <span class="w-1 h-1 rounded-full" :class="MOOD_CLASSES[effectiveStatusMeta(draft).mood]?.dot" />
+              {{ effectiveStatusMeta(draft).short }}
             </span>
             <span class="text-[10px] font-mono uppercase tracking-[0.14em] text-neutral-500">
               {{ formatChip(draft.format) }}
