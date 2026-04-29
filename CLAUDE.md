@@ -806,6 +806,41 @@ pkill -9 -u claudesn -f "node.*obsidian-mcp"
 free -h  # confirm memory freed
 ```
 
+### SSH Key Path: Two Contexts (HTTP vs Queue Worker)
+
+`*_GEN_SSH_KEY` env vars must point to a path readable by **whichever user actually runs the SSH call**, and that user differs by service:
+
+| Service | Dispatched from | Effective UID | Key path |
+|---|---|---|---|
+| `ARTICLE_GEN_*` | HTTP (admin clicks → controller → sync SSH inside the request) | `www-data` (PHP-FPM) | `/var/www/.ssh/id_ed25519` (owner: www-data, mode 600) |
+| `LINKEDIN_GEN_*` | Queue (admin click → `GenerateLinkedInPost::dispatch` → worker) | `claudesn` (queue worker) | `/home/claudesn/.ssh/id_ed25519` (owner: claudesn, mode 600) |
+| `CAROUSEL_GEN_*` | Queue (regenerate-images → `RegenerateLinkedInCarouselContent` → worker) | `claudesn` (queue worker) | `/home/claudesn/.ssh/id_ed25519` |
+
+**Why this matters:** mode-600 keys grant ONLY-owner read. claudesn is in the www-data group but mode 600 gives the group zero read access, so the queue worker (claudesn) cannot use a www-data-owned key file even though it's group-readable in theory. Production incident **April 29, 2026 (session 7)**: regenerate-images on draft 19 returned `Re-author failed: /carousel-gen returned no usable output. See logs.` with `SSH prompt write failed: Warning: Identity file /var/www/.ssh/id_ed25519 not accessible: Permission denied` in `laravel.log`.
+
+**One-time VPS setup** (after first install of queue worker):
+```bash
+sudo cp /var/www/.ssh/id_ed25519 /home/claudesn/.ssh/id_ed25519
+sudo chown claudesn:claudesn /home/claudesn/.ssh/id_ed25519
+sudo chmod 600 /home/claudesn/.ssh/id_ed25519
+# Verify:
+sudo -u claudesn ssh -i /home/claudesn/.ssh/id_ed25519 -o BatchMode=yes claudesn@localhost 'whoami'
+# → claudesn
+```
+
+The same private key works in both locations because the corresponding pubkey already lives in `/home/claudesn/.ssh/authorized_keys` (that's how `www-data → claudesn@localhost` SSH worked all along).
+
+**Then in `.env`:**
+```env
+ARTICLE_GEN_SSH_KEY=/var/www/.ssh/id_ed25519           # HTTP context
+LINKEDIN_GEN_SSH_KEY=/home/claudesn/.ssh/id_ed25519    # Queue worker context
+CAROUSEL_GEN_SSH_KEY=/home/claudesn/.ssh/id_ed25519    # Queue worker context
+```
+
+After updating `.env`, run `php artisan config:cache && systemctl restart portfolio-queue.service` so the worker picks up the new path.
+
+**Future improvement (not yet shipped):** detect process UID at runtime and switch from `ssh` driver to `local` driver when the worker user matches the SSH target — eliminates the SSH round-trip entirely for queue-dispatched calls (claudesn → claudesn@localhost is wasted hop).
+
 ## Code Style Conventions
 
 ### Laravel
