@@ -416,39 +416,38 @@ class LinkedInGenerationService
             $updates['carousel_slides'] = $carousel['slides'] ?? [];
 
             // Plugin v0.4.3+ emits caption + hashtags + link_comment at the
-            // carousel root (full LinkedIn post body — swipe teaser, hashtag
-            // mix, link-in-comment bridge). Plugin v0.4.6+ splits per-slide
-            // copy into copy_id (Indonesian, main headline) + copy_en
-            // (English, subtitle); older plugins use single `copy` field.
-            //
-            // Fallback chain (from best to worst, each may be missing):
-            //   caption     → carousel.caption ?? cover_slide.copy_en ??
-            //                 cover_slide.copy ?? ''
-            //   hashtags    → carousel.hashtags ?? brief.hashtags ?? []
-            //   link_comment → carousel.link_comment ?? brief.pull_quote ?? ''
+            // carousel root. Post-v0.5.0 the universal /carousel-gen engine
+            // doesn't emit these (it focuses on slide visuals — caption +
+            // hashtags + link CTA are LinkedIn-publisher-side concerns).
+            // Backend is now the source of truth for those fields on
+            // carousel format.
             $coverSlide = collect($carousel['slides'] ?? [])->firstWhere('is_cover', true)
                 ?? ($carousel['slides'][0] ?? []);
 
-            $updates['content'] = (string) (
-                $carousel['caption']
-                ?? $coverSlide['copy_en']
-                ?? $coverSlide['copy']
-                ?? ''
+            $pluginCaption = (string) ($carousel['caption'] ?? '');
+            $updates['content'] = $this->buildCarouselCaption($pluginCaption, $coverSlide, $parsed['brief'] ?? []);
+            $updates['hashtags'] = $this->resolveHashtags(
+                $carousel['hashtags'] ?? null,
+                $parsed['brief']['hashtags'] ?? null,
+                $draft
             );
-            $updates['hashtags'] = is_array($carousel['hashtags'] ?? null)
-                ? $carousel['hashtags']
-                : ($parsed['brief']['hashtags'] ?? []);
-            $updates['link_comment'] = (string) (
-                $carousel['link_comment']
-                ?? $parsed['brief']['pull_quote']
-                ?? ''
+            $updates['link_comment'] = $this->resolveLinkComment(
+                (string) ($carousel['link_comment'] ?? ''),
+                $draft
             );
         } else {
             // Text path
             $post = $parsed['post'] ?? [];
             $updates['content'] = (string) ($post['post_text'] ?? '');
-            $updates['hashtags'] = is_array($post['hashtags'] ?? null) ? $post['hashtags'] : [];
-            $updates['link_comment'] = (string) ($post['link_comment'] ?? '');
+            $updates['hashtags'] = $this->resolveHashtags(
+                $post['hashtags'] ?? null,
+                $parsed['brief']['hashtags'] ?? null,
+                $draft
+            );
+            $updates['link_comment'] = $this->resolveLinkComment(
+                (string) ($post['link_comment'] ?? ''),
+                $draft
+            );
         }
 
         $draft->update($updates);
@@ -775,5 +774,170 @@ class LinkedInGenerationService
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * Canonical blog URL for the draft's source post:
+     *   {APP_URL}/blog/{slug}
+     * Empty string when the post or slug is missing (defensive — prevents
+     * malformed URLs from leaking into LinkedIn comments).
+     */
+    private function blogUrl(LinkedInPost $draft): string
+    {
+        $appUrl = rtrim((string) config('app.url', ''), '/');
+        $slug = (string) ($draft->post?->slug ?? '');
+        return ($appUrl !== '' && $slug !== '') ? "{$appUrl}/blog/{$slug}" : '';
+    }
+
+    /**
+     * Resolve link_comment to always include the canonical blog URL.
+     *
+     * If the plugin-emitted link_comment already contains an http(s) URL,
+     * trust it as-is (operator-defined CTA). Otherwise replace with
+     * "Full article: {blogUrl}" — every LinkedIn post MUST surface the
+     * source link via first-comment automation (avoids 60% reach penalty
+     * on body links + maintains traffic-back to alisadikinma.com).
+     *
+     * Operators can still override via PUT /admin/linkedin-drafts/{id}
+     * after generation if they want a different CTA copy.
+     */
+    private function resolveLinkComment(string $pluginValue, LinkedInPost $draft): string
+    {
+        $cleaned = trim($pluginValue);
+        if ($cleaned !== '' && preg_match('#https?://#i', $cleaned) === 1) {
+            return $cleaned;
+        }
+        $url = $this->blogUrl($draft);
+        return $url !== '' ? "Full article: {$url}" : $cleaned;
+    }
+
+    /**
+     * Build the LinkedIn post body for a carousel draft.
+     *
+     * Plugin v0.5.0+ /carousel-gen engine doesn't emit caption (visual
+     * focus only). Backend composes a 3-block caption:
+     *   1. Hook (cover slide Indonesian + English subtitle)
+     *   2. Body context (brief.pull_quote — single-sentence value prop)
+     *   3. CTAs (Swipe → see breakdown / Full article in comments ↓)
+     *
+     * If the plugin DID emit a non-empty caption (rare but possible for
+     * legacy envelopes), trust it.
+     */
+    private function buildCarouselCaption(string $pluginCaption, array $coverSlide, array $brief): string
+    {
+        $cleaned = trim($pluginCaption);
+        if ($cleaned !== '' && mb_strlen($cleaned) >= 200) {
+            return $cleaned;
+        }
+
+        $coverId = trim((string) ($coverSlide['copy_id'] ?? $coverSlide['copy'] ?? ''));
+        $coverEn = trim((string) ($coverSlide['copy_en'] ?? ''));
+        $pullQuote = trim((string) ($brief['pull_quote'] ?? ''));
+
+        $parts = [];
+        if ($coverId !== '') {
+            $parts[] = $coverId;
+        }
+        if ($coverEn !== '' && $coverEn !== $coverId) {
+            $parts[] = $coverEn;
+        }
+        if ($pullQuote !== '' && $pullQuote !== $coverId && $pullQuote !== $coverEn) {
+            $parts[] = $pullQuote;
+        }
+        // Always end with the swipe + link-in-comments CTA pair.
+        $parts[] = "Swipe → for the full breakdown.";
+        $parts[] = "Full article: link in comments ↓";
+
+        return implode("\n\n", $parts);
+    }
+
+    /**
+     * Resolve hashtags. Plugin output > brief fallback > synthesized from
+     * blog meta_keywords. Always returns 3-5 tags (LinkedIn validator rule)
+     * — pads with brand defaults if too few.
+     */
+    private function resolveHashtags(?array $pluginHashtags, ?array $briefHashtags, LinkedInPost $draft): array
+    {
+        $tags = is_array($pluginHashtags) && count($pluginHashtags) > 0
+            ? $pluginHashtags
+            : (is_array($briefHashtags) ? $briefHashtags : []);
+
+        if (count($tags) === 0) {
+            $tags = $this->synthesizeHashtagsFromBlog($draft);
+        }
+
+        // Normalize: ensure each starts with #, no spaces, dedupe (case-insensitive)
+        $normalized = [];
+        $seen = [];
+        foreach ($tags as $raw) {
+            if (!is_string($raw)) continue;
+            $tag = trim($raw);
+            if ($tag === '') continue;
+            $tag = str_replace(' ', '', $tag);
+            if ($tag[0] !== '#') $tag = '#' . $tag;
+            $key = mb_strtolower($tag);
+            if (isset($seen[$key])) continue;
+            $seen[$key] = true;
+            $normalized[] = $tag;
+            if (count($normalized) >= 5) break;
+        }
+
+        // Pad with brand defaults if below the 3-tag minimum
+        $defaults = ['#AI', '#Engineering', '#TechIndonesia'];
+        foreach ($defaults as $d) {
+            if (count($normalized) >= 3) break;
+            $key = mb_strtolower($d);
+            if (!isset($seen[$key])) {
+                $seen[$key] = true;
+                $normalized[] = $d;
+            }
+        }
+        return $normalized;
+    }
+
+    /**
+     * Build hashtags from the source blog post's meta_keywords + tags.
+     * Caps at 5, strips non-alphanumerics, prepends #.
+     */
+    private function synthesizeHashtagsFromBlog(LinkedInPost $draft): array
+    {
+        $post = $draft->post;
+        if (!$post) return [];
+
+        // Prefer the primary translation's meta_keywords (comma-separated).
+        $translations = $post->translations ?? collect();
+        $primary = $translations->where('language', 'id')->first()
+            ?? $translations->first();
+        $keywords = (string) ($primary->meta_keywords ?? '');
+
+        $candidates = [];
+        if ($keywords !== '') {
+            foreach (explode(',', $keywords) as $kw) {
+                $candidates[] = trim($kw);
+            }
+        }
+
+        // Also include post `tags` column if it exists (JSON or comma string).
+        $tags = $post->tags ?? null;
+        if (is_array($tags)) {
+            $candidates = array_merge($candidates, $tags);
+        } elseif (is_string($tags) && $tags !== '') {
+            foreach (explode(',', $tags) as $t) {
+                $candidates[] = trim($t);
+            }
+        }
+
+        $hashtags = [];
+        foreach ($candidates as $c) {
+            if (!is_string($c) || trim($c) === '') continue;
+            // Strip whitespace + non-word chars, CamelCase-ify
+            $clean = preg_replace('/[^a-zA-Z0-9\s]/u', '', $c);
+            $clean = ucwords(mb_strtolower(trim($clean)));
+            $clean = str_replace(' ', '', $clean);
+            if ($clean === '' || strlen($clean) < 2) continue;
+            $hashtags[] = '#' . $clean;
+            if (count($hashtags) >= 5) break;
+        }
+        return $hashtags;
     }
 }
