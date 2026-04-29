@@ -13,7 +13,9 @@ use RuntimeException;
  *   1. buildAuthorizeUrl() — generate redirect URL with CSRF state
  *   2. exchangeCodeForTokens() — POST to /oauth/v2/accessToken with the
  *      code returned in the callback, get access_token + refresh_token
- *   3. fetchProfile() — GET /v2/me to extract person URN + display name
+ *   3. fetchProfile() — GET /v2/userinfo (OpenID Connect) to extract
+ *      person URN + display name. Replaces the legacy /v2/me endpoint
+ *      which required the deprecated `r_liteprofile` scope.
  *   4. upsertAccount() — write (or update) LinkedInAccount row
  *
  * All network calls use Laravel HTTP client with 10-second timeout.
@@ -74,19 +76,35 @@ class LinkedInOAuthService
     }
 
     /**
-     * Fetch /v2/me to extract person URN (id) + display name.
+     * Fetch the authenticated member's profile via OpenID Connect's
+     * /v2/userinfo endpoint. Returns:
+     *   {
+     *     sub: "abc123",          // LinkedIn member id (becomes person URN)
+     *     name: "Ali Sadikin",    // full name
+     *     given_name: "Ali",
+     *     family_name: "Sadikin",
+     *     picture: "https://...", // CDN URL
+     *     email: "ali@...",
+     *     email_verified: true,
+     *     locale: "en_US"
+     *   }
+     *
+     * Note: /userinfo is OpenID Connect spec — does NOT need the
+     * `LinkedIn-Version` header that LinkedIn-versioned API endpoints
+     * require. Sending it is harmless but omitted for cleanliness.
      *
      * @throws RuntimeException on profile fetch failure
      */
     public function fetchProfile(string $accessToken): array
     {
+        $endpoint = config('linkedin.api.base_url') . config('linkedin.api.userinfo_endpoint', '/userinfo');
+
         $response = Http::withToken($accessToken)
-            ->withHeaders(['LinkedIn-Version' => config('linkedin.api.version')])
             ->timeout(10)
-            ->get(config('linkedin.api.base_url') . config('linkedin.api.me_endpoint'));
+            ->get($endpoint);
 
         if ($response->failed()) {
-            Log::error('[LinkedInOAuth] /v2/me fetch failed', [
+            Log::error('[LinkedInOAuth] /userinfo fetch failed', [
                 'status' => $response->status(),
                 'body' => $response->body(),
             ]);
@@ -96,17 +114,23 @@ class LinkedInOAuthService
         }
 
         $data = $response->json();
-        $personId = $data['id'] ?? null;
-        $firstName = $data['localizedFirstName'] ?? $data['firstName']['localized']['en_US'] ?? '';
-        $lastName = $data['localizedLastName'] ?? $data['lastName']['localized']['en_US'] ?? '';
+        $personId = $data['sub'] ?? null;
 
         if (empty($personId)) {
-            throw new RuntimeException('LinkedIn /v2/me returned no id field');
+            throw new RuntimeException('LinkedIn /userinfo returned no `sub` field');
+        }
+
+        // Prefer composite `name` from OIDC; fall back to first+last.
+        $displayName = trim((string) ($data['name'] ?? ''));
+        if ($displayName === '') {
+            $given = (string) ($data['given_name'] ?? '');
+            $family = (string) ($data['family_name'] ?? '');
+            $displayName = trim("{$given} {$family}");
         }
 
         return [
             'person_urn' => 'urn:li:person:' . $personId,
-            'display_name' => trim("{$firstName} {$lastName}") ?: 'LinkedIn User',
+            'display_name' => $displayName !== '' ? $displayName : 'LinkedIn User',
         ];
     }
 

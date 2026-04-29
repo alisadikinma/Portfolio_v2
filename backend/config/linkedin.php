@@ -16,9 +16,17 @@ return [
             'LINKEDIN_OAUTH_REDIRECT_URI',
             env('APP_URL') . '/api/admin/linkedin/oauth/callback'
         ),
+        // Scopes: LinkedIn deprecated `r_liteprofile` for new apps in 2023.
+        // New apps MUST use OpenID Connect ("Sign In with LinkedIn using
+        // OpenID Connect" product) — request space-separated scopes:
+        //   - openid profile email — for /userinfo endpoint
+        //   - w_member_social      — for posting via /ugcPosts
+        // Default below uses spaces (OIDC standard); LinkedIn also accepts
+        // commas. Keep the env var format consistent with whatever the
+        // operator typed during onboarding.
         'scopes' => env(
             'LINKEDIN_OAUTH_SCOPES',
-            'w_member_social,r_liteprofile'
+            'openid profile email w_member_social'
         ),
         'authorize_url' => 'https://www.linkedin.com/oauth/v2/authorization',
         'token_url' => 'https://www.linkedin.com/oauth/v2/accessToken',
@@ -28,7 +36,11 @@ return [
     'api' => [
         'base_url' => env('LINKEDIN_API_BASE_URL', 'https://api.linkedin.com/v2'),
         'version' => env('LINKEDIN_API_VERSION', '202405'),
-        'me_endpoint' => '/me',
+        // OpenID Connect /userinfo endpoint — replaces the legacy /me call.
+        // Returns: sub (LinkedIn member id), name, given_name, family_name,
+        // picture, email, email_verified. The `sub` field becomes the
+        // person URN (urn:li:person:{sub}).
+        'userinfo_endpoint' => '/userinfo',
         'ugc_posts_endpoint' => '/ugcPosts',
         'assets_endpoint' => '/assets',
     ],
