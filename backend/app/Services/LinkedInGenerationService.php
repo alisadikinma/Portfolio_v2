@@ -234,6 +234,35 @@ class LinkedInGenerationService
         return implode(' ', $flags);
     }
 
+    /**
+     * Returns the --mcp-config flags that disable ALL MCP server boot for
+     * pipeline runs. Without this, every claude CLI invocation spawns its
+     * full MCP server stack (obsidian-mcp, firecrawl, playwright, etc.) —
+     * obsidian-mcp in particular leaks its child node process when the
+     * parent claude exits, accumulating ~60MB RSS each per leak. Production
+     * incident on April 29, 2026 saw 140 leaked obsidian-mcp processes
+     * consuming 8.7GB RSS over 4 days, hanging the carousel-gen runs.
+     *
+     * `--mcp-config /home/claudesn/empty-mcp.json` points at a JSON file
+     * with `{"mcpServers": {}}` — zero servers configured.
+     * `--strict-mcp-config` tells claude to use ONLY that config and ignore
+     * the user-level `~/.claude.json` MCP entries entirely.
+     *
+     * Pipeline runs don't need MCP servers — all required context comes via
+     * `--append-system-prompt-file` (compiled refs) and the prompt itself.
+     */
+    private function buildMcpFlags(): string
+    {
+        $emptyConfig = (string) config(
+            'linkedin.generation.empty_mcp_config',
+            '/home/claudesn/empty-mcp.json'
+        );
+        if ($emptyConfig === '') {
+            return '';
+        }
+        return '--mcp-config ' . escapeshellarg($emptyConfig) . ' --strict-mcp-config';
+    }
+
     private function executeLocal(string $prompt, string $model, string $refsFlags, int $timeout): array
     {
         $claudePath = (string) config('linkedin.generation.claude_path', 'claude');
@@ -249,14 +278,15 @@ class LinkedInGenerationService
         // solved structurally in plugin v0.4.6 by tightening per-layout
         // copy length invariants (so each slide is shorter, freeing tokens
         // for the post-body fields).
+        $mcpFlags = $this->buildMcpFlags();
         try {
             if ($isWindows) {
-                $cmd = "& \"{$claudePath}\" -p (Get-Content -Raw \"{$promptFile}\") --model {$model} {$refsFlags} --dangerously-skip-permissions";
+                $cmd = "& \"{$claudePath}\" -p (Get-Content -Raw \"{$promptFile}\") --model {$model} {$refsFlags} {$mcpFlags} --dangerously-skip-permissions";
                 $result = Process::timeout($timeout)->run(['powershell', '-Command', $cmd]);
             } else {
                 $result = Process::timeout($timeout)->run([
                     'bash', '-lc',
-                    "{$claudePath} -p \"\$(cat " . escapeshellarg($promptFile) . ")\" --model {$model} {$refsFlags} --dangerously-skip-permissions",
+                    "{$claudePath} -p \"\$(cat " . escapeshellarg($promptFile) . ")\" --model {$model} {$refsFlags} {$mcpFlags} --dangerously-skip-permissions",
                 ]);
             }
         } finally {
@@ -301,8 +331,9 @@ class LinkedInGenerationService
         // remote (verified in production on draft #1, post #24). Reserve 20s
         // for SSH connect + cleanup so the local timeout never trips first.
         $remoteTimeout = max(30, $timeout - 20);
+        $mcpFlags = $this->buildMcpFlags();
         // Reverted --effort max: see executeLocal() comment for rationale.
-        $remoteCmd = "bash -lc 'source ~/.profile 2>/dev/null; timeout --kill-after=10s {$remoteTimeout} {$claudePath} -p \"\$(cat {$promptFile})\" --model {$model} {$refsFlags} --dangerously-skip-permissions; STATUS=\$?; rm -f {$promptFile} 2>/dev/null || true; exit \$STATUS'";
+        $remoteCmd = "bash -lc 'source ~/.profile 2>/dev/null; timeout --kill-after=10s {$remoteTimeout} {$claudePath} -p \"\$(cat {$promptFile})\" --model {$model} {$refsFlags} {$mcpFlags} --dangerously-skip-permissions; STATUS=\$?; rm -f {$promptFile} 2>/dev/null || true; exit \$STATUS'";
         $runCmd = $sshPrefix . escapeshellarg($remoteCmd);
 
         $result = Process::timeout($timeout)->run($runCmd);
@@ -705,14 +736,15 @@ class LinkedInGenerationService
         $promptFile = $tmpDir . DIRECTORY_SEPARATOR . 'carousel-gen-' . uniqid() . '.txt';
         file_put_contents($promptFile, $prompt);
 
+        $mcpFlags = $this->buildMcpFlags();
         try {
             if ($isWindows) {
-                $cmd = "& \"{$claudePath}\" -p (Get-Content -Raw \"{$promptFile}\") --model {$model} {$refsFlag} --dangerously-skip-permissions";
+                $cmd = "& \"{$claudePath}\" -p (Get-Content -Raw \"{$promptFile}\") --model {$model} {$refsFlag} {$mcpFlags} --dangerously-skip-permissions";
                 $result = Process::timeout($timeout)->run(['powershell', '-Command', $cmd]);
             } else {
                 $result = Process::timeout($timeout)->run([
                     'bash', '-lc',
-                    "{$claudePath} -p \"\$(cat " . escapeshellarg($promptFile) . ")\" --model {$model} {$refsFlag} --dangerously-skip-permissions",
+                    "{$claudePath} -p \"\$(cat " . escapeshellarg($promptFile) . ")\" --model {$model} {$refsFlag} {$mcpFlags} --dangerously-skip-permissions",
                 ]);
             }
         } finally {
@@ -751,7 +783,8 @@ class LinkedInGenerationService
 
         // Reserve 20s for SSH connect + cleanup.
         $remoteTimeout = max(30, $timeout - 20);
-        $remoteCmd = "bash -lc 'source ~/.profile 2>/dev/null; timeout --kill-after=10s {$remoteTimeout} {$claudePath} -p \"\$(cat {$promptFile})\" --model {$model} {$refsFlag} --dangerously-skip-permissions; STATUS=\$?; rm -f {$promptFile} 2>/dev/null || true; exit \$STATUS'";
+        $mcpFlags = $this->buildMcpFlags();
+        $remoteCmd = "bash -lc 'source ~/.profile 2>/dev/null; timeout --kill-after=10s {$remoteTimeout} {$claudePath} -p \"\$(cat {$promptFile})\" --model {$model} {$refsFlag} {$mcpFlags} --dangerously-skip-permissions; STATUS=\$?; rm -f {$promptFile} 2>/dev/null || true; exit \$STATUS'";
         $runCmd = $sshPrefix . escapeshellarg($remoteCmd);
 
         $result = Process::timeout($timeout)->run($runCmd);

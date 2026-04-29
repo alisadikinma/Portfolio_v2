@@ -88,6 +88,14 @@ return [
         'use_translate_phase' => env('ARTICLE_GEN_USE_TRANSLATE_PHASE', false),
         'use_score_phase' => env('ARTICLE_GEN_USE_SCORE_PHASE', false),
         'use_safety_rewrite' => env('ARTICLE_GEN_USE_SAFETY_REWRITE', true),
+        // Empty MCP config — passed via `--mcp-config <path> --strict-mcp-config`
+        // so pipeline runs of `claude` skip MCP server boot entirely. Without
+        // this, every `claude -p` invocation spawns the user's full MCP stack
+        // (obsidian-mcp, firecrawl, playwright, etc.) and obsidian-mcp leaks
+        // its node child whenever the parent claude exits — production saw
+        // 140 leaked processes consuming 8.7GB RSS in 4 days. Set to empty
+        // string to disable the override (dev-only fallback).
+        'empty_mcp_config' => env('ARTICLE_GEN_EMPTY_MCP_CONFIG', '/home/claudesn/empty-mcp.json'),
     ],
 
 ];

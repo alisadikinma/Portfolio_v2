@@ -27,6 +27,31 @@ class ArticleGenerationService
     }
 
     /**
+     * Returns the --mcp-config flags that disable ALL MCP server boot for
+     * pipeline runs. Without this, every claude CLI invocation spawns its
+     * full MCP server stack (obsidian-mcp, firecrawl, playwright, etc.) —
+     * obsidian-mcp in particular leaks its child node process when the
+     * parent claude exits, accumulating ~60MB RSS each per leak. Production
+     * incident on April 29, 2026 saw 140 leaked obsidian-mcp processes
+     * consuming 8.7GB RSS over 4 days, hanging carousel-gen runs.
+     *
+     * Pipeline runs don't need MCP servers — all required context comes via
+     * `--append-system-prompt-file` (compiled refs) and the prompt itself.
+     * Mirrors LinkedInGenerationService::buildMcpFlags().
+     */
+    private function buildMcpFlags(): string
+    {
+        $emptyConfig = (string) config(
+            'services.article_generation.empty_mcp_config',
+            '/home/claudesn/empty-mcp.json'
+        );
+        if ($emptyConfig === '') {
+            return '';
+        }
+        return '--mcp-config ' . escapeshellarg($emptyConfig) . ' --strict-mcp-config';
+    }
+
+    /**
      * Trigger full article generation (single-skill fallback).
      * Uses /article-gen skill — all steps in one session.
      *
@@ -729,9 +754,10 @@ PROMPT;
     private function executeSyncPrompt(string $claudePrompt, string $phase, string $model = ''): array
     {
         $modelFlag = $model ? "--model {$model}" : '';
+        $mcpFlags = $this->buildMcpFlags();
         // Pure translation doesn't need reasoning — skip --effort to save time.
         // VD rewrite also a single-pass transformation; fine without effort too.
-        $extraFlags = trim($modelFlag);
+        $extraFlags = trim("{$modelFlag} {$mcpFlags}");
         // 300s matches nginx fastcgi_read_timeout; 180s wasn't enough for
         // longer articles (~14 KB JSON) under current Claude API latency.
         $syncTimeout = 300;
@@ -849,7 +875,8 @@ PROMPT;
 
         $modelFlag = $model ? "--model {$model}" : '';
         $refsFlag = $refsFile ? "--append-system-prompt-file {$refsFile}" : '';
-        $extraFlags = trim("{$modelFlag} {$refsFlag}");
+        $mcpFlags = $this->buildMcpFlags();
+        $extraFlags = trim("{$modelFlag} {$refsFlag} {$mcpFlags}");
 
         if ($isWindows) {
             $sep = DIRECTORY_SEPARATOR;
@@ -908,7 +935,8 @@ PROMPT;
         // Step 2: Build runner script with model + refs flags
         $modelFlag = $model ? "--model {$model}" : '';
         $refsFlag = $refsFile ? "--append-system-prompt-file {$refsFile}" : '';
-        $extraFlags = trim("{$modelFlag} {$refsFlag}");
+        $mcpFlags = $this->buildMcpFlags();
+        $extraFlags = trim("{$modelFlag} {$refsFlag} {$mcpFlags}");
 
         $scriptContent = base64_encode(implode("\n", [
             '#!/bin/bash',

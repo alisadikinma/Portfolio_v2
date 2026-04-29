@@ -81,6 +81,14 @@ return [
         'refs_playbook' => env('LINKEDIN_GEN_REFS_PLAYBOOK', '/home/claudesn/refs-linkedin-playbook.md'),
         'refs_templates' => env('LINKEDIN_GEN_REFS_TEMPLATES', '/home/claudesn/refs-linkedin-templates.md'),
         'refs_formats' => env('LINKEDIN_GEN_REFS_FORMATS', '/home/claudesn/refs-linkedin-formats.md'),
+        // Empty MCP config — passed via `--mcp-config <path> --strict-mcp-config`
+        // so pipeline runs of `claude` skip MCP server boot entirely. Without
+        // this, every `claude -p` invocation spawns the user's full MCP stack
+        // (obsidian-mcp, firecrawl, playwright, etc.) and obsidian-mcp leaks
+        // its node child whenever the parent claude exits — production saw
+        // 140 leaked processes consuming 8.7GB RSS in 4 days. Set to empty
+        // string to disable the override (dev-only fallback).
+        'empty_mcp_config' => env('LINKEDIN_GEN_EMPTY_MCP_CONFIG', '/home/claudesn/empty-mcp.json'),
         // Sync execution timeout for the SSH→Sonnet→plugin chain. Production
         // measurement on a real blog (post #24, ~8KB content, 4 system prompt
         // refs, carousel format) clocked at 369s wall — the prior 300s default
