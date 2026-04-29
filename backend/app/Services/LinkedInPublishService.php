@@ -117,7 +117,7 @@ class LinkedInPublishService
         $baseUrl = rtrim((string) config('linkedin.api.base_url', 'https://api.linkedin.com/v2'), '/');
         $endpoint = $baseUrl . (string) config('linkedin.api.ugc_posts_endpoint', '/ugcPosts');
 
-        $author = "urn:li:person:{$account->person_urn}";
+        $author = $this->authorUrn($account);
 
         // Resolve thumbnail asset URN. Reuse blog's featured_image (already 16:9,
         // CDN-served, operator-approved). Pure text posts ("wall of text")
@@ -159,7 +159,6 @@ class LinkedInPublishService
                 ->withHeaders([
                     'X-Restli-Protocol-Version' => '2.0.0',
                     'Content-Type' => 'application/json',
-                    'LinkedIn-Version' => (string) config('linkedin.api.version', '202405'),
                 ])
                 ->timeout(30)
                 ->post($endpoint, $payload);
@@ -319,7 +318,7 @@ class LinkedInPublishService
             return $this->carouselFailure($draft, 'Cannot publish: caption is empty. Edit content before publishing.');
         }
 
-        $author = "urn:li:person:{$account->person_urn}";
+        $author = $this->authorUrn($account);
         $payload = [
             'author' => $author,
             'lifecycleState' => 'PUBLISHED',
@@ -343,7 +342,6 @@ class LinkedInPublishService
                 ->withHeaders([
                     'X-Restli-Protocol-Version' => '2.0.0',
                     'Content-Type' => 'application/json',
-                    'LinkedIn-Version' => (string) config('linkedin.api.version', '202405'),
                 ])
                 ->timeout(45)
                 ->post($endpoint, $payload);
@@ -427,7 +425,7 @@ class LinkedInPublishService
         $endpoint = $baseUrl . '/socialActions/' . rawurlencode($postUrn) . '/comments';
 
         $payload = [
-            'actor' => "urn:li:person:{$account->person_urn}",
+            'actor' => $this->authorUrn($account),
             'object' => $postUrn,
             'message' => ['text' => $linkComment],
         ];
@@ -437,7 +435,6 @@ class LinkedInPublishService
                 ->withHeaders([
                     'X-Restli-Protocol-Version' => '2.0.0',
                     'Content-Type' => 'application/json',
-                    'LinkedIn-Version' => (string) config('linkedin.api.version', '202405'),
                 ])
                 ->timeout(20)
                 ->post($endpoint, $payload);
@@ -489,6 +486,28 @@ class LinkedInPublishService
             return null;
         }
         return 'https://www.linkedin.com/feed/update/' . $urn . '/';
+    }
+
+    /**
+     * Resolve the author/owner URN for LinkedIn API payloads. Handles all
+     * three storage formats we've seen for LinkedInAccount.person_urn:
+     *
+     *   - "urn:li:person:aYm_YQ3pM7" — current OpenID Connect format (sub from /userinfo)
+     *   - "urn:li:member:599804594" — legacy r_liteprofile format
+     *   - "aYm_YQ3pM7" — bare ID (defensive — should not happen post v0.5.0)
+     *
+     * If already URN-prefixed (`urn:li:`), returns as-is. Otherwise prepends
+     * `urn:li:person:` (the OIDC default). Prevents the "double-prefix" bug
+     * that produced authors like `urn:li:person:urn:li:member:599804594`
+     * which LinkedIn rejected with /author regex mismatch.
+     */
+    private function authorUrn(LinkedInAccount $account): string
+    {
+        $stored = trim((string) $account->person_urn);
+        if (str_starts_with($stored, 'urn:li:')) {
+            return $stored;
+        }
+        return "urn:li:person:{$stored}";
     }
 
     private function firstCommentEnabled(LinkedInPost $draft): bool
@@ -556,7 +575,7 @@ class LinkedInPublishService
         $registerPayload = [
             'registerUploadRequest' => [
                 'recipes' => ['urn:li:digitalmediaRecipe:feedshare-image'],
-                'owner' => "urn:li:person:{$account->person_urn}",
+                'owner' => $this->authorUrn($account),
                 'serviceRelationships' => [[
                     'relationshipType' => 'OWNER',
                     'identifier' => 'urn:li:userGeneratedContent',
