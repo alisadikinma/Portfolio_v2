@@ -35,6 +35,7 @@ class LinkedInPost extends Model
         'linkedin_post_urn',
         'linkedin_asset_urn',
         'thumbnail_asset_urn',
+        'slide_asset_urns',
         'linkedin_post_url',
         'status',
         'pipeline_state_log',
@@ -45,6 +46,7 @@ class LinkedInPost extends Model
     protected $casts = [
         'hashtags' => 'array',
         'carousel_slides' => 'array',
+        'slide_asset_urns' => 'array',
         'validation_log' => 'array',
         'pipeline_state_log' => 'array',
         'scheduled_at' => 'datetime',

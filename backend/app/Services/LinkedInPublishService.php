@@ -215,22 +215,200 @@ class LinkedInPublishService
     }
 
     /**
-     * Publish a carousel PDF via 3-step flow. DEFERRED — requires PDF
-     * composition via TCPDF (plugin Phase D11). For now returns 503.
+     * Publish a carousel as a LinkedIn multi-image post. MVP path while the
+     * proper TCPDF document carousel is deferred. Visually similar to a
+     * native PDF carousel — viewer swipes through the rendered slides as
+     * a multi-image gallery.
+     *
+     * Flow:
+     *   1. Validate every slide has image_status=done + image_url
+     *   2. Cap at 9 slides (LinkedIn ugcPost media[] limit)
+     *   3. For each slide where slide_asset_urns[i] is missing →
+     *      registerAndUploadImage(image_url, account) → persist URN
+     *      (idempotent: 7-of-9 partial uploads survive across retries)
+     *   4. Compose ugcPost payload with shareMediaCategory=IMAGE +
+     *      media[] array of all asset URNs
+     *   5. POST /v2/ugcPosts → extract URN from X-RestLi-Id header
+     *   6. Schedule first-comment (blog link) when configured
+     *
+     * Note: LinkedIn shows multi-image posts as a swipeable gallery in
+     * feed; engagement is ~70-80% of true PDF document carousels but
+     * MVP gets us live publishing today. PDF flow (linkedin_asset_urn +
+     * shareMediaCategory=DOCUMENT) ships separately.
      */
     public function publishCarousel(LinkedInPost $draft, LinkedInAccount $account): array
     {
-        Log::info('[LinkedInPublish] publishCarousel invoked (deferred)', [
+        $slides = is_array($draft->carousel_slides) ? $draft->carousel_slides : [];
+        $slideCount = count($slides);
+
+        if ($slideCount === 0) {
+            return $this->carouselFailure($draft, 'Carousel has no slides — regenerate before publishing.');
+        }
+
+        if ($slideCount > 9) {
+            return $this->carouselFailure($draft, "LinkedIn allows max 9 images per multi-image post; this carousel has {$slideCount}. Reduce slides or wait for PDF carousel support.");
+        }
+
+        // Validate every slide has a rendered image ready to upload.
+        foreach ($slides as $i => $slide) {
+            $status = $slide['image_status'] ?? null;
+            $url = trim((string) ($slide['image_url'] ?? ''));
+            if ($status !== 'done' || $url === '') {
+                $human = $i + 1;
+                return $this->carouselFailure(
+                    $draft,
+                    "Slide {$human} not ready (status={$status}, image_url=" . ($url === '' ? 'empty' : 'present') . "). Regenerate failed slides before publishing."
+                );
+            }
+        }
+
+        // Resolve / upload asset URNs (idempotent — preserves prior partial uploads).
+        $persisted = is_array($draft->slide_asset_urns) ? $draft->slide_asset_urns : [];
+        $resolved = $persisted;
+        $changed = false;
+
+        foreach ($slides as $i => $slide) {
+            $key = (string) $i;
+            if (!empty($resolved[$key])) {
+                continue; // already uploaded in a prior attempt
+            }
+            $sourceUrl = trim((string) $slide['image_url']);
+            $urn = $this->registerAndUploadImage($sourceUrl, $account);
+            if ($urn === null) {
+                // Persist whatever succeeded so far before bailing.
+                if ($changed) {
+                    $draft->update(['slide_asset_urns' => $resolved]);
+                }
+                $human = $i + 1;
+                return $this->carouselFailure(
+                    $draft,
+                    "Failed to upload slide {$human} to LinkedIn. Retry publish to resume from this slide.",
+                    /* persistError */ true
+                );
+            }
+            $resolved[$key] = $urn;
+            $changed = true;
+        }
+
+        if ($changed) {
+            $draft->update(['slide_asset_urns' => $resolved]);
+        }
+
+        // Compose payload. media[] order MUST follow slide_number — viewers
+        // swipe in array order so cover (slide 1) must be first.
+        $draft->loadMissing(['post.translations']);
+        $blogTitle = (string) ($draft->post?->translations->first()?->title ?? 'Carousel');
+        $titleText = mb_substr($blogTitle, 0, 200);
+
+        $media = [];
+        foreach ($slides as $i => $slide) {
+            $key = (string) $i;
+            if (empty($resolved[$key])) {
+                // Defensive — should never happen given the loop above.
+                return $this->carouselFailure($draft, "Slide " . ($i + 1) . " has no asset URN after upload phase. This is a bug; please report.");
+            }
+            $media[] = [
+                'status' => 'READY',
+                'media' => $resolved[$key],
+                'title' => ['text' => $titleText],
+            ];
+        }
+
+        $body = $this->composeTextBody($draft);
+        if ($body === '') {
+            return $this->carouselFailure($draft, 'Cannot publish: caption is empty. Edit content before publishing.');
+        }
+
+        $author = "urn:li:person:{$account->person_urn}";
+        $payload = [
+            'author' => $author,
+            'lifecycleState' => 'PUBLISHED',
+            'specificContent' => [
+                'com.linkedin.ugc.ShareContent' => [
+                    'shareCommentary' => ['text' => $body],
+                    'shareMediaCategory' => 'IMAGE',
+                    'media' => $media,
+                ],
+            ],
+            'visibility' => [
+                'com.linkedin.ugc.MemberNetworkVisibility' => 'PUBLIC',
+            ],
+        ];
+
+        $baseUrl = rtrim((string) config('linkedin.api.base_url', 'https://api.linkedin.com/v2'), '/');
+        $endpoint = $baseUrl . (string) config('linkedin.api.ugc_posts_endpoint', '/ugcPosts');
+
+        try {
+            $response = Http::withToken($account->access_token)
+                ->withHeaders([
+                    'X-Restli-Protocol-Version' => '2.0.0',
+                    'Content-Type' => 'application/json',
+                    'LinkedIn-Version' => (string) config('linkedin.api.version', '202405'),
+                ])
+                ->timeout(45)
+                ->post($endpoint, $payload);
+        } catch (\Throwable $e) {
+            Log::error('[LinkedInPublish] publishCarousel HTTP exception', [
+                'draft_id' => $draft->id,
+                'error' => $e->getMessage(),
+            ]);
+            return $this->carouselFailure($draft, 'Network error calling LinkedIn: ' . $e->getMessage());
+        }
+
+        if (!$response->successful()) {
+            Log::warning('[LinkedInPublish] publishCarousel API error', [
+                'draft_id' => $draft->id,
+                'status' => $response->status(),
+                'body' => mb_substr((string) $response->body(), 0, 500),
+            ]);
+            return $this->carouselFailure(
+                $draft,
+                "LinkedIn API {$response->status()}: " . $this->extractApiError($response)
+            );
+        }
+
+        $postUrn = $response->header('X-RestLi-Id') ?: ($response->json('id'));
+        $postUrl = $this->urnToPublicUrl($postUrn);
+
+        Log::info('[LinkedInPublish] publishCarousel success', [
             'draft_id' => $draft->id,
-            'account_id' => $account->id,
-            'slide_count' => is_array($draft->carousel_slides) ? count($draft->carousel_slides) : 0,
+            'post_urn' => $postUrn,
+            'slide_count' => $slideCount,
         ]);
 
+        if ($this->firstCommentEnabled($draft) && $postUrn) {
+            $delay = (int) config('linkedin.first_comment_delay_seconds', 30);
+            PostLinkedInFirstComment::dispatch($draft->id, $postUrn, $account->id)
+                ->delay(now()->addSeconds(max(5, $delay)));
+        }
+
+        return [
+            'success' => true,
+            'post_urn' => $postUrn,
+            'post_url' => $postUrl,
+            'error' => null,
+        ];
+    }
+
+    /**
+     * Uniform failure return + optional last_error persistence for
+     * publishCarousel branches. Keeping this helper inline avoids
+     * scattering identical 4-key arrays across 8+ early-exit paths.
+     */
+    private function carouselFailure(LinkedInPost $draft, string $message, bool $persistError = false): array
+    {
+        if ($persistError) {
+            try {
+                $draft->update(['last_error' => $message]);
+            } catch (\Throwable $e) {
+                // Non-fatal — surface the original error to the caller.
+            }
+        }
         return [
             'success' => false,
             'post_urn' => null,
             'post_url' => null,
-            'error' => 'Carousel publish deferred — PDF composition (TCPDF) + document upload pending. Route to manual_review for now.',
+            'error' => $message,
         ];
     }
 
