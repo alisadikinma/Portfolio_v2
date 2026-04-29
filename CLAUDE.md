@@ -778,6 +778,16 @@ mysql -u ali -p portfolio_v2 -e "SELECT COUNT(*) FROM jobs;"  # not growing unbo
 
 Full ops doc + troubleshooting at [scripts/systemd/README.md](scripts/systemd/README.md). Symptom of missing setup: 20+ "in-progress" rows piling up in admin UI with `updated_at` timestamps far in the past.
 
+**ALSO check there's no rogue cron-fired `queue:work` running as `www-data`:**
+```bash
+sudo crontab -u www-data -l 2>/dev/null   # → "no crontab for www-data" expected
+ps -u www-data -o pid,etime,cmd | grep "queue:work" | grep -v grep   # → empty expected
+```
+
+Production incident **April 29, 2026 (session 8)**: a forgotten www-data crontab from the original VPS bootstrap was firing `php artisan queue:work --stop-when-empty --max-time=50 --tries=2` every minute alongside the new claudesn systemd worker. The www-data worker would race with claudesn picking up `RegenerateLinkedInCarouselContent` and `GenerateLinkedInPost` jobs in the WRONG user context — www-data cannot read `/home/claudesn/.ssh/id_ed25519` (mode 600), so /carousel-gen + /linkedin-gen invocations failed `SSH prompt write failed: Warning: Identity file ... not accessible: Permission denied`. Plus `--max-time=50` killed the worker mid-job (carousel-gen needs 3-7 min), causing `MaxAttemptsExceededException` on the next pickup attempt. Plus `--stop-when-empty` meant 60 ephemeral workers per hour vs one persistent systemd unit — wasteful and harder to reason about.
+
+If you find this crontab, remove it: `sudo crontab -u www-data -r`. The systemd unit + claudesn schedule:run cover both responsibilities.
+
 ### Empty MCP Config (Required for Pipeline Runs)
 
 Every `claude -p "..."` invocation from `LinkedInGenerationService` and `ArticleGenerationService` is a **fresh, one-shot CLI process** — there's no shared session between calls. Each invocation boots claude from scratch, including loading **all MCP servers** from the user's `~/.claude.json`.
