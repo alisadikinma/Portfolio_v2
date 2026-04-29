@@ -649,6 +649,32 @@ const showThumbnailUploadCaption = computed(() =>
 
             <!-- CAROUSEL format -->
             <div v-else-if="draft.format === 'carousel'" class="px-6 py-5 space-y-4">
+              <!-- LinkedIn-style author header (mirrors text mockup so operator
+                   sees what the post looks like in feed). -->
+              <header class="flex items-start gap-3 pb-4 border-b border-neutral-800/60">
+                <div class="w-11 h-11 rounded-full bg-gradient-to-br from-amber-500 to-cyan-500 flex items-center justify-center text-neutral-950 font-bold text-sm">
+                  AS
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="font-semibold text-neutral-100 text-sm">Ali Sadikin Ma</p>
+                  <p class="text-xs text-neutral-500">AI Generalist Expert · now · <span class="font-mono">PUBLIC</span></p>
+                </div>
+                <svg viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 text-[#0077B5] shrink-0">
+                  <path :d="ICON.linkedin" />
+                </svg>
+              </header>
+
+              <!-- Post body caption — what shows above the carousel attachment
+                   in LinkedIn feed. Operator sees the EXACT text + paragraph
+                   breaks that will publish. Empty fallback shows "—" with
+                   warning so operator knows caption is missing. -->
+              <div v-if="draft.content && draft.content.trim() !== ''" class="whitespace-pre-wrap text-neutral-200 leading-relaxed text-[15px]">
+                {{ draft.content }}
+              </div>
+              <div v-else class="rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-200">
+                <strong class="text-amber-300">No caption.</strong> The carousel will publish without a body — typically 50% lower reach. Click "Edit content" to add one.
+              </div>
+
               <div v-if="carouselSlides.length === 0" class="text-center py-12">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-10 h-10 text-neutral-600 mx-auto mb-2">
                   <path :d="ICON.image" />
@@ -827,6 +853,17 @@ const showThumbnailUploadCaption = computed(() =>
 
               <div v-if="Array.isArray(draft.hashtags) && draft.hashtags.length > 0" class="flex flex-wrap gap-x-2 gap-y-1 pt-3 border-t border-neutral-800/60">
                 <span v-for="tag in draft.hashtags" :key="tag" class="text-cyan-400 text-sm">{{ tag }}</span>
+              </div>
+
+              <!-- First-comment bubble (link to original blog post). LinkedIn
+                   posts this 30s after the main post via PostLinkedInFirstComment
+                   job — avoids the 60% reach penalty from in-body URLs. -->
+              <div
+                v-if="draft.link_comment"
+                class="mt-2 p-3 rounded-lg border border-cyan-500/20 bg-cyan-500/5"
+              >
+                <p class="text-[10px] text-cyan-400 font-mono uppercase tracking-[0.14em] mb-1">First comment (auto-posted +30s)</p>
+                <p class="text-sm text-neutral-300 break-all">{{ draft.link_comment }}</p>
               </div>
             </div>
           </article>
