@@ -1219,6 +1219,7 @@ Route::middleware(['auth:sanctum'])->prefix('admin/linkedin-drafts')->group(func
     // synchronously into LinkedInCarouselImageService (HTTP to GeminiGen).
     // Webhook completes asynchronously; frontend polls draft.show for status.
     Route::post('/{id}/regenerate-images', [LinkedInDraftController::class, 'regenerateAllImages']);
+    Route::post('/{id}/regenerate-caption', [LinkedInDraftController::class, 'regenerateCaption']);
     Route::post('/{id}/slides/{slideIndex}/regenerate-image', [LinkedInDraftController::class, 'regenerateSlideImage']);
 });
 

@@ -597,7 +597,8 @@ POST   /api/admin/linkedin-drafts/{id}/cancel        # Any non-terminal → canc
 POST   /api/admin/linkedin-drafts/{id}/publish-now   # awaiting_publish → published (via LinkedInPublishService; 503 until OAuth configured + plugin content-gen wired)
 
 # Carousel image generation (April 27, 2026)
-POST   /api/admin/linkedin-drafts/{id}/regenerate-images                          # Re-dispatch GeminiGen for every non-done slide
+POST   /api/admin/linkedin-drafts/{id}/regenerate-images                          # Re-dispatch /carousel-gen + every slide (~5-7 min, FE label "Regenerate All Images")
+POST   /api/admin/linkedin-drafts/{id}/regenerate-caption                         # Re-synth caption + hashtags from current slides (~1s, sync, carousel-only — Apr 29)
 POST   /api/admin/linkedin-drafts/{id}/slides/{slideIndex}/regenerate-image       # Re-dispatch single slide (per-slide retry button)
 POST   /api/automation/linkedin/carousel-image-webhook                            # PUBLIC — GeminiGen callback (mirrors slide status onto carousel_slides JSON)
 

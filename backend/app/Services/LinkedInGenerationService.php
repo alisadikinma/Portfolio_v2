@@ -872,6 +872,69 @@ class LinkedInGenerationService
      *
      * Plugin captions ≥800 chars are trusted as-is (legacy v0.4.x envelopes).
      */
+    /**
+     * Re-synthesize caption + hashtags from existing carousel slides without
+     * touching slide images, FSM state, or draft ID. Used by the admin
+     * "Regenerate caption" button when slides look good but the caption
+     * needs a refresh (operator scenario: re-authored slides preserve
+     * caption per design — but operator wants caption updated to match
+     * new slide content).
+     *
+     * Forces backend synthesis by passing empty pluginCaption — the trust
+     * threshold (≥800 chars passthrough) won't fire so buildCarouselCaption
+     * runs the 7-block synthesizer (hook, subtitle, setup, pull-quote,
+     * insight bullets, engagement question, link CTA).
+     *
+     * Hashtags re-resolved with null plugin/brief inputs — falls through to
+     * blog meta_keywords synthesis path with brand handle enforcement.
+     *
+     * Carousel-only — text format's "caption" IS the post body, can't be
+     * regenerated independently of the post.
+     */
+    public function regenerateCaption(LinkedInPost $draft): array
+    {
+        if ($draft->format !== 'carousel') {
+            return [
+                'success' => false,
+                'error' => 'Caption regeneration is only available for carousel drafts. Text-format captions are the post body and require a full regenerate.',
+            ];
+        }
+
+        $slides = is_array($draft->carousel_slides) ? $draft->carousel_slides : [];
+        if (empty($slides)) {
+            return [
+                'success' => false,
+                'error' => 'Draft has no carousel slides to source caption content from.',
+            ];
+        }
+
+        $draft->loadMissing(['post.translations']);
+
+        $carousel = ['slides' => $slides];
+        $brief = is_array($draft->validation_log['brief'] ?? null) ? $draft->validation_log['brief'] : [];
+
+        $newCaption = $this->buildCarouselCaption('', $carousel, $brief, $draft);
+        $newHashtags = $this->resolveHashtags(null, $brief['hashtags'] ?? null, $draft);
+
+        $draft->update([
+            'content' => $newCaption,
+            'hashtags' => $newHashtags,
+        ]);
+
+        Log::info('[LinkedInGeneration] Caption regenerated', [
+            'draft_id' => $draft->id,
+            'caption_length' => mb_strlen($newCaption),
+            'hashtag_count' => count($newHashtags),
+        ]);
+
+        return [
+            'success' => true,
+            'draft_id' => $draft->id,
+            'content' => $newCaption,
+            'hashtags' => $newHashtags,
+        ];
+    }
+
     private function buildCarouselCaption(string $pluginCaption, array $carousel, array $brief, LinkedInPost $draft): string
     {
         $cleaned = trim($pluginCaption);
