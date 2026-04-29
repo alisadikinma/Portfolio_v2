@@ -57,10 +57,76 @@ function classifyForQueue(draft) {
   return null
 }
 
+// --- Sorting ----------------------------------------------------------------
+// Default: virality DESC then published DESC (freshest, most viral first).
+// Operator can click any header to override; second click flips direction;
+// third click drops back to default (sortKey=null).
+const SORT_DEFAULT = { key: null, dir: 'desc' }
+const sortState = ref({ ...SORT_DEFAULT })
+
+function toggleSort(key) {
+  if (sortState.value.key !== key) {
+    sortState.value = { key, dir: 'desc' }
+  } else if (sortState.value.dir === 'desc') {
+    sortState.value = { key, dir: 'asc' }
+  } else {
+    sortState.value = { ...SORT_DEFAULT }
+  }
+}
+
+// Pluck the comparable value for a given sort key. Nulls always sink so
+// drafts with missing data never beat drafts that have it (avoids unscored
+// drafts ranking #1 just because their null sorts before 100).
+function sortValue(draft, key) {
+  switch (key) {
+    case 'virality':  return draft.post?.content_idea?.virality_score ?? null
+    case 'depth':     return draft.depth_score ?? null
+    case 'published': {
+      const p = draft.post?.published_at
+      return p ? new Date(p).getTime() : null
+    }
+    case 'source':    return (postTitle(draft) || '').toLowerCase()
+    default:          return null
+  }
+}
+
+function compareDrafts(a, b, key, dir) {
+  const av = sortValue(a, key)
+  const bv = sortValue(b, key)
+  // Null sink: present values always win over null regardless of direction
+  if (av === null && bv === null) return 0
+  if (av === null) return 1
+  if (bv === null) return -1
+  if (av < bv) return dir === 'asc' ? -1 : 1
+  if (av > bv) return dir === 'asc' ? 1 : -1
+  return 0
+}
+
 const drafts = computed(() => {
-  if (activeTab.value === 'all') return allDrafts.value
-  return allDrafts.value.filter((d) => classifyForQueue(d) === activeTab.value)
+  const filtered = activeTab.value === 'all'
+    ? [...allDrafts.value]
+    : allDrafts.value.filter((d) => classifyForQueue(d) === activeTab.value)
+
+  // User-driven sort overrides default
+  if (sortState.value.key) {
+    return filtered.sort((a, b) =>
+      compareDrafts(a, b, sortState.value.key, sortState.value.dir)
+    )
+  }
+
+  // Default sort: virality DESC, then published DESC. Stable on ties.
+  return filtered.sort((a, b) => {
+    const cv = compareDrafts(a, b, 'virality', 'desc')
+    if (cv !== 0) return cv
+    return compareDrafts(a, b, 'published', 'desc')
+  })
 })
+
+// Sort indicator helper for header rendering
+function sortIndicator(key) {
+  if (sortState.value.key !== key) return null
+  return sortState.value.dir === 'asc' ? '▲' : '▼'
+}
 
 const counts = computed(() => {
   const c = { manual_review: 0, failed: 0, in_progress: 0 }
@@ -216,12 +282,43 @@ const emptyMessage = computed(() => ({
 
     <!-- Table-list (cockpit, hairline dividers, no card boxes) -->
     <div v-else class="rounded-2xl border border-neutral-800/80 bg-neutral-950/40 overflow-hidden">
-      <div class="hidden md:grid grid-cols-[1fr_120px_84px_1fr_100px_140px] px-5 py-2.5 text-[10px] font-mono uppercase tracking-[0.14em] text-neutral-500 border-b border-neutral-800/80">
-        <span>Source</span>
+      <!-- Header row: 7 cols. Sortable headers are buttons; non-sortable
+           are plain spans. Active sort col gets amber accent + ▲/▼ glyph. -->
+      <div class="hidden md:grid grid-cols-[1fr_90px_130px_70px_1fr_110px_130px] px-5 py-2.5 text-[10px] font-mono uppercase tracking-[0.14em] text-neutral-500 border-b border-neutral-800/80 gap-x-4">
+        <button
+          @click="toggleSort('source')"
+          class="text-left inline-flex items-center gap-1 hover:text-neutral-300 transition-colors"
+          :class="sortState.key === 'source' ? 'text-amber-400' : ''"
+        >
+          Source
+          <span v-if="sortIndicator('source')" class="text-[8px]">{{ sortIndicator('source') }}</span>
+        </button>
+        <button
+          @click="toggleSort('virality')"
+          class="text-right inline-flex items-center justify-end gap-1 hover:text-neutral-300 transition-colors"
+          :class="sortState.key === 'virality' ? 'text-amber-400' : ''"
+        >
+          Virality
+          <span v-if="sortIndicator('virality')" class="text-[8px]">{{ sortIndicator('virality') }}</span>
+        </button>
         <span>Status</span>
-        <span class="text-right">Depth</span>
+        <button
+          @click="toggleSort('depth')"
+          class="text-right inline-flex items-center justify-end gap-1 hover:text-neutral-300 transition-colors"
+          :class="sortState.key === 'depth' ? 'text-amber-400' : ''"
+        >
+          Depth
+          <span v-if="sortIndicator('depth')" class="text-[8px]">{{ sortIndicator('depth') }}</span>
+        </button>
         <span>Issue</span>
-        <span class="text-right">Updated</span>
+        <button
+          @click="toggleSort('published')"
+          class="text-right inline-flex items-center justify-end gap-1 hover:text-neutral-300 transition-colors"
+          :class="sortState.key === 'published' ? 'text-amber-400' : ''"
+        >
+          Published
+          <span v-if="sortIndicator('published')" class="text-[8px]">{{ sortIndicator('published') }}</span>
+        </button>
         <span class="text-right">Actions</span>
       </div>
 
@@ -230,12 +327,25 @@ const emptyMessage = computed(() => ({
           v-for="draft in drafts"
           :key="draft.id"
           @click="openDetail(draft.id)"
-          class="group relative px-5 py-3.5 grid md:grid-cols-[1fr_120px_84px_1fr_100px_140px] gap-y-2 gap-x-4 cursor-pointer hover:bg-neutral-900/40 transition-colors"
+          class="group relative px-5 py-3.5 grid md:grid-cols-[1fr_90px_130px_70px_1fr_110px_130px] gap-y-2 gap-x-4 cursor-pointer hover:bg-neutral-900/40 transition-colors"
         >
           <!-- Source -->
           <div class="min-w-0">
             <p class="text-sm text-neutral-200 truncate font-medium">{{ postTitle(draft) }}</p>
             <p class="text-[11px] font-mono text-neutral-600">#{{ draft.id }} · {{ formatChip(draft.format) }}<template v-if="draft.format === 'carousel' && Array.isArray(draft.carousel_slides)"> · {{ draft.carousel_slides.length }} slides</template></p>
+          </div>
+
+          <!-- Virality (sourced from post.content_idea.virality_score) -->
+          <div class="md:self-center md:text-right">
+            <span
+              v-if="draft.post?.content_idea?.virality_score !== null && draft.post?.content_idea?.virality_score !== undefined"
+              class="text-sm font-mono font-bold"
+              :class="depthTone(draft.post.content_idea.virality_score)"
+              :title="`Virality score: ${draft.post.content_idea.virality_score}/100 (from Content Engine)`"
+            >
+              {{ draft.post.content_idea.virality_score }}
+            </span>
+            <span v-else class="text-sm text-neutral-600 font-mono" title="No Content Engine source — manual blog post">—</span>
           </div>
 
           <!-- Status — uses effectiveStatusMeta so carousel rows in
@@ -257,6 +367,7 @@ const emptyMessage = computed(() => ({
               v-if="draft.depth_score !== null && draft.depth_score !== undefined"
               class="text-sm font-mono font-bold"
               :class="depthTone(draft.depth_score)"
+              :title="`LinkedIn depth score: ${draft.depth_score}/100`"
             >
               {{ draft.depth_score }}
             </span>
@@ -268,9 +379,14 @@ const emptyMessage = computed(() => ({
             {{ issueSummary(draft) }}
           </div>
 
-          <!-- Updated -->
+          <!-- Published (source blog's published_at, falls back to draft updated_at) -->
           <div class="md:self-center md:text-right text-xs text-neutral-500 font-mono whitespace-nowrap">
-            {{ relativeTime(draft.updated_at) }}
+            <template v-if="draft.post?.published_at">
+              <span :title="`Blog published: ${draft.post.published_at}`">{{ relativeTime(draft.post.published_at) }}</span>
+            </template>
+            <span v-else class="text-neutral-600" :title="`Draft last updated: ${draft.updated_at}`">
+              {{ relativeTime(draft.updated_at) }}*
+            </span>
           </div>
 
           <!-- Actions -->

@@ -128,6 +128,16 @@ class Post extends Model
         return $this->hasMany(\App\Models\LinkedInPost::class);
     }
 
+    /**
+     * Inverse of ContentIdea::post — the Content Engine idea that produced
+     * this published post (if any). Manual blog posts return null.
+     * Drives virality_score surfacing in the LinkedIn admin queue.
+     */
+    public function contentIdea()
+    {
+        return $this->hasOne(\App\Models\ContentIdea::class, 'result_post_id');
+    }
+
     public function relatedPosts()
     {
         return $this->belongsToMany(Post::class, 'related_posts', 'post_id', 'related_post_id')

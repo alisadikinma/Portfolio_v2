@@ -48,7 +48,7 @@ class LinkedInDraftController extends Controller
             'per_page' => ['nullable', 'integer', 'min:1', 'max:200'],
         ]);
 
-        $query = LinkedInPost::with(['post.translations', 'account'])
+        $query = LinkedInPost::with(['post.translations', 'post.contentIdea:id,result_post_id,virality_score', 'account'])
             ->orderByDesc('updated_at');
 
         if (!empty($validated['status'])) {
@@ -80,7 +80,7 @@ class LinkedInDraftController extends Controller
 
     public function show(int $id): JsonResponse
     {
-        $draft = LinkedInPost::with(['post.translations', 'account'])->find($id);
+        $draft = LinkedInPost::with(['post.translations', 'post.contentIdea:id,result_post_id,virality_score', 'account'])->find($id);
         if ($draft === null) {
             return $this->notFound();
         }
@@ -124,7 +124,7 @@ class LinkedInDraftController extends Controller
         // status=validating + plugin dispatch.
         return response()->json([
             'success' => true,
-            'data' => $draft->fresh(['post.translations', 'account']),
+            'data' => $draft->fresh(['post.translations', 'post.contentIdea:id,result_post_id,virality_score', 'account']),
             'warnings' => ['Re-validation deferred until plugin content-generation pipeline ships'],
         ]);
     }
@@ -272,7 +272,7 @@ class LinkedInDraftController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => $draft->fresh(['post.translations', 'account']),
+                'data' => $draft->fresh(['post.translations', 'post.contentIdea:id,result_post_id,virality_score', 'account']),
                 'message' => 'Scheduled for ' . $publishAt->toIso8601String(),
             ]);
         } catch (InvalidStateTransitionException $e) {
@@ -297,7 +297,7 @@ class LinkedInDraftController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => $draft->fresh(['post.translations', 'account']),
+                'data' => $draft->fresh(['post.translations', 'post.contentIdea:id,result_post_id,virality_score', 'account']),
                 'message' => 'Draft cancelled. Regenerate to re-attempt.',
             ]);
         } catch (InvalidStateTransitionException $e) {
@@ -355,7 +355,7 @@ class LinkedInDraftController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $draft->fresh(['post.translations', 'account']),
+            'data' => $draft->fresh(['post.translations', 'post.contentIdea:id,result_post_id,virality_score', 'account']),
             'message' => 'Published to LinkedIn.',
         ]);
     }
@@ -443,7 +443,7 @@ class LinkedInDraftController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $draft->fresh(['post.translations', 'account']),
+            'data' => $draft->fresh(['post.translations', 'post.contentIdea:id,result_post_id,virality_score', 'account']),
             'message' => "Re-authoring {$slideCount} slide(s) via /carousel-gen plugin (~2-3 min) then rendering images (~3-4 min). Total ~5-7 min — webhooks will update slides live as each finishes.",
             'queued' => $slideCount,
         ], 202);
@@ -507,13 +507,13 @@ class LinkedInDraftController extends Controller
                     'code' => 'dispatch_failed',
                     'message' => 'GeminiGen dispatch returned no UUID. Check logs.',
                 ],
-                'data' => $draft->fresh(['post.translations', 'account']),
+                'data' => $draft->fresh(['post.translations', 'post.contentIdea:id,result_post_id,virality_score', 'account']),
             ], 503);
         }
 
         return response()->json([
             'success' => true,
-            'data' => $draft->fresh(['post.translations', 'account']),
+            'data' => $draft->fresh(['post.translations', 'post.contentIdea:id,result_post_id,virality_score', 'account']),
             'message' => "Slide {$slideIndex} re-dispatched.",
             'job_uuid' => $uuid,
         ]);
