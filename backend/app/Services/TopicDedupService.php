@@ -27,8 +27,12 @@ class TopicDedupService
 
         $incomingSlug = Str::slug($incoming);
 
+        // content_ideas has no `slug` column — slug is computed at compare time
+        // via Str::slug($existing->title). Selecting `slug` here used to throw
+        // SQLSTATE[42S22] under MySQL strict mode, killing the daily trending
+        // import.
         $candidates = ContentIdea::where('created_at', '>=', now()->subDays(self::LOOKBACK_DAYS))
-            ->get(['id', 'title', 'slug', 'pillar', 'source', 'status', 'created_at']);
+            ->get(['id', 'title', 'pillar', 'source', 'status', 'created_at']);
 
         foreach ($candidates as $existing) {
             if (Str::slug((string) $existing->title) === $incomingSlug) {
