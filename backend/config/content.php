@@ -45,5 +45,13 @@ return [
         // so 60 = 3 Sonnet calls. Raise when the admin modal feels too thin;
         // each extra chunk adds ~3-5s latency + 1 Sonnet invocation.
         'max_scored' => (int) env('TRENDING_MAX_SCORED', 60),
+
+        // Hard gate for the daily auto-import (PullTrendingDaily). Topics
+        // whose AI-scored virality_score falls below this threshold are
+        // skipped — they never reach the content_ideas table. Default 70
+        // matches the editorial bar for "this is worth writing about".
+        // Lower this to widen the funnel during slow news cycles, raise it
+        // when the queue is overflowing with mid-tier topics.
+        'virality_threshold' => (int) env('TRENDING_VIRALITY_THRESHOLD', 70),
     ],
 ];
