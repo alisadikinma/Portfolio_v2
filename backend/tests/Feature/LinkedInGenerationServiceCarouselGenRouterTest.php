@@ -13,15 +13,17 @@ use Tests\TestCase;
  * Unit tests for LinkedInGenerationService::applyCarouselGenAdapter.
  *
  * Plugin v0.5.0 retired /linkedin-carousel + the
- * `linkedin.use_carousel_gen_engine` feature flag. The router now
- * always dispatches /carousel-gen for carousel format. Behavior matrix:
+ * `linkedin.use_carousel_gen_engine` feature flag. May 2026 follow-up
+ * removed the legacy envelope fallback entirely — for carousel format,
+ * the orchestrator MUST emit `status='route_to_carousel_gen'`. Anything
+ * else (including the pre-v0.5.0 inline `complete` envelope) gets rejected
+ * via CarouselGenAdapterException.
  *
- *   format='text'                                 → return parsed unchanged
- *   format='carousel' + status='route_to_carousel_gen' → dispatch /carousel-gen,
- *                                                         build carousel slot,
- *                                                         promote status to 'complete'
- *   format='carousel' + status='complete' (legacy) → dispatch /carousel-gen,
- *                                                     REPLACE carousel.slides
+ *   format='text'                                       → return parsed unchanged
+ *   format='carousel' + status='route_to_carousel_gen'  → dispatch /carousel-gen,
+ *                                                          build carousel slot,
+ *                                                          promote to 'complete'
+ *   format='carousel' + ANY OTHER status                → throw (legacy rejected)
  *
  * Adapter exceptions (CarouselGenAdapterException) are thrown to caller —
  * generate() catches and routes draft to FSM Failed.
@@ -100,18 +102,20 @@ class LinkedInGenerationServiceCarouselGenRouterTest extends TestCase
         $this->assertSame('PAS', $result['brief']['hook_framework']);
     }
 
-    public function test_legacy_complete_carousel_envelope_replaces_slides(): void
+    public function test_rejects_legacy_complete_carousel_envelope(): void
     {
-        // Backward compat: old envelope with status='complete' + inline slides
-        // still gets routed through /carousel-gen and slides[] replaced.
+        // Legacy fallback removal (May 2026): pre-v0.5.0 envelopes with
+        // status='complete' + format='carousel' + inline slides MUST be
+        // rejected. Operator-side regenerate / queue retry surfaces this
+        // as FSM Failed instead of silently honoring stale plugin output.
         $svc = Mockery::mock(LinkedInGenerationService::class . '[dispatchCarouselGenEngine]', [
             Mockery::mock(PipelineGuard::class),
             new CarouselGenOutputAdapter(),
         ])->makePartial();
 
-        $svc->shouldReceive('dispatchCarouselGenEngine')
-            ->once()
-            ->andReturn($this->fakeCarouselGenOutput());
+        // dispatchCarouselGenEngine MUST NOT be called for legacy envelopes —
+        // we throw before reaching dispatch.
+        $svc->shouldNotReceive('dispatchCarouselGenEngine');
 
         $parsed = [
             'status' => 'complete',
@@ -126,15 +130,10 @@ class LinkedInGenerationServiceCarouselGenRouterTest extends TestCase
             'generated_at' => '2026-04-28T10:00:00Z',
         ];
 
-        $result = $svc->applyCarouselGenAdapter($parsed, 'https://example.com/blog/x', 42);
+        $this->expectException(CarouselGenAdapterException::class);
+        $this->expectExceptionMessageMatches("/route_to_carousel_gen|Legacy envelopes/i");
 
-        // Status stays complete (already there).
-        $this->assertSame('complete', $result['status']);
-        // Slides replaced with adapter output.
-        $this->assertCount(5, $result['carousel']['slides']);
-        $this->assertSame('Cover ID', $result['carousel']['slides'][0]['copy_id']);
-        // Validation preserved (legacy envelopes had inline validation).
-        $this->assertSame(85, $result['validation']['depth_score']);
+        $svc->applyCarouselGenAdapter($parsed, 'https://example.com/blog/x', 42);
     }
 
     public function test_throws_carousel_gen_adapter_exception_when_carousel_gen_returns_failed(): void

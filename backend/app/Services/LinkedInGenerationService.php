@@ -379,35 +379,45 @@ class LinkedInGenerationService
 
     /**
      * Parse plugin stdout for the first top-level JSON object matching the
-     * orchestrator schema. Plugin may emit interactive narration after the
-     * JSON — we anchor on the leading `{` and match balanced braces.
+     * orchestrator schema. Plugin may emit a Sonnet-narrated preamble
+     * ("Verified facts… let me assemble the JSON…") and wrap the JSON in a
+     * ```json fenced block — the balanced-brace scanner anchors on the first
+     * `{` and ignores both prefixes/suffixes naturally.
+     *
+     * Earlier versions stripped fences with `preg_replace('/\s*```.*$/s', '')`,
+     * but with `s`-flag the LEFTMOST `\s*```` match landed on the OPENING
+     * ```json fence and the greedy `.*$` consumed the entire JSON to EOF —
+     * leaving only preamble. Real production failure on draft #43 (Apr 29)
+     * surfaced the regression. Dropping fence-strip entirely is safe because
+     * `strpos($text, '{')` skips Sonnet preamble (preamble bullets contain
+     * markdown brackets `[]` but never `{`) and the balanced-brace scanner
+     * stops at the matched `}` regardless of trailing fence/narration.
      *
      * Returns null on parse failure.
      */
     public function parseOrchestratorOutput(string $raw): ?array
     {
-        $text = trim($raw);
-        if ($text === '') {
+        $text = (string) $raw;
+        if (trim($text) === '') {
             return null;
         }
 
-        // Strip optional markdown fence
-        $text = preg_replace('/^```(?:json)?\s*/i', '', $text);
-        $text = preg_replace('/\s*```.*$/s', '', (string) $text);
-
-        // Anchor on first `{`
+        // Anchor on first `{` — skips Sonnet preamble narration and any
+        // ```json fence opener (fence chars are backtick + 'json' + newline,
+        // none of which include `{`).
         $start = strpos($text, '{');
         if ($start === false) {
             return null;
         }
 
-        // Balanced brace scan to find the matching `}` even if interactive
-        // narration follows.
+        // Balanced brace scan to find the matching `}` even if a closing
+        // ```fence or interactive narration follows.
         $depth = 0;
         $end = null;
         $inString = false;
         $escape = false;
-        for ($i = $start; $i < strlen($text); $i++) {
+        $len = strlen($text);
+        for ($i = $start; $i < $len; $i++) {
             $c = $text[$i];
             if ($inString) {
                 if ($escape) {
@@ -477,30 +487,39 @@ class LinkedInGenerationService
             'last_error' => null,
         ];
 
-        if ($format === 'carousel' && is_array($parsed['carousel'] ?? null)) {
-            $carousel = $parsed['carousel'];
-            $updates['carousel_slides'] = $carousel['slides'] ?? [];
+        if ($format === 'carousel') {
+            // Strict guard: by the time persistAndRoute runs for carousel
+            // format, applyCarouselGenAdapter MUST have populated slides[]
+            // from /carousel-gen. A missing or empty slot here means the
+            // adapter was bypassed (caller bug) — refuse to persist garbage.
+            $carousel = is_array($parsed['carousel'] ?? null) ? $parsed['carousel'] : [];
+            $slides = is_array($carousel['slides'] ?? null) ? $carousel['slides'] : [];
+            if (empty($slides)) {
+                $this->markFailed(
+                    $draft,
+                    'Carousel persist guard: /carousel-gen produced no slides — refusing to publish empty carousel.'
+                );
+                return [
+                    'success' => false,
+                    'draft_id' => $draft->id,
+                    'status' => 'failed',
+                    'error' => 'Carousel persist guard: empty slides',
+                ];
+            }
+            $updates['carousel_slides'] = $slides;
 
-            // Plugin v0.4.3+ emits caption + hashtags + link_comment at the
-            // carousel root. Post-v0.5.0 the universal /carousel-gen engine
-            // doesn't emit these (it focuses on slide visuals — caption +
-            // hashtags + link CTA are LinkedIn-publisher-side concerns).
-            // Backend is now the source of truth for those fields on
-            // carousel format.
-            $coverSlide = collect($carousel['slides'] ?? [])->firstWhere('is_cover', true)
-                ?? ($carousel['slides'][0] ?? []);
-
-            $pluginCaption = (string) ($carousel['caption'] ?? '');
-            $updates['content'] = $this->buildCarouselCaption($pluginCaption, $carousel, $parsed['brief'] ?? [], $draft);
+            // Backend is the sole source of truth for caption + hashtags +
+            // link_comment on carousel format — /carousel-gen focuses on
+            // slide visuals only (caption / hashtags / link CTA are LinkedIn-
+            // publisher-side concerns, not part of the universal carousel
+            // engine's contract).
+            $updates['content'] = $this->buildCarouselCaption('', $carousel, $parsed['brief'] ?? [], $draft);
             $updates['hashtags'] = $this->resolveHashtags(
-                $carousel['hashtags'] ?? null,
+                null,
                 $parsed['brief']['hashtags'] ?? null,
                 $draft
             );
-            $updates['link_comment'] = $this->resolveLinkComment(
-                (string) ($carousel['link_comment'] ?? ''),
-                $draft
-            );
+            $updates['link_comment'] = $this->resolveLinkComment('', $draft);
         } else {
             // Text path
             $post = $parsed['post'] ?? [];
@@ -625,25 +644,33 @@ class LinkedInGenerationService
     }
 
     /**
-     * Carousel router (post plugin v0.5.0).
+     * Carousel router — STRICT /carousel-gen enforcement (no legacy fallback).
      *
      * Behavior matrix:
-     *   format='text'                          → return $parsed unchanged
-     *   status='route_to_carousel_gen'         → dispatch /carousel-gen, build
-     *                                             carousel slot from adapter output
-     *   format='carousel' + 'complete' (legacy) → still dispatch /carousel-gen and
-     *                                              REPLACE $parsed.carousel.slides
-     *                                              (handles old envelopes during
-     *                                              the brief transition window)
+     *   format='text'                                 → return $parsed unchanged
+     *   format='carousel' + status='route_to_carousel_gen' → dispatch /carousel-gen,
+     *                                                         build carousel slot
+     *                                                         from adapter output
+     *   format='carousel' + ANY OTHER status          → throw (rejects legacy
+     *                                                   plugin envelopes, hand-
+     *                                                   crafted JSON, etc.)
      *
-     * Plugin v0.5.0 short-circuits at the brief stage for carousel format —
+     * Plugin v0.5.0+ short-circuits at the brief stage for carousel format —
      * /linkedin-gen emits status='route_to_carousel_gen' with carousel=null
-     * and validation=null. The backend builds the carousel slot from the
-     * /carousel-gen adapter output. Validation does not apply to carousels
-     * (the /carousel-gen schema enforces structural quality).
+     * and validation=null. The backend MUST build the carousel slot from the
+     * /carousel-gen adapter output and only that path. Validation does not
+     * apply to carousels (the /carousel-gen schema enforces structural quality).
+     *
+     * Pre-v0.5.0 envelopes with inline `status='complete' + format='carousel'`
+     * slides are explicitly rejected here — operator-side regenerate flow
+     * surfaces this as FSM Failed with a clear "legacy envelope rejected"
+     * message rather than silently honoring stale plugin output.
      *
      * @throws CarouselGenAdapterException When /carousel-gen returns null,
-     *                                      empty, or status=failed. Caller
+     *                                      empty, status=failed, OR when the
+     *                                      orchestrator emitted a
+     *                                      non-route_to_carousel_gen status
+     *                                      for carousel format. Caller
      *                                      catches and routes to FSM Failed.
      */
     public function applyCarouselGenAdapter(array $parsed, string $blogUrl, int $draftId): array
@@ -653,13 +680,25 @@ class LinkedInGenerationService
             return $parsed;
         }
 
-        $brief = is_array($parsed['brief'] ?? null) ? $parsed['brief'] : [];
         $status = $parsed['status'] ?? null;
+
+        // Strict v0.5.0+ enforcement: only `route_to_carousel_gen` is a valid
+        // carousel envelope. Legacy `complete` envelopes (with inline slides
+        // emitted by the retired /linkedin-carousel skill) are rejected so
+        // we never publish slides authored outside /carousel-gen.
+        if ($status !== 'route_to_carousel_gen') {
+            throw new CarouselGenAdapterException(
+                "Carousel format requires status='route_to_carousel_gen' (plugin v0.5.0+); "
+                . 'got status=' . var_export($status, true) . '. '
+                . 'Legacy envelopes with inline slides are rejected — re-run plugin or use admin Regenerate.'
+            );
+        }
+
+        $brief = is_array($parsed['brief'] ?? null) ? $parsed['brief'] : [];
 
         Log::info('[LinkedInGeneration] dispatching /carousel-gen engine', [
             'draft_id' => $draftId,
             'blog_url' => $blogUrl,
-            'orchestrator_status' => $status,
             'brief_hook' => $brief['hook_framework'] ?? null,
             'brief_pillar' => $brief['pillar'] ?? null,
         ]);
@@ -677,11 +716,13 @@ class LinkedInGenerationService
         // JSON shape (with image_status='pending' lifecycle fields initialized).
         $adaptedSlides = $this->carouselAdapter->adapt($carouselGenJson);
 
-        // Build (or replace) the carousel slot. Plugin v0.5.0 sends carousel=null
-        // so we always start fresh; legacy envelopes had inline slides that we
-        // overwrite. Either way the result has only adapter-authored slides.
-        $parsed['carousel'] = is_array($parsed['carousel'] ?? null) ? $parsed['carousel'] : [];
-        $parsed['carousel']['slides'] = $adaptedSlides;
+        // Build the carousel slot fresh from adapter output — orchestrator
+        // sends carousel=null on route_to_carousel_gen, so there's nothing
+        // to merge with. Slides + bilingual + narrative come solely from
+        // /carousel-gen.
+        $parsed['carousel'] = [
+            'slides' => $adaptedSlides,
+        ];
         if (isset($carouselGenJson['bilingual'])) {
             $parsed['carousel']['bilingual'] = (bool) $carouselGenJson['bilingual'];
         }
@@ -689,12 +730,10 @@ class LinkedInGenerationService
             $parsed['carousel']['narrative'] = (string) $carouselGenJson['narrative'];
         }
 
-        // Promote route_to_carousel_gen to complete now that the carousel
-        // is materialized. Downstream persistAndRoute treats status=complete
-        // as the FSM advance trigger.
-        if ($status === 'route_to_carousel_gen') {
-            $parsed['status'] = 'complete';
-        }
+        // Promote route_to_carousel_gen → complete now that the carousel is
+        // materialized. Downstream persistAndRoute treats status=complete as
+        // the FSM advance trigger.
+        $parsed['status'] = 'complete';
 
         Log::info('[LinkedInGeneration] /carousel-gen adapter applied', [
             'draft_id' => $draftId,
