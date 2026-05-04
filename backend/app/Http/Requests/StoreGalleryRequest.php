@@ -31,7 +31,7 @@ class StoreGalleryRequest extends FormRequest
             'description' => ['nullable', 'string', 'max:1000'],
             'company' => ['nullable', 'string', 'max:255'],
             'period' => ['nullable', 'string', 'max:100'],
-            'thumbnail' => ['nullable', 'image', 'mimes:jpeg,jpg,png,gif,webp', 'max:5120'], // 5MB max
+            'thumbnail' => ['nullable', 'image', 'mimes:jpeg,jpg,png,gif,webp', 'max:30720'], // 30MB max
             'award_id' => ['nullable', 'integer', 'exists:awards,id'],
             'is_active' => ['nullable', 'boolean'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
@@ -49,7 +49,7 @@ class StoreGalleryRequest extends FormRequest
             'title.required' => 'Gallery title is required',
             'thumbnail.image' => 'The file must be an image',
             'thumbnail.mimes' => 'Image must be: jpeg, jpg, png, gif, or webp',
-            'thumbnail.max' => 'Image size cannot exceed 5MB',
+            'thumbnail.max' => 'Image size cannot exceed 30MB',
             'award_id.exists' => 'The selected award does not exist',
         ];
     }

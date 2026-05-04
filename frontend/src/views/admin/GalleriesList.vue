@@ -381,83 +381,266 @@
     </BaseModal>
 
     <!-- Edit Modal -->
-    <BaseModal v-model="showEditModal" title="Edit Gallery Item" size="md">
-      <form @submit.prevent="handleUpdate" class="space-y-4">
-        <!-- Current Thumbnail -->
-        <div>
-          <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-            Current Thumbnail
-          </label>
-          <div class="w-32 h-32 rounded-lg overflow-hidden bg-neutral-100 dark:bg-neutral-900">
-            <img :src="editForm.image" :alt="editForm.title" class="w-full h-full object-cover" />
+    <BaseModal v-model="showEditModal" title="Edit Gallery" size="xl">
+      <div class="space-y-6">
+        <!-- Tabs -->
+        <div class="flex gap-1 border-b border-neutral-200 dark:border-neutral-700">
+          <button
+            type="button"
+            @click="editTab = 'details'"
+            :class="[
+              'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
+              editTab === 'details'
+                ? 'border-primary-600 text-primary-600 dark:text-primary-400'
+                : 'border-transparent text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'
+            ]"
+          >
+            Details
+          </button>
+          <button
+            type="button"
+            @click="editTab = 'images'"
+            :class="[
+              'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
+              editTab === 'images'
+                ? 'border-primary-600 text-primary-600 dark:text-primary-400'
+                : 'border-transparent text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'
+            ]"
+          >
+            Images
+            <span class="ml-1 text-xs text-neutral-400">({{ editItems.length }})</span>
+          </button>
+        </div>
+
+        <!-- Details tab -->
+        <form v-if="editTab === 'details'" @submit.prevent="handleUpdate" class="space-y-4">
+          <!-- Thumbnail (current + replace) -->
+          <div>
+            <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+              Thumbnail
+            </label>
+            <div class="flex gap-4 items-start">
+              <div class="w-32 h-32 flex-shrink-0 rounded-lg overflow-hidden bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700">
+                <img :src="editThumbnailPreview || editForm.image" :alt="editForm.title" class="w-full h-full object-cover" />
+              </div>
+              <div class="flex-1">
+                <input
+                  ref="editThumbnailInput"
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                  @change="handleEditThumbnailChange"
+                  class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                />
+                <p class="text-xs text-neutral-500 dark:text-neutral-500 mt-1">
+                  Leave empty to keep the current thumbnail. Max 30MB.
+                </p>
+                <button
+                  v-if="editForm.thumbnailFile"
+                  type="button"
+                  @click="clearEditThumbnail"
+                  class="mt-2 text-xs text-red-600 hover:text-red-700"
+                >
+                  Discard new thumbnail
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Title -->
+          <div>
+            <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+              Title *
+            </label>
+            <input
+              v-model="editForm.title"
+              type="text"
+              class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              required
+            />
+          </div>
+
+          <!-- Description -->
+          <div>
+            <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+              Description *
+            </label>
+            <textarea
+              v-model="editForm.description"
+              rows="3"
+              class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              required
+            ></textarea>
+          </div>
+
+          <!-- Sort Order -->
+          <div>
+            <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+              Sort Order
+            </label>
+            <input
+              v-model.number="editForm.sort_order"
+              type="number"
+              min="0"
+              placeholder="Display order"
+              class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+            <p class="text-xs text-neutral-500 dark:text-neutral-500 mt-1">
+              Lower number appears first
+            </p>
+          </div>
+
+          <!-- Actions -->
+          <div class="flex items-center justify-end gap-3 pt-4">
+            <BaseButton
+              type="button"
+              variant="secondary"
+              @click="closeEditModal"
+              :disabled="isUpdating"
+            >
+              Cancel
+            </BaseButton>
+            <BaseButton
+              type="submit"
+              :disabled="isUpdating"
+            >
+              <svg v-if="isUpdating" class="animate-spin h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              {{ isUpdating ? 'Updating...' : 'Update' }}
+            </BaseButton>
+          </div>
+        </form>
+
+        <!-- Images tab -->
+        <div v-else-if="editTab === 'images'" class="space-y-4">
+          <!-- Add new images -->
+          <div class="border border-dashed border-neutral-300 dark:border-neutral-600 rounded-lg p-4">
+            <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+              Add Images (max 20 per upload)
+            </label>
+            <input
+              ref="addItemsInput"
+              type="file"
+              accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+              multiple
+              @change="handleAddItemsChange"
+              class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+            />
+            <p class="text-xs text-neutral-500 dark:text-neutral-500 mt-1">
+              JPG, PNG, GIF, WEBP • Max 30MB per image
+            </p>
+
+            <!-- Preview -->
+            <div v-if="addItemsPreviews.length > 0" class="mt-3 grid grid-cols-4 sm:grid-cols-6 gap-2">
+              <div
+                v-for="(url, index) in addItemsPreviews"
+                :key="index"
+                class="aspect-square rounded-md overflow-hidden bg-neutral-100 dark:bg-neutral-900"
+              >
+                <img :src="url" alt="Preview" class="w-full h-full object-cover" />
+              </div>
+            </div>
+
+            <div v-if="addItemsFiles.length > 0" class="mt-3 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                @click="clearAddItems"
+                class="text-xs text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
+              >
+                Clear
+              </button>
+              <BaseButton
+                type="button"
+                size="sm"
+                @click="handleAddItems"
+                :disabled="isAddingItems"
+              >
+                <svg v-if="isAddingItems" class="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                {{ isAddingItems ? 'Uploading...' : `Upload ${addItemsFiles.length} image${addItemsFiles.length > 1 ? 's' : ''}` }}
+              </BaseButton>
+            </div>
+          </div>
+
+          <!-- Existing items list -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <h4 class="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                Current Images
+              </h4>
+              <button
+                v-if="editItems.length > 0"
+                type="button"
+                @click="reloadEditItems"
+                class="text-xs text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
+                :disabled="isLoadingEditItems"
+              >
+                Refresh
+              </button>
+            </div>
+
+            <div v-if="isLoadingEditItems" class="flex items-center justify-center py-8">
+              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+            </div>
+
+            <div
+              v-else-if="editItems.length === 0"
+              class="text-center py-8 text-sm text-neutral-500 dark:text-neutral-400"
+            >
+              No images yet. Use the upload box above to add some.
+            </div>
+
+            <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[50vh] overflow-y-auto pr-1">
+              <div
+                v-for="item in editItems"
+                :key="item.id"
+                class="relative group bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden"
+              >
+                <div class="aspect-square bg-neutral-100 dark:bg-neutral-900 overflow-hidden">
+                  <img
+                    :src="item.file_url"
+                    :alt="item.title || 'Gallery item'"
+                    class="w-full h-full object-cover cursor-pointer"
+                    @click="openLightbox(item.file_url)"
+                  />
+                </div>
+                <div v-if="item.title" class="p-2">
+                  <p class="text-xs text-neutral-600 dark:text-neutral-400 truncate">{{ item.title }}</p>
+                </div>
+                <button
+                  type="button"
+                  @click="handleDeleteItem(item.id)"
+                  class="absolute top-2 right-2 p-1.5 bg-red-600 hover:bg-red-700 text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                  :disabled="deletingItemId === item.id"
+                  title="Delete image"
+                >
+                  <svg v-if="deletingItemId === item.id" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div class="flex items-center justify-end gap-3 pt-4 border-t border-neutral-200 dark:border-neutral-700">
+            <BaseButton
+              type="button"
+              variant="secondary"
+              @click="closeEditModal"
+            >
+              Done
+            </BaseButton>
           </div>
         </div>
-
-        <!-- Title -->
-        <div>
-          <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-            Title *
-          </label>
-          <input
-            v-model="editForm.title"
-            type="text"
-            class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            required
-          />
-        </div>
-
-        <!-- Description -->
-        <div>
-          <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-            Description *
-          </label>
-          <textarea
-            v-model="editForm.description"
-            rows="3"
-            class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            required
-          ></textarea>
-        </div>
-
-        <!-- Sort Order -->
-        <div>
-          <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-            Sort Order
-          </label>
-          <input
-            v-model.number="editForm.sort_order"
-            type="number"
-            min="0"
-            placeholder="Display order"
-            class="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-          />
-          <p class="text-xs text-neutral-500 dark:text-neutral-500 mt-1">
-            Lower number appears first
-          </p>
-        </div>
-
-        <!-- Actions -->
-        <div class="flex items-center justify-end gap-3 pt-4">
-          <BaseButton
-            type="button"
-            variant="secondary"
-            @click="showEditModal = false"
-            :disabled="isUpdating"
-          >
-            Cancel
-          </BaseButton>
-          <BaseButton
-            type="submit"
-            :disabled="isUpdating"
-          >
-            <svg v-if="isUpdating" class="animate-spin h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            {{ isUpdating ? 'Updating...' : 'Update' }}
-          </BaseButton>
-        </div>
-      </form>
+      </div>
     </BaseModal>
   </div>
 </template>
@@ -481,7 +664,10 @@ const {
   bulkUploadImages,
   updateGalleryItem,
   deleteGalleryItem,
-  bulkDeleteGalleryItems
+  bulkDeleteGalleryItems,
+  fetchItemsForGallery,
+  addItemsToGallery,
+  deleteItem
 } = useGallery()
 
 const uiStore = useUiStore()
@@ -523,8 +709,21 @@ const editForm = ref({
   title: '',
   description: '',
   sort_order: null,
-  image: ''
+  image: '',
+  thumbnailFile: null
 })
+
+// Edit modal — images management
+const editTab = ref('details')
+const editItems = ref([])
+const isLoadingEditItems = ref(false)
+const editThumbnailInput = ref(null)
+const editThumbnailPreview = ref('')
+const addItemsInput = ref(null)
+const addItemsFiles = ref([])
+const addItemsPreviews = ref([])
+const isAddingItems = ref(false)
+const deletingItemId = ref(null)
 
 // Computed
 const isAllSelected = computed(() => {
@@ -725,9 +924,124 @@ function handleEdit(item) {
     title: item.title,
     description: item.description || '',
     sort_order: item.sort_order || null,
-    image: item.thumbnail
+    image: item.thumbnail,
+    thumbnailFile: null
   }
+  editTab.value = 'details'
+  editItems.value = []
+  editThumbnailPreview.value = ''
+  addItemsFiles.value = []
+  addItemsPreviews.value = []
   showEditModal.value = true
+  // Load items in background so the count is ready when user switches tabs
+  reloadEditItems()
+}
+
+function closeEditModal() {
+  showEditModal.value = false
+  editThumbnailPreview.value = ''
+  addItemsFiles.value = []
+  addItemsPreviews.value = []
+  if (addItemsInput.value) addItemsInput.value.value = ''
+  if (editThumbnailInput.value) editThumbnailInput.value.value = ''
+}
+
+function handleEditThumbnailChange(event) {
+  const file = event.target.files[0]
+  if (!file) return
+  editForm.value.thumbnailFile = file
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    editThumbnailPreview.value = e.target.result
+  }
+  reader.readAsDataURL(file)
+}
+
+function clearEditThumbnail() {
+  editForm.value.thumbnailFile = null
+  editThumbnailPreview.value = ''
+  if (editThumbnailInput.value) editThumbnailInput.value.value = ''
+}
+
+async function reloadEditItems() {
+  if (!editForm.value.id) return
+  isLoadingEditItems.value = true
+  try {
+    const result = await fetchItemsForGallery(editForm.value.id)
+    if (result.success) {
+      editItems.value = result.data
+    } else {
+      uiStore.showError(result.error || 'Failed to load images')
+    }
+  } finally {
+    isLoadingEditItems.value = false
+  }
+}
+
+function handleAddItemsChange(event) {
+  const files = Array.from(event.target.files)
+  if (files.length > 20) {
+    uiStore.showError('Maximum 20 images per upload')
+    event.target.value = ''
+    return
+  }
+  addItemsFiles.value = files
+  addItemsPreviews.value = []
+  files.forEach(file => {
+    const reader = new FileReader()
+    reader.onload = (e) => addItemsPreviews.value.push(e.target.result)
+    reader.readAsDataURL(file)
+  })
+}
+
+function clearAddItems() {
+  addItemsFiles.value = []
+  addItemsPreviews.value = []
+  if (addItemsInput.value) addItemsInput.value.value = ''
+}
+
+async function handleAddItems() {
+  if (addItemsFiles.value.length === 0) return
+
+  isAddingItems.value = true
+  try {
+    const formData = new FormData()
+    addItemsFiles.value.forEach(file => {
+      formData.append('files[]', file)
+    })
+
+    const result = await addItemsToGallery(editForm.value.id, formData)
+    if (result.success) {
+      uiStore.showSuccess(`${addItemsFiles.value.length} image${addItemsFiles.value.length > 1 ? 's' : ''} uploaded`)
+      clearAddItems()
+      await reloadEditItems()
+    } else {
+      uiStore.showError(result.error)
+    }
+  } catch (error) {
+    uiStore.showError('Upload failed. Please try again.')
+  } finally {
+    isAddingItems.value = false
+  }
+}
+
+async function handleDeleteItem(itemId) {
+  if (!confirm('Delete this image? This action cannot be undone.')) return
+
+  deletingItemId.value = itemId
+  try {
+    const result = await deleteItem(editForm.value.id, itemId)
+    if (result.success) {
+      uiStore.showSuccess('Image deleted')
+      editItems.value = editItems.value.filter(i => i.id !== itemId)
+    } else {
+      uiStore.showError(result.error)
+    }
+  } catch (error) {
+    uiStore.showError('Delete failed. Please try again.')
+  } finally {
+    deletingItemId.value = null
+  }
 }
 
 async function handleUpdate() {
@@ -735,34 +1049,42 @@ async function handleUpdate() {
     uiStore.showError('Title is required')
     return
   }
-  
+
   if (!editForm.value.description || !editForm.value.description.trim()) {
     uiStore.showError('Description is required')
     return
   }
-  
+
   isUpdating.value = true
 
   try {
     const formData = new FormData()
+    formData.append('_method', 'PUT')
     formData.append('title', editForm.value.title.trim())
     formData.append('description', editForm.value.description.trim())
-    
-    // Add sort_order if provided
+
     if (editForm.value.sort_order !== null && editForm.value.sort_order !== '') {
       formData.append('sort_order', editForm.value.sort_order)
     }
 
+    if (editForm.value.thumbnailFile) {
+      formData.append('thumbnail', editForm.value.thumbnailFile)
+    }
+
     const result = await updateGalleryItem(editForm.value.id, formData)
     if (result.success) {
-      uiStore.showSuccess('Gallery item updated successfully')
-      showEditModal.value = false
+      uiStore.showSuccess('Gallery updated successfully')
+      closeEditModal()
       await fetchGalleries()
     } else {
       uiStore.showError(result.error)
     }
   } catch (error) {
-    uiStore.showError('Update failed. Please try again.')
+    const validationErrors = error?.response?.data?.errors
+    const serverMsg = validationErrors
+      ? Object.values(validationErrors).flat().join(' · ')
+      : (error?.response?.data?.message || 'Update failed. Please try again.')
+    uiStore.showError(serverMsg)
   } finally {
     isUpdating.value = false
   }

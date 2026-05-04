@@ -277,6 +277,81 @@ export function useGallery(initialParams = {}) {
     }
   }
 
+  // ===== Gallery Items (sub-resource: photos within a gallery) =====
+
+  // Fetch list of items within a gallery (for Edit modal images section)
+  const fetchItemsForGallery = async (galleryId) => {
+    try {
+      const response = await api.get(`/admin/galleries/${galleryId}/items`)
+      return { success: true, data: response.data.data || [] }
+    } catch (err) {
+      return {
+        success: false,
+        error: err.response?.data?.message || 'Failed to fetch gallery items'
+      }
+    }
+  }
+
+  // Bulk-upload new images into an existing gallery
+  const addItemsToGallery = async (galleryId, formData) => {
+    try {
+      const response = await api.post(`/admin/galleries/${galleryId}/items/bulk-upload`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+
+      // Invalidate caches
+      queryClient.invalidateQueries(['gallery', galleryId])
+      setCache(`gallery_${galleryId}`, null, 0)
+      setCache(getItemsCacheKey(galleryId), null, 0)
+      await refetch()
+
+      return { success: true, data: response.data.data }
+    } catch (err) {
+      const validationErrors = err.response?.data?.errors
+      const errorMsg = validationErrors
+        ? Object.values(validationErrors).flat().join(' · ')
+        : (err.response?.data?.message || 'Upload failed')
+      return { success: false, error: errorMsg }
+    }
+  }
+
+  // Update a single gallery item (title/description/sequence)
+  const updateItem = async (galleryId, itemId, payload) => {
+    try {
+      const response = await api.put(`/admin/galleries/${galleryId}/items/${itemId}`, payload)
+
+      queryClient.invalidateQueries(['gallery', galleryId])
+      setCache(`gallery_${galleryId}`, null, 0)
+      setCache(getItemsCacheKey(galleryId), null, 0)
+
+      return { success: true, data: response.data.data }
+    } catch (err) {
+      return {
+        success: false,
+        error: err.response?.data?.message || 'Update failed'
+      }
+    }
+  }
+
+  // Delete a single gallery item (one photo)
+  const deleteItem = async (galleryId, itemId) => {
+    try {
+      await api.delete(`/admin/galleries/${galleryId}/items/${itemId}`)
+
+      queryClient.invalidateQueries(['gallery', galleryId])
+      setCache(`gallery_${galleryId}`, null, 0)
+      setCache(getItemsCacheKey(galleryId), null, 0)
+      await refetch()
+
+      return { success: true }
+    } catch (err) {
+      return {
+        success: false,
+        error: err.response?.data?.message || 'Delete failed'
+      }
+    }
+  }
+
   // Bulk delete gallery items
   const bulkDeleteGalleryItems = async (ids) => {
     try {
@@ -320,6 +395,12 @@ export function useGallery(initialParams = {}) {
     bulkUploadImages,
     updateGalleryItem,
     deleteGalleryItem,
-    bulkDeleteGalleryItems
+    bulkDeleteGalleryItems,
+
+    // Gallery items (photos within a gallery)
+    fetchItemsForGallery,
+    addItemsToGallery,
+    updateItem,
+    deleteItem
   }
 }
