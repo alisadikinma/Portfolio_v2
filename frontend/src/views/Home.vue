@@ -9,6 +9,11 @@
     <!-- 2. SKILLS REEL — Kinetic Marquee (no snap, flows naturally) -->
     <SkillsReel v-if="isSectionActive('skills-reel')" />
 
+    <!-- 2.5 WHAT I SOLVE — Three-discipline tabbed switcher (Phase 3) -->
+    <div class="snap-section" v-if="isSectionActive('what-i-solve')">
+      <WhatISolveTabs />
+    </div>
+
     <!-- 3. VIBE CODING -->
     <div class="snap-section" v-if="isSectionActive('skill-vibe-coding')">
       <SkillShowcase
@@ -90,6 +95,7 @@ import { usePageSections } from '@/composables/usePageSections'
 import CinematicHero from '@/components/CinematicHero.vue'
 import SkillsReel from '@/components/home/SkillsReel.vue'
 import SkillShowcase from '@/components/home/SkillShowcase.vue'
+import WhatISolveTabs from '@/components/home/WhatISolveTabs.vue'
 import ProjectsBento from '@/components/home/ProjectsBento.vue'
 import LatestBlog from '@/components/home/LatestBlog.vue'
 import StatsBar from '@/components/home/StatsBar.vue'
