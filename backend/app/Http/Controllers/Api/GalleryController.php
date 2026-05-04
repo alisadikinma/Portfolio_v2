@@ -306,9 +306,9 @@ class GalleryController extends Controller
     public function bulkUpload(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'thumbnail' => 'required|image|mimes:jpg,jpeg,png,webp|max:5120',
+            'thumbnail' => 'required|image|mimes:jpg,jpeg,png,gif,webp|max:30720',
             'images' => 'required|array|min:1|max:20',
-            'images.*' => 'image|mimes:jpg,jpeg,png,webp|max:5120',
+            'images.*' => 'image|mimes:jpg,jpeg,png,gif,webp|max:30720',
             'title' => 'required|string|max:255',
             'description' => 'required|string',
             'company' => 'nullable|string|max:255',

@@ -50,7 +50,7 @@ class GalleryItemController extends Controller
 
         $validator = Validator::make($request->all(), [
             'type' => 'required|in:image,video',
-            'file' => 'required_if:type,image|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+            'file' => 'required_if:type,image|image|mimes:jpeg,jpg,png,gif,webp|max:30720',
             'file_path' => 'required_if:type,video|string|max:500',
             'title' => 'nullable|string|max:255',
             'description' => 'nullable|string',
@@ -141,7 +141,7 @@ class GalleryItemController extends Controller
 
         $validator = Validator::make($request->all(), [
             'type' => 'sometimes|in:image,video',
-            'file' => 'nullable|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+            'file' => 'nullable|image|mimes:jpeg,jpg,png,gif,webp|max:30720',
             'file_path' => 'nullable|string|max:500',
             'title' => 'nullable|string|max:255',
             'description' => 'nullable|string',
@@ -263,7 +263,7 @@ class GalleryItemController extends Controller
 
         $validator = Validator::make($request->all(), [
             'files' => 'required|array|min:1|max:20',
-            'files.*' => 'required|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+            'files.*' => 'required|image|mimes:jpeg,jpg,png,gif,webp|max:30720',
             'titles' => 'nullable|array',
             'titles.*' => 'nullable|string|max:255',
             'descriptions' => 'nullable|array',

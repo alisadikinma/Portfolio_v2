@@ -215,18 +215,19 @@ export function useGallery(initialParams = {}) {
       const response = await api.post('/admin/galleries/bulk-upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       })
-      
+
       // Invalidate cache
       await refetch()
       const cacheKey = getCacheKey(queryParams.value) // âœ… Use helper
       setCache(cacheKey, null, 0)
-      
+
       return { success: true, data: response.data.data }
     } catch (err) {
-      return {
-        success: false,
-        error: err.response?.data?.message || 'Bulk upload failed'
-      }
+      const validationErrors = err.response?.data?.errors
+      const errorMsg = validationErrors
+        ? Object.values(validationErrors).flat().join(' · ')
+        : (err.response?.data?.message || 'Bulk upload failed')
+      return { success: false, error: errorMsg }
     }
   }
 

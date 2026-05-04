@@ -293,7 +293,7 @@
             required
           />
           <p class="text-xs text-neutral-500 dark:text-neutral-500 mt-1">
-            Accepted: JPG, PNG, GIF, WEBP • Max size: 5MB per image
+            Accepted: JPG, PNG, GIF, WEBP • Max size: 30MB per image
           </p>
         </div>
 
@@ -668,7 +668,11 @@ async function handleUpload() {
       uiStore.showError(result.error)
     }
   } catch (error) {
-    uiStore.showError('Upload failed. Please try again.')
+    const validationErrors = error?.response?.data?.errors
+    const serverMsg = validationErrors
+      ? Object.values(validationErrors).flat().join(' · ')
+      : (error?.response?.data?.message || 'Upload failed. Please try again.')
+    uiStore.showError(serverMsg)
   } finally {
     isUploading.value = false
   }
