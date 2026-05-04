@@ -93,4 +93,32 @@ class LinkedInPost extends Model
     {
         return $q->whereIn('status', LinkedInPostStatus::queueStatuses());
     }
+
+    /**
+     * Defense-in-depth guard: legacy drafts created before commit c64e9c31
+     * (Apr 29, 2026) may have a non-URL link_comment (e.g., a stale
+     * pull_quote / insight sentence) because LinkedInGenerationService::
+     * resolveLinkComment didn't exist yet. PostLinkedInFirstComment posts
+     * link_comment as-is, so without this guard a legacy draft published
+     * post-fix would put the insight sentence in the comment instead of
+     * the blog URL — defeating the whole point of the link-in-comment
+     * automation (avoiding LinkedIn's 60% reach penalty on body links).
+     *
+     * Idempotent. No-op when link_comment already contains http(s)://.
+     * Returns true when the field was rewritten.
+     */
+    public function ensureLinkCommentHasUrl(): bool
+    {
+        $current = trim((string) $this->link_comment);
+        if ($current !== '' && preg_match('#https?://#i', $current) === 1) {
+            return false;
+        }
+        $appUrl = rtrim((string) config('app.url'), '/');
+        $slug = (string) ($this->post?->slug ?? '');
+        if ($appUrl === '' || $slug === '') {
+            return false;
+        }
+        $this->update(['link_comment' => "Full article: {$appUrl}/blog/{$slug}"]);
+        return true;
+    }
 }

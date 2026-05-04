@@ -77,6 +77,17 @@ class LinkedInPublishService
             }
         }
 
+        // Defense-in-depth — legacy drafts (pre-Apr 29 2026) may have a
+        // non-URL link_comment. Rewrite to "Full article: {blogUrl}" so
+        // the first-comment job posts the actual blog link, not whatever
+        // the plugin happened to emit before resolveLinkComment shipped.
+        $draft->loadMissing('post');
+        if ($draft->ensureLinkCommentHasUrl()) {
+            Log::info('[LinkedInPublish] Rewrote legacy link_comment to include blog URL', [
+                'draft_id' => $draft->id,
+            ]);
+        }
+
         return match ($draft->format) {
             'carousel' => $this->publishCarousel($draft, $account),
             default => $this->publishText($draft, $account),
