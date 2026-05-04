@@ -102,10 +102,12 @@ export function useLinkedInDraft(id) {
 /**
  * Streaming progress query for a draft. Mirrors useContentEngine's
  * getProgress pattern — returns {progress_percentage, current_step,
- * progress_log[], process_alive, status, format, last_error}.
+ * progress_log[], process_alive, images_pending, status, format,
+ * last_error}.
  *
- * Polls every 3s while process_alive=true, otherwise stops. Designed
- * for the live progress modal/panel inside LinkedInDraftDetail.
+ * Polls every 3s while the BRIEF→VALIDATE pipeline is running
+ * (process_alive=true), every 5s while only image rendering is in
+ * flight (images_pending=true), otherwise stops.
  */
 export function useLinkedInDraftProgress(id, options = {}) {
   const enabled = options.enabled ?? computed(() => !!unref(id))
@@ -120,7 +122,9 @@ export function useLinkedInDraftProgress(id, options = {}) {
     refetchInterval: (q) => {
       const data = q.state.data?.data
       if (!data) return 3_000
-      return data.process_alive ? 3_000 : false
+      if (data.process_alive) return 3_000
+      if (data.images_pending) return 5_000
+      return false
     },
   })
 
@@ -128,7 +132,8 @@ export function useLinkedInDraftProgress(id, options = {}) {
     progress_percentage: 0,
     current_step: null,
     progress_log: [],
-    process_alive: true,
+    process_alive: false,
+    images_pending: false,
     status: null,
     format: null,
     last_error: null,

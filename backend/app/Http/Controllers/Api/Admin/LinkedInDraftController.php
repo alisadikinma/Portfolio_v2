@@ -101,10 +101,16 @@ class LinkedInDraftController extends Controller
      * progress endpoint shape so the LinkedInDraftDetail page can reuse
      * the same modal pattern (phase cards + step pills + log viewer).
      *
-     * Liveness signal:
+     * Two distinct liveness signals:
      *   process_alive=true while status ∈ {pending_generation, generating,
-     *   validating} OR any carousel slide has image_status ∈ {pending,
-     *   generating}. Otherwise false (terminal state reached).
+     *     validating} — i.e. the BRIEF→CAROUSEL_GEN→VALIDATE pipeline is
+     *     actively running. Frontend uses this to render the phase tracker.
+     *   images_pending=true when ANY carousel slide has image_status ∈
+     *     {pending, generating} — i.e. only image rendering is in flight.
+     *     Frontend treats this differently because the slide thumbnail strip
+     *     already provides per-slide visibility; mirroring it onto the
+     *     phase tracker would falsely highlight BRIEF/SSH Dispatch as
+     *     "active" when nothing is actually running on Sonnet/SSH.
      */
     public function progress(int $id): JsonResponse
     {
@@ -116,13 +122,12 @@ class LinkedInDraftController extends Controller
         $inFlightStatuses = ['pending_generation', 'generating', 'validating'];
         $processAlive = in_array($draft->status, $inFlightStatuses, true);
 
-        // Carousel: slides still rendering counts as alive too, even if FSM
-        // is awaiting_publish / manual_review.
-        if (!$processAlive && $draft->format === 'carousel' && is_array($draft->carousel_slides)) {
+        $imagesPending = false;
+        if ($draft->format === 'carousel' && is_array($draft->carousel_slides)) {
             foreach ($draft->carousel_slides as $slide) {
                 $st = $slide['image_status'] ?? null;
                 if ($st === 'pending' || $st === 'generating') {
-                    $processAlive = true;
+                    $imagesPending = true;
                     break;
                 }
             }
@@ -138,6 +143,7 @@ class LinkedInDraftController extends Controller
                 'current_step' => $draft->current_step,
                 'progress_log' => $draft->progress_log ?? [],
                 'process_alive' => $processAlive,
+                'images_pending' => $imagesPending,
                 'last_error' => $draft->last_error,
             ],
         ]);

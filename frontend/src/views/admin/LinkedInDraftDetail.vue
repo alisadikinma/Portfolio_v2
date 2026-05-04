@@ -254,9 +254,13 @@ const progressPhases = computed(() => {
   return draft.value?.format === 'carousel' ? PHASES_CAROUSEL : PHASES_TEXT
 })
 
-// Show the progress panel whenever the pipeline is doing something —
-// in-flight FSM states OR carousel slides still rendering OR explicit
-// progress_alive signal from the backend.
+// Show the BRIEF→VALIDATE phase tracker only when the orchestrator
+// pipeline is actually running. Image-rendering-in-flight (FSM at
+// manual_review/awaiting_publish with slides still pending) is excluded
+// — the slide thumbnail strip and "Approval gated" banner already
+// surface render progress, and lighting up BRIEF/SSH Dispatch when no
+// SSH/Sonnet work is happening was the source of the "stuck at SSH
+// Dispatch" misread.
 const showProgressPanel = computed(() => {
   if (!draft.value) return false
   if (isInProgress.value) return true
@@ -293,6 +297,15 @@ function formatLogTime(ts) {
 
 function phaseStatus(phase) {
   const pct = progressPct.value
+  // First phase + pct=0 + no step signal = nothing started yet. Without
+  // this guard, BRIEF always reads "active" with an amber border the
+  // moment the panel mounts (because 0 >= phase.minPct(0) trivially
+  // matches), which historically misled operators into thinking SSH
+  // Dispatch was stuck when in fact no work had been kicked off.
+  if (pct === 0 && phase.minPct === 0) {
+    const step = currentStepName.value
+    if (!step || step === 'initializing') return 'pending'
+  }
   if (isProgressFailed.value && pct >= phase.minPct && pct < phase.maxPct) return 'failed'
   if (pct >= phase.maxPct) return 'done'
   if (pct >= phase.minPct) return 'active'
