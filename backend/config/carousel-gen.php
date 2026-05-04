@@ -22,6 +22,12 @@ return [
     'ssh_key'  => env('CAROUSEL_GEN_SSH_KEY', '/var/www/.ssh/id_ed25519'),
 
     'claude_path' => env('CAROUSEL_GEN_CLAUDE_PATH', 'claude'),
+
+    // Model selection: 'sonnet' (default, ~1x cost) or 'opus' (~4-5x cost,
+    // higher output token cap). Switch to 'opus' when 9-slide bilingual
+    // carousels keep failing on Sonnet output truncation despite the May 4
+    // 2026 mitigations (target_slides=7 default, image_prompt cap=1800).
+    // The CLI accepts the bare names — full Anthropic IDs also work.
     'model'       => env('CAROUSEL_GEN_MODEL', 'sonnet'),
 
     // Path on VPS to the compiled refs bundle for /carousel-gen pipeline mode,

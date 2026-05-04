@@ -534,6 +534,107 @@ class LinkedInDraftController extends Controller
     }
 
     /**
+     * POST /admin/linkedin-drafts/{id}/rerender-images
+     *
+     * Operator escape hatch: re-renders slide images using the EXISTING
+     * carousel_slides JSON without going through /carousel-gen. Use when
+     * /carousel-gen keeps failing (Sonnet output truncation on 9-slide
+     * bilingual carousels — see CLAUDE.md May 2 entry "Open issue") but
+     * the slides JSON is intact and operator just wants the PNGs.
+     *
+     * Differs from regenerateAllImages: that one re-AUTHORS via
+     * /carousel-gen (fresh prompts, ~5-7 min, can fail). This one only
+     * re-RENDERS via GeminiGen using the prompts already in the DB
+     * (~2-3 min, no Sonnet round-trip, can't hit truncation). Mirrors
+     * what the carousel-image reaper does on stuck slides.
+     */
+    public function rerenderImagesOnly(int $id): JsonResponse
+    {
+        $draft = LinkedInPost::find($id);
+        if ($draft === null) {
+            return $this->notFound();
+        }
+
+        if ($draft->format !== 'carousel') {
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'not_carousel',
+                    'message' => 'Image rerender is only valid for carousel drafts.',
+                ],
+            ], 422);
+        }
+
+        if (in_array($draft->status, ['pending_generation', 'generating', 'validating'], true)) {
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'rerender_in_progress',
+                    'message' => 'A generation is already in progress for this draft.',
+                ],
+            ], 409);
+        }
+
+        $slides = $draft->carousel_slides ?? [];
+        $slideCount = count($slides);
+        if ($slideCount === 0) {
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'no_slides',
+                    'message' => 'This draft has no carousel slides to render. Use Regenerate All Images to author via /carousel-gen first.',
+                ],
+            ], 422);
+        }
+
+        // Verify each slide carries an image_prompt — otherwise GeminiGen has
+        // nothing to render. This is the difference between "slides JSON
+        // exists but is half-baked" vs "slides JSON is complete".
+        $missingPrompts = 0;
+        foreach ($slides as $slide) {
+            if (empty($slide['image_prompt'] ?? null)) {
+                $missingPrompts++;
+            }
+        }
+        if ($missingPrompts > 0) {
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'missing_image_prompts',
+                    'message' => "{$missingPrompts} of {$slideCount} slides have no image_prompt. Use Regenerate All Images to author via /carousel-gen.",
+                ],
+            ], 422);
+        }
+
+        // Reset image status only — prompts + copy + brand chrome stay.
+        foreach ($slides as $i => $slide) {
+            $slides[$i]['image_status'] = 'pending';
+            $slides[$i]['image_url'] = '';
+            $slides[$i]['image_error'] = null;
+            $slides[$i]['image_job_uuid'] = null;
+        }
+        $draft->update([
+            'carousel_slides' => $slides,
+            'slide_asset_urns' => null,
+            'last_error' => null,
+        ]);
+
+        \App\Jobs\GenerateLinkedInCarouselImages::dispatch($draft->id);
+
+        Log::info('[LinkedInDraft] rerender-images queued (skip /carousel-gen, use existing prompts)', [
+            'draft_id' => $draft->id,
+            'slide_count' => $slideCount,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'data' => $draft->fresh(['post.translations', 'post.contentIdea:id,result_post_id,virality_score', 'account']),
+            'message' => "Rendering {$slideCount} slide(s) from existing prompts (~2-3 min). Webhooks will update slides live as each finishes.",
+            'queued' => $slideCount,
+        ], 202);
+    }
+
+    /**
      * POST /admin/linkedin-drafts/{id}/regenerate-caption
      *
      * Re-synthesizes caption + hashtags from existing slide content. Slide

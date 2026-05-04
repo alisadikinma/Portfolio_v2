@@ -10,6 +10,7 @@ import {
   usePublishLinkedInDraftNow,
   useRegenerateLinkedInDraft,
   useRegenerateAllCarouselImages,
+  useRerenderImagesOnly,
   useRegenerateCaption,
   useRegenerateSlideImage,
   postTitle,
@@ -39,6 +40,7 @@ const cancelMutation = useCancelLinkedInDraft()
 const publishNowMutation = usePublishLinkedInDraftNow()
 const regenerateMutation = useRegenerateLinkedInDraft()
 const regenerateAllImagesMutation = useRegenerateAllCarouselImages()
+const rerenderImagesOnlyMutation = useRerenderImagesOnly()
 const regenerateCaptionMutation = useRegenerateCaption()
 const regenerateSlideMutation = useRegenerateSlideImage()
 
@@ -356,14 +358,29 @@ watch(progressLog, async (entries) => {
 
 const isTerminalGood = computed(() => draft.value?.status === 'published')
 const isTerminalBad = computed(() => draft.value?.status === 'failed')
-const showLastError = computed(() =>
-  // Only relevant when current status is failed OR manual_review.
-  // Hides stale errors lingering after a successful retry.
-  Boolean(
-    draft.value?.last_error &&
-      ['failed', 'manual_review'].includes(draft.value?.status)
-  )
-)
+
+const STALE_ERROR_HOURS = 24
+const showLastError = computed(() => {
+  if (!draft.value?.last_error) return false
+  // Status gate — only failed / manual_review surface errors at all.
+  if (!['failed', 'manual_review'].includes(draft.value.status)) return false
+
+  // Staleness gate — if the most recent state transition is older than
+  // STALE_ERROR_HOURS, the error has been sitting around without further
+  // activity and is almost certainly from a resolved issue. Hides errors
+  // like "Could not parse orchestrator JSON from stdout" written days ago
+  // before subsequent fixes (May 2 parser fix, etc.) shipped. The error
+  // stays in the DB for debugging — only the UI suppresses.
+  const log = Array.isArray(draft.value?.pipeline_state_log)
+    ? draft.value.pipeline_state_log
+    : []
+  if (log.length === 0) return true
+  const latest = log[log.length - 1]
+  const latestTs = latest?.timestamp ? Date.parse(latest.timestamp) : NaN
+  if (Number.isNaN(latestTs)) return true
+  const ageHours = (Date.now() - latestTs) / 36e5
+  return ageHours < STALE_ERROR_HOURS
+})
 
 // --- Live countdown ticker for awaiting_publish so the seconds tick visibly
 const tick = ref(0)
@@ -535,6 +552,23 @@ async function regenerateAllImages() {
     alert(res?.message || `Queued for ${count} slides — slides will update live via webhooks as each renders.`)
   } catch (err) {
     alert(err?.response?.data?.error?.message || 'Image regeneration failed')
+  }
+}
+
+async function rerenderImagesOnly() {
+  if (!draft.value) return
+  const count = carouselSlides.value.length
+  const msg = `Re-render only — skip /carousel-gen and use the existing slide prompts?\n\n` +
+    `Use this when /carousel-gen keeps failing (Sonnet truncation) but the slides JSON is already good. ` +
+    `Visual concepts stay the same; GeminiGen just re-runs against the prompts already in the DB.\n\n` +
+    `Runtime: ~2-3 min (image rendering only — no plugin re-authoring).`
+  if (!confirm(msg)) return
+  try {
+    const res = await rerenderImagesOnlyMutation.mutateAsync(draftId.value)
+    refetch()
+    alert(res?.message || `Re-rendering ${count} slides — slides will update live via webhooks.`)
+  } catch (err) {
+    alert(err?.response?.data?.error?.message || 'Image rerender failed')
   }
 }
 
@@ -1526,6 +1560,21 @@ const showThumbnailUploadCaption = computed(() =>
                     <path :d="ICON.image" />
                   </svg>
                   {{ regenerateAllImagesMutation.isPending.value ? 'Dispatching…' : 'Regenerate All Images' }}
+                </span>
+              </button>
+
+              <button
+                v-if="draft.format === 'carousel' && carouselSlides.length > 0"
+                @click="rerenderImagesOnly"
+                :disabled="rerenderImagesOnlyMutation.isPending.value"
+                title="Re-render PNGs from existing slide prompts. Skips /carousel-gen entirely (~2-3 min). Use when /carousel-gen keeps failing but slides JSON is good."
+                class="inline-flex items-center justify-between px-3 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-sm font-medium text-neutral-200 ring-1 ring-neutral-800 transition group disabled:opacity-50"
+              >
+                <span class="inline-flex items-center gap-2">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-neutral-400 group-hover:text-cyan-400 transition-colors">
+                    <path :d="ICON.refresh" />
+                  </svg>
+                  {{ rerenderImagesOnlyMutation.isPending.value ? 'Dispatching…' : 'Re-render Images Only' }}
                 </span>
               </button>
 

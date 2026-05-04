@@ -29,6 +29,8 @@ use App\Http\Controllers\Api\CarouselDraftController;
 use App\Http\Controllers\Api\Admin\ContentIdeaController;
 use App\Http\Controllers\Api\Admin\LinkedInDraftController;
 use App\Http\Controllers\Api\LinkedInOAuthController;
+use App\Http\Controllers\Api\HomepageController;
+use App\Http\Controllers\Api\CvExportController;
 
 // ============================================
 // Authentication Routes
@@ -51,6 +53,26 @@ Route::get('/user', function (Request $request) {
 // ============================================
 // Public API Routes
 // ============================================
+
+// Homepage aggregation endpoints (Phase 1, Homepage Redesign 2026-05-04).
+// Wrapped in SetLocaleByGeoIP so PostResource / ProjectResource pick up the
+// right translation without the frontend having to thread `?lang=` through
+// every call. Other public read endpoints can be migrated under the same
+// middleware in follow-up phases.
+Route::middleware('set.locale.by.geoip')->group(function () {
+    Route::get('/homepage/stats', [HomepageController::class, 'stats']);
+    Route::get('/homepage/featured', [HomepageController::class, 'featured']);
+});
+
+// CV Master Export API (Phase 10, May 4, 2026)
+// Token-protected endpoint for jobhunter platforms — emits Ali's full
+// professional profile (basics + projects + awards + thought leadership)
+// in a JSON Resume-flavored shape. Auth: Sanctum bearer token with the
+// `cv:read` ability. Rate limit: 30 req/min. Lives outside the public
+// locale group because the payload is not locale-scoped.
+Route::middleware(['auth:sanctum', 'ability:cv:read', 'throttle:30,1'])->group(function () {
+    Route::get('/cv/export', [CvExportController::class, 'export']);
+});
 
 // Public Awards Routes
 Route::prefix('awards')->group(function () {
@@ -1220,6 +1242,7 @@ Route::middleware(['auth:sanctum'])->prefix('admin/linkedin-drafts')->group(func
     // synchronously into LinkedInCarouselImageService (HTTP to GeminiGen).
     // Webhook completes asynchronously; frontend polls draft.show for status.
     Route::post('/{id}/regenerate-images', [LinkedInDraftController::class, 'regenerateAllImages']);
+    Route::post('/{id}/rerender-images', [LinkedInDraftController::class, 'rerenderImagesOnly']);
     Route::post('/{id}/regenerate-caption', [LinkedInDraftController::class, 'regenerateCaption']);
     Route::post('/{id}/slides/{slideIndex}/regenerate-image', [LinkedInDraftController::class, 'regenerateSlideImage']);
 });

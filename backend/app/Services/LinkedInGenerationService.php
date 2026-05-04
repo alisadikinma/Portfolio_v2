@@ -824,19 +824,23 @@ class LinkedInGenerationService
     }
 
     /**
-     * Heuristic: pick target slide count from brief signal. Listicle (PAS,
-     * loss_aversion frameworks) leans 9, framework leans 6-7, case study
-     * leans 8-10. Defaults to 9 (the canonical /linkedin-carousel default
-     * before this refactor).
+     * Heuristic: pick target slide count from brief signal.
+     *
+     * May 4, 2026: Reduced from 9 → 7 default after sustained Sonnet output
+     * truncation on 9-slide bilingual carousels (model emits per-slide JSON
+     * chunks with continuation prose instead of a single envelope, breaks
+     * the orchestrator parser). 7 slides cuts ~22% of output tokens while
+     * preserving the 5-act narrative arc (cover + 4 body + human + cta).
+     * See CLAUDE.md May 2 entry "Open issue: Sonnet output truncation".
      */
     private function inferTargetSlides(array $brief): int
     {
         $framework = $brief['hook_framework'] ?? null;
         return match ($framework) {
-            'before_after' => 8,
-            'AIDA' => 7,
-            'contrarian' => 8,
-            default => 9,
+            'before_after' => 7,
+            'AIDA' => 6,
+            'contrarian' => 7,
+            default => 7,
         };
     }
 

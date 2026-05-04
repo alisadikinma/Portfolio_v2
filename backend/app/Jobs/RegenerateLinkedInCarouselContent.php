@@ -100,9 +100,9 @@ class RegenerateLinkedInCarouselContent implements ShouldQueue
         }
         $blogUrl = "{$appUrl}/blog/{$slug}";
 
-        // Brief is only used by inferTargetSlides → default 9 if framework
-        // unknown. Pass an empty array; /carousel-gen reads blog content
-        // fresh via --blog-source so it doesn't need our brief metadata.
+        // Brief is only used by inferTargetSlides → default 7 (post May 4
+        // 2026 reduction from 9). /carousel-gen reads blog content fresh
+        // via --blog-source so it doesn't need our brief metadata.
         $brief = [];
 
         Log::info('[RegenerateCarouselContent] dispatching /carousel-gen', [

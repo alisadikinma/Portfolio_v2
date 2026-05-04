@@ -157,6 +157,24 @@ export function useRegenerateAllCarouselImages() {
 }
 
 /**
+ * POST /admin/linkedin-drafts/{id}/rerender-images — render only.
+ * Skips /carousel-gen entirely; uses existing carousel_slides image_prompts.
+ * Operator escape hatch when /carousel-gen keeps failing on Sonnet output
+ * truncation but the prompts in DB are still good.
+ */
+export function useRerenderImagesOnly() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) =>
+      api.post(`/admin/linkedin-drafts/${id}/rerender-images`).then(r => r.data),
+    onSuccess: (_, id) => {
+      qc.invalidateQueries({ queryKey: [LIST_KEY] })
+      qc.invalidateQueries({ queryKey: [LIST_KEY, id] })
+    },
+  })
+}
+
+/**
  * POST /admin/linkedin-drafts/{id}/regenerate-caption — re-synth caption + hashtags
  * from existing slide content. Synchronous (~1s, pure PHP), so the mutation
  * resolves with the updated draft in the response. Carousel-only — text
