@@ -16,12 +16,13 @@
         </router-link>
       </div>
 
-      <!-- Loading -->
+      <!-- Loading — 1 hero + 3 stacked (matches Phase 4 magazine layout) -->
       <div v-if="isLoading" class="grid grid-cols-1 md:grid-cols-12 gap-5">
-        <div class="md:col-span-7 bezel-shell"><div class="bezel-core animate-pulse h-80" /></div>
-        <div class="md:col-span-5 space-y-5">
-          <div class="bezel-shell-sm"><div class="bezel-core-sm animate-pulse h-36" /></div>
-          <div class="bezel-shell-sm"><div class="bezel-core-sm animate-pulse h-36" /></div>
+        <div class="md:col-span-7 bezel-shell"><div class="bezel-core animate-pulse h-96" /></div>
+        <div class="md:col-span-5 flex flex-col gap-4">
+          <div class="bezel-shell-sm flex-1"><div class="bezel-core-sm animate-pulse h-28" /></div>
+          <div class="bezel-shell-sm flex-1"><div class="bezel-core-sm animate-pulse h-28" /></div>
+          <div class="bezel-shell-sm flex-1"><div class="bezel-core-sm animate-pulse h-28" /></div>
         </div>
       </div>
 
@@ -61,10 +62,10 @@
           </div>
         </router-link>
 
-        <!-- Stacked smaller posts (5 cols) -->
-        <div class="md:col-span-5 flex flex-col gap-5">
+        <!-- Stacked smaller posts (5 cols) — up to 3 secondary articles -->
+        <div class="md:col-span-5 flex flex-col gap-4">
           <router-link
-            v-for="post in posts.slice(1, 3)"
+            v-for="post in posts.slice(1, 4)"
             :key="post.id"
             :to="`/blog/${post.slug}`"
             class="group flex-1"
@@ -127,7 +128,7 @@ function formatDate(dateStr) {
 
 onMounted(async () => {
   try {
-    const res = await api.get('/posts', { params: { per_page: 3 } })
+    const res = await api.get('/posts', { params: { per_page: 4 } })
     posts.value = res.data.data || []
   } catch (err) {
     console.error('Failed to fetch latest posts:', err)

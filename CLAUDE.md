@@ -907,13 +907,14 @@ After updating `.env`, run `php artisan config:cache && systemctl restart portfo
 |---|---|---|---|
 | `homepage` | `hero` | [Home.vue](frontend/src/views/Home.vue) | `CinematicHero` |
 | `homepage` | `skills-reel` | Home.vue | `SkillsReel` |
-| `homepage` | `what-i-solve` | Home.vue | `WhatISolveTabs` (Phase 3 — three-discipline tabbed switcher; coexists with skill showcases until Phase 8 cleanup) |
-| `homepage` | `skill-vibe-coding` | Home.vue | `SkillShowcase` |
-| `homepage` | `skill-ai-automation` | Home.vue | `SkillShowcase` |
-| `homepage` | `skill-ai-agents` | Home.vue | `SkillShowcase` |
-| `homepage` | `skill-ai-video` | Home.vue | `SkillShowcase` |
+| `homepage` | `what-i-solve` | Home.vue | `WhatISolveTabs` (Phase 3 expanded May 5 — 4-discipline tabbed switcher with autoplay loop muted video per tab; absorbed Vibe Coding + AI Automation + AI Agents + AI Video Gen content from the 4 retired SkillShowcase sections) |
+| ~~`skill-vibe-coding`~~ | ~~Home.vue~~ | ~~`SkillShowcase`~~ | RETIRED May 5 — content merged into `what-i-solve` |
+| ~~`skill-ai-automation`~~ | ~~Home.vue~~ | ~~`SkillShowcase`~~ | RETIRED May 5 — content merged into `what-i-solve` |
+| ~~`skill-ai-agents`~~ | ~~Home.vue~~ | ~~`SkillShowcase`~~ | RETIRED May 5 — content merged into `what-i-solve` |
+| ~~`skill-ai-video`~~ | ~~Home.vue~~ | ~~`SkillShowcase`~~ | RETIRED May 5 — content merged into `what-i-solve` |
 | `homepage` | `featured-projects` | Home.vue | `ProjectsBento` |
-| `homepage` | `latest-blog` | Home.vue | `LatestBlog` (asymmetric 1-large + 2-stacked with thumbnails) |
+| `homepage` | `latest-blog` | Home.vue | `LatestBlog` (1 hero + 3 stacked secondary; per_page=4) |
+| `homepage` | `testimonials` | Home.vue | `TestimonialsCarousel` (LinkedIn-sourced quotes, 8s auto-rotate, pause-on-hover, dots nav, keyboard ←/→) |
 | `homepage` | `stats-cta` | Home.vue | `StatsBar` + `CTASection` (home variant) |
 | `about` | `cta` | [About.vue](frontend/src/views/About.vue) | `CTASection` (root variant, WhatsApp + social) |
 | `projects` | `cta` | [Projects.vue](frontend/src/views/Projects.vue) | `CTASection` (root variant) |
