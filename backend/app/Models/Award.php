@@ -18,11 +18,13 @@ class Award extends Model
         'image',
         'received_at',
         'sort_order',
+        'is_featured',
     ];
 
     protected $casts = [
         // received_at is stored as string to support flexible formats
         // like "January 2025", "Q1 2025", etc.
+        'is_featured' => 'boolean',
     ];
 
     protected $appends = ['total_photos'];

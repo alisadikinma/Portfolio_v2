@@ -27,7 +27,17 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             \App\Http\Middleware\SetCacheHeaders::class,
         ]);
-        
+
+        // Middleware aliases for route-level use (`->middleware('set.locale.by.geoip')`).
+        // `ability` / `abilities` are Sanctum's per-token capability gates —
+        // used by the CV Master Export API (Phase 10) to scope the jobhunter
+        // token to read-only access without granting full app session.
+        $middleware->alias([
+            'set.locale.by.geoip' => \App\Http\Middleware\SetLocaleByGeoIP::class,
+            'ability' => \Laravel\Sanctum\Http\Middleware\CheckAbilities::class,
+            'abilities' => \Laravel\Sanctum\Http\Middleware\CheckForAnyAbility::class,
+        ]);
+
         // Note: statefulApi() removed - we're using token-based auth, not cookie-based
         // This prevents CSRF 419 errors on API routes
     })

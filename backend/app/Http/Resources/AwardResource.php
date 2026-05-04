@@ -41,6 +41,7 @@ class AwardResource extends JsonResource
             'award_date' => $this->received_at, // Alias for frontend
             'order' => $this->order,
             'is_active' => $this->is_active ?? true,
+            'is_featured' => (bool) ($this->is_featured ?? false),
             'featured_gallery_id' => $this->featured_gallery_id,
             'total_photos' => $this->total_photos,
             'galleries' => GalleryResource::collection($this->whenLoaded('galleries')),

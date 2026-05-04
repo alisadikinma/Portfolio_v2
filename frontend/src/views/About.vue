@@ -213,6 +213,45 @@
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                     </svg>
                   </button>
+
+                  <!-- Linked Gallery Thumbnail Strip (Phase 11) -->
+                  <div v-if="exp.galleries && exp.galleries.length > 0" class="mt-5 pt-5 border-t border-border-hairline">
+                    <div class="flex items-center gap-3 mb-3">
+                      <span class="h-px flex-1 bg-border-hairline"></span>
+                      <span class="mono-label text-fg-dim text-[10px]">
+                        Gallery ({{ totalGalleryItems(exp) }} {{ totalGalleryItems(exp) === 1 ? 'photo' : 'photos' }})
+                      </span>
+                      <span class="h-px flex-1 bg-border-hairline"></span>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                      <button
+                        v-for="thumb in previewThumbnails(exp).slice(0, isMobileGalleryStrip ? 3 : 4)"
+                        :key="`${thumb.galleryId}-${thumb.id}`"
+                        type="button"
+                        @click="openExperienceGallery(exp)"
+                        class="exp-gallery-thumb relative overflow-hidden rounded-lg border border-border-hairline focus:outline-none focus:ring-2 focus:ring-accent-gold focus:border-accent-gold transition-all duration-150 hover:border-accent-gold"
+                        :class="isMobileGalleryStrip ? 'w-[60px] h-[60px]' : 'w-20 h-20'"
+                        :aria-label="`Open gallery: ${thumb.galleryTitle}`"
+                      >
+                        <img
+                          :src="thumb.thumbnail"
+                          :alt="thumb.galleryTitle"
+                          class="w-full h-full object-cover"
+                          loading="lazy"
+                          @error="(e) => { e.target.style.opacity = '0.3' }"
+                        />
+                      </button>
+                      <button
+                        v-if="previewThumbnails(exp).length > (isMobileGalleryStrip ? 3 : 4)"
+                        type="button"
+                        @click="openExperienceGallery(exp)"
+                        class="rounded-full px-3 py-1.5 text-xs font-mono bg-white/5 border border-border-hairline text-fg-muted hover:text-accent-gold hover:border-accent-gold transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-accent-gold"
+                        :aria-label="`See all ${totalGalleryItems(exp)} photos`"
+                      >
+                        +{{ totalGalleryItems(exp) - (isMobileGalleryStrip ? 3 : 4) }}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -409,12 +448,25 @@
       :show-social-links="true"
     />
 
+    <!-- Experience Gallery Modal (Phase 11) -->
+    <BaseGalleryModal
+      :show="galleryModalOpen"
+      :title="galleryModalData.title"
+      :description="galleryModalData.description"
+      :company="galleryModalData.company"
+      :period="galleryModalData.period"
+      :items="galleryModalData.items"
+      empty-message="No photos in this gallery yet"
+      @close="galleryModalOpen = false"
+    />
+
   </div>
 </template>
 
 <script setup>
-import { computed, ref, watch, onMounted } from 'vue'
+import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import CTASection from '@/components/CTASection.vue'
+import BaseGalleryModal from '@/components/base/BaseGalleryModal.vue'
 import { usePageSections } from '@/composables/usePageSections'
 import { useAboutSettings } from '@/composables/useAboutSettings'
 import { useSettings } from '@/composables/useSettings'
@@ -445,6 +497,47 @@ fetchSettings()
 const experienceData = ref([])
 const expandedStates = ref({})
 const showAllExperience = ref(false)
+
+// ── Experience Gallery Modal State ─────────────────────
+const galleryModalOpen = ref(false)
+const galleryModalData = ref({
+  title: '',
+  description: '',
+  company: '',
+  period: '',
+  items: []
+})
+
+// Track viewport width to switch 4 vs 3 thumbnails on mobile
+const isMobileGalleryStrip = ref(false)
+const mobileMediaQuery = typeof window !== 'undefined'
+  ? window.matchMedia('(max-width: 639px)')
+  : null
+
+const updateMobileGalleryStrip = () => {
+  if (mobileMediaQuery) {
+    isMobileGalleryStrip.value = mobileMediaQuery.matches
+  }
+}
+
+if (mobileMediaQuery) {
+  updateMobileGalleryStrip()
+  // Use addEventListener for evergreen browsers; fall back to addListener for older Safari
+  if (mobileMediaQuery.addEventListener) {
+    mobileMediaQuery.addEventListener('change', updateMobileGalleryStrip)
+  } else if (mobileMediaQuery.addListener) {
+    mobileMediaQuery.addListener(updateMobileGalleryStrip)
+  }
+}
+
+onBeforeUnmount(() => {
+  if (!mobileMediaQuery) return
+  if (mobileMediaQuery.removeEventListener) {
+    mobileMediaQuery.removeEventListener('change', updateMobileGalleryStrip)
+  } else if (mobileMediaQuery.removeListener) {
+    mobileMediaQuery.removeListener(updateMobileGalleryStrip)
+  }
+})
 
 const displayedExperience = computed(() =>
   showAllExperience.value ? experienceData.value : experienceData.value.slice(0, 3)
@@ -534,27 +627,119 @@ const getOrganizationIcon = (company) => {
   return null
 }
 
+// ── Experience Gallery Helpers ─────────────────────────
+// Resolve a thumbnail path (cover or item) into a renderable URL. Backend
+// already prepends APP_URL for /uploads paths and Storage::url() for bare
+// keys; we only need to handle the relative /storage/* case for local dev
+// where Vite proxies are not in play.
+const resolveGalleryThumb = (path) => {
+  if (!path) return ''
+  if (typeof path !== 'string') return ''
+  if (path.startsWith('http://') || path.startsWith('https://')) return path
+  if (path.startsWith('/storage/')) {
+    const base = (import.meta.env.VITE_API_URL || '').replace('/api', '')
+    return base ? base + path : path
+  }
+  return path
+}
+
+// Total previewable items across all linked galleries on this experience entry.
+const totalGalleryItems = (exp) => {
+  if (!exp?.galleries) return 0
+  return exp.galleries.reduce((sum, g) => sum + (g?.items_count || 0), 0)
+}
+
+// Flatten preview_items across linked galleries — used by the inline strip.
+// Backend caps each gallery at 4 preview_items, so worst case we have N*4
+// thumbnails. We slice down to display limit (4 desktop / 3 mobile) at render.
+const previewThumbnails = (exp) => {
+  if (!exp?.galleries) return []
+  const out = []
+  for (const g of exp.galleries) {
+    if (Array.isArray(g.preview_items)) {
+      for (const item of g.preview_items) {
+        out.push({
+          id: item.id,
+          galleryId: g.id,
+          galleryTitle: g.title,
+          thumbnail: resolveGalleryThumb(item.thumbnail),
+        })
+      }
+    }
+  }
+  return out
+}
+
+// Open the modal with a flattened item list across all galleries linked to
+// this experience entry (so user sees everything in one shot regardless of
+// which thumbnail they clicked).
+const openExperienceGallery = (exp) => {
+  if (!exp?.galleries?.length) return
+  const allItems = []
+  for (const g of exp.galleries) {
+    if (Array.isArray(g.preview_items)) {
+      for (const item of g.preview_items) {
+        allItems.push({
+          id: item.id,
+          title: item.title,
+          file_path: item.thumbnail, // BaseGalleryModal reads file_path|file_url|image
+        })
+      }
+    }
+  }
+
+  galleryModalData.value = {
+    title: exp.galleries.length === 1
+      ? exp.galleries[0].title
+      : `${exp.title || exp.position} — ${exp.galleries.length} galleries`,
+    description: exp.description || '',
+    company: exp.company || '',
+    period: `${exp.start_date || ''}${exp.end_date ? ' — ' + (exp.end_date || 'Present') : ''}`,
+    items: allItems,
+  }
+  galleryModalOpen.value = true
+}
+
 // ── Load settings on mount ─────────────────────────────
 onMounted(async () => {
   await fetchSettings(true)
 })
 
-// ── Parse experience data from settings ───────────────
+// ── Parse experience data ──────────────────────────────
+// Prefer the hydrated `aboutSettings.experience` (which includes `galleries`
+// post backend Phase 11 hydration). Falls back to the raw `settings` array
+// for backward compatibility when the about endpoint is unreachable.
 watch(
-  () => settings.value,
-  (settingsArray) => {
-    if (!settingsArray?.length) return
-    const experienceSetting = settingsArray.find(s => s.key === 'experience')
-    if (!experienceSetting) { experienceData.value = []; return }
-    try {
-      let parsed = Array.isArray(experienceSetting.value)
-        ? experienceSetting.value
-        : JSON.parse(experienceSetting.value)
-      parsed.sort((a, b) => parseExperienceDate(b.start_date) - parseExperienceDate(a.start_date))
-      experienceData.value = parsed
-    } catch {
-      experienceData.value = []
+  [() => aboutSettings.value, () => settings.value],
+  ([about, settingsArray]) => {
+    let parsed = null
+
+    // Path 1: hydrated source (includes galleries[])
+    if (about?.experience && Array.isArray(about.experience) && about.experience.length > 0) {
+      parsed = about.experience
+    } else if (settingsArray?.length) {
+      // Path 2: legacy raw settings array (no galleries)
+      const experienceSetting = settingsArray.find(s => s.key === 'experience')
+      if (experienceSetting) {
+        try {
+          parsed = Array.isArray(experienceSetting.value)
+            ? experienceSetting.value
+            : JSON.parse(experienceSetting.value)
+        } catch {
+          parsed = null
+        }
+      }
     }
+
+    if (!parsed || !Array.isArray(parsed)) {
+      experienceData.value = []
+      return
+    }
+
+    const sorted = [...parsed].sort(
+      (a, b) => parseExperienceDate(b.start_date) - parseExperienceDate(a.start_date)
+    )
+    experienceData.value = sorted
   },
   { immediate: true, deep: true }
 )
@@ -669,5 +854,17 @@ const getWhatsAppLink = () => {
 
 .prose-dark :deep(a) {
   color: #06B6D4;
+}
+
+/* Phase 11 — Experience gallery thumbnail hover scale.
+   Honour prefers-reduced-motion: skip the scale, only swap border. */
+.exp-gallery-thumb {
+  transform: scale(1);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .exp-gallery-thumb:hover {
+    transform: scale(1.05);
+  }
 }
 </style>

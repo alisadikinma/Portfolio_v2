@@ -18,6 +18,8 @@ class Testimonial extends Model
         'star_rating',
         'is_active',
         'sort_order',
+        'source',
+        'source_url',
     ];
 
     protected $casts = [

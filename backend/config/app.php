@@ -56,6 +56,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Years of Experience
+    |--------------------------------------------------------------------------
+    |
+    | Surfaced on the homepage hero stats. Bumped manually each year — kept
+    | in config (vs computed from a start_date) because Ali's career narrative
+    | bridges multiple roles and we don't want it tied to a single anchor.
+    |
+    */
+
+    'years_experience' => (int) env('APP_YEARS_EXPERIENCE', 17),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |

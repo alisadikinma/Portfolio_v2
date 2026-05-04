@@ -39,6 +39,17 @@ return [
         'api_key' => env('GEMINIGEN_API_KEY', ''),
     ],
 
+    'geoip' => [
+        // Provider used by SetLocaleByGeoIP when CF-IPCountry header is absent.
+        // Currently 'ip-api' (only one supported). Set to anything else to
+        // disable the fallback entirely (locale defaults to 'en').
+        'fallback' => env('GEOIP_FALLBACK_PROVIDER', 'ip-api'),
+        // HTTP timeout in seconds for the fallback lookup. Kept short — the
+        // middleware fails-open on timeout so latency on the first request
+        // is bounded.
+        'timeout' => (int) env('GEOIP_FALLBACK_TIMEOUT', 2),
+    ],
+
     'pexels' => [
         'api_key' => env('PEXELS_API_KEY', ''),
     ],

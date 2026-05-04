@@ -29,6 +29,8 @@ class TestimonialResource extends JsonResource
             'star_rating' => $this->star_rating,
             'is_active' => $this->is_active,
             'sort_order' => $this->sort_order,
+            'source' => $this->source ?? 'direct',
+            'source_url' => $this->source_url,
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\UpdateAboutSettingsRequest;
 use App\Http\Requests\UpdateSiteSettingsRequest;
+use App\Models\Gallery;
 use App\Models\Setting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -61,6 +62,14 @@ class SettingsController extends Controller
                     'success_rate' => '95%'
                 ]
             ], $aboutData);
+
+            // Hydrate experience[i].galleries[] from gallery_ids[]. Adds a sibling
+            // `galleries` array to each experience entry shaped for inline thumb
+            // strip rendering on About.vue. Original `gallery_ids` is preserved
+            // so the admin picker still round-trips.
+            if (!empty($aboutData['experience']) && is_array($aboutData['experience'])) {
+                $aboutData['experience'] = $this->hydrateExperienceGalleries($aboutData['experience']);
+            }
 
             return response()->json([
                 'success' => true,
@@ -731,6 +740,103 @@ class SettingsController extends Controller
             'message' => 'Test message sent successfully',
             'telegram_response' => $result['telegram_response'] ?? null,
         ]);
+    }
+
+    /**
+     * Hydrate experience[i].galleries[] from gallery_ids[].
+     *
+     * Each experience entry stored in settings.about.experience may carry a
+     * `gallery_ids` array (set via the AboutSettings admin picker). Public
+     * About.vue needs a thumbnail strip per role, so we fetch the linked
+     * Gallery rows + a small preview slice of items in a single batched
+     * query, then attach a `galleries` sibling array to each experience.
+     *
+     * Edge cases:
+     *   - missing/null gallery_ids        → galleries: []
+     *   - dangling ID (deleted gallery)   → silently filtered
+     *   - gallery with 0 items            → items_count=0, preview_items=[]
+     *   - missing thumbnail/file_path     → null
+     */
+    private function hydrateExperienceGalleries(array $experience): array
+    {
+        $allIds = collect($experience)
+            ->pluck('gallery_ids')
+            ->flatten()
+            ->filter(fn ($id) => is_numeric($id))
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($allIds->isEmpty()) {
+            return collect($experience)->map(function ($exp) {
+                $exp['galleries'] = [];
+                return $exp;
+            })->all();
+        }
+
+        // Eager-load up to 4 items per gallery for the preview strip + a
+        // separate aggregate count so the strip header reflects the REAL
+        // total (the limited preview collection cannot be used for counting).
+        $galleryMap = Gallery::withCount('items')
+            ->with(['items' => fn ($q) => $q->limit(4)])
+            ->whereIn('id', $allIds)
+            ->get()
+            ->keyBy('id');
+
+        return collect($experience)->map(function ($exp) use ($galleryMap) {
+            $ids = $exp['gallery_ids'] ?? [];
+            if (!is_array($ids)) {
+                $ids = [];
+            }
+
+            $exp['galleries'] = collect($ids)
+                ->map(fn ($id) => $galleryMap->get((int) $id))
+                ->filter()
+                ->map(function ($gallery) {
+                    return [
+                        'id' => $gallery->id,
+                        'title' => $gallery->title,
+                        'thumbnail' => $this->resolveAssetUrl($gallery->thumbnail),
+                        'items_count' => (int) ($gallery->items_count ?? 0),
+                        'preview_items' => $gallery->items->take(4)->map(function ($item) {
+                            return [
+                                'id' => $item->id,
+                                'title' => $item->title,
+                                'thumbnail' => $this->resolveAssetUrl($item->file_path),
+                            ];
+                        })->values()->all(),
+                    ];
+                })
+                ->values()
+                ->all();
+
+            return $exp;
+        })->all();
+    }
+
+    /**
+     * Resolve a stored asset path to a public URL. Handles three storage
+     * conventions used across the codebase:
+     *   - already-absolute https URL      → return as-is
+     *   - /uploads/* (public_path)         → prepend APP_URL
+     *   - /storage/* or bare path          → use Storage::url()
+     */
+    private function resolveAssetUrl(?string $path): ?string
+    {
+        if (!$path) {
+            return null;
+        }
+
+        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+            return $path;
+        }
+
+        if (str_starts_with($path, '/uploads/') || str_starts_with($path, '/storage/')) {
+            return rtrim(config('app.url'), '/') . $path;
+        }
+
+        // Storage::url() handles bare 'galleries/foo.jpg' → '/storage/galleries/foo.jpg'
+        return Storage::url($path);
     }
 
     /**
