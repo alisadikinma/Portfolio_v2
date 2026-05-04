@@ -101,6 +101,12 @@ echo "▶ php artisan db:seed telegram (idempotent)"
 php artisan db:seed --class=TelegramSettingsSeeder --force || \
   echo "  (seeder failed or already applied — continuing)"
 
+# Phase 6 partial — May 5: 4 LinkedIn-sourced testimonials. Idempotent
+# via updateOrCreate keyed on (client_name, source). Safe to re-run.
+echo "▶ php artisan db:seed linkedin_testimonials (idempotent)"
+php artisan db:seed --class=LinkedInTestimonialsSeeder --force || \
+  echo "  (seeder failed or already applied — continuing)"
+
 # ---- 4. Cache refresh --------------------------------------------------------
 echo "▶ Laravel cache refresh"
 php artisan config:clear
