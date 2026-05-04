@@ -903,8 +903,8 @@ const selectedTrending = ref([])
 const trendingSourceFilter = ref('')
 const trendingSearch = ref('')
 const trustedOnly = ref(true) // default: hide tier-3 niche blogs
-const highViralityOnly = ref(true) // default: hide ⚡ < 60 so the modal leads with actionable topics only
-const HIGH_VIRALITY_THRESHOLD = 60
+const highViralityOnly = ref(true) // default: hide ⚡ < 70 so the modal leads with actionable topics only
+const HIGH_VIRALITY_THRESHOLD = 70
 const currentPage = ref(1)
 const perPage = 24
 const filteredTrending = computed(() => {
@@ -914,7 +914,7 @@ const filteredTrending = computed(() => {
     results = results.filter(t => !t.publisher_tier || t.publisher_tier <= 2)
   }
   if (highViralityOnly.value) {
-    // Hide low-scoring items (⚡ < 60). Keep entries lacking a score — pre-scored
+    // Hide low-scoring items (⚡ < 70). Keep entries lacking a score — pre-scored
     // payloads or cached topics shouldn't silently disappear. Use topicDisplayScore
     // so the filter honors the same number the card shows.
     results = results.filter(t => {
