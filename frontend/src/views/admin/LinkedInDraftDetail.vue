@@ -1150,50 +1150,30 @@ const showThumbnailUploadCaption = computed(() =>
                 <p class="text-sm text-neutral-500">No slides authored yet.</p>
               </div>
               <div v-else>
-                <!-- Slide nav -->
+                <!-- Slide counter + per-slide retry. Prev/next arrows moved
+                     onto the image frame itself (overlay, gallery pattern). -->
                 <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
                   <p class="text-xs font-mono uppercase tracking-[0.14em] text-neutral-400">
                     Slide <span class="text-neutral-100 font-bold">{{ activeSlideIndex + 1 }}</span> / {{ carouselSlides.length }}
                   </p>
-                  <div class="flex gap-1.5">
-                    <button
-                      @click="regenerateSingleSlide(activeSlideIndex)"
-                      :disabled="regenerateSlideMutation.isPending.value"
-                      class="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] rounded-md bg-amber-500/10 ring-1 ring-amber-500/30 text-amber-300 hover:bg-amber-500/20 disabled:opacity-30 transition"
-                      title="Re-render only this slide's image (~30-60s, same prompt)"
-                    >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3">
-                        <path :d="ICON.refresh" />
-                      </svg>
-                      Re-render image
-                    </button>
-                    <button
-                      @click="prevSlide"
-                      :disabled="activeSlideIndex === 0"
-                      class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30 transition"
-                      aria-label="Previous slide"
-                    >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5 text-neutral-300">
-                        <path :d="ICON.chevronLeft" />
-                      </svg>
-                    </button>
-                    <button
-                      @click="nextSlide"
-                      :disabled="activeSlideIndex === carouselSlides.length - 1"
-                      class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30 transition"
-                      aria-label="Next slide"
-                    >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5 text-neutral-300">
-                        <path :d="ICON.chevronRight" />
-                      </svg>
-                    </button>
-                  </div>
+                  <button
+                    @click="regenerateSingleSlide(activeSlideIndex)"
+                    :disabled="regenerateSlideMutation.isPending.value"
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] rounded-md bg-amber-500/10 ring-1 ring-amber-500/30 text-amber-300 hover:bg-amber-500/20 disabled:opacity-30 transition"
+                    title="Re-render only this slide's image (~30-60s, same prompt)"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3">
+                      <path :d="ICON.refresh" />
+                    </svg>
+                    Re-render image
+                  </button>
                 </div>
 
-                <!-- Slide frame (3:4) -->
+                <!-- Slide frame (3:4) with overlaid prev/next gallery arrows -->
+                <div class="relative mx-auto" style="max-width: min(100%, 60vh);">
                 <div
-                  class="rounded-xl border border-neutral-800/80 overflow-hidden bg-gradient-to-br from-neutral-950 to-neutral-900 mx-auto relative"
-                  style="aspect-ratio: 3 / 4; max-height: 80vh; max-width: min(100%, 60vh);"
+                  class="rounded-xl border border-neutral-800/80 overflow-hidden bg-gradient-to-br from-neutral-950 to-neutral-900 relative"
+                  style="aspect-ratio: 3 / 4; max-height: 80vh;"
                 >
                   <!-- Status pill -->
                   <span
@@ -1266,6 +1246,31 @@ const showThumbnailUploadCaption = computed(() =>
                     <p class="text-white text-2xl font-bold uppercase tracking-tight max-w-md mb-2 leading-tight">{{ slideCopyId(carouselSlides[activeSlideIndex]) }}</p>
                     <p class="text-white/80 text-xs max-w-md">{{ slideCopyEn(carouselSlides[activeSlideIndex]) }}</p>
                   </div>
+                </div>
+                  <!-- Gallery-style prev/next arrows overlaid on the frame.
+                       Placed in the relative wrapper above the frame so they
+                       can sit at the vertical center of the slide regardless
+                       of frame height. -->
+                  <button
+                    @click="prevSlide"
+                    :disabled="activeSlideIndex === 0"
+                    class="absolute left-2 top-1/2 -translate-y-1/2 z-20 inline-flex items-center justify-center w-9 h-9 rounded-full bg-neutral-900/80 backdrop-blur-md ring-1 ring-neutral-700 hover:bg-neutral-800 hover:ring-amber-500/50 disabled:opacity-0 disabled:pointer-events-none transition-all shadow-lg"
+                    aria-label="Previous slide"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-neutral-200">
+                      <path :d="ICON.chevronLeft" />
+                    </svg>
+                  </button>
+                  <button
+                    @click="nextSlide"
+                    :disabled="activeSlideIndex === carouselSlides.length - 1"
+                    class="absolute right-2 top-1/2 -translate-y-1/2 z-20 inline-flex items-center justify-center w-9 h-9 rounded-full bg-neutral-900/80 backdrop-blur-md ring-1 ring-neutral-700 hover:bg-neutral-800 hover:ring-amber-500/50 disabled:opacity-0 disabled:pointer-events-none transition-all shadow-lg"
+                    aria-label="Next slide"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-neutral-200">
+                      <path :d="ICON.chevronRight" />
+                    </svg>
+                  </button>
                 </div>
 
                 <!-- Image generation tally -->

@@ -148,15 +148,58 @@ export function useLinkedInDraftProgress(id, options = {}) {
   }
 }
 
+/**
+ * Optimistic helper: flip every slide to pending + clear errors locally so
+ * the UI reflects the click instantly, before the network round-trip and
+ * the queue worker pickup latency. Returns rollback context for onError.
+ *
+ * Used by the bulk re-render mutations. Single-slide retry uses a narrower
+ * variant inline (only flips the one slide).
+ */
+async function optimisticResetAllSlides(qc, id) {
+  await qc.cancelQueries({ queryKey: [LIST_KEY, id] })
+  const previous = qc.getQueryData([LIST_KEY, id])
+  if (previous?.data?.carousel_slides && Array.isArray(previous.data.carousel_slides)) {
+    const nextSlides = previous.data.carousel_slides.map(s => ({
+      ...s,
+      image_status: 'pending',
+      image_url: '',
+      image_error: null,
+      image_job_uuid: null,
+    }))
+    qc.setQueryData([LIST_KEY, id], {
+      ...previous,
+      data: {
+        ...previous.data,
+        carousel_slides: nextSlides,
+        last_error: null,
+      },
+    })
+  }
+  return { previous }
+}
+
 /** POST /admin/linkedin-drafts/{id}/regenerate-images — bulk re-dispatch */
 export function useRegenerateAllCarouselImages() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id) =>
       api.post(`/admin/linkedin-drafts/${id}/regenerate-images`).then(r => r.data),
-    onSuccess: (_, id) => {
+    onMutate: (id) => optimisticResetAllSlides(qc, id),
+    onError: (_err, id, context) => {
+      if (context?.previous) qc.setQueryData([LIST_KEY, id], context.previous)
+    },
+    onSuccess: (response, id) => {
+      // Populate detail cache from the response so we don't pay another
+      // round-trip after invalidation. List cache (queue/feed counts)
+      // still gets invalidated via onSettled.
+      if (response?.data) {
+        const cur = qc.getQueryData([LIST_KEY, id])
+        qc.setQueryData([LIST_KEY, id], { ...(cur || {}), data: response.data })
+      }
+    },
+    onSettled: (_d, _e, id) => {
       qc.invalidateQueries({ queryKey: [LIST_KEY] })
-      qc.invalidateQueries({ queryKey: [LIST_KEY, id] })
     },
   })
 }
@@ -172,9 +215,18 @@ export function useRerenderImagesOnly() {
   return useMutation({
     mutationFn: (id) =>
       api.post(`/admin/linkedin-drafts/${id}/rerender-images`).then(r => r.data),
-    onSuccess: (_, id) => {
+    onMutate: (id) => optimisticResetAllSlides(qc, id),
+    onError: (_err, id, context) => {
+      if (context?.previous) qc.setQueryData([LIST_KEY, id], context.previous)
+    },
+    onSuccess: (response, id) => {
+      if (response?.data) {
+        const cur = qc.getQueryData([LIST_KEY, id])
+        qc.setQueryData([LIST_KEY, id], { ...(cur || {}), data: response.data })
+      }
+    },
+    onSettled: (_d, _e, id) => {
       qc.invalidateQueries({ queryKey: [LIST_KEY] })
-      qc.invalidateQueries({ queryKey: [LIST_KEY, id] })
     },
   })
 }
@@ -203,9 +255,33 @@ export function useRegenerateSlideImage() {
   return useMutation({
     mutationFn: ({ id, slideIndex }) =>
       api.post(`/admin/linkedin-drafts/${id}/slides/${slideIndex}/regenerate-image`).then(r => r.data),
-    onSuccess: (_, { id }) => {
+    onMutate: async ({ id, slideIndex }) => {
+      await qc.cancelQueries({ queryKey: [LIST_KEY, id] })
+      const previous = qc.getQueryData([LIST_KEY, id])
+      if (previous?.data?.carousel_slides && Array.isArray(previous.data.carousel_slides)) {
+        const nextSlides = previous.data.carousel_slides.map((s, i) =>
+          i === slideIndex
+            ? { ...s, image_status: 'pending', image_url: '', image_error: null, image_job_uuid: null }
+            : s
+        )
+        qc.setQueryData([LIST_KEY, id], {
+          ...previous,
+          data: { ...previous.data, carousel_slides: nextSlides },
+        })
+      }
+      return { previous }
+    },
+    onError: (_err, { id }, context) => {
+      if (context?.previous) qc.setQueryData([LIST_KEY, id], context.previous)
+    },
+    onSuccess: (response, { id }) => {
+      if (response?.data) {
+        const cur = qc.getQueryData([LIST_KEY, id])
+        qc.setQueryData([LIST_KEY, id], { ...(cur || {}), data: response.data })
+      }
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: [LIST_KEY] })
-      qc.invalidateQueries({ queryKey: [LIST_KEY, id] })
     },
   })
 }

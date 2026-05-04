@@ -84,7 +84,28 @@ class LinkedInGenerationService
         }
 
         // Step 3: Invoke plugin
-        $result = $this->invokePlugin($blog, $draft->id);
+        // Wrap in try/catch — Laravel's Process::timeout()->run() throws
+        // ProcessTimedOutException when SSH dispatch hangs past the budget
+        // (Sonnet output cap exhaustion, MCP leak, network), and Symfony's
+        // process layer can throw RuntimeException on exec(); without this
+        // catch the exception propagates up and `markFailed` never runs,
+        // leaving the FSM stuck in `generating` until the 20-min reaper
+        // surfaces it as a misleading "Reaper: stuck" message — operators
+        // saw this loop on drafts #59/#63/#65 with regenerate not breaking
+        // out. Catching here turns the SSH timeout into an actionable
+        // Failed transition with a clean error message.
+        try {
+            $result = $this->invokePlugin($blog, $draft->id);
+        } catch (\Throwable $e) {
+            $errMsg = 'SSH dispatch threw: ' . $e->getMessage();
+            $this->markFailed($draft, $errMsg);
+            return [
+                'success' => false,
+                'draft_id' => $draft->id,
+                'status' => 'failed',
+                'error' => $errMsg,
+            ];
+        }
         if (!$result['success']) {
             $this->markFailed($draft, $result['error'] ?? 'Plugin invocation failed');
             return [
@@ -149,6 +170,20 @@ class LinkedInGenerationService
                 'draft_id' => $draft->id,
                 'status' => 'failed',
                 'error' => $e->getMessage(),
+            ];
+        } catch (\Throwable $e) {
+            // Same defense as Step 3 above — Process::run() inside
+            // dispatchCarouselGenEngine can throw ProcessTimedOutException
+            // when /carousel-gen SSH hangs past the budget. Without this
+            // catch the FSM is stuck in `generating` until the 20-min
+            // reaper.
+            $errMsg = "carousel-gen SSH dispatch threw: {$e->getMessage()}";
+            $this->markFailed($draft, $errMsg);
+            return [
+                'success' => false,
+                'draft_id' => $draft->id,
+                'status' => 'failed',
+                'error' => $errMsg,
             ];
         }
 
