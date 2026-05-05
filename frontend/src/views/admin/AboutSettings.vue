@@ -593,7 +593,7 @@
             </div>
           </div>
 
-          <div class="flex flex-wrap items-center gap-3 pt-3 border-t border-neutral-200 dark:border-neutral-700">
+          <div class="pt-3 border-t border-neutral-200 dark:border-neutral-700 space-y-4">
             <BaseButton
               type="submit"
               :disabled="mailSubmitting"
@@ -602,19 +602,37 @@
               {{ mailSubmitting ? 'Saving...' : 'Save SMTP Settings' }}
             </BaseButton>
 
-            <BaseButton
-              type="button"
-              :disabled="mailTesting || !mailPasswordConfigured"
-              :loading="mailTesting"
-              button-type="secondary"
-              @click="handleMailTest"
-            >
-              📤 Send test email to me
-            </BaseButton>
+            <div class="flex flex-wrap items-end gap-3 pt-3 border-t border-neutral-200 dark:border-neutral-700">
+              <div class="flex-1 min-w-[260px]">
+                <label for="mail_test_recipient" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                  Send test to
+                </label>
+                <input
+                  id="mail_test_recipient"
+                  v-model="mailTestRecipient"
+                  type="email"
+                  :placeholder="authStore.user?.email ? `Default: ${authStore.user.email}` : 'recipient@example.com'"
+                  class="w-full border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+                <p class="text-xs text-neutral-500 mt-1">
+                  Type any email you have access to (e.g. your Gmail). Defaults to your admin user email if blank.
+                </p>
+              </div>
 
-            <span v-if="mailTestResult" :class="mailTestResult.success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'" class="text-sm">
+              <BaseButton
+                type="button"
+                :disabled="mailTesting || !mailPasswordConfigured"
+                :loading="mailTesting"
+                button-type="secondary"
+                @click="handleMailTest"
+              >
+                📤 Send test email
+              </BaseButton>
+            </div>
+
+            <p v-if="mailTestResult" :class="mailTestResult.success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'" class="text-sm leading-relaxed">
               {{ mailTestResult.message }}
-            </span>
+            </p>
           </div>
         </form>
       </BaseCard>
@@ -1713,6 +1731,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useQueryClient } from '@tanstack/vue-query'
 import { useSettingsStore } from '@/stores/settings'
 import { useUiStore } from '@/stores/ui'
+import { useAuthStore } from '@/stores/auth'
 import BaseCard from '@/components/base/BaseCard.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import api from '@/services/api'
@@ -1730,6 +1749,7 @@ const router = useRouter()
 const queryClient = useQueryClient()
 const settingsStore = useSettingsStore()
 const uiStore = useUiStore()
+const authStore = useAuthStore()
 
 const fileInput = ref(null)
 const isSubmitting = ref(false)
@@ -1858,6 +1878,7 @@ async function handleTelegramTest() {
 const mailSubmitting = ref(false)
 const mailTesting = ref(false)
 const mailTestResult = ref(null)
+const mailTestRecipient = ref('')
 
 const mailFormData = ref({
   mail_mailer: 'smtp',
@@ -1914,7 +1935,8 @@ async function handleMailTest() {
   mailTesting.value = true
   mailTestResult.value = null
   try {
-    const result = await settingsStore.sendMailTestMessage()
+    const recipient = mailTestRecipient.value.trim() || undefined
+    const result = await settingsStore.sendMailTestMessage(recipient)
     mailTestResult.value = result.success
       ? { success: true, message: '✓ ' + (result.message || 'Test sent — check your inbox + spam') }
       : { success: false, message: '✗ ' + (result.error || 'SMTP test failed') }
