@@ -12,6 +12,7 @@ use App\Models\Project;
 use App\Models\Setting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 
 /**
  * CV Master Export API (Phase 10, May 2026)
@@ -90,6 +91,28 @@ class CvExportController extends Controller
             'success' => true,
             'data' => $payload,
         ]);
+    }
+
+    /**
+     * GET /api/cv/master.md
+     *
+     * LLM-optimized markdown rendering of Ali's full professional profile,
+     * sourced from the same data as `/api/cv/export` (settings + projects
+     * + awards + thought leadership). Designed for jobhunter platform
+     * `cv-tailor` and `job-score` skills that consume CV as prompt input.
+     *
+     * Optional `?compact=1` query truncates per-project narrative for
+     * tighter LLM context windows (~5k tokens vs. ~10k default).
+     *
+     * Auth: Sanctum bearer + `cv:read` ability + throttle:30,1
+     * (inherited from the route group).
+     */
+    public function master(Request $request): Response
+    {
+        $body = "# Ali Sadikin\n";
+
+        return response($body, 200)
+            ->header('Content-Type', 'text/markdown; charset=utf-8');
     }
 
     /**

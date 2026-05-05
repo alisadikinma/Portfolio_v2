@@ -73,6 +73,7 @@ Route::middleware('set.locale.by.geoip')->group(function () {
 // locale group because the payload is not locale-scoped.
 Route::middleware(['auth:sanctum', 'ability:cv:read', 'throttle:30,1'])->group(function () {
     Route::get('/cv/export', [CvExportController::class, 'export']);
+    Route::get('/cv/master.md', [CvExportController::class, 'master']);
 });
 
 // Public Awards Routes
