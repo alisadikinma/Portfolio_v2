@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\HasImageVariants;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -10,9 +11,15 @@ use Spatie\Sluggable\SlugOptions;
 
 class Project extends Model
 {
-    use HasFactory, SoftDeletes, HasSlug;
+    use HasFactory, SoftDeletes, HasSlug, HasImageVariants;
+
+    public function imageVariantSource(): string
+    {
+        return 'image';
+    }
 
     protected $fillable = [
+        'image_variants',
         'title',
         'slug',
         'description',
@@ -61,6 +68,7 @@ class Project extends Model
     ];
 
     protected $casts = [
+        'image_variants' => 'array',
         'images' => 'array',
         'technologies' => 'array',
         'related_project_ids' => 'array',

@@ -32,6 +32,7 @@ class PostResource extends JsonResource
             'featured_image' => $this->featured_image
                 ? (str_starts_with($this->featured_image, 'http') ? $this->featured_image : url($this->featured_image))
                 : null,
+            'image_variants' => $this->image_variants, // BaseImage srcset + LQIP. Null when not yet generated.
             'tags' => $this->tags ?? [],
             'is_premium' => (bool) $this->is_premium,
             'published' => (bool) $this->published,

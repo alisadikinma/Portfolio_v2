@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\HasImageVariants;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -10,9 +11,15 @@ use Spatie\Sluggable\SlugOptions;
 
 class Post extends Model
 {
-    use HasFactory, SoftDeletes, HasSlug;
+    use HasFactory, SoftDeletes, HasSlug, HasImageVariants;
+
+    public function imageVariantSource(): string
+    {
+        return 'featured_image';
+    }
 
     protected $fillable = [
+        'image_variants',
         'category_id',
         'title',
         'slug',
@@ -39,6 +46,7 @@ class Post extends Model
     ];
 
     protected $casts = [
+        'image_variants' => 'array',
         'tags' => 'array',
         'is_premium' => 'boolean',
         'published' => 'boolean',

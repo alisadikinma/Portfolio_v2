@@ -2,14 +2,21 @@
 
 namespace App\Models;
 
+use App\Traits\HasImageVariants;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class GalleryItem extends Model
 {
-    use HasFactory;
+    use HasFactory, HasImageVariants;
+
+    public function imageVariantSource(): string
+    {
+        return 'file_path';
+    }
 
     protected $fillable = [
+        'image_variants',
         'gallery_id',
         'type',
         'file_path',
@@ -19,6 +26,7 @@ class GalleryItem extends Model
     ];
 
     protected $casts = [
+        'image_variants' => 'array',
         'sequence' => 'integer',
     ];
 

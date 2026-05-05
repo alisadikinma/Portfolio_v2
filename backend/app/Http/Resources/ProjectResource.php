@@ -46,6 +46,7 @@ class ProjectResource extends JsonResource
             // Images (with alias for frontend compatibility)
             'image' => $this->getImageUrl($this->image),
             'featured_image' => $this->getImageUrl($this->image), // Frontend expects this
+            'image_variants' => $this->image_variants, // BaseImage uses for srcset + LQIP. Null when not yet generated.
             'images' => $this->images ? collect($this->images)->map(fn($img) => $this->getImageUrl($img))->toArray() : [],
             
             'category' => $this->category,
