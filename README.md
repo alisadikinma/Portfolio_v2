@@ -20,10 +20,13 @@ Modern, scalable full-stack portfolio and CMS featuring RESTful API architecture
 | **Status** | Production Ready |
 | **Production URL** | https://alisadikinma.com |
 | **API Endpoints** | 140+ documented endpoints |
-| **Performance** | <500ms cached loads (83% improvement) |
+| **Performance** | <500ms cached loads (83% improvement) + Cloudflare edge caching (60-80% bandwidth saved on /storage/*) |
 | **Security Score** | 95/100 |
 | **AI Content Plugin** | article-content-writer v2.7.2 (Wikidata + lede + role-resolution + hard SEO audit) |
-| **Last Updated** | April 21, 2026 |
+| **Image Pipeline** | WebP variants (320/640/1024/1920w) + LQIP blur via Intervention Image — `php artisan images:generate-variants` |
+| **HTTP Caching** | ETag/304 on all JSON GET responses (~50 byte revalidation vs full payload) |
+| **CDN** | Cloudflare proxy (orange cloud) — `/storage/*` + `/uploads/*` cached at edge, `/api/*` bypassed |
+| **Last Updated** | May 5, 2026 |
 
 ---
 
@@ -335,10 +338,14 @@ Carousels:    GET /api/automation/carousel/accounts, /drafts
 - **Backward compatible**: `watermark_enabled` opt-in default off, legacy blog pipeline unchanged
 
 ### Performance
-- TanStack Query caching (5-60min stale times per resource)
+- **Cloudflare edge caching** — `/storage/*` + `/uploads/*` cached globally at 300+ POPs (Cache Everything, 1 month TTL), 60-80% bandwidth reduction on origin VPS
+- **ETag/304 revalidation** — all JSON GET responses get a weak ETag; browser revalidates with `If-None-Match` and gets `304 Not Modified` (~80 byte response) instead of full payload (~95% bandwidth saved per revalidation)
+- **WebP variant pipeline** — Intervention Image generates 4 widths (320/640/1024/1920w) + LQIP blur placeholder per image; frontend will render via `<picture><source srcset>` (Phase D)
+- TanStack Query in-memory caching (5-60min stale times per resource)
 - 83% faster repeat visits, 70% fewer API calls
 - All pages <500ms on cached loads
 - Prefetch critical data on router navigation
+- Service Worker for media files (videos + images) — cache-first strategy
 
 ---
 
@@ -465,4 +472,4 @@ Contact: ali.sadikincom85@gmail.com | Location: Batam, Indonesia
 
 ---
 
-**Last Updated:** April 18, 2026 | **Version:** 2.3.0 | **Status:** Production Ready
+**Last Updated:** May 5, 2026 | **Version:** 2.4.0 | **Status:** Production Ready
