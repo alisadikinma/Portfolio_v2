@@ -235,7 +235,7 @@
                 :key="award.id"
                 class="awards-slide"
                 :style="getSlideStyle(i)"
-                @click="activeAwardIndex = i"
+                @click="handleAwardCardClick(award, i)"
               >
                 <div class="awards-card" :class="{ 'awards-card--active': i === activeAwardIndex }">
                   <!-- Image -->
@@ -549,6 +549,20 @@ function formatAwardYear(date) {
 }
 
 // ── Gallery Modal ────────────────────────────────────────────
+// Click anywhere on the active award card opens the gallery; clicking an
+// inactive card simply rotates it to active first (so the carousel stays
+// navigable). Clicking the explicit VIEW GALLERY button uses @click.stop
+// and goes straight to openGalleryModal regardless.
+function handleAwardCardClick(award, i) {
+  if (i !== activeAwardIndex.value) {
+    activeAwardIndex.value = i
+    return
+  }
+  if (award?.total_photos > 0) {
+    openGalleryModal(award)
+  }
+}
+
 async function openGalleryModal(award) {
   selectedAward.value = award
   showGalleryModal.value = true
