@@ -25,18 +25,17 @@
         class="mx-auto mb-12 max-w-2xl text-center text-sm text-[var(--fg-muted,#8A8F98)] lg:text-base"
         style="font-family: 'Inter', sans-serif; font-weight: 300;"
       >
-        Public recommendations — every quote linked back to its
-        author's LinkedIn profile.
+        Public recommendations from people who've worked alongside me.
       </p>
 
       <!-- Loading skeleton -->
       <div
         v-if="isLoading"
-        class="glass-card mx-auto h-[18rem] w-full max-w-3xl animate-pulse rounded-xl border border-white/5 bg-white/[0.03] lg:h-[20rem]"
+        class="glass-card mx-auto h-[20rem] w-full max-w-3xl animate-pulse rounded-xl border border-white/5 bg-white/[0.03] lg:h-[22rem]"
         aria-hidden="true"
       ></div>
 
-      <!-- Empty state — render nothing if no testimonials (matches Phase 11 silent-absence pattern) -->
+      <!-- Empty state -->
       <div v-else-if="!testimonials.length" class="hidden"></div>
 
       <!-- Carousel -->
@@ -46,10 +45,11 @@
         @mouseenter="pause"
         @mouseleave="resume"
       >
+        <!-- Slide -->
         <Transition name="quote-fade" mode="out-in">
           <article
             :key="active.id"
-            class="rounded-xl border border-white/5 bg-white/[0.04] p-7 backdrop-blur-md md:p-10"
+            class="relative rounded-xl border border-white/5 bg-white/[0.04] p-7 backdrop-blur-md md:p-10"
             role="group"
             :aria-roledescription="`testimonial ${activeIdx + 1} of ${testimonials.length}`"
           >
@@ -71,9 +71,31 @@
               >{{ para }}</p>
             </div>
 
-            <!-- Footer: client + LinkedIn badge -->
-            <div class="flex items-end justify-between gap-4 border-t border-white/5 pt-5">
-              <div class="min-w-0">
+            <!-- Footer: avatar + client name + role -->
+            <div class="flex items-center gap-4 border-t border-white/5 pt-5">
+              <!-- Avatar (photo or initials fallback) -->
+              <div class="shrink-0">
+                <img
+                  v-if="active.client_photo"
+                  :src="active.client_photo"
+                  :alt="active.client_name"
+                  class="h-14 w-14 rounded-full border border-white/10 object-cover lg:h-16 lg:w-16"
+                  loading="lazy"
+                  @error="onPhotoError($event)"
+                />
+                <div
+                  v-else
+                  class="flex h-14 w-14 items-center justify-center rounded-full border border-white/10 text-base font-semibold uppercase tracking-wider text-[var(--bg-deep,#050506)] lg:h-16 lg:w-16 lg:text-lg"
+                  :style="initialsAvatarStyle(active)"
+                  style="font-family: 'Space Grotesk', sans-serif;"
+                  aria-hidden="true"
+                >
+                  {{ initials(active.client_name) }}
+                </div>
+              </div>
+
+              <!-- Name + role -->
+              <div class="min-w-0 flex-1">
                 <p
                   class="truncate text-sm font-semibold uppercase tracking-[0.16em] text-[var(--fg-primary,#EDEDEF)] lg:text-[0.95rem]"
                   style="font-family: 'JetBrains Mono', ui-monospace, monospace;"
@@ -95,22 +117,35 @@
                   {{ active.company_name }}
                 </p>
               </div>
-
-              <a
-                v-if="active.source_url"
-                :href="active.source_url"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="shrink-0 inline-flex items-center gap-1.5 rounded-md border border-[var(--accent-cyan,#06B6D4)]/40 bg-white/5 px-3 py-1.5 text-[0.65rem] font-medium uppercase tracking-[0.18em] text-[var(--fg-primary,#EDEDEF)]/90 transition-colors hover:border-[var(--accent-cyan,#06B6D4)] hover:text-[var(--accent-cyan,#06B6D4)] lg:text-xs"
-                style="font-family: 'JetBrains Mono', ui-monospace, monospace;"
-              >
-                via LinkedIn ↗
-              </a>
             </div>
           </article>
         </Transition>
 
-        <!-- Dots / nav -->
+        <!-- Prev/Next arrow buttons -->
+        <button
+          v-if="testimonials.length > 1"
+          type="button"
+          class="nav-arrow nav-arrow-prev"
+          aria-label="Previous testimonial"
+          @click="prev"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        <button
+          v-if="testimonials.length > 1"
+          type="button"
+          class="nav-arrow nav-arrow-next"
+          aria-label="Next testimonial"
+          @click="next"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+
+        <!-- Dots nav -->
         <div
           v-if="testimonials.length > 1"
           class="mt-8 flex items-center justify-center gap-3"
@@ -172,19 +207,24 @@ function resume() { isPaused = false }
 
 function goTo(idx) {
   activeIdx.value = idx
-  // Reset rotation timer so manual click doesn't immediately get bumped
   startTimer()
+}
+
+function next() {
+  goTo((activeIdx.value + 1) % testimonials.value.length)
+}
+
+function prev() {
+  goTo((activeIdx.value - 1 + testimonials.value.length) % testimonials.value.length)
 }
 
 function handleKey(e) {
   if (e.key === 'ArrowRight') {
     e.preventDefault()
-    goTo((activeIdx.value + 1) % testimonials.value.length)
+    next()
   } else if (e.key === 'ArrowLeft') {
     e.preventDefault()
-    goTo(
-      (activeIdx.value - 1 + testimonials.value.length) % testimonials.value.length
-    )
+    prev()
   }
 }
 
@@ -194,6 +234,45 @@ function quoteParagraphs(t) {
     .split(/\n\s*\n/)
     .map((p) => p.trim())
     .filter(Boolean)
+}
+
+function initials(name) {
+  if (!name) return '?'
+  const parts = String(name).trim().split(/\s+/)
+  const first = parts[0]?.[0] ?? ''
+  const second = parts[parts.length - 1]?.[0] ?? ''
+  return (first + (parts.length > 1 ? second : '')).toUpperCase()
+}
+
+// Stable per-name gradient using simple hash → palette index
+const PALETTES = [
+  ['#D4A843', '#06B6D4'], // gold → cyan
+  ['#06B6D4', '#5E6AD2'], // cyan → indigo
+  ['#5E6AD2', '#D4A843'], // indigo → gold
+  ['#D4A843', '#5E6AD2'], // gold → indigo
+]
+
+function paletteFor(name) {
+  const str = String(name ?? '')
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash * 31 + str.charCodeAt(i)) >>> 0
+  }
+  return PALETTES[hash % PALETTES.length]
+}
+
+function initialsAvatarStyle(t) {
+  const [a, b] = paletteFor(t?.client_name)
+  return {
+    background: `linear-gradient(135deg, ${a} 0%, ${b} 100%)`,
+  }
+}
+
+function onPhotoError(e) {
+  // Photo URL broke — hide <img> so initials fallback rerenders next tick.
+  // Mutate the testimonial object so v-if/v-else flips.
+  if (active.value) active.value.client_photo = null
+  if (e?.target) e.target.style.display = 'none'
 }
 
 watch(
@@ -215,11 +294,50 @@ onBeforeUnmount(() => {
 .quote-fade-enter-from { opacity: 0; transform: translateY(10px); }
 .quote-fade-leave-to { opacity: 0; transform: translateY(-6px); }
 
+.nav-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2.75rem;
+  height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--fg-primary, #EDEDEF);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  cursor: pointer;
+  transition: background 200ms ease, border-color 200ms ease, transform 200ms ease, color 200ms ease;
+  z-index: 5;
+}
+.nav-arrow svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+.nav-arrow:hover {
+  background: rgba(212, 168, 67, 0.12);
+  border-color: rgba(212, 168, 67, 0.5);
+  color: var(--accent-gold, #D4A843);
+}
+.nav-arrow:active {
+  transform: translateY(-50%) scale(0.96);
+}
+.nav-arrow-prev { left: -1rem; }
+.nav-arrow-next { right: -1rem; }
+@media (min-width: 1024px) {
+  .nav-arrow-prev { left: -3.5rem; }
+  .nav-arrow-next { right: -3.5rem; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .quote-fade-enter-active,
   .quote-fade-leave-active { transition: none; }
   .quote-fade-enter-from,
   .quote-fade-leave-to { transform: none; }
-  .dot { transition: none; }
+  .dot,
+  .nav-arrow { transition: none; }
 }
 </style>
