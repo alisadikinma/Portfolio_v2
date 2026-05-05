@@ -10,6 +10,7 @@ use App\Models\Award;
 use App\Models\Post;
 use App\Models\Project;
 use App\Models\Setting;
+use App\Services\CvMasterMarkdownService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -107,9 +108,9 @@ class CvExportController extends Controller
      * Auth: Sanctum bearer + `cv:read` ability + throttle:30,1
      * (inherited from the route group).
      */
-    public function master(Request $request): Response
+    public function master(Request $request, CvMasterMarkdownService $service): Response
     {
-        $body = "# Ali Sadikin\n";
+        $body = $service->render($request->boolean('compact'));
 
         return response($body, 200)
             ->header('Content-Type', 'text/markdown; charset=utf-8');
