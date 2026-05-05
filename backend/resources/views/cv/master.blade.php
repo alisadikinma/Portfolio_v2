@@ -15,13 +15,23 @@
 
     $allBits = array_merge($contactBits, $profileBits);
 @endphp
-# {{ $basics['name'] }}
-**{{ $basics['title'] }}**@if($location !== '') · {{ $location }}@endif
+# {!! $basics['name'] !!}
+**{!! $basics['title'] !!}**@if($location !== '') · {!! $location !!}@endif
 
 @if(!empty($allBits))
-{{ implode(' · ', $allBits) }}
+{!! implode(' · ', $allBits) !!}
 
 @endif
 ## Summary
 
-{{ $basics['summary'] }}
+{!! $basics['summary'] !!}
+
+## Skills Matrix
+
+@foreach($skill_domains as $domain)
+### {!! $domain['label'] !!} (~{{ $domain['years'] }} yrs · {{ $domain['count'] }} projects)
+@foreach($domain['bullets'] as $bullet)
+- {!! $bullet !!}
+@endforeach
+
+@endforeach

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Project;
 use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -85,6 +86,57 @@ class CvMasterMarkdownApiTest extends TestCase
         $this->assertStringContainsString('## Summary', $body);
         $this->assertStringContainsString('Bio summary text for the elevator pitch.', $body);
         $this->assertStringContainsString('linkedin.com/in/x', $body);
+    }
+
+    /** @test */
+    public function renders_skills_matrix_with_domain_headers_and_project_counts(): void
+    {
+        // 2 projects matching ai_automation/ai_agents heuristic ("AI" keyword)
+        Project::create([
+            'title' => 'AI Agent Platform',
+            'slug' => 'ai-agent-platform',
+            'description' => 'Multi-agent orchestration toolkit',
+            'category' => 'AI',
+            'published' => true,
+            'sort_order' => 10,
+        ]);
+        Project::create([
+            'title' => 'Automation Pipeline',
+            'slug' => 'automation-pipeline',
+            'description' => 'RPA workflow engine',
+            'category' => 'Automation',
+            'published' => true,
+            'sort_order' => 20,
+        ]);
+        // 1 project matching manufacturing/enterprise heuristic
+        Project::create([
+            'title' => 'Manufacturing QA System',
+            'slug' => 'mfg-qa',
+            'description' => 'Vision inspection for factory QA',
+            'category' => 'Manufacturing',
+            'published' => true,
+            'sort_order' => 30,
+        ]);
+
+        $user = User::factory()->create();
+        Sanctum::actingAs($user, ['cv:read']);
+
+        $body = $this->get('/api/cv/master.md')->assertOk()->getContent();
+
+        $this->assertStringContainsString('## Skills Matrix', $body);
+        // ai_automation domain — 2 projects matched
+        $this->assertMatchesRegularExpression(
+            '/### AI Automation \(~7 yrs · 2 projects\)/',
+            $body
+        );
+        // manufacturing domain — 1 project matched
+        $this->assertMatchesRegularExpression(
+            '/### Industrial Automation & Manufacturing \(~12 yrs · 1 projects?\)/',
+            $body
+        );
+        // Bullets present under each domain
+        $this->assertStringContainsString('LLM orchestration, RAG pipelines', $body);
+        $this->assertStringContainsString('PLC programming', $body);
     }
 
     /** @test */
