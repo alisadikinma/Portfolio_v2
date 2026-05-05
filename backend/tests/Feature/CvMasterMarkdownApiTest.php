@@ -331,6 +331,58 @@ class CvMasterMarkdownApiTest extends TestCase
     }
 
     /** @test */
+    public function compact_mode_reduces_body_size_by_at_least_40_percent(): void
+    {
+        // Seed projects with rich Problem + Outcome strings — these are the
+        // fields gated behind !$compact in the Blade template.
+        for ($i = 1; $i <= 5; $i++) {
+            Project::create([
+                'title' => "Project $i",
+                'slug' => "project-$i",
+                'description' => str_repeat('Detailed problem description for project. ', 10),
+                'result' => str_repeat('Measurable outcome and impact figures. ', 10),
+                'category' => 'AI',
+                'role' => 'Tech Lead',
+                'published' => true,
+                'sort_order' => $i,
+            ]);
+        }
+
+        $user = User::factory()->create();
+        Sanctum::actingAs($user, ['cv:read']);
+
+        $full = $this->get('/api/cv/master.md')->assertOk()->getContent();
+        $compact = $this->get('/api/cv/master.md?compact=1')->assertOk()->getContent();
+
+        $this->assertGreaterThan(0, strlen($full));
+        $this->assertLessThan(
+            strlen($full) * 0.6,
+            strlen($compact),
+            'Compact mode should reduce body length by at least 40%'
+        );
+        // Compact still contains structural sections.
+        $this->assertStringContainsString('## Selected Projects', $compact);
+        // Compact should NOT contain the Problem: / Outcome: prefixes.
+        $this->assertStringNotContainsString('Problem:', $compact);
+        $this->assertStringNotContainsString('Outcome:', $compact);
+    }
+
+    /** @test */
+    public function etag_round_trip_returns_304_on_repeat_request(): void
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user, ['cv:read']);
+
+        $first = $this->get('/api/cv/master.md')->assertOk();
+        $etag = $first->headers->get('ETag');
+        $this->assertNotEmpty($etag, 'First response must include an ETag header');
+
+        $second = $this->get('/api/cv/master.md', ['If-None-Match' => $etag]);
+        $second->assertStatus(304);
+        $this->assertSame('', $second->getContent());
+    }
+
+    /** @test */
     public function omits_optional_contact_fields_when_settings_absent(): void
     {
         Setting::create(['group' => 'about', 'key' => 'name', 'value' => 'Ali Sadikin']);
