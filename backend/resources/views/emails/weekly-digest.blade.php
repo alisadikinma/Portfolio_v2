@@ -65,7 +65,7 @@
                                 @if($featuredImage)
                                     <tr>
                                         <td style="padding:0;">
-                                            <a href="{{ $url }}" style="display:block;text-decoration:none;">
+                                            <a href="{{ $url }}" target="_blank" rel="noopener noreferrer" style="display:block;text-decoration:none;">
                                                 <img src="{{ $featuredImage }}" alt="{{ $title }}" width="536" style="display:block;width:100%;max-width:536px;height:auto;border-radius:10px 10px 0 0;border:0;outline:none;text-decoration:none;">
                                             </a>
                                         </td>
@@ -77,12 +77,12 @@
                                             {{ $category }}
                                         </p>
                                         <h2 style="margin:0 0 10px 0;font-size:22px;line-height:1.3;color:#EDEDEF;font-weight:700;letter-spacing:-0.01em;">
-                                            <a href="{{ $url }}" style="color:#EDEDEF;text-decoration:none;">{{ $title }}</a>
+                                            <a href="{{ $url }}" target="_blank" rel="noopener noreferrer" style="color:#EDEDEF;text-decoration:none;">{{ $title }}</a>
                                         </h2>
                                         <p style="margin:0 0 18px 0;font-size:14px;line-height:1.6;color:#8A8F98;">
                                             {{ \Illuminate\Support\Str::limit(strip_tags($excerpt), 180) }}
                                         </p>
-                                        <a href="{{ $url }}" style="display:inline-block;padding:10px 18px;background-color:#D4A843;color:#050506;font-size:13px;font-weight:700;text-decoration:none;border-radius:999px;letter-spacing:0.01em;">
+                                        <a href="{{ $url }}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:10px 18px;background-color:#D4A843;color:#050506;font-size:13px;font-weight:700;text-decoration:none;border-radius:999px;letter-spacing:0.01em;">
                                             Read this essay &rarr;
                                         </a>
                                     </td>
@@ -92,58 +92,66 @@
                     </tr>
                 @endforeach
 
-                @if(!empty($featuredProject))
-                    @php
-                        $rawProjectImage = $featuredProject->image ?? '';
-                        $projectImageUrl = str_starts_with($rawProjectImage, 'http')
-                            ? $rawProjectImage
-                            : (empty($rawProjectImage) ? null : 'https://alisadikinma.com/storage/' . ltrim($rawProjectImage, '/'));
-                        $projectUrl = "https://alisadikinma.com/projects/{$featuredProject->slug}?utm_source=newsletter&utm_medium=email&utm_campaign={$campaign}";
-                        $projectExcerpt = $featuredProject->impact_statement
-                            ?? \Illuminate\Support\Str::limit(strip_tags($featuredProject->description ?? ''), 160);
-                    @endphp
+                @if(!empty($featuredProjects) && $featuredProjects->count() > 0)
                     <tr>
-                        <td style="padding:20px 32px 8px 32px;">
-                            <p style="margin:0 0 10px 0;font-family:'SF Mono','JetBrains Mono',Consolas,Monaco,monospace;font-size:10px;font-weight:600;color:#06B6D4;letter-spacing:0.18em;text-transform:uppercase;">
-                                Featured Project
+                        <td style="padding:20px 32px 4px 32px;">
+                            <p style="margin:0 0 6px 0;font-family:'SF Mono','JetBrains Mono',Consolas,Monaco,monospace;font-size:10px;font-weight:600;color:#06B6D4;letter-spacing:0.18em;text-transform:uppercase;">
+                                Featured Projects
+                            </p>
+                            <p style="margin:0 0 4px 0;font-size:13px;line-height:1.6;color:#8A8F98;">
+                                Real-world AI &amp; engineering case studies &mdash; swipe through to see the impact.
                             </p>
                         </td>
                     </tr>
-                    <tr>
-                        <td style="padding:0 32px 8px 32px;">
-                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#0E0E11;border-radius:10px;border:1px solid rgba(6,182,212,0.18);">
-                                @if($projectImageUrl)
+                    @foreach($featuredProjects as $fp)
+                        @php
+                            $fpRawImage = $fp->image ?? '';
+                            $fpImageUrl = str_starts_with($fpRawImage, 'http')
+                                ? $fpRawImage
+                                : (empty($fpRawImage) ? null : 'https://alisadikinma.com/storage/' . ltrim($fpRawImage, '/'));
+                            $fpUrl = "https://alisadikinma.com/projects/{$fp->slug}?utm_source=newsletter&utm_medium=email&utm_campaign={$campaign}";
+                            $fpExcerpt = $fp->impact_statement
+                                ?? \Illuminate\Support\Str::limit(strip_tags($fp->description ?? ''), 160);
+                            $fpIndex = $loop->iteration;
+                            $fpTotal = $loop->count;
+                        @endphp
+                        <tr>
+                            <td style="padding:6px 32px 6px 32px;">
+                                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#0E0E11;border-radius:10px;border:1px solid rgba(6,182,212,0.18);">
+                                    @if($fpImageUrl)
+                                        <tr>
+                                            <td style="padding:0;">
+                                                <a href="{{ $fpUrl }}" target="_blank" rel="noopener noreferrer" style="display:block;text-decoration:none;">
+                                                    <img src="{{ $fpImageUrl }}" alt="{{ $fp->title }}" width="536" style="display:block;width:100%;max-width:536px;height:auto;border-radius:10px 10px 0 0;border:0;outline:none;text-decoration:none;">
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    @endif
                                     <tr>
-                                        <td style="padding:0;">
-                                            <a href="{{ $projectUrl }}" style="display:block;text-decoration:none;">
-                                                <img src="{{ $projectImageUrl }}" alt="{{ $featuredProject->title }}" width="536" style="display:block;width:100%;max-width:536px;height:auto;border-radius:10px 10px 0 0;border:0;outline:none;text-decoration:none;">
+                                        <td style="padding:18px 24px 20px 24px;">
+                                            <p style="margin:0 0 8px 0;font-family:'SF Mono','JetBrains Mono',Consolas,Monaco,monospace;font-size:10px;font-weight:600;color:#06B6D4;letter-spacing:0.16em;text-transform:uppercase;">
+                                                {{ str_pad((string) $fpIndex, 2, '0', STR_PAD_LEFT) }} / {{ str_pad((string) $fpTotal, 2, '0', STR_PAD_LEFT) }}
+                                                @if(!empty($fp->category))
+                                                    &nbsp;&middot;&nbsp; {{ $fp->category }}
+                                                @endif
+                                            </p>
+                                            <h2 style="margin:0 0 10px 0;font-size:20px;line-height:1.3;color:#EDEDEF;font-weight:700;letter-spacing:-0.01em;">
+                                                <a href="{{ $fpUrl }}" target="_blank" rel="noopener noreferrer" style="color:#EDEDEF;text-decoration:none;">{{ $fp->title }}</a>
+                                            </h2>
+                                            @if($fpExcerpt)
+                                                <p style="margin:0 0 16px 0;font-size:14px;line-height:1.6;color:#8A8F98;">
+                                                    {{ \Illuminate\Support\Str::limit($fpExcerpt, 160) }}
+                                                </p>
+                                            @endif
+                                            <a href="{{ $fpUrl }}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:9px 16px;background-color:transparent;color:#06B6D4;font-size:13px;font-weight:700;text-decoration:none;border:1px solid #06B6D4;border-radius:999px;letter-spacing:0.01em;">
+                                                View case study &rarr;
                                             </a>
                                         </td>
                                     </tr>
-                                @endif
-                                <tr>
-                                    <td style="padding:20px 24px 22px 24px;">
-                                        @if(!empty($featuredProject->category))
-                                            <p style="margin:0 0 8px 0;font-family:'SF Mono','JetBrains Mono',Consolas,Monaco,monospace;font-size:10px;font-weight:600;color:#06B6D4;letter-spacing:0.16em;text-transform:uppercase;">
-                                                {{ $featuredProject->category }}
-                                            </p>
-                                        @endif
-                                        <h2 style="margin:0 0 10px 0;font-size:22px;line-height:1.3;color:#EDEDEF;font-weight:700;letter-spacing:-0.01em;">
-                                            <a href="{{ $projectUrl }}" style="color:#EDEDEF;text-decoration:none;">{{ $featuredProject->title }}</a>
-                                        </h2>
-                                        @if($projectExcerpt)
-                                            <p style="margin:0 0 18px 0;font-size:14px;line-height:1.6;color:#8A8F98;">
-                                                {{ \Illuminate\Support\Str::limit($projectExcerpt, 180) }}
-                                            </p>
-                                        @endif
-                                        <a href="{{ $projectUrl }}" style="display:inline-block;padding:10px 18px;background-color:transparent;color:#06B6D4;font-size:13px;font-weight:700;text-decoration:none;border:1px solid #06B6D4;border-radius:999px;letter-spacing:0.01em;">
-                                            View case study &rarr;
-                                        </a>
-                                    </td>
-                                </tr>
-                            </table>
-                        </td>
-                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    @endforeach
                 @endif
 
                 @php
@@ -166,7 +174,7 @@
                                         diskusi langsung di WhatsApp tentang bagaimana AI bisa meningkatkan efisiensi operasional
                                         perusahaan atau tempat kerja Anda.
                                     </p>
-                                    <a href="{{ $waUrl }}" style="display:inline-block;padding:12px 22px;background-color:#25D366;color:#FFFFFF;font-size:14px;font-weight:700;text-decoration:none;border-radius:999px;letter-spacing:0.01em;">
+                                    <a href="{{ $waUrl }}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:12px 22px;background-color:#25D366;color:#FFFFFF;font-size:14px;font-weight:700;text-decoration:none;border-radius:999px;letter-spacing:0.01em;">
                                         💬 Chat di WhatsApp &rarr;
                                     </a>
                                     <p style="margin:12px 0 0 0;font-size:11px;color:#5A5F68;font-family:'SF Mono','JetBrains Mono',Consolas,Monaco,monospace;letter-spacing:0.05em;">
@@ -190,7 +198,7 @@
                                         Ali Sadikin
                                     </p>
                                     <p style="margin:0;font-size:13px;color:#8A8F98;">
-                                        <a href="https://alisadikinma.com" style="color:#06B6D4;text-decoration:none;">alisadikinma.com</a>
+                                        <a href="https://alisadikinma.com" target="_blank" rel="noopener noreferrer" style="color:#06B6D4;text-decoration:none;">alisadikinma.com</a>
                                     </p>
                                 </td>
                             </tr>
@@ -203,11 +211,11 @@
             <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;margin-top:20px;">
                 <tr>
                     <td align="center" style="padding:18px 24px;font-size:11px;line-height:1.6;color:#5A5F68;">
-                        <a href="https://alisadikinma.com/newsletter/unsubscribe?token={{ $subscriber->unsubscribe_token }}" style="color:#8A8F98;text-decoration:underline;">Unsubscribe</a>
+                        <a href="https://alisadikinma.com/newsletter/unsubscribe?token={{ $subscriber->unsubscribe_token }}" target="_blank" rel="noopener noreferrer" style="color:#8A8F98;text-decoration:underline;">Unsubscribe</a>
                         &nbsp;&middot;&nbsp;
-                        <a href="https://www.linkedin.com/in/alisadikinma" style="color:#8A8F98;text-decoration:underline;">LinkedIn</a>
+                        <a href="https://www.linkedin.com/in/alisadikinma" target="_blank" rel="noopener noreferrer" style="color:#8A8F98;text-decoration:underline;">LinkedIn</a>
                         &nbsp;&middot;&nbsp;
-                        <a href="https://alisadikinma.com" style="color:#8A8F98;text-decoration:underline;">Portfolio</a>
+                        <a href="https://alisadikinma.com" target="_blank" rel="noopener noreferrer" style="color:#8A8F98;text-decoration:underline;">Portfolio</a>
                         <br><br>
                         <span style="color:#5A5F68;">You're receiving this because you subscribed at alisadikinma.com.</span>
                     </td>

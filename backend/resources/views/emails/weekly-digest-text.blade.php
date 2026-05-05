@@ -16,19 +16,21 @@ $url = 'https://alisadikinma.com/blog/' . $post->slug . '?utm_source=newsletter&
 
 @endforeach
 @endif
-@if(!empty($featuredProject))
+@if(!empty($featuredProjects) && $featuredProjects->count() > 0)
 ---
 
-FEATURED PROJECT
+FEATURED PROJECTS
 
-{{ $featuredProject->title }}@if(!empty($featuredProject->category)) ({{ $featuredProject->category }})@endif
+@foreach($featuredProjects as $fp)
 @php
-$projectExcerpt = $featuredProject->impact_statement ?? \Illuminate\Support\Str::limit(strip_tags($featuredProject->description ?? ''), 160);
+$fpExcerpt = $fp->impact_statement ?? \Illuminate\Support\Str::limit(strip_tags($fp->description ?? ''), 160);
 @endphp
-@if($projectExcerpt){{ \Illuminate\Support\Str::limit($projectExcerpt, 180) }}
+{{ str_pad((string) $loop->iteration, 2, '0', STR_PAD_LEFT) }}/{{ str_pad((string) $loop->count, 2, '0', STR_PAD_LEFT) }} · {{ $fp->title }}@if(!empty($fp->category)) ({{ $fp->category }})@endif
+@if($fpExcerpt){{ \Illuminate\Support\Str::limit($fpExcerpt, 160) }}
 @endif
-View case study: https://alisadikinma.com/projects/{{ $featuredProject->slug }}?utm_source=newsletter&utm_medium=email&utm_campaign={{ $campaign }}
+View case study: https://alisadikinma.com/projects/{{ $fp->slug }}?utm_source=newsletter&utm_medium=email&utm_campaign={{ $campaign }}
 
+@endforeach
 @endif
 ---
 
