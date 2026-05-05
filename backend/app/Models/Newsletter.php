@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 class Newsletter extends Model
 {
@@ -11,6 +12,11 @@ class Newsletter extends Model
 
     protected $fillable = [
         'email',
+        'name',
+        'whatsapp_number',
+        'unsubscribe_token',
+        'consent_given_at',
+        'source',
         'is_subscribed',
         'subscribed_at',
         'unsubscribed_at',
@@ -20,20 +26,24 @@ class Newsletter extends Model
         'is_subscribed' => 'boolean',
         'subscribed_at' => 'datetime',
         'unsubscribed_at' => 'datetime',
+        'consent_given_at' => 'datetime',
     ];
 
-    /**
-     * Scope a query to only include subscribed users.
-     */
+    protected static function booted(): void
+    {
+        static::creating(function (self $model) {
+            if (empty($model->unsubscribe_token)) {
+                $model->unsubscribe_token = Str::random(32);
+            }
+        });
+    }
+
     public function scopeSubscribed($query)
     {
         return $query->where('is_subscribed', true);
     }
 
-    /**
-     * Subscribe the user.
-     */
-    public function subscribe()
+    public function subscribe(): void
     {
         $this->update([
             'is_subscribed' => true,
@@ -42,10 +52,7 @@ class Newsletter extends Model
         ]);
     }
 
-    /**
-     * Unsubscribe the user.
-     */
-    public function unsubscribe()
+    public function unsubscribe(): void
     {
         $this->update([
             'is_subscribed' => false,

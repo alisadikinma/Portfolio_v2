@@ -42,18 +42,9 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 
-const email = ref('')
-const subscribeMessage = ref('')
-const subscribeSuccess = ref(false)
 const isVisible = ref(false)
 const sectionRef = ref(null)
 let observer = null
-
-function handleSubscribe() {
-  subscribeMessage.value = 'Newsletter coming soon! Thanks for your interest.'
-  subscribeSuccess.value = true
-  email.value = ''
-}
 
 onMounted(() => {
   observer = new IntersectionObserver(

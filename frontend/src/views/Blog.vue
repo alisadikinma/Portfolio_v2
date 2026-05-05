@@ -320,8 +320,20 @@
                 Thoughtful pieces on AI, engineering, and the future of work.
               </p>
 
-              <form class="flex flex-col sm:flex-row gap-3 max-w-sm mx-auto" @submit.prevent="subscribeNewsletter">
-                <div class="flex-1 bezel-shell-sm">
+              <form class="flex flex-col gap-3 max-w-sm mx-auto" @submit.prevent="subscribeNewsletter">
+                <div class="bezel-shell-sm">
+                  <input
+                    v-model="newsletterName"
+                    type="text"
+                    placeholder="Your name"
+                    required
+                    minlength="2"
+                    maxlength="120"
+                    :disabled="nlStatus === 'loading'"
+                    class="w-full px-4 py-3 bg-transparent text-fg-primary placeholder-fg-dim text-sm focus:outline-none rounded-[calc(1.25rem-4px)] disabled:opacity-50"
+                  />
+                </div>
+                <div class="bezel-shell-sm">
                   <input
                     v-model="newsletterEmail"
                     type="email"
@@ -331,7 +343,21 @@
                     class="w-full px-4 py-3 bg-transparent text-fg-primary placeholder-fg-dim text-sm focus:outline-none rounded-[calc(1.25rem-4px)] disabled:opacity-50"
                   />
                 </div>
-                <button type="submit" class="btn-gold text-sm" :disabled="nlStatus === 'loading'">
+                <div class="bezel-shell-sm" :class="newsletterWaError ? 'ring-1 ring-red-400/40' : ''">
+                  <input
+                    v-model="newsletterWa"
+                    type="tel"
+                    placeholder="+628123456789"
+                    required
+                    :disabled="nlStatus === 'loading'"
+                    @blur="validateNewsletterWa"
+                    class="w-full px-4 py-3 bg-transparent text-fg-primary placeholder-fg-dim text-sm focus:outline-none rounded-[calc(1.25rem-4px)] disabled:opacity-50"
+                  />
+                </div>
+                <p v-if="newsletterWaError" class="text-red-400 text-[11px] -mt-1">
+                  Format internasional, e.g. +628123456789
+                </p>
+                <button type="submit" class="btn-gold text-sm mt-1" :disabled="nlStatus === 'loading' || newsletterWaError">
                   <span v-if="nlStatus !== 'loading'">Subscribe</span>
                   <span v-else class="inline-flex items-center gap-2">
                     <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
@@ -344,7 +370,7 @@
               </form>
 
               <p v-if="nlStatus === 'error'" class="text-red-400 text-xs mt-3">{{ nlErrorMsg }}</p>
-              <p v-else class="text-fg-dim text-xs mt-4">No spam. Unsubscribe anytime.</p>
+              <p v-else class="text-fg-dim text-xs mt-4">WhatsApp untuk update penting. No spam, unsubscribe anytime.</p>
             </div>
 
             <Transition name="fade" mode="out-in">
@@ -399,11 +425,23 @@ const searchQuery = ref('')
 const currentPage = ref(1)
 const perPage = 12
 
+const newsletterName = ref('')
 const newsletterEmail = ref('')
+const newsletterWa = ref('')
+const newsletterWaError = ref(false)
 const nlStatus = ref('idle')
 const nlErrorMsg = ref('')
 const newsletterAlreadySubscribed = ref(false)
 const showFooterBar = ref(false)
+const NL_WA_REGEX = /^\+[1-9]\d{6,14}$/
+
+function validateNewsletterWa() {
+  if (!newsletterWa.value) {
+    newsletterWaError.value = false
+    return
+  }
+  newsletterWaError.value = !NL_WA_REGEX.test(newsletterWa.value.trim())
+}
 
 let scrollRafId = null
 let scrollListener = null
@@ -565,20 +603,32 @@ const readingTime = (text) => {
 }
 
 const subscribeNewsletter = async () => {
+  if (newsletterWaError.value) return
+  const name = newsletterName.value.trim()
   const email = newsletterEmail.value.trim()
-  if (!email) return
+  const whatsappNumber = newsletterWa.value.trim()
+  if (!name || !email || !whatsappNumber) return
 
   nlStatus.value = 'loading'
   nlErrorMsg.value = ''
 
-  const result = await nlSubscribe(email)
+  const result = await nlSubscribe({
+    name,
+    email,
+    whatsappNumber,
+    source: 'blog_inline',
+  })
 
   if (result.success) {
     nlStatus.value = 'success'
+    newsletterName.value = ''
     newsletterEmail.value = ''
+    newsletterWa.value = ''
   } else if (result.duplicate) {
     nlStatus.value = 'duplicate'
+    newsletterName.value = ''
     newsletterEmail.value = ''
+    newsletterWa.value = ''
   } else {
     nlStatus.value = 'error'
     nlErrorMsg.value = result.message || 'Something went wrong. Please try again.'

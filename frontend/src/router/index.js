@@ -140,11 +140,30 @@ const routes = [
     }
   },
   {
+    path: '/newsletter/unsubscribe',
+    name: 'newsletter-unsubscribe',
+    component: () => import('@/views/NewsletterUnsubscribe.vue'),
+    meta: {
+      title: 'Unsubscribe — Ali Sadikin Ma',
+      requiresAuth: false,
+    }
+  },
+  {
     path: '/admin',
     name: 'admin',
     component: () => import('@/views/admin/Dashboard.vue'),
     meta: {
       title: 'Admin Dashboard - Portfolio V2',
+      requiresAuth: true,
+      layout: 'admin'
+    }
+  },
+  {
+    path: '/admin/newsletter',
+    name: 'admin-newsletter',
+    component: () => import('@/views/admin/NewsletterSubscribers.vue'),
+    meta: {
+      title: 'Newsletter — Admin',
       requiresAuth: true,
       layout: 'admin'
     }

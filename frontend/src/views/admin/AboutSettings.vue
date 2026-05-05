@@ -441,6 +441,154 @@
         </div>
       </BaseCard>
 
+      <!-- Email — SMTP Settings Card (Newsletter system, May 2026) -->
+      <BaseCard>
+        <h2 class="text-xl font-display font-semibold text-neutral-900 dark:text-neutral-100 mb-2">
+          Email — SMTP Settings
+        </h2>
+        <p class="text-sm text-neutral-600 dark:text-neutral-400 mb-6">
+          Outgoing email config used by the weekly newsletter digest, contact-form notifications, and admin test sends.
+          For Hostinger mailbox <code class="text-xs bg-neutral-100 dark:bg-neutral-800 px-1 rounded">aiagent@alisadikinma.com</code>:
+          host <code class="text-xs bg-neutral-100 dark:bg-neutral-800 px-1 rounded">smtp.hostinger.com</code>, port 465, SSL.
+          <strong>Password is encrypted at rest</strong> (Laravel Crypt) and never returned in API responses.
+        </p>
+
+        <form @submit.prevent="handleMailSubmit" class="space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label for="mail_host" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                SMTP Host
+              </label>
+              <input
+                id="mail_host"
+                v-model="mailFormData.mail_host"
+                type="text"
+                placeholder="smtp.hostinger.com"
+                class="w-full border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+            <div>
+              <label for="mail_port" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                Port
+              </label>
+              <input
+                id="mail_port"
+                v-model="mailFormData.mail_port"
+                type="text"
+                inputmode="numeric"
+                pattern="\d*"
+                placeholder="465"
+                class="w-full border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+              <p class="text-xs text-neutral-500 mt-1">465 = SSL · 587 = TLS · 25 = none</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label for="mail_username" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                Username (mailbox address)
+              </label>
+              <input
+                id="mail_username"
+                v-model="mailFormData.mail_username"
+                type="text"
+                placeholder="aiagent@alisadikinma.com"
+                autocomplete="username"
+                class="w-full border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+            <div>
+              <label for="mail_encryption" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                Encryption
+              </label>
+              <select
+                id="mail_encryption"
+                v-model="mailFormData.mail_encryption"
+                class="w-full border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                <option value="ssl">SSL (port 465)</option>
+                <option value="tls">TLS (port 587)</option>
+                <option value="none">None (insecure, port 25)</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label for="mail_password" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+              Password
+              <span v-if="mailPasswordConfigured" class="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                ✓ Configured
+              </span>
+            </label>
+            <input
+              id="mail_password"
+              v-model="mailFormData.mail_password"
+              type="password"
+              autocomplete="new-password"
+              :placeholder="mailPasswordConfigured ? 'Leave blank to keep current password' : 'Paste mailbox password here'"
+              class="w-full border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+            <p class="text-xs text-neutral-500 mt-1">
+              Get from Hostinger panel → Email → {{ mailFormData.mail_username || 'mailbox' }} → Manage. Encrypted before storage; never visible after save.
+            </p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label for="mail_from_address" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                From Address
+              </label>
+              <input
+                id="mail_from_address"
+                v-model="mailFormData.mail_from_address"
+                type="email"
+                placeholder="aiagent@alisadikinma.com"
+                class="w-full border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+              <p class="text-xs text-neutral-500 mt-1">Must match the mailbox above for SPF/DKIM to validate.</p>
+            </div>
+            <div>
+              <label for="mail_from_name" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                From Name
+              </label>
+              <input
+                id="mail_from_name"
+                v-model="mailFormData.mail_from_name"
+                type="text"
+                placeholder="Ali Sadikin"
+                maxlength="120"
+                class="w-full border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-3 pt-3 border-t border-neutral-200 dark:border-neutral-700">
+            <BaseButton
+              type="submit"
+              :disabled="mailSubmitting"
+              button-type="primary"
+            >
+              {{ mailSubmitting ? 'Saving...' : 'Save SMTP Settings' }}
+            </BaseButton>
+
+            <BaseButton
+              type="button"
+              :disabled="mailTesting || !mailPasswordConfigured"
+              :loading="mailTesting"
+              button-type="secondary"
+              @click="handleMailTest"
+            >
+              📤 Send test email to me
+            </BaseButton>
+
+            <span v-if="mailTestResult" :class="mailTestResult.success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'" class="text-sm">
+              {{ mailTestResult.message }}
+            </span>
+          </div>
+        </form>
+      </BaseCard>
+
       <!-- LinkedIn Integration Card -->
       <BaseCard>
         <h2 class="text-xl font-display font-semibold text-neutral-900 dark:text-neutral-100 mb-2">
@@ -1674,6 +1822,78 @@ async function handleTelegramTest() {
 }
 
 // ============================================================================
+// Mail SMTP Settings (Newsletter system, May 2026)
+// ============================================================================
+
+const mailSubmitting = ref(false)
+const mailTesting = ref(false)
+const mailTestResult = ref(null)
+
+const mailFormData = ref({
+  mail_mailer: 'smtp',
+  mail_host: 'smtp.hostinger.com',
+  mail_port: '465',
+  mail_username: 'aiagent@alisadikinma.com',
+  mail_password: '',
+  mail_encryption: 'ssl',
+  mail_from_address: 'aiagent@alisadikinma.com',
+  mail_from_name: 'Ali Sadikin',
+})
+
+const mailPasswordConfigured = computed(() => settingsStore.mailSettings?.mail_password_configured === true)
+
+async function loadMailSettings() {
+  try {
+    await settingsStore.fetchMailSettings()
+    const s = settingsStore.mailSettings
+    mailFormData.value = {
+      mail_mailer: s.mail_mailer || 'smtp',
+      mail_host: s.mail_host || 'smtp.hostinger.com',
+      mail_port: s.mail_port || '465',
+      mail_username: s.mail_username || 'aiagent@alisadikinma.com',
+      mail_password: '', // never prefill — even masked value
+      mail_encryption: s.mail_encryption || 'ssl',
+      mail_from_address: s.mail_from_address || 'aiagent@alisadikinma.com',
+      mail_from_name: s.mail_from_name || 'Ali Sadikin',
+    }
+  } catch (err) {
+    // Defaults remain if fetch fails (e.g. fresh DB before seeder runs)
+  }
+}
+
+async function handleMailSubmit() {
+  mailSubmitting.value = true
+  mailTestResult.value = null
+  try {
+    const payload = { ...mailFormData.value }
+    // Don't send empty password — server treats empty as "preserve existing"
+    if (!payload.mail_password) delete payload.mail_password
+
+    await settingsStore.updateMailSettings(payload)
+    uiStore.showSuccess('SMTP settings saved. Use "Send test email" to verify.', 'Saved')
+    mailFormData.value.mail_password = '' // clear the field — masked indicator now shown
+  } catch (err) {
+    uiStore.showError(err.response?.data?.message || err.message || 'Failed to save SMTP settings', 'Save Failed')
+  } finally {
+    mailSubmitting.value = false
+  }
+}
+
+async function handleMailTest() {
+  mailTesting.value = true
+  mailTestResult.value = null
+  try {
+    const result = await settingsStore.sendMailTestMessage()
+    mailTestResult.value = result.success
+      ? { success: true, message: '✓ ' + (result.message || 'Test sent — check your inbox + spam') }
+      : { success: false, message: '✗ ' + (result.error || 'SMTP test failed') }
+    setTimeout(() => { mailTestResult.value = null }, 12000)
+  } finally {
+    mailTesting.value = false
+  }
+}
+
+// ============================================================================
 // LinkedIn Integration — direct OAuth + publishing controls
 // ============================================================================
 
@@ -2263,6 +2483,10 @@ async function loadSettings() {
       settingsStore.fetchTelegramSettings().catch((err) => {
         // Non-fatal: telegram seeder may not have run on older installs
         console.warn('[AboutSettings] telegram fetch failed — using defaults', err)
+      }),
+      loadMailSettings().catch((err) => {
+        // Non-fatal: mail seeder may not have run on older installs
+        console.warn('[AboutSettings] mail fetch failed — using defaults', err)
       }),
     ])
 

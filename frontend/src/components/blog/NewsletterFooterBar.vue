@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useNewsletter } from '@/composables/useNewsletter'
+import NewsletterModal from '@/components/blog/NewsletterModal.vue'
 
 defineProps({
   show: {
@@ -11,32 +12,33 @@ defineProps({
 
 const emit = defineEmits(['dismiss', 'subscribed'])
 
-const { subscribe, markDismissed } = useNewsletter()
+const { markDismissed, markSubscribed } = useNewsletter()
 
-const email = ref('')
-const status = ref('idle') // 'idle' | 'loading' | 'success' | 'duplicate' | 'error'
+const showModal = ref(false)
+const collapsed = ref(false)
+const successKind = ref('success') // 'success' | 'duplicate'
 
-async function handleSubmit() {
-  const value = email.value.trim()
-  if (!value) return
+function openModal() {
+  showModal.value = true
+}
 
-  status.value = 'loading'
+function onModalDismiss() {
+  showModal.value = false
+}
 
-  const result = await subscribe(value)
-
-  if (result.success) {
-    status.value = 'success'
-    email.value = ''
-    emit('subscribed', value)
-    setTimeout(() => emit('dismiss'), 2500)
-  } else if (result.duplicate) {
-    status.value = 'duplicate'
-    email.value = ''
-    emit('subscribed', value)
-    setTimeout(() => emit('dismiss'), 2500)
-  } else {
-    status.value = 'idle'
+function onModalSubscribed(submittedEmail) {
+  // The modal already calls markSubscribed via its own subscribe() chain.
+  // We just collapse the bar to a small success state, then fully dismiss.
+  if (submittedEmail) {
+    markSubscribed(submittedEmail)
   }
+  successKind.value = 'success'
+  collapsed.value = true
+  emit('subscribed', submittedEmail)
+  setTimeout(() => {
+    showModal.value = false
+    emit('dismiss')
+  }, 2500)
 }
 
 function handleDismiss() {
@@ -55,8 +57,7 @@ function handleDismiss() {
       aria-label="Newsletter subscription"
     >
       <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3">
-        <!-- Idle / loading state -->
-        <div v-if="status !== 'success' && status !== 'duplicate'" class="flex items-center gap-3 sm:gap-6">
+        <div v-if="!collapsed" class="flex items-center gap-3 sm:gap-6">
           <div class="hidden sm:flex items-center gap-3 flex-shrink-0">
             <span class="text-lg" aria-hidden="true">✨</span>
             <p class="text-fg-primary text-sm font-medium">
@@ -64,26 +65,15 @@ function handleDismiss() {
             </p>
           </div>
 
-          <p class="sm:hidden text-fg-primary text-xs font-medium flex-shrink-0">Get weekly essays</p>
+          <p class="sm:hidden text-fg-primary text-xs font-medium flex-1">Get weekly essays</p>
 
-          <form class="flex items-center gap-2 flex-1 min-w-0 sm:max-w-md" @submit.prevent="handleSubmit">
-            <input
-              v-model="email"
-              type="email"
-              required
-              :disabled="status === 'loading'"
-              placeholder="your@email.com"
-              class="flex-1 min-w-0 px-3 py-2 rounded-full bg-white/4 border border-border-hairline text-fg-primary placeholder-fg-dim text-xs sm:text-sm focus:outline-none focus:border-accent-gold/40 transition-colors disabled:opacity-50"
-            />
-            <button
-              type="submit"
-              :disabled="status === 'loading'"
-              class="btn-gold text-xs px-4 py-2 whitespace-nowrap"
-            >
-              <span v-if="status !== 'loading'">Subscribe</span>
-              <span v-else>...</span>
-            </button>
-          </form>
+          <button
+            type="button"
+            class="btn-gold text-xs sm:text-sm px-4 py-2 whitespace-nowrap ml-auto sm:ml-0 sm:flex-1 sm:max-w-[180px]"
+            @click="openModal"
+          >
+            Subscribe →
+          </button>
 
           <button
             type="button"
@@ -97,22 +87,28 @@ function handleDismiss() {
           </button>
         </div>
 
-        <!-- Success state -->
         <div v-else class="flex items-center justify-center gap-3 py-1">
           <svg
             class="w-5 h-5"
-            :class="status === 'success' ? 'text-accent-gold' : 'text-accent-cyan'"
+            :class="successKind === 'success' ? 'text-accent-gold' : 'text-accent-cyan'"
             fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"
           >
             <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
           </svg>
           <p class="text-fg-primary text-sm font-medium">
-            {{ status === 'success' ? "You're in! Check your inbox." : "You're already on the list ✓" }}
+            {{ successKind === 'success' ? "You're in! Check your inbox." : "You're already on the list ✓" }}
           </p>
         </div>
       </div>
     </div>
   </Transition>
+
+  <NewsletterModal
+    :show="showModal"
+    source="footer_bar"
+    @dismiss="onModalDismiss"
+    @subscribed="onModalSubscribed"
+  />
 </template>
 
 <style scoped>

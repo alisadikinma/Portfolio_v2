@@ -28,6 +28,7 @@ use App\Http\Controllers\Api\BlogPromoSlotController;
 use App\Http\Controllers\Api\CarouselDraftController;
 use App\Http\Controllers\Api\Admin\ContentIdeaController;
 use App\Http\Controllers\Api\Admin\LinkedInDraftController;
+use App\Http\Controllers\Api\Admin\NewsletterAdminController;
 use App\Http\Controllers\Api\LinkedInOAuthController;
 use App\Http\Controllers\Api\HomepageController;
 use App\Http\Controllers\Api\CvExportController;
@@ -162,6 +163,7 @@ Route::get('/blog/promo-slot', [BlogPromoSlotController::class, 'show']);
 // Newsletter
 Route::post('/newsletter/subscribe', [NewsletterController::class, 'subscribe'])->middleware('throttle:5,60');
 Route::delete('/newsletter/unsubscribe', [NewsletterController::class, 'unsubscribe']);
+Route::post('/newsletter/unsubscribe-by-token', [NewsletterController::class, 'unsubscribeByToken']);
 
 // Public Menu Items Routes (for navbar)
 Route::get('/menu-items', [MenuItemController::class, 'publicMenuItems']);
@@ -280,6 +282,18 @@ Route::middleware(['auth:sanctum'])->prefix('admin/contacts')->group(function ()
     Route::delete('/{id}', [ContactController::class, 'destroy']);
 });
 
+// Admin Newsletter Routes
+Route::middleware(['auth:sanctum'])->prefix('admin/newsletter')->group(function () {
+    Route::get('/', [NewsletterAdminController::class, 'index']);
+    Route::get('/export', [NewsletterAdminController::class, 'export']);
+    Route::get('/digest-preview', [NewsletterAdminController::class, 'preview']);
+    Route::post('/send-test', [NewsletterAdminController::class, 'sendTest']);
+    Route::post('/send-now', [NewsletterAdminController::class, 'sendNow']);
+    Route::get('/sends', [NewsletterAdminController::class, 'sends']);
+    Route::get('/sends/{id}', [NewsletterAdminController::class, 'showSend']);
+    Route::delete('/{id}', [NewsletterAdminController::class, 'destroy']);
+});
+
 // Admin Settings Routes
 Route::middleware(['auth:sanctum'])->prefix('admin/settings')->group(function () {
     Route::get('/about', [SettingsController::class, 'getAboutSettings']);
@@ -296,6 +310,9 @@ Route::middleware(['auth:sanctum'])->prefix('admin/settings')->group(function ()
     Route::post('/telegram/test', [SettingsController::class, 'testTelegramNotification']);
     Route::get('/linkedin', [SettingsController::class, 'getLinkedInSettings']);
     Route::put('/linkedin', [SettingsController::class, 'updateLinkedInSettings']);
+    Route::get('/mail', [SettingsController::class, 'getMailSettings']);
+    Route::put('/mail', [SettingsController::class, 'updateMailSettings']);
+    Route::post('/mail/test', [SettingsController::class, 'testMailConnection']);
 });
 
 // Admin Menu Items Routes

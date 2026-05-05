@@ -38,6 +38,17 @@ export const useSettingsStore = defineStore('settings', {
       watermark_opacity: '0.30',
       watermark_enabled: 'false'
     },
+    mailSettings: {
+      mail_mailer: 'smtp',
+      mail_host: 'smtp.hostinger.com',
+      mail_port: '465',
+      mail_username: 'aiagent@alisadikinma.com',
+      mail_password: '',
+      mail_password_configured: false,
+      mail_encryption: 'ssl',
+      mail_from_address: 'aiagent@alisadikinma.com',
+      mail_from_name: 'Ali Sadikin',
+    },
     loading: false,
     error: null
   }),
@@ -271,6 +282,55 @@ export const useSettingsStore = defineStore('settings', {
         return {
           success: false,
           error: error.response?.data?.message || error.message || 'Test message failed',
+        }
+      }
+    },
+
+    // Mail SMTP settings (Newsletter system, May 2026)
+    async fetchMailSettings() {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await api.get('/admin/settings/mail')
+        if (response.data.success) {
+          this.mailSettings = response.data.data
+        }
+        return this.mailSettings
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to fetch mail settings'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async updateMailSettings(payload) {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await api.put('/admin/settings/mail', payload)
+        if (response.data.success) {
+          // Refresh the masked-password state from server
+          await this.fetchMailSettings()
+        }
+        return response.data
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to update mail settings'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async sendMailTestMessage(recipient) {
+      try {
+        const body = recipient ? { recipient } : {}
+        const response = await api.post('/admin/settings/mail/test', body)
+        return { success: true, message: response.data.message }
+      } catch (error) {
+        return {
+          success: false,
+          error: error.response?.data?.error?.message || error.response?.data?.message || error.message || 'SMTP test failed',
         }
       }
     },

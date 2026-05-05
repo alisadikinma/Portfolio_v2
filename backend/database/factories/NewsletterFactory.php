@@ -9,15 +9,21 @@ use Illuminate\Database\Eloquent\Factories\Factory;
  */
 class NewsletterFactory extends Factory
 {
-    /**
-     * Define the model's default state.
-     *
-     * @return array<string, mixed>
-     */
     public function definition(): array
     {
         return [
-            //
+            'email' => $this->faker->unique()->safeEmail(),
+            'name' => $this->faker->name(),
+            'whatsapp_number' => '+62' . $this->faker->unique()->numerify('8##########'),
+            'consent_given_at' => now(),
+            'source' => $this->faker->randomElement([
+                'blog_inline',
+                'inline_card',
+                'floating_banner',
+                'footer_bar',
+            ]),
+            'is_subscribed' => true,
+            'subscribed_at' => now(),
         ];
     }
 }

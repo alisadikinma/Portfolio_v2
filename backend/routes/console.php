@@ -80,3 +80,13 @@ Schedule::command('linkedin:purge-low-virality')
     ->dailyAt('04:00')
     ->timezone('Asia/Jakarta')
     ->withoutOverlapping(15);
+
+// Newsletter: weekly digest every Friday 09:00 WIB. Skip-if-empty handled
+// inside the command (logs to newsletter_sends.status='skipped'). Reuses
+// existing portfolio-queue.service systemd worker for actual Resend sends +
+// portfolio-scheduler crontab for the trigger.
+Schedule::command('newsletter:send-weekly')
+    ->fridays()
+    ->at('09:00')
+    ->timezone('Asia/Jakarta')
+    ->withoutOverlapping(60);

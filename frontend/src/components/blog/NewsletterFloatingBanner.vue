@@ -13,29 +13,51 @@ const emit = defineEmits(['dismiss', 'subscribed'])
 
 const { subscribe, markDismissed } = useNewsletter()
 
+const name = ref('')
 const email = ref('')
-const status = ref('idle') // 'idle' | 'loading' | 'success' | 'duplicate' | 'error'
+const whatsappNumber = ref('')
+const waError = ref(false)
+const status = ref('idle')
 const errorMsg = ref('')
 const cardRef = ref(null)
 
+const WA_REGEX = /^\+[1-9]\d{6,14}$/
+
+function validateWa() {
+  if (!whatsappNumber.value) {
+    waError.value = false
+    return
+  }
+  waError.value = !WA_REGEX.test(whatsappNumber.value.trim())
+}
+
 async function handleSubmit() {
-  const value = email.value.trim()
-  if (!value) return
+  if (waError.value) return
+  if (!name.value.trim() || !email.value.trim() || !whatsappNumber.value.trim()) return
 
   status.value = 'loading'
   errorMsg.value = ''
 
-  const result = await subscribe(value)
+  const result = await subscribe({
+    name: name.value.trim(),
+    email: email.value.trim(),
+    whatsappNumber: whatsappNumber.value.trim(),
+    source: 'floating_banner',
+  })
 
   if (result.success) {
     status.value = 'success'
+    name.value = ''
     email.value = ''
-    emit('subscribed', value)
+    whatsappNumber.value = ''
+    emit('subscribed', email.value)
     setTimeout(() => emit('dismiss'), 2800)
   } else if (result.duplicate) {
     status.value = 'duplicate'
+    name.value = ''
     email.value = ''
-    emit('subscribed', value)
+    whatsappNumber.value = ''
+    emit('subscribed', email.value)
     setTimeout(() => emit('dismiss'), 2800)
   } else {
     status.value = 'error'
@@ -62,13 +84,12 @@ onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
 })
 
-// Focus first input when banner becomes visible, for keyboard users
 watch(
   () => props.show,
   async (visible) => {
     if (visible) {
       await nextTick()
-      const input = cardRef.value?.querySelector('input[type="email"]')
+      const input = cardRef.value?.querySelector('input[type="text"]')
       input?.focus()
     }
   },
@@ -86,7 +107,6 @@ watch(
       aria-label="Subscribe to newsletter"
       aria-modal="false"
     >
-      <!-- Dismiss in top-right -->
       <button
         type="button"
         class="absolute top-3 right-3 w-7 h-7 rounded-full flex items-center justify-center text-fg-dim hover:text-fg-primary hover:bg-white/5 transition-colors"
@@ -98,7 +118,6 @@ watch(
         </svg>
       </button>
 
-      <!-- Idle / loading / error -->
       <div v-if="status !== 'success' && status !== 'duplicate'">
         <p class="mono-label text-accent-gold text-[10px] mb-2">✨ BEFORE YOU GO</p>
         <h3 class="font-display font-bold text-lg text-fg-primary mb-1.5 leading-snug">
@@ -110,6 +129,16 @@ watch(
 
         <form class="flex flex-col gap-2" @submit.prevent="handleSubmit">
           <input
+            v-model="name"
+            type="text"
+            required
+            minlength="2"
+            maxlength="120"
+            :disabled="status === 'loading'"
+            placeholder="Your name"
+            class="w-full px-4 py-2.5 rounded-full bg-white/4 border border-border-hairline text-fg-primary placeholder-fg-dim text-sm focus:outline-none focus:border-accent-gold/40 transition-colors disabled:opacity-50"
+          />
+          <input
             v-model="email"
             type="email"
             required
@@ -117,10 +146,23 @@ watch(
             placeholder="your@email.com"
             class="w-full px-4 py-2.5 rounded-full bg-white/4 border border-border-hairline text-fg-primary placeholder-fg-dim text-sm focus:outline-none focus:border-accent-gold/40 transition-colors disabled:opacity-50"
           />
+          <input
+            v-model="whatsappNumber"
+            type="tel"
+            required
+            :disabled="status === 'loading'"
+            placeholder="+628123456789"
+            @blur="validateWa"
+            class="w-full px-4 py-2.5 rounded-full bg-white/4 border text-fg-primary placeholder-fg-dim text-sm focus:outline-none transition-colors disabled:opacity-50"
+            :class="waError ? 'border-red-400/60 focus:border-red-400/80' : 'border-border-hairline focus:border-accent-gold/40'"
+          />
+          <p v-if="waError" class="text-red-400 text-[10px] px-2">
+            Format: +country code, e.g., +628123456789
+          </p>
           <button
             type="submit"
-            :disabled="status === 'loading'"
-            class="btn-gold text-sm w-full"
+            :disabled="status === 'loading' || waError"
+            class="btn-gold text-sm w-full mt-1"
           >
             <span v-if="status !== 'loading'">Subscribe</span>
             <span v-else class="inline-flex items-center gap-2 justify-center">
@@ -144,7 +186,6 @@ watch(
         </button>
       </div>
 
-      <!-- Success / duplicate -->
       <div v-else class="flex items-center gap-3 py-2">
         <div
           class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"

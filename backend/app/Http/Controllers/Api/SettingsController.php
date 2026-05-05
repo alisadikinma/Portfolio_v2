@@ -947,4 +947,195 @@ class SettingsController extends Controller
             ], 500);
         }
     }
+
+    // --------------------------------------------------------------------
+    // Mail SMTP Settings (Newsletter system, May 2026)
+    // --------------------------------------------------------------------
+
+    /**
+     * Get SMTP settings for the admin UI. The mail_password field is NEVER
+     * surfaced raw — returns the literal string "***SET***" if configured,
+     * empty string otherwise. Admin UI shows it as read-only with a "change"
+     * affordance; saving an empty value preserves the existing password.
+     */
+    public function getMailSettings(): JsonResponse
+    {
+        try {
+            $rows = Setting::byGroup('mail')->get();
+
+            $data = [];
+            foreach ($rows as $setting) {
+                $data[$setting->key] = $setting->value;
+            }
+
+            $data = array_merge([
+                'mail_mailer' => 'smtp',
+                'mail_host' => 'smtp.hostinger.com',
+                'mail_port' => '465',
+                'mail_username' => 'aiagent@alisadikinma.com',
+                'mail_password' => null,
+                'mail_encryption' => 'ssl',
+                'mail_from_address' => 'aiagent@alisadikinma.com',
+                'mail_from_name' => 'Ali Sadikin',
+            ], $data);
+
+            // Mask password — UI never sees the real value
+            $data['mail_password'] = !empty($data['mail_password']) ? '***SET***' : '';
+            $data['mail_password_configured'] = $data['mail_password'] === '***SET***';
+
+            return response()->json([
+                'success' => true,
+                'data' => $data,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to fetch mail settings', ['error' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch mail settings',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred',
+            ], 500);
+        }
+    }
+
+    /**
+     * Update SMTP settings. Empty mail_password is treated as "no change" —
+     * non-empty values get encrypted via Crypt::encryptString before storage.
+     */
+    public function updateMailSettings(\Illuminate\Http\Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'mail_mailer' => ['nullable', 'string', 'in:smtp,log,sendmail,array'],
+            'mail_host' => ['nullable', 'string', 'max:255'],
+            'mail_port' => ['nullable', 'string', 'regex:/^\d{1,5}$/'],
+            'mail_username' => ['nullable', 'string', 'max:255'],
+            'mail_password' => ['nullable', 'string', 'max:1024'],
+            'mail_encryption' => ['nullable', 'string', 'in:ssl,tls,none'],
+            'mail_from_address' => ['nullable', 'email', 'max:255'],
+            'mail_from_name' => ['nullable', 'string', 'max:120'],
+        ]);
+
+        DB::beginTransaction();
+        try {
+            // Empty password = preserve existing (admin chose not to change it)
+            $passwordValue = $request->input('mail_password');
+            if ($passwordValue === null || $passwordValue === '' || $passwordValue === '***SET***') {
+                unset($validated['mail_password']);
+            } else {
+                $validated['mail_password'] = \Illuminate\Support\Facades\Crypt::encryptString($passwordValue);
+            }
+
+            // Normalize "none" → empty for encryption (matches Symfony Mailer convention)
+            if (isset($validated['mail_encryption']) && $validated['mail_encryption'] === 'none') {
+                $validated['mail_encryption'] = '';
+            }
+
+            foreach ($validated as $key => $value) {
+                Setting::updateOrCreate(
+                    ['key' => $key, 'group' => 'mail'],
+                    ['value' => $value, 'type' => 'text']
+                );
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Mail settings updated. Restart the queue worker for changes to fully apply.',
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Failed to update mail settings', ['error' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update mail settings',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred',
+            ], 500);
+        }
+    }
+
+    /**
+     * Send a one-shot test email to verify SMTP creds work end-to-end.
+     * Defaults to auth user's email; admin can override via request body.
+     */
+    public function testMailConnection(\Illuminate\Http\Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'recipient' => ['nullable', 'email'],
+        ]);
+
+        $recipient = $validated['recipient'] ?? $request->user()?->email;
+        if (!$recipient) {
+            return response()->json([
+                'success' => false,
+                'error' => ['code' => 'NO_RECIPIENT', 'message' => 'No recipient email available.'],
+            ], 422);
+        }
+
+        // Re-apply config from DB before sending — covers the case where the
+        // admin just saved new creds and the worker hasn't restarted yet.
+        $this->reapplyMailConfigFromDb();
+
+        try {
+            \Illuminate\Support\Facades\Mail::raw(
+                "This is a test from your Portfolio admin panel.\n\nIf you're reading this, SMTP is configured correctly. ✅\n\nSent at: " . now()->toIso8601String(),
+                function ($message) use ($recipient) {
+                    $message->to($recipient)->subject('SMTP Test — Portfolio Admin');
+                }
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => "Test email sent to {$recipient}. Check inbox + spam folder.",
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('SMTP test send failed', ['error' => $e->getMessage(), 'recipient' => $recipient]);
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'SMTP_FAILED',
+                    'message' => $e->getMessage(),
+                ],
+            ], 500);
+        }
+    }
+
+    private function reapplyMailConfigFromDb(): void
+    {
+        $rows = Setting::byGroup('mail')->pluck('value', 'key')->toArray();
+
+        if (!empty($rows['mail_mailer'])) {
+            \Illuminate\Support\Facades\Config::set('mail.default', $rows['mail_mailer']);
+        }
+        if (!empty($rows['mail_host'])) {
+            \Illuminate\Support\Facades\Config::set('mail.mailers.smtp.host', $rows['mail_host']);
+        }
+        if (!empty($rows['mail_port'])) {
+            \Illuminate\Support\Facades\Config::set('mail.mailers.smtp.port', (int) $rows['mail_port']);
+        }
+        if (!empty($rows['mail_username'])) {
+            \Illuminate\Support\Facades\Config::set('mail.mailers.smtp.username', $rows['mail_username']);
+        }
+        if (isset($rows['mail_encryption'])) {
+            \Illuminate\Support\Facades\Config::set(
+                'mail.mailers.smtp.encryption',
+                $rows['mail_encryption'] === 'none' ? '' : $rows['mail_encryption']
+            );
+        }
+        if (!empty($rows['mail_password'])) {
+            try {
+                \Illuminate\Support\Facades\Config::set(
+                    'mail.mailers.smtp.password',
+                    \Illuminate\Support\Facades\Crypt::decryptString($rows['mail_password'])
+                );
+            } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+                // leave .env fallback in place
+            }
+        }
+        if (!empty($rows['mail_from_address'])) {
+            \Illuminate\Support\Facades\Config::set('mail.from.address', $rows['mail_from_address']);
+        }
+        if (!empty($rows['mail_from_name'])) {
+            \Illuminate\Support\Facades\Config::set('mail.from.name', $rows['mail_from_name']);
+        }
+    }
 }
