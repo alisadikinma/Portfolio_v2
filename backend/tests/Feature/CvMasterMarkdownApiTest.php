@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -57,5 +58,51 @@ class CvMasterMarkdownApiTest extends TestCase
             'text/markdown',
             $response->headers->get('Content-Type') ?? ''
         );
+    }
+
+    /** @test */
+    public function renders_identity_and_summary_from_settings(): void
+    {
+        Setting::create(['group' => 'about', 'key' => 'name', 'value' => 'Ali Sadikin Ma']);
+        Setting::create(['group' => 'about', 'key' => 'title', 'value' => 'AI Generalist Expert']);
+        Setting::create(['group' => 'about', 'key' => 'bio', 'value' => 'Bio summary text for the elevator pitch.']);
+        Setting::create([
+            'group' => 'about',
+            'key' => 'social_links',
+            'value' => json_encode([
+                ['platform' => 'LinkedIn', 'url' => 'https://linkedin.com/in/x', 'icon' => 'fab fa-linkedin'],
+                ['platform' => 'NoUrl', 'icon' => 'fab fa-x'],
+            ]),
+        ]);
+
+        $user = User::factory()->create();
+        Sanctum::actingAs($user, ['cv:read']);
+
+        $body = $this->get('/api/cv/master.md')->assertOk()->getContent();
+
+        $this->assertStringContainsString('# Ali Sadikin Ma', $body);
+        $this->assertStringContainsString('AI Generalist Expert', $body);
+        $this->assertStringContainsString('## Summary', $body);
+        $this->assertStringContainsString('Bio summary text for the elevator pitch.', $body);
+        $this->assertStringContainsString('linkedin.com/in/x', $body);
+    }
+
+    /** @test */
+    public function omits_optional_contact_fields_when_settings_absent(): void
+    {
+        Setting::create(['group' => 'about', 'key' => 'name', 'value' => 'Ali Sadikin']);
+        Setting::create(['group' => 'about', 'key' => 'title', 'value' => 'AI Generalist']);
+        Setting::create(['group' => 'about', 'key' => 'bio', 'value' => 'Short bio.']);
+
+        $user = User::factory()->create();
+        Sanctum::actingAs($user, ['cv:read']);
+
+        $body = $this->get('/api/cv/master.md')->assertOk()->getContent();
+
+        // No literal "null" leaking into the rendered output.
+        $this->assertStringNotContainsString('null', $body);
+        // No "email:" / "phone:" prefix when their settings aren't set.
+        $this->assertStringNotContainsString('email:', $body);
+        $this->assertStringNotContainsString('phone:', $body);
     }
 }

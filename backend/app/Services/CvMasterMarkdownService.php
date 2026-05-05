@@ -2,6 +2,9 @@
 
 namespace App\Services;
 
+use App\Models\Setting;
+use Illuminate\Support\Facades\View;
+
 /**
  * CV Master Markdown rendering service.
  *
@@ -12,8 +15,6 @@ namespace App\Services;
  * Reads the same data sources as App\Http\Controllers\Api\CvExportController
  * (settings group=about, projects with translations, awards, published
  * posts) so the two endpoints stay structurally consistent.
- *
- * Phase B skeleton — full rendering ships incrementally in Phases C–G.
  */
 class CvMasterMarkdownService
 {
@@ -27,6 +28,51 @@ class CvMasterMarkdownService
      */
     public function render(bool $compact = false): string
     {
-        return "# Ali Sadikin\n";
+        $about = Setting::where('group', 'about')->pluck('value', 'key');
+
+        $basics = [
+            'name' => $about->get('name') ?: 'Ali Sadikin',
+            'title' => $about->get('title') ?: 'AI Generalist Expert',
+            'summary' => $about->get('bio') ?: '',
+            'email' => $about->get('email'),
+            'phone' => $about->get('phone'),
+            'city' => $about->get('city'),
+            'country' => $about->get('country'),
+            'profiles' => $this->parseSocialLinks($about->get('social_links')),
+        ];
+
+        return View::make('cv.master', [
+            'basics' => $basics,
+            'compact' => $compact,
+        ])->render();
+    }
+
+    /**
+     * Decode the Settings.social_links JSON blob into a list of profile
+     * rows shaped {network, url}. Mirrors the helper on
+     * CvExportController so the two endpoints render identical socials.
+     *
+     * Hardened against:
+     *   - settings row missing entirely (returns [])
+     *   - JSON parse failure (returns [])
+     *   - rows without a url (filtered out)
+     */
+    protected function parseSocialLinks($raw): array
+    {
+        if (!$raw) {
+            return [];
+        }
+        $decoded = is_array($raw) ? $raw : json_decode($raw, true);
+        if (!is_array($decoded)) {
+            return [];
+        }
+        return collect($decoded)
+            ->map(fn ($row) => [
+                'network' => $row['platform'] ?? null,
+                'url' => $row['url'] ?? null,
+            ])
+            ->filter(fn ($row) => !empty($row['url']))
+            ->values()
+            ->all();
     }
 }
