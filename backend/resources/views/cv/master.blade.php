@@ -67,3 +67,34 @@ Relevance: {{ $p['relevance'] }}
 @endif
 
 @endforeach
+@if(!empty($awards))
+## Awards & Recognition
+
+@foreach($awards as $a)
+@php
+    $awardLine = '- ';
+    if (!empty($a['year'])) {
+        $awardLine .= '**' . $a['year'] . '** — ';
+    }
+    $awardLine .= $a['title'];
+    if (!empty($a['organization'])) {
+        $awardLine .= ' · ' . $a['organization'];
+    }
+    if (!empty($a['description'])) {
+        $awardLine .= ' — ' . $a['description'];
+    }
+@endphp
+{!! $awardLine !!}
+@endforeach
+
+@endif
+@if(!empty($thought_leadership))
+## Thought Leadership
+
+@foreach($thought_leadership as $t)
+- [{!! $t['title'] !!}]({{ $t['url'] }}) · {{ $t['date'] }}@if(!empty($t['excerpt'])) · {!! $t['excerpt'] !!}@endif
+@endforeach
+
+@endif
+---
+Generated {{ $generated_at }} · {{ $self_url }}

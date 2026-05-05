@@ -3,9 +3,12 @@
 namespace App\Services;
 
 use App\Http\Resources\Cv\CvProjectResource;
+use App\Models\Award;
+use App\Models\Post;
 use App\Models\Project;
 use App\Models\Setting;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\View;
 
@@ -52,13 +55,100 @@ class CvMasterMarkdownService
 
         $skillDomains = $this->aggregateSkillDomains($projects);
         $projectRows = $projects->map(fn ($p) => $this->buildProjectRow($p))->all();
+        $awardRows = $this->loadAwardRows();
+        $thoughtRows = $this->loadThoughtLeadershipRows();
+
+        $appUrl = rtrim(config('app.url'), '/');
 
         return View::make('cv.master', [
             'basics' => $basics,
             'compact' => $compact,
             'skill_domains' => $skillDomains,
             'projects' => $projectRows,
+            'awards' => $awardRows,
+            'thought_leadership' => $thoughtRows,
+            'generated_at' => now()->toDateString(),
+            'self_url' => $appUrl . '/api/cv/master.md',
         ])->render();
+    }
+
+    /**
+     * Award rows ordered by `is_featured DESC, id DESC` — mirrors the
+     * exact query used by CvExportController so the JSON and markdown
+     * exports surface awards in the same priority.
+     *
+     * @return array<int, array{year:?string,title:string,organization:?string,description:?string}>
+     */
+    protected function loadAwardRows(): array
+    {
+        return Award::orderByDesc('is_featured')
+            ->orderByDesc('id')
+            ->get()
+            ->map(fn (Award $a) => [
+                'year' => $this->extractYear($a->received_at),
+                'title' => $this->normalizeMarkdownText((string) $a->title),
+                'organization' => $a->organization ? $this->normalizeMarkdownText((string) $a->organization) : null,
+                'description' => $a->description
+                    ? $this->summarize((string) $a->description, 30)
+                    : null,
+            ])
+            ->all();
+    }
+
+    /**
+     * Top 5 published posts ordered by published_at DESC. Each row uses
+     * the EN translation when available, otherwise falls back silently
+     * to the primary translation, then to the direct title/excerpt
+     * columns. Public URL uses `/blog/{slug}` per frontend routing.
+     *
+     * @return array<int, array{title:string,url:string,date:string,excerpt:string}>
+     */
+    protected function loadThoughtLeadershipRows(): array
+    {
+        $appUrl = rtrim(config('app.url'), '/');
+
+        return Post::with(['translations', 'category'])
+            ->where('published', true)
+            ->whereNotNull('published_at')
+            ->orderByDesc('published_at')
+            ->limit(5)
+            ->get()
+            ->map(function (Post $p) use ($appUrl) {
+                $translations = $p->relationLoaded('translations')
+                    ? $p->translations
+                    : $p->translations()->get();
+                $en = $translations->firstWhere('language', 'en');
+                $primary = $translations->first();
+
+                $title = $en?->title ?? $primary?->title ?? $p->title;
+                $excerpt = $en?->excerpt ?? $primary?->excerpt ?? $p->excerpt;
+
+                return [
+                    'title' => $this->normalizeMarkdownText((string) $title),
+                    'url' => $appUrl . '/blog/' . $p->slug,
+                    'date' => $p->published_at?->toDateString() ?? '',
+                    'excerpt' => $this->summarize((string) ($excerpt ?? ''), 24) ?? '',
+                ];
+            })
+            ->all();
+    }
+
+    /**
+     * Pull a 4-digit year off whatever shape `awards.received_at` carries
+     * (DateTimeInterface, ISO string, "2024" plain year, null).
+     */
+    protected function extractYear($value): ?string
+    {
+        if (!$value) {
+            return null;
+        }
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('Y');
+        }
+        if (is_string($value) && preg_match('/(\d{4})/', $value, $m)) {
+            return $m[1];
+        }
+        return null;
     }
 
     /**

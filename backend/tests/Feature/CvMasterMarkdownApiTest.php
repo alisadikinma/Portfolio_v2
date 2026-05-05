@@ -2,6 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Models\Award;
+use App\Models\Category;
+use App\Models\Post;
+use App\Models\PostTranslation;
 use App\Models\Project;
 use App\Models\ProjectTranslation;
 use App\Models\Setting;
@@ -226,6 +230,104 @@ class CvMasterMarkdownApiTest extends TestCase
         // Indonesian fallback rendered when EN missing — no "[ID]" prefix tag
         $this->assertStringContainsString('Judul Indonesia', $body);
         $this->assertStringNotContainsString('[ID]', $body);
+    }
+
+    /** @test */
+    public function renders_awards_section_ordered_by_is_featured_then_id_desc(): void
+    {
+        Award::create([
+            'title' => 'Old Unfeatured',
+            'organization' => 'Foo',
+            'received_at' => '2018',
+            'is_featured' => false,
+        ]);
+        Award::create([
+            'title' => 'Recent Unfeatured',
+            'organization' => 'Bar',
+            'received_at' => '2024',
+            'is_featured' => false,
+        ]);
+        Award::create([
+            'title' => 'Featured Outskill',
+            'organization' => 'Outskill',
+            'received_at' => '2025',
+            'description' => 'Demo Day Champion #1',
+            'is_featured' => true,
+        ]);
+
+        $user = User::factory()->create();
+        Sanctum::actingAs($user, ['cv:read']);
+
+        $body = $this->get('/api/cv/master.md')->assertOk()->getContent();
+
+        $this->assertStringContainsString('## Awards & Recognition', $body);
+
+        // Featured row appears first; remaining ordered by id desc.
+        $posFeatured = strpos($body, 'Featured Outskill');
+        $posRecent = strpos($body, 'Recent Unfeatured');
+        $posOld = strpos($body, 'Old Unfeatured');
+        $this->assertNotFalse($posFeatured);
+        $this->assertNotFalse($posRecent);
+        $this->assertNotFalse($posOld);
+        $this->assertLessThan($posRecent, $posFeatured);
+        $this->assertLessThan($posOld, $posRecent);
+        $this->assertStringContainsString('Demo Day Champion', $body);
+    }
+
+    /** @test */
+    public function renders_thought_leadership_with_top_5_posts_by_published_at(): void
+    {
+        $cat = Category::create(['name' => 'AI', 'slug' => 'ai']);
+
+        // 7 published posts — only the 5 most recent should land in the section.
+        for ($i = 1; $i <= 7; $i++) {
+            $post = Post::create([
+                'category_id' => $cat->id,
+                'slug' => "post-$i",
+                'title' => "Stub Title $i",
+                'excerpt' => "Stub excerpt $i",
+                'content' => "<p>Body $i</p>",
+                'published' => true,
+                'published_at' => now()->subDays(8 - $i), // post-7 is most recent
+            ]);
+            PostTranslation::create([
+                'post_id' => $post->id,
+                'language' => 'en',
+                'title' => "EN Title $i",
+                'slug' => "post-$i",
+                'excerpt' => "EN excerpt $i",
+                'content' => "<p>EN body $i</p>",
+            ]);
+        }
+
+        $user = User::factory()->create();
+        Sanctum::actingAs($user, ['cv:read']);
+
+        $body = $this->get('/api/cv/master.md')->assertOk()->getContent();
+
+        $this->assertStringContainsString('## Thought Leadership', $body);
+        // Most recent (post-7) shows up; oldest 2 (post-1, post-2) trimmed.
+        $this->assertStringContainsString('EN Title 7', $body);
+        $this->assertStringContainsString('EN Title 3', $body);
+        $this->assertStringNotContainsString('EN Title 2', $body);
+        $this->assertStringNotContainsString('EN Title 1', $body);
+    }
+
+    /** @test */
+    public function renders_footer_with_generated_timestamp_and_self_url(): void
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user, ['cv:read']);
+
+        $body = $this->get('/api/cv/master.md')->assertOk()->getContent();
+
+        // Footer separator + "Generated YYYY-MM-DD" line.
+        $this->assertStringContainsString('---', $body);
+        $this->assertMatchesRegularExpression(
+            '/Generated \d{4}-\d{2}-\d{2}/',
+            $body
+        );
+        $this->assertStringContainsString('cv/master.md', $body);
     }
 
     /** @test */
