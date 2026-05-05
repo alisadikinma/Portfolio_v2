@@ -70,6 +70,22 @@
       </p>
     </div>
 
+    <!-- LinkedIn Profile URL -->
+    <div>
+      <BaseInput
+        v-model="formData.linkedin_url"
+        label="LinkedIn Profile URL"
+        type="url"
+        placeholder="https://www.linkedin.com/in/username/"
+        :error="errors.linkedin_url"
+        @blur="validateField('linkedin_url')"
+      >
+        <template #help>
+          Optional. When set, the testimonial card on the homepage links to this profile.
+        </template>
+      </BaseInput>
+    </div>
+
     <!-- Star Rating -->
     <div>
       <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
@@ -196,7 +212,8 @@ const formData = ref({
   current_photo: null,
   star_rating: 5,
   is_active: true,
-  sort_order: 0
+  sort_order: 0,
+  linkedin_url: ''
 })
 
 // Form errors
@@ -213,7 +230,8 @@ if (props.testimonial) {
     current_photo: props.testimonial.client_photo || null,
     star_rating: props.testimonial.star_rating || 5,
     is_active: props.testimonial.is_active !== undefined ? props.testimonial.is_active : true,
-    sort_order: props.testimonial.sort_order || 0
+    sort_order: props.testimonial.sort_order || 0,
+    linkedin_url: props.testimonial.linkedin_url || ''
   }
 }
 
@@ -265,6 +283,17 @@ function validateField(field) {
         errors.value.sort_order = 'Sort order must be 0 or greater'
       }
       break
+
+    case 'linkedin_url':
+      if (formData.value.linkedin_url) {
+        const url = formData.value.linkedin_url.trim()
+        if (url.length > 500) {
+          errors.value.linkedin_url = 'URL must be less than 500 characters'
+        } else if (!/^https?:\/\/.+/i.test(url)) {
+          errors.value.linkedin_url = 'Must be a valid http(s) URL'
+        }
+      }
+      break
   }
 }
 
@@ -278,6 +307,7 @@ function validateForm() {
   validateField('testimonial_text')
   validateField('star_rating')
   validateField('sort_order')
+  validateField('linkedin_url')
 
   return Object.keys(errors.value).every(key => !errors.value[key])
 }
@@ -314,6 +344,9 @@ function handleSubmit() {
   if (formData.value.client_photo) {
     submissionData.append('client_photo', formData.value.client_photo)
   }
+
+  // LinkedIn URL — always send (empty string clears the field on backend)
+  submissionData.append('linkedin_url', formData.value.linkedin_url ? formData.value.linkedin_url.trim() : '')
 
   // Add _method for Laravel PUT spoofing (only if editing)
   if (props.testimonial) {

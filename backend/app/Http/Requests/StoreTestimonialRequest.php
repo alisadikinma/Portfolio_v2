@@ -15,6 +15,18 @@ class StoreTestimonialRequest extends FormRequest
     }
 
     /**
+     * Normalise empty linkedin_url to null so the `nullable|url` rule
+     * accepts admin clearing the field via FormData (which sends '').
+     */
+    protected function prepareForValidation(): void
+    {
+        $url = $this->input('linkedin_url');
+        if (is_string($url) && trim($url) === '') {
+            $this->merge(['linkedin_url' => null]);
+        }
+    }
+
+    /**
      * Get the validation rules that apply to the request.
      *
      * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>

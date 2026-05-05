@@ -139,6 +139,7 @@ class TestimonialController extends Controller
                 'star_rating',
                 'is_active',
                 'sort_order',
+                'linkedin_url',
             ]);
 
             // Handle file upload
@@ -193,6 +194,7 @@ class TestimonialController extends Controller
                 'star_rating',
                 'is_active',
                 'sort_order',
+                'linkedin_url',
             ]);
 
             // Handle file upload
