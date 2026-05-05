@@ -33,13 +33,36 @@ use Illuminate\Support\Facades\Storage;
 class CarouselSlideEnhancer
 {
     /**
-     * Layout hints that require the creator's face on the rendered slide.
-     * 'body' is conditional (depends on whether scene has human figures) —
-     * the plugin signals via prompt body content, so we don't auto-inject
-     * for body slides; if a body slide needs the creator, the plugin should
-     * use the {{CREATOR_FACE}} placeholder explicitly.
+     * Layout hints that ALWAYS require the creator's face on the rendered
+     * slide regardless of prompt content. For other layouts (body,
+     * direct_answer) we additionally inspect the prompt body — if it
+     * references the creator (per plugin SKILL.md the protagonist is named
+     * "creator" by convention), we auto-attach face_refs too.
+     *
+     * Why prompt sniffing matters: the plugin's slide_role taxonomy
+     * (foreshadow / problem / loop-end / b-roll-with-humans) maps onto only
+     * 5 Zod layout_hint enums (cover / body / human_fingerprint /
+     * direct_answer / cta), so a foreshadow slide depicting the creator is
+     * routinely emitted as layout_hint='body'. Without prompt sniffing those
+     * slides drop face_refs at dispatch and GeminiGen renders a generic
+     * person instead of the creator's likeness.
+     *
+     * SKILL.md line 160 mandates creator face on:
+     *   Hook + CTA + Foreshadow + Loop-end + Thumbnail
+     *   + any B-Roll with human figures.
+     * Sniffing for 'creator' tokens covers all those roles in one rule.
      */
     private const FACE_REQUIRED_LAYOUTS = ['cover', 'human_fingerprint', 'cta'];
+
+    /**
+     * Regex (case-insensitive, word-boundary) that flags a prompt as
+     * depicting the creator. Matches plugin convention: "creator", "the
+     * creator's face", "creator hands", "creator's silhouette", etc. Also
+     * catches the post-replacement marker "the provided creator face
+     * reference image" left by the {{CREATOR_FACE}} placeholder substitution
+     * (so prompts that explicitly opted in always get the face URL).
+     */
+    private const CREATOR_PROMPT_REGEX = '/\b(creator(?:\'s)?|the provided creator face reference image|creator face from the)\b/i';
 
     /**
      * Prepare a single slide for GeminiGen dispatch.
@@ -109,15 +132,36 @@ class CarouselSlideEnhancer
             $opacityWord
         );
 
-        // 5. Build face_refs: creator face for required layouts
+        // 5. Build face_refs: creator face for required layouts + ANY slide
+        //    whose prompt references the creator. This is the rule the
+        //    operator enforced after slide-2 foreshadow slides shipped
+        //    without face_refs and rendered generic faces (May 6, 2026):
+        //    "step manapun klo ada muka creator pastikan attach reference
+        //    image".
+        //
+        //    Detection order:
+        //      a) Layout is in FACE_REQUIRED_LAYOUTS (cover/human_fingerprint/cta)
+        //      b) Prompt body matches CREATOR_PROMPT_REGEX (catches body +
+        //         direct_answer slides that depict the creator, including
+        //         foreshadow / loop-end / B-roll-with-humans)
         $faceRefs = [];
-        $needsFace = in_array($layoutHint, self::FACE_REQUIRED_LAYOUTS, true);
+        $layoutMandates = in_array($layoutHint, self::FACE_REQUIRED_LAYOUTS, true);
+        $promptMentionsCreator = $this->promptReferencesCreator($promptText);
+        $needsFace = $layoutMandates || $promptMentionsCreator;
+
         if ($needsFace && $creatorFaceUrl !== null) {
             $faceRefs[] = $creatorFaceUrl;
+            if (! $layoutMandates && $promptMentionsCreator) {
+                Log::info('[CarouselSlideEnhancer] auto-attached creator face on non-mandated layout (prompt references creator)', [
+                    'layout_hint' => $layoutHint,
+                    'slide_index' => $slideIndex,
+                ]);
+            }
         } elseif ($needsFace && $creatorFaceUrl === null) {
             Log::warning('[CarouselSlideEnhancer] face required but creator face URL unresolvable', [
                 'layout_hint' => $layoutHint,
                 'slide_index' => $slideIndex,
+                'reason' => $layoutMandates ? 'layout_mandates' : 'prompt_references_creator',
             ]);
         }
 
@@ -141,6 +185,18 @@ class CarouselSlideEnhancer
     }
 
     /**
+     * Detect whether the (post-placeholder-replacement) prompt body refers
+     * to the creator as a subject in the scene. Used to attach face_refs on
+     * `body` and `direct_answer` slides that the plugin authored as creator
+     * scenes (foreshadow, loop-end, B-roll with humans) but didn't tag with
+     * a face-mandating layout_hint.
+     */
+    private function promptReferencesCreator(string $body): bool
+    {
+        return (bool) preg_match(self::CREATOR_PROMPT_REGEX, $body);
+    }
+
+    /**
      * Prepend an explicit "PRIMARY SUBJECT" instruction that demands the
      * creator's face from the supplied face reference image be rendered as a
      * key visual element of the slide. Layout-specific positioning so the
@@ -160,13 +216,20 @@ class CarouselSlideEnhancer
      */
     private function prependCreatorFaceMandate(string $body, string $layoutHint, ?string $faceUrl): string
     {
-        if (!in_array($layoutHint, self::FACE_REQUIRED_LAYOUTS, true)) {
-            return $body;
-        }
         if ($faceUrl === null) {
             return $body;
         }
-        // Idempotency guard — plugin already wired in the placeholder
+
+        $layoutMandates = in_array($layoutHint, self::FACE_REQUIRED_LAYOUTS, true);
+        $promptMentionsCreator = $this->promptReferencesCreator($body);
+
+        if (! $layoutMandates && ! $promptMentionsCreator) {
+            return $body;
+        }
+
+        // Idempotency guard — plugin already baked in the placeholder
+        // (replacePlaceholders converted {{CREATOR_FACE}} → the literal
+        // marker) or already authored the mandate prose.
         if (str_contains($body, 'the provided creator face reference image')
             || str_contains($body, "creator's face")
             || str_contains($body, 'creator face from the')) {
@@ -177,6 +240,11 @@ class CarouselSlideEnhancer
             'cover' => "PRIMARY SUBJECT (mandatory): render the creator's face from the provided face reference image as a head-and-shoulders portrait, photographic and naturally lit, prominently positioned in the right third or center of the canvas as the personal-brand hook of this cover slide. Use the exact likeness from the face reference — do not generate a generic person, an avatar, or an icon. The face should occupy approximately twenty-five to thirty-five percent of the canvas height and visually anchor the headline. The headline text and any background scene composition described below must yield canvas space to accommodate the portrait.\n\n",
             'human_fingerprint' => "PRIMARY SUBJECT (mandatory): the human figure in the scene IS the creator. Render their face from the provided face reference image, photographic and naturally lit, with their exact likeness. Do not generate a generic person, a stock model, or an avatar. The creator's face must be clearly recognizable.\n\n",
             'cta' => "SECONDARY SUBJECT (mandatory): render a small circular portrait of the creator from the provided face reference image, approximately ninety to one hundred twenty pixels in diameter, positioned in the upper-center area of the canvas above the headline. Use the exact likeness from the face reference — do not generate a generic avatar.\n\n",
+            // body + direct_answer reach this branch only when the prompt
+            // body itself names the creator (foreshadow, loop-end, B-roll
+            // with humans). Mandate the face-reference likeness so
+            // GeminiGen renders the creator instead of a generic figure.
+            'body', 'direct_answer' => "PRIMARY SUBJECT (mandatory): the creator depicted in this scene must be rendered using the creator's exact likeness from the provided face reference image — photographic, naturally lit, recognizable. Do not generate a generic person, a stock model, an avatar, or an icon. The creator is the protagonist of this slide; compose the scene so their face is clearly visible and unobstructed.\n\n",
             default => '',
         };
 
@@ -248,7 +316,7 @@ class CarouselSlideEnhancer
      * (often kebab-case like "creator-brand") which produces an incorrect
      * `@creator-brand` watermark. We deliberately fall through past it.
      */
-    private function resolveHandle(): string
+    protected function resolveHandle(): string
     {
         $value = Setting::where('group', 'linkedin')
             ->where('key', 'creator_handle')
@@ -308,7 +376,7 @@ class CarouselSlideEnhancer
      *      About admin) — prepend https:// if missing
      *   3. Laravel app.url config
      */
-    private function resolvePortfolioUrl(): string
+    protected function resolvePortfolioUrl(): string
     {
         $value = Setting::where('group', 'about')
             ->where('key', 'website_url')
