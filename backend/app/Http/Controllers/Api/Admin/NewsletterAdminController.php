@@ -182,6 +182,16 @@ class NewsletterAdminController extends Controller
         ]);
         $fakeSubscriber->unsubscribe_token = str_repeat('x', 32);
 
+        // Re-apply DB→config bridge before sending — covers the case where
+        // operator just saved SMTP creds and OPcache hasn't reloaded the
+        // service provider state. Mirrors SettingsController::testMailConnection.
+        $this->reapplyMailConfigFromDb();
+
+        // Capture effective config diagnostics — surfaced in response so
+        // operator immediately sees if "sent" actually used 'log' driver
+        // (which writes to laravel.log instead of real SMTP delivery).
+        $diagnostics = $this->buildMailDiagnostics();
+
         $startedAt = now();
 
         try {
@@ -203,6 +213,7 @@ class NewsletterAdminController extends Controller
             return response()->json([
                 'success' => false,
                 'error' => ['code' => 'SEND_FAILED', 'message' => $e->getMessage()],
+                'diagnostics' => $diagnostics,
             ], 500);
         }
 
@@ -218,10 +229,80 @@ class NewsletterAdminController extends Controller
             'duration_seconds' => $startedAt->diffInSeconds(now()),
         ]);
 
+        // Driver-specific success message so operator instantly sees if
+        // 'sent' actually means SMTP-was-attempted vs went-to-log-file.
+        $driverNote = match ($diagnostics['driver']) {
+            'log' => " ⚠️ DELIVERED TO LOG FILE, NOT REAL SMTP. Check storage/logs/laravel.log. Save SMTP password in /admin/about to enable real sends.",
+            'array' => " ⚠️ Driver is 'array' — message stayed in memory, no real send happened.",
+            'smtp' => " via SMTP {$diagnostics['host']}:{$diagnostics['port']} (from: {$diagnostics['from_address']}). If not in inbox, check spam folder.",
+            default => " via driver '{$diagnostics['driver']}'.",
+        };
+
         return response()->json([
             'success' => true,
-            'message' => "Test digest sent to {$recipient}.",
+            'message' => "Test digest sent to {$recipient}{$driverNote}",
+            'diagnostics' => $diagnostics,
         ]);
+    }
+
+    /**
+     * Mirrors SettingsController::reapplyMailConfigFromDb — ensures the test
+     * send uses the latest admin-saved SMTP creds without waiting for a
+     * config:cache refresh or queue worker restart.
+     */
+    private function reapplyMailConfigFromDb(): void
+    {
+        $rows = \App\Models\Setting::byGroup('mail')->pluck('value', 'key')->toArray();
+
+        if (!empty($rows['mail_mailer'])) {
+            \Illuminate\Support\Facades\Config::set('mail.default', $rows['mail_mailer']);
+        }
+        if (!empty($rows['mail_host'])) {
+            \Illuminate\Support\Facades\Config::set('mail.mailers.smtp.host', $rows['mail_host']);
+        }
+        if (!empty($rows['mail_port'])) {
+            \Illuminate\Support\Facades\Config::set('mail.mailers.smtp.port', (int) $rows['mail_port']);
+        }
+        if (!empty($rows['mail_username'])) {
+            \Illuminate\Support\Facades\Config::set('mail.mailers.smtp.username', $rows['mail_username']);
+        }
+        if (isset($rows['mail_encryption'])) {
+            \Illuminate\Support\Facades\Config::set(
+                'mail.mailers.smtp.encryption',
+                $rows['mail_encryption'] === 'none' ? '' : $rows['mail_encryption']
+            );
+        }
+        if (!empty($rows['mail_password'])) {
+            try {
+                \Illuminate\Support\Facades\Config::set(
+                    'mail.mailers.smtp.password',
+                    \Illuminate\Support\Facades\Crypt::decryptString($rows['mail_password'])
+                );
+            } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+                // leave .env fallback in place
+            }
+        }
+        if (!empty($rows['mail_from_address'])) {
+            \Illuminate\Support\Facades\Config::set('mail.from.address', $rows['mail_from_address']);
+        }
+        if (!empty($rows['mail_from_name'])) {
+            \Illuminate\Support\Facades\Config::set('mail.from.name', $rows['mail_from_name']);
+        }
+    }
+
+    private function buildMailDiagnostics(): array
+    {
+        $driver = (string) config('mail.default');
+        return [
+            'driver' => $driver,
+            'host' => $driver === 'smtp' ? config('mail.mailers.smtp.host') : null,
+            'port' => $driver === 'smtp' ? config('mail.mailers.smtp.port') : null,
+            'username' => $driver === 'smtp' ? config('mail.mailers.smtp.username') : null,
+            'encryption' => $driver === 'smtp' ? (config('mail.mailers.smtp.encryption') ?: 'none') : null,
+            'password_set' => $driver === 'smtp' ? !empty(config('mail.mailers.smtp.password')) : null,
+            'from_address' => config('mail.from.address'),
+            'from_name' => config('mail.from.name'),
+        ];
     }
 
     public function sendNow(Request $request): JsonResponse

@@ -453,6 +453,36 @@
           <strong>Password is encrypted at rest</strong> (Laravel Crypt) and never returned in API responses.
         </p>
 
+        <!-- Active driver diagnostic — surfaced when admin saves SMTP but
+             real delivery still doesn't work (driver still 'log' etc) -->
+        <div
+          v-if="mailEffective"
+          class="mb-6 p-3 rounded-md text-sm flex items-start gap-2"
+          :class="mailEffective.driver === 'smtp'
+            ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-800/50'
+            : 'bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800/50'"
+        >
+          <span class="font-mono text-xs uppercase tracking-wider px-1.5 py-0.5 rounded font-semibold"
+                :class="mailEffective.driver === 'smtp'
+                  ? 'bg-green-200 dark:bg-green-800/50 text-green-900 dark:text-green-200'
+                  : 'bg-amber-200 dark:bg-amber-800/50 text-amber-900 dark:text-amber-200'">
+            {{ mailEffective.driver }}
+          </span>
+          <span class="flex-1">
+            <strong>Active driver: {{ mailEffective.driver }}</strong>
+            <template v-if="mailEffective.driver === 'smtp'">
+              — sends go to <code class="text-xs">{{ mailEffective.host }}:{{ mailEffective.port }}</code> as <code class="text-xs">{{ mailEffective.from_address }}</code>.
+              <span v-if="!mailEffective.password_set" class="block mt-1 text-amber-700 dark:text-amber-400">⚠️ Password not set yet — saves below before test send.</span>
+            </template>
+            <template v-else-if="mailEffective.driver === 'log'">
+              — emails go to <code class="text-xs">storage/logs/laravel.log</code>, NOT real inboxes. Save SMTP form below to switch to real delivery.
+            </template>
+            <template v-else>
+              — driver "<code>{{ mailEffective.driver }}</code>" doesn't deliver. Configure SMTP form below.
+            </template>
+          </span>
+        </div>
+
         <form @submit.prevent="handleMailSubmit" class="space-y-4">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -1841,6 +1871,7 @@ const mailFormData = ref({
 })
 
 const mailPasswordConfigured = computed(() => settingsStore.mailSettings?.mail_password_configured === true)
+const mailEffective = computed(() => settingsStore.mailSettings?.effective || null)
 
 async function loadMailSettings() {
   try {
@@ -1887,7 +1918,11 @@ async function handleMailTest() {
     mailTestResult.value = result.success
       ? { success: true, message: '✓ ' + (result.message || 'Test sent — check your inbox + spam') }
       : { success: false, message: '✗ ' + (result.error || 'SMTP test failed') }
-    setTimeout(() => { mailTestResult.value = null }, 12000)
+    // Reload mail settings — picks up updated `effective` block so the
+    // active-driver badge reflects current state (operator may have saved
+    // password just before clicking test).
+    await loadMailSettings().catch(() => {})
+    setTimeout(() => { mailTestResult.value = null }, 15000)
   } finally {
     mailTesting.value = false
   }

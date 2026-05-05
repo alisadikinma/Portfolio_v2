@@ -983,6 +983,12 @@ class SettingsController extends Controller
             $data['mail_password'] = !empty($data['mail_password']) ? '***SET***' : '';
             $data['mail_password_configured'] = $data['mail_password'] === '***SET***';
 
+            // Effective config Laravel will actually use right now (after
+            // MailConfigOverrideProvider boot + any in-request overrides).
+            // Lets the admin UI surface "Active driver: log" when SMTP isn't
+            // wired up yet — explains why test sends don't actually deliver.
+            $data['effective'] = $this->buildMailDiagnostics();
+
             return response()->json([
                 'success' => true,
                 'data' => $data,
@@ -1075,17 +1081,27 @@ class SettingsController extends Controller
         // admin just saved new creds and the worker hasn't restarted yet.
         $this->reapplyMailConfigFromDb();
 
+        $diagnostics = $this->buildMailDiagnostics();
+
         try {
             \Illuminate\Support\Facades\Mail::raw(
-                "This is a test from your Portfolio admin panel.\n\nIf you're reading this, SMTP is configured correctly. ✅\n\nSent at: " . now()->toIso8601String(),
+                "This is a test from your Portfolio admin panel.\n\nIf you're reading this, SMTP is configured correctly. ✅\n\nSent at: " . now()->toIso8601String() . "\nDriver: " . $diagnostics['driver'] . "\nHost: " . ($diagnostics['host'] ?? 'n/a'),
                 function ($message) use ($recipient) {
                     $message->to($recipient)->subject('SMTP Test — Portfolio Admin');
                 }
             );
 
+            $driverNote = match ($diagnostics['driver']) {
+                'log' => " ⚠️ DELIVERED TO LOG FILE only (driver='log'). Save SMTP password above + retry.",
+                'array' => " ⚠️ Driver='array' — message stayed in memory, no real send.",
+                'smtp' => " via SMTP {$diagnostics['host']}:{$diagnostics['port']}. If not in inbox, check spam folder.",
+                default => " via driver '{$diagnostics['driver']}'.",
+            };
+
             return response()->json([
                 'success' => true,
-                'message' => "Test email sent to {$recipient}. Check inbox + spam folder.",
+                'message' => "Test email sent to {$recipient}{$driverNote}",
+                'diagnostics' => $diagnostics,
             ]);
         } catch (\Throwable $e) {
             Log::error('SMTP test send failed', ['error' => $e->getMessage(), 'recipient' => $recipient]);
@@ -1095,8 +1111,24 @@ class SettingsController extends Controller
                     'code' => 'SMTP_FAILED',
                     'message' => $e->getMessage(),
                 ],
+                'diagnostics' => $diagnostics,
             ], 500);
         }
+    }
+
+    private function buildMailDiagnostics(): array
+    {
+        $driver = (string) config('mail.default');
+        return [
+            'driver' => $driver,
+            'host' => $driver === 'smtp' ? config('mail.mailers.smtp.host') : null,
+            'port' => $driver === 'smtp' ? config('mail.mailers.smtp.port') : null,
+            'username' => $driver === 'smtp' ? config('mail.mailers.smtp.username') : null,
+            'encryption' => $driver === 'smtp' ? (config('mail.mailers.smtp.encryption') ?: 'none') : null,
+            'password_set' => $driver === 'smtp' ? !empty(config('mail.mailers.smtp.password')) : null,
+            'from_address' => config('mail.from.address'),
+            'from_name' => config('mail.from.name'),
+        ];
     }
 
     private function reapplyMailConfigFromDb(): void
