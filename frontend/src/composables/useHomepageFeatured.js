@@ -15,8 +15,8 @@ export function useHomepageFeatured() {
       const res = await api.get('/homepage/featured')
       return res.data?.data ?? null
     },
-    staleTime: 30 * 60 * 1000,
-    refetchOnMount: false,
+    staleTime: 30 * 1000,
+    refetchOnMount: 'always',
     refetchOnWindowFocus: false,
   })
 
