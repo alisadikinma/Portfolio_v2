@@ -214,42 +214,48 @@
                     </svg>
                   </button>
 
-                  <!-- Linked Gallery Thumbnail Strip (Phase 11) -->
-                  <div v-if="exp.galleries && exp.galleries.length > 0" class="mt-5 pt-5 border-t border-border-hairline">
-                    <div class="flex items-center gap-3 mb-3">
-                      <span class="h-px flex-1 bg-border-hairline"></span>
-                      <span class="mono-label text-fg-dim text-[10px]">
-                        Gallery ({{ totalGalleryItems(exp) }} {{ totalGalleryItems(exp) === 1 ? 'photo' : 'photos' }})
-                      </span>
-                      <span class="h-px flex-1 bg-border-hairline"></span>
-                    </div>
-                    <div class="flex flex-wrap items-center gap-2">
-                      <button
-                        v-for="thumb in previewThumbnails(exp).slice(0, isMobileGalleryStrip ? 3 : 4)"
-                        :key="`${thumb.galleryId}-${thumb.id}`"
-                        type="button"
-                        @click="openExperienceGallery(exp)"
-                        class="exp-gallery-thumb relative overflow-hidden rounded-lg border border-border-hairline focus:outline-none focus:ring-2 focus:ring-accent-gold focus:border-accent-gold transition-all duration-150 hover:border-accent-gold"
-                        :class="isMobileGalleryStrip ? 'w-[60px] h-[60px]' : 'w-20 h-20'"
-                        :aria-label="`Open gallery: ${thumb.galleryTitle}`"
-                      >
-                        <img
-                          :src="thumb.thumbnail"
-                          :alt="thumb.galleryTitle"
-                          class="w-full h-full object-cover"
-                          loading="lazy"
-                          @error="(e) => { e.target.style.opacity = '0.3' }"
-                        />
-                      </button>
-                      <button
-                        v-if="previewThumbnails(exp).length > (isMobileGalleryStrip ? 3 : 4)"
-                        type="button"
-                        @click="openExperienceGallery(exp)"
-                        class="rounded-full px-3 py-1.5 text-xs font-mono bg-white/5 border border-border-hairline text-fg-muted hover:text-accent-gold hover:border-accent-gold transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-accent-gold"
-                        :aria-label="`See all ${totalGalleryItems(exp)} photos`"
-                      >
-                        +{{ totalGalleryItems(exp) - (isMobileGalleryStrip ? 3 : 4) }}
-                      </button>
+                  <!-- Per-Gallery Thumbnail Groups (Phase 11.1: 1 experience can carry N awards/galleries) -->
+                  <div v-if="renderableGalleries(exp).length > 0" class="mt-5 pt-5 border-t border-border-hairline space-y-5">
+                    <div
+                      v-for="gallery in renderableGalleries(exp)"
+                      :key="gallery.id"
+                      class="space-y-3"
+                    >
+                      <div class="flex items-center gap-3">
+                        <span class="h-px flex-1 bg-border-hairline"></span>
+                        <span class="mono-label text-fg-dim text-[10px] tracking-[0.14em]">
+                          {{ gallery.title }} · {{ gallery.items_count }} {{ gallery.items_count === 1 ? 'photo' : 'photos' }}
+                        </span>
+                        <span class="h-px flex-1 bg-border-hairline"></span>
+                      </div>
+                      <div class="flex flex-wrap items-center gap-2">
+                        <button
+                          v-for="(item, idx) in (gallery.preview_items || []).slice(0, isMobileGalleryStrip ? 3 : 4)"
+                          :key="`${gallery.id}-${item.id}-${idx}`"
+                          type="button"
+                          @click="openExperienceGallery(exp, gallery)"
+                          class="exp-gallery-thumb relative overflow-hidden rounded-lg border border-border-hairline focus:outline-none focus:ring-2 focus:ring-accent-gold focus:border-accent-gold transition-all duration-150 hover:border-accent-gold"
+                          :class="isMobileGalleryStrip ? 'w-[60px] h-[60px]' : 'w-20 h-20'"
+                          :aria-label="`Open gallery: ${gallery.title}`"
+                        >
+                          <img
+                            :src="resolveGalleryThumb(item.thumbnail)"
+                            :alt="gallery.title"
+                            class="w-full h-full object-cover"
+                            loading="lazy"
+                            @error="(e) => { e.target.style.opacity = '0.3' }"
+                          />
+                        </button>
+                        <button
+                          v-if="gallery.items_count > (isMobileGalleryStrip ? 3 : 4)"
+                          type="button"
+                          @click="openExperienceGallery(exp, gallery)"
+                          class="rounded-full px-3 py-1.5 text-xs font-mono bg-white/5 border border-border-hairline text-fg-muted hover:text-accent-gold hover:border-accent-gold transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-accent-gold"
+                          :aria-label="`See all ${gallery.items_count} photos in ${gallery.title}`"
+                        >
+                          +{{ gallery.items_count - (isMobileGalleryStrip ? 3 : 4) }}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -643,59 +649,52 @@ const resolveGalleryThumb = (path) => {
   return path
 }
 
-// Total previewable items across all linked galleries on this experience entry.
-const totalGalleryItems = (exp) => {
-  if (!exp?.galleries) return 0
-  return exp.galleries.reduce((sum, g) => sum + (g?.items_count || 0), 0)
+// Galleries worth rendering — drop empty/unhydrated ones so we don't show a
+// header label with no thumbnails under it.
+const renderableGalleries = (exp) => {
+  if (!Array.isArray(exp?.galleries)) return []
+  return exp.galleries.filter(g => g && (g.items_count || 0) > 0 && Array.isArray(g.preview_items) && g.preview_items.length > 0)
 }
 
-// Flatten preview_items across linked galleries — used by the inline strip.
-// Backend caps each gallery at 4 preview_items, so worst case we have N*4
-// thumbnails. We slice down to display limit (4 desktop / 3 mobile) at render.
-const previewThumbnails = (exp) => {
-  if (!exp?.galleries) return []
-  const out = []
-  for (const g of exp.galleries) {
-    if (Array.isArray(g.preview_items)) {
-      for (const item of g.preview_items) {
-        out.push({
-          id: item.id,
-          galleryId: g.id,
-          galleryTitle: g.title,
-          thumbnail: resolveGalleryThumb(item.thumbnail),
-        })
-      }
-    }
-  }
-  return out
-}
+// Open the modal scoped to a single gallery (default) OR to the merged set
+// across all galleries when `gallery` is omitted. Per-award scoping keeps
+// each credential distinct in the modal header — no more "X — 3 galleries"
+// ambiguity.
+const openExperienceGallery = (exp, gallery = null) => {
+  const galleries = renderableGalleries(exp)
+  if (!galleries.length) return
 
-// Open the modal with a flattened item list across all galleries linked to
-// this experience entry (so user sees everything in one shot regardless of
-// which thumbnail they clicked).
-const openExperienceGallery = (exp) => {
-  if (!exp?.galleries?.length) return
-  const allItems = []
-  for (const g of exp.galleries) {
-    if (Array.isArray(g.preview_items)) {
-      for (const item of g.preview_items) {
-        allItems.push({
-          id: item.id,
+  let items = []
+  let title = ''
+
+  if (gallery) {
+    title = gallery.title
+    items = (gallery.preview_items || []).map(item => ({
+      id: item.id,
+      title: item.title,
+      file_path: item.thumbnail, // BaseGalleryModal reads file_path|file_url|image
+    }))
+  } else {
+    title = galleries.length === 1
+      ? galleries[0].title
+      : `${exp.title || exp.position} — ${galleries.length} galleries`
+    for (const g of galleries) {
+      for (const item of (g.preview_items || [])) {
+        items.push({
+          id: `${g.id}-${item.id}`,
           title: item.title,
-          file_path: item.thumbnail, // BaseGalleryModal reads file_path|file_url|image
+          file_path: item.thumbnail,
         })
       }
     }
   }
 
   galleryModalData.value = {
-    title: exp.galleries.length === 1
-      ? exp.galleries[0].title
-      : `${exp.title || exp.position} — ${exp.galleries.length} galleries`,
+    title,
     description: exp.description || '',
     company: exp.company || '',
     period: `${exp.start_date || ''}${exp.end_date ? ' — ' + (exp.end_date || 'Present') : ''}`,
-    items: allItems,
+    items,
   }
   galleryModalOpen.value = true
 }
