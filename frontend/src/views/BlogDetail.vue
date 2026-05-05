@@ -178,7 +178,7 @@
           </div>
 
           <!-- Share Bar — inline after article -->
-          <div class="mt-10 pt-8 border-t border-white/5">
+          <div ref="inlineShareBar" class="mt-10 pt-8 border-t border-white/5">
             <p class="mono-label text-fg-dim mb-4 text-xs">Share this article</p>
             <div class="flex gap-2">
               <button @click="shareTwitter" title="Share on X"
@@ -293,6 +293,13 @@
       :show-social-links="true"
     />
 
+    <!-- Floating share rail — desktop right-side, mobile bottom-pill.
+         Hides when the inline share bar at the end of the article is in view. -->
+    <FloatingShareRail
+      :title="post?.title || ''"
+      :hide-near="inlineShareBar"
+    />
+
     <!-- Floating newsletter banner — fires 60s after mount -->
     <NewsletterFloatingBanner
       :show="showFloatingBanner"
@@ -316,6 +323,7 @@ import BaseImage from '@/components/base/BaseImage.vue'
 import { extractFaqFromHtml } from '@/utils/extractFaqFromHtml'
 import FaqAccordion from '@/components/blog/FaqAccordion.vue'
 import NewsletterFloatingBanner from '@/components/blog/NewsletterFloatingBanner.vue'
+import FloatingShareRail from '@/components/blog/FloatingShareRail.vue'
 import StickyTOC from '@/components/blog/StickyTOC.vue'
 import BlogContentInjector from '@/components/blog/BlogContentInjector.vue'
 import CTASection from '@/components/CTASection.vue'
@@ -341,6 +349,7 @@ const fetchError = ref(null)
 const relatedPosts = ref([])
 const urlCopied = ref(false)
 const articleContent = ref(null)
+const inlineShareBar = ref(null)
 const readingProgress = ref(0)
 const showFloatingBanner = ref(false)
 const promoSlot = ref(null)
