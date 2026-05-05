@@ -22,7 +22,14 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->api(prepend: [
             \Illuminate\Http\Middleware\HandleCors::class,
         ]);
-        
+
+        // ETag/304 for JSON GET responses — cuts revalidation cost from
+        // full payload to ~50 bytes. Skips non-GET, non-2xx, and >1MB
+        // payloads internally; safe to apply globally to the api group.
+        $middleware->api(append: [
+            \App\Http\Middleware\ApiETag::class,
+        ]);
+
         // Add cache headers for static assets (images, CSS, JS, fonts)
         $middleware->web(append: [
             \App\Http\Middleware\SetCacheHeaders::class,

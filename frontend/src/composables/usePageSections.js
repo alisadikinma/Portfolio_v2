@@ -107,30 +107,19 @@ export function usePageSections() {
     }
   }
 
-  // Fetch active sections (public) - WITH CACHE
+  // Fetch active sections (public).
+  // Always issues refetch — TanStack serves stale-cached data immediately
+  // while the background fetch updates with fresh server state. The previous
+  // early-return on TanStack cache hit caused stale data to persist across
+  // navigations and hid newly-added section rows after admin toggles.
   const fetchActiveSections = async (page = null) => {
     selectedPage.value = page
-    
-    const cacheKey = `page_sections_${page}`
-    
-    // Check instant localStorage
-    cachedSections.value = getCache(cacheKey)
-    
-    // Check TanStack Query cache
-    const queryCache = queryClient.getQueryData(['page-sections', page])
-    if (queryCache) {
-      console.log('[usePageSections] TanStack Query cache HIT:', page)
-      return { success: true, data: queryCache }
-    }
 
-    if (!cachedSections.value) {
-      console.log('[usePageSections] Cache MISS for:', page, '- fetching...')
-    } else {
-      console.log('[usePageSections] âš¡ INSTANT from localStorage, background refresh...')
-    }
-    
+    const cacheKey = `page_sections_${page}`
+    cachedSections.value = getCache(cacheKey)
+
     const result = await refetch()
-    
+
     return {
       success: !result.isError,
       data: result.data,
@@ -138,43 +127,25 @@ export function usePageSections() {
     }
   }
 
-  // Update section (toggle active/inactive) - INVALIDATE ALL CACHE LAYERS
+  // Update section (toggle active/inactive).
+  // Invalidate TanStack in-memory cache + the short-TTL useLocalCache. The
+  // legacy PORTFOLIO_QUERY_CACHE persistent cache was removed 2026-05-05 so
+  // its bookkeeping disappears here too.
   const updateSection = async (id, data) => {
     try {
       const response = await api.put(`/admin/page-sections/${id}`, data)
 
-      // Update local admin sections
       const index = adminSections.value.findIndex(s => s.id === id)
       if (index !== -1) {
         adminSections.value[index] = response.data.data
       }
 
-      // Layer 1: Invalidate TanStack Query cache
       queryClient.invalidateQueries({ queryKey: ['page-sections'] })
 
-      // Layer 2: Clear useLocalCache
       if (selectedPage.value) {
-        const cacheKey = `page_sections_${selectedPage.value}`
-        setCache(cacheKey, null, 0)
+        setCache(`page_sections_${selectedPage.value}`, null, 0)
       }
-      // Also clear common page keys
       setCache('page_sections_homepage', null, 0)
-
-      // Layer 3: Clear persistent 24hr cache in main.js (PORTFOLIO_QUERY_CACHE)
-      try {
-        const persistentCache = localStorage.getItem('PORTFOLIO_QUERY_CACHE')
-        if (persistentCache) {
-          const parsed = JSON.parse(persistentCache)
-          if (parsed.queries) {
-            // Remove all page-sections entries from persistent cache
-            const keysToRemove = Object.keys(parsed.queries).filter(k => k.includes('page-sections'))
-            keysToRemove.forEach(k => delete parsed.queries[k])
-            localStorage.setItem('PORTFOLIO_QUERY_CACHE', JSON.stringify(parsed))
-          }
-        }
-      } catch (e) {
-        // Non-fatal
-      }
 
       return { success: true, data: response.data.data }
     } catch (err) {
@@ -186,38 +157,18 @@ export function usePageSections() {
     }
   }
 
-  // Reorder sections - INVALIDATE ALL CACHE LAYERS
   const reorderSections = async (items) => {
     try {
       const response = await api.put('/admin/page-sections/reorder', { items })
 
-      // Update local admin sections
       adminSections.value = response.data.data
 
-      // Layer 1: Invalidate TanStack Query cache
       queryClient.invalidateQueries({ queryKey: ['page-sections'] })
 
-      // Layer 2: Clear useLocalCache
       if (selectedPage.value) {
-        const cacheKey = `page_sections_${selectedPage.value}`
-        setCache(cacheKey, null, 0)
+        setCache(`page_sections_${selectedPage.value}`, null, 0)
       }
       setCache('page_sections_homepage', null, 0)
-
-      // Layer 3: Clear persistent 24hr cache
-      try {
-        const persistentCache = localStorage.getItem('PORTFOLIO_QUERY_CACHE')
-        if (persistentCache) {
-          const parsed = JSON.parse(persistentCache)
-          if (parsed.queries) {
-            const keysToRemove = Object.keys(parsed.queries).filter(k => k.includes('page-sections'))
-            keysToRemove.forEach(k => delete parsed.queries[k])
-            localStorage.setItem('PORTFOLIO_QUERY_CACHE', JSON.stringify(parsed))
-          }
-        }
-      } catch (e) {
-        // Non-fatal
-      }
 
       return { success: true, data: response.data.data }
     } catch (err) {

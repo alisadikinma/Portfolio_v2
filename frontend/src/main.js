@@ -21,83 +21,33 @@ import { useAuthStore } from './stores/auth'
 const authStore = useAuthStore()
 authStore.initAuth()
 
-// Configure QueryClient with AGGRESSIVE cache policies
+// QueryClient — in-memory cache only.
+// Persistent localStorage cache removed 2026-05-05 (caused 24h stale window;
+// rely on browser HTTP cache + ETag/304 for cheap revalidation instead).
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 10 * 60 * 1000, // 10 minutes - data dianggap fresh
-      gcTime: 24 * 60 * 60 * 1000, // 24 HOURS - keep in memory cache
-      refetchOnWindowFocus: false, // Jangan refetch saat window focus
-      refetchOnMount: false, // Jangan refetch on mount if data exists
-      refetchOnReconnect: false, // Jangan refetch on reconnect
+      staleTime: 10 * 60 * 1000,
+      gcTime: 24 * 60 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+      refetchOnReconnect: false,
       retry: 1,
       retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000)
     }
   }
 })
 
-// MANUAL PERSISTENT CACHE IMPLEMENTATION - Simple & Reliable
-const CACHE_KEY = 'PORTFOLIO_QUERY_CACHE'
-const CACHE_VERSION = 'v1'
-
-// Restore cache from localStorage on app init
+// One-time cleanup of legacy persistent cache key for any users still
+// carrying it from before the 2026-05-05 refactor. Safe to remove this
+// block after a month of production deploy (May → June 2026).
 try {
-  const savedCache = localStorage.getItem(CACHE_KEY)
-  if (savedCache) {
-    const parsed = JSON.parse(savedCache)
-    if (parsed.version === CACHE_VERSION && parsed.timestamp) {
-      const age = Date.now() - parsed.timestamp
-      const maxAge = 24 * 60 * 60 * 1000 // 24 hours
-      
-      if (age < maxAge) {
-        // Cache masih valid, restore ke TanStack Query
-        Object.entries(parsed.queries || {}).forEach(([key, data]) => {
-          queryClient.setQueryData(JSON.parse(key), data)
-        })
-        console.log('[App] ⚡ Cache RESTORED from localStorage (' + Object.keys(parsed.queries || {}).length + ' queries)')
-      } else {
-        console.log('[App] 🗑️ Cache expired, clearing...')
-        localStorage.removeItem(CACHE_KEY)
-      }
-    }
+  if (localStorage.getItem('PORTFOLIO_QUERY_CACHE')) {
+    localStorage.removeItem('PORTFOLIO_QUERY_CACHE')
   }
-} catch (error) {
-  console.error('[App] ❌ Failed to restore cache:', error)
-  localStorage.removeItem(CACHE_KEY)
+} catch (_) {
+  // Non-fatal — localStorage may be disabled in some browsers
 }
-
-// Save cache to localStorage on window unload (before close/refresh)
-const saveCache = () => {
-  try {
-    const cache = queryClient.getQueryCache().getAll()
-    const toSave = {}
-    
-    cache.forEach(query => {
-      if (query.state.data) {
-        toSave[JSON.stringify(query.queryKey)] = query.state.data
-      }
-    })
-    
-    const cacheData = {
-      version: CACHE_VERSION,
-      timestamp: Date.now(),
-      queries: toSave
-    }
-    
-    localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData))
-    console.log('[App] 💾 Cache saved to localStorage (' + Object.keys(toSave).length + ' queries)')
-  } catch (error) {
-    console.error('[App] ❌ Failed to save cache:', error)
-  }
-}
-
-// Save cache on page unload
-window.addEventListener('beforeunload', saveCache)
-
-// Also save cache periodically (every 5 minutes)
-setInterval(saveCache, 5 * 60 * 1000)
-
-console.log('[App] ✅ Persistent cache initialized!')
 
 // Prefetch critical homepage data on app load for instant first render
 ;(async () => {
