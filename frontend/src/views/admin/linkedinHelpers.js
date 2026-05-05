@@ -290,6 +290,45 @@ export function formatDateTime(dt) {
   return `${month} ${day} · ${time}`
 }
 
+// --- Generating progress % ---------------------------------------------------
+// Synthetic progress indicator for drafts in generating/validating/pending_generation
+// state. Reads pipeline_state_log[] timestamps + format-aware baselines.
+//
+// Why synthetic: /linkedin-gen and /carousel-gen run as one-shot synchronous SSH
+// invocations — the plugin emits no mid-run progress callback. P50 baselines
+// (text 60s, carousel 360s) are derived from observed run durations; tune via
+// the GEN_BASELINES_MS constant below if the pattern drifts.
+//
+// Hard cap at 95% during generating so operators never see a misleading "100%"
+// on a still-running draft. Validating ramps 95→99 (validating phase is short).
+const GEN_BASELINES_MS = {
+  text:     { generating: 60_000,  validating: 8_000 },
+  carousel: { generating: 360_000, validating: 8_000 },
+}
+
+export function generatingProgress(draft) {
+  if (!draft) return null
+  const status = draft.status
+  if (!['generating', 'validating', 'pending_generation'].includes(status)) {
+    return null
+  }
+  const log = Array.isArray(draft.pipeline_state_log) ? draft.pipeline_state_log : []
+  const target = status === 'validating' ? 'validating' : 'generating'
+  // findLast — most recent transition into the target state (handles regen cycles)
+  const entry = [...log].reverse().find((e) => e?.to === target)
+  if (!entry?.timestamp) return null
+  const startedAt = new Date(entry.timestamp).getTime()
+  if (!Number.isFinite(startedAt)) return null
+  const elapsed = Date.now() - startedAt
+  if (elapsed < 0) return null
+  const baseline = GEN_BASELINES_MS[draft.format ?? 'text']?.[target] ?? 60_000
+  const raw = (elapsed / baseline) * 100
+  if (target === 'validating') {
+    return Math.min(99, Math.max(95, Math.floor(95 + raw / 25)))
+  }
+  return Math.min(95, Math.max(0, Math.floor(raw)))
+}
+
 // --- SVG icon paths ----------------------------------------------------------
 // 24x24 viewBox, designed for stroke="currentColor" strokeWidth=1.5 fill="none".
 // Pulled from Phosphor-style line set, manually traced for license-free use.

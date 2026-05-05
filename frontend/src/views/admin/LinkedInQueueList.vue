@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   useLinkedInDraftsList,
@@ -14,6 +14,7 @@ import {
   MOOD_CLASSES,
   formatChip,
   relativeTime,
+  generatingProgress,
   QUEUE_TAB_KEY,
   ICON,
 } from './linkedinHelpers'
@@ -30,6 +31,23 @@ onMounted(() => {
   }
 })
 watch(activeTab, (v) => sessionStorage.setItem(QUEUE_TAB_KEY, v))
+
+// --- Live ticker for generating progress % --------------------------------
+// Increments every second so generatingProgress(draft) re-evaluates against
+// fresh Date.now(). The status pill template references `tick` via the
+// comma-operator pattern so Vue's reactivity tracker subscribes to it
+// without re-computing for every draft on every tick.
+const tick = ref(0)
+let tickerHandle = null
+onMounted(() => {
+  tickerHandle = setInterval(() => { tick.value++ }, 1000)
+})
+onBeforeUnmount(() => {
+  if (tickerHandle) {
+    clearInterval(tickerHandle)
+    tickerHandle = null
+  }
+})
 
 // Always fetch the full queue (no server-side status filter) so client-side
 // classification can re-route carousel drafts whose slide rendering is still
@@ -80,7 +98,6 @@ function toggleSort(key) {
 function sortValue(draft, key) {
   switch (key) {
     case 'virality':  return draft.post?.content_idea?.virality_score ?? null
-    case 'depth':     return draft.depth_score ?? null
     case 'published': {
       const p = draft.post?.published_at
       return p ? new Date(p).getTime() : null
@@ -295,7 +312,7 @@ const emptyMessage = computed(() => ({
     <div v-else class="rounded-2xl border border-neutral-800/80 bg-neutral-950/40 overflow-hidden">
       <!-- Header row: 7 cols. Sortable headers are buttons; non-sortable
            are plain spans. Active sort col gets amber accent + ▲/▼ glyph. -->
-      <div class="hidden md:grid grid-cols-[1fr_90px_130px_70px_1fr_110px_130px] px-5 py-2.5 text-[10px] font-mono uppercase tracking-[0.14em] text-neutral-500 border-b border-neutral-800/80 gap-x-4">
+      <div class="hidden md:grid grid-cols-[1fr_90px_130px_1fr_110px_130px] px-5 py-2.5 text-[10px] font-mono uppercase tracking-[0.14em] text-neutral-500 border-b border-neutral-800/80 gap-x-4">
         <button
           @click="toggleSort('source')"
           class="text-left inline-flex items-center gap-1 hover:text-neutral-300 transition-colors"
@@ -313,14 +330,6 @@ const emptyMessage = computed(() => ({
           <span v-if="sortIndicator('virality')" class="text-[8px]">{{ sortIndicator('virality') }}</span>
         </button>
         <span>Status</span>
-        <button
-          @click="toggleSort('depth')"
-          class="text-right inline-flex items-center justify-end gap-1 hover:text-neutral-300 transition-colors"
-          :class="sortState.key === 'depth' ? 'text-amber-400' : ''"
-        >
-          Depth
-          <span v-if="sortIndicator('depth')" class="text-[8px]">{{ sortIndicator('depth') }}</span>
-        </button>
         <span>Issue</span>
         <button
           @click="toggleSort('published')"
@@ -338,7 +347,7 @@ const emptyMessage = computed(() => ({
           v-for="draft in drafts"
           :key="draft.id"
           @click="openDetail(draft.id)"
-          class="group relative px-5 py-3.5 grid md:grid-cols-[1fr_90px_130px_70px_1fr_110px_130px] gap-y-2 gap-x-4 cursor-pointer hover:bg-neutral-900/40 transition-colors"
+          class="group relative px-5 py-3.5 grid md:grid-cols-[1fr_90px_130px_1fr_110px_130px] gap-y-2 gap-x-4 cursor-pointer hover:bg-neutral-900/40 transition-colors"
         >
           <!-- Source -->
           <div class="min-w-0">
@@ -369,23 +378,11 @@ const emptyMessage = computed(() => ({
             >
               <span class="w-1 h-1 rounded-full" :class="MOOD_CLASSES[effectiveStatusMeta(draft).mood]?.dot" />
               {{ effectiveStatusMeta(draft).short }}
+              <!-- Comma-operator forces tick subscription without breaking the function call -->
+              <template v-if="(tick, generatingProgress(draft)) !== null">
+                <span class="opacity-70">~{{ generatingProgress(draft) }}%</span>
+              </template>
             </span>
-          </div>
-
-          <!-- Depth — only meaningful for format=text. Carousels (post plugin
-               v0.5.0) skip /linkedin-validate's depth rubric, so the score is
-               either null (new drafts) or a legacy 100 stub from v0.4.x. Hide
-               either way so it doesn't distract from virality_score. -->
-          <div class="md:self-center md:text-right">
-            <span
-              v-if="draft.format !== 'carousel' && draft.depth_score !== null && draft.depth_score !== undefined"
-              class="text-sm font-mono font-bold"
-              :class="depthTone(draft.depth_score)"
-              :title="`LinkedIn depth score: ${draft.depth_score}/100`"
-            >
-              {{ draft.depth_score }}
-            </span>
-            <span v-else class="text-sm text-neutral-600 font-mono" :title="draft.format === 'carousel' ? 'Depth score does not apply to carousels' : 'No depth score'">—</span>
           </div>
 
           <!-- Issue -->

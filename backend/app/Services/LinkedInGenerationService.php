@@ -202,20 +202,36 @@ class LinkedInGenerationService
     }
 
     /**
-     * Build the `{url, title, content}` blog payload from the draft's Post.
-     * Prefers primary-language translation. Returns null if missing.
+     * Build the `{url, title, content}` blog payload shipped to the /linkedin-gen
+     * plugin via SSH. Prefers EN translation when available so the plugin
+     * authors LinkedIn content in English regardless of the source blog's
+     * primary language (May 6, 2026 scope decision).
+     *
+     * Public for unit-test access — same precedent as parseOrchestratorOutput
+     * + buildCarouselCaption.
+     *
+     * Returns null when no translation has both a non-empty title and ≥100
+     * chars of content (plugin's hard requirement for usable input).
      */
-    private function buildBlogPayload(LinkedInPost $draft): ?array
+    public function buildBlogPayload(LinkedInPost $draft): ?array
     {
-        $draft->loadMissing('post.translations');
+        // Skip loadMissing when relations are already pre-loaded — keeps unit
+        // tests (vanilla PHPUnit\TestCase, no DB resolver) green while
+        // preserving production behavior (callers don't always eager-load).
+        if (!$draft->relationLoaded('post')
+            || ($draft->post && !$draft->post->relationLoaded('translations'))) {
+            $draft->loadMissing('post.translations');
+        }
         $post = $draft->post;
         if ($post === null) {
             return null;
         }
 
-        // Primary translation: 'id' (Indonesian) by project convention, fall back to first
-        $translation = $post->translations->firstWhere('language', 'id')
-            ?? $post->translations->firstWhere('language', 'en')
+        // Prefer EN translation; fall back to ID; last resort = first available.
+        // Pre-May 6, 2026 this preferred ID — switched to EN so the plugin
+        // sees English source content and naturally authors English captions.
+        $translation = $post->translations->firstWhere('language', 'en')
+            ?? $post->translations->firstWhere('language', 'id')
             ?? $post->translations->first();
 
         if ($translation === null) {
@@ -1004,27 +1020,6 @@ class LinkedInGenerationService
     }
 
     /**
-     * Build the LinkedIn post body for a carousel draft.
-     *
-     * Targets the 2026 LinkedIn carousel sweet spot: 800-1500 chars with a
-     * Hook → Setup → Insights → Question → Swipe → Link structure. Long-form
-     * captions sustain dwell time (61s+ correlates with 15.6% engagement vs
-     * 1.2% for sub-3s posts), and carousel posts hit 6.60% engagement when
-     * paired with story-driven captions.
-     *
-     * Plugin v0.5.0+ /carousel-gen engine doesn't emit caption (visual focus
-     * only). Backend composes a 7-block caption:
-     *   1. Hook (cover_id) — within first 210 chars (preview window)
-     *   2. Punchline subtitle (cover_en, if distinct)
-     *   3. Setup paragraph (blog excerpt or first body slide, ≤280 chars)
-     *   4. Pull-quote / data point (brief.pull_quote, if distinct)
-     *   5. Insight bullets (3 sharpest body slides as → bullets)
-     *   6. Engagement question + Swipe CTA
-     *   7. "Full article: link in comments ↓"
-     *
-     * Plugin captions ≥800 chars are trusted as-is (legacy v0.4.x envelopes).
-     */
-    /**
      * Re-synthesize caption + hashtags from existing carousel slides without
      * touching slide images, FSM state, or draft ID. Used by the admin
      * "Regenerate caption" button when slides look good but the caption
@@ -1034,8 +1029,8 @@ class LinkedInGenerationService
      *
      * Forces backend synthesis by passing empty pluginCaption — the trust
      * threshold (≥800 chars passthrough) won't fire so buildCarouselCaption
-     * runs the 7-block synthesizer (hook, subtitle, setup, pull-quote,
-     * insight bullets, engagement question, link CTA).
+     * runs the 6-block English-only synthesizer (hook → setup → pull-quote →
+     * insight bullets → engagement question + Swipe CTA → link CTA).
      *
      * Hashtags re-resolved with null plugin/brief inputs — falls through to
      * blog meta_keywords synthesis path with brand handle enforcement.
@@ -1087,7 +1082,18 @@ class LinkedInGenerationService
         ];
     }
 
-    private function buildCarouselCaption(string $pluginCaption, array $carousel, array $brief, LinkedInPost $draft): string
+    /**
+     * Build the English-only LinkedIn carousel caption (post-May 6, 2026).
+     *
+     * Public for unit-test access (matches parseOrchestratorOutput precedent).
+     * Carousel SLIDES themselves stay bilingual via /carousel-gen brand chrome
+     * — only the LinkedIn post body that accompanies them is English-only.
+     *
+     * Composition: hook → setup → pull_quote → insights bullets → question +
+     * Swipe CTA → "link in comments". Capped at 1900 chars (engagement sweet
+     * spot per 2026 LinkedIn data).
+     */
+    public function buildCarouselCaption(string $pluginCaption, array $carousel, array $brief, LinkedInPost $draft): string
     {
         $cleaned = trim($pluginCaption);
         if ($cleaned !== '' && mb_strlen($cleaned) >= 800) {
@@ -1097,73 +1103,44 @@ class LinkedInGenerationService
         $slides = is_array($carousel['slides'] ?? null) ? $carousel['slides'] : [];
         $coverSlide = collect($slides)->firstWhere('is_cover', true) ?? ($slides[0] ?? []);
 
-        // /carousel-gen plugin v2.16+ emits cover.copy as multi-paragraph string:
-        //   paragraph 1 = the sharp hook line ("AI chatbot kasih ritual.")
-        //   paragraph 2 = pattern-interrupt subtitle ("Paku besi. Mazmur 91...")
-        //   paragraph 3 = stat / proof point ("3 dari 5 chatbot...")
-        // Old code took the entire trim() so all three bled into the hook
-        // slot, then setup/insights duplicated paragraph 3. Splitting on
-        // blank-line boundary lets each paragraph fill its intended caption
-        // role.
-        $coverParagraphs = $this->splitParagraphs(
-            (string) ($coverSlide['copy_id'] ?? $coverSlide['copy'] ?? '')
-        );
-        $hook = $coverParagraphs[0] ?? '';
-
-        // Subtitle: prefer plugin-authored copy_en (legacy v0.4.x bilingual
-        // schema). When absent (universal /carousel-gen path), fall back to
-        // the cover's second paragraph — it's authored as the pattern-
-        // interrupt line and reads as a natural subtitle.
-        $subtitle = trim((string) ($coverSlide['copy_en'] ?? ''));
-        if ($subtitle === '' && isset($coverParagraphs[1])) {
-            $subtitle = $coverParagraphs[1];
-        }
-
-        // The cover's third paragraph (stat/proof) is high-signal — surface
-        // it as a stat line right under the subtitle so the hook block reads
-        // hook → subtitle → stat. Skip when missing or duplicate of subtitle.
-        $coverStat = $coverParagraphs[2] ?? '';
-        if ($coverStat !== '' && mb_strtolower($coverStat) === mb_strtolower($subtitle)) {
-            $coverStat = '';
+        // Hook: prefer cover.copy_en. /carousel-gen typically emits copy_en as
+        // a single-line English summary; if a future plugin variant emits
+        // multi-paragraph EN copy, take only the first paragraph (defensive).
+        $hook = trim((string) ($coverSlide['copy_en'] ?? $coverSlide['copy'] ?? ''));
+        if (str_contains($hook, "\n")) {
+            $paragraphs = $this->splitParagraphs($hook);
+            $hook = $paragraphs[0] ?? $hook;
         }
 
         $setup = $this->extractSetupParagraph($draft, $slides);
         $pullQuote = trim((string) ($brief['pull_quote'] ?? ''));
-        // Skip insight slides that already appear in setup or hook block to
-        // avoid the "Studi 2026 dalam 60 Detik" duplicate the operator hit.
         $skipFingerprints = array_filter([
             $this->captionFingerprint($setup),
             $this->captionFingerprint($hook),
-            $this->captionFingerprint($coverStat),
         ]);
         $insights = $this->extractInsightsFromSlides($slides, 3, $skipFingerprints);
         $question = trim((string) ($brief['engagement_question'] ?? $brief['question'] ?? ''));
         if ($question === '') {
-            $question = 'Apa yang sebenarnya terjadi di balik layar?';
+            $question = "What's really happening behind the scenes?";
         }
 
         $parts = [];
         if ($hook !== '') $parts[] = $hook;
-        if ($subtitle !== '' && mb_strtolower($subtitle) !== mb_strtolower($hook)) {
-            $parts[] = $subtitle;
+        if ($setup !== '' && mb_strtolower($setup) !== mb_strtolower($hook)) {
+            $parts[] = $setup;
         }
-        if ($coverStat !== '' && mb_strtolower($coverStat) !== mb_strtolower($hook)) {
-            $parts[] = $coverStat;
-        }
-        if ($setup !== '') $parts[] = $setup;
         if ($pullQuote !== '' && $pullQuote !== $setup && mb_stripos($setup, $pullQuote) === false) {
             $parts[] = $pullQuote;
         }
         if (!empty($insights)) {
             $bullets = implode("\n", array_map(fn($i) => "→ {$i}", $insights));
-            $parts[] = "Yang nggak kelihatan dari permukaan:\n{$bullets}";
+            $parts[] = "What you can't see from the surface:\n{$bullets}";
         }
-        $parts[] = "{$question}\n\nSwipe → untuk breakdown lengkap.";
+        $parts[] = "{$question}\n\nSwipe → for the full breakdown.";
         $parts[] = 'Full article: link in comments ↓';
 
         $caption = implode("\n\n", $parts);
 
-        // Cap at 1900 chars (LinkedIn engagement sweet spot per 2026 data).
         if (mb_strlen($caption) > 1900) {
             $caption = mb_substr($caption, 0, 1897) . '...';
         }
@@ -1220,7 +1197,10 @@ class LinkedInGenerationService
     {
         $post = $draft->post;
         if ($post && $post->translations) {
-            $primary = $post->translations->where('language', 'id')->first()
+            // Prefer EN excerpt — caption is English-only post May 6, 2026.
+            // Falls back to ID, then to first translation if neither found.
+            $primary = $post->translations->where('language', 'en')->first()
+                ?? $post->translations->where('language', 'id')->first()
                 ?? $post->translations->first();
             if ($primary) {
                 $excerpt = trim((string) ($primary->excerpt ?? ''));
@@ -1246,9 +1226,11 @@ class LinkedInGenerationService
                 $candidate = trim((string) ($s['direct_answer_block'] ?? ''));
             }
             if ($candidate === '') {
-                // Fall back: first 1-2 paragraphs of slide.copy joined by space.
+                // Fall back: first 1-2 paragraphs of slide.copy_en joined by
+                // space. Caption is English-only (May 6, 2026) — prefer copy_en;
+                // copy_id retained as last-resort fallback for legacy drafts.
                 $paragraphs = $this->splitParagraphs(
-                    (string) ($s['copy_id'] ?? $s['copy'] ?? '')
+                    (string) ($s['copy_en'] ?? $s['copy'] ?? $s['copy_id'] ?? '')
                 );
                 $candidate = trim(implode(' ', array_slice($paragraphs, 0, 2)));
             }
@@ -1285,7 +1267,9 @@ class LinkedInGenerationService
             if (($s['is_cover'] ?? false) || ($s['is_cta'] ?? false)) continue;
             if (in_array(($s['layout_hint'] ?? ''), ['cover', 'cta'], true)) continue;
 
-            $copy = (string) ($s['headline_id'] ?? $s['copy_id'] ?? $s['copy'] ?? $s['headline'] ?? '');
+            // English-only caption (May 6, 2026): prefer headline_en/copy_en;
+            // fall back to legacy fields for drafts authored pre-EN switch.
+            $copy = (string) ($s['headline_en'] ?? $s['copy_en'] ?? $s['copy'] ?? $s['headline'] ?? '');
             if (trim($copy) === '') continue;
 
             $paragraphs = $this->splitParagraphs($copy);
@@ -1402,9 +1386,11 @@ class LinkedInGenerationService
         $post = $draft->post;
         if (!$post) return [];
 
-        // Prefer the primary translation's meta_keywords (comma-separated).
+        // Prefer EN translation's meta_keywords (matches blog payload + caption
+        // EN preference shipped May 6, 2026). Falls back to ID, then first.
         $translations = $post->translations ?? collect();
-        $primary = $translations->where('language', 'id')->first()
+        $primary = $translations->where('language', 'en')->first()
+            ?? $translations->where('language', 'id')->first()
             ?? $translations->first();
         $keywords = (string) ($primary->meta_keywords ?? '');
 
