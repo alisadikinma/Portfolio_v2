@@ -92,6 +92,92 @@
                     </tr>
                 @endforeach
 
+                @if(!empty($featuredProject))
+                    @php
+                        $rawProjectImage = $featuredProject->image ?? '';
+                        $projectImageUrl = str_starts_with($rawProjectImage, 'http')
+                            ? $rawProjectImage
+                            : (empty($rawProjectImage) ? null : 'https://alisadikinma.com/storage/' . ltrim($rawProjectImage, '/'));
+                        $projectUrl = "https://alisadikinma.com/projects/{$featuredProject->slug}?utm_source=newsletter&utm_medium=email&utm_campaign={$campaign}";
+                        $projectExcerpt = $featuredProject->impact_statement
+                            ?? \Illuminate\Support\Str::limit(strip_tags($featuredProject->description ?? ''), 160);
+                    @endphp
+                    <tr>
+                        <td style="padding:20px 32px 8px 32px;">
+                            <p style="margin:0 0 10px 0;font-family:'SF Mono','JetBrains Mono',Consolas,Monaco,monospace;font-size:10px;font-weight:600;color:#06B6D4;letter-spacing:0.18em;text-transform:uppercase;">
+                                Featured Project
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding:0 32px 8px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#0E0E11;border-radius:10px;border:1px solid rgba(6,182,212,0.18);">
+                                @if($projectImageUrl)
+                                    <tr>
+                                        <td style="padding:0;">
+                                            <a href="{{ $projectUrl }}" style="display:block;text-decoration:none;">
+                                                <img src="{{ $projectImageUrl }}" alt="{{ $featuredProject->title }}" width="536" style="display:block;width:100%;max-width:536px;height:auto;border-radius:10px 10px 0 0;border:0;outline:none;text-decoration:none;">
+                                            </a>
+                                        </td>
+                                    </tr>
+                                @endif
+                                <tr>
+                                    <td style="padding:20px 24px 22px 24px;">
+                                        @if(!empty($featuredProject->category))
+                                            <p style="margin:0 0 8px 0;font-family:'SF Mono','JetBrains Mono',Consolas,Monaco,monospace;font-size:10px;font-weight:600;color:#06B6D4;letter-spacing:0.16em;text-transform:uppercase;">
+                                                {{ $featuredProject->category }}
+                                            </p>
+                                        @endif
+                                        <h2 style="margin:0 0 10px 0;font-size:22px;line-height:1.3;color:#EDEDEF;font-weight:700;letter-spacing:-0.01em;">
+                                            <a href="{{ $projectUrl }}" style="color:#EDEDEF;text-decoration:none;">{{ $featuredProject->title }}</a>
+                                        </h2>
+                                        @if($projectExcerpt)
+                                            <p style="margin:0 0 18px 0;font-size:14px;line-height:1.6;color:#8A8F98;">
+                                                {{ \Illuminate\Support\Str::limit($projectExcerpt, 180) }}
+                                            </p>
+                                        @endif
+                                        <a href="{{ $projectUrl }}" style="display:inline-block;padding:10px 18px;background-color:transparent;color:#06B6D4;font-size:13px;font-weight:700;text-decoration:none;border:1px solid #06B6D4;border-radius:999px;letter-spacing:0.01em;">
+                                            View case study &rarr;
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                @endif
+
+                @php
+                    $waMessage = rawurlencode("Halo Ali, saya tertarik konsultasi tentang efisiensi operasional dengan AI di tempat kerja saya.");
+                    $waUrl = "https://wa.me/6281380163758?text={$waMessage}";
+                @endphp
+                <tr>
+                    <td style="padding:8px 32px 8px 32px;">
+                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:linear-gradient(135deg,#1A1611 0%,#0E0E11 100%);border-radius:12px;border:1px solid rgba(212,168,67,0.25);">
+                            <tr>
+                                <td style="padding:24px 26px;">
+                                    <p style="margin:0 0 8px 0;font-family:'SF Mono','JetBrains Mono',Consolas,Monaco,monospace;font-size:10px;font-weight:600;color:#D4A843;letter-spacing:0.18em;text-transform:uppercase;">
+                                        Konsultasi AI &middot; 1-on-1
+                                    </p>
+                                    <h3 style="margin:0 0 10px 0;font-size:20px;line-height:1.3;color:#EDEDEF;font-weight:700;letter-spacing:-0.01em;">
+                                        Need an AI expert for your business?
+                                    </h3>
+                                    <p style="margin:0 0 18px 0;font-size:14px;line-height:1.6;color:#8A8F98;">
+                                        Ali Sadikin adalah <strong style="color:#EDEDEF;font-weight:600;">AI Generalist Expert</strong> &mdash;
+                                        diskusi langsung di WhatsApp tentang bagaimana AI bisa meningkatkan efisiensi operasional
+                                        perusahaan atau tempat kerja Anda.
+                                    </p>
+                                    <a href="{{ $waUrl }}" style="display:inline-block;padding:12px 22px;background-color:#25D366;color:#FFFFFF;font-size:14px;font-weight:700;text-decoration:none;border-radius:999px;letter-spacing:0.01em;">
+                                        💬 Chat di WhatsApp &rarr;
+                                    </a>
+                                    <p style="margin:12px 0 0 0;font-size:11px;color:#5A5F68;font-family:'SF Mono','JetBrains Mono',Consolas,Monaco,monospace;letter-spacing:0.05em;">
+                                        +62 813-8016-3758
+                                    </p>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+
                 <tr>
                     <td style="padding:24px 32px 32px 32px;">
                         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import {
   useSubscribersList,
   useDeleteSubscriber,
@@ -73,6 +73,8 @@ const previewEnabled = ref(false)
 const previewQuery = useDigestPreview(previewEnabled)
 const previewHtml = computed(() => previewQuery.data.value?.data?.html || '')
 const previewMeta = computed(() => previewQuery.data.value?.data || null)
+const previewBlobUrl = ref(null)
+const previewIframeRef = ref(null)
 
 function openPreview() {
   previewEnabled.value = true
@@ -80,7 +82,24 @@ function openPreview() {
 
 function closePreview() {
   previewEnabled.value = false
+  if (previewBlobUrl.value) {
+    URL.revokeObjectURL(previewBlobUrl.value)
+    previewBlobUrl.value = null
+  }
 }
+
+// Watch for fetched HTML and convert to Blob URL — more reliable than srcdoc
+// across browsers (sandbox + srcdoc + DOCTYPE combo can render blank in Chrome).
+watch(previewHtml, (html) => {
+  if (previewBlobUrl.value) {
+    URL.revokeObjectURL(previewBlobUrl.value)
+    previewBlobUrl.value = null
+  }
+  if (html && html.length > 0) {
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+    previewBlobUrl.value = URL.createObjectURL(blob)
+  }
+}, { immediate: true })
 
 const sendTestRecipient = ref('')
 const sendTestMutation = useSendTest()
@@ -469,12 +488,20 @@ function sourceLabel(source) {
           <div v-if="previewQuery.isLoading.value" class="flex items-center justify-center flex-1 py-12">
             <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
           </div>
+          <div v-else-if="previewQuery.error.value" class="flex flex-col items-center justify-center flex-1 py-12 px-6 text-center">
+            <p class="text-red-500 dark:text-red-400 font-medium mb-2">Failed to load preview</p>
+            <p class="text-sm text-neutral-500">{{ previewQuery.error.value?.message || 'Unknown error' }}</p>
+          </div>
+          <div v-else-if="!previewBlobUrl" class="flex flex-col items-center justify-center flex-1 py-12 px-6 text-center">
+            <p class="text-neutral-700 dark:text-neutral-300 font-medium mb-2">Empty preview</p>
+            <p class="text-sm text-neutral-500">Server returned no HTML — check that posts exist + Mailable renders.</p>
+          </div>
           <iframe
             v-else
-            :srcdoc="previewHtml"
-            class="flex-1 w-full bg-white"
-            style="min-height: 600px;"
-            sandbox="allow-same-origin"
+            ref="previewIframeRef"
+            :src="previewBlobUrl"
+            class="flex-1 w-full bg-neutral-900"
+            style="min-height: 600px; border: 0;"
           ></iframe>
         </div>
       </div>
