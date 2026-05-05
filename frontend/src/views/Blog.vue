@@ -1,17 +1,50 @@
 <template>
-  <div class="min-h-screen bg-bg-deep text-fg-primary">
+  <div class="min-h-screen bg-bg-deep text-fg-primary relative">
 
-    <!-- Page Header — compact, no wasted vertical -->
-    <section class="relative pt-24 pb-10 md:pt-28 md:pb-12">
+    <!-- Ambient backdrop -->
+    <div class="absolute inset-x-0 top-0 h-[700px] pointer-events-none overflow-hidden" aria-hidden="true">
+      <div
+        class="absolute -top-32 left-1/2 -translate-x-1/2 w-[900px] h-[500px] rounded-full opacity-[0.07] blur-3xl"
+        style="background: radial-gradient(circle, #D4A843 0%, transparent 70%);"
+      ></div>
+      <div
+        class="absolute top-32 -right-40 w-[500px] h-[500px] rounded-full opacity-[0.05] blur-3xl"
+        style="background: radial-gradient(circle, #06B6D4 0%, transparent 70%);"
+      ></div>
+    </div>
+
+    <!-- Editorial Header -->
+    <section class="relative pt-28 md:pt-36 pb-14 md:pb-20">
       <div class="container-custom">
-        <div class="max-w-3xl">
-          <span class="eyebrow-tag text-accent-gold mb-4 inline-flex">Writing & Insights</span>
-          <h1 class="section-heading text-4xl md:text-5xl font-bold tracking-tight leading-[1.05] mb-4">
-            <span class="text-gradient">Blog</span> <span class="text-fg-primary">&amp; Articles</span>
+        <!-- Live indicator -->
+        <div class="flex items-center gap-3 mb-8">
+          <span class="relative flex h-2 w-2" aria-hidden="true">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-gold opacity-50"></span>
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-accent-gold"></span>
+          </span>
+          <span class="mono-label text-fg-dim text-[10px] tracking-[0.25em]">Writing &amp; Insights · Live</span>
+        </div>
+
+        <!-- Display heading -->
+        <div class="max-w-4xl">
+          <h1 class="font-display text-5xl md:text-7xl lg:text-[5.25rem] font-bold tracking-[-0.025em] leading-[0.95] mb-6 md:mb-8 text-fg-primary">
+            Field notes on
+            <br class="hidden sm:block" />
+            <span class="text-gradient italic font-bold">building</span> with AI.
           </h1>
           <p class="text-base md:text-lg text-fg-muted font-light max-w-xl leading-relaxed">
-            Thoughts, tutorials, and dispatches on AI, engineering, and building things that matter.
+            Essays, postmortems, and tactical playbooks from the trenches.
+            Updated when the work surfaces something worth saying.
           </p>
+        </div>
+
+        <!-- Stats strip -->
+        <div class="flex flex-wrap items-center gap-x-8 gap-y-3 mono-label text-fg-dim text-[10px] mt-12 pt-6 border-t border-border-hairline tracking-[0.18em]">
+          <span><span class="text-accent-gold tabular-nums">{{ String(totalCount).padStart(2, '0') }}</span> Essays</span>
+          <span class="text-border-hover" aria-hidden="true">/</span>
+          <span><span class="text-accent-cyan tabular-nums">{{ String(categories.length).padStart(2, '0') }}</span> Topics</span>
+          <span class="text-border-hover" aria-hidden="true">/</span>
+          <span>Last drop <span class="text-fg-primary">{{ lastDropLabel }}</span></span>
         </div>
       </div>
     </section>
@@ -30,58 +63,131 @@
             />
           </div>
 
-          <div class="flex items-center gap-3 flex-shrink-0">
-            <div class="mono-label text-fg-dim text-[10px] hidden md:block">
-              {{ filteredTotal }} {{ filteredTotal === 1 ? 'article' : 'articles' }}
-            </div>
-
-            <div class="relative w-full md:w-56">
-              <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-fg-dim pointer-events-none" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/>
+          <div class="relative w-full md:w-56 flex-shrink-0">
+            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-fg-dim pointer-events-none" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/>
+            </svg>
+            <input
+              v-model="searchQuery"
+              type="text"
+              placeholder="Search essays…"
+              class="w-full pl-9 pr-8 py-2 rounded-full bg-white/4 border border-border-hairline text-fg-primary placeholder-fg-dim text-sm focus:outline-none focus:border-accent-gold/30 transition-all duration-500 ease-spring"
+              aria-label="Search essays"
+            />
+            <button
+              v-if="searchQuery"
+              class="absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-dim hover:text-fg-primary transition-colors p-0.5"
+              @click="searchQuery = ''"
+              aria-label="Clear search"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
               </svg>
-              <input
-                v-model="searchQuery"
-                type="text"
-                placeholder="Search articles…"
-                class="w-full pl-9 pr-8 py-2 rounded-full bg-white/4 border border-border-hairline text-fg-primary placeholder-fg-dim text-sm focus:outline-none focus:border-accent-gold/30 transition-all duration-500 ease-spring"
-                aria-label="Search articles"
-              />
-              <button
-                v-if="searchQuery"
-                class="absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-dim hover:text-fg-primary transition-colors p-0.5"
-                @click="searchQuery = ''"
-                aria-label="Clear search"
-              >
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-              </button>
-            </div>
+            </button>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Feed -->
-    <section class="container-custom mt-10 md:mt-12 mb-20">
+    <!-- Featured Essay (page 1 only) -->
+    <section v-if="featuredPost && !isLoading" class="container-custom mt-14 md:mt-20 mb-16 md:mb-24">
+      <RouterLink
+        :to="`/${lang}/blog/${featuredPost.slug}`"
+        class="group relative block"
+        data-testid="blog-featured"
+      >
+        <div class="relative grid md:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] gap-0 rounded-2xl overflow-hidden border border-border-hairline group-hover:border-accent-gold/40 transition-colors duration-700 ease-spring bg-bg-elevated/30">
+
+          <!-- Left text panel -->
+          <div class="relative p-7 md:p-10 lg:p-14 flex flex-col justify-center order-2 md:order-1 z-10">
+            <div class="mono-label text-accent-gold text-[10px] mb-5 inline-flex items-center gap-2.5 tracking-[0.2em]">
+              <span class="w-6 h-px bg-accent-gold/60"></span>
+              Featured Essay
+              <span class="text-fg-dim font-mono">№ {{ String(featuredNumber).padStart(2, '0') }}</span>
+            </div>
+
+            <h2 class="font-display text-3xl md:text-4xl lg:text-[2.75rem] font-bold leading-[1.05] tracking-[-0.02em] text-fg-primary mb-5 max-w-[20ch]">
+              <span class="bg-[linear-gradient(currentColor,currentColor)] bg-no-repeat bg-[length:0%_2px] bg-[position:0_99%] group-hover:bg-[length:100%_2px] transition-[background-size] duration-[900ms] ease-spring">
+                {{ featuredPost.title }}
+              </span>
+            </h2>
+
+            <p v-if="featuredPost.excerpt" class="text-base md:text-lg text-fg-muted leading-relaxed font-light line-clamp-3 max-w-[55ch] mb-8">
+              {{ featuredPost.excerpt }}
+            </p>
+
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mono-label text-fg-dim text-[10px] tracking-[0.2em] mb-7">
+              <span v-if="featuredPost.category?.name" class="text-accent-cyan">{{ featuredPost.category.name }}</span>
+              <span v-if="featuredPost.category?.name" class="text-border-hover" aria-hidden="true">/</span>
+              <time v-if="featuredPost.published_at" :datetime="featuredPost.published_at">
+                {{ formatDate(featuredPost.published_at) }}
+              </time>
+              <span class="text-border-hover" aria-hidden="true">/</span>
+              <span>{{ readingTime(featuredPost.content || featuredPost.excerpt) }} min read</span>
+            </div>
+
+            <span class="inline-flex items-center gap-2 text-accent-gold text-sm font-medium group-hover:gap-3 transition-all duration-500 ease-spring">
+              Read essay
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
+              </svg>
+            </span>
+          </div>
+
+          <!-- Right atmospheric image (cropped to right, faded into text panel) -->
+          <div class="relative order-1 md:order-2 aspect-[16/10] md:aspect-auto md:min-h-[480px] overflow-hidden bg-bg-deep">
+            <img
+              v-if="featuredPost.featured_image"
+              :src="featuredPost.featured_image"
+              :alt="featuredPost.title"
+              loading="eager"
+              class="absolute inset-0 w-full h-full object-cover transition-transform duration-[1500ms] ease-spring group-hover:scale-[1.04]"
+              style="object-position: right center;"
+            />
+            <!-- Left edge fade INTO text panel — kills burned-in title that lives on left of image -->
+            <div class="absolute inset-y-0 left-0 w-2/3 md:w-1/2 bg-gradient-to-r from-bg-elevated via-bg-elevated/85 to-transparent"></div>
+            <!-- Bottom subtle vignette -->
+            <div class="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-bg-deep/40 to-transparent"></div>
+            <!-- Atmospheric color wash -->
+            <div class="absolute inset-0 mix-blend-overlay opacity-30 pointer-events-none" style="background: radial-gradient(circle at 80% 50%, rgba(212,168,67,0.25) 0%, transparent 60%);"></div>
+          </div>
+        </div>
+
+        <!-- Hover rail (gold→cyan stripe across bottom) -->
+        <div class="absolute -bottom-px left-0 right-0 h-[2px] bg-gradient-to-r from-accent-gold via-accent-cyan to-transparent scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-1000 ease-spring rounded-full"></div>
+      </RouterLink>
+    </section>
+
+    <!-- The Index -->
+    <section class="container-custom mb-20 md:mb-28">
+
+      <!-- Section header -->
+      <div v-if="!isLoading && (feedPosts.length > 0 || featuredPost)" class="flex items-end justify-between mb-6 md:mb-10 pb-5 md:pb-6 border-b border-border-hairline">
+        <div>
+          <span class="mono-label text-fg-dim text-[10px] inline-flex tracking-[0.25em] mb-3">Section · 02</span>
+          <h3 class="font-display text-2xl md:text-3xl font-bold tracking-[-0.02em] text-fg-primary">
+            The <span class="italic font-medium text-accent-gold">index</span>
+          </h3>
+        </div>
+        <div class="text-right">
+          <div class="mono-label text-fg-dim text-[10px] tracking-[0.2em] mb-1">Filtered</div>
+          <div class="font-mono text-sm md:text-base text-fg-primary tabular-nums">
+            {{ String(filteredTotal).padStart(2, '0') }}
+            <span class="text-fg-dim text-xs">/ {{ String(totalCount).padStart(2, '0') }}</span>
+          </div>
+        </div>
+      </div>
 
       <!-- Loading skeleton -->
       <div v-if="isLoading" class="space-y-0">
-        <div class="flex gap-5 py-6 animate-pulse">
-          <div class="w-[180px] md:w-[280px] aspect-[4/3] flex-shrink-0 bg-white/3 rounded-xl"></div>
-          <div class="flex-1 space-y-3 py-2">
-            <div class="h-3 bg-white/3 rounded w-1/3"></div>
-            <div class="h-7 bg-white/3 rounded w-4/5"></div>
-            <div class="h-4 bg-white/3 rounded w-full"></div>
-          </div>
-        </div>
-        <div v-for="i in 5" :key="i" class="flex gap-4 md:gap-5 py-6 border-t border-border-hairline animate-pulse">
-          <div class="w-24 md:w-32 aspect-[4/3] flex-shrink-0 bg-white/3 rounded-lg"></div>
-          <div class="flex-1 space-y-2.5 py-1">
-            <div class="h-2.5 bg-white/3 rounded w-1/4"></div>
+        <div v-for="i in 8" :key="i" class="grid grid-cols-[40px_1fr_36px] md:grid-cols-[60px_1fr_100px_36px] items-center gap-4 md:gap-6 py-6 md:py-7 border-b border-border-hairline animate-pulse">
+          <div class="h-3 bg-white/3 rounded w-full"></div>
+          <div class="space-y-2.5 min-w-0">
             <div class="h-5 bg-white/3 rounded w-3/4"></div>
-            <div class="h-3 bg-white/3 rounded w-full"></div>
+            <div class="h-2.5 bg-white/3 rounded w-1/3"></div>
           </div>
+          <div class="hidden md:block h-3 bg-white/3 rounded w-full"></div>
+          <div class="w-7 h-7 rounded-full bg-white/3"></div>
         </div>
       </div>
 
@@ -101,158 +207,98 @@
         </div>
       </div>
 
-      <!-- Editorial feed -->
-      <div v-else class="space-y-0">
+      <!-- Editorial typography list -->
+      <div v-else class="essay-list">
+        <template v-for="(post, index) in feedPosts" :key="post.id || index">
 
-        <!-- Latest (compact horizontal feature, only on page 1) -->
-        <RouterLink
-          v-if="featuredPost"
-          :to="`/${lang}/blog/${featuredPost.slug}`"
-          class="group grid grid-cols-1 md:grid-cols-[minmax(0,1.1fr),minmax(0,1fr)] gap-5 md:gap-8 pb-8 md:pb-10 mb-2"
-          data-testid="blog-feature"
-        >
-          <div class="relative aspect-[16/10] md:aspect-[4/3] overflow-hidden rounded-xl bg-bg-elevated border border-border-hairline">
-            <img
-              v-if="featuredPost.featured_image"
-              :src="featuredPost.featured_image"
-              :alt="featuredPost.title"
-              loading="eager"
-              class="w-full h-full object-cover transition-transform duration-[900ms] ease-spring group-hover:scale-[1.03]"
-            />
-            <div v-else class="w-full h-full flex items-center justify-center">
-              <svg class="w-10 h-10 text-fg-dim" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-              </svg>
-            </div>
-            <span class="absolute top-3 left-3 mono-label text-[9px] tracking-[0.2em] text-accent-gold bg-bg-deep/85 backdrop-blur-sm px-2 py-1 rounded-full border border-accent-gold/25">
-              Latest
+          <RouterLink
+            :to="`/${lang}/blog/${post.slug}`"
+            class="essay-row group relative grid grid-cols-[40px_1fr_28px] md:grid-cols-[60px_1fr_110px_36px] items-center gap-4 md:gap-6 py-6 md:py-7 border-b border-border-hairline transition-[padding,background] duration-500 ease-spring hover:pl-3 md:hover:pl-4 hover:bg-white/[0.012]"
+            :style="{ '--row-delay': `${Math.min(index * 40, 320)}ms` }"
+            data-testid="blog-row"
+          >
+            <!-- Left rail accent (slides in on hover) -->
+            <span
+              class="absolute left-0 top-3 bottom-3 w-[2px] rounded-full bg-gradient-to-b from-accent-gold via-accent-gold to-accent-cyan scale-y-0 group-hover:scale-y-100 origin-center transition-transform duration-700 ease-spring"
+              aria-hidden="true"
+            ></span>
+
+            <!-- Number -->
+            <span class="font-mono text-xs md:text-sm text-fg-dim group-hover:text-accent-gold transition-colors duration-500 tabular-nums tracking-[0.05em] whitespace-nowrap">
+              <span class="opacity-60 mr-0.5">№</span>{{ String(getPostNumber(index)).padStart(2, '0') }}
             </span>
-          </div>
 
-          <div class="flex flex-col justify-center">
-            <div class="flex items-center gap-2 mono-label text-fg-dim text-[10px] mb-3">
-              <span v-if="featuredPost.category?.name" class="text-accent-cyan">{{ featuredPost.category.name }}</span>
-              <span v-if="featuredPost.category?.name" aria-hidden="true">·</span>
-              <time v-if="featuredPost.published_at" :datetime="featuredPost.published_at">
-                {{ formatDate(featuredPost.published_at) }}
-              </time>
-              <span aria-hidden="true">·</span>
-              <span>{{ readingTime(featuredPost.content || featuredPost.excerpt) }} min read</span>
+            <!-- Title + meta + excerpt -->
+            <div class="min-w-0">
+              <h4 class="font-display text-base md:text-xl font-semibold leading-[1.25] tracking-[-0.015em] text-fg-primary group-hover:text-accent-gold transition-colors duration-500 mb-1.5 line-clamp-2">
+                {{ post.title }}
+              </h4>
+              <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mono-label text-fg-dim text-[10px] tracking-[0.18em]">
+                <span v-if="post.category?.name" class="text-accent-cyan">{{ post.category.name }}</span>
+                <span v-if="post.category?.name" class="text-border-hover" aria-hidden="true">/</span>
+                <time v-if="post.published_at" :datetime="post.published_at">{{ formatDate(post.published_at) }}</time>
+              </div>
+              <p v-if="post.excerpt" class="hidden md:block text-fg-muted text-sm leading-relaxed font-light line-clamp-1 mt-2 max-w-[62ch]">
+                {{ post.excerpt }}
+              </p>
             </div>
 
-            <h2 class="font-display text-2xl md:text-3xl lg:text-[2rem] font-bold leading-[1.15] tracking-tight text-fg-primary mb-3 transition-colors duration-500">
-              <span class="bg-[linear-gradient(currentColor,currentColor)] bg-no-repeat bg-[length:0%_1px] bg-[position:0_98%] group-hover:bg-[length:100%_1px] transition-[background-size] duration-700 ease-spring text-fg-primary group-hover:text-accent-gold">
-                {{ featuredPost.title }}
-              </span>
-            </h2>
+            <!-- Reading time (desktop only) -->
+            <div class="hidden md:flex items-center justify-end mono-label text-fg-dim text-[10px] tracking-[0.2em] tabular-nums whitespace-nowrap">
+              <span class="text-fg-muted">{{ String(readingTime(post.content || post.excerpt)).padStart(2, '0') }}</span>
+              <span class="ml-1.5 text-border-hover">MIN</span>
+            </div>
 
-            <p v-if="featuredPost.excerpt" class="text-fg-muted text-sm md:text-base leading-relaxed font-light line-clamp-3 mb-5 max-w-[55ch]">
-              {{ featuredPost.excerpt }}
-            </p>
-
-            <span class="inline-flex items-center gap-2 text-accent-gold text-sm font-medium group-hover:gap-3 transition-all duration-500 ease-spring">
-              Read article
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+            <!-- Arrow -->
+            <span
+              class="w-7 h-7 md:w-8 md:h-8 rounded-full border border-border-hairline flex items-center justify-center text-fg-dim group-hover:text-bg-deep group-hover:bg-accent-gold group-hover:border-accent-gold transition-all duration-500 ease-spring group-hover:translate-x-0.5"
+              aria-hidden="true"
+            >
+              <svg class="w-3 h-3 md:w-3.5 md:h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
               </svg>
             </span>
+          </RouterLink>
+
+          <!-- Inline newsletter every N rows (chapter break) -->
+          <div
+            v-if="shouldInjectNewsletter(index)"
+            class="py-8 md:py-10 border-b border-border-hairline"
+            :data-newsletter-after="index"
+          >
+            <NewsletterInlineCard variant="list" />
           </div>
-        </RouterLink>
-
-        <!-- Editorial divide-y list -->
-        <div class="divide-y divide-border-hairline border-t border-border-hairline">
-          <template v-for="(post, index) in feedPosts" :key="post.id || index">
-
-            <RouterLink
-              :to="`/${lang}/blog/${post.slug}`"
-              class="group flex gap-4 md:gap-6 py-5 md:py-6 transition-colors duration-300"
-              data-testid="blog-row"
-            >
-              <!-- Thumbnail (small, controlled) -->
-              <div class="relative w-24 md:w-36 lg:w-44 aspect-[4/3] flex-shrink-0 overflow-hidden rounded-lg bg-bg-elevated border border-border-hairline">
-                <img
-                  v-if="post.featured_image"
-                  :src="post.featured_image"
-                  :alt="post.title"
-                  loading="lazy"
-                  class="w-full h-full object-cover transition-transform duration-700 ease-spring group-hover:scale-[1.06]"
-                />
-                <div v-else class="w-full h-full flex items-center justify-center">
-                  <svg class="w-6 h-6 text-fg-dim" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                  </svg>
-                </div>
-              </div>
-
-              <!-- Content -->
-              <div class="flex-1 min-w-0 flex flex-col justify-center">
-                <div class="flex items-center gap-2 mono-label text-fg-dim text-[10px] mb-1.5 md:mb-2">
-                  <span v-if="post.category?.name" class="text-accent-cyan">{{ post.category.name }}</span>
-                  <span v-if="post.category?.name" aria-hidden="true" class="text-border-hover">·</span>
-                  <time v-if="post.published_at" :datetime="post.published_at">{{ formatDate(post.published_at) }}</time>
-                  <span aria-hidden="true" class="text-border-hover">·</span>
-                  <span>{{ readingTime(post.content || post.excerpt) }} min</span>
-                </div>
-
-                <h3 class="font-display text-lg md:text-xl font-semibold leading-snug tracking-tight text-fg-primary mb-1.5 line-clamp-2 transition-colors duration-300 group-hover:text-accent-gold">
-                  {{ post.title }}
-                </h3>
-
-                <p v-if="post.excerpt" class="hidden md:block text-fg-muted text-sm leading-relaxed font-light line-clamp-2 max-w-[60ch]">
-                  {{ post.excerpt }}
-                </p>
-              </div>
-
-              <!-- Trailing arrow (desktop only) -->
-              <div class="hidden md:flex items-center pl-2">
-                <span class="w-8 h-8 rounded-full border border-border-hairline flex items-center justify-center text-fg-dim group-hover:text-accent-gold group-hover:border-accent-gold/40 group-hover:bg-accent-gold/[0.04] transition-all duration-500 ease-spring group-hover:translate-x-0.5">
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
-                  </svg>
-                </span>
-              </div>
-            </RouterLink>
-
-            <!-- Inline newsletter card every N rows -->
-            <div
-              v-if="shouldInjectNewsletter(index)"
-              class="py-6"
-              :data-newsletter-after="index"
-            >
-              <NewsletterInlineCard variant="list" />
-            </div>
-          </template>
-        </div>
+        </template>
       </div>
 
       <!-- Pagination -->
-      <div v-if="totalPages > 1 && !isLoading" class="flex items-center justify-center gap-1.5 mt-12 md:mt-14">
+      <div v-if="totalPages > 1 && !isLoading" class="grid grid-cols-3 items-center gap-4 mt-14 md:mt-20 pt-7 border-t border-border-hairline">
         <button
-          class="px-3.5 py-2 text-xs mono-label tracking-[0.18em] rounded-full border border-border-hairline text-fg-muted hover:text-fg-primary hover:border-border-hover transition-all duration-500 ease-spring active:scale-[0.97] disabled:opacity-30 disabled:cursor-not-allowed"
+          class="group inline-flex items-center gap-3 mono-label text-[10px] text-fg-muted hover:text-fg-primary transition-colors duration-500 tracking-[0.22em] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-fg-muted justify-self-start"
           :disabled="currentPage === 1"
           @click="goToPage(currentPage - 1)"
         >
-          Prev
+          <svg class="w-3 h-3 group-hover:-translate-x-1 group-disabled:translate-x-0 transition-transform duration-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+          </svg>
+          Earlier
         </button>
-        <div class="flex items-center gap-1 mx-1">
-          <button
-            v-for="page in displayedPages"
-            :key="page"
-            class="w-9 h-9 rounded-full text-sm font-medium transition-all duration-500 ease-spring active:scale-[0.95]"
-            :class="page === currentPage
-              ? 'bg-accent-gold/15 text-accent-gold border border-accent-gold/30 shadow-[inset_0_1px_0_rgba(212,168,67,0.25)]'
-              : 'bg-transparent text-fg-muted border border-border-hairline hover:border-border-hover hover:text-fg-primary'"
-            @click="goToPage(page)"
-          >
-            {{ page }}
-          </button>
+
+        <div class="font-mono text-xs md:text-sm text-fg-dim tabular-nums tracking-[0.18em] justify-self-center text-center">
+          <span class="text-accent-gold">{{ String(currentPage).padStart(2, '0') }}</span>
+          <span class="mx-1.5 text-border-hover">/</span>
+          <span>{{ String(totalPages).padStart(2, '0') }}</span>
         </div>
+
         <button
-          class="px-3.5 py-2 text-xs mono-label tracking-[0.18em] rounded-full border border-border-hairline text-fg-muted hover:text-fg-primary hover:border-border-hover transition-all duration-500 ease-spring active:scale-[0.97] disabled:opacity-30 disabled:cursor-not-allowed"
+          class="group inline-flex items-center gap-3 mono-label text-[10px] text-fg-muted hover:text-fg-primary transition-colors duration-500 tracking-[0.22em] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-fg-muted justify-self-end"
           :disabled="currentPage === totalPages"
           @click="goToPage(currentPage + 1)"
         >
-          Next
+          Recent
+          <svg class="w-3 h-3 group-hover:translate-x-1 group-disabled:translate-x-0 transition-transform duration-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+          </svg>
         </button>
       </div>
     </section>
@@ -351,7 +397,7 @@ const categories = ref([])
 const selectedCategory = ref(null)
 const searchQuery = ref('')
 const currentPage = ref(1)
-const perPage = 10
+const perPage = 12
 
 const newsletterEmail = ref('')
 const nlStatus = ref('idle')
@@ -425,6 +471,25 @@ watch(lang, async (newLang) => {
   await fetchPosts({}, newLang)
 })
 
+const totalCount = computed(() => (posts.value ? posts.value.length : 0))
+
+const lastDropLabel = computed(() => {
+  const list = posts.value || []
+  if (!list.length) return '—'
+  const latest = list.reduce((acc, p) => {
+    const t = p.published_at ? new Date(p.published_at).getTime() : 0
+    return t > acc ? t : acc
+  }, 0)
+  if (!latest) return '—'
+  const diff = Date.now() - latest
+  const days = Math.floor(diff / 86400000)
+  if (days <= 0) return 'today'
+  if (days === 1) return 'yesterday'
+  if (days < 7) return `${days}d ago`
+  if (days < 30) return `${Math.floor(days / 7)}w ago`
+  return `${Math.floor(days / 30)}mo ago`
+})
+
 const filteredPosts = computed(() => {
   let list = posts.value ? [...posts.value] : []
   if (selectedCategory.value !== null) {
@@ -448,18 +513,24 @@ const paginatedPosts = computed(() => {
   return filteredPosts.value.slice(start, start + perPage)
 })
 
-// Featured = first post on page 1 only; rest go to the editorial list.
-// On other pages every post is treated equally — no synthetic "Latest" repeat.
 const featuredPost = computed(() => {
   if (currentPage.value !== 1) return null
   return paginatedPosts.value[0] || null
 })
 
+const featuredNumber = computed(() => filteredTotal.value)
+
 const feedPosts = computed(() =>
   featuredPost.value ? paginatedPosts.value.slice(1) : paginatedPosts.value
 )
 
-// Inject inline newsletter every 6 rows (skip the very last row)
+// Number = position in filtered list, descending (newest = highest number)
+function getPostNumber(localFeedIndex) {
+  const featuredOffset = (currentPage.value === 1 && featuredPost.value) ? 1 : 0
+  const filteredIndex = (currentPage.value - 1) * perPage + featuredOffset + localFeedIndex
+  return Math.max(1, filteredTotal.value - filteredIndex)
+}
+
 const newsletterEvery = 6
 function shouldInjectNewsletter(index) {
   if (newsletterAlreadySubscribed.value) return false
@@ -467,16 +538,6 @@ function shouldInjectNewsletter(index) {
   if (index === feedPosts.value.length - 1) return false
   return (index + 1) % newsletterEvery === 0
 }
-
-const displayedPages = computed(() => {
-  const maxVisible = 5
-  let start = Math.max(1, currentPage.value - Math.floor(maxVisible / 2))
-  let end = Math.min(totalPages.value, start + maxVisible - 1)
-  if (end - start < maxVisible - 1) {
-    start = Math.max(1, end - maxVisible + 1)
-  }
-  return Array.from({ length: end - start + 1 }, (_, i) => start + i)
-})
 
 const goToPage = (page) => {
   currentPage.value = page
@@ -534,6 +595,22 @@ const subscribeNewsletter = async () => {
   display: none;
 }
 
+/* Staggered row reveal */
+.essay-list .essay-row {
+  animation: row-rise 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--row-delay, 0ms);
+}
+@keyframes row-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.3s ease, transform 0.3s ease;
@@ -551,8 +628,8 @@ const subscribeNewsletter = async () => {
     transition-duration: 0ms !important;
     animation-duration: 0ms !important;
   }
-  .group:hover img {
-    transform: none !important;
+  .essay-list .essay-row {
+    animation: none !important;
   }
 }
 </style>
