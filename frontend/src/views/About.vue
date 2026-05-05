@@ -468,6 +468,7 @@
 import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import CTASection from '@/components/CTASection.vue'
 import BaseGalleryModal from '@/components/base/BaseGalleryModal.vue'
+import api from '@/services/api'
 import { usePageSections } from '@/composables/usePageSections'
 import { useAboutSettings } from '@/composables/useAboutSettings'
 import { useSettings } from '@/composables/useSettings'
@@ -696,9 +697,41 @@ const stripPreviewThumbs = (exp) => {
   return out
 }
 
+// Cache full items per gallery id. Backend hydrate caps preview_items at 4
+// for the inline strip, so when a gallery has > 4 photos we fetch the full
+// list on demand from /api/galleries/{id}/items and patch the modal data.
+const fullItemsByGalleryId = new Map() // galleryId → Promise<items[]>
+
+const fetchFullGalleryItems = (galleryId) => {
+  if (fullItemsByGalleryId.has(galleryId)) {
+    return fullItemsByGalleryId.get(galleryId)
+  }
+  const promise = api.get(`/galleries/${galleryId}/items`)
+    .then(res => Array.isArray(res?.data?.data) ? res.data.data : [])
+    .catch(err => {
+      console.error(`[About] Failed to fetch items for gallery ${galleryId}`, err)
+      return []
+    })
+  fullItemsByGalleryId.set(galleryId, promise)
+  return promise
+}
+
+// Map a backend gallery_item shape to the modal's item shape.
+// Backend returns {id, title, file_url, file_path, image_variants, ...}
+// Modal reads item.file_url || item.image || item.file_path (in that order).
+const toModalItem = (item, galleryId) => ({
+  id: galleryId ? `${galleryId}-${item.id}` : item.id,
+  title: item.title,
+  file_url: item.file_url,
+  file_path: item.file_path,
+  image_variants: item.image_variants,
+})
+
 // Open the modal carrying the FULL galleries[] structure so the modal can
 // render its own per-award tab strip. Falls back to a single flat items[]
-// when only one gallery is linked (existing modal behavior).
+// when only one gallery is linked (existing modal behavior). For galleries
+// with more items than the preview cap, lazy-fetches the full list and
+// patches the modal data so all photos render once they arrive.
 const openExperienceGallery = (exp) => {
   const galleries = renderableGalleries(exp)
   if (!galleries.length) return
@@ -713,32 +746,64 @@ const openExperienceGallery = (exp) => {
       company: exp.company || '',
       period,
       galleries: [],
-      items: (g.preview_items || []).map(item => ({
+      items: (g.preview_items || []).map(item => toModalItem({
         id: item.id,
         title: item.title,
         file_path: item.thumbnail,
       })),
     }
-  } else {
-    galleryModalData.value = {
-      title: exp.title || exp.position || '',
-      description: exp.description || '',
-      company: exp.company || '',
-      period,
-      galleries: galleries.map(g => ({
-        id: g.id,
-        title: g.title,
-        items_count: g.items_count || 0,
-        items: (g.preview_items || []).map(item => ({
-          id: `${g.id}-${item.id}`,
-          title: item.title,
-          file_path: item.thumbnail,
-        })),
-      })),
-      items: [],
+    galleryModalOpen.value = true
+
+    // Patch with full items if preview was capped
+    if ((g.items_count || 0) > (g.preview_items?.length || 0)) {
+      fetchFullGalleryItems(g.id).then(fullItems => {
+        if (!galleryModalOpen.value) return
+        galleryModalData.value = {
+          ...galleryModalData.value,
+          items: fullItems.map(it => toModalItem(it)),
+        }
+      })
     }
+    return
+  }
+
+  // Multi-gallery path — build tab structure with previews first, then patch
+  galleryModalData.value = {
+    title: exp.title || exp.position || '',
+    description: exp.description || '',
+    company: exp.company || '',
+    period,
+    galleries: galleries.map(g => ({
+      id: g.id,
+      title: g.title,
+      items_count: g.items_count || 0,
+      items: (g.preview_items || []).map(item => toModalItem({
+        id: item.id,
+        title: item.title,
+        file_path: item.thumbnail,
+      }, g.id)),
+    })),
+    items: [],
   }
   galleryModalOpen.value = true
+
+  // Kick off parallel fetches for any gallery whose preview is incomplete
+  galleries.forEach(g => {
+    if ((g.items_count || 0) <= (g.preview_items?.length || 0)) return
+    fetchFullGalleryItems(g.id).then(fullItems => {
+      if (!galleryModalOpen.value) return
+      // Patch by id in the active modal data — preserves tab order + active tab
+      const next = { ...galleryModalData.value }
+      next.galleries = next.galleries.map(entry => {
+        if (entry.id !== g.id) return entry
+        return {
+          ...entry,
+          items: fullItems.map(it => toModalItem(it, g.id)),
+        }
+      })
+      galleryModalData.value = next
+    })
+  })
 }
 
 // ── Load settings on mount ─────────────────────────────
