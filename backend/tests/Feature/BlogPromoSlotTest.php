@@ -25,12 +25,12 @@ class BlogPromoSlotTest extends TestCase
         url()->forceRootUrl('http://localhost');
 
         $this->seed(BlogPromoSettingsSeeder::class);
-        Cache::forget('blog_promo_slot');
+        Cache::flush();
     }
 
     protected function tearDown(): void
     {
-        Cache::forget('blog_promo_slot');
+        Cache::flush();
         parent::tearDown();
     }
 
@@ -134,6 +134,66 @@ class BlogPromoSlotTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('data.type', 'cta')
             ->assertJsonStructure(['data' => ['type', 'title', 'description', 'link', 'cta_label']]);
+    }
+
+    /** @test */
+    public function rotates_featured_project_deterministically_by_slug(): void
+    {
+        // Three featured projects — without a slug rotation the controller
+        // would always pick whichever sorts first by completed_at desc, id desc.
+        $a = Project::create([
+            'title' => 'Project Alpha',
+            'slug' => 'alpha',
+            'description' => 'A',
+            'category' => 'web',
+            'featured' => true,
+            'published' => true,
+            'completed_at' => now()->subDays(1),
+        ]);
+        $b = Project::create([
+            'title' => 'Project Beta',
+            'slug' => 'beta',
+            'description' => 'B',
+            'category' => 'web',
+            'featured' => true,
+            'published' => true,
+            'completed_at' => now()->subDays(2),
+        ]);
+        $c = Project::create([
+            'title' => 'Project Gamma',
+            'slug' => 'gamma',
+            'description' => 'C',
+            'category' => 'web',
+            'featured' => true,
+            'published' => true,
+            'completed_at' => now()->subDays(3),
+        ]);
+
+        // Same slug → same project across multiple calls (cacheable, SEO-stable)
+        $first = $this->getJson('/api/blog/promo-slot?slug=post-one');
+        $first->assertOk()->assertJsonPath('data.type', 'project');
+        $firstTitle = $first->json('data.title');
+
+        Cache::flush();
+
+        $second = $this->getJson('/api/blog/promo-slot?slug=post-one');
+        $second->assertJsonPath('data.title', $firstTitle);
+
+        // Across many distinct slugs we should hit at least 2 different
+        // projects (3 featured projects + 20 distinct slugs → essentially
+        // guaranteed). Asserts the rotation actually rotates.
+        $titlesSeen = [];
+        for ($i = 0; $i < 20; $i++) {
+            Cache::flush();
+            $resp = $this->getJson('/api/blog/promo-slot?slug=post-' . $i);
+            $titlesSeen[$resp->json('data.title')] = true;
+        }
+
+        $this->assertGreaterThan(
+            1,
+            count($titlesSeen),
+            'Expected slug rotation to surface multiple featured projects, got: ' . implode(', ', array_keys($titlesSeen))
+        );
     }
 
     /** @test */

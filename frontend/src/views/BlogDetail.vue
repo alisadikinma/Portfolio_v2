@@ -566,7 +566,12 @@ onMounted(async () => {
 
 async function fetchPromoSlot() {
   try {
-    const res = await api.get('/blog/promo-slot')
+    // Pass the blog slug so the backend rotates featured projects per-post —
+    // each post stably surfaces a different case study instead of every post
+    // promoting the same one.
+    const slug = post.value?.slug || route.params.slug
+    const params = slug ? { slug } : {}
+    const res = await api.get('/blog/promo-slot', { params })
     promoSlot.value = res.data?.data || null
   } catch {
     promoSlot.value = null

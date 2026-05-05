@@ -14,9 +14,16 @@ use Illuminate\Support\Facades\Cache;
  * Resolves the mid-article promo slot shown by BlogDetail.vue between article
  * sections. Priority order:
  *   1. Project explicitly pinned via setting `blog.blog_promo_project_id`
- *   2. Latest `featured` project
+ *   2. Featured project — rotated deterministically by blog slug (so every
+ *      post shows a *different* but stable case study, instead of every post
+ *      promoting the same Mysatnusa card)
  *   3. Most recently received award
  *   4. Generic CTA (reads site settings for headline/link)
+ *
+ * Variation strategy: the optional `?slug=` query param identifies the host
+ * blog post. We hash that slug into the featured-project list so each post
+ * gets a stable pick (good for SEO + repeat readers), but readers moving
+ * across posts see variety.
  *
  * Response is a flat, renderer-friendly payload — the frontend card does not
  * need to know which tier fired.
@@ -25,14 +32,20 @@ class BlogPromoSlotController extends Controller
 {
     public function show(Request $request): JsonResponse
     {
-        $payload = Cache::remember('blog_promo_slot', 60, function () {
-            return $this->resolvePayload();
+        $slug = $this->normalizeSlug($request->query('slug'));
+
+        // Cache key per slug so different posts get different promos (still
+        // 60s TTL so an admin pinning a project sees the change quickly).
+        $cacheKey = 'blog_promo_slot:' . ($slug ?? 'default');
+
+        $payload = Cache::remember($cacheKey, 60, function () use ($slug) {
+            return $this->resolvePayload($slug);
         });
 
         return response()->json(['data' => $payload]);
     }
 
-    private function resolvePayload(): array
+    private function resolvePayload(?string $slug): array
     {
         $pinnedId = Setting::where('group', 'blog')
             ->where('key', 'blog_promo_project_id')
@@ -47,11 +60,7 @@ class BlogPromoSlotController extends Controller
             }
         }
 
-        $featured = Project::where('featured', true)
-            ->where('published', true)
-            ->orderByDesc('completed_at')
-            ->orderByDesc('id')
-            ->first();
+        $featured = $this->pickFeaturedProject($slug);
         if ($featured) {
             return $this->projectPayload($featured);
         }
@@ -64,6 +73,40 @@ class BlogPromoSlotController extends Controller
         }
 
         return $this->genericPayload();
+    }
+
+    /**
+     * Pick a featured project rotated by blog slug. With N featured projects
+     * and a stable hash, every post N steps apart cycles back — but for
+     * realistic catalogs (4-12 featured projects) every post effectively
+     * gets a different one.
+     *
+     * Falls back to the most recent featured project when slug is absent
+     * (e.g. caller hasn't been updated, listing pages, sitemap fetches).
+     */
+    private function pickFeaturedProject(?string $slug): ?Project
+    {
+        $featured = Project::where('featured', true)
+            ->where('published', true)
+            ->orderByDesc('completed_at')
+            ->orderByDesc('id')
+            ->get();
+
+        if ($featured->isEmpty()) return null;
+        if ($featured->count() === 1 || !$slug) return $featured->first();
+
+        // crc32 → unsigned int → modulo gives a stable index per slug.
+        $index = crc32($slug) % $featured->count();
+        return $featured[$index];
+    }
+
+    private function normalizeSlug(mixed $raw): ?string
+    {
+        if (!is_string($raw)) return null;
+        $clean = trim($raw);
+        if ($clean === '') return null;
+        // Cap length so a malicious caller can't blow up the cache namespace.
+        return mb_substr($clean, 0, 200);
     }
 
     private function projectPayload(Project $project): array
