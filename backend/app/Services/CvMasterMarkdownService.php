@@ -51,12 +51,131 @@ class CvMasterMarkdownService
             ->get();
 
         $skillDomains = $this->aggregateSkillDomains($projects);
+        $projectRows = $projects->map(fn ($p) => $this->buildProjectRow($p))->all();
 
         return View::make('cv.master', [
             'basics' => $basics,
             'compact' => $compact,
             'skill_domains' => $skillDomains,
+            'projects' => $projectRows,
         ])->render();
+    }
+
+    /**
+     * Compose a render-ready row for a single project.
+     *
+     * Reuses CvProjectResource for industry / tags / metrics / highlights
+     * / relevance_hint (single-source heuristic) but overrides the title
+     * + description with English-preferring translation lookup. The CV
+     * Master Markdown endpoint is English-only by design — Indonesian
+     * fallback is silent (no "[ID]" prefix).
+     *
+     * Year range: prefers explicit start_date/end_date columns, falls
+     * back to completed_at year when only that column is populated.
+     *
+     * @return array{
+     *   title:string,
+     *   role:?string,
+     *   year_range:?string,
+     *   industry:?string,
+     *   tech_stack:?string,
+     *   problem:?string,
+     *   outcome:?string,
+     *   relevance:?string
+     * }
+     */
+    protected function buildProjectRow(Project $project): array
+    {
+        $request = Request::create('/api/cv/master.md', 'GET');
+        $resource = (new CvProjectResource($project))->toArray($request);
+
+        // English-preferring translation override (resource picks Indonesian).
+        $translations = $project->relationLoaded('translations')
+            ? $project->translations
+            : $project->translations()->get();
+
+        $en = $translations->firstWhere('language', 'en');
+        $primary = $translations->first();
+        $title = $en?->title ?? $primary?->title ?? $resource['name'] ?? $project->title;
+        $description = $en?->description ?? $primary?->description ?? $resource['description'] ?? $project->description;
+
+        // Year range — prefer start/end, fallback to completed_at year.
+        $start = $this->yearFromDate($project->start_date);
+        $end = $this->yearFromDate($project->end_date) ?? $this->yearFromDate($project->completed_at);
+        $yearRange = $this->formatYearRange($start, $end);
+
+        // Tech stack — comma-joined, capped to keep token budget tight.
+        $techStack = collect($resource['tags'] ?? [])
+            ->take(8)
+            ->implode(', ');
+
+        return [
+            'title' => $this->normalizeMarkdownText((string) $title),
+            'role' => $project->role ? (string) $project->role : null,
+            'year_range' => $yearRange,
+            'industry' => $resource['industry'] ?? null,
+            'tech_stack' => $techStack !== '' ? $techStack : null,
+            'problem' => $this->summarize($description ?? '', 80),
+            'outcome' => $this->summarize($project->result ?? $project->impact_statement ?? '', 60),
+            'relevance' => collect($resource['relevance_hint'] ?? [])->implode(', ') ?: null,
+        ];
+    }
+
+    /**
+     * Extract a 4-digit year from a value that may be a Carbon, ISO
+     * string, year-only string, or null.
+     */
+    protected function yearFromDate($value): ?int
+    {
+        if (!$value) {
+            return null;
+        }
+        if ($value instanceof \DateTimeInterface) {
+            return (int) $value->format('Y');
+        }
+        if (is_string($value)) {
+            if (preg_match('/^(\d{4})/', $value, $m)) {
+                return (int) $m[1];
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Format a year-range pair as "2022–2024" / "2022" / "2022–present".
+     * Returns null when both ends are missing.
+     */
+    protected function formatYearRange(?int $start, ?int $end): ?string
+    {
+        if ($start === null && $end === null) {
+            return null;
+        }
+        if ($start !== null && $end !== null && $start !== $end) {
+            return $start . '–' . $end;
+        }
+        if ($start !== null && $end === null) {
+            return $start . '–present';
+        }
+        return (string) ($start ?? $end);
+    }
+
+    /**
+     * Strip HTML, decode entities, then truncate to ~N words while
+     * preserving word boundaries. Returns null when input is empty.
+     */
+    protected function summarize(string $raw, int $words): ?string
+    {
+        $clean = $this->normalizeMarkdownText($raw);
+        if ($clean === '') {
+            return null;
+        }
+        // Single-line summary: collapse all whitespace to one space.
+        $clean = preg_replace('/\s+/', ' ', $clean);
+        $tokens = preg_split('/\s+/', $clean) ?: [];
+        if (count($tokens) <= $words) {
+            return $clean;
+        }
+        return rtrim(implode(' ', array_slice($tokens, 0, $words)), ".,;: ") . '…';
     }
 
     /**

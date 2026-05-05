@@ -35,3 +35,35 @@
 @endforeach
 
 @endforeach
+## Selected Projects ({{ count($projects) }})
+
+@foreach($projects as $i => $p)
+@php
+    $titleLine = ($i + 1) . '. ' . $p['title'];
+    if (!empty($p['role'])) {
+        $titleLine .= ' — ' . $p['role'];
+    }
+    if (!empty($p['year_range'])) {
+        $titleLine .= ' (' . $p['year_range'] . ')';
+    }
+
+    $metaLine = collect([
+        !empty($p['industry']) ? 'Industry: ' . $p['industry'] : null,
+        !empty($p['tech_stack']) ? 'Stack: ' . $p['tech_stack'] : null,
+    ])->filter()->implode(' · ');
+@endphp
+### {!! $titleLine !!}
+@if($metaLine !== '')
+{!! $metaLine !!}
+@endif
+@if(!$compact && !empty($p['problem']))
+Problem: {!! $p['problem'] !!}
+@endif
+@if(!$compact && !empty($p['outcome']))
+Outcome: {!! $p['outcome'] !!}
+@endif
+@if(!empty($p['relevance']))
+Relevance: {{ $p['relevance'] }}
+@endif
+
+@endforeach

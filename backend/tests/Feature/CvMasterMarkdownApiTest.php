@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Project;
+use App\Models\ProjectTranslation;
 use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -137,6 +138,94 @@ class CvMasterMarkdownApiTest extends TestCase
         // Bullets present under each domain
         $this->assertStringContainsString('LLM orchestration, RAG pipelines', $body);
         $this->assertStringContainsString('PLC programming', $body);
+    }
+
+    /** @test */
+    public function renders_all_projects_in_sort_order_with_en_translation(): void
+    {
+        Project::create([
+            'title' => 'Z Project',
+            'slug' => 'z-project',
+            'description' => 'Z desc',
+            'category' => 'web',
+            'role' => 'Engineer',
+            'published' => true,
+            'sort_order' => 30,
+        ]);
+        $a = Project::create([
+            'title' => 'A Project (raw)',
+            'slug' => 'a-project',
+            'description' => 'A desc',
+            'category' => 'web',
+            'role' => 'Tech Lead',
+            'published' => true,
+            'sort_order' => 10,
+        ]);
+        ProjectTranslation::create([
+            'project_id' => $a->id,
+            'language' => 'en',
+            'title' => 'A Project EN',
+            'slug' => 'a-project',
+            'description' => 'English description for A.',
+        ]);
+        Project::create([
+            'title' => 'M Project',
+            'slug' => 'm-project',
+            'description' => 'M desc',
+            'category' => 'web',
+            'published' => true,
+            'sort_order' => 20,
+        ]);
+
+        $user = User::factory()->create();
+        Sanctum::actingAs($user, ['cv:read']);
+
+        $body = $this->get('/api/cv/master.md')->assertOk()->getContent();
+
+        $this->assertStringContainsString('## Selected Projects (3)', $body);
+        // EN translation wins for project A
+        $this->assertStringContainsString('A Project EN', $body);
+        $this->assertStringNotContainsString('A Project (raw)', $body);
+        // Sort order honored: A (10), M (20), Z (30)
+        $posA = strpos($body, 'A Project EN');
+        $posM = strpos($body, 'M Project');
+        $posZ = strpos($body, 'Z Project');
+        $this->assertNotFalse($posA);
+        $this->assertNotFalse($posM);
+        $this->assertNotFalse($posZ);
+        $this->assertLessThan($posM, $posA);
+        $this->assertLessThan($posZ, $posM);
+        // Role surfaces for A
+        $this->assertStringContainsString('Tech Lead', $body);
+    }
+
+    /** @test */
+    public function falls_back_to_primary_translation_when_en_missing(): void
+    {
+        $p = Project::create([
+            'title' => 'Direct Title',
+            'slug' => 'only-id',
+            'description' => 'Direct desc',
+            'category' => 'web',
+            'published' => true,
+            'sort_order' => 10,
+        ]);
+        ProjectTranslation::create([
+            'project_id' => $p->id,
+            'language' => 'id',
+            'title' => 'Judul Indonesia',
+            'slug' => 'only-id',
+            'description' => 'Deskripsi Indonesia.',
+        ]);
+
+        $user = User::factory()->create();
+        Sanctum::actingAs($user, ['cv:read']);
+
+        $body = $this->get('/api/cv/master.md')->assertOk()->getContent();
+
+        // Indonesian fallback rendered when EN missing — no "[ID]" prefix tag
+        $this->assertStringContainsString('Judul Indonesia', $body);
+        $this->assertStringNotContainsString('[ID]', $body);
     }
 
     /** @test */
