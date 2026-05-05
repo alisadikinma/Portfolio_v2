@@ -20,6 +20,7 @@ class Testimonial extends Model
         'sort_order',
         'source',
         'source_url',
+        'linkedin_url',
     ];
 
     protected $casts = [

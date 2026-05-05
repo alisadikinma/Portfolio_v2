@@ -30,6 +30,7 @@ class UpdateTestimonialRequest extends FormRequest
             'star_rating' => ['required', 'integer', 'min:1', 'max:5'],
             'is_active' => ['nullable', 'boolean'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
+            'linkedin_url' => ['nullable', 'url', 'max:500'],
         ];
     }
 

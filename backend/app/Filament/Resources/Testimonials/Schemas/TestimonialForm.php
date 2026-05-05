@@ -37,6 +37,13 @@ class TestimonialForm
                     ->maxSize(2048)
                     ->directory('testimonials')
                     ->default(null),
+                TextInput::make('linkedin_url')
+                    ->label('LinkedIn Profile URL')
+                    ->helperText('Personal LinkedIn URL of the testimonial author. Card on homepage will link here.')
+                    ->url()
+                    ->placeholder('https://www.linkedin.com/in/username/')
+                    ->maxLength(500)
+                    ->default(null),
                 Select::make('star_rating')
                     ->required()
                     ->options([

@@ -31,6 +31,7 @@ class TestimonialResource extends JsonResource
             'sort_order' => $this->sort_order,
             'source' => $this->source ?? 'direct',
             'source_url' => $this->source_url,
+            'linkedin_url' => $this->linkedin_url,
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];
