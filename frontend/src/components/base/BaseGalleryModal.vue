@@ -39,6 +39,34 @@
             </p>
           </div>
 
+          <!-- Tab strip — shown only when galleries[] carries 2+ award groups -->
+          <div
+            v-if="hasGalleryTabs"
+            class="shrink-0 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/50 overflow-x-auto custom-scrollbar"
+            role="tablist"
+            :aria-label="`${galleries.length} awards in this experience`"
+          >
+            <div class="flex items-stretch px-2 min-w-max">
+              <button
+                v-for="(g, idx) in galleries"
+                :key="g.id"
+                type="button"
+                role="tab"
+                :aria-selected="activeTab === idx"
+                :tabindex="activeTab === idx ? 0 : -1"
+                @click="activeTab = idx"
+                @keydown="handleTabKey($event, idx)"
+                class="px-4 py-3 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-inset"
+                :class="activeTab === idx
+                  ? 'border-primary-600 text-primary-700 dark:text-primary-300'
+                  : 'border-transparent text-neutral-500 dark:text-neutral-400 hover:text-primary-700 dark:hover:text-primary-300'"
+              >
+                {{ g.title }}
+                <span class="ml-1.5 text-xs opacity-70">· {{ g.items_count }}</span>
+              </button>
+            </div>
+          </div>
+
           <!-- Modal Body - FIXED: flex-1 + overflow for proper scrolling -->
           <div class="flex-1 p-8 overflow-y-auto custom-scrollbar">
             <!-- Loading State -->
@@ -50,9 +78,9 @@
             </div>
 
             <!-- Gallery Grid -->
-            <div v-else-if="items.length > 0" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div v-else-if="displayItems.length > 0" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               <div
-                v-for="(item, index) in items"
+                v-for="(item, index) in displayItems"
                 :key="item.id || index"
                 class="relative group cursor-pointer aspect-square rounded-2xl overflow-hidden bg-neutral-100 dark:bg-neutral-800"
                 :style="{ animationDelay: `${index * 30}ms` }"
@@ -97,6 +125,8 @@
 </template>
 
 <script setup>
+import { computed, ref, watch } from 'vue'
+
 const props = defineProps({
   show: {
     type: Boolean,
@@ -122,6 +152,13 @@ const props = defineProps({
     type: Array,
     default: () => []
   },
+  // Optional per-award tab structure. When length >= 2, the modal renders
+  // a tab strip and switches body content per active tab. Each entry shape:
+  // { id, title, items_count, items: [{id, title, file_path|file_url|image}] }
+  galleries: {
+    type: Array,
+    default: () => []
+  },
   loading: {
     type: Boolean,
     default: false
@@ -133,6 +170,48 @@ const props = defineProps({
 })
 
 defineEmits(['close', 'open-lightbox'])
+
+// Tab state (only relevant when galleries[] has 2+ entries)
+const activeTab = ref(0)
+const hasGalleryTabs = computed(() => Array.isArray(props.galleries) && props.galleries.length >= 2)
+
+// Reset to first tab whenever the modal opens (and any time galleries change shape)
+watch(() => props.show, (open) => {
+  if (open) activeTab.value = 0
+})
+watch(() => props.galleries, () => {
+  activeTab.value = 0
+})
+
+// Active dataset: tab content when in multi-gallery mode, else the flat items[]
+const displayItems = computed(() => {
+  if (hasGalleryTabs.value) {
+    const g = props.galleries[activeTab.value]
+    return Array.isArray(g?.items) ? g.items : []
+  }
+  return props.items
+})
+
+// Keyboard navigation: ←/→ cycles tabs with wraparound, Home/End jump to ends
+const handleTabKey = (event, idx) => {
+  const total = props.galleries.length
+  if (!total) return
+  let next = null
+  switch (event.key) {
+    case 'ArrowLeft':
+      next = (idx - 1 + total) % total; break
+    case 'ArrowRight':
+      next = (idx + 1) % total; break
+    case 'Home':
+      next = 0; break
+    case 'End':
+      next = total - 1; break
+    default:
+      return
+  }
+  event.preventDefault()
+  activeTab.value = next
+}
 
 // Strip HTML tags
 const stripHtml = (html) => {
