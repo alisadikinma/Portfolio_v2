@@ -60,29 +60,27 @@
                         $featuredImage = $post->featured_image;
                     @endphp
                     <tr>
-                        <td style="padding:8px 32px 8px 32px;">
+                        <td style="padding:5px 32px 5px 32px;">
                             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#0E0E11;border-radius:10px;border:1px solid rgba(255,255,255,0.04);">
-                                @if($featuredImage)
-                                    <tr>
-                                        <td style="padding:0;">
+                                <tr>
+                                    @if($featuredImage)
+                                        <td width="140" valign="top" style="padding:0;width:140px;">
                                             <a href="{{ $url }}" target="_blank" rel="noopener noreferrer" style="display:block;text-decoration:none;">
-                                                <img src="{{ $featuredImage }}" alt="{{ $title }}" width="536" style="display:block;width:100%;max-width:536px;height:auto;border-radius:10px 10px 0 0;border:0;outline:none;text-decoration:none;">
+                                                <img src="{{ $featuredImage }}" alt="{{ $title }}" width="140" height="140" style="display:block;width:140px;height:140px;object-fit:cover;border-radius:10px 0 0 10px;border:0;outline:none;text-decoration:none;">
                                             </a>
                                         </td>
-                                    </tr>
-                                @endif
-                                <tr>
-                                    <td style="padding:20px 24px 22px 24px;">
-                                        <p style="margin:0 0 8px 0;font-family:'SF Mono','JetBrains Mono',Consolas,Monaco,monospace;font-size:10px;font-weight:600;color:#D4A843;letter-spacing:0.16em;text-transform:uppercase;">
+                                    @endif
+                                    <td valign="top" style="padding:14px 18px 14px 18px;">
+                                        <p style="margin:0 0 6px 0;font-family:'SF Mono','JetBrains Mono',Consolas,Monaco,monospace;font-size:9px;font-weight:600;color:#D4A843;letter-spacing:0.16em;text-transform:uppercase;">
                                             {{ $category }}
                                         </p>
-                                        <h2 style="margin:0 0 10px 0;font-size:22px;line-height:1.3;color:#EDEDEF;font-weight:700;letter-spacing:-0.01em;">
+                                        <h2 style="margin:0 0 6px 0;font-size:16px;line-height:1.3;color:#EDEDEF;font-weight:700;letter-spacing:-0.01em;">
                                             <a href="{{ $url }}" target="_blank" rel="noopener noreferrer" style="color:#EDEDEF;text-decoration:none;">{{ $title }}</a>
                                         </h2>
-                                        <p style="margin:0 0 18px 0;font-size:14px;line-height:1.6;color:#8A8F98;">
-                                            {{ \Illuminate\Support\Str::limit(strip_tags($excerpt), 180) }}
+                                        <p style="margin:0 0 10px 0;font-size:12px;line-height:1.5;color:#8A8F98;">
+                                            {{ \Illuminate\Support\Str::limit(strip_tags($excerpt), 120) }}
                                         </p>
-                                        <a href="{{ $url }}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:10px 18px;background-color:#D4A843;color:#050506;font-size:13px;font-weight:700;text-decoration:none;border-radius:999px;letter-spacing:0.01em;">
+                                        <a href="{{ $url }}" target="_blank" rel="noopener noreferrer" style="display:inline-block;font-size:12px;font-weight:700;color:#D4A843;text-decoration:none;letter-spacing:0.01em;">
                                             Read this essay &rarr;
                                         </a>
                                     </td>
@@ -111,39 +109,37 @@
                                 : (empty($fpRawImage) ? null : 'https://alisadikinma.com/storage/' . ltrim($fpRawImage, '/'));
                             $fpUrl = "https://alisadikinma.com/projects/{$fp->slug}?utm_source=newsletter&utm_medium=email&utm_campaign={$campaign}";
                             $fpExcerpt = $fp->impact_statement
-                                ?? \Illuminate\Support\Str::limit(strip_tags($fp->description ?? ''), 160);
+                                ?? \Illuminate\Support\Str::limit(strip_tags($fp->description ?? ''), 110);
                             $fpIndex = $loop->iteration;
                             $fpTotal = $loop->count;
                         @endphp
                         <tr>
-                            <td style="padding:6px 32px 6px 32px;">
+                            <td style="padding:5px 32px 5px 32px;">
                                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#0E0E11;border-radius:10px;border:1px solid rgba(6,182,212,0.18);">
-                                    @if($fpImageUrl)
-                                        <tr>
-                                            <td style="padding:0;">
+                                    <tr>
+                                        @if($fpImageUrl)
+                                            <td width="140" valign="top" style="padding:0;width:140px;">
                                                 <a href="{{ $fpUrl }}" target="_blank" rel="noopener noreferrer" style="display:block;text-decoration:none;">
-                                                    <img src="{{ $fpImageUrl }}" alt="{{ $fp->title }}" width="536" style="display:block;width:100%;max-width:536px;height:auto;border-radius:10px 10px 0 0;border:0;outline:none;text-decoration:none;">
+                                                    <img src="{{ $fpImageUrl }}" alt="{{ $fp->title }}" width="140" height="140" style="display:block;width:140px;height:140px;object-fit:cover;border-radius:10px 0 0 10px;border:0;outline:none;text-decoration:none;">
                                                 </a>
                                             </td>
-                                        </tr>
-                                    @endif
-                                    <tr>
-                                        <td style="padding:18px 24px 20px 24px;">
-                                            <p style="margin:0 0 8px 0;font-family:'SF Mono','JetBrains Mono',Consolas,Monaco,monospace;font-size:10px;font-weight:600;color:#06B6D4;letter-spacing:0.16em;text-transform:uppercase;">
+                                        @endif
+                                        <td valign="top" style="padding:14px 18px 14px 18px;">
+                                            <p style="margin:0 0 6px 0;font-family:'SF Mono','JetBrains Mono',Consolas,Monaco,monospace;font-size:9px;font-weight:600;color:#06B6D4;letter-spacing:0.16em;text-transform:uppercase;">
                                                 {{ str_pad((string) $fpIndex, 2, '0', STR_PAD_LEFT) }} / {{ str_pad((string) $fpTotal, 2, '0', STR_PAD_LEFT) }}
                                                 @if(!empty($fp->category))
                                                     &nbsp;&middot;&nbsp; {{ $fp->category }}
                                                 @endif
                                             </p>
-                                            <h2 style="margin:0 0 10px 0;font-size:20px;line-height:1.3;color:#EDEDEF;font-weight:700;letter-spacing:-0.01em;">
+                                            <h3 style="margin:0 0 6px 0;font-size:15px;line-height:1.3;color:#EDEDEF;font-weight:700;letter-spacing:-0.01em;">
                                                 <a href="{{ $fpUrl }}" target="_blank" rel="noopener noreferrer" style="color:#EDEDEF;text-decoration:none;">{{ $fp->title }}</a>
-                                            </h2>
+                                            </h3>
                                             @if($fpExcerpt)
-                                                <p style="margin:0 0 16px 0;font-size:14px;line-height:1.6;color:#8A8F98;">
-                                                    {{ \Illuminate\Support\Str::limit($fpExcerpt, 160) }}
+                                                <p style="margin:0 0 10px 0;font-size:12px;line-height:1.5;color:#8A8F98;">
+                                                    {{ \Illuminate\Support\Str::limit($fpExcerpt, 110) }}
                                                 </p>
                                             @endif
-                                            <a href="{{ $fpUrl }}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:9px 16px;background-color:transparent;color:#06B6D4;font-size:13px;font-weight:700;text-decoration:none;border:1px solid #06B6D4;border-radius:999px;letter-spacing:0.01em;">
+                                            <a href="{{ $fpUrl }}" target="_blank" rel="noopener noreferrer" style="display:inline-block;font-size:12px;font-weight:700;color:#06B6D4;text-decoration:none;letter-spacing:0.01em;">
                                                 View case study &rarr;
                                             </a>
                                         </td>
