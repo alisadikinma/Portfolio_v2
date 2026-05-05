@@ -59,11 +59,14 @@ class SendWeeklyNewsletter extends Command
         }
 
         if ($this->option('dry-run')) {
-            $fakeSub = Newsletter::factory()->make([
-                'unsubscribe_token' => str_repeat('x', 32),
+            // Don't depend on factory — production composer install --no-dev
+            // sometimes drops dev autoload paths. Hand-build a throwaway model.
+            $fakeSub = new Newsletter([
                 'name' => 'Preview Recipient',
                 'email' => 'preview@example.com',
+                'whatsapp_number' => '+628000000000',
             ]);
+            $fakeSub->unsubscribe_token = str_repeat('x', 32);
 
             $rendered = (new WeeklyDigest($posts, $fakeSub))->render();
             $this->info('--- DRY RUN: rendered HTML preview below ---');

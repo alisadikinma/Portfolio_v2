@@ -103,30 +103,48 @@ class NewsletterAdminController extends Controller
 
     public function preview(): JsonResponse
     {
-        $posts = Post::published()
-            ->whereBetween('published_at', [now()->subWeek(), now()])
-            ->with(['category', 'translations'])
-            ->orderByDesc('published_at')
-            ->limit(5)
-            ->get();
+        try {
+            $posts = Post::published()
+                ->whereBetween('published_at', [now()->subWeek(), now()])
+                ->with(['category', 'translations'])
+                ->orderByDesc('published_at')
+                ->limit(5)
+                ->get();
 
-        $fakeSubscriber = Newsletter::factory()->make([
-            'unsubscribe_token' => str_repeat('x', 32),
-            'name' => 'Preview Recipient',
-            'email' => 'preview@example.com',
-        ]);
+            // Don't depend on factory — production might run without
+            // database/factories autoloaded. Hand-build the throwaway model
+            // so render() always works.
+            $fakeSubscriber = new Newsletter([
+                'name' => 'Preview Recipient',
+                'email' => 'preview@example.com',
+                'whatsapp_number' => '+628000000000',
+            ]);
+            $fakeSubscriber->unsubscribe_token = str_repeat('x', 32);
 
-        $html = (new WeeklyDigest($posts, $fakeSubscriber))->render();
+            $html = (new WeeklyDigest($posts, $fakeSubscriber))->render();
 
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'html' => $html,
-                'posts_count' => $posts->count(),
-                'subscriber_count' => Newsletter::count(),
-                'campaign' => 'weekly-' . now()->format('Y-W'),
-            ],
-        ]);
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'html' => $html,
+                    'posts_count' => $posts->count(),
+                    'subscriber_count' => Newsletter::count(),
+                    'campaign' => 'weekly-' . now()->format('Y-W'),
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Newsletter preview render failed', [
+                'error' => $e->getMessage(),
+                'trace_first' => $e->getTraceAsString(),
+            ]);
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'PREVIEW_FAILED',
+                    'message' => $e->getMessage(),
+                ],
+            ], 500);
+        }
     }
 
     public function sendTest(Request $request): JsonResponse
@@ -157,11 +175,12 @@ class NewsletterAdminController extends Controller
             ->limit(5)
             ->get();
 
-        $fakeSubscriber = Newsletter::factory()->make([
-            'unsubscribe_token' => str_repeat('x', 32),
+        $fakeSubscriber = new Newsletter([
             'name' => 'Test Recipient',
             'email' => $recipient,
+            'whatsapp_number' => '+628000000000',
         ]);
+        $fakeSubscriber->unsubscribe_token = str_repeat('x', 32);
 
         $startedAt = now();
 

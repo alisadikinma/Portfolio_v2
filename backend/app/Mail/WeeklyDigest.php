@@ -25,14 +25,23 @@ class WeeklyDigest extends Mailable implements ShouldQueue
     ) {
         // One featured project per digest — picks the most recently sorted
         // published+featured project. Skipped silently in template if null
-        // (fresh DBs / no featured projects).
-        $this->featuredProject = Project::query()
-            ->where('featured', true)
-            ->where('published', true)
-            ->where('is_active', true)
-            ->orderByDesc('sort_order')
-            ->orderByDesc('id')
-            ->first();
+        // (fresh DBs / no featured projects). Try/catch swallows schema
+        // mismatch errors (e.g. missing `featured` or `is_active` column on
+        // older deployments) — never blocks the digest from rendering.
+        try {
+            $this->featuredProject = Project::query()
+                ->where('featured', true)
+                ->where('published', true)
+                ->where('is_active', true)
+                ->orderByDesc('sort_order')
+                ->orderByDesc('id')
+                ->first();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('WeeklyDigest featured project lookup failed', [
+                'error' => $e->getMessage(),
+            ]);
+            $this->featuredProject = null;
+        }
     }
 
     public function envelope(): Envelope
