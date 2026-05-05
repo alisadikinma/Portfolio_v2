@@ -80,11 +80,13 @@
               <!-- Image Section -->
               <div class="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-primary-50 to-secondary-50 dark:from-gray-900 dark:to-gray-800">
                 <div class="absolute inset-0 bg-gradient-to-br from-primary-500/10 to-secondary-500/10 group-hover:opacity-0 transition-opacity duration-500"></div>
-                <img
+                <BaseImage
                   v-if="project.image"
                   :src="project.image"
+                  :variants="project.image_variants"
                   :alt="project.title"
-                  class="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700 ease-out"
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                  class="w-full h-full transform group-hover:scale-110 transition-transform duration-700 ease-out"
                 />
                 <!-- Gradient Overlay -->
                 <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-60 group-hover:opacity-90 transition-opacity duration-300"></div>
@@ -242,7 +244,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useProjects } from '@/composables/useProjects'
 import { usePageSections } from '@/composables/usePageSections'
 import { useAboutSettings } from '@/composables/useAboutSettings'
-import { BaseButton, BaseLoader } from '@/components/base'
+import { BaseButton, BaseLoader, BaseImage } from '@/components/base'
 import CTASection from '@/components/CTASection.vue'
 import { useRouter } from 'vue-router'
 

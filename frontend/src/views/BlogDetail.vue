@@ -111,10 +111,14 @@
       <figure v-if="post.featured_image" class="container-custom mb-12">
         <div class="max-w-4xl mx-auto">
           <div class="rounded-2xl overflow-hidden aspect-video bg-bg-elevated">
-            <img
+            <BaseImage
               :src="post.featured_image"
+              :variants="post.image_variants"
               :alt="post.title"
-              class="w-full h-full object-cover"
+              sizes="(max-width: 1024px) 100vw, 1024px"
+              :eager="true"
+              fetchpriority="high"
+              class="w-full h-full"
             />
           </div>
           <figcaption v-if="post.title" class="mt-3 text-center text-sm text-fg-dim mono-label">
@@ -249,12 +253,13 @@
               class="group relative rounded-xl overflow-hidden bg-bg-elevated/50 border border-white/5 hover:border-accent-gold/20 transition-all duration-300"
             >
               <div class="aspect-[16/10] bg-bg-elevated overflow-hidden">
-                <img
+                <BaseImage
                   v-if="related.featured_image"
                   :src="related.featured_image"
+                  :variants="related.image_variants"
                   :alt="related.title"
-                  class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  loading="lazy"
+                  sizes="(max-width: 768px) 100vw, 33vw"
+                  class="w-full h-full transition-transform duration-500 group-hover:scale-105"
                 />
                 <div v-else class="w-full h-full flex items-center justify-center">
                   <svg class="w-8 h-8 text-fg-dim" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -307,6 +312,7 @@ import { useNewsletter } from '@/composables/useNewsletter'
 import { useToast } from '@/composables/useToast'
 import { useAboutSettings } from '@/composables/useAboutSettings'
 import { stripFaqSection } from '@/utils/stripFaqSection'
+import BaseImage from '@/components/base/BaseImage.vue'
 import { extractFaqFromHtml } from '@/utils/extractFaqFromHtml'
 import FaqAccordion from '@/components/blog/FaqAccordion.vue'
 import NewsletterFloatingBanner from '@/components/blog/NewsletterFloatingBanner.vue'

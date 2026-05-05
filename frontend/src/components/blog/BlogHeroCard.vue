@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
+import BaseImage from '@/components/base/BaseImage.vue'
 
 const props = defineProps({
   post: { type: Object, required: true },
@@ -27,11 +28,15 @@ const minutesLabel = computed(() => `${readingTime(props.post.content || props.p
     class="relative block group rounded-3xl overflow-hidden bg-bg-elevated aspect-[4/5] md:aspect-[21/9]"
     data-testid="blog-hero-card"
   >
-    <img
+    <BaseImage
       v-if="post.featured_image"
       :src="post.featured_image"
+      :variants="post.image_variants"
       :alt="post.title"
-      class="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-spring group-hover:scale-105"
+      sizes="(max-width: 768px) 100vw, 80vw"
+      :eager="true"
+      fetchpriority="high"
+      class="absolute inset-0 w-full h-full transition-transform duration-700 ease-spring group-hover:scale-105"
     />
     <div
       v-else

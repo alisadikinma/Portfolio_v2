@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
+import BaseImage from '@/components/base/BaseImage.vue'
 
 const props = defineProps({
   post: { type: Object, required: true },
@@ -31,12 +32,13 @@ const minutesLabel = computed(() => `${readingTime(props.post.content || props.p
       <div class="grid md:grid-cols-2 gap-0">
         <!-- Image side -->
         <div class="relative aspect-video md:aspect-[4/3] overflow-hidden bg-bg-elevated">
-          <img
+          <BaseImage
             v-if="post.featured_image"
             :src="post.featured_image"
+            :variants="post.image_variants"
             :alt="post.title"
-            loading="lazy"
-            class="w-full h-full object-cover transition-transform duration-700 ease-spring group-hover:scale-105"
+            sizes="(max-width: 768px) 100vw, 50vw"
+            class="w-full h-full transition-transform duration-700 ease-spring group-hover:scale-105"
           />
           <div v-else class="w-full h-full flex items-center justify-center">
             <svg class="w-14 h-14 text-fg-dim" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24" aria-hidden="true">

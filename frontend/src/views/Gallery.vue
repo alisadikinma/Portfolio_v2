@@ -74,13 +74,13 @@
               <div class="relative h-full overflow-hidden">
                 <div class="absolute inset-0 bg-gradient-to-br from-primary-500/20 via-secondary-500/20 to-accent-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-10"></div>
                 
-                <img
+                <BaseImage
                   v-if="item.thumbnail"
                   :src="item.thumbnail"
+                  :variants="item.image_variants"
                   :alt="item.title"
-                  class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                  loading="lazy"
-                  @error="handleImageError"
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                  class="w-full h-full group-hover:scale-110 transition-transform duration-700"
                 />
                 
                 <div v-else class="w-full h-full flex items-center justify-center bg-gradient-to-br from-neutral-200 to-neutral-300 dark:from-neutral-800 dark:to-neutral-900">
@@ -175,7 +175,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { BaseButton, BaseLoader, BaseGalleryModal, BaseLightbox } from '@/components/base'
+import { BaseButton, BaseLoader, BaseGalleryModal, BaseLightbox, BaseImage } from '@/components/base'
 import CTASection from '@/components/CTASection.vue'
 import { useGallery } from '@/composables/useGallery'
 import { usePageSections } from '@/composables/usePageSections'

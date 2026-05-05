@@ -298,11 +298,12 @@
                     >
                       <!-- Image -->
                       <div class="relative h-40 bg-neutral-200 dark:bg-neutral-600 overflow-hidden">
-                        <img
+                        <BaseImage
                           :src="relatedProject.thumbnail || relatedProject.featured_image || getImageUrl(relatedProject.slug, '600', 'webp')"
+                          :variants="relatedProject.image_variants"
                           :alt="relatedProject.title"
-                          class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                          @error="handleRelatedImageError"
+                          sizes="280px"
+                          class="w-full h-full group-hover:scale-110 transition-transform duration-300"
                         />
                       </div>
 
@@ -429,6 +430,7 @@ import { useRoute, useRouter } from 'vue-router'
 import api from '@/services/api'
 import { useMetaTags } from '@/composables/useMetaTags'
 import { useSettings } from '@/composables/useSettings'
+import BaseImage from '@/components/base/BaseImage.vue'
 
 const route = useRoute()
 const router = useRouter()

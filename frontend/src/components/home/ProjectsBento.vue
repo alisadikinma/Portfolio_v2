@@ -29,12 +29,15 @@
           :class="idx === 0 ? 'bento-hero' : ''"
           class="bento-card group"
         >
-          <img
+          <BaseImage
             v-if="project.image || project.featured_image"
             :src="project.image || project.featured_image"
+            :variants="project.image_variants"
             :alt="project.title"
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            :eager="idx === 0"
+            :fetchpriority="idx === 0 ? 'high' : 'auto'"
             class="bento-card__img group-hover:scale-105 transition-transform duration-700"
-            loading="lazy"
           />
           <div v-else class="bento-card__img-placeholder">
             <svg class="w-8 h-8 text-fg-dim/20" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5a2.25 2.25 0 002.25-2.25V5.25a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v13.5a2.25 2.25 0 002.25 2.25z"/></svg>
@@ -76,6 +79,7 @@ import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import api from '@/services/api'
+import BaseImage from '@/components/base/BaseImage.vue'
 
 gsap.registerPlugin(ScrollTrigger)
 

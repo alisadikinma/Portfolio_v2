@@ -37,11 +37,12 @@
           <div class="bezel-shell h-full">
             <div class="bezel-core h-full overflow-hidden flex flex-col">
               <div v-if="posts[0].featured_image" class="aspect-[16/9] overflow-hidden bg-bg-elevated flex-shrink-0">
-                <img
+                <BaseImage
                   :src="posts[0].featured_image"
+                  :variants="posts[0].image_variants"
                   :alt="posts[0].title"
-                  class="w-full h-full object-cover transition-transform duration-700 ease-spring group-hover:scale-105"
-                  loading="lazy"
+                  sizes="(max-width: 768px) 100vw, 60vw"
+                  class="w-full h-full transition-transform duration-700 ease-spring group-hover:scale-105"
                 />
               </div>
               <div class="p-6 flex-1 flex flex-col">
@@ -73,11 +74,12 @@
             <div class="bezel-shell-sm h-full">
               <div class="bezel-core-sm h-full overflow-hidden flex">
                 <div v-if="post.featured_image" class="w-2/5 flex-shrink-0 overflow-hidden bg-bg-elevated">
-                  <img
+                  <BaseImage
                     :src="post.featured_image"
+                    :variants="post.image_variants"
                     :alt="post.title"
-                    class="w-full h-full object-cover transition-transform duration-700 ease-spring group-hover:scale-105"
-                    loading="lazy"
+                    sizes="(max-width: 768px) 40vw, 250px"
+                    class="w-full h-full transition-transform duration-700 ease-spring group-hover:scale-105"
                   />
                 </div>
                 <div class="flex-1 p-5 flex flex-col">
@@ -114,6 +116,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import api from '@/services/api'
+import BaseImage from '@/components/base/BaseImage.vue'
 
 const posts = ref([])
 const isLoading = ref(true)
