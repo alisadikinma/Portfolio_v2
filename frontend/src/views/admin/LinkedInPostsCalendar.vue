@@ -10,6 +10,8 @@ import {
   effectiveStatusMeta,
   MOOD_CLASSES,
   formatDateTime,
+  formatPinTimeWIB,
+  pinTimeLabel,
   ICON,
 } from './linkedinHelpers'
 
@@ -517,7 +519,10 @@ function statusDotClass(status) {
           </div>
           <div class="flex items-center gap-3 text-xs text-neutral-400 flex-shrink-0">
             <span class="uppercase tracking-wider font-mono text-[10px]">{{ post.format }}</span>
-            <span class="font-mono">{{ formatDateTime(post.pin_at) }}</span>
+            <span :class="['font-mono uppercase tracking-wider text-[10px]', post.status === 'awaiting_publish' ? 'text-amber-400/80' : post.status === 'published' ? 'text-emerald-400/80' : 'text-neutral-500']">
+              {{ pinTimeLabel(post) }}
+            </span>
+            <span class="font-mono">{{ formatPinTimeWIB(post.pin_at) }}</span>
           </div>
         </div>
       </div>
@@ -584,9 +589,14 @@ function statusDotClass(status) {
                   <span class="text-[10px] font-mono uppercase tracking-wider text-neutral-500">
                     {{ post.status.replace(/_/g, ' ') }} · {{ post.format }}
                   </span>
-                  <span v-if="post.pin_at" class="ml-auto text-[10px] font-mono text-neutral-400">{{ formatDateTime(post.pin_at) }}</span>
                 </div>
-                <p class="text-sm text-neutral-100 truncate">{{ post.post_title }}</p>
+                <p class="text-sm text-neutral-100 truncate mb-1.5">{{ post.post_title }}</p>
+                <div v-if="post.pin_at" class="flex items-center gap-1.5 text-[11px]">
+                  <span :class="['font-mono uppercase tracking-wider', post.status === 'awaiting_publish' ? 'text-amber-400/80' : post.status === 'published' ? 'text-emerald-400/80' : 'text-neutral-500']">
+                    {{ pinTimeLabel(post) }}:
+                  </span>
+                  <span class="font-mono text-neutral-300">{{ formatPinTimeWIB(post.pin_at) }}</span>
+                </div>
               </button>
             </div>
           </div>

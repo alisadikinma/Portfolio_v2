@@ -290,6 +290,47 @@ export function formatDateTime(dt) {
   return `${month} ${day} · ${time}`
 }
 
+/**
+ * Pin-time label for calendar rows. The Day Detail panel needs to
+ * disambiguate WHEN something is happening — operators were confused by
+ * raw "May 6 · 07:54 AM" with no context (was that scheduled? published?
+ * last updated?).
+ *
+ * Status-aware mapping:
+ *   awaiting_publish  → "Scheduled"  (scheduled_at, not yet sent)
+ *   published         → "Published"  (published_at, terminal)
+ *   manual_review     → "Updated"    (last FSM transition)
+ *   failed/cancelled  → "Updated"
+ *   else              → "Updated"
+ */
+export function pinTimeLabel(post) {
+  const status = post?.status
+  if (status === 'awaiting_publish') return 'Scheduled'
+  if (status === 'published') return 'Published'
+  return 'Updated'
+}
+
+/**
+ * Format a pin time with WIB timezone suffix (Asia/Jakarta — operator's
+ * authoritative local time per CLAUDE.md scheduling defaults).
+ */
+export function formatPinTimeWIB(dt) {
+  if (!dt) return '—'
+  const d = new Date(dt)
+  // Force Asia/Jakarta render so operators always see WIB regardless of
+  // browser locale (an operator on the road in a different timezone would
+  // otherwise see a confusing local time).
+  const formatted = d.toLocaleString('en-US', {
+    timeZone: 'Asia/Jakarta',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  })
+  return `${formatted} WIB`
+}
+
 // --- Generating progress % ---------------------------------------------------
 // Synthetic progress indicator for drafts in generating/validating/pending_generation
 // state. Reads pipeline_state_log[] timestamps + format-aware baselines.
