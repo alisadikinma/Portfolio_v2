@@ -170,6 +170,15 @@ const postsByDay = computed(() => {
     if (!buckets[key]) buckets[key] = []
     buckets[key].push(item)
   }
+  // Sort each day's posts by pin_at ASC so detail panel + cell thumbnails
+  // show chronological order (03:20 AM → 05:00 PM) regardless of status.
+  for (const key in buckets) {
+    buckets[key].sort((a, b) => {
+      const ta = a.pin_at ? new Date(a.pin_at).getTime() : 0
+      const tb = b.pin_at ? new Date(b.pin_at).getTime() : 0
+      return ta - tb
+    })
+  }
   return buckets
 })
 
