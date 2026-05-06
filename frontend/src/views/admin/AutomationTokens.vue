@@ -145,10 +145,17 @@
                 </div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
-                {{ token.requests_count || 0 }}
+                <!-- requests_count is sourced from automation_logs (only
+                     populated for automation-category tokens). CV tokens
+                     always read 0 here — Sanctum's last_used_at column is
+                     the authoritative usage signal for CV API. -->
+                <span v-if="token.category === 'automation'">{{ token.requests_count || 0 }}</span>
+                <span v-else class="text-gray-400 dark:text-gray-500" title="Use Last Used column for CV tokens — request logging not wired for this surface">—</span>
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
-                {{ token.last_used_at ? formatDate(token.last_used_at) : 'Never' }}
+              <td class="px-6 py-4 whitespace-nowrap text-sm">
+                <span :title="token.last_used_at ? formatDate(token.last_used_at) : 'Never used'" :class="usageBadgeClass(token.last_used_at)">
+                  {{ token.last_used_at ? relativeTime(token.last_used_at) : 'Never' }}
+                </span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
                 {{ formatDate(token.created_at) }}
@@ -164,6 +171,133 @@
             </tr>
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- API Playground -->
+    <div class="mt-8 rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+      <div class="border-b border-gray-200 p-6 dark:border-gray-700">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">API Playground</h2>
+        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          Test an endpoint with one of the tokens above. The token IS the bearer sent on the wire — no admin-session fallback.
+        </p>
+      </div>
+      <div class="p-6 space-y-4">
+        <!-- Form row -->
+        <div class="grid gap-4 md:grid-cols-12">
+          <div class="md:col-span-3">
+            <label class="block text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Token</label>
+            <select
+              v-model="playground.tokenId"
+              class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            >
+              <option :value="null">— Select token —</option>
+              <option v-for="t in automationStore.tokens" :key="t.id" :value="t.id">
+                {{ t.name }} ({{ categoryLabel(t.category) }})
+              </option>
+            </select>
+            <p class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+              Tokens shown above; plain text only available right after creation.
+            </p>
+          </div>
+          <div class="md:col-span-2">
+            <label class="block text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Method</label>
+            <select
+              v-model="playground.method"
+              class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            >
+              <option>GET</option>
+              <option>POST</option>
+              <option>PUT</option>
+              <option>DELETE</option>
+            </select>
+          </div>
+          <div class="md:col-span-7">
+            <label class="block text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Endpoint</label>
+            <input
+              v-model="playground.endpoint"
+              type="text"
+              placeholder="/api/cv/master.md"
+              list="playground-suggestions"
+              class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            />
+            <datalist id="playground-suggestions">
+              <option v-for="s in endpointSuggestions" :key="s" :value="s" />
+            </datalist>
+            <p class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+              Path only (e.g. <code>/api/cv/master.md</code>). Hosted from this server. Suggestions auto-filter by selected token's abilities.
+            </p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <button
+            @click="runPlayground"
+            :disabled="!canRunPlayground"
+            class="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            <svg v-if="!playground.loading" class="-ml-1 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+            </svg>
+            <span v-if="playground.loading" class="-ml-1 mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+            {{ playground.loading ? 'Testing…' : 'Send Request' }}
+          </button>
+          <button
+            v-if="playground.response"
+            @click="resetPlayground"
+            class="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400"
+          >
+            Clear result
+          </button>
+          <span v-if="playground.warning" class="text-xs text-amber-600 dark:text-amber-400">{{ playground.warning }}</span>
+        </div>
+
+        <!-- Plain-text token field — only used when the token's plainText
+             isn't cached client-side (i.e. minted in a different session). -->
+        <div v-if="playground.tokenId && !playgroundTokenPlain" class="rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20">
+          <label class="block text-xs font-medium uppercase tracking-wider text-amber-700 dark:text-amber-300">Paste plain-text token</label>
+          <input
+            v-model="playground.manualToken"
+            type="password"
+            :placeholder="'e.g. ' + playgroundTokenIdPrefix() + '|...'"
+            class="mt-1 block w-full rounded-md border border-amber-300 px-3 py-2 font-mono text-xs focus:border-amber-500 focus:outline-none focus:ring-amber-500 dark:border-amber-700 dark:bg-amber-900/30 dark:text-white"
+          />
+          <p class="mt-1 text-[11px] text-amber-700 dark:text-amber-300">
+            Sanctum doesn't store plain-text tokens server-side. Either mint a new token (gets cached for this session) or paste the saved plain-text value.
+          </p>
+        </div>
+
+        <!-- Response panel -->
+        <div v-if="playground.response" class="rounded-md border border-gray-200 dark:border-gray-700">
+          <div class="flex items-center gap-3 border-b border-gray-200 px-4 py-2 dark:border-gray-700">
+            <span
+              class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-mono font-bold"
+              :class="statusBadgeClass(playground.response.status)"
+            >
+              {{ playground.response.status }}
+            </span>
+            <span class="text-xs text-gray-500 dark:text-gray-400">
+              {{ playground.response.durationMs }}ms · {{ formatBytes(playground.response.size) }}
+            </span>
+            <button
+              @click="copyResponse"
+              class="ml-auto text-xs text-blue-600 hover:underline dark:text-blue-400"
+            >
+              {{ playground.copied ? 'Copied!' : 'Copy body' }}
+            </button>
+          </div>
+          <div class="p-4 space-y-3">
+            <div>
+              <p class="text-[11px] font-mono uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">Headers</p>
+              <pre class="overflow-x-auto rounded bg-gray-50 p-3 text-[11px] font-mono text-gray-800 dark:bg-gray-900 dark:text-gray-200">{{ playground.response.headersText }}</pre>
+            </div>
+            <div>
+              <p class="text-[11px] font-mono uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">
+                Body {{ playground.response.bodyTruncated ? '(first 50 lines, truncated)' : '' }}
+              </p>
+              <pre class="max-h-96 overflow-auto rounded bg-gray-50 p-3 text-[11px] font-mono text-gray-800 dark:bg-gray-900 dark:text-gray-200">{{ playground.response.bodyText }}</pre>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -521,4 +655,219 @@ const formatDate = (dateString) => {
     minute: '2-digit'
   })
 }
+
+// Relative time for token usage indicator. Shorter than full datetime —
+// scannable at a glance for "is this token active?".
+const relativeTime = (dateString) => {
+  if (!dateString) return 'Never'
+  const diff = Date.now() - new Date(dateString).getTime()
+  if (diff < 0) return 'just now'
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  if (days < 30) return `${days}d ago`
+  const months = Math.floor(days / 30)
+  if (months < 12) return `${months}mo ago`
+  return `${Math.floor(months / 12)}y ago`
+}
+
+// Color usage indicator by activity tier:
+//   <24h   → emerald (active)
+//   <7d    → blue    (recent)
+//   <30d   → amber   (stale)
+//   ≥30d   → red     (dormant)
+//   never  → gray
+function usageBadgeClass(dateString) {
+  const base = 'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium '
+  if (!dateString) return base + 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
+  const days = (Date.now() - new Date(dateString).getTime()) / 86400000
+  if (days < 1)  return base + 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200'
+  if (days < 7)  return base + 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+  if (days < 30) return base + 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200'
+  return base + 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+}
+
+// --- API Playground ---------------------------------------------------------
+// In-page tool to hit any backend endpoint with one of the existing tokens.
+// Direct fetch (NOT through axios `api` instance) so the bearer being tested
+// is what actually goes on the wire — no admin-session interceptor fallback.
+//
+// Plain-text caching strategy:
+//   - When a token is minted via the modal, we cache its plainText keyed by
+//     id in this component's lifetime. Survives component re-mount within a
+//     session via sessionStorage (cleared on tab close — never persisted).
+//   - For tokens minted in a previous session OR via tinker, the operator
+//     pastes the plain-text value into the manual-token field below.
+//   - Sanctum does NOT store plain text server-side — by design.
+const PLAINTEXT_CACHE_KEY = 'admin:tokens:plaintext-cache'
+
+const playgroundCache = ref(loadPlaintextCache())
+function loadPlaintextCache() {
+  try {
+    const raw = sessionStorage.getItem(PLAINTEXT_CACHE_KEY)
+    return raw ? JSON.parse(raw) : {}
+  } catch { return {} }
+}
+function savePlaintextCache() {
+  try {
+    sessionStorage.setItem(PLAINTEXT_CACHE_KEY, JSON.stringify(playgroundCache.value))
+  } catch { /* quota / disabled — degrade silently */ }
+}
+
+const playground = ref({
+  tokenId: null,
+  method: 'GET',
+  endpoint: '/api/cv/master.md',
+  manualToken: '',
+  loading: false,
+  response: null,
+  warning: '',
+  copied: false,
+})
+
+const playgroundTokenPlain = computed(() => {
+  if (!playground.value.tokenId) return null
+  // 1. Cached from a recent mint in this session
+  const cached = playgroundCache.value[playground.value.tokenId]
+  if (cached) return cached
+  // 2. Manually pasted by operator
+  if (playground.value.manualToken && playground.value.manualToken.includes('|')) {
+    return playground.value.manualToken
+  }
+  return null
+})
+
+function playgroundTokenIdPrefix() {
+  return playground.value.tokenId ? String(playground.value.tokenId) : '<id>'
+}
+
+// Suggested endpoints filtered by selected token's abilities. Falls back to
+// full list when no token selected so the operator can browse what's tested.
+const ENDPOINT_CATALOG = [
+  { path: '/api/health', abilities: [], desc: 'Liveness' },
+  { path: '/api/cv/master.md', abilities: ['cv:read'], desc: 'CV master markdown' },
+  { path: '/api/cv/master.md?compact=1', abilities: ['cv:read'], desc: 'CV compact' },
+  { path: '/api/cv/export', abilities: ['cv:read'], desc: 'JSON Resume' },
+  { path: '/api/automation/posts', abilities: ['post:read'], desc: 'List posts (automation)' },
+  { path: '/api/categories', abilities: [], desc: 'Public categories' },
+]
+
+const endpointSuggestions = computed(() => {
+  const sel = automationStore.tokens.find((t) => t.id === playground.value.tokenId)
+  if (!sel) return ENDPOINT_CATALOG.map((e) => e.path)
+  return ENDPOINT_CATALOG
+    .filter((e) => e.abilities.length === 0 || e.abilities.some((a) => sel.abilities?.includes(a)))
+    .map((e) => e.path)
+})
+
+const canRunPlayground = computed(() =>
+  playground.value.tokenId
+  && playground.value.endpoint.startsWith('/')
+  && !!playgroundTokenPlain.value
+  && !playground.value.loading
+)
+
+function statusBadgeClass(status) {
+  if (status >= 200 && status < 300) return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200'
+  if (status >= 300 && status < 400) return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+  if (status >= 400 && status < 500) return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200'
+  return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+}
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return `${bytes}B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`
+  return `${(bytes / 1024 / 1024).toFixed(2)}MB`
+}
+
+async function runPlayground() {
+  const bearer = playgroundTokenPlain.value
+  if (!bearer) {
+    playground.value.warning = 'Need plain-text token (cached from mint or pasted manually)'
+    return
+  }
+  playground.value.warning = ''
+  playground.value.loading = true
+  playground.value.response = null
+  const start = performance.now()
+
+  try {
+    // Use raw fetch — bypasses the axios interceptor that auto-attaches the
+    // admin's session bearer. We want THIS specific bearer on the wire.
+    // baseURL inferred from window.location origin so dev (localhost) and
+    // prod (alisadikinma.com) both work.
+    const resp = await fetch(playground.value.endpoint, {
+      method: playground.value.method,
+      headers: {
+        Authorization: `Bearer ${bearer}`,
+        Accept: 'application/json, text/markdown, */*',
+      },
+    })
+    const text = await resp.text()
+    const durationMs = Math.round(performance.now() - start)
+
+    // Format headers as displayable text
+    const headerLines = []
+    resp.headers.forEach((value, key) => headerLines.push(`${key}: ${value}`))
+
+    // Truncate body to first 50 lines for display (full body still in copy buffer)
+    const lines = text.split('\n')
+    const bodyTruncated = lines.length > 50
+    const bodyText = bodyTruncated ? lines.slice(0, 50).join('\n') + '\n...' : text
+
+    playground.value.response = {
+      status: resp.status,
+      headersText: headerLines.sort().join('\n'),
+      bodyText,
+      bodyFull: text,
+      bodyTruncated,
+      size: new Blob([text]).size,
+      durationMs,
+    }
+  } catch (err) {
+    playground.value.response = {
+      status: 0,
+      headersText: '(no response)',
+      bodyText: `Network error: ${err.message}`,
+      bodyFull: '',
+      bodyTruncated: false,
+      size: 0,
+      durationMs: Math.round(performance.now() - start),
+    }
+  } finally {
+    playground.value.loading = false
+  }
+}
+
+function resetPlayground() {
+  playground.value.response = null
+  playground.value.copied = false
+}
+
+async function copyResponse() {
+  if (!playground.value.response?.bodyFull) return
+  try {
+    await navigator.clipboard.writeText(playground.value.response.bodyFull)
+    playground.value.copied = true
+    setTimeout(() => { playground.value.copied = false }, 2000)
+  } catch {
+    toast.error('Failed to copy')
+  }
+}
+
+// Hook into successful mints: cache the plain-text token by id so the
+// playground can use it without operator paste. Watch the createdToken ref —
+// it gets set when a token is freshly minted.
+watch(createdToken, (val) => {
+  if (!val) return
+  // The newest token is at the head of the list (store.unshift on success).
+  const newest = automationStore.tokens[0]
+  if (newest) {
+    playgroundCache.value[newest.id] = val
+    savePlaintextCache()
+  }
+})
 </script>

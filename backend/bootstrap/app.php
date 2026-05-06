@@ -60,4 +60,22 @@ return Application::configure(basePath: dirname(__DIR__))
                 ], 409);
             }
         });
+
+        // API routes must return 401 JSON (not 302 redirect to /login HTML
+        // page) when Sanctum auth fails. The default Laravel behavior assumes
+        // a web session and redirects — for API consumers (jobhunter,
+        // automation webhooks, mobile clients) this surfaces as a confusing
+        // HTML response. Override applies to anything matching `api/*` OR
+        // any request that prefers JSON via Accept header.
+        $exceptions->render(function (\Illuminate\Auth\AuthenticationException $e, \Illuminate\Http\Request $request) {
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json([
+                    'success' => false,
+                    'error' => [
+                        'code' => 'UNAUTHENTICATED',
+                        'message' => $e->getMessage() ?: 'Unauthenticated.',
+                    ],
+                ], 401);
+            }
+        });
     })->create();
