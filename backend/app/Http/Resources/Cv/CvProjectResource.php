@@ -139,6 +139,10 @@ class CvProjectResource extends JsonResource
             // Manufacturing / industrial / IoT
             'IoT', 'PCB', 'OEE', 'MES', 'SCADA', 'PLC', 'HMI',
             'RFID', 'NFC', 'GPS', 'UAV', 'LIDAR', 'IMU',
+            // Security
+            'DLP', 'VPN', 'SSO', 'MFA', '2FA', 'IAM', 'SIEM', 'SOC',
+            // Indonesian institutional
+            'SPSI', 'BPJS', 'KPK', 'OJK', 'BI',
         ];
 
         foreach ($acronyms as $acronym) {
