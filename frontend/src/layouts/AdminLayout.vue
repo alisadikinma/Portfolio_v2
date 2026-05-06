@@ -273,8 +273,8 @@
 
       <!-- Main Content — dynamic margin based on sidebar state -->
       <div class="flex-1 transition-all duration-300" :class="uiStore.isSidebarOpen ? 'lg:ml-64' : 'lg:ml-0'">
-        <!-- Top Bar -->
-        <header class="h-16 bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 flex items-center justify-between px-6">
+        <!-- Top Bar — sticky so the hamburger + dark toggle stay reachable on long admin pages -->
+        <header class="sticky top-0 z-30 h-16 bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 flex items-center justify-between px-6 backdrop-blur supports-[backdrop-filter]:bg-white/95 supports-[backdrop-filter]:dark:bg-neutral-800/95">
           <div class="flex items-center gap-3">
             <button
               @click="uiStore.toggleSidebar"

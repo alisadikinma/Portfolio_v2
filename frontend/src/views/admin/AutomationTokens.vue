@@ -188,12 +188,30 @@
                 {{ formatDate(token.created_at) }}
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                <button
-                  @click="confirmRevoke(token)"
-                  class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                >
-                  Delete
-                </button>
+                <div class="inline-flex items-center gap-3">
+                  <button
+                    @click="handleCopyToken(token)"
+                    :title="hasPlaintextCached(token.id) ? 'Cached this session — click to copy' : 'Plain-text not cached — click to paste & copy'"
+                    class="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                  >
+                    <svg v-if="copiedTokenId !== token.id" class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    <svg v-else class="h-4 w-4 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span :class="copiedTokenId === token.id ? 'text-emerald-600 dark:text-emerald-400' : ''">
+                      {{ copiedTokenId === token.id ? 'Copied' : 'Copy' }}
+                    </span>
+                  </button>
+                  <span class="text-gray-300 dark:text-gray-600">·</span>
+                  <button
+                    @click="confirmRevoke(token)"
+                    class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                  >
+                    Delete
+                  </button>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -476,6 +494,65 @@
       </div>
     </div>
 
+    <!-- Copy Token Paste Modal — shown when plain-text isn't cached for the
+         requested token (e.g. minted in a previous session or via tinker).
+         Sanctum doesn't store plain text server-side, so the operator pastes
+         the saved value once; we cache it for the rest of the session. -->
+    <div
+      v-if="showCopyPasteModal"
+      class="fixed inset-0 z-50 overflow-y-auto"
+      @click.self="closeCopyPasteModal"
+      @keydown.esc="closeCopyPasteModal"
+    >
+      <div class="flex min-h-screen items-center justify-center px-4">
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
+
+        <div class="relative w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+            Paste plain-text token
+          </h3>
+          <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            <span class="font-medium text-gray-900 dark:text-white">{{ tokenToCopy?.name }}</span>
+            was minted in a previous session, so the plain text isn't cached on this device.
+            Sanctum stores only the hash — paste the saved value once and we'll cache it for this tab.
+          </p>
+
+          <div class="mt-4">
+            <label class="block text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              Token (format: <span class="font-mono normal-case">{{ tokenToCopy?.id }}|...</span>)
+            </label>
+            <input
+              ref="pasteInputRef"
+              v-model="pastedTokenInput"
+              type="password"
+              :placeholder="(tokenToCopy?.id || '') + '|...'"
+              autocomplete="off"
+              spellcheck="false"
+              class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-xs focus:border-blue-500 focus:outline-none focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              @keydown.enter="confirmPasteAndCopy"
+            />
+            <p v-if="pasteError" class="mt-1 text-xs text-red-600 dark:text-red-400">{{ pasteError }}</p>
+          </div>
+
+          <div class="mt-6 flex space-x-3">
+            <button
+              @click="confirmPasteAndCopy"
+              :disabled="!pastedTokenInput"
+              class="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              Cache & Copy
+            </button>
+            <button
+              @click="closeCopyPasteModal"
+              class="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Delete Confirmation Modal -->
     <div
       v-if="showRevokeModal"
@@ -512,7 +589,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useAutomation } from '@/stores/automation'
 import { useToast } from '@/stores/ui'
 
@@ -526,6 +603,19 @@ const createdToken = ref('')
 const copied = ref(false)
 const tokenToRevoke = ref(null)
 const activeTab = ref('all')
+
+// Per-row Copy action state. `copiedTokenId` is the id of the row that just
+// had its token copied to the clipboard — used to flip the icon + label to
+// "Copied" for ~2s. The paste modal opens when the operator clicks Copy on
+// a token whose plain-text isn't cached client-side (Sanctum stores only the
+// hash server-side; the cache is populated at mint time, so any token minted
+// in a previous session / via tinker needs a one-time paste).
+const copiedTokenId = ref(null)
+const showCopyPasteModal = ref(false)
+const tokenToCopy = ref(null)
+const pastedTokenInput = ref('')
+const pasteError = ref('')
+const pasteInputRef = ref(null)
 
 // Top-level view: 'tokens' (CRUD listing with category sub-tabs) vs
 // 'playground' (in-page endpoint tester). Persisted across navigations
@@ -689,6 +779,96 @@ const closeTokenModal = () => {
   showTokenModal.value = false
   createdToken.value = ''
   copied.value = false
+}
+
+// --- Per-row Copy action ----------------------------------------------------
+// Look up plain-text from the session cache (populated at mint time + via the
+// paste-fallback modal). Returns null when nothing's cached for this id.
+function hasPlaintextCached(tokenId) {
+  return Boolean(playgroundCache.value[tokenId])
+}
+
+async function writeToClipboard(text) {
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    // Fallback for browsers without the async clipboard API (rare in admin
+    // contexts but cheap to support).
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.style.position = 'fixed'
+    ta.style.opacity = '0'
+    document.body.appendChild(ta)
+    ta.select()
+    const ok = document.execCommand('copy')
+    document.body.removeChild(ta)
+    return ok
+  }
+}
+
+async function handleCopyToken(token) {
+  const cached = playgroundCache.value[token.id]
+  if (cached) {
+    const ok = await writeToClipboard(cached)
+    if (ok) {
+      copiedTokenId.value = token.id
+      toast.success('Token copied to clipboard')
+      setTimeout(() => {
+        if (copiedTokenId.value === token.id) copiedTokenId.value = null
+      }, 2000)
+    } else {
+      toast.error('Failed to copy token')
+    }
+    return
+  }
+  // Cache miss — open paste modal so the operator can supply the saved value.
+  tokenToCopy.value = token
+  pastedTokenInput.value = ''
+  pasteError.value = ''
+  showCopyPasteModal.value = true
+  await nextTick()
+  pasteInputRef.value?.focus()
+}
+
+async function confirmPasteAndCopy() {
+  const value = (pastedTokenInput.value || '').trim()
+  if (!value) {
+    pasteError.value = 'Paste the saved token value to continue.'
+    return
+  }
+  if (!value.includes('|')) {
+    pasteError.value = 'Token must look like "<id>|<hash>" — check the saved value.'
+    return
+  }
+  const expectedPrefix = String(tokenToCopy.value?.id || '') + '|'
+  if (!value.startsWith(expectedPrefix)) {
+    pasteError.value = `Token id mismatch — expected prefix "${expectedPrefix}".`
+    return
+  }
+  // Cache for the rest of the session, then copy.
+  playgroundCache.value[tokenToCopy.value.id] = value
+  savePlaintextCache()
+  const ok = await writeToClipboard(value)
+  if (!ok) {
+    toast.error('Cached, but failed to copy to clipboard')
+    closeCopyPasteModal()
+    return
+  }
+  copiedTokenId.value = tokenToCopy.value.id
+  toast.success('Token cached & copied')
+  const justCopiedId = tokenToCopy.value.id
+  setTimeout(() => {
+    if (copiedTokenId.value === justCopiedId) copiedTokenId.value = null
+  }, 2000)
+  closeCopyPasteModal()
+}
+
+function closeCopyPasteModal() {
+  showCopyPasteModal.value = false
+  tokenToCopy.value = null
+  pastedTokenInput.value = ''
+  pasteError.value = ''
 }
 
 const confirmRevoke = (token) => {
