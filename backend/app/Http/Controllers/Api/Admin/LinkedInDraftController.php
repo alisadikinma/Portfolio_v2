@@ -776,11 +776,21 @@ class LinkedInDraftController extends Controller
     /**
      * GET /admin/linkedin-posts/calendar?from=2026-05-01&to=2026-05-31
      *
-     * Lightweight date-range query for the calendar month grid. Returns a
-     * compact shape per row (no full post body — that's lazy-loaded via show()
-     * when the operator clicks a dot). Filters by either scheduled_at OR
-     * published_at falling inside [from, to] so the calendar shows both
-     * "still queued" and "already shipped" posts on their respective days.
+     * Lightweight date-range query for the calendar month grid.
+     *
+     * **Pin semantics** — drafts pin to the day they're meaningful TO THE
+     * OPERATOR, which differs by status:
+     *   - published     -> published_at         (terminal — when it shipped)
+     *   - awaiting_publish -> cancel_window_ends_at (actual fire time —
+     *                          what the cron checks; `scheduled_at` is the
+     *                          immutable approval timestamp, NOT the publish
+     *                          target. Operator picked publish_at via the
+     *                          reschedule modal which writes
+     *                          cancel_window_ends_at — see approve() ll.299-305.)
+     *   - other         -> scheduled_at         (queue ordering fallback)
+     *
+     * Query OR-matches all three columns in [from,to] so a draft approved
+     * yesterday but scheduled to publish today still shows on today's cell.
      */
     public function calendar(Request $request): JsonResponse
     {
@@ -796,7 +806,8 @@ class LinkedInDraftController extends Controller
         $query = LinkedInPost::query()
             ->with(['post.translations'])
             ->where(function ($q) use ($from, $to) {
-                $q->whereBetween('scheduled_at', [$from, $to])
+                $q->whereBetween('cancel_window_ends_at', [$from, $to])
+                    ->orWhereBetween('scheduled_at', [$from, $to])
                     ->orWhereBetween('published_at', [$from, $to]);
             });
 
@@ -804,13 +815,18 @@ class LinkedInDraftController extends Controller
             $query->where('status', $validated['status']);
         }
 
-        $rows = $query->orderBy('scheduled_at')->orderBy('published_at')->get();
+        $rows = $query
+            ->orderBy('cancel_window_ends_at')
+            ->orderBy('scheduled_at')
+            ->orderBy('published_at')
+            ->get();
 
         $items = $rows->map(function (LinkedInPost $draft) {
             $title = $draft->post?->translations?->first()?->title ?? 'Untitled draft';
-            // Calendar pin date: prefer published_at when present (terminal),
-            // else scheduled_at (still queued). Frontend buckets by this date.
-            $pinAt = $draft->published_at ?? $draft->scheduled_at;
+            // Pin to actual operator-meaningful time — see method docblock.
+            $pinAt = $draft->published_at
+                ?? $draft->cancel_window_ends_at
+                ?? $draft->scheduled_at;
             return [
                 'id' => $draft->id,
                 'status' => $draft->status,
@@ -818,6 +834,7 @@ class LinkedInDraftController extends Controller
                 'post_id' => $draft->post_id,
                 'post_title' => $title,
                 'scheduled_at' => $draft->scheduled_at?->toIso8601String(),
+                'cancel_window_ends_at' => $draft->cancel_window_ends_at?->toIso8601String(),
                 'published_at' => $draft->published_at?->toIso8601String(),
                 'pin_at' => $pinAt?->toIso8601String(),
                 'depth_score' => $draft->depth_score,
