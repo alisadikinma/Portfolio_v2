@@ -41,15 +41,25 @@ class CvAwardResource extends JsonResource
     }
 
     /**
-     * Strip HTML tags + collapse whitespace + decode entities. Returns null
-     * for null input (preserves null vs empty-string semantics).
+     * Strip HTML tags but preserve paragraph breaks. Block-level boundaries
+     * (`</p>`, `<br>`, etc.) become `\n` / `\n\n` before tag strip — keeps
+     * narrative structure intact for downstream LLM prompts. Mirrors the
+     * helper in CvExportController.
      */
     protected function stripHtmlPlain(?string $html): ?string
     {
         if ($html === null) return null;
+
+        $html = preg_replace('#<br\s*/?>#i', "\n", $html);
+        $html = preg_replace('#</(p|div|li|h[1-6])>#i', "\n\n", $html);
+
         $text = strip_tags($html);
         $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $text = preg_replace('/\s+/u', ' ', $text);
+
+        $text = preg_replace('/[ \t]+/u', ' ', $text);
+        $text = preg_replace('/[ \t]*\n[ \t]*/', "\n", $text);
+        $text = preg_replace('/\n{3,}/', "\n\n", $text);
+
         return trim($text);
     }
 

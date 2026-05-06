@@ -58,11 +58,11 @@ class CvProjectResource extends JsonResource
         $translation = $translations->firstWhere('language', 'id')
             ?? $translations->first();
 
-        $name = $translation?->title ?? $this->title;
+        $name = $this->restoreAcronyms($translation?->title ?? $this->title);
         $description = $translation?->description ?? $this->description;
 
         // Surface domain (Case Study) first, fall back to legacy category.
-        $industry = $this->domain ?: $this->category;
+        $industry = $this->restoreAcronyms($this->domain ?: $this->category);
 
         // tags column = freeform taxonomy (semantic categories).
         // technologies column = concrete tools used to build it.
@@ -95,7 +95,11 @@ class CvProjectResource extends JsonResource
             'description' => $description,
             'url' => $this->slug ? rtrim(config('app.url'), '/') . '/projects/' . $this->slug : null,
             'industry' => $industry,
-            'metrics' => $metrics,
+            // Cast to object so empty serializes as `{}` (object) not `[]`
+            // (list). PHP encodes empty arrays as JSON arrays — consumer
+            // schema declares metrics as a dict, the list shape fails strict
+            // Pydantic validation. Non-empty associative arrays cast cleanly.
+            'metrics' => (object) $metrics,
             'tags' => $tags,
             'tech_stack' => $techStack,
             'highlights' => $highlights,
@@ -104,6 +108,41 @@ class CvProjectResource extends JsonResource
             'start_date' => $startDate,
             'end_date' => $endDate,
         ];
+    }
+
+    /**
+     * Restore tech acronym casing in titles that were title-cased at import
+     * time (e.g. "Production Ai-Powered ... Cctv" → "Production AI-Powered
+     * ... CCTV"). Word-boundary regex tolerates hyphen separators.
+     *
+     * Permanent fix is operator data-cleanup on the projects.title column;
+     * until then, this output-time normalizer keeps the API surface clean
+     * for downstream LLM / ATS consumers that read the canonical project
+     * name from this field.
+     */
+    protected function restoreAcronyms(?string $text): ?string
+    {
+        if ($text === null || $text === '') {
+            return $text;
+        }
+
+        static $acronyms = [
+            'AI', 'ML', 'CCTV', 'API', 'AWS', 'GCP', 'GPU', 'CPU', 'IoT',
+            'UI', 'UX', 'RAG', 'OCR', 'SDK', 'SaaS', 'B2B', 'B2C', 'ERP',
+            'CRM', 'CMS', 'ETL', 'KPI', 'ROI', 'NPM', 'HTTP', 'HTTPS',
+            'JSON', 'YAML', 'XML', 'SQL', 'NoSQL', 'PHP', 'JS', 'TS',
+            'NLP', 'LLM', 'IDE', 'DevOps', 'MLOps', 'RPA', 'QA', 'QC',
+            'IT', 'PDF', 'CSV', 'CDN', 'DNS', 'JWT', 'OAuth',
+        ];
+
+        foreach ($acronyms as $acronym) {
+            $text = preg_replace(
+                '/\b' . preg_quote($acronym, '/') . '\b/i',
+                $acronym,
+                $text
+            );
+        }
+        return $text;
     }
 
     /**

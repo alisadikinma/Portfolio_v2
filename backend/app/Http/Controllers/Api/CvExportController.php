@@ -187,15 +187,32 @@ class CvExportController extends Controller
     }
 
     /**
-     * Strip HTML tags + collapse whitespace + decode entities. Returns null
-     * for null input (preserves null vs empty-string semantics on the wire).
+     * Strip HTML tags but preserve paragraph breaks. Returns null for null
+     * input (preserves null vs empty-string semantics on the wire).
+     *
+     * Block-level boundaries (`</p>`, `</div>`, `</li>`, `</hN>`, `<br>`) are
+     * converted to newlines BEFORE stripping tags, so the plain-text output
+     * keeps narrative structure that downstream LLM prompts and ATS scorers
+     * rely on for paragraph segmentation. Naive `strip_tags` + `\s+` collapse
+     * (the v2.0.0 ship) joined `</p><p>` boundaries into a single space.
      */
     protected function stripHtmlPlain(?string $html): ?string
     {
         if ($html === null) return null;
+
+        // Convert block-level boundaries to newlines while still HTML.
+        $html = preg_replace('#<br\s*/?>#i', "\n", $html);
+        $html = preg_replace('#</(p|div|li|h[1-6])>#i', "\n\n", $html);
+
         $text = strip_tags($html);
         $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $text = preg_replace('/\s+/u', ' ', $text);
+
+        // Collapse runs of spaces/tabs but PRESERVE newlines, then normalize
+        // 3+ consecutive newlines down to a paragraph break (\n\n).
+        $text = preg_replace('/[ \t]+/u', ' ', $text);
+        $text = preg_replace('/[ \t]*\n[ \t]*/', "\n", $text);
+        $text = preg_replace('/\n{3,}/', "\n\n", $text);
+
         return trim($text);
     }
 
