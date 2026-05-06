@@ -14,9 +14,11 @@ use App\Services\PipelineGuard;
 use App\Services\TelegramNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 
 /**
@@ -768,6 +770,156 @@ class LinkedInDraftController extends Controller
             'data' => $draft->fresh(['post.translations', 'post.contentIdea:id,result_post_id,virality_score', 'account']),
             'message' => "Slide {$slideIndex} re-dispatched.",
             'job_uuid' => $uuid,
+        ]);
+    }
+
+    /**
+     * GET /admin/linkedin-posts/calendar?from=2026-05-01&to=2026-05-31
+     *
+     * Lightweight date-range query for the calendar month grid. Returns a
+     * compact shape per row (no full post body — that's lazy-loaded via show()
+     * when the operator clicks a dot). Filters by either scheduled_at OR
+     * published_at falling inside [from, to] so the calendar shows both
+     * "still queued" and "already shipped" posts on their respective days.
+     */
+    public function calendar(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'from' => ['required', 'date'],
+            'to' => ['required', 'date', 'after_or_equal:from'],
+            'status' => ['nullable', 'string'], // optional client-side filter pill
+        ]);
+
+        $from = Carbon::parse($validated['from'])->startOfDay();
+        $to = Carbon::parse($validated['to'])->endOfDay();
+
+        $query = LinkedInPost::query()
+            ->with(['post.translations'])
+            ->where(function ($q) use ($from, $to) {
+                $q->whereBetween('scheduled_at', [$from, $to])
+                    ->orWhereBetween('published_at', [$from, $to]);
+            });
+
+        if (!empty($validated['status'])) {
+            $query->where('status', $validated['status']);
+        }
+
+        $rows = $query->orderBy('scheduled_at')->orderBy('published_at')->get();
+
+        $items = $rows->map(function (LinkedInPost $draft) {
+            $title = $draft->post?->translations?->first()?->title ?? 'Untitled draft';
+            // Calendar pin date: prefer published_at when present (terminal),
+            // else scheduled_at (still queued). Frontend buckets by this date.
+            $pinAt = $draft->published_at ?? $draft->scheduled_at;
+            return [
+                'id' => $draft->id,
+                'status' => $draft->status,
+                'format' => $draft->format,
+                'post_id' => $draft->post_id,
+                'post_title' => $title,
+                'scheduled_at' => $draft->scheduled_at?->toIso8601String(),
+                'published_at' => $draft->published_at?->toIso8601String(),
+                'pin_at' => $pinAt?->toIso8601String(),
+                'depth_score' => $draft->depth_score,
+            ];
+        })->values();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'from' => $from->toIso8601String(),
+                'to' => $to->toIso8601String(),
+                'items' => $items,
+                'count' => $items->count(),
+            ],
+        ]);
+    }
+
+    /**
+     * POST /admin/linkedin-drafts/{id}/check-conflict
+     *
+     * Check whether a proposed scheduled_at conflicts with other live drafts
+     * within ±30 min window. Soft-warning data — operator decides whether to
+     * proceed (LinkedIn distributes reach poorly when same-author posts
+     * ship within ~30 min, but legitimate cases exist: announcement + Q&A).
+     *
+     * Returns:
+     *   - has_conflict: bool
+     *   - conflicts: [{id, post_title, scheduled_at, minutes_apart}]
+     *   - suggested_alternatives: ["09:00", "11:30", ...] (top 3 hours that day
+     *     with score >= 80, sourced from posting_time_rules table when present)
+     *   - window_minutes: 30 (echo back so frontend can label the warning)
+     */
+    public function checkConflict(Request $request, int $id): JsonResponse
+    {
+        $draft = LinkedInPost::findOrFail($id);
+
+        $validated = $request->validate([
+            'at' => ['required', 'date'],
+        ]);
+
+        $proposed = Carbon::parse($validated['at']);
+        $windowMinutes = 30;
+
+        // Conflict status whitelist: posts that are "live on the schedule".
+        // 'scheduled' is NOT in the FSM today but reserved for forward-compat
+        // (skipped if not present in the enum to avoid breakage).
+        $liveStatuses = [
+            LinkedInPostStatus::AwaitingPublish->value,
+            LinkedInPostStatus::Published->value,
+        ];
+
+        $conflicts = LinkedInPost::query()
+            ->where('id', '!=', $id)
+            ->whereIn('status', $liveStatuses)
+            ->whereNotNull('scheduled_at')
+            ->whereBetween('scheduled_at', [
+                $proposed->copy()->subMinutes($windowMinutes),
+                $proposed->copy()->addMinutes($windowMinutes),
+            ])
+            ->with('post.translations')
+            ->get()
+            ->map(function (LinkedInPost $other) use ($proposed) {
+                $title = $other->post?->translations?->first()?->title ?? 'Untitled draft';
+                $diffMinutes = (int) abs($other->scheduled_at->diffInMinutes($proposed, false));
+                return [
+                    'id' => $other->id,
+                    'post_title' => $title,
+                    'scheduled_at' => $other->scheduled_at->toIso8601String(),
+                    'minutes_apart' => $diffMinutes,
+                ];
+            })
+            ->values();
+
+        // Suggested alternatives: pull from posting_time_rules if the table
+        // exists + has rows for the proposed dow + linkedin/b2b_tech audience.
+        // Phase A1 ships the migration; until then this gracefully degrades
+        // to an empty array (frontend shows the existing static hint).
+        $suggestedAlternatives = [];
+        if (Schema::hasTable('posting_time_rules')) {
+            $dow = $proposed->dayOfWeek; // Carbon: 0=Sun..6=Sat (matches schema)
+            $suggestedAlternatives = DB::table('posting_time_rules')
+                ->where('platform', 'linkedin')
+                ->where('audience', 'b2b_tech')
+                ->where('day_of_week', $dow)
+                ->where('score', '>=', 80)
+                ->orderByDesc('score')
+                ->orderBy('hour')
+                ->limit(3)
+                ->pluck('hour')
+                ->map(fn ($h) => sprintf('%02d:00', $h))
+                ->values()
+                ->all();
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'has_conflict' => $conflicts->isNotEmpty(),
+                'conflicts' => $conflicts,
+                'suggested_alternatives' => $suggestedAlternatives,
+                'window_minutes' => $windowMinutes,
+            ],
         ]);
     }
 

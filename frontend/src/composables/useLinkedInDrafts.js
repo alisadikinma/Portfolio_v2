@@ -361,6 +361,112 @@ export function usePublishLinkedInDraftNow() {
   })
 }
 
+/**
+ * GET /admin/linkedin-posts/calendar?from=&to=&status=
+ *
+ * Date-range query for the calendar month grid. Returns compact per-row shape
+ * (id, status, format, post_title, scheduled_at, published_at, pin_at,
+ * depth_score). Frontend buckets rows by `pin_at` day.
+ *
+ * `range` should be a ref/computed `{ from: 'YYYY-MM-DD', to: 'YYYY-MM-DD',
+ * status?: 'awaiting_publish' }`. Query re-fetches when range changes.
+ */
+export function useLinkedInCalendar(range) {
+  const query = useQuery({
+    queryKey: ['linkedin-calendar', range],
+    queryFn: async () => {
+      const { from, to, status } = unref(range) || {}
+      if (!from || !to) return { items: [], from: null, to: null, count: 0 }
+      const params = { from, to }
+      if (status) params.status = status
+      const { data } = await api.get('/admin/linkedin-posts/calendar', { params })
+      return data?.data ?? { items: [], from, to, count: 0 }
+    },
+    staleTime: 30_000,
+    refetchOnMount: 'always',
+    gcTime: 5 * 60 * 1000,
+  })
+
+  return {
+    items: computed(() => query.data.value?.items || []),
+    isLoading: query.isLoading,
+    isFetching: query.isFetching,
+    error: query.error,
+    refetch: query.refetch,
+  }
+}
+
+/**
+ * GET /admin/posting-rules?platform=linkedin
+ *
+ * Heatmap data for the calendar — rule scores per (day_of_week, hour) +
+ * day_summaries (top 3 best_hours per day where score>=80). Long-cached
+ * because rules only refresh quarterly via the artisan.
+ */
+export function usePostingRules(platform = 'linkedin') {
+  const query = useQuery({
+    queryKey: ['posting-rules', platform],
+    queryFn: async () => {
+      const p = unref(platform) || 'linkedin'
+      const { data } = await api.get('/admin/posting-rules', { params: { platform: p } })
+      return data?.data ?? null
+    },
+    staleTime: 1000 * 60 * 60 * 6, // 6h — survives operator session
+    gcTime: 1000 * 60 * 60 * 12,
+  })
+
+  return {
+    rules: computed(() => query.data.value?.rules || []),
+    daySummaries: computed(() => query.data.value?.day_summaries || []),
+    sources: computed(() => query.data.value?.sources || []),
+    lastResearchedAt: computed(() => query.data.value?.last_researched_at || null),
+    ruleCount: computed(() => query.data.value?.rule_count || 0),
+    isLoading: query.isLoading,
+    error: query.error,
+    refetch: query.refetch,
+  }
+}
+
+/**
+ * POST /admin/posting-rules/refresh body: {platform: linkedin}
+ * Dispatches the research artisan via Artisan::queue. UI button gates spam.
+ */
+export function useRefreshPostingRules() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ platform }) => {
+      const { data } = await api.post('/admin/posting-rules/refresh', { platform })
+      return data?.data ?? data
+    },
+    onSuccess: () => {
+      // Invalidate so the next index() call surfaces the fresh last_researched_at
+      qc.invalidateQueries({ queryKey: ['posting-rules'] })
+    },
+  })
+}
+
+/**
+ * POST /admin/linkedin-drafts/{id}/check-conflict
+ *
+ * Soft-warning lookup for the reschedule modal — debounce in the consumer
+ * (~300ms) and fire on every datetime input change. Operator can still
+ * proceed when has_conflict=true; this just surfaces the warning + suggests
+ * AI-recommended alternatives sourced from the posting_time_rules table.
+ *
+ * Usage:
+ *   const conflictMutation = useConflictCheck()
+ *   const result = await conflictMutation.mutateAsync({ draftId: 12, at: isoString })
+ *   // result: {has_conflict, conflicts[], suggested_alternatives[], window_minutes}
+ */
+export function useConflictCheck() {
+  return useMutation({
+    mutationFn: async ({ draftId, at }) => {
+      const { data } = await api.post(`/admin/linkedin-drafts/${draftId}/check-conflict`, { at })
+      return data?.data ?? data
+    },
+  })
+}
+
 /** POST /admin/linkedin-drafts/{id}/regenerate */
 export function useRegenerateLinkedInDraft() {
   const qc = useQueryClient()

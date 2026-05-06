@@ -13,6 +13,7 @@ import {
   useRerenderImagesOnly,
   useRegenerateCaption,
   useRegenerateSlideImage,
+  useConflictCheck,
   postTitle,
 } from '@/composables/useLinkedInDrafts'
 import {
@@ -464,6 +465,64 @@ async function submitSchedule() {
   } catch (err) {
     alert(err?.response?.data?.error?.message || 'Schedule failed')
   }
+}
+
+// --- Conflict warning (soft, ±30 min window) -------------------------------
+// Per design doc §4.1: as the operator types a new datetime, debounce-check
+// against other live drafts. Reschedule button stays enabled (soft warning,
+// not hard block — announcement + Q&A back-to-back is legitimate).
+const conflictMutation = useConflictCheck()
+const conflictData = ref(null)
+let conflictDebounceTimer = null
+
+watch(scheduleAt, (newVal) => {
+  // Reset whenever the input clears or the modal closes
+  if (!newVal) {
+    conflictData.value = null
+    if (conflictDebounceTimer) clearTimeout(conflictDebounceTimer)
+    return
+  }
+  if (conflictDebounceTimer) clearTimeout(conflictDebounceTimer)
+  conflictDebounceTimer = setTimeout(async () => {
+    try {
+      const local = new Date(newVal)
+      if (Number.isNaN(local.getTime())) {
+        conflictData.value = null
+        return
+      }
+      const result = await conflictMutation.mutateAsync({
+        draftId: draftId.value,
+        at: local.toISOString(),
+      })
+      conflictData.value = result
+    } catch (e) {
+      // Soft-failure: warning is informational, network blip shouldn't
+      // block the operator. Log to console for debugging.
+      console.warn('[LinkedInDraft] conflict check failed', e?.message)
+      conflictData.value = null
+    }
+  }, 300)
+})
+
+onBeforeUnmount(() => {
+  if (conflictDebounceTimer) clearTimeout(conflictDebounceTimer)
+})
+
+/**
+ * Apply a suggested hour from the conflict-warning suggestion chips.
+ * Replaces the time portion of the existing scheduleAt while preserving
+ * the date. `hour` arrives as "HH:00" string from the backend.
+ */
+function applySuggestedHour(hour) {
+  if (!scheduleAt.value || !hour) return
+  // scheduleAt format is "YYYY-MM-DDTHH:mm" (datetime-local browser format)
+  const [datePart] = scheduleAt.value.split('T')
+  if (!datePart) return
+  // hour is "HH:00" — trim and pad just in case
+  const [h, m = '00'] = hour.split(':')
+  const hh = String(h).padStart(2, '0')
+  const mm = String(m).padStart(2, '0')
+  scheduleAt.value = `${datePart}T${hh}:${mm}`
 }
 
 // --- Action handlers -------------------------------------------------------
@@ -1032,7 +1091,9 @@ const showThumbnailUploadCaption = computed(() =>
               <button
                 @click="submitSchedule"
                 :disabled="approveMutation.isPending.value || !slidesReadyForPublish"
-                :title="slidesReadyForPublish ? '' : slidesPendingMessage"
+                :title="slidesReadyForPublish
+                  ? (conflictData?.has_conflict ? 'Soft warning — proceed if intentional.' : '')
+                  : slidesPendingMessage"
                 class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-amber-500 text-amber-950 hover:bg-amber-400 active:scale-[0.98] text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-amber-500"
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
@@ -1046,6 +1107,44 @@ const showThumbnailUploadCaption = computed(() =>
               >
                 Discard
               </button>
+            </div>
+          </div>
+
+          <!-- Soft-warning conflict block. Shown only when the debounced
+               check returns has_conflict=true. Reschedule button remains
+               enabled — operator decides whether back-to-back is intentional. -->
+          <div
+            v-if="conflictData?.has_conflict"
+            class="mt-3 max-w-3xl rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm"
+          >
+            <div class="flex items-start gap-2">
+              <span class="text-amber-300 mt-0.5">⚠</span>
+              <div class="flex-1">
+                <p class="text-amber-100">
+                  <strong>Conflict:</strong>
+                  '{{ conflictData.conflicts[0].post_title }}' is scheduled at
+                  {{ formatDateTime(conflictData.conflicts[0].scheduled_at) }}
+                  ({{ conflictData.conflicts[0].minutes_apart }} min apart).
+                </p>
+                <p class="mt-1 text-amber-200/80 text-xs">
+                  LinkedIn distributes reach poorly when same-author posts ship within 30 minutes.
+                </p>
+                <div
+                  v-if="conflictData.suggested_alternatives?.length"
+                  class="mt-2 flex flex-wrap items-center gap-1.5"
+                >
+                  <span class="text-xs text-amber-200/70">Suggested alternatives:</span>
+                  <button
+                    v-for="hour in conflictData.suggested_alternatives"
+                    :key="hour"
+                    type="button"
+                    @click="applySuggestedHour(hour)"
+                    class="rounded-md border border-amber-400/40 bg-amber-500/10 px-2 py-0.5 text-xs text-amber-100 hover:bg-amber-500/20 transition-colors"
+                  >
+                    {{ hour }}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

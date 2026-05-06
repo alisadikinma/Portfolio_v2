@@ -474,7 +474,7 @@ const routes = [
   {
     path: '/admin/linkedin-posts',
     name: 'admin-linkedin-posts',
-    component: () => import('@/views/admin/LinkedInPostsList.vue'),
+    component: () => import('@/views/admin/LinkedInPostsCalendar.vue'),
     meta: {
       title: 'LinkedIn Posts - Admin',
       requiresAuth: true,

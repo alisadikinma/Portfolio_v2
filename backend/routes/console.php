@@ -90,3 +90,15 @@ Schedule::command('newsletter:send-weekly')
     ->at('09:00')
     ->timezone('Asia/Jakarta')
     ->withoutOverlapping(60);
+
+// Posting Time Rules: quarterly research refresh — 03:00 WIB on the 1st
+// day of every 3rd month (Jan/Apr/Jul/Oct). Sonnet WebSearches industry
+// sources (Hootsuite/Buffer/Sprout/etc.) and upserts ~168 (dow,hour) rules
+// per platform. Operator can also force-refresh via the calendar toolbar
+// button (POST /admin/posting-rules/refresh) which dispatches the same
+// command via Artisan::queue. Per docs/plans/2026-05-06-linkedin-calendar-
+// and-ai-time-rules.md §5.3.
+Schedule::command('posting-rules:research --platform=linkedin')
+    ->cron('0 3 1 */3 *')
+    ->timezone('Asia/Jakarta')
+    ->withoutOverlapping(15);

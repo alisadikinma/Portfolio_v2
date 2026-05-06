@@ -29,6 +29,7 @@ use App\Http\Controllers\Api\CarouselDraftController;
 use App\Http\Controllers\Api\Admin\ContentIdeaController;
 use App\Http\Controllers\Api\Admin\LinkedInDraftController;
 use App\Http\Controllers\Api\Admin\NewsletterAdminController;
+use App\Http\Controllers\Api\Admin\PostingRuleController;
 use App\Http\Controllers\Api\LinkedInOAuthController;
 use App\Http\Controllers\Api\HomepageController;
 use App\Http\Controllers\Api\CvExportController;
@@ -1247,6 +1248,11 @@ Route::middleware(['auth:sanctum'])->prefix('admin/content-engine')->group(funct
 // publish, schedule. Plugin (WIP) generates content only.
 // ============================================================================
 
+// Calendar endpoint — date-range query for /admin/linkedin-posts (now calendar view).
+// Per docs/plans/2026-05-06-linkedin-calendar-and-ai-time-rules.md §6.1.
+Route::middleware(['auth:sanctum'])->get('/admin/linkedin-posts/calendar', [LinkedInDraftController::class, 'calendar'])
+    ->name('admin.linkedin-posts.calendar');
+
 // Admin draft CRUD (7 endpoints per plugin design §4.5 + 2 carousel image endpoints)
 Route::middleware(['auth:sanctum'])->prefix('admin/linkedin-drafts')->group(function () {
     Route::get('/', [LinkedInDraftController::class, 'index']);
@@ -1264,6 +1270,22 @@ Route::middleware(['auth:sanctum'])->prefix('admin/linkedin-drafts')->group(func
     Route::post('/{id}/rerender-images', [LinkedInDraftController::class, 'rerenderImagesOnly']);
     Route::post('/{id}/regenerate-caption', [LinkedInDraftController::class, 'regenerateCaption']);
     Route::post('/{id}/slides/{slideIndex}/regenerate-image', [LinkedInDraftController::class, 'regenerateSlideImage']);
+    // Soft-warning conflict check for the reschedule modal — fires debounced
+    // (300ms) on every datetime input change. Operator can still proceed.
+    Route::post('/{id}/check-conflict', [LinkedInDraftController::class, 'checkConflict'])
+        ->name('admin.linkedin-drafts.check-conflict');
+});
+
+// ============================================================================
+// Posting Time Rules — AI-researched best posting times per platform.
+// Per docs/plans/2026-05-06-linkedin-calendar-and-ai-time-rules.md §6.1.
+// Seeded by `php artisan posting-rules:research --platform=linkedin`.
+// ============================================================================
+Route::middleware(['auth:sanctum'])->prefix('admin/posting-rules')->group(function () {
+    Route::get('/', [PostingRuleController::class, 'index'])
+        ->name('admin.posting-rules.index');
+    Route::post('/refresh', [PostingRuleController::class, 'refresh'])
+        ->name('admin.posting-rules.refresh');
 });
 
 // OAuth flow. `connect` is admin-only; `callback` is public (LinkedIn
