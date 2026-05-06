@@ -151,12 +151,22 @@ const range = computed(() => {
 
 const { items: calendarItems, isLoading: calendarLoading, isFetching: calendarFetching } = useLinkedInCalendar(range)
 
-// Bucket posts by pin_at day (YYYY-MM-DD key)
+// Bucket posts by pin_at day (YYYY-MM-DD key, WIB local date).
+// pin_at is ISO 8601 UTC from backend. Naive .slice(0,10) keys by UTC date,
+// which puts a post scheduled May 7 06:00 WIB (= May 6 23:00 UTC) into the
+// May 6 cell. Use Asia/Jakarta to match the WIB-rendered display labels.
+const WIB_DATE_KEY = new Intl.DateTimeFormat('sv-SE', {
+  timeZone: 'Asia/Jakarta',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+})
+
 const postsByDay = computed(() => {
   const buckets = {}
   for (const item of calendarItems.value) {
     if (!item.pin_at) continue
-    const key = item.pin_at.slice(0, 10) // 'YYYY-MM-DD'
+    const key = WIB_DATE_KEY.format(new Date(item.pin_at)) // 'YYYY-MM-DD' in WIB
     if (!buckets[key]) buckets[key] = []
     buckets[key].push(item)
   }
