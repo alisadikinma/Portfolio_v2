@@ -1170,4 +1170,142 @@ class SettingsController extends Controller
             \Illuminate\Support\Facades\Config::set('mail.from.name', $rows['mail_from_name']);
         }
     }
+
+    // =====================================================================
+    // CV Master Export settings (group=cv) — schema_version 2.0.0
+    // =====================================================================
+    //
+    // Four JSON keys consumed by /api/cv/export and the jobhunter platform:
+    //   summary_variants  : { vibe_coding, ai_automation, ai_video } strings
+    //   work_experience   : [ {company, position, start_date, end_date, ...} ]
+    //   skills_matrix     : { languages, frameworks, ai_tools, ... } -> string[]
+    //   education         : [ {institution, area, study_type, start, end} ]
+    //
+    // Each row's `value` column stores the JSON-encoded blob and `type=json`.
+    // Admin UI on AboutSettings.vue posts the raw JSON back; we re-encode
+    // server-side so persisted strings stay canonical.
+
+    public function getCvSettings(): JsonResponse
+    {
+        try {
+            $rows = Setting::byGroup('cv')->get();
+
+            $data = [
+                'summary_variants' => null,
+                'work_experience'  => [],
+                'skills_matrix'    => [],
+                'education'        => [],
+            ];
+
+            foreach ($rows as $row) {
+                $decoded = is_string($row->value) ? json_decode($row->value, true) : $row->value;
+                $data[$row->key] = $decoded;
+            }
+
+            return response()->json([
+                'success' => true,
+                'data'    => $data,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to fetch CV settings', ['error' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch CV settings',
+                'error'   => config('app.debug') ? $e->getMessage() : 'An error occurred',
+            ], 500);
+        }
+    }
+
+    public function updateCvSettings(\Illuminate\Http\Request $request): JsonResponse
+    {
+        // Each field can be either an already-decoded array (axios JSON) OR a
+        // raw JSON string (admin UI textarea). Normalize both shapes.
+        $validated = $request->validate([
+            'summary_variants' => ['nullable'],
+            'work_experience'  => ['nullable'],
+            'skills_matrix'    => ['nullable'],
+            'education'        => ['nullable'],
+        ]);
+
+        $errors = [];
+        $payload = [];
+
+        foreach (['summary_variants', 'work_experience', 'skills_matrix', 'education'] as $key) {
+            if (!array_key_exists($key, $validated)) continue;
+            $value = $validated[$key];
+
+            // Skip explicit nulls — operator clearing the field via UI sends
+            // empty string, not null. Treat null as "no change" so partial
+            // updates from the admin UI don't accidentally clear other keys.
+            if ($value === null) continue;
+
+            if (is_string($value)) {
+                $trimmed = trim($value);
+                if ($trimmed === '') {
+                    // Empty string = explicit clear → store empty array/object.
+                    $payload[$key] = $key === 'summary_variants' ? new \stdClass() : [];
+                    continue;
+                }
+                $decoded = json_decode($trimmed, true);
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    $errors[$key] = 'Invalid JSON: ' . json_last_error_msg();
+                    continue;
+                }
+                $payload[$key] = $decoded;
+            } else {
+                // Already-decoded array (e.g. axios sent JSON body).
+                $payload[$key] = $value;
+            }
+        }
+
+        // Shape-level validation — each field has a known top-level shape.
+        if (isset($payload['summary_variants']) && !is_array($payload['summary_variants']) && !($payload['summary_variants'] instanceof \stdClass)) {
+            $errors['summary_variants'] = 'Must be an object with vibe_coding / ai_automation / ai_video keys';
+        }
+        if (isset($payload['work_experience']) && !is_array($payload['work_experience'])) {
+            $errors['work_experience'] = 'Must be an array of work entries';
+        }
+        if (isset($payload['skills_matrix']) && !is_array($payload['skills_matrix']) && !($payload['skills_matrix'] instanceof \stdClass)) {
+            $errors['skills_matrix'] = 'Must be an object mapping category → string[]';
+        }
+        if (isset($payload['education']) && !is_array($payload['education'])) {
+            $errors['education'] = 'Must be an array of education entries';
+        }
+
+        if (!empty($errors)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors'  => $errors,
+            ], 422);
+        }
+
+        DB::beginTransaction();
+        try {
+            foreach ($payload as $key => $value) {
+                Setting::updateOrCreate(
+                    ['key' => $key, 'group' => 'cv'],
+                    [
+                        'value' => json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+                        'type'  => 'json',
+                    ]
+                );
+            }
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'CV settings updated',
+                'data'    => $this->getCvSettings()->getData(true)['data'] ?? null,
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Failed to update CV settings', ['error' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update CV settings',
+                'error'   => config('app.debug') ? $e->getMessage() : 'An error occurred',
+            ], 500);
+        }
+    }
 }

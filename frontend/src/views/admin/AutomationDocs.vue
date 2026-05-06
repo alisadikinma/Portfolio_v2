@@ -440,35 +440,82 @@ const cvExportExample = `curl -H "Authorization: Bearer cv-jobhunter-export-PLAI
      -H "Accept: application/json" \\
      ${baseUrl}/cv/export
 
-# Response (HTTP 200, JSON Resume v1.0.0 envelope)
+# Response (HTTP 200, schema_version "2.0.0" — NO {success, data} envelope)
 {
-  "$schema": "https://jsonresume.org/schema/1.0.0/resume.json",
+  "schema_version": "2.0.0",
+  "generated_at": "2026-05-06T07:19:01Z",
   "basics": {
     "name": "Ali Sadikin",
-    "label": "AI Generalist Expert",
-    "summary": "...",
-    "location": { "city": null, "region": "Indonesia" },
-    "profiles": [
-      { "network": "LinkedIn", "url": "https://linkedin.com/in/..." },
-      ...
-    ]
-  },
-  "work": [
-    {
-      "name": "Project Name",
-      "position": "Lead AI Engineer",
-      "startDate": "2024",
-      "endDate": "2025",
-      "summary": "Short description",
-      "highlights": ["Outcome 1", "Outcome 2"],
-      "industry": "Manufacturing",
-      "tech_stack": ["Python", "LangChain", "n8n"],
-      "relevance_hint": ["ai_automation", "manufacturing"]
+    "label": "AI Solopreneur Studio · Founder of INDUSIA.ai",
+    "email": null,
+    "phone": null,
+    "url": "https://alisadikinma.com",
+    "summary": "<p>17 years in enterprise...</p>",
+    "summary_text": "17 years in enterprise...",       // HTML-stripped parallel
+    "summary_variants": {
+      "vibe_coding":   "Full-stack vibe coder shipping production AI apps...",
+      "ai_automation": "AI Visual Inspection live on production lines at...",
+      "ai_video":      "AI video generation pipeline operator — VEO 3, Sora..."
     },
-    ... // ~56 entries
+    "location": { "city": null, "country": "Indonesia", "remote": true },
+    "profiles": [{ "network": "LinkedIn", "url": "https://linkedin.com/in/..." }]
+  },
+  "work": [                                              // NEW in 2.0.0
+    {
+      "company": "INDUSIA.ai",
+      "position": "Founder / Solo AI Engineer",
+      "start_date": "2024-01",
+      "end_date": null,
+      "location": "Batam, Indonesia (remote-global)",
+      "summary": "AI Visual Inspection deployments...",
+      "highlights": [
+        {
+          "text": "Replaced $24K Keyence rigs with $19,950 INDUSIA deploys",
+          "metrics": {"cost_saved_usd": 4050, "deployments": 1},
+          "tags": ["industrial", "computer_vision"],
+          "variant_hint": ["ai_automation"]
+        }
+      ],
+      "tech_stack": ["Python", "PyTorch", "FastAPI"]
+    }
   ],
-  "awards":       [ ... ],   // featured-first
-  "publications": [ ... ]    // top 5 by published_at DESC
+  "education": [],                                       // NEW in 2.0.0
+  "skills": {                                            // NEW in 2.0.0
+    "languages":  ["Python", "TypeScript", "PHP"],
+    "frameworks": ["FastAPI", "Next.js 15", "Laravel"],
+    "ai_tools":   ["Claude Sonnet 4.6", "VEO 3", "Sora"],
+    "cloud":      ["AWS", "Hostinger VPS"],
+    "databases":  ["PostgreSQL", "MySQL"],
+    "domain":     ["Computer Vision", "Industrial QC", "RAG"]
+  },
+  "projects": [
+    {
+      "name": "...",
+      "description": "...",
+      "url": "...",
+      "industry": "AI",
+      "metrics": {"total_deployments": 4, "uptime_pct": 99.7},
+      "tags":       ["computer_vision", "industrial_qc"],
+      "tech_stack": ["Python", "PyTorch", "ONNX"],       // NEW: separate from tags
+      "highlights": [                                     // structured shape now
+        {"text": "...", "metrics": null, "tags": [], "variant_hint": []}
+      ],
+      "variant_hint":   ["ai_automation"],               // NEW: strict 3-value enum
+      "relevance_hint": ["ai_automation", "manufacturing"], // legacy, back-compat
+      "start_date": "2025-03",
+      "end_date": null
+    }
+    // ~56 entries
+  ],
+  "awards": [
+    {
+      "title":        "...",
+      "summary":      "<p>...</p>",
+      "summary_text": "...",                             // NEW: HTML-stripped parallel
+      "is_featured":  true
+    }
+  ],
+  "thought_leadership": [{ "title": "...", "url": "...", "published_at": "..." }]
 }`
 
 const cvEtagExample = `# First request — note the ETag header
@@ -712,20 +759,24 @@ function buildCvDocsMd() {
     '',
     '### GET /api/cv/export',
     '',
-    'JSON Resume v1.0.0 envelope. Use when the consumer parses fields',
-    'programmatically (ATS, scoring engines, structured filtering).',
+    'Structured JSON for ATS-style consumers. **Schema v2.0.0 (May 2026)** —',
+    'no `{success, data}` envelope; HTTP status conveys success/failure.',
     '',
-    'Each `work[]` entry includes a `relevance_hint[]` array (e.g.',
-    '`["ai_automation", "ai_agents"]`) so consumers can filter/rank without',
-    're-parsing prose.',
+    'Top-level shape:',
     '',
-    'Response shape:',
-    '',
-    '- `basics` — name, label, summary, location, profiles',
-    '- `work` — Selected Projects (~56 entries) with role, year_range, industry,',
-    '  tech_stack, problem, outcome, relevance_hint',
-    '- `awards` — featured-first ordering',
-    '- `publications` — top 5 published thought-leadership posts',
+    '- `schema_version` (string, currently `"2.0.0"`)',
+    '- `generated_at` (ISO-8601 UTC)',
+    '- `basics` — identity + 3 `summary_variants` for variant scoring',
+    '- `work[]` — employment history (separate from `projects[]`)',
+    '- `education[]` — degrees + courses (may be empty list)',
+    '- `skills{}` — categorized skills object (`languages` / `frameworks` /',
+    '  `ai_tools` / `cloud` / `databases` / `infrastructure` / `domain`)',
+    '- `projects[]` — case studies with `tech_stack[]` separate from `tags[]`,',
+    '  structured `highlights[]`, strict `variant_hint[]` plus legacy',
+    '  `relevance_hint[]` for back-compat',
+    '- `awards[]` — featured-first ordering, both `summary` (HTML) and',
+    '  `summary_text` (plain) parallel fields',
+    '- `thought_leadership[]` — top 5 published posts',
     '',
     '```bash',
     'curl -H "Authorization: Bearer $CV_TOKEN" \\',
@@ -733,37 +784,69 @@ function buildCvDocsMd() {
     '     ' + baseUrl + '/cv/export',
     '```',
     '',
-    'Sample response:',
+    'Sample response (schema 2.0.0):',
     '',
     '```json',
     '{',
-    '  "$schema": "https://jsonresume.org/schema/1.0.0/resume.json",',
+    '  "schema_version": "2.0.0",',
+    '  "generated_at": "2026-05-06T07:19:01Z",',
     '  "basics": {',
     '    "name": "Ali Sadikin",',
-    '    "label": "AI Generalist Expert",',
-    '    "summary": "...",',
-    '    "location": { "city": null, "region": "Indonesia" },',
-    '    "profiles": [',
-    '      { "network": "LinkedIn", "url": "https://linkedin.com/in/..." }',
-    '    ]',
+    '    "label": "AI Solopreneur Studio · Founder of INDUSIA.ai",',
+    '    "url": "https://alisadikinma.com",',
+    '    "summary": "<p>17 years in enterprise...</p>",',
+    '    "summary_text": "17 years in enterprise...",',
+    '    "summary_variants": {',
+    '      "vibe_coding":   "Full-stack vibe coder shipping...",',
+    '      "ai_automation": "AI Visual Inspection live on production...",',
+    '      "ai_video":      "AI video generation pipeline operator..."',
+    '    },',
+    '    "location": { "city": null, "country": "Indonesia", "remote": true },',
+    '    "profiles": [{ "network": "LinkedIn", "url": "..." }]',
     '  },',
     '  "work": [',
     '    {',
-    '      "name": "Project Name",',
-    '      "position": "Lead AI Engineer",',
-    '      "startDate": "2024",',
-    '      "endDate": "2025",',
-    '      "summary": "Short description",',
-    '      "highlights": ["Outcome 1", "Outcome 2"],',
-    '      "industry": "Manufacturing",',
-    '      "tech_stack": ["Python", "LangChain", "n8n"],',
-    '      "relevance_hint": ["ai_automation", "manufacturing"]',
+    '      "company": "INDUSIA.ai",',
+    '      "position": "Founder / Solo AI Engineer",',
+    '      "start_date": "2024-01",',
+    '      "end_date": null,',
+    '      "summary": "AI Visual Inspection deployments...",',
+    '      "highlights": [',
+    '        {',
+    '          "text": "Replaced $24K Keyence rigs with $19,950 deploys",',
+    '          "metrics": {"cost_saved_usd": 4050, "deployments": 1},',
+    '          "tags": ["industrial", "computer_vision"],',
+    '          "variant_hint": ["ai_automation"]',
+    '        }',
+    '      ],',
+    '      "tech_stack": ["Python", "PyTorch", "FastAPI"]',
     '    }',
     '  ],',
-    '  "awards": [],',
-    '  "publications": []',
+    '  "education": [],',
+    '  "skills": {',
+    '    "languages":  ["Python", "TypeScript"],',
+    '    "frameworks": ["FastAPI", "Next.js 15"],',
+    '    "ai_tools":   ["Claude Sonnet 4.6", "VEO 3"]',
+    '  },',
+    '  "projects": [',
+    '    {',
+    '      "name": "...",',
+    '      "tags":          ["computer_vision", "industrial_qc"],',
+    '      "tech_stack":    ["Python", "PyTorch", "ONNX"],',
+    '      "highlights":    [{"text": "...", "metrics": null, "tags": [], "variant_hint": []}],',
+    '      "metrics":       {"total_deployments": 4},',
+    '      "variant_hint":  ["ai_automation"],',
+    '      "relevance_hint":["ai_automation", "manufacturing"]',
+    '    }',
+    '  ],',
+    '  "awards": [{"title": "...", "summary": "<p>...</p>", "summary_text": "...", "is_featured": true}],',
+    '  "thought_leadership": []',
     '}',
     '```',
+    '',
+    '**Validation note:** every field above maps directly to the consumer-side',
+    '`MasterCVContent` Pydantic model. If `model_validate(response.json())`',
+    'passes, the consumer imports in <1s with zero LLM cost.',
     '',
     '## ETag Revalidation (recommended)',
     '',

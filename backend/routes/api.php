@@ -315,6 +315,9 @@ Route::middleware(['auth:sanctum'])->prefix('admin/settings')->group(function ()
     Route::get('/mail', [SettingsController::class, 'getMailSettings']);
     Route::put('/mail', [SettingsController::class, 'updateMailSettings']);
     Route::post('/mail/test', [SettingsController::class, 'testMailConnection']);
+    // CV Master Export (group=cv) — feeds /api/cv/export schema_version 2.0.0
+    Route::get('/cv', [SettingsController::class, 'getCvSettings']);
+    Route::put('/cv', [SettingsController::class, 'updateCvSettings']);
 });
 
 // Admin Menu Items Routes

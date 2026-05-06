@@ -31,9 +31,26 @@ class CvAwardResource extends JsonResource
             'awarder' => $this->organization,
             'date' => $this->formatDate($this->received_at),
             'summary' => $this->description,
+            // Schema v2.0.0 — HTML-stripped parallel of summary so consumers
+            // (cv-tailor / job-score LLM prompts) don't burn ~30% of token
+            // budget on `<p>`/`<strong>` markup.
+            'summary_text' => $this->stripHtmlPlain($this->description),
             'tags' => [],
             'is_featured' => (bool) ($this->is_featured ?? false),
         ];
+    }
+
+    /**
+     * Strip HTML tags + collapse whitespace + decode entities. Returns null
+     * for null input (preserves null vs empty-string semantics).
+     */
+    protected function stripHtmlPlain(?string $html): ?string
+    {
+        if ($html === null) return null;
+        $text = strip_tags($html);
+        $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $text = preg_replace('/\s+/u', ' ', $text);
+        return trim($text);
     }
 
     /**

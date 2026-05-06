@@ -637,6 +637,158 @@
         </form>
       </BaseCard>
 
+      <!-- CV Master Export Card (schema_version 2.0.0, May 2026) -->
+      <!-- Drives /api/cv/export response — feeds the jobhunter platform.    -->
+      <!-- Four sections: 3 summary_variants + 3 JSON blobs (work_experience, -->
+      <!-- skills_matrix, education). Each section validates inline on save. -->
+      <BaseCard>
+        <h2 class="text-xl font-display font-semibold text-neutral-900 dark:text-neutral-100 mb-2">
+          CV Master Export — for jobhunter Agent
+        </h2>
+        <p class="text-sm text-neutral-600 dark:text-neutral-400 mb-6">
+          Drives the JSON returned by
+          <code class="text-xs bg-neutral-100 dark:bg-neutral-800 px-1 rounded">GET /api/cv/export</code>
+          (schema_version <strong>2.0.0</strong>) — consumed by the jobhunter platform's
+          <code class="text-xs bg-neutral-100 dark:bg-neutral-800 px-1 rounded">cv-tailor</code> /
+          <code class="text-xs bg-neutral-100 dark:bg-neutral-800 px-1 rounded">job-score</code> skills.
+          Operator-edited values survive deploys (idempotent seeder uses
+          <code class="text-xs bg-neutral-100 dark:bg-neutral-800 px-1 rounded">firstOrCreate</code>).
+          See the
+          <router-link to="/admin/automation/docs" class="text-blue-600 dark:text-blue-400 underline">API Docs page</router-link>
+          for the full response shape.
+        </p>
+
+        <form @submit.prevent="handleCvSubmit" class="space-y-8">
+          <!-- summary_variants — 3 labeled textareas -->
+          <div>
+            <div class="mb-3 flex items-baseline justify-between">
+              <h3 class="text-base font-semibold text-neutral-900 dark:text-neutral-100">
+                Summary Variants
+              </h3>
+              <span class="text-xs text-neutral-500 dark:text-neutral-400">basics.summary_variants</span>
+            </div>
+            <p class="text-xs text-neutral-600 dark:text-neutral-400 mb-4">
+              Three opening paragraphs — jobhunter scores each scraped role against all three and picks the strongest match.
+              Keep each ~3-5 sentences, lead with the strongest concrete signal (deployments, names, $ amounts).
+            </p>
+            <div class="space-y-4">
+              <div v-for="variant in cvVariantOrder" :key="variant">
+                <label :for="`cv-summary-${variant}`" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                  <span class="inline-flex items-center gap-2">
+                    <span class="inline-block w-2 h-2 rounded-full" :class="cvVariantDot(variant)"></span>
+                    {{ cvVariantLabel(variant) }}
+                  </span>
+                </label>
+                <textarea
+                  :id="`cv-summary-${variant}`"
+                  v-model="cvVariants[variant]"
+                  rows="4"
+                  class="w-full rounded-md border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-sm text-neutral-900 dark:text-neutral-100 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  :placeholder="cvVariantPlaceholder(variant)"
+                />
+              </div>
+            </div>
+            <p v-if="cvErrors.summary_variants" class="mt-2 text-xs text-red-600 dark:text-red-400">
+              {{ cvErrors.summary_variants }}
+            </p>
+          </div>
+
+          <!-- work_experience — JSON textarea -->
+          <div>
+            <div class="mb-3 flex items-baseline justify-between">
+              <h3 class="text-base font-semibold text-neutral-900 dark:text-neutral-100">
+                Work Experience
+              </h3>
+              <span class="text-xs text-neutral-500 dark:text-neutral-400">work[]</span>
+            </div>
+            <p class="text-xs text-neutral-600 dark:text-neutral-400 mb-2">
+              Employment history (separate from <code class="text-[11px] bg-neutral-100 dark:bg-neutral-800 px-1 rounded">projects[]</code>).
+              JSON array of <code class="text-[11px]">{company, position, start_date, end_date, summary, highlights[], tech_stack[]}</code> entries.
+              Without this, ATS scorers compute years-of-experience by summing all 56 projects → inflated to ~50 years.
+            </p>
+            <textarea
+              v-model="cvWorkJson"
+              rows="14"
+              spellcheck="false"
+              class="w-full rounded-md border border-neutral-300 dark:border-neutral-600 bg-neutral-50 dark:bg-neutral-900 text-xs font-mono text-neutral-900 dark:text-neutral-100 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              placeholder='[{"company":"INDUSIA.ai","position":"Founder","start_date":"2024-01","end_date":null,"summary":"...","highlights":[],"tech_stack":["Python"]}]'
+            />
+            <p v-if="cvErrors.work_experience" class="mt-2 text-xs text-red-600 dark:text-red-400">
+              {{ cvErrors.work_experience }}
+            </p>
+          </div>
+
+          <!-- skills_matrix — JSON textarea -->
+          <div>
+            <div class="mb-3 flex items-baseline justify-between">
+              <h3 class="text-base font-semibold text-neutral-900 dark:text-neutral-100">
+                Skills Matrix
+              </h3>
+              <span class="text-xs text-neutral-500 dark:text-neutral-400">skills{}</span>
+            </div>
+            <p class="text-xs text-neutral-600 dark:text-neutral-400 mb-2">
+              Categorized object — JSON object mapping
+              <code class="text-[11px]">category &rarr; string[]</code>.
+              Suggested keys: <code class="text-[11px]">languages</code>, <code class="text-[11px]">frameworks</code>,
+              <code class="text-[11px]">ai_tools</code>, <code class="text-[11px]">cloud</code>,
+              <code class="text-[11px]">databases</code>, <code class="text-[11px]">infrastructure</code>,
+              <code class="text-[11px]">domain</code>. Categories are freeform but should stay stable across responses
+              (don't rename <code class="text-[11px]">ai_tools</code> &rarr; <code class="text-[11px]">ai</code> later — breaks consumer caching).
+            </p>
+            <textarea
+              v-model="cvSkillsJson"
+              rows="12"
+              spellcheck="false"
+              class="w-full rounded-md border border-neutral-300 dark:border-neutral-600 bg-neutral-50 dark:bg-neutral-900 text-xs font-mono text-neutral-900 dark:text-neutral-100 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              placeholder='{"languages":["Python","TypeScript"],"frameworks":["FastAPI","Next.js 15"],"ai_tools":["Claude Sonnet 4.6","VEO 3"],"cloud":["AWS"],"domain":["Computer Vision"]}'
+            />
+            <p v-if="cvErrors.skills_matrix" class="mt-2 text-xs text-red-600 dark:text-red-400">
+              {{ cvErrors.skills_matrix }}
+            </p>
+          </div>
+
+          <!-- education — JSON textarea -->
+          <div>
+            <div class="mb-3 flex items-baseline justify-between">
+              <h3 class="text-base font-semibold text-neutral-900 dark:text-neutral-100">
+                Education
+              </h3>
+              <span class="text-xs text-neutral-500 dark:text-neutral-400">education[]</span>
+            </div>
+            <p class="text-xs text-neutral-600 dark:text-neutral-400 mb-2">
+              JSON array of <code class="text-[11px]">{institution, area, study_type, start_date, end_date, score, courses[]}</code> entries.
+              Empty list <code class="text-[11px]">[]</code> is valid (consumer renders nothing — no error).
+            </p>
+            <textarea
+              v-model="cvEducationJson"
+              rows="8"
+              spellcheck="false"
+              class="w-full rounded-md border border-neutral-300 dark:border-neutral-600 bg-neutral-50 dark:bg-neutral-900 text-xs font-mono text-neutral-900 dark:text-neutral-100 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              placeholder="[]"
+            />
+            <p v-if="cvErrors.education" class="mt-2 text-xs text-red-600 dark:text-red-400">
+              {{ cvErrors.education }}
+            </p>
+          </div>
+
+          <div class="flex items-center gap-3 pt-2">
+            <BaseButton type="submit" :disabled="cvSubmitting" variant="primary">
+              <span v-if="cvSubmitting">Saving…</span>
+              <span v-else>Save CV Settings</span>
+            </BaseButton>
+            <a
+              :href="apiBaseOrigin + '/api/cv/export'"
+              target="_blank"
+              rel="noopener"
+              class="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+              title="Open the live JSON response in a new tab (requires a cv:read token)"
+            >
+              View live /api/cv/export →
+            </a>
+          </div>
+        </form>
+      </BaseCard>
+
       <!-- LinkedIn Integration Card -->
       <BaseCard>
         <h2 class="text-xl font-display font-semibold text-neutral-900 dark:text-neutral-100 mb-2">
@@ -1951,6 +2103,106 @@ async function handleMailTest() {
 }
 
 // ============================================================================
+// CV Master Export settings (schema_version 2.0.0, May 2026)
+// ============================================================================
+//
+// Drives /api/cv/export response. Four UI sections:
+//   1. summary_variants — 3 labeled textareas (vibe_coding / ai_automation /
+//      ai_video). Bind directly to an object so save sends the structured
+//      shape the backend expects.
+//   2. work_experience — JSON textarea (array). Pre-filled with the seeded
+//      example so operator can use it as a template.
+//   3. skills_matrix — JSON textarea (object). Categorized skills.
+//   4. education — JSON textarea (array). Empty list is valid.
+//
+// JSON textareas hold strings; backend accepts both raw JSON strings AND
+// already-decoded values, parses + validates server-side. Per-field 422
+// errors surface inline beneath each textarea.
+
+const cvVariantOrder = ['vibe_coding', 'ai_automation', 'ai_video']
+const cvVariants = ref({ vibe_coding: '', ai_automation: '', ai_video: '' })
+const cvWorkJson = ref('[]')
+const cvSkillsJson = ref('{}')
+const cvEducationJson = ref('[]')
+const cvSubmitting = ref(false)
+const cvErrors = ref({})
+
+// Origin of the actual API host (NOT the Vite dev server) — used for the
+// "View live /api/cv/export" deep-link. Vite dev runs on :5173 but the
+// API itself lives on XAMPP at localhost/Portfolio_v2/backend/public.
+const apiBaseOrigin = (() => {
+  if (typeof window === 'undefined') return ''
+  const origin = window.location.origin
+  if (origin.includes('localhost:5173')) return 'http://localhost/Portfolio_v2/backend/public'
+  return origin
+})()
+
+function cvVariantLabel(slug) {
+  return {
+    vibe_coding: 'Vibe Coding',
+    ai_automation: 'AI Automation',
+    ai_video: 'AI Video',
+  }[slug] || slug
+}
+
+function cvVariantDot(slug) {
+  return {
+    vibe_coding: 'bg-purple-500',
+    ai_automation: 'bg-emerald-500',
+    ai_video: 'bg-amber-500',
+  }[slug] || 'bg-neutral-400'
+}
+
+function cvVariantPlaceholder(slug) {
+  return {
+    vibe_coding: 'Full-stack vibe coder shipping production AI apps from prompt → deploy in days. INDUSIA.ai stack…',
+    ai_automation: 'AI Visual Inspection live on production lines at Evident Scientific and Novanta. Replacing $24K Keyence rigs…',
+    ai_video: 'AI video generation pipeline operator — VEO 3, Sora, Runway, Kling. 7-beat narrative-arc engine…',
+  }[slug] || ''
+}
+
+async function loadCvSettings() {
+  try {
+    const data = await settingsStore.fetchCvSettings()
+    cvVariants.value = {
+      vibe_coding: data?.summary_variants?.vibe_coding || '',
+      ai_automation: data?.summary_variants?.ai_automation || '',
+      ai_video: data?.summary_variants?.ai_video || '',
+    }
+    cvWorkJson.value = JSON.stringify(data?.work_experience ?? [], null, 2)
+    cvSkillsJson.value = JSON.stringify(data?.skills_matrix ?? {}, null, 2)
+    cvEducationJson.value = JSON.stringify(data?.education ?? [], null, 2)
+  } catch (err) {
+    // Silent — defaults remain (e.g. fresh DB before seeder ran).
+  }
+}
+
+async function handleCvSubmit() {
+  cvSubmitting.value = true
+  cvErrors.value = {}
+  try {
+    await settingsStore.updateCvSettings({
+      summary_variants: cvVariants.value,
+      work_experience: cvWorkJson.value,
+      skills_matrix: cvSkillsJson.value,
+      education: cvEducationJson.value,
+    })
+    uiStore.showSuccess('CV Master Export settings saved.', 'Saved')
+    // Re-pretty-print the JSON textareas from the freshly persisted state.
+    await loadCvSettings()
+  } catch (err) {
+    const data = err.response?.data
+    cvErrors.value = data?.errors || {}
+    uiStore.showError(
+      data?.message || err.message || 'Failed to save CV settings',
+      'Save Failed'
+    )
+  } finally {
+    cvSubmitting.value = false
+  }
+}
+
+// ============================================================================
 // LinkedIn Integration — direct OAuth + publishing controls
 // ============================================================================
 
@@ -2544,6 +2796,10 @@ async function loadSettings() {
       loadMailSettings().catch((err) => {
         // Non-fatal: mail seeder may not have run on older installs
         console.warn('[AboutSettings] mail fetch failed — using defaults', err)
+      }),
+      loadCvSettings().catch((err) => {
+        // Non-fatal: cv seeder may not have run on older installs
+        console.warn('[AboutSettings] cv fetch failed — using defaults', err)
       }),
     ])
 

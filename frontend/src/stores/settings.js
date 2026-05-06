@@ -49,6 +49,15 @@ export const useSettingsStore = defineStore('settings', {
       mail_from_address: 'aiagent@alisadikinma.com',
       mail_from_name: 'Ali Sadikin',
     },
+    // CV Master Export settings (group=cv) — feeds /api/cv/export schema 2.0.0.
+    // Each value is the JSON-decoded blob (object/array). UI textareas serialize
+    // back to JSON strings before posting via updateCvSettings.
+    cvSettings: {
+      summary_variants: { vibe_coding: '', ai_automation: '', ai_video: '' },
+      work_experience: [],
+      skills_matrix: {},
+      education: [],
+    },
     loading: false,
     error: null
   }),
@@ -332,6 +341,44 @@ export const useSettingsStore = defineStore('settings', {
           success: false,
           error: error.response?.data?.error?.message || error.response?.data?.message || error.message || 'SMTP test failed',
         }
+      }
+    },
+
+    // CV Master Export settings (May 2026, schema_version 2.0.0)
+    async fetchCvSettings() {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await api.get('/admin/settings/cv')
+        if (response.data.success) {
+          this.cvSettings = response.data.data
+        }
+        return this.cvSettings
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to fetch CV settings'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async updateCvSettings(payload) {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await api.put('/admin/settings/cv', payload)
+        if (response.data.success) {
+          await this.fetchCvSettings()
+        }
+        return response.data
+      } catch (error) {
+        // Server returns {errors: {field: msg}} on 422 — surface those.
+        const data = error.response?.data
+        this.error = data?.message || 'Failed to update CV settings'
+        // Re-throw with full payload so the caller can map per-field errors.
+        throw error
+      } finally {
+        this.loading = false
       }
     },
 

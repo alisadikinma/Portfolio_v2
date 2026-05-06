@@ -34,6 +34,7 @@ class DatabaseSeeder extends Seeder
             TelegramSettingsSeeder::class, // telegram bot for manifest/failure/success alerts
             LinkedInSettingsSeeder::class, // linkedin admin UI publishing flags
             BlogPromoSettingsSeeder::class, // blog.blog_promo_project_id for mid-article promo rotator
+            CvSettingsSeeder::class, // /api/cv/export schema_version 2.0.0 — summary_variants, work_experience, skills_matrix, education
         ]);
 
         $this->command->info('✅ Database seeding completed successfully!');

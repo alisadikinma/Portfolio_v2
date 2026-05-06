@@ -9,35 +9,39 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * CvProjectResource — JSON Resume-flavored project shape for the CV
  * Master Export endpoint consumed by jobhunter platforms.
  *
+ * Schema v2.0.0 changes (May 6, 2026)
+ * -----------------------------------
+ * - `variant_hint`: NEW — strict 3-value enum {vibe_coding, ai_automation,
+ *   ai_video}. Replaces the loose 6-value `relevance_hint` for jobhunter's
+ *   strict consumer schema. Old `relevance_hint` is preserved for back-compat
+ *   but consumers should migrate.
+ * - `tags`: freeform taxonomy (semantic categories). Was conflated with
+ *   tech_stack — now distinct.
+ * - `tech_stack`: NEW — concrete tools used to build the project (Python,
+ *   PyTorch, etc.). Sourced from the `technologies` JSON column. ATS
+ *   keyword matchers care intensely about this; tags is for filters/search.
+ * - `highlights[]`: structured shape now. Each entry is
+ *   {text, metrics, tags, variant_hint} (instead of bare strings). Existing
+ *   case-study fields are wrapped into the structured shape with empty
+ *   metrics/tags/variant_hint until per-project data entry catches up.
+ * - `metrics{}`: object shape preserved (already correct).
+ *
  * Schema mapping notes
  * --------------------
- * The `projects` table stores `title` + `description` as direct columns
- * (legacy single-language path). i18n via project_translations is optional
- * and frequently empty for older records — when present, the primary-language
- * translation (id) wins, falling back to whatever locale exists.
+ * - `industry`: surfaces `domain` (Case Study) → `category` (legacy fallback).
+ * - Translations: prefer `id` primary, fall back to first available, then
+ *   to direct columns (legacy single-language rows).
  *
- * `industry` does not exist as a column. We surface `domain` first
- * (Case Study additions) and fall back to `category` for legacy rows.
- *
- * `metrics` is parsed from `tech_stack_details` (JSON) when present —
- * authored figures live there. Otherwise empty object so callers can
- * always read it as a map.
- *
- * `highlights` collects the strongest narrative beats from the case-study
- * fields when populated: impact_statement, problem, solution, result.
- *
- * `relevance_hint` heuristic
- * --------------------------
- * 1-3 hints derived from title / tags / category / domain. Lowercase scan:
- *   - "AI" / "agent" / "automation" / "RPA" / "ML" → ai_automation, ai_agents
+ * variant_hint heuristic (strict 3 values only)
+ * ---------------------------------------------
+ *   - "video" / "veo" / "sora" / "runway" / "kling" / "viral content"
+ *     → ai_video
  *   - "vibe coding" / "claude" / "cursor" / "ai coding" → vibe_coding
- *   - "manufacturing" / "factory" / "ISC" → enterprise, manufacturing
- *   - "logistics" / "supply chain" / "port" → logistics, enterprise
- *   - "government" → gov_tech, enterprise
- *   - "banking" / "finance" → fintech
- * Plus: any 6-figure savings figure in metrics → enterprise
- *
- * Hints are deduped, capped at 3 entries.
+ *   - "ai" / "agent" / "automation" / "rpa" / "ml" / "computer vision"
+ *     / "industrial" → ai_automation
+ * Multiple matches allowed; no cap. Empty array when nothing matches
+ * (consumer treats absence as "uncategorized" — does NOT silently
+ * default to ai_automation).
  */
 class CvProjectResource extends JsonResource
 {
@@ -60,9 +64,17 @@ class CvProjectResource extends JsonResource
         // Surface domain (Case Study) first, fall back to legacy category.
         $industry = $this->domain ?: $this->category;
 
-        // tags column is JSON-cast to array; technologies similarly.
+        // tags column = freeform taxonomy (semantic categories).
+        // technologies column = concrete tools used to build it.
+        // Pre-v2: these were merged into a single tags[] field — split now
+        // because ATS scorers want tech_stack distinct from semantic tags.
         $tags = collect((array) ($this->tags ?? []))
-            ->merge((array) ($this->technologies ?? []))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $techStack = collect((array) ($this->technologies ?? []))
             ->filter()
             ->unique()
             ->values()
@@ -70,7 +82,8 @@ class CvProjectResource extends JsonResource
 
         $metrics = $this->extractMetrics();
         $highlights = $this->extractHighlights();
-        $relevanceHint = $this->buildRelevanceHint($name, $industry, $tags, $metrics);
+        $relevanceHint = $this->buildRelevanceHint($name, $industry, $tags, $techStack, $metrics);
+        $variantHint = $this->buildVariantHint($name, $industry, $tags, $techStack);
 
         // Date column candidates: start_date / end_date (Case Study era),
         // completed_at (legacy single-date rows).
@@ -84,7 +97,9 @@ class CvProjectResource extends JsonResource
             'industry' => $industry,
             'metrics' => $metrics,
             'tags' => $tags,
+            'tech_stack' => $techStack,
             'highlights' => $highlights,
+            'variant_hint' => $variantHint,
             'relevance_hint' => $relevanceHint,
             'start_date' => $startDate,
             'end_date' => $endDate,
@@ -115,9 +130,16 @@ class CvProjectResource extends JsonResource
     }
 
     /**
-     * Distill a short list of bullet-style highlights from the Case Study
-     * narrative fields. Strips HTML tags + collapses whitespace so the
-     * downstream consumer can render them as plain bullets.
+     * Distill structured highlights from the Case Study narrative fields.
+     *
+     * Schema v2.0.0 shape: each highlight is
+     *   {text: string, metrics: object|null, tags: string[], variant_hint: string[]}
+     *
+     * Existing data only has plain text per case-study field (impact /
+     * problem / solution / result), so metrics/tags/variant_hint default to
+     * empty until per-project enrichment lands. Consumer parsers can
+     * already validate against the spec'd Pydantic schema — they just see
+     * empty enrichment slots.
      */
     protected function extractHighlights(): array
     {
@@ -131,33 +153,77 @@ class CvProjectResource extends JsonResource
         return collect($candidates)
             ->map(fn ($s) => trim(preg_replace('/\s+/', ' ', strip_tags((string) $s))))
             ->filter(fn ($s) => $s !== '')
+            ->map(fn ($s) => [
+                'text' => $s,
+                'metrics' => null,
+                'tags' => [],
+                'variant_hint' => [],
+            ])
             ->values()
             ->all();
     }
 
     /**
-     * Heuristic — see class docblock for the full rule table.
+     * Strict variant hint per schema v2.0.0. Returns subset of
+     * {vibe_coding, ai_automation, ai_video} only — never values outside
+     * that triple. Empty array when nothing matches (signal: consumer
+     * should not auto-categorize this entry).
      */
-    protected function buildRelevanceHint(?string $name, ?string $industry, array $tags, array $metrics): array
+    protected function buildVariantHint(?string $name, ?string $industry, array $tags, array $techStack): array
     {
         $haystack = mb_strtolower(implode(' ', array_filter([
             $name,
             $industry,
             implode(' ', $tags),
+            implode(' ', $techStack),
         ])), 'UTF-8');
 
         $hints = [];
 
-        // AI / automation cluster
-        if (preg_match('/\b(ai|agent|automation|rpa|ml)\b/', $haystack)) {
-            $hints[] = 'ai_automation';
-            $hints[] = 'ai_agents';
+        // ai_video — explicit AI-video tooling or output focus.
+        if (preg_match('/\b(veo|sora|runway|kling|viral\s+content|video\s+generation|ai\s+video)\b/', $haystack)) {
+            $hints[] = 'ai_video';
         }
+
+        // vibe_coding — IDE-coupled "AI authoring code in tight feedback loop".
         if (str_contains($haystack, 'vibe coding')
-            || str_contains($haystack, 'claude')
+            || str_contains($haystack, 'claude code')
             || str_contains($haystack, 'cursor')
             || str_contains($haystack, 'ai coding')) {
             $hints[] = 'vibe_coding';
+        }
+
+        // ai_automation — broadest bucket: AI agents, RPA, computer vision,
+        // workflow automation, industrial QC.
+        if (preg_match('/\b(ai|agent|automation|rpa|ml|computer\s+vision|industrial|qc|workflow|n8n|zapier|langchain|rag)\b/', $haystack)) {
+            $hints[] = 'ai_automation';
+        }
+
+        return collect($hints)->unique()->values()->all();
+    }
+
+    /**
+     * Legacy 6-value relevance_hint kept for back-compat with v1.0.0
+     * consumers. Adds enterprise / manufacturing / logistics / fintech /
+     * gov_tech tags on top of the 3 strict variants.
+     *
+     * Heuristic — see class docblock for the full rule table.
+     */
+    protected function buildRelevanceHint(?string $name, ?string $industry, array $tags, array $techStack, array $metrics): array
+    {
+        $haystack = mb_strtolower(implode(' ', array_filter([
+            $name,
+            $industry,
+            implode(' ', $tags),
+            implode(' ', $techStack),
+        ])), 'UTF-8');
+
+        $hints = $this->buildVariantHint($name, $industry, $tags, $techStack);
+
+        // Legacy ai_agents marker (consolidated into ai_automation in v2.0.0
+        // variant_hint, but kept for back-compat in relevance_hint).
+        if (preg_match('/\b(agent|rag|langchain)\b/', $haystack)) {
+            $hints[] = 'ai_agents';
         }
 
         // Industry verticals
@@ -197,7 +263,7 @@ class CvProjectResource extends JsonResource
             }
         }
 
-        return collect($hints)->unique()->take(3)->values()->all();
+        return collect($hints)->unique()->take(5)->values()->all();
     }
 
     /**

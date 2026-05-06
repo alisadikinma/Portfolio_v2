@@ -107,6 +107,14 @@ echo "▶ php artisan db:seed linkedin_testimonials (idempotent)"
 php artisan db:seed --class=LinkedInTestimonialsSeeder --force || \
   echo "  (seeder failed or already applied — continuing)"
 
+# CV Master Export schema_version 2.0.0 (May 6, 2026): seeds summary_variants
+# + work_experience + skills_matrix + education JSON keys consumed by
+# /api/cv/export. Idempotent via firstOrCreate — operator-edited values
+# survive deploys.
+echo "▶ php artisan db:seed cv (idempotent)"
+php artisan db:seed --class=CvSettingsSeeder --force || \
+  echo "  (seeder failed or already applied — continuing)"
+
 # ---- 4. Cache refresh --------------------------------------------------------
 echo "▶ Laravel cache refresh"
 php artisan config:clear
