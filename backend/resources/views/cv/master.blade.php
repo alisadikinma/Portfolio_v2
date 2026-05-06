@@ -1,5 +1,5 @@
 @php
-    $location = collect([$basics['city'] ?? null, $basics['country'] ?? null])
+    $location = $basics['location'] ?? collect([$basics['city'] ?? null, $basics['country'] ?? null])
         ->filter()
         ->implode(', ');
 
@@ -22,10 +22,40 @@
 {!! implode(' · ', $allBits) !!}
 
 @endif
+@if(!empty($basics['hero_tagline']))
+> {!! $basics['hero_tagline'] !!}
+
+@endif
 ## Summary
 
 {!! $basics['summary'] !!}
 
+@if(!$compact && !empty($basics['mission']))
+## Mission
+
+{!! $basics['mission'] !!}
+
+@endif
+@if(!$compact && !empty($basics['approach']))
+## Approach
+
+{!! $basics['approach'] !!}
+
+@endif
+@if(!empty($basics['availability_note']))
+## Availability
+
+{!! $basics['availability_note'] !!}
+
+@endif
+@if(!empty($skills_list))
+## Core Skills
+
+@foreach($skills_list as $skill)
+- {!! $skill !!}
+@endforeach
+
+@endif
 ## Skills Matrix
 
 @foreach($skill_domains as $domain)
@@ -35,6 +65,54 @@
 @endforeach
 
 @endforeach
+@if(!empty($experience))
+## Experience
+
+@foreach($experience as $e)
+@php
+    $expLine = '### ' . $e['title'];
+    if (!empty($e['company'])) {
+        $expLine .= ' · ' . $e['company'];
+    }
+    if (!empty($e['period'])) {
+        $expLine .= ' (' . $e['period'] . ')';
+    }
+    $metaParts = collect([
+        $e['location'] ?? null,
+        $e['company_url'] ?? null,
+    ])->filter()->implode(' · ');
+@endphp
+{!! $expLine !!}
+@if($metaParts !== '')
+{!! $metaParts !!}
+@endif
+@if(!empty($e['description']))
+
+{!! $e['description'] !!}
+@endif
+
+@endforeach
+@endif
+@if(!empty($education))
+## Education
+
+@foreach($education as $ed)
+@php
+    $eduLine = '- **' . $ed['degree'] . '**';
+    if (!empty($ed['institution'])) {
+        $eduLine .= ' · ' . $ed['institution'];
+    }
+    if (!empty($ed['period'])) {
+        $eduLine .= ' (' . $ed['period'] . ')';
+    }
+    if (!empty($ed['description'])) {
+        $eduLine .= ' — ' . $ed['description'];
+    }
+@endphp
+{!! $eduLine !!}
+@endforeach
+
+@endif
 ## Selected Projects ({{ count($projects) }})
 
 @foreach($projects as $i => $p)
@@ -56,11 +134,21 @@
 @if($metaLine !== '')
 {!! $metaLine !!}
 @endif
-@if(!$compact && !empty($p['problem']))
-Problem: {!! $p['problem'] !!}
+@if(!$compact && !empty($p['url']))
+URL: {{ $p['url'] }}
 @endif
-@if(!$compact && !empty($p['outcome']))
-Outcome: {!! $p['outcome'] !!}
+@if(!$compact && !empty($p['description']))
+
+{!! $p['description'] !!}
+@endif
+@if(!$compact && !empty($p['narrative']))
+
+@foreach($p['narrative'] as $beat)
+- **{{ $beat['label'] }}:** {!! $beat['text'] !!}
+@endforeach
+@endif
+@if(!$compact && !empty($p['metrics']))
+Metrics: {!! $p['metrics'] !!}
 @endif
 @if(!empty($p['relevance']))
 Relevance: {{ $p['relevance'] }}
@@ -92,7 +180,14 @@ Relevance: {{ $p['relevance'] }}
 ## Thought Leadership
 
 @foreach($thought_leadership as $t)
-- [{!! $t['title'] !!}]({{ $t['url'] }}) · {{ $t['date'] }}@if(!empty($t['excerpt'])) · {!! $t['excerpt'] !!}@endif
+@php
+    $thoughtTail = collect([
+        $t['date'] ?? null,
+        $t['category'] ?? null,
+        $t['excerpt'] ?? null,
+    ])->filter()->implode(' · ');
+@endphp
+- [{!! $t['title'] !!}]({{ $t['url'] }}) · {!! $thoughtTail !!}
 @endforeach
 
 @endif

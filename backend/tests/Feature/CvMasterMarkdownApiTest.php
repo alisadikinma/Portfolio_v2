@@ -275,12 +275,12 @@ class CvMasterMarkdownApiTest extends TestCase
     }
 
     /** @test */
-    public function renders_thought_leadership_with_top_5_posts_by_published_at(): void
+    public function renders_thought_leadership_with_top_15_posts_by_published_at(): void
     {
         $cat = Category::create(['name' => 'AI', 'slug' => 'ai']);
 
-        // 7 published posts — only the 5 most recent should land in the section.
-        for ($i = 1; $i <= 7; $i++) {
+        // 18 published posts — only the 15 most recent should land in non-compact mode.
+        for ($i = 1; $i <= 18; $i++) {
             $post = Post::create([
                 'category_id' => $cat->id,
                 'slug' => "post-$i",
@@ -288,7 +288,7 @@ class CvMasterMarkdownApiTest extends TestCase
                 'excerpt' => "Stub excerpt $i",
                 'content' => "<p>Body $i</p>",
                 'published' => true,
-                'published_at' => now()->subDays(8 - $i), // post-7 is most recent
+                'published_at' => now()->subDays(19 - $i), // post-18 is most recent
             ]);
             PostTranslation::create([
                 'post_id' => $post->id,
@@ -306,11 +306,12 @@ class CvMasterMarkdownApiTest extends TestCase
         $body = $this->get('/api/cv/master.md')->assertOk()->getContent();
 
         $this->assertStringContainsString('## Thought Leadership', $body);
-        // Most recent (post-7) shows up; oldest 2 (post-1, post-2) trimmed.
-        $this->assertStringContainsString('EN Title 7', $body);
-        $this->assertStringContainsString('EN Title 3', $body);
-        $this->assertStringNotContainsString('EN Title 2', $body);
-        $this->assertStringNotContainsString('EN Title 1', $body);
+        // Most recent (post-18) shows up; 15-window means post-4..18 included, post-1..3 trimmed.
+        // Use markdown link bracket as delimiter so "Title 1" doesn't substring-match "Title 18".
+        $this->assertStringContainsString('EN Title 18]', $body);
+        $this->assertStringContainsString('EN Title 4]', $body);
+        $this->assertStringNotContainsString('EN Title 3]', $body);
+        $this->assertStringNotContainsString('EN Title 1]', $body);
     }
 
     /** @test */

@@ -45,8 +45,17 @@ class CvMasterMarkdownService
             'phone' => $about->get('phone'),
             'city' => $about->get('city'),
             'country' => $about->get('country'),
+            'location' => $about->get('location'),
+            'hero_tagline' => $this->normalizeMarkdownText($about->get('hero_tagline') ?: ''),
+            'availability_note' => $this->normalizeMarkdownText($about->get('availability_note') ?: ''),
+            'mission' => $this->normalizeMarkdownText($about->get('mission') ?: ''),
+            'approach' => $this->normalizeMarkdownText($about->get('approach') ?: ''),
             'profiles' => $this->parseSocialLinks($about->get('social_links')),
         ];
+
+        $skillsList = $this->parseJsonArray($about->get('skills'));
+        $experienceList = $this->parseJsonArray($about->get('experience'));
+        $educationList = $this->parseJsonArray($about->get('education'));
 
         $projects = Project::with('translations')
             ->orderBy('sort_order')
@@ -54,9 +63,9 @@ class CvMasterMarkdownService
             ->get();
 
         $skillDomains = $this->aggregateSkillDomains($projects);
-        $projectRows = $projects->map(fn ($p) => $this->buildProjectRow($p))->all();
-        $awardRows = $this->loadAwardRows();
-        $thoughtRows = $this->loadThoughtLeadershipRows();
+        $projectRows = $projects->map(fn ($p) => $this->buildProjectRow($p, $compact))->all();
+        $awardRows = $this->loadAwardRows($compact);
+        $thoughtRows = $this->loadThoughtLeadershipRows($compact);
 
         $appUrl = rtrim(config('app.url'), '/');
 
@@ -64,6 +73,9 @@ class CvMasterMarkdownService
             'basics' => $basics,
             'compact' => $compact,
             'skill_domains' => $skillDomains,
+            'skills_list' => $skillsList,
+            'experience' => $this->buildExperienceRows($experienceList, $compact),
+            'education' => $this->buildEducationRows($educationList),
             'projects' => $projectRows,
             'awards' => $awardRows,
             'thought_leadership' => $thoughtRows,
@@ -73,13 +85,65 @@ class CvMasterMarkdownService
     }
 
     /**
+     * Decode a settings JSON column into an array, returning [] on any
+     * decode failure or non-array result.
+     */
+    protected function parseJsonArray($raw): array
+    {
+        if (!$raw) return [];
+        $decoded = is_array($raw) ? $raw : json_decode((string) $raw, true);
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    /**
+     * Render experience entries into role lines with dates, company,
+     * location, and a description (full in non-compact, summarized in compact).
+     */
+    protected function buildExperienceRows(array $entries, bool $compact): array
+    {
+        return collect($entries)->map(function (array $e) use ($compact) {
+            $start = (string) ($e['start_date'] ?? '');
+            $end = !empty($e['current']) ? 'present' : (string) ($e['end_date'] ?? '');
+            $period = trim($start . ($end !== '' ? ' – ' . $end : ''));
+
+            $description = (string) ($e['description'] ?? '');
+            $rendered = $compact
+                ? $this->summarize($description, 30)
+                : $this->normalizeMarkdownText($description);
+
+            return [
+                'title' => $this->normalizeMarkdownText((string) ($e['title'] ?? '')),
+                'company' => $this->normalizeMarkdownText((string) ($e['company'] ?? '')),
+                'company_url' => (string) ($e['company_url'] ?? '') ?: null,
+                'location' => $this->normalizeMarkdownText((string) ($e['location'] ?? '')) ?: null,
+                'period' => $period !== '' ? $period : null,
+                'current' => !empty($e['current']),
+                'description' => $rendered ?: null,
+            ];
+        })->all();
+    }
+
+    /**
+     * Render education entries into degree + institution + period + brief note.
+     */
+    protected function buildEducationRows(array $entries): array
+    {
+        return collect($entries)->map(fn (array $e) => [
+            'degree' => $this->normalizeMarkdownText((string) ($e['degree'] ?? '')),
+            'institution' => $this->normalizeMarkdownText((string) ($e['institution'] ?? '')),
+            'period' => (string) ($e['period'] ?? '') ?: null,
+            'description' => $this->normalizeMarkdownText((string) ($e['description'] ?? '')) ?: null,
+        ])->all();
+    }
+
+    /**
      * Award rows ordered by `is_featured DESC, id DESC` — mirrors the
      * exact query used by CvExportController so the JSON and markdown
      * exports surface awards in the same priority.
      *
      * @return array<int, array{year:?string,title:string,organization:?string,description:?string}>
      */
-    protected function loadAwardRows(): array
+    protected function loadAwardRows(bool $compact = false): array
     {
         return Award::orderByDesc('is_featured')
             ->orderByDesc('id')
@@ -89,7 +153,7 @@ class CvMasterMarkdownService
                 'title' => $this->normalizeMarkdownText((string) $a->title),
                 'organization' => $a->organization ? $this->normalizeMarkdownText((string) $a->organization) : null,
                 'description' => $a->description
-                    ? $this->summarize((string) $a->description, 30)
+                    ? $this->summarize((string) $a->description, $compact ? 30 : 150)
                     : null,
             ])
             ->all();
@@ -103,7 +167,7 @@ class CvMasterMarkdownService
      *
      * @return array<int, array{title:string,url:string,date:string,excerpt:string}>
      */
-    protected function loadThoughtLeadershipRows(): array
+    protected function loadThoughtLeadershipRows(bool $compact = false): array
     {
         $appUrl = rtrim(config('app.url'), '/');
 
@@ -111,9 +175,9 @@ class CvMasterMarkdownService
             ->where('published', true)
             ->whereNotNull('published_at')
             ->orderByDesc('published_at')
-            ->limit(5)
+            ->limit($compact ? 5 : 15)
             ->get()
-            ->map(function (Post $p) use ($appUrl) {
+            ->map(function (Post $p) use ($appUrl, $compact) {
                 $translations = $p->relationLoaded('translations')
                     ? $p->translations
                     : $p->translations()->get();
@@ -127,7 +191,8 @@ class CvMasterMarkdownService
                     'title' => $this->normalizeMarkdownText((string) $title),
                     'url' => $appUrl . '/blog/' . $p->slug,
                     'date' => $p->published_at?->toDateString() ?? '',
-                    'excerpt' => $this->summarize((string) ($excerpt ?? ''), 24) ?? '',
+                    'excerpt' => $this->summarize((string) ($excerpt ?? ''), $compact ? 24 : 80) ?? '',
+                    'category' => $p->category?->name ?? null,
                 ];
             })
             ->all();
@@ -174,7 +239,7 @@ class CvMasterMarkdownService
      *   relevance:?string
      * }
      */
-    protected function buildProjectRow(Project $project): array
+    protected function buildProjectRow(Project $project, bool $compact = false): array
     {
         $request = Request::create('/api/cv/master.md', 'GET');
         $resource = (new CvProjectResource($project))->toArray($request);
@@ -194,10 +259,15 @@ class CvMasterMarkdownService
         $end = $this->yearFromDate($project->end_date) ?? $this->yearFromDate($project->completed_at);
         $yearRange = $this->formatYearRange($start, $end);
 
-        // Tech stack — comma-joined, capped to keep token budget tight.
-        $techStack = collect($resource['tags'] ?? [])
-            ->take(8)
-            ->implode(', ');
+        // Tech stack — full list in non-compact, capped at 5 in compact.
+        $tags = collect($resource['tags'] ?? []);
+        $techStack = ($compact ? $tags->take(5) : $tags)->implode(', ');
+
+        // Narrative beats (impact/problem/solution/result) — only for non-compact.
+        $narrative = $compact ? null : $this->buildNarrativeBeats($project);
+
+        // Metrics map — surface authored numbers (savings, deploy counts, KPIs).
+        $metrics = $compact ? null : $this->buildMetricsLine($resource['metrics'] ?? []);
 
         return [
             'title' => $this->normalizeMarkdownText((string) $title),
@@ -205,10 +275,60 @@ class CvMasterMarkdownService
             'year_range' => $yearRange,
             'industry' => $resource['industry'] ?? null,
             'tech_stack' => $techStack !== '' ? $techStack : null,
-            'problem' => $this->summarize($description ?? '', 80),
-            'outcome' => $this->summarize($project->result ?? $project->impact_statement ?? '', 60),
+            'description' => $compact ? null : ($this->normalizeMarkdownText((string) ($description ?? '')) ?: null),
+            'problem' => $compact ? null : $this->summarize($description ?? '', 200),
+            'outcome' => $compact ? null : $this->summarize($project->result ?? $project->impact_statement ?? '', 150),
+            'narrative' => $narrative,
+            'metrics' => $metrics,
+            'url' => $resource['url'] ?? null,
             'relevance' => collect($resource['relevance_hint'] ?? [])->implode(', ') ?: null,
         ];
+    }
+
+    /**
+     * Compose a 4-beat narrative array (Impact / Problem / Solution / Result)
+     * from the project's case-study fields. Returns null when no beat is
+     * populated. Each beat is HTML-stripped and word-bounded.
+     *
+     * @return array<int, array{label:string, text:string}>|null
+     */
+    protected function buildNarrativeBeats(Project $project): ?array
+    {
+        $beats = [
+            ['label' => 'Impact', 'raw' => $project->impact_statement],
+            ['label' => 'Problem', 'raw' => $project->problem],
+            ['label' => 'Solution', 'raw' => $project->solution],
+            ['label' => 'Result', 'raw' => $project->result],
+        ];
+
+        $rendered = collect($beats)
+            ->map(fn ($beat) => [
+                'label' => $beat['label'],
+                'text' => $this->summarize((string) ($beat['raw'] ?? ''), 120) ?? '',
+            ])
+            ->filter(fn ($beat) => $beat['text'] !== '')
+            ->values()
+            ->all();
+
+        return $rendered ?: null;
+    }
+
+    /**
+     * Render the metrics map as an inline "key: value · key: value" string.
+     * Returns null when empty so the Blade @if guard hides the line.
+     */
+    protected function buildMetricsLine(array $metrics): ?string
+    {
+        if (empty($metrics)) {
+            return null;
+        }
+        $parts = [];
+        foreach ($metrics as $key => $value) {
+            if (!is_scalar($value)) continue;
+            $label = is_string($key) ? str_replace('_', ' ', $key) : null;
+            $parts[] = $label ? "{$label}: {$value}" : (string) $value;
+        }
+        return $parts ? implode(' · ', $parts) : null;
     }
 
     /**
@@ -316,11 +436,16 @@ class CvMasterMarkdownService
         if ($raw === '') {
             return '';
         }
+        // Treat consecutive <br> tags as paragraph breaks (rich-text editors
+        // often emit <br><br> instead of wrapping content in <p>).
+        $withParaBreaks = preg_replace('#(<br\s*/?\s*>\s*){2,}#i', "\n\n", $raw);
+        // Single <br> → single newline (line break inside a paragraph).
+        $withParaBreaks = preg_replace('#<br\s*/?\s*>#i', "\n", $withParaBreaks);
         // Insert paragraph breaks where HTML block tags close, then strip.
         $withBreaks = preg_replace(
             '#</(p|div|h[1-6]|li|blockquote)>#i',
             "$0\n\n",
-            $raw
+            $withParaBreaks
         );
         $stripped = strip_tags($withBreaks);
         $decoded = html_entity_decode($stripped, ENT_QUOTES | ENT_HTML5, 'UTF-8');
