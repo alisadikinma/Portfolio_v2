@@ -217,6 +217,15 @@ class CvProjectResource extends JsonResource
      * {vibe_coding, ai_automation, ai_video} only — never values outside
      * that triple. Empty array when nothing matches (signal: consumer
      * should not auto-categorize this entry).
+     *
+     * ai_automation keyword set was widened in the post-v2.0.0 audit so it
+     * catches the SatNusa-era manufacturing / IoT / shop-floor portfolio
+     * (35 projects with `industry=Web|IoT|Mobile` that the original
+     * narrower regex skipped). The matching is OR-of-broad-buckets — if a
+     * project shows ANY industrial / monitoring / workflow / shop-floor /
+     * manufacturing-line signal, it qualifies as ai_automation. False
+     * positives are cheap (consumer just sees a hint); false negatives are
+     * expensive (consumer can't rank by variant).
      */
     protected function buildVariantHint(?string $name, ?string $industry, array $tags, array $techStack): array
     {
@@ -242,9 +251,21 @@ class CvProjectResource extends JsonResource
             $hints[] = 'vibe_coding';
         }
 
-        // ai_automation — broadest bucket: AI agents, RPA, computer vision,
-        // workflow automation, industrial QC.
-        if (preg_match('/\b(ai|agent|automation|rpa|ml|computer\s+vision|industrial|qc|workflow|n8n|zapier|langchain|rag)\b/', $haystack)) {
+        // ai_automation — broadest bucket. Three keyword groups so the
+        // regex stays readable:
+        //   Group A — explicit AI / agent / ML / CV / RPA / workflow tooling.
+        //   Group B — manufacturing / shop-floor systems (MES, SMT,
+        //             moulding, stamping, fabrication, tooling, kiosk).
+        //   Group C — operational monitoring / sensor / dashboard / asset
+        //             tracking / digital-twin / inspection workflows that
+        //             SatNusa-era projects implemented but the v2.0.0
+        //             heuristic missed.
+        $patternA = '\b(ai|agent|automation|rpa|ml|computer\s+vision|industrial|qc|workflow|n8n|zapier|langchain|rag)\b';
+        $patternB = '\b(mes|smt|moulding|stamping|fabrication|tooling|kiosk|production)\b';
+        $patternC = '\b(iot|monitoring|sensor|sensors|inspection|attendance|warehouse|fleet|forklift|dashboard|digital\s+twin|asset\s+audit|esd)\b';
+        if (preg_match('/' . $patternA . '/', $haystack)
+            || preg_match('/' . $patternB . '/', $haystack)
+            || preg_match('/' . $patternC . '/', $haystack)) {
             $hints[] = 'ai_automation';
         }
 

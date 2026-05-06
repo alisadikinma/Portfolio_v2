@@ -120,5 +120,9 @@
       "D:\\Projects\\claude-plugin\\article-content-writer",
       "C:\\Users\\alisa\\.claude\\plugins\\marketplaces\\alisadikinma-ai-content-suite\\.claude-plugin"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "ssh-prod-vps"
+  ],
+  "enableAllProjectMcpServers": true
 }
