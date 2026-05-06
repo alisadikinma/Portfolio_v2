@@ -189,9 +189,13 @@
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                 <div class="inline-flex items-center gap-3">
+                  <!-- Copy: only when plaintext is cached this session.
+                       Otherwise we render a non-interactive lock badge so the
+                       UI doesn't promise something it can't deliver. -->
                   <button
+                    v-if="hasPlaintextCached(token.id)"
                     @click="handleCopyToken(token)"
-                    :title="hasPlaintextCached(token.id) ? 'Cached this session — click to copy' : 'Plain-text not cached — click to paste & copy'"
+                    title="Cached this session — click to copy"
                     class="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
                   >
                     <svg v-if="copiedTokenId !== token.id" class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -203,6 +207,24 @@
                     <span :class="copiedTokenId === token.id ? 'text-emerald-600 dark:text-emerald-400' : ''">
                       {{ copiedTokenId === token.id ? 'Copied' : 'Copy' }}
                     </span>
+                  </button>
+                  <span
+                    v-else
+                    title="Token plain-text only visible at creation — regenerate to get a fresh copyable value"
+                    class="inline-flex items-center gap-1 text-gray-400 dark:text-gray-500 cursor-default"
+                  >
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0-1.657 1.343-3 3-3s3 1.343 3 3v2M5 11h14a1 1 0 011 1v8a1 1 0 01-1 1H5a1 1 0 01-1-1v-8a1 1 0 011-1z" />
+                    </svg>
+                    <span>Hidden</span>
+                  </span>
+                  <span class="text-gray-300 dark:text-gray-600">·</span>
+                  <button
+                    @click="confirmRegenerate(token)"
+                    title="Revoke this token and mint a fresh one with the same name + abilities"
+                    class="text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300"
+                  >
+                    Regenerate
                   </button>
                   <span class="text-gray-300 dark:text-gray-600">·</span>
                   <button
@@ -298,18 +320,15 @@
           <span v-if="playground.warning" class="text-xs text-amber-600 dark:text-amber-400">{{ playground.warning }}</span>
         </div>
 
-        <!-- Plain-text token field — only used when the token's plainText
-             isn't cached client-side (i.e. minted in a different session). -->
+        <!-- Token has no cached plaintext — playground can't bearer-auth without
+             it. Point operator at the Regenerate action instead of asking them
+             to paste manually (consistent with the row-level UX). -->
         <div v-if="playground.tokenId && !playgroundTokenPlain" class="rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20">
-          <label class="block text-xs font-medium uppercase tracking-wider text-amber-700 dark:text-amber-300">Paste plain-text token</label>
-          <input
-            v-model="playground.manualToken"
-            type="password"
-            :placeholder="'e.g. ' + playgroundTokenIdPrefix() + '|...'"
-            class="mt-1 block w-full rounded-md border border-amber-300 px-3 py-2 font-mono text-xs focus:border-amber-500 focus:outline-none focus:ring-amber-500 dark:border-amber-700 dark:bg-amber-900/30 dark:text-white"
-          />
-          <p class="mt-1 text-[11px] text-amber-700 dark:text-amber-300">
-            Sanctum doesn't store plain-text tokens server-side. Either mint a new token (gets cached for this session) or paste the saved plain-text value.
+          <p class="text-sm text-amber-800 dark:text-amber-200">
+            <span class="font-medium">Token plaintext unavailable.</span>
+            It was minted in a different session and Sanctum only stores the hash.
+            <button @click="mainView = 'tokens'" class="underline hover:no-underline">Switch to Tokens</button>
+            and click <span class="font-medium">Regenerate</span> to get a fresh copyable value.
           </p>
         </div>
 
@@ -494,57 +513,51 @@
       </div>
     </div>
 
-    <!-- Copy Token Paste Modal — shown when plain-text isn't cached for the
-         requested token (e.g. minted in a previous session or via tinker).
-         Sanctum doesn't store plain text server-side, so the operator pastes
-         the saved value once; we cache it for the rest of the session. -->
+    <!-- Regenerate Confirmation Modal — replaces the old "paste your saved
+         token" recovery flow. Revoke + create cycle invalidates any consumer
+         still using the old plaintext, so we confirm before proceeding. -->
     <div
-      v-if="showCopyPasteModal"
+      v-if="showRegenerateModal"
       class="fixed inset-0 z-50 overflow-y-auto"
-      @click.self="closeCopyPasteModal"
-      @keydown.esc="closeCopyPasteModal"
+      @click.self="showRegenerateModal = false"
+      @keydown.esc="showRegenerateModal = false"
     >
       <div class="flex min-h-screen items-center justify-center px-4">
         <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
 
         <div class="relative w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800">
-          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
-            Paste plain-text token
-          </h3>
-          <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            <span class="font-medium text-gray-900 dark:text-white">{{ tokenToCopy?.name }}</span>
-            was minted in a previous session, so the plain text isn't cached on this device.
-            Sanctum stores only the hash — paste the saved value once and we'll cache it for this tab.
-          </p>
-
-          <div class="mt-4">
-            <label class="block text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              Token (format: <span class="font-mono normal-case">{{ tokenToCopy?.id }}|...</span>)
-            </label>
-            <input
-              ref="pasteInputRef"
-              v-model="pastedTokenInput"
-              type="password"
-              :placeholder="(tokenToCopy?.id || '') + '|...'"
-              autocomplete="off"
-              spellcheck="false"
-              class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-xs focus:border-blue-500 focus:outline-none focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-              @keydown.enter="confirmPasteAndCopy"
-            />
-            <p v-if="pasteError" class="mt-1 text-xs text-red-600 dark:text-red-400">{{ pasteError }}</p>
+          <div class="flex items-start gap-3">
+            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900">
+              <svg class="h-5 w-5 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0L3.16 16.25A2 2 0 005 19z" />
+              </svg>
+            </div>
+            <div class="flex-1">
+              <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Regenerate token?</h3>
+              <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                This revokes <span class="font-medium text-gray-900 dark:text-white">{{ tokenToRegenerate?.name }}</span>
+                and mints a fresh token with the same name and abilities. Any integration still using the old token
+                will start receiving 401 errors immediately.
+              </p>
+              <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                You'll see the new plaintext once — copy it before closing.
+              </p>
+            </div>
           </div>
 
           <div class="mt-6 flex space-x-3">
             <button
-              @click="confirmPasteAndCopy"
-              :disabled="!pastedTokenInput"
-              class="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              @click="regenerateToken"
+              :disabled="regenerating"
+              class="flex-1 inline-flex items-center justify-center rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
             >
-              Cache & Copy
+              <span v-if="regenerating" class="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+              {{ regenerating ? 'Regenerating…' : 'Regenerate' }}
             </button>
             <button
-              @click="closeCopyPasteModal"
-              class="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+              @click="showRegenerateModal = false"
+              :disabled="regenerating"
+              class="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
             >
               Cancel
             </button>
@@ -589,7 +602,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useAutomation } from '@/stores/automation'
 import { useToast } from '@/stores/ui'
 
@@ -606,16 +619,13 @@ const activeTab = ref('all')
 
 // Per-row Copy action state. `copiedTokenId` is the id of the row that just
 // had its token copied to the clipboard — used to flip the icon + label to
-// "Copied" for ~2s. The paste modal opens when the operator clicks Copy on
-// a token whose plain-text isn't cached client-side (Sanctum stores only the
-// hash server-side; the cache is populated at mint time, so any token minted
-// in a previous session / via tinker needs a one-time paste).
+// "Copied" for ~2s. Tokens minted in a previous session have no cached
+// plaintext (Sanctum stores hash only) — those rows show a lock icon instead
+// of Copy, and the operator regenerates if they need a fresh copyable token.
 const copiedTokenId = ref(null)
-const showCopyPasteModal = ref(false)
-const tokenToCopy = ref(null)
-const pastedTokenInput = ref('')
-const pasteError = ref('')
-const pasteInputRef = ref(null)
+const showRegenerateModal = ref(false)
+const tokenToRegenerate = ref(null)
+const regenerating = ref(false)
 
 // Top-level view: 'tokens' (CRUD listing with category sub-tabs) vs
 // 'playground' (in-page endpoint tester). Persisted across navigations
@@ -808,67 +818,65 @@ async function writeToClipboard(text) {
 }
 
 async function handleCopyToken(token) {
+  // Copy button only renders when plaintext is cached — this is just the
+  // hot-path action. The lock-icon variant has no click handler.
   const cached = playgroundCache.value[token.id]
-  if (cached) {
-    const ok = await writeToClipboard(cached)
-    if (ok) {
-      copiedTokenId.value = token.id
-      toast.success('Token copied to clipboard')
-      setTimeout(() => {
-        if (copiedTokenId.value === token.id) copiedTokenId.value = null
-      }, 2000)
-    } else {
-      toast.error('Failed to copy token')
-    }
-    return
+  if (!cached) return
+  const ok = await writeToClipboard(cached)
+  if (ok) {
+    copiedTokenId.value = token.id
+    toast.success('Token copied to clipboard')
+    setTimeout(() => {
+      if (copiedTokenId.value === token.id) copiedTokenId.value = null
+    }, 2000)
+  } else {
+    toast.error('Failed to copy token')
   }
-  // Cache miss — open paste modal so the operator can supply the saved value.
-  tokenToCopy.value = token
-  pastedTokenInput.value = ''
-  pasteError.value = ''
-  showCopyPasteModal.value = true
-  await nextTick()
-  pasteInputRef.value?.focus()
 }
 
-async function confirmPasteAndCopy() {
-  const value = (pastedTokenInput.value || '').trim()
-  if (!value) {
-    pasteError.value = 'Paste the saved token value to continue.'
-    return
-  }
-  if (!value.includes('|')) {
-    pasteError.value = 'Token must look like "<id>|<hash>" — check the saved value.'
-    return
-  }
-  const expectedPrefix = String(tokenToCopy.value?.id || '') + '|'
-  if (!value.startsWith(expectedPrefix)) {
-    pasteError.value = `Token id mismatch — expected prefix "${expectedPrefix}".`
-    return
-  }
-  // Cache for the rest of the session, then copy.
-  playgroundCache.value[tokenToCopy.value.id] = value
-  savePlaintextCache()
-  const ok = await writeToClipboard(value)
-  if (!ok) {
-    toast.error('Cached, but failed to copy to clipboard')
-    closeCopyPasteModal()
-    return
-  }
-  copiedTokenId.value = tokenToCopy.value.id
-  toast.success('Token cached & copied')
-  const justCopiedId = tokenToCopy.value.id
-  setTimeout(() => {
-    if (copiedTokenId.value === justCopiedId) copiedTokenId.value = null
-  }, 2000)
-  closeCopyPasteModal()
+// --- Regenerate ----------------------------------------------------------
+// Replaces the old "paste your saved token" recovery flow. When operator
+// loses the plaintext (token from a previous session), they regenerate:
+// revoke the old token then mint a fresh one with the same name + abilities.
+// The new plaintext is cached + shown in the "Token Created" modal so the
+// operator can copy it once before it's gone.
+function confirmRegenerate(token) {
+  tokenToRegenerate.value = token
+  showRegenerateModal.value = true
 }
 
-function closeCopyPasteModal() {
-  showCopyPasteModal.value = false
-  tokenToCopy.value = null
-  pastedTokenInput.value = ''
-  pasteError.value = ''
+async function regenerateToken() {
+  const old = tokenToRegenerate.value
+  if (!old || regenerating.value) return
+  regenerating.value = true
+  try {
+    // Strip the category prefix from the stored name so createToken can
+    // re-prefix it server-side (consistent with how the create modal works).
+    const cat = selectableCategories.value.find((c) => c.slug === old.category)
+    const prefix = cat?.prefix || 'api-'
+    const bareName = old.name.startsWith(prefix) ? old.name.slice(prefix.length) : old.name
+
+    await automationStore.revokeToken(old.id)
+
+    const response = await automationStore.createToken({
+      category: old.category,
+      name: bareName,
+      abilities: old.abilities || [],
+    })
+
+    // Drop the cached plaintext for the now-revoked id (keeps cache tidy).
+    delete playgroundCache.value[old.id]
+
+    createdToken.value = response.token
+    showRegenerateModal.value = false
+    tokenToRegenerate.value = null
+    showTokenModal.value = true
+    toast.success('Token regenerated')
+  } catch (error) {
+    toast.error(error.response?.data?.message || 'Failed to regenerate token')
+  } finally {
+    regenerating.value = false
+  }
 }
 
 const confirmRevoke = (token) => {
@@ -962,7 +970,6 @@ const playground = ref({
   tokenId: null,
   method: 'GET',
   endpoint: '/api/cv/master.md',
-  manualToken: '',
   loading: false,
   response: null,
   warning: '',
@@ -971,19 +978,8 @@ const playground = ref({
 
 const playgroundTokenPlain = computed(() => {
   if (!playground.value.tokenId) return null
-  // 1. Cached from a recent mint in this session
-  const cached = playgroundCache.value[playground.value.tokenId]
-  if (cached) return cached
-  // 2. Manually pasted by operator
-  if (playground.value.manualToken && playground.value.manualToken.includes('|')) {
-    return playground.value.manualToken
-  }
-  return null
+  return playgroundCache.value[playground.value.tokenId] || null
 })
-
-function playgroundTokenIdPrefix() {
-  return playground.value.tokenId ? String(playground.value.tokenId) : '<id>'
-}
 
 // Suggested endpoints filtered by selected token's abilities. Falls back to
 // full list when no token selected so the operator can browse what's tested.
@@ -1027,7 +1023,7 @@ function formatBytes(bytes) {
 async function runPlayground() {
   const bearer = playgroundTokenPlain.value
   if (!bearer) {
-    playground.value.warning = 'Need plain-text token (cached from mint or pasted manually)'
+    playground.value.warning = 'Plaintext not cached — regenerate this token from the Tokens tab'
     return
   }
   playground.value.warning = ''
