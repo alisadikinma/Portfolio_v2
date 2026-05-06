@@ -323,30 +323,26 @@
               <div class="mb-1 flex items-center justify-between">
                 <p class="text-[11px] font-mono uppercase tracking-wider text-gray-500 dark:text-gray-400">
                   Body
-                  <span v-if="playground.response.bodyTruncated && !playground.showFullBody" class="text-amber-600 dark:text-amber-400">
-                    (first 50 lines · {{ playground.response.size }} bytes total)
-                  </span>
-                  <span v-else-if="playground.showFullBody" class="text-emerald-600 dark:text-emerald-400">
-                    (full · {{ playground.response.size }} bytes)
+                  <span class="text-emerald-600 dark:text-emerald-400">
+                    · {{ playground.response.size }} bytes · {{ playground.response.lineCount }} lines (full · scroll to read)
                   </span>
                 </p>
                 <div class="flex items-center gap-2">
                   <button
-                    v-if="playground.response.bodyTruncated"
-                    @click="playground.showFullBody = !playground.showFullBody"
-                    class="text-[11px] font-mono uppercase tracking-wider text-blue-600 hover:text-blue-700 dark:text-blue-400"
-                  >
-                    {{ playground.showFullBody ? 'Show first 50 lines' : 'Show full body' }}
-                  </button>
-                  <button
                     @click="copyPlaygroundBody"
-                    class="text-[11px] font-mono uppercase tracking-wider text-gray-600 hover:text-gray-800 dark:text-gray-400"
+                    class="text-[11px] font-mono uppercase tracking-wider text-blue-600 hover:text-blue-700 dark:text-blue-400"
                   >
                     {{ playground.copied ? 'Copied ✓' : 'Copy full' }}
                   </button>
+                  <button
+                    @click="downloadPlaygroundBody"
+                    class="text-[11px] font-mono uppercase tracking-wider text-gray-600 hover:text-gray-800 dark:text-gray-400"
+                  >
+                    Download
+                  </button>
                 </div>
               </div>
-              <pre class="max-h-96 overflow-auto rounded bg-gray-50 p-3 text-[11px] font-mono text-gray-800 dark:bg-gray-900 dark:text-gray-200">{{ playground.showFullBody ? playground.response.bodyFull : playground.response.bodyText }}</pre>
+              <pre class="max-h-[600px] overflow-auto rounded bg-gray-50 p-3 text-[11px] font-mono text-gray-800 dark:bg-gray-900 dark:text-gray-200">{{ playground.response.bodyFull }}</pre>
             </div>
           </div>
         </div>
@@ -791,7 +787,6 @@ const playground = ref({
   response: null,
   warning: '',
   copied: false,
-  showFullBody: false,
 })
 
 const playgroundTokenPlain = computed(() => {
@@ -879,17 +874,16 @@ async function runPlayground() {
     const headerLines = []
     resp.headers.forEach((value, key) => headerLines.push(`${key}: ${value}`))
 
-    // Truncate body to first 50 lines for display (full body still in copy buffer)
-    const lines = text.split('\n')
-    const bodyTruncated = lines.length > 50
-    const bodyText = bodyTruncated ? lines.slice(0, 50).join('\n') + '\n...' : text
+    // Show full body in scrollable container — no client-side truncation.
+    // Operator can scroll / Ctrl+F / Copy full.
+    const lineCount = text.split('\n').length
 
     playground.value.response = {
       status: resp.status,
       headersText: headerLines.sort().join('\n'),
-      bodyText,
+      bodyText: text,
       bodyFull: text,
-      bodyTruncated,
+      lineCount,
       size: new Blob([text]).size,
       durationMs,
     }
@@ -906,6 +900,21 @@ async function runPlayground() {
   } finally {
     playground.value.loading = false
   }
+}
+
+function downloadPlaygroundBody() {
+  if (!playground.value.response?.bodyFull) return
+  const ext = playground.value.endpoint.match(/\.([a-z0-9]+)(\?|$)/i)?.[1] ?? 'txt'
+  const filename = `playground-response-${Date.now()}.${ext}`
+  const blob = new Blob([playground.value.response.bodyFull], { type: 'text/plain;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
 }
 
 async function copyPlaygroundBody() {
@@ -930,7 +939,6 @@ async function copyPlaygroundBody() {
 function resetPlayground() {
   playground.value.response = null
   playground.value.copied = false
-  playground.value.showFullBody = false
 }
 
 async function copyResponse() {
