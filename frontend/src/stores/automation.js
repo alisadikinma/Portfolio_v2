@@ -4,6 +4,7 @@ import api from '@/services/api'
 export const useAutomation = defineStore('automation', {
   state: () => ({
     tokens: [],
+    categories: [],   // [{slug, label, prefix, abilities[], description}]
     logs: [],
     loading: false,
     error: null,
@@ -18,18 +19,45 @@ export const useAutomation = defineStore('automation', {
   getters: {
     totalActiveTokens: (state) => state.tokens.length,
     totalRequests: (state) => state.tokens.reduce((sum, token) => sum + (token.requests_count || 0), 0),
+    /**
+     * Group tokens by category for tab counts. Returns { automation: 3, cv: 1, ... }.
+     */
+    tokensByCategory: (state) => state.tokens.reduce((acc, t) => {
+      const cat = t.category || 'other'
+      acc[cat] = (acc[cat] || 0) + 1
+      return acc
+    }, {}),
   },
 
   actions: {
     /**
-     * Fetch all API tokens
+     * Fetch the static category registry (slug + prefix + ability whitelist).
+     * Used by the create-token modal to render the right dropdown + checkbox
+     * set per chosen surface. Cached on first load.
      */
-    async fetchTokens() {
+    async fetchCategories() {
+      if (this.categories.length > 0) return this.categories
+      try {
+        const response = await api.get('/admin/automation/categories')
+        this.categories = response.data.data || []
+        return this.categories
+      } catch (error) {
+        // Soft fail — UI falls back to hardcoded automation defaults
+        return []
+      }
+    },
+
+    /**
+     * Fetch API tokens. Optional `category` slug narrows the result to one
+     * surface (e.g. `cv` for jobhunter tokens only).
+     */
+    async fetchTokens(category = null) {
       this.loading = true
       this.error = null
 
       try {
-        const response = await api.get('/admin/automation/tokens')
+        const params = category ? { category } : {}
+        const response = await api.get('/admin/automation/tokens', { params })
         this.tokens = response.data.data || []
         return response.data
       } catch (error) {

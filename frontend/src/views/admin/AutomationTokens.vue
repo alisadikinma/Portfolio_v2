@@ -7,11 +7,11 @@
           API Tokens
         </h1>
         <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-          Manage API tokens for automation platforms (n8n, Zapier, Make.com)
+          Manage API tokens across surfaces — Automation (n8n / Zapier / Make.com) and CV API (jobhunter export).
         </p>
       </div>
       <button
-        @click="showCreateModal = true"
+        @click="openCreateModal"
         class="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:bg-blue-500 dark:hover:bg-blue-600"
       >
         <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -42,10 +42,11 @@
       <div class="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
         <div class="flex items-center">
           <div class="flex-1">
-            <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Total Requests</p>
+            <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Total Automation Requests</p>
             <p class="mt-2 text-3xl font-semibold text-gray-900 dark:text-white">
               {{ automationStore.totalRequests }}
             </p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">CV calls tracked via last_used_at instead</p>
           </div>
           <div class="rounded-full bg-blue-100 p-3 dark:bg-blue-900">
             <svg class="h-6 w-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -56,26 +57,50 @@
       </div>
     </div>
 
+    <!-- Category tabs -->
+    <div class="mb-4 flex flex-wrap gap-1 rounded-lg bg-gray-100 p-1 dark:bg-gray-800 w-max max-w-full">
+      <button
+        v-for="tab in tabs"
+        :key="tab.slug"
+        @click="activeTab = tab.slug"
+        :class="[
+          'inline-flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all',
+          activeTab === tab.slug
+            ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-white'
+            : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200',
+        ]"
+      >
+        <span>{{ tab.label }}</span>
+        <span
+          class="text-xs font-mono px-1.5 py-0.5 rounded-full"
+          :class="activeTab === tab.slug ? 'bg-gray-200 text-gray-700 dark:bg-gray-600 dark:text-gray-200' : 'bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-400'"
+        >
+          {{ tab.count }}
+        </span>
+      </button>
+    </div>
+
     <!-- Tokens List -->
     <div class="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
       <div class="border-b border-gray-200 p-6 dark:border-gray-700">
-        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">API Tokens</h2>
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ activeTabConfig.label }} Tokens</h2>
+        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ activeTabConfig.description }}</p>
       </div>
 
       <div v-if="automationStore.loading" class="flex items-center justify-center p-12">
         <div class="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
       </div>
 
-      <div v-else-if="automationStore.tokens.length === 0" class="p-12 text-center">
+      <div v-else-if="filteredTokens.length === 0" class="p-12 text-center">
         <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
         </svg>
-        <h3 class="mt-4 text-lg font-medium text-gray-900 dark:text-white">No tokens yet</h3>
+        <h3 class="mt-4 text-lg font-medium text-gray-900 dark:text-white">No tokens in this category</h3>
         <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-          Create your first API token to get started with automation
+          Create a token to get started
         </p>
         <button
-          @click="showCreateModal = true"
+          @click="openCreateModal"
           class="mt-6 inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
         >
           Create Token
@@ -87,6 +112,7 @@
           <thead class="bg-gray-50 dark:bg-gray-900">
             <tr>
               <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Name</th>
+              <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Category</th>
               <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Abilities</th>
               <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Requests</th>
               <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Last Used</th>
@@ -95,9 +121,17 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-            <tr v-for="token in automationStore.tokens" :key="token.id" class="hover:bg-gray-50 dark:hover:bg-gray-700">
+            <tr v-for="token in filteredTokens" :key="token.id" class="hover:bg-gray-50 dark:hover:bg-gray-700">
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="text-sm font-medium text-gray-900 dark:text-white">{{ token.name }}</div>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <span
+                  class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
+                  :class="categoryBadgeClass(token.category)"
+                >
+                  {{ categoryLabel(token.category) }}
+                </span>
               </td>
               <td class="px-6 py-4">
                 <div class="flex flex-wrap gap-1">
@@ -146,24 +180,42 @@
           <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Create API Token</h3>
 
           <div class="mt-4 space-y-4">
+            <!-- Category dropdown -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Category</label>
+              <select
+                v-model="newToken.category"
+                class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              >
+                <option v-for="cat in selectableCategories" :key="cat.slug" :value="cat.slug">
+                  {{ cat.label }}
+                </option>
+              </select>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {{ selectedCategoryConfig?.description || '' }}
+              </p>
+            </div>
+
+            <!-- Token name with category-aware prefix addon -->
             <div>
               <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Token Name</label>
               <div class="mt-1 flex rounded-md shadow-sm">
                 <span class="inline-flex items-center rounded-l-md border border-r-0 border-gray-300 bg-gray-50 px-3 text-sm text-gray-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-400">
-                  api-
+                  {{ selectedCategoryConfig?.prefix || 'api-' }}
                 </span>
                 <input
                   v-model="newToken.name"
                   type="text"
-                  placeholder="n8n-workflow"
+                  :placeholder="namePlaceholder"
                   class="block w-full flex-1 rounded-none rounded-r-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                 />
               </div>
               <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Example: api-n8n-workflow, api-zapier-integration
+                Final name: {{ (selectedCategoryConfig?.prefix || 'api-') + (newToken.name || '<name>') }}
               </p>
             </div>
 
+            <!-- Abilities (driven by selected category) -->
             <div>
               <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Abilities</label>
               <div class="mt-2 space-y-2">
@@ -176,6 +228,9 @@
                   />
                   <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">{{ ability }}</span>
                 </label>
+                <p v-if="availableAbilities.length === 0" class="text-xs text-gray-500 dark:text-gray-400">
+                  Select a category to see available abilities
+                </p>
               </div>
             </div>
           </div>
@@ -183,7 +238,7 @@
           <div class="mt-6 flex space-x-3">
             <button
               @click="createToken"
-              :disabled="!newToken.name || newToken.abilities.length === 0"
+              :disabled="!newToken.name || newToken.abilities.length === 0 || !newToken.category"
               class="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
             >
               Create Token
@@ -275,7 +330,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useAutomation } from '@/stores/automation'
 import { useToast } from '@/stores/ui'
 
@@ -288,41 +343,136 @@ const showRevokeModal = ref(false)
 const createdToken = ref('')
 const copied = ref(false)
 const tokenToRevoke = ref(null)
+const activeTab = ref('all')
 
+// Category-aware new-token form. Defaults to automation for backward compat
+// with existing operator muscle memory.
 const newToken = ref({
+  category: 'automation',
   name: '',
   abilities: []
 })
 
-const availableAbilities = ['post:read', 'post:write', 'post:delete', 'category:read']
+// --- Category helpers --------------------------------------------------------
+// `selectableCategories` uses the live registry from the backend. Falls back
+// to a static default when the categories endpoint isn't reachable, so the
+// modal still works in degraded conditions.
+const FALLBACK_CATEGORIES = [
+  { slug: 'automation', label: 'Automation', prefix: 'api-',
+    abilities: ['post:read', 'post:write', 'post:delete', 'category:read'],
+    description: 'Webhook ingestion for n8n / Zapier / Make.com' },
+  { slug: 'cv', label: 'CV API', prefix: 'cv-',
+    abilities: ['cv:read'],
+    description: 'Read-only CV export for jobhunter platform' },
+]
 
+const selectableCategories = computed(() =>
+  automationStore.categories.length > 0 ? automationStore.categories : FALLBACK_CATEGORIES
+)
+
+const selectedCategoryConfig = computed(() =>
+  selectableCategories.value.find((c) => c.slug === newToken.value.category)
+)
+
+const availableAbilities = computed(() =>
+  selectedCategoryConfig.value?.abilities || []
+)
+
+const namePlaceholder = computed(() =>
+  newToken.value.category === 'cv' ? 'jobhunter-export' : 'n8n-workflow'
+)
+
+// --- Tabs --------------------------------------------------------------------
+// Tabs are derived from the registered categories + an "All" entry. Counts
+// come from the store getter that buckets tokens by their backend-derived
+// category field.
+const tabs = computed(() => {
+  const byCategory = automationStore.tokensByCategory
+  const total = automationStore.tokens.length
+  return [
+    { slug: 'all', label: 'All', count: total, description: 'Every API token across surfaces' },
+    ...selectableCategories.value.map((cat) => ({
+      slug: cat.slug,
+      label: cat.label,
+      count: byCategory[cat.slug] || 0,
+      description: cat.description,
+    })),
+  ]
+})
+
+const activeTabConfig = computed(() =>
+  tabs.value.find((t) => t.slug === activeTab.value) || tabs.value[0]
+)
+
+const filteredTokens = computed(() => {
+  if (activeTab.value === 'all') return automationStore.tokens
+  return automationStore.tokens.filter((t) => t.category === activeTab.value)
+})
+
+// --- Category badge styling --------------------------------------------------
+function categoryBadgeClass(slug) {
+  const map = {
+    automation: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+    cv:         'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200',
+  }
+  return map[slug] || 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+}
+
+function categoryLabel(slug) {
+  const cat = selectableCategories.value.find((c) => c.slug === slug)
+  return cat?.label || (slug ? slug.toUpperCase() : '—')
+}
+
+// --- Lifecycle ---------------------------------------------------------------
 onMounted(async () => {
   try {
-    await automationStore.fetchTokens()
+    // Fire both in parallel — categories are static config, tokens are live data.
+    await Promise.all([
+      automationStore.fetchCategories(),
+      automationStore.fetchTokens(),
+    ])
   } catch (error) {
     toast.error('Failed to load tokens')
   }
 })
 
+// Reset abilities when category changes (different categories have disjoint
+// ability whitelists; previously-selected abilities may not apply to the
+// newly-selected category).
+watch(() => newToken.value.category, () => {
+  newToken.value.abilities = []
+})
+
+// --- Actions -----------------------------------------------------------------
+function openCreateModal() {
+  // If user is on a specific category tab, pre-select that category in the
+  // create modal — saves a click.
+  if (activeTab.value !== 'all'
+      && selectableCategories.value.some((c) => c.slug === activeTab.value)) {
+    newToken.value.category = activeTab.value
+  }
+  showCreateModal.value = true
+}
+
 const createToken = async () => {
   try {
-    // Auto-prepend 'api-' if user forgets
-    const tokenName = newToken.value.name.startsWith('api-') 
-      ? newToken.value.name 
-      : `api-${newToken.value.name}`
-
     const response = await automationStore.createToken({
-      name: tokenName,
+      category: newToken.value.category,
+      name: newToken.value.name,
       abilities: newToken.value.abilities
     })
-    
+
     createdToken.value = response.token
     showCreateModal.value = false
     showTokenModal.value = true
     toast.success('Token created successfully')
 
-    // Reset form
-    newToken.value = { name: '', abilities: [] }
+    // Reset form (preserve category so consecutive creates stay in same surface)
+    newToken.value = {
+      category: newToken.value.category,
+      name: '',
+      abilities: []
+    }
   } catch (error) {
     toast.error(error.response?.data?.message || 'Failed to create token')
   }

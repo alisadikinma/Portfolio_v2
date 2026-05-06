@@ -922,6 +922,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
 // Admin Automation Management Routes
 Route::middleware(['auth:sanctum'])->prefix('admin/automation')->group(function () {
     // Token management
+    Route::get('/categories', [TokenController::class, 'categories']);
     Route::get('/tokens', [TokenController::class, 'index']);
     Route::post('/tokens', [TokenController::class, 'store']);
     Route::delete('/tokens/{id}', [TokenController::class, 'destroy']);
