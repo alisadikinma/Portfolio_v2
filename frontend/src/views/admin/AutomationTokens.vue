@@ -320,10 +320,33 @@
               <pre class="overflow-x-auto rounded bg-gray-50 p-3 text-[11px] font-mono text-gray-800 dark:bg-gray-900 dark:text-gray-200">{{ playground.response.headersText }}</pre>
             </div>
             <div>
-              <p class="text-[11px] font-mono uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">
-                Body {{ playground.response.bodyTruncated ? '(first 50 lines, truncated)' : '' }}
-              </p>
-              <pre class="max-h-96 overflow-auto rounded bg-gray-50 p-3 text-[11px] font-mono text-gray-800 dark:bg-gray-900 dark:text-gray-200">{{ playground.response.bodyText }}</pre>
+              <div class="mb-1 flex items-center justify-between">
+                <p class="text-[11px] font-mono uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  Body
+                  <span v-if="playground.response.bodyTruncated && !playground.showFullBody" class="text-amber-600 dark:text-amber-400">
+                    (first 50 lines · {{ playground.response.size }} bytes total)
+                  </span>
+                  <span v-else-if="playground.showFullBody" class="text-emerald-600 dark:text-emerald-400">
+                    (full · {{ playground.response.size }} bytes)
+                  </span>
+                </p>
+                <div class="flex items-center gap-2">
+                  <button
+                    v-if="playground.response.bodyTruncated"
+                    @click="playground.showFullBody = !playground.showFullBody"
+                    class="text-[11px] font-mono uppercase tracking-wider text-blue-600 hover:text-blue-700 dark:text-blue-400"
+                  >
+                    {{ playground.showFullBody ? 'Show first 50 lines' : 'Show full body' }}
+                  </button>
+                  <button
+                    @click="copyPlaygroundBody"
+                    class="text-[11px] font-mono uppercase tracking-wider text-gray-600 hover:text-gray-800 dark:text-gray-400"
+                  >
+                    {{ playground.copied ? 'Copied ✓' : 'Copy full' }}
+                  </button>
+                </div>
+              </div>
+              <pre class="max-h-96 overflow-auto rounded bg-gray-50 p-3 text-[11px] font-mono text-gray-800 dark:bg-gray-900 dark:text-gray-200">{{ playground.showFullBody ? playground.response.bodyFull : playground.response.bodyText }}</pre>
             </div>
           </div>
         </div>
@@ -768,6 +791,7 @@ const playground = ref({
   response: null,
   warning: '',
   copied: false,
+  showFullBody: false,
 })
 
 const playgroundTokenPlain = computed(() => {
@@ -884,9 +908,29 @@ async function runPlayground() {
   }
 }
 
+async function copyPlaygroundBody() {
+  if (!playground.value.response?.bodyFull) return
+  try {
+    await navigator.clipboard.writeText(playground.value.response.bodyFull)
+    playground.value.copied = true
+    setTimeout(() => { playground.value.copied = false }, 2000)
+  } catch (err) {
+    // Fallback: select-and-copy via temporary textarea (rare browsers without clipboard API).
+    const ta = document.createElement('textarea')
+    ta.value = playground.value.response.bodyFull
+    document.body.appendChild(ta)
+    ta.select()
+    document.execCommand('copy')
+    document.body.removeChild(ta)
+    playground.value.copied = true
+    setTimeout(() => { playground.value.copied = false }, 2000)
+  }
+}
+
 function resetPlayground() {
   playground.value.response = null
   playground.value.copied = false
+  playground.value.showFullBody = false
 }
 
 async function copyResponse() {
