@@ -57,30 +57,57 @@
       </div>
     </div>
 
-    <!-- Category tabs -->
-    <div class="mb-4 flex flex-wrap gap-1 rounded-lg bg-gray-100 p-1 dark:bg-gray-800 w-max max-w-full">
-      <button
-        v-for="tab in tabs"
-        :key="tab.slug"
-        @click="activeTab = tab.slug"
-        :class="[
-          'inline-flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all',
-          activeTab === tab.slug
-            ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-white'
-            : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200',
-        ]"
-      >
-        <span>{{ tab.label }}</span>
-        <span
-          class="text-xs font-mono px-1.5 py-0.5 rounded-full"
-          :class="activeTab === tab.slug ? 'bg-gray-200 text-gray-700 dark:bg-gray-600 dark:text-gray-200' : 'bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-400'"
+    <!-- Top-level view tabs -->
+    <div class="mb-4 border-b border-gray-200 dark:border-gray-700">
+      <nav class="-mb-px flex gap-6" aria-label="Token admin sections">
+        <button
+          v-for="view in topLevelViews"
+          :key="view.slug"
+          @click="mainView = view.slug"
+          :class="[
+            'inline-flex items-center gap-2 border-b-2 px-1 py-3 text-sm font-medium transition-colors',
+            mainView === view.slug
+              ? 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+              : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:text-gray-200',
+          ]"
         >
-          {{ tab.count }}
-        </span>
-      </button>
+          <svg v-if="view.slug === 'tokens'" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+          </svg>
+          <svg v-else class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+          </svg>
+          {{ view.label }}
+        </button>
+      </nav>
     </div>
 
-    <!-- Tokens List -->
+    <!-- Tokens view -->
+    <div v-if="mainView === 'tokens'">
+      <!-- Category tabs (sub-nav under Tokens view) -->
+      <div class="mb-4 flex flex-wrap gap-1 rounded-lg bg-gray-100 p-1 dark:bg-gray-800 w-max max-w-full">
+        <button
+          v-for="tab in tabs"
+          :key="tab.slug"
+          @click="activeTab = tab.slug"
+          :class="[
+            'inline-flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all',
+            activeTab === tab.slug
+              ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-white'
+              : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200',
+          ]"
+        >
+          <span>{{ tab.label }}</span>
+          <span
+            class="text-xs font-mono px-1.5 py-0.5 rounded-full"
+            :class="activeTab === tab.slug ? 'bg-gray-200 text-gray-700 dark:bg-gray-600 dark:text-gray-200' : 'bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-400'"
+          >
+            {{ tab.count }}
+          </span>
+        </button>
+      </div>
+
+      <!-- Tokens List -->
     <div class="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
       <div class="border-b border-gray-200 p-6 dark:border-gray-700">
         <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ activeTabConfig.label }} Tokens</h2>
@@ -173,13 +200,15 @@
         </table>
       </div>
     </div>
+    </div>
+    <!-- /tokens view -->
 
-    <!-- API Playground -->
-    <div class="mt-8 rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+    <!-- API Playground (top-level tab) -->
+    <div v-if="mainView === 'playground'" class="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
       <div class="border-b border-gray-200 p-6 dark:border-gray-700">
         <h2 class="text-lg font-semibold text-gray-900 dark:text-white">API Playground</h2>
         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          Test an endpoint with one of the tokens above. The token IS the bearer sent on the wire — no admin-session fallback.
+          Test an endpoint with one of your tokens. The token IS the bearer sent on the wire — no admin-session fallback. Switch back to the <button @click="mainView = 'tokens'" class="text-blue-600 hover:underline dark:text-blue-400">Tokens tab</button> to mint or revoke.
         </p>
       </div>
       <div class="p-6 space-y-4">
@@ -478,6 +507,19 @@ const createdToken = ref('')
 const copied = ref(false)
 const tokenToRevoke = ref(null)
 const activeTab = ref('all')
+
+// Top-level view: 'tokens' (CRUD listing with category sub-tabs) vs
+// 'playground' (in-page endpoint tester). Persisted across navigations
+// via sessionStorage so operators returning from another admin page
+// land back where they left off.
+const MAIN_VIEW_KEY = 'admin:tokens:mainView'
+const mainView = ref(sessionStorage.getItem(MAIN_VIEW_KEY) || 'tokens')
+watch(mainView, (v) => sessionStorage.setItem(MAIN_VIEW_KEY, v))
+
+const topLevelViews = [
+  { slug: 'tokens', label: 'Tokens' },
+  { slug: 'playground', label: 'API Playground' },
+]
 
 // Category-aware new-token form. Defaults to automation for backward compat
 // with existing operator muscle memory.
