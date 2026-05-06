@@ -127,12 +127,18 @@ class CvProjectResource extends JsonResource
         }
 
         static $acronyms = [
-            'AI', 'ML', 'CCTV', 'API', 'AWS', 'GCP', 'GPU', 'CPU', 'IoT',
-            'UI', 'UX', 'RAG', 'OCR', 'SDK', 'SaaS', 'B2B', 'B2C', 'ERP',
-            'CRM', 'CMS', 'ETL', 'KPI', 'ROI', 'NPM', 'HTTP', 'HTTPS',
-            'JSON', 'YAML', 'XML', 'SQL', 'NoSQL', 'PHP', 'JS', 'TS',
-            'NLP', 'LLM', 'IDE', 'DevOps', 'MLOps', 'RPA', 'QA', 'QC',
-            'IT', 'PDF', 'CSV', 'CDN', 'DNS', 'JWT', 'OAuth',
+            // Software / cloud / web
+            'AI', 'ML', 'NLP', 'LLM', 'RAG', 'OCR', 'API', 'SDK', 'IDE',
+            'AWS', 'GCP', 'CDN', 'DNS', 'HTTP', 'HTTPS', 'JSON', 'YAML',
+            'XML', 'SQL', 'NoSQL', 'PHP', 'JS', 'TS', 'NPM', 'PDF', 'CSV',
+            'JWT', 'OAuth', 'SaaS', 'B2B', 'B2C', 'CMS', 'CRM', 'ERP',
+            'ETL', 'KPI', 'ROI', 'UI', 'UX', 'QA', 'QC', 'IT',
+            'DevOps', 'MLOps', 'RPA', 'CCTV',
+            // Hardware
+            'GPU', 'CPU', 'RAM', 'SSD', 'USB', 'HDMI', 'LED', 'LCD',
+            // Manufacturing / industrial / IoT
+            'IoT', 'PCB', 'OEE', 'MES', 'SCADA', 'PLC', 'HMI',
+            'RFID', 'NFC', 'GPS', 'UAV', 'LIDAR', 'IMU',
         ];
 
         foreach ($acronyms as $acronym) {
