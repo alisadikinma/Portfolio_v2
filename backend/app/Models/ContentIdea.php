@@ -56,11 +56,14 @@ class ContentIdea extends Model
         'pipeline_state_log',
         'translation_attempts_auto',
         'translation_ready_at',
+        'auto_retry_count',
+        'last_classified_error_class',
     ];
 
     protected $casts = [
         'tags' => 'array',
         'auto_mode' => 'boolean',
+        'auto_retry_count' => 'integer',
         'scheduled_at' => 'datetime',
         'languages' => 'array',
         'output_types' => 'array',
