@@ -358,12 +358,17 @@ class ArticleGenerationService
      * @param string $originalVd  Original Visual Direction text
      * @param string $safetyReason GeminiGen error_message ("PUBLIC_ERROR_PROMINENT_PEOPLE_UPLOAD ...")
      * @param array  $segmentContext Optional segment metadata (label, concept, style)
+     * @param \App\Enums\PipelineErrorClass|null $errorClass Optional pre-classified
+     *   error class so the rewrite prompt can branch — e.g., POLICY_BRAND keeps
+     *   persons but strips brand names. When null, falls back to the historical
+     *   aggressive-strip behavior (backward compatible for existing callers).
      * @return array{success: bool, rewritten_vd: string|null, error: string|null}
      */
     public function rewriteVisualDirectionForSafety(
         string $originalVd,
         string $safetyReason,
-        array $segmentContext = []
+        array $segmentContext = [],
+        ?\App\Enums\PipelineErrorClass $errorClass = null
     ): array {
         if (trim($originalVd) === '') {
             return ['success' => false, 'rewritten_vd' => null, 'error' => 'Missing original VD'];
@@ -372,7 +377,7 @@ class ArticleGenerationService
         $model = config('services.article_generation.model_vd_rewrite', 'sonnet');
 
         try {
-            $prompt = $this->buildSafetyRewritePrompt($originalVd, $safetyReason, $segmentContext);
+            $prompt = $this->buildSafetyRewritePrompt($originalVd, $safetyReason, $segmentContext, $errorClass);
             $result = $this->executeSyncPrompt($prompt, 'vd-safety-rewrite', $model);
         } catch (\Exception $e) {
             Log::error('[ArticleGeneration] Safety VD rewrite failed', [
@@ -662,8 +667,12 @@ PROMPT;
      * Text-only — no image input. The LLM strips any named entity that
      * could be tripping GeminiGen's safety filters.
      */
-    private function buildSafetyRewritePrompt(string $originalVd, string $safetyReason, array $segmentContext): string
-    {
+    private function buildSafetyRewritePrompt(
+        string $originalVd,
+        string $safetyReason,
+        array $segmentContext,
+        ?\App\Enums\PipelineErrorClass $errorClass = null
+    ): string {
         $contextLine = '';
         if (!empty($segmentContext['label']) || !empty($segmentContext['concept'])) {
             $label = $segmentContext['label'] ?? '';
@@ -672,6 +681,42 @@ PROMPT;
         }
 
         $reason = trim($safetyReason) !== '' ? $safetyReason : 'unsafe content';
+
+        // Class-specific guidance keeps mutations minimal — stripping ONLY the
+        // tokens the API actually objected to means the rewritten scene retains
+        // more of the operator's editorial intent than a blanket strip.
+        $branchInstructions = match ($errorClass) {
+            \App\Enums\PipelineErrorClass::PolicyPerson => "PRIMARY MUTATION (person policy):\n"
+                . "- Strip ONLY proper nouns referring to people (named persons, role+org references like 'CEO of Anthropic').\n"
+                . "- Replace each with a generic role + descriptive features that preserve the scene.\n"
+                . "- KEEP brand mentions, scene composition, lighting, mood, camera angle.",
+
+            \App\Enums\PipelineErrorClass::PolicyBrand => "PRIMARY MUTATION (brand policy):\n"
+                . "- Strip ONLY brand names, product names, logo references, and trademarked composition.\n"
+                . "- Replace each with a generic product type or anonymous device descriptor.\n"
+                . "- KEEP persons (use generic descriptors if previously named), scene composition, lighting, mood.",
+
+            \App\Enums\PipelineErrorClass::PolicyMinor => "PRIMARY MUTATION (minor policy):\n"
+                . "- Replace any age-ambiguous descriptors with explicit 'adult professional, 30+'.\n"
+                . "- Strip school, classroom, youth, or under-18 contextual cues entirely.\n"
+                . "- KEEP scene composition, lighting, mood, brand context, and other entities.",
+
+            \App\Enums\PipelineErrorClass::PolicyNsfw => "PRIMARY MUTATION (NSFW policy):\n"
+                . "- Soften any tension, conflict, or violent words to neutral synonyms.\n"
+                . "- Strip any suggestive elements (poses, clothing emphasis, intimate framing).\n"
+                . "- KEEP scene framing, lighting, named subjects (persons + brands), composition.",
+
+            \App\Enums\PipelineErrorClass::PolicyGeneric, null => "PRIMARY MUTATION (general policy):\n"
+                . "- Remove ALL proper nouns (person names, brand names, product names, landmark names).\n"
+                . "- Replace each removed entity with a generic descriptor that preserves the article concept:\n"
+                . "  - Person name -> generic role + descriptive features (e.g., 'a tech CEO in his early 40s with short curly hair, hooded sweatshirt, focused expression').\n"
+                . "  - Brand name -> generic product type (e.g., 'a modern AI agent dashboard interface').\n"
+                . "  - Landmark -> generic locale (e.g., 'a modern corporate headquarters lobby').",
+
+            default => "PRIMARY MUTATION (general policy):\n"
+                . "- Remove ALL proper nouns (person, brand, product, landmark names).\n"
+                . "- Replace each with a generic descriptor that preserves the article concept.",
+        };
 
         return <<<PROMPT
 You are rewriting an AI image generation prompt that was REJECTED by the image API for a safety/policy reason.
@@ -688,17 +733,14 @@ Common triggers:
 
 Your job: rewrite the Visual Direction so the same scene can be generated WITHOUT triggering the policy.
 
-Rules:
-1. Remove ALL proper nouns (person names, brand names, product names, landmark names).
-2. Replace each removed entity with a generic descriptor that preserves the article's concept:
-   - Person name -> generic role + descriptive features ("a tech CEO in his early 40s with short curly hair and a hooded sweatshirt, focused expression")
-   - Brand name -> generic product type ("a modern AI agent dashboard interface")
-   - Landmark -> generic locale ("a modern corporate headquarters lobby")
-3. Keep scene, setting, lighting, mood, camera angle, composition, and visual style EXACTLY as in the original.
-4. Do not add any new concept that wasn't in the original.
-5. Do not add disclaimers, safety notes, or meta-commentary.
-6. Output ONLY the rewritten Visual Direction paragraph.
-7. No preamble, no explanation, no quotes, no markdown, no labels.
+{$branchInstructions}
+
+Universal rules:
+1. Keep scene, setting, lighting, mood, camera angle, composition, and visual style EXACTLY as in the original (unless explicitly modified above).
+2. Do not add any new concept that wasn't in the original.
+3. Do not add disclaimers, safety notes, or meta-commentary.
+4. Output ONLY the rewritten Visual Direction paragraph.
+5. No preamble, no explanation, no quotes, no markdown, no labels.
 
 {$contextLine}Original Visual Direction (rejected):
 {$originalVd}

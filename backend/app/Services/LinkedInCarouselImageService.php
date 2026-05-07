@@ -407,14 +407,39 @@ class LinkedInCarouselImageService
     }
 
     /**
-     * Pure rewrite (no dispatch). Detects safety errors, calls Sonnet to
-     * sanitize the prompt, persists with idempotency sentinel + layout
-     * demotion. Returns true if the slide's image_prompt was mutated.
+     * Tiered rewrite (no dispatch). Detects safety errors and progressively
+     * sanitizes the slide prompt. Three tiers:
+     *
+     *   Tier 0 → Tier 1: per-class Sonnet rewrite (POLICY_PERSON keeps brands;
+     *     POLICY_BRAND keeps persons; POLICY_NSFW softens; POLICY_MINOR
+     *     forces adult; POLICY_GENERIC strips everything).
+     *
+     *   Tier 1 → Tier 2: in-process generic-stock fallback prompt (no Sonnet
+     *     call). Uses layout_hint to pick a stock template that's known
+     *     safe — no proper nouns, no scene specifics, no human focus.
+     *
+     *   Tier 2 → Permanent: mark `image_status='failed_permanent'`, dispatch
+     *     `carousel_slide_tier2_failed` Telegram notify. No further auto-mutation.
+     *
+     * Returns true if the slide was mutated (prompt rewritten OR marked
+     * failed_permanent — caller knows whether to redispatch).
      */
     private function rewriteSlidePromptIfSafetyError(int $draftId, int $slideIndex, string $reason): bool
     {
         $imgSvc = app(\App\Services\ImageGenerationService::class);
-        if (!$imgSvc->isSafetyError($reason)) {
+        $errorClass = $imgSvc->classifyError($reason);
+
+        // Only POLICY_* errors trigger the tiered rewrite. Transient / permanent
+        // / unknown errors are handled by the existing GeminiGen retry path or
+        // surfaced to the operator unchanged.
+        $isPolicyClass = in_array($errorClass, [
+            \App\Enums\PipelineErrorClass::PolicyPerson,
+            \App\Enums\PipelineErrorClass::PolicyMinor,
+            \App\Enums\PipelineErrorClass::PolicyNsfw,
+            \App\Enums\PipelineErrorClass::PolicyBrand,
+            \App\Enums\PipelineErrorClass::PolicyGeneric,
+        ], true);
+        if (!$isPolicyClass) {
             return false;
         }
 
@@ -433,16 +458,44 @@ class LinkedInCarouselImageService
         }
 
         $slide = $slides[$slideIndex];
+        $tier = (int) ($slide['image_rewrite_tier'] ?? 0);
 
-        // Idempotency: skip if we already rewrote this slide's prompt.
-        if (!empty($slide['image_prompt_pre_safety'])) {
-            Log::info('[LinkedInCarouselImage] safety-rewrite skipped (already rewritten once)', [
-                'draft_id' => $draftId,
-                'slide_index' => $slideIndex,
-            ]);
-            return false;
+        // ============== Tier 2 → Permanent failure ==============
+        if ($tier >= 2) {
+            $this->markSlideFailedPermanent($draftId, $slideIndex, $reason);
+            return true;
         }
 
+        // ============== Tier 1 → Tier 2 (generic-stock fallback) ==============
+        if ($tier === 1) {
+            $genericPrompt = $this->buildGenericStockPrompt(
+                (string) ($slide['layout_hint'] ?? 'body'),
+                (string) ($slide['copy'] ?? $slide['copy_id'] ?? '')
+            );
+
+            DB::transaction(function () use ($draftId, $slideIndex, $genericPrompt) {
+                $locked = LinkedInPost::lockForUpdate()->find($draftId);
+                if (!$locked) return;
+                $s = $locked->carousel_slides ?? [];
+                if (!isset($s[$slideIndex])) return;
+
+                $s[$slideIndex]['image_prompt'] = $genericPrompt;
+                $s[$slideIndex]['image_rewrite_tier'] = 2;
+                $s[$slideIndex]['image_status'] = 'pending';
+                $s[$slideIndex]['image_error'] = null;
+                $s[$slideIndex]['image_job_uuid'] = null;
+                $locked->update(['carousel_slides' => $s]);
+            });
+
+            Log::info('[LinkedInCarouselImage] tier-2 generic-stock fallback applied', [
+                'draft_id' => $draftId,
+                'slide_index' => $slideIndex,
+                'error_class' => $errorClass->value,
+            ]);
+            return true;
+        }
+
+        // ============== Tier 0 → Tier 1 (per-class Sonnet rewrite) ==============
         $originalPrompt = (string) ($slide['image_prompt'] ?? '');
         if (trim($originalPrompt) === '') {
             return false;
@@ -456,7 +509,8 @@ class LinkedInCarouselImageService
                 [
                     'label' => (string) ($slide['layout_hint'] ?? 'body'),
                     'concept' => (string) ($slide['copy'] ?? $slide['copy_id'] ?? ''),
-                ]
+                ],
+                $errorClass
             );
         } catch (\Throwable $e) {
             Log::error('[LinkedInCarouselImage] safety rewrite threw', [
@@ -477,9 +531,9 @@ class LinkedInCarouselImageService
         }
 
         $rewritten = (string) $result['rewritten_vd'];
+        $errorClassValue = $errorClass->value;
 
-        // Persist the rewrite + clear status so dispatchSingleSlide can run.
-        DB::transaction(function () use ($draftId, $slideIndex, $rewritten, $originalPrompt) {
+        DB::transaction(function () use ($draftId, $slideIndex, $rewritten, $originalPrompt, $errorClassValue) {
             $locked = LinkedInPost::lockForUpdate()->find($draftId);
             if (!$locked) return;
             $s = $locked->carousel_slides ?? [];
@@ -487,9 +541,11 @@ class LinkedInCarouselImageService
 
             $s[$slideIndex]['image_prompt_pre_safety'] = $originalPrompt;
             $s[$slideIndex]['image_prompt'] = $rewritten;
+            $s[$slideIndex]['image_rewrite_tier'] = 1;
             $s[$slideIndex]['image_status'] = 'pending';
             $s[$slideIndex]['image_error'] = null;
             $s[$slideIndex]['image_job_uuid'] = null;
+            $s[$slideIndex]['last_classified_error_class'] = $errorClassValue;
             // Drop face_refs from human_fingerprint specifically — that
             // layout's whole purpose is "creator face holding a callout",
             // and when paired with named-entity copy GeminiGen refuses.
@@ -502,6 +558,75 @@ class LinkedInCarouselImageService
         });
 
         return true;
+    }
+
+    /**
+     * Mark a slide as permanently failed (tier 2 fallback also rejected).
+     * Surfaces NB2 error verbatim to admin via `image_error` and dispatches
+     * a Telegram notify so the operator can decide whether to skip + republish
+     * the carousel without this slide.
+     */
+    private function markSlideFailedPermanent(int $draftId, int $slideIndex, string $reason): void
+    {
+        DB::transaction(function () use ($draftId, $slideIndex, $reason) {
+            $locked = LinkedInPost::lockForUpdate()->find($draftId);
+            if (!$locked) return;
+            $s = $locked->carousel_slides ?? [];
+            if (!isset($s[$slideIndex])) return;
+
+            $s[$slideIndex]['image_status'] = 'failed_permanent';
+            $s[$slideIndex]['image_error'] = '[Tier 2 fallback failed] ' . $reason;
+            $s[$slideIndex]['image_job_uuid'] = null;
+            $locked->update(['carousel_slides' => $s]);
+        });
+
+        try {
+            \App\Jobs\DispatchTelegramNotification::dispatch(
+                'carousel_slide_tier2_failed',
+                [
+                    'draft_id' => $draftId,
+                    'slide_index' => $slideIndex,
+                    'error' => $reason,
+                ]
+            );
+        } catch (\Throwable $e) {
+            Log::warning('[LinkedInCarouselImage] tier-2 failure telegram notify failed', [
+                'draft_id' => $draftId,
+                'slide_index' => $slideIndex,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        Log::warning('[LinkedInCarouselImage] slide marked failed_permanent (tier 2 exhausted)', [
+            'draft_id' => $draftId,
+            'slide_index' => $slideIndex,
+            'reason' => $reason,
+        ]);
+    }
+
+    /**
+     * Build a layout-aware generic-stock prompt that's known safe under
+     * NB2 content policy. No proper nouns, no scene specifics, no human
+     * focus. Brand chrome (logo, page indicator, swipe text) still gets
+     * appended later via CarouselSlideEnhancer, so the slide stays
+     * on-brand even though the scene itself is generic.
+     */
+    private function buildGenericStockPrompt(string $layoutHint, string $copy): string
+    {
+        $base = 'Professional studio photograph, photorealistic, soft natural lighting, neutral background, business context, no recognizable people, no brands, no logos, 4:5 aspect ratio.';
+
+        // Truncate copy to a safe length and strip any obvious proper nouns
+        // (uppercase tokens) so even the copy reference stays generic.
+        $contextHint = trim(preg_replace('/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b/', '...', $copy) ?? '');
+        $contextHint = mb_substr($contextHint, 0, 120);
+
+        return match ($layoutHint) {
+            'cover' => "{$base} Hero composition with subtle depth, rule of thirds, soft bokeh background. Subject context: {$contextHint}",
+            'data_point' => "{$base} Clean infographic-style layout with abstract data visualization elements (subtle line graph, soft geometric shapes), no text overlay.",
+            'human_fingerprint', 'body' => "{$base} Generic workspace scene, abstract human silhouette in soft focus, modern desk with laptop closed, ambient morning light.",
+            'cta' => "{$base} Minimalist composition with breathing room for text overlay. Soft gradient background, single focal element off-center.",
+            default => $base,
+        };
     }
 
     /**

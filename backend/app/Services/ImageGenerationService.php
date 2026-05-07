@@ -886,6 +886,20 @@ class ImageGenerationService
     }
 
     /**
+     * Classify a GeminiGen error message into a PipelineErrorClass.
+     *
+     * Wraps PipelineErrorClassifier so callers don't need to construct it
+     * themselves. POLICY_* classes drive the per-class Sonnet rewrite branch
+     * (see ArticleGenerationService::buildSafetyRewritePrompt). Non-policy
+     * classes (TRANSIENT/PERMANENT/UNKNOWN) signal "don't try the rewrite",
+     * just retry / surface to operator respectively.
+     */
+    public function classifyError(?string $reason): \App\Enums\PipelineErrorClass
+    {
+        return (new \App\Services\PipelineErrorClassifier())->classify($reason);
+    }
+
+    /**
      * Public on-demand safety rewrite for a single segment. Persists the
      * result back to the idea. Used by the manual retry endpoint when an
      * operator clicks Retry on a segment stuck at the cap with a safety
