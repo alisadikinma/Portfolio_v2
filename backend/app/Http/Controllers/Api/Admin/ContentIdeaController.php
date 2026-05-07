@@ -57,12 +57,12 @@ class ContentIdeaController extends Controller
         $perPage = min((int) $request->query('per_page', 500), 500);
         $ideas = $query->orderBy('created_at', 'desc')->paginate($perPage);
 
-        // Auto-sync: check workflow completion for in-progress ideas
-        foreach ($ideas as $idea) {
-            if (in_array($idea->status, ['researching', 'generating_images'])) {
-                $this->syncIdeaStatus($idea);
-            }
-        }
+        // Stuck-process detection moved off the hot path — the per-idea
+        // SSH `kill -0` probe added 1-3s × N latency on production VPS and
+        // routinely tripped the 30s frontend timeout. The reaper crons
+        // (linkedin:reap-stuck, ProcessPendingImages, etc.) own that
+        // responsibility now. Per-idea progress polling still calls
+        // syncIdeaStatus() in getProgress() where one SSH hop is fine.
 
         // Trending-priority sort: HOT topics with many trusted publishers and
         // fresh pub_dates float to row 1 so the user works the highest-signal
