@@ -63,9 +63,32 @@ class CvExportController extends Controller
     {
         $about = Setting::where('group', 'about')->pluck('value', 'key');
         $cv = Setting::where('group', 'cv')->pluck('value', 'key');
+        $site = Setting::where('group', 'site')->pluck('value', 'key');
 
         $socialLinks = $this->parseSocialLinks($about->get('social_links'));
         $bio = $about->get('bio');
+
+        // PRIMARY sources for the CV API (no manual JSON paste required —
+        // these are the same fields the operator already maintains in the
+        // /admin/about admin form):
+        //   work          <- about.experience       (was: cv.work_experience)
+        //   email         <- site.contact_email     (was: about.email — never set)
+        //   phone         <- site.contact_phone     (was: about.phone — never set)
+        //   certifications<- about.certifications   (new on the wire)
+        //   languages     <- about.languages        (new on the wire)
+        //
+        // Legacy `cv.work_experience` is still consulted as a fallback for
+        // any consumer that pre-seeded it before this refactor; same for
+        // `about.email` / `about.phone` if anyone migrated to those keys.
+        $work = $this->mapAboutExperienceToWork(
+            $this->decodeJsonSetting($about->get('experience'), [])
+        );
+        if (empty($work)) {
+            $work = $this->decodeJsonSetting($cv->get('work_experience'), []);
+        }
+
+        $email = $about->get('email') ?: $site->get('contact_email');
+        $phone = $about->get('phone') ?: $site->get('contact_phone');
 
         $payload = [
             'schema_version' => '2.0.0',
@@ -73,8 +96,8 @@ class CvExportController extends Controller
             'basics' => [
                 'name' => $about->get('name') ?: 'Ali Sadikin',
                 'label' => $about->get('title') ?: 'AI Generalist Expert',
-                'email' => $about->get('email'),
-                'phone' => $about->get('phone'),
+                'email' => $email,
+                'phone' => $phone,
                 'url' => rtrim(config('app.url'), '/'),
                 'summary' => $bio,
                 'summary_text' => $this->stripHtmlPlain($bio),
@@ -83,6 +106,7 @@ class CvExportController extends Controller
                     'ai_automation' => '',
                     'ai_video' => '',
                 ]),
+                'languages' => $this->decodeJsonSetting($about->get('languages'), []),
                 'location' => [
                     'city' => $about->get('city'),
                     'country' => $about->get('country') ?: 'Indonesia',
@@ -90,9 +114,12 @@ class CvExportController extends Controller
                 ],
                 'profiles' => $socialLinks,
             ],
-            'work' => $this->decodeJsonSetting($cv->get('work_experience'), []),
+            'work' => $work,
             'education' => $this->decodeJsonSetting($cv->get('education'), []),
             'skills' => $this->decodeJsonSetting($cv->get('skills_matrix'), []),
+            'certifications' => $this->mapCertifications(
+                $this->decodeJsonSetting($about->get('certifications'), [])
+            ),
             'projects' => CvProjectResource::collection(
                 Project::with('translations')
                     ->orderBy('sort_order')
@@ -157,6 +184,76 @@ class CvExportController extends Controller
         if (is_array($raw)) return $raw;
         $decoded = json_decode($raw, true);
         return is_array($decoded) ? $decoded : $default;
+    }
+
+    /**
+     * Re-shape the operator's `settings.about.experience` array (the same
+     * data the public /about page already renders) into the JSON Resume
+     * `work[]` shape that jobhunter consumers expect.
+     *
+     * Field mapping:
+     *   title       -> position
+     *   description -> summary (HTML stripped to plain, paragraph-aware)
+     *   end_date "" -> end_date null    (the admin form leaves end_date
+     *                                    empty when `current=true`)
+     *   gallery_ids / galleries / company_logo / company_url -> dropped
+     *                                    (CV consumers don't render them;
+     *                                    they bloat the prompt window)
+     *
+     * Returns an empty array on null / non-array input so the caller can
+     * fall back to legacy `cv.work_experience` without an extra null check.
+     */
+    protected function mapAboutExperienceToWork($raw): array
+    {
+        if (!is_array($raw) || empty($raw)) {
+            return [];
+        }
+
+        return collect($raw)
+            ->filter(fn ($e) => is_array($e) && !empty($e['company']))
+            ->map(function ($e) {
+                $endDate = $e['end_date'] ?? null;
+                if ($endDate === '' || $endDate === null) {
+                    $endDate = null;
+                }
+                return [
+                    'company' => $e['company'] ?? null,
+                    'position' => $e['title'] ?? ($e['position'] ?? null),
+                    'start_date' => $e['start_date'] ?? null,
+                    'end_date' => $endDate,
+                    'location' => $e['location'] ?? null,
+                    'summary' => $this->stripHtmlPlain($e['description'] ?? null),
+                    'highlights' => is_array($e['highlights'] ?? null)
+                        ? $e['highlights']
+                        : [],
+                    'tech_stack' => is_array($e['tech_stack'] ?? null)
+                        ? $e['tech_stack']
+                        : [],
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Re-shape `settings.about.certifications` so it surfaces as a clean
+     * top-level `certifications[]` field on the wire — strips logo paths
+     * (consumer doesn't render images), keeps name + url. Empty array on
+     * missing / malformed input.
+     */
+    protected function mapCertifications($raw): array
+    {
+        if (!is_array($raw) || empty($raw)) {
+            return [];
+        }
+        return collect($raw)
+            ->filter(fn ($c) => is_array($c) && !empty($c['name']))
+            ->map(fn ($c) => [
+                'name' => $c['name'],
+                'url' => $c['url'] ?? null,
+            ])
+            ->values()
+            ->all();
     }
 
     /**
