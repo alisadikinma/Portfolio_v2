@@ -526,6 +526,17 @@ class AutoPipelineOrchestrator
         $attempts = (int) ($idea->pipeline_attempts ?? 0) + 1;
         $exhausted = $attempts >= self::MAX_ATTEMPTS;
 
+        // Phase D — classifier-driven retry decision. Layered ON TOP of the
+        // existing pipeline_attempts budget: TRANSIENT / DETERMINISTIC_LLM
+        // schedule a retry as before; POLICY_* / PERMANENT / UNKNOWN skip
+        // the retry-schedule entirely and surface to the operator (auto would
+        // refuse the same way next attempt — wasted Sonnet + SSH calls).
+        $errorClass = (new PipelineErrorClassifier())->classify($errorMessage);
+        $autoRetryEligible = in_array($errorClass, [
+            \App\Enums\PipelineErrorClass::Transient,
+            \App\Enums\PipelineErrorClass::DeterministicLlm,
+        ], true);
+
         $log = $idea->progress_log ?? [];
         $log[] = [
             'timestamp' => now()->toISOString(),
@@ -534,14 +545,24 @@ class AutoPipelineOrchestrator
             'message' => "[{$stage}] " . $errorMessage,
         ];
 
+        // pipeline_next_retry_at controls whether retryReadyIdeas() will pick
+        // this row up. NULL = no retry; non-null timestamp = eligible at that
+        // time. Compute based on BOTH the attempt budget AND the error class.
+        $shouldScheduleRetry = !$exhausted && $autoRetryEligible;
+        $nextRetryAt = $shouldScheduleRetry ? now()->addMinutes(self::RETRY_DELAY_MINUTES) : null;
+
         // Use direct update when already failed (self-transition not in map);
         // otherwise route through transitionTo so the log records the reason.
         $extra = [
             'pipeline_attempts' => $attempts,
             'pipeline_last_attempt_at' => now(),
-            'pipeline_next_retry_at' => $exhausted ? null : now()->addMinutes(self::RETRY_DELAY_MINUTES),
+            'pipeline_next_retry_at' => $nextRetryAt,
             'pipeline_failed_stage' => $stage,
             'progress_log' => $log,
+            'auto_retry_count' => $shouldScheduleRetry
+                ? (int) ($idea->auto_retry_count ?? 0) + 1
+                : (int) ($idea->auto_retry_count ?? 0),
+            'last_classified_error_class' => $errorClass->value,
         ];
 
         if ($idea->status === 'failed') {
@@ -550,10 +571,18 @@ class AutoPipelineOrchestrator
             $idea->transitionTo(ContentIdeaStatus::Failed, "markFailed_{$stage}", $extra);
         }
 
-        Log::warning("[AutoPipeline] Idea #{$idea->id} failed at {$stage} (attempt {$attempts}/" . self::MAX_ATTEMPTS . "): {$errorMessage}");
+        Log::warning(
+            "[AutoPipeline] Idea #{$idea->id} failed at {$stage} (attempt {$attempts}/"
+            . self::MAX_ATTEMPTS
+            . ", class={$errorClass->value}, retry_scheduled="
+            . ($shouldScheduleRetry ? 'yes' : 'no')
+            . "): {$errorMessage}"
+        );
 
-        if ($exhausted) {
-            Log::error("[AutoPipeline] Idea #{$idea->id} exhausted retries — sending Telegram failure ping");
+        // Telegram fires on either: (a) attempt budget exhausted, or (b)
+        // classifier rejected this error class entirely (no auto-retry path).
+        if ($exhausted || !$autoRetryEligible) {
+            Log::error("[AutoPipeline] Idea #{$idea->id} pipeline halted — sending Telegram failure ping");
             try {
                 $this->telegram->notifyFinalFailure($idea->fresh());
             } catch (\Throwable $e) {

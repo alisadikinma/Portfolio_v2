@@ -62,6 +62,15 @@ Schedule::command('linkedin:reap-stuck')
     ->everyFiveMinutes()
     ->withoutOverlapping(5);
 
+// LinkedIn: bounded auto-retry for failed drafts whose error classifies as
+// TRANSIENT or DETERMINISTIC_LLM. Max 2 retries per record, backoff windows
+// 5min/30min for transient, 30min single retry for deterministic. POLICY_*
+// and PERMANENT errors skip auto-retry entirely (operator decision required).
+// Every 10 min so transient SSH timeout recovers in ~15 min worst case.
+Schedule::command('linkedin:retry-failed')
+    ->everyTenMinutes()
+    ->withoutOverlapping(15);
+
 // LinkedIn: reap carousel slides stuck mid-render. One level deeper than
 // reap-stuck above — handles per-slide `image_status='pending'` (>30m) and
 // 'generating' (>15m) by re-dispatching GenerateLinkedInCarouselImages
