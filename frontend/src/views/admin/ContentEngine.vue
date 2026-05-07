@@ -1580,7 +1580,19 @@ async function handleImportTrending() {
   }))
   const result = await importTrending(topics)
   if (result.success) {
-    toast.success(`Imported ${result.data?.imported || topics.length} topics`)
+    const importedCount = Array.isArray(result.data) ? result.data.length : 0
+    const skippedCount = Array.isArray(result.skipped) ? result.skipped.length : 0
+    if (importedCount > 0) {
+      toast.success(
+        skippedCount > 0
+          ? `Imported ${importedCount}, skipped ${skippedCount} (virality < ${result.threshold ?? 70})`
+          : `Imported ${importedCount} topics`
+      )
+    } else if (skippedCount > 0) {
+      toast.error(`All ${skippedCount} topic(s) below virality threshold (${result.threshold ?? 70})`)
+    } else {
+      toast.success(result.message || 'Done')
+    }
     showTrendingModal.value = false
     currentPage.value = 1
     await refreshIdeas()

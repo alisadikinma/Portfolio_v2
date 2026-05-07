@@ -370,6 +370,13 @@ class ContentIdeaController extends Controller
 
     /**
      * Import selected trending topics as content ideas.
+     *
+     * Virality gate: rejects topics whose headline score (composite_score
+     * with virality_score fallback) falls below
+     * config('content.trending.virality_threshold', 70). Mirrors the gate
+     * applied by the daily PullTrendingDaily cron so manual UI imports
+     * can't bypass the editorial bar. Skipped topics are returned in the
+     * response payload so the operator sees what was filtered + why.
      */
     public function importTrending(Request $request): JsonResponse
     {
@@ -385,16 +392,12 @@ class ContentIdeaController extends Controller
         // listed in rules above, which silently drops everything else.
         $topics = (array) $request->input('topics', []);
 
+        $threshold = (int) config('content.trending.virality_threshold', 70);
+
         $imported = [];
+        $skipped = [];
         foreach ($topics as $topic) {
             if (empty($topic['title'])) continue;
-
-            $payload = [
-                'title' => $topic['title'],
-                'source' => $topic['source'] ?? 'manual',
-                'status' => 'draft',
-                'source_data' => $topic,
-            ];
 
             // Carry scored signals (Phase A) forward onto the ContentIdea
             // so downstream tiering/prioritization can read them without
@@ -406,9 +409,29 @@ class ContentIdeaController extends Controller
             $triggers = $topic['triggers'] ?? null;
 
             $headlineScore = $composite ?? $virality;
-            if ($headlineScore !== null) {
-                $payload['virality_score'] = $headlineScore;
+
+            // Hard editorial gate. Unscored topics (headlineScore === null)
+            // are rejected too — the upstream Pull Trending modal always
+            // surfaces scored topics now, so an unscored row reaching this
+            // endpoint indicates a frontend bug or direct-API misuse.
+            if ($headlineScore === null || $headlineScore < $threshold) {
+                $skipped[] = [
+                    'title' => $topic['title'],
+                    'virality_score' => $headlineScore,
+                    'reason' => $headlineScore === null
+                        ? 'unscored'
+                        : "below_threshold ({$headlineScore}<{$threshold})",
+                ];
+                continue;
             }
+
+            $payload = [
+                'title' => $topic['title'],
+                'source' => $topic['source'] ?? 'manual',
+                'status' => 'draft',
+                'source_data' => $topic,
+                'virality_score' => $headlineScore,
+            ];
 
             if ($composite !== null || $virality !== null || $momentum !== null || is_array($triggers)) {
                 $payload['virality_breakdown'] = [
@@ -422,10 +445,18 @@ class ContentIdeaController extends Controller
             $imported[] = ContentIdea::create($payload);
         }
 
+        $message = count($imported) . ' topic(s) imported';
+        if (!empty($skipped)) {
+            $message .= ', ' . count($skipped) . " skipped (virality < {$threshold})";
+        }
+        $message .= '.';
+
         return response()->json([
             'success' => true,
             'data' => $imported,
-            'message' => count($imported) . ' topic(s) imported.',
+            'skipped' => $skipped,
+            'threshold' => $threshold,
+            'message' => $message,
         ], 201);
     }
 

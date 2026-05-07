@@ -77,7 +77,28 @@ export function useContentEngine() {
     return request('post', '/admin/content-engine/trending/score-batch', body, null, { timeout: 240000 })
   }
 
-  const importTrending = (topics) => request('post', '/admin/content-engine/trending/import', { topics })
+  // Direct call (not via request() wrapper) so the response carries
+  // `skipped[]` + `threshold` fields surfaced by the backend's virality
+  // gate. The shared wrapper strips everything except {success,data,message}.
+  const importTrending = async (topics) => {
+    isLoading.value = true
+    error.value = null
+    try {
+      const response = await api.post('/admin/content-engine/trending/import', { topics })
+      return {
+        success: true,
+        data: response.data.data,
+        skipped: response.data.skipped || [],
+        threshold: response.data.threshold,
+        message: response.data.message,
+      }
+    } catch (err) {
+      error.value = err.response?.data?.message || err.message || 'Request failed'
+      return { success: false, error: error.value }
+    } finally {
+      isLoading.value = false
+    }
+  }
 
   const startResearch = (id, config) => request('post', `/admin/content-engine/ideas/${id}/research`, config)
 
