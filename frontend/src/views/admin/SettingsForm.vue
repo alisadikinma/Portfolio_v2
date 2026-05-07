@@ -443,6 +443,21 @@ LINKEDIN_OAUTH_REDIRECT_URI=https://alisadikinma.com/api/admin/linkedin/oauth/ca
                 When OFF, drafts that pass validation stop at <code class="text-[10px] bg-neutral-100 dark:bg-neutral-800 px-1 rounded">awaiting_publish</code> and never fire the cancel-window timer.
               </p>
 
+              <label class="flex items-center gap-3 cursor-pointer">
+                <input
+                  :checked="linkedinFormData.linkedin_auto_approve_enabled === 'true'"
+                  type="checkbox"
+                  class="w-4 h-4 text-amber-600 border-neutral-300 rounded focus:ring-amber-500"
+                  @change="e => linkedinFormData.linkedin_auto_approve_enabled = e.target.checked ? 'true' : 'false'"
+                >
+                <span class="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                  Enable auto-schedule for manual_review drafts
+                </span>
+              </label>
+              <p class="text-xs text-neutral-500 -mt-2 pl-7">
+                Daily 04:30 WIB cron <code class="text-[10px] bg-neutral-100 dark:bg-neutral-800 px-1 rounded">linkedin:auto-schedule</code> promotes <code class="text-[10px] bg-neutral-100 dark:bg-neutral-800 px-1 rounded">manual_review</code> drafts to the next ideal posting slot (<code class="text-[10px] bg-neutral-100 dark:bg-neutral-800 px-1 rounded">posting_time_rules.score &ge; 85</code>, 14-day lookahead). Pairs with auto-publish — flip both ON for hands-off pipeline.
+              </p>
+
               <div>
                 <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
                   Depth Score threshold
@@ -1507,6 +1522,7 @@ const linkedinOauthFlash = ref(null)
 
 const linkedinFormData = ref({
   linkedin_auto_publish: 'false',
+  linkedin_auto_approve_enabled: 'false',
   linkedin_depth_score_threshold: '80',
   linkedin_cancel_window_minutes: '15',
   linkedin_first_comment_enabled: 'true',
@@ -1539,6 +1555,7 @@ watch(linkedinSettings, (s) => {
   if (!s) return
   linkedinFormData.value = {
     linkedin_auto_publish: s.linkedin_auto_publish ?? 'false',
+    linkedin_auto_approve_enabled: s.linkedin_auto_approve_enabled ?? 'false',
     linkedin_depth_score_threshold: s.linkedin_depth_score_threshold ?? '80',
     linkedin_cancel_window_minutes: s.linkedin_cancel_window_minutes ?? '15',
     linkedin_first_comment_enabled: s.linkedin_first_comment_enabled ?? 'true',
@@ -1553,6 +1570,7 @@ async function handleLinkedInSubmit() {
   try {
     await saveLinkedinSettings({
       linkedin_auto_publish: linkedinFormData.value.linkedin_auto_publish,
+      linkedin_auto_approve_enabled: linkedinFormData.value.linkedin_auto_approve_enabled,
       linkedin_depth_score_threshold: parseInt(linkedinFormData.value.linkedin_depth_score_threshold, 10),
       linkedin_cancel_window_minutes: parseInt(linkedinFormData.value.linkedin_cancel_window_minutes, 10),
       linkedin_first_comment_enabled: linkedinFormData.value.linkedin_first_comment_enabled,

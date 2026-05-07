@@ -10,6 +10,7 @@ use App\Models\LinkedInPost;
 use App\Services\LinkedInCarouselImageService;
 use App\Services\LinkedInGenerationService;
 use App\Services\LinkedInPublishService;
+use App\Services\LinkedInScheduleConflictService;
 use App\Services\PipelineGuard;
 use App\Services\TelegramNotificationService;
 use Illuminate\Http\JsonResponse;
@@ -43,6 +44,7 @@ class LinkedInDraftController extends Controller
         private readonly LinkedInCarouselImageService $carouselImages,
         private readonly TelegramNotificationService $telegram,
         private readonly LinkedInGenerationService $generation,
+        private readonly LinkedInScheduleConflictService $conflictService,
     ) {
     }
 
@@ -876,37 +878,9 @@ class LinkedInDraftController extends Controller
         ]);
 
         $proposed = Carbon::parse($validated['at']);
-        $windowMinutes = 30;
+        $windowMinutes = LinkedInScheduleConflictService::DEFAULT_WINDOW_MINUTES;
 
-        // Conflict status whitelist: posts that are "live on the schedule".
-        // 'scheduled' is NOT in the FSM today but reserved for forward-compat
-        // (skipped if not present in the enum to avoid breakage).
-        $liveStatuses = [
-            LinkedInPostStatus::AwaitingPublish->value,
-            LinkedInPostStatus::Published->value,
-        ];
-
-        $conflicts = LinkedInPost::query()
-            ->where('id', '!=', $id)
-            ->whereIn('status', $liveStatuses)
-            ->whereNotNull('scheduled_at')
-            ->whereBetween('scheduled_at', [
-                $proposed->copy()->subMinutes($windowMinutes),
-                $proposed->copy()->addMinutes($windowMinutes),
-            ])
-            ->with('post.translations')
-            ->get()
-            ->map(function (LinkedInPost $other) use ($proposed) {
-                $title = $other->post?->translations?->first()?->title ?? 'Untitled draft';
-                $diffMinutes = (int) abs($other->scheduled_at->diffInMinutes($proposed, false));
-                return [
-                    'id' => $other->id,
-                    'post_title' => $title,
-                    'scheduled_at' => $other->scheduled_at->toIso8601String(),
-                    'minutes_apart' => $diffMinutes,
-                ];
-            })
-            ->values();
+        $conflicts = $this->conflictService->findConflicts($proposed, $id, $windowMinutes);
 
         // Suggested alternatives: pull from posting_time_rules if the table
         // exists + has rows for the proposed dow + linkedin/b2b_tech audience.

@@ -1432,13 +1432,14 @@ function nextActionLabel(idea) {
     generating_images: 'View Image Generation',
     images_ready: 'Finalize',
     completed: 'View',
+    failed: 'Retry Research',
     archived: 'Restore',
   }
   return map[idea.status] || 'Next'
 }
 
 function triggerNextAction(idea) {
-  if (idea.status === 'draft') return openConfigModal(idea)
+  if (idea.status === 'draft' || idea.status === 'failed') return openConfigModal(idea)
   if (idea.status === 'researching') return openProgressModal(idea)
   if (idea.status === 'generating_images' || idea.status === 'images_ready') {
     return router.push({ name: 'admin-content-engine-images', params: { id: idea.id } })

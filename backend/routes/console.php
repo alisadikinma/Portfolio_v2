@@ -90,6 +90,21 @@ Schedule::command('linkedin:purge-low-virality')
     ->timezone('Asia/Jakarta')
     ->withoutOverlapping(15);
 
+// LinkedIn: daily 04:30 WIB — auto-promote manual_review drafts to
+// awaiting_publish, assigning cancel_window_ends_at to next free
+// posting_time_rules.score >= 85 slot (14-day lookahead). Drafts ordered
+// virality_score DESC, created_at ASC. Gated by linkedin_auto_approve_enabled
+// setting (default OFF — feature dormant until operator opts in via
+// AboutSettings). Loop guard skips drafts demoted by kill_switch_demotion
+// within 24h to prevent ping-pong with linkedin:process-scheduled.
+// Carousel format dispatches GenerateLinkedInCarouselImages for
+// non-rendered slides. Per docs/plans/2026-05-07-linkedin-auto-schedule-
+// manual-review.md.
+Schedule::command('linkedin:auto-schedule')
+    ->dailyAt('04:30')
+    ->timezone('Asia/Jakarta')
+    ->withoutOverlapping(15);
+
 // Newsletter: weekly digest every Friday 09:00 WIB. Skip-if-empty handled
 // inside the command (logs to newsletter_sends.status='skipped'). Reuses
 // existing portfolio-queue.service systemd worker for actual Resend sends +

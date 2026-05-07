@@ -35,6 +35,13 @@ class LinkedInSettingsSeeder extends Seeder
             // Both thresholds are operator-tunable from AboutSettings.
             ['key' => 'linkedin_virality_min_score',           'value' => '60',    'type' => 'text'],
             ['key' => 'linkedin_virality_purge_below',         'value' => '50',    'type' => 'text'],
+            // Auto-approve cron (May 7, 2026):
+            // When 'true', linkedin:auto-schedule (daily 04:30 WIB) promotes
+            // manual_review drafts to awaiting_publish, assigning
+            // cancel_window_ends_at to the next posting_time_rules.score >= 85
+            // slot (14-day lookahead). Default OFF — feature dormant until
+            // operator opts in via AboutSettings UI.
+            ['key' => 'linkedin_auto_approve_enabled',         'value' => 'false', 'type' => 'text'],
         ];
 
         foreach ($settings as $setting) {
@@ -49,9 +56,14 @@ class LinkedInSettingsSeeder extends Seeder
         // Add the 3 new LinkedIn notification toggles here so they share
         // the group + are editable from the existing Telegram card.
         $telegramExtensions = [
-            ['key' => 'telegram_notify_linkedin_preview',       'value' => 'true',  'type' => 'text'],
-            ['key' => 'telegram_notify_linkedin_depth_failed',  'value' => 'true',  'type' => 'text'],
-            ['key' => 'telegram_notify_linkedin_published',     'value' => 'true',  'type' => 'text'],
+            ['key' => 'telegram_notify_linkedin_preview',           'value' => 'true',  'type' => 'text'],
+            ['key' => 'telegram_notify_linkedin_depth_failed',      'value' => 'true',  'type' => 'text'],
+            ['key' => 'telegram_notify_linkedin_published',         'value' => 'true',  'type' => 'text'],
+            // Fired when linkedin:auto-schedule walks the full 14-day
+            // lookahead window without finding a free slot for any pending
+            // manual_review draft. Default OFF — opt in if backlog growth
+            // becomes a real signal worth waking up to.
+            ['key' => 'telegram_notify_linkedin_backlog_exhausted', 'value' => 'false', 'type' => 'text'],
         ];
 
         foreach ($telegramExtensions as $setting) {
@@ -62,7 +74,7 @@ class LinkedInSettingsSeeder extends Seeder
         }
 
         if ($this->command) {
-            $this->command->info('✅ LinkedIn settings seeded (9 linkedin + 3 telegram_notify_linkedin_* keys)');
+            $this->command->info('✅ LinkedIn settings seeded (10 linkedin + 4 telegram_notify_linkedin_* keys)');
         }
     }
 }

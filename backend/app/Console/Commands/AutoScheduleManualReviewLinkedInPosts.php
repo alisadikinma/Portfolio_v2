@@ -1,0 +1,258 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Console\Commands;
+
+use App\Enums\LinkedInPostStatus;
+use App\Jobs\GenerateLinkedInCarouselImages;
+use App\Models\LinkedInPost;
+use App\Models\Setting;
+use App\Services\LinkedInAutoSchedulerService;
+use App\Services\PipelineGuard;
+use Carbon\Carbon;
+use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+
+/**
+ * Daily 04:30 WIB cron — promotes LinkedIn drafts in `manual_review` to
+ * `awaiting_publish`, assigning `cancel_window_ends_at` to the next
+ * posting_time_rules.score >= 85 slot (14-day lookahead).
+ *
+ * Gated by setting `linkedin_auto_approve_enabled` (default 'false').
+ * Drafts ordered by virality_score DESC, created_at ASC (highest virality
+ * gets prime slot, FIFO tiebreaker).
+ *
+ * Loop guard: skips drafts demoted by `linkedin:process-scheduled` due to
+ * kill_switch_demotion within the last 24h, so flipping auto_publish off
+ * while auto_approve stays on doesn't ping-pong drafts between states.
+ *
+ * Carousel format: dispatches GenerateLinkedInCarouselImages for slides
+ * not yet rendered, mirroring the self-heal path in
+ * LinkedInDraftController::approve.
+ */
+class AutoScheduleManualReviewLinkedInPosts extends Command
+{
+    protected $signature = 'linkedin:auto-schedule
+                            {--dry-run : Log planned promotions without writing state}
+                            {--limit= : Cap the number of promotions per tick}
+                            {--lookahead=14 : Max future days to walk when picking slots}';
+
+    protected $description = 'Promote manual_review LinkedIn drafts to awaiting_publish on next ideal posting slot.';
+
+    private const KILL_SWITCH_LOOP_GUARD_HOURS = 24;
+
+    public function __construct(
+        private readonly LinkedInAutoSchedulerService $scheduler,
+        private readonly PipelineGuard $guard,
+    ) {
+        parent::__construct();
+    }
+
+    public function handle(): int
+    {
+        $enabled = Setting::query()
+            ->where('group', 'linkedin')
+            ->where('key', 'linkedin_auto_approve_enabled')
+            ->value('value');
+
+        if ($enabled !== 'true') {
+            $this->info('[linkedin:auto-schedule] kill switch off — exiting.');
+            Log::info('[linkedin:auto-schedule] skipped: linkedin_auto_approve_enabled != true');
+            return self::SUCCESS;
+        }
+
+        $dryRun = (bool) $this->option('dry-run');
+        $limit = $this->option('limit') !== null ? (int) $this->option('limit') : null;
+        $lookahead = (int) $this->option('lookahead');
+
+        $candidates = $this->loadCandidates();
+
+        $promoted = 0;
+        $skipped = 0;
+        $failed = 0;
+        $assignedSlots = [];
+
+        foreach ($candidates as $draft) {
+            if ($limit !== null && $promoted >= $limit) {
+                break;
+            }
+
+            if ($this->wasRecentlyDemotedByKillSwitch($draft)) {
+                $skipped++;
+                Log::debug('[linkedin:auto-schedule] skipped (kill_switch_loop_guard)', [
+                    'draft_id' => $draft->id,
+                ]);
+                continue;
+            }
+
+            $slot = $this->scheduler->nextAvailableSlot(
+                Carbon::now(),
+                $assignedSlots,
+                LinkedInAutoSchedulerService::DEFAULT_MIN_SCORE,
+                $lookahead
+            );
+
+            if ($slot === null) {
+                Log::warning('[linkedin:auto-schedule] lookahead exhausted — backlog larger than ideal capacity', [
+                    'remaining_drafts' => $candidates->count() - $promoted - $skipped - $failed,
+                    'lookahead_days' => $lookahead,
+                ]);
+                break;
+            }
+
+            if ($dryRun) {
+                $this->line(sprintf(
+                    '  [dry-run] would promote draft #%d (virality=%s) → %s',
+                    $draft->id,
+                    $draft->getAttribute('virality_score') ?? 'null',
+                    $slot->toIso8601String()
+                ));
+                $promoted++;
+                $assignedSlots[] = $slot->toIso8601String();
+                continue;
+            }
+
+            try {
+                $this->promoteDraft($draft, $slot);
+                $promoted++;
+                $assignedSlots[] = $slot->toIso8601String();
+            } catch (\Throwable $e) {
+                $failed++;
+                Log::error('[linkedin:auto-schedule] promotion failed', [
+                    'draft_id' => $draft->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        $this->info(sprintf(
+            '[linkedin:auto-schedule] processed: %d promoted, %d skipped, %d failed (lookahead=%d, dry-run=%s)',
+            $promoted,
+            $skipped,
+            $failed,
+            $lookahead,
+            $dryRun ? 'yes' : 'no'
+        ));
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * Loads manual_review drafts ordered by virality_score DESC then created_at ASC.
+     * Uses a left join so manual drafts (no ContentIdea linkage) still appear,
+     * sorted last via COALESCE(virality_score, 0).
+     */
+    private function loadCandidates()
+    {
+        return LinkedInPost::query()
+            ->select('linkedin_posts.*')
+            ->selectRaw('COALESCE(content_ideas.virality_score, 0) as virality_score')
+            ->leftJoin('posts', 'linkedin_posts.post_id', '=', 'posts.id')
+            ->leftJoin('content_ideas', 'posts.id', '=', 'content_ideas.result_post_id')
+            ->where('linkedin_posts.status', LinkedInPostStatus::ManualReview->value)
+            ->whereNull('linkedin_posts.deleted_at')
+            ->orderByDesc('virality_score')
+            ->orderBy('linkedin_posts.created_at')
+            ->lockForUpdate()
+            ->get();
+    }
+
+    /**
+     * Inspects pipeline_state_log for a recent kill_switch_demotion entry.
+     * Prevents the auto_publish=off + auto_approve=on ping-pong loop.
+     */
+    private function wasRecentlyDemotedByKillSwitch(LinkedInPost $draft): bool
+    {
+        $log = $draft->pipeline_state_log ?? [];
+        if (empty($log)) {
+            return false;
+        }
+
+        $cutoff = Carbon::now()->subHours(self::KILL_SWITCH_LOOP_GUARD_HOURS);
+
+        // Walk in reverse — most recent entries come last.
+        foreach (array_reverse($log) as $entry) {
+            $reason = (string) ($entry['reason'] ?? '');
+            $to = (string) ($entry['to'] ?? '');
+            $timestampStr = $entry['timestamp'] ?? null;
+
+            if (! $timestampStr) {
+                continue;
+            }
+
+            $timestamp = Carbon::parse($timestampStr);
+            if ($timestamp->lt($cutoff)) {
+                // Older than the guard window — and since we're walking newest-first,
+                // anything else is also older. Done scanning.
+                break;
+            }
+
+            if ($to === LinkedInPostStatus::ManualReview->value
+                && stripos($reason, 'kill_switch') !== false) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function promoteDraft(LinkedInPost $draft, Carbon $slot): void
+    {
+        DB::transaction(function () use ($draft, $slot): void {
+            $draft->update([
+                'scheduled_at' => Carbon::now(),
+                'cancel_window_ends_at' => $slot,
+            ]);
+
+            $this->guard->advance(
+                $draft,
+                LinkedInPostStatus::AwaitingPublish,
+                'auto_schedule:no_gate',
+                [
+                    'cancel_window_ends_at' => $slot->toIso8601String(),
+                    'virality_score' => $draft->getAttribute('virality_score'),
+                ]
+            );
+        });
+
+        if ($draft->format === 'carousel') {
+            $this->triggerImageGenIfSlidesPending($draft);
+        }
+    }
+
+    /**
+     * Mirrors the self-heal path in LinkedInDraftController::approve.
+     * Idempotent — GenerateLinkedInCarouselImages skips slides already 'done'.
+     */
+    private function triggerImageGenIfSlidesPending(LinkedInPost $draft): void
+    {
+        $slides = $draft->carousel_slides ?? [];
+        $needsImages = false;
+        foreach ($slides as $slide) {
+            $status = $slide['image_status'] ?? null;
+            $url = $slide['image_url'] ?? null;
+            if ($status !== 'done' || empty($url)) {
+                $needsImages = true;
+                break;
+            }
+        }
+
+        if (! $needsImages) {
+            return;
+        }
+
+        try {
+            GenerateLinkedInCarouselImages::dispatch($draft->id);
+            Log::info('[linkedin:auto-schedule] dispatched carousel images', [
+                'draft_id' => $draft->id,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('[linkedin:auto-schedule] image dispatch failed (non-fatal)', [
+                'draft_id' => $draft->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+}

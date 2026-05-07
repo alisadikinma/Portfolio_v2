@@ -875,6 +875,7 @@ class SettingsController extends Controller
 
             $data = array_merge([
                 'linkedin_auto_publish' => 'false',
+                'linkedin_auto_approve_enabled' => 'false',
                 'linkedin_depth_score_threshold' => '80',
                 'linkedin_cancel_window_minutes' => '15',
                 'linkedin_first_comment_enabled' => 'true',
@@ -911,6 +912,7 @@ class SettingsController extends Controller
     {
         $validated = $request->validate([
             'linkedin_auto_publish' => ['nullable', 'in:true,false,1,0'],
+            'linkedin_auto_approve_enabled' => ['nullable', 'in:true,false,1,0'],
             'linkedin_depth_score_threshold' => ['nullable', 'integer', 'between:0,100'],
             'linkedin_cancel_window_minutes' => ['nullable', 'integer', 'between:1,1440'],
             'linkedin_first_comment_enabled' => ['nullable', 'in:true,false,1,0'],
@@ -921,7 +923,7 @@ class SettingsController extends Controller
 
         try {
             // Normalize booleans to canonical 'true'/'false' strings
-            foreach (['linkedin_auto_publish', 'linkedin_first_comment_enabled'] as $boolKey) {
+            foreach (['linkedin_auto_publish', 'linkedin_auto_approve_enabled', 'linkedin_first_comment_enabled'] as $boolKey) {
                 if (isset($validated[$boolKey])) {
                     $validated[$boolKey] = in_array($validated[$boolKey], [true, 'true', 1, '1'], true) ? 'true' : 'false';
                 }
