@@ -19,6 +19,16 @@ class TelegramSettingsSeeder extends Seeder
             ['key' => 'telegram_notify_segment_failed',     'value' => 'true',  'type' => 'text'],
             ['key' => 'telegram_notify_cover_critical',     'value' => 'true',  'type' => 'text'],
             ['key' => 'telegram_notify_translate_failed',   'value' => 'true',  'type' => 'text'],
+
+            // Phase F additions — auto-retry exhaustion + carousel tier-2 failure
+            // notify toggles. webhook_secret is the inbound Telegram webhook
+            // shared secret (used in X-Telegram-Bot-Api-Secret-Token header for
+            // server-to-server identity proof + as the HMAC key for inline
+            // button callback_data signing).
+            ['key' => 'telegram_notify_linkedin_auto_retry_exhausted', 'value' => 'true', 'type' => 'text'],
+            ['key' => 'telegram_notify_idea_auto_retry_exhausted',     'value' => 'true', 'type' => 'text'],
+            ['key' => 'telegram_notify_carousel_tier2_failed',          'value' => 'true', 'type' => 'text'],
+            ['key' => 'telegram_webhook_secret',                        'value' => bin2hex(random_bytes(16)), 'type' => 'text'],
         ];
 
         // firstOrCreate — NOT updateOrCreate — so running this seeder on every

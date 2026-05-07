@@ -581,7 +581,7 @@ class LinkedInCarouselImageService
         });
 
         try {
-            \App\Jobs\DispatchTelegramNotification::dispatch(
+            \App\Jobs\DispatchPipelineTelegramEvent::dispatch(
                 'carousel_slide_tier2_failed',
                 [
                     'draft_id' => $draftId,

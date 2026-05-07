@@ -4,7 +4,7 @@ namespace App\Console\Commands;
 
 use App\Enums\LinkedInPostStatus;
 use App\Enums\PipelineErrorClass;
-use App\Jobs\DispatchTelegramNotification;
+use App\Jobs\DispatchPipelineTelegramEvent;
 use App\Jobs\GenerateLinkedInPost;
 use App\Models\LinkedInPost;
 use App\Services\PipelineErrorClassifier;
@@ -120,7 +120,7 @@ class RetryFailedLinkedInPosts extends Command
             }
 
             try {
-                DispatchTelegramNotification::dispatch('linkedin_auto_retry_exhausted', [
+                DispatchPipelineTelegramEvent::dispatch('linkedin_auto_retry_exhausted', [
                     'draft_id' => $draft->id,
                     'last_error' => $draft->last_error,
                     'auto_retry_count' => $draft->auto_retry_count,

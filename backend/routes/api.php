@@ -358,6 +358,13 @@ Route::prefix('automation')->group(function () {
 
     // Carousel webhook (Content Engine calls this to save carousel draft)
     Route::post('/carousel/save-draft', [CarouselDraftController::class, 'saveDraft']);
+
+    // Telegram inbound webhook for inline-button callbacks (Phase F).
+    // Public route — auth via X-Telegram-Bot-Api-Secret-Token header
+    // (verified inside controller against telegram_webhook_secret setting).
+    // Operator runs `php artisan telegram:set-webhook` once per env to
+    // register this URL with the bot.
+    Route::post('/telegram/webhook', \App\Http\Controllers\Api\Automation\TelegramWebhookController::class);
 });
 
 // Protected automation routes (require auth token)

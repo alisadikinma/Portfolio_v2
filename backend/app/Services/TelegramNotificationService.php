@@ -229,6 +229,183 @@ class TelegramNotificationService
     }
 
     /**
+     * Phase F — LinkedIn auto-retry exhaustion alert. Fires from
+     * `linkedin:retry-failed` cron when a draft hits auto_retry_count >= 2
+     * and is still in FSM=Failed. Includes inline buttons for one-click
+     * resolve from Telegram (handled by TelegramWebhookController).
+     */
+    public function sendLinkedInAutoRetryExhausted(LinkedInPost $draft, string $lastError): bool
+    {
+        if (!$this->isEnabledFor('linkedin_auto_retry_exhausted')) {
+            return false;
+        }
+
+        $title = $draft->post?->translations->where('language', 'id')->first()?->title
+            ?? $draft->post?->translations->first()?->title
+            ?? "(post #{$draft->post_id})";
+
+        $errorClass = $draft->last_classified_error_class ?? 'unknown';
+        $adminUrl = rtrim((string) config('app.url'), '/') . '/admin/linkedin-drafts/' . $draft->id;
+
+        $lines = [];
+        $lines[] = '⚠️ *LinkedIn auto-retry exhausted*';
+        $lines[] = '';
+        $lines[] = 'Draft #' . $draft->id . ' (' . strtoupper((string) $draft->format) . ') — _' . $this->escapeMarkdown($title) . '_';
+        $lines[] = 'Error class: `' . $errorClass . '` after ' . $draft->auto_retry_count . ' retries';
+        if (!empty($lastError)) {
+            $lines[] = '';
+            $lines[] = '```' . "\n" . $this->truncate($lastError, 300) . "\n" . '```';
+        }
+
+        $keyboard = $this->buildResolveInlineKeyboard('linkedin', $draft->id, $adminUrl);
+
+        return $this->send(implode("\n", $lines), $keyboard);
+    }
+
+    /**
+     * Phase F — Content Idea auto-retry exhaustion alert. Fires when
+     * AutoPipelineOrchestrator's classifier-driven gate halts retries
+     * (POLICY_*, PERMANENT, UNKNOWN) OR existing pipeline_attempts cap
+     * is hit.
+     */
+    public function sendIdeaAutoRetryExhausted(\App\Models\ContentIdea $idea, string $lastError): bool
+    {
+        if (!$this->isEnabledFor('idea_auto_retry_exhausted')) {
+            return false;
+        }
+
+        $errorClass = $idea->last_classified_error_class ?? 'unknown';
+        $adminUrl = rtrim((string) config('app.url'), '/') . '/admin/content-engine?idea=' . $idea->id;
+
+        $lines = [];
+        $lines[] = '⚠️ *Content Engine auto-retry halted*';
+        $lines[] = '';
+        $lines[] = 'Idea #' . $idea->id . ' — _' . $this->escapeMarkdown((string) $idea->title) . '_';
+        $lines[] = 'Stage: `' . ($idea->pipeline_failed_stage ?? 'unknown') . '`';
+        $lines[] = 'Class: `' . $errorClass . '` (attempts ' . ($idea->pipeline_attempts ?? 0) . ')';
+        if (!empty($lastError)) {
+            $lines[] = '';
+            $lines[] = '```' . "\n" . $this->truncate($lastError, 300) . "\n" . '```';
+        }
+
+        $keyboard = $this->buildResolveInlineKeyboard('idea', $idea->id, $adminUrl);
+
+        return $this->send(implode("\n", $lines), $keyboard);
+    }
+
+    /**
+     * Phase F — Carousel slide tier-2 fallback failure alert. Fires after
+     * the in-process generic-stock prompt also gets rejected. Operator
+     * decision required: retry slide manually with bespoke prompt OR
+     * skip the slide and republish carousel without it.
+     */
+    public function sendCarouselSlideTier2Failed(LinkedInPost $draft, int $slideIndex, string $error): bool
+    {
+        if (!$this->isEnabledFor('carousel_tier2_failed')) {
+            return false;
+        }
+
+        $adminUrl = rtrim((string) config('app.url'), '/') . '/admin/linkedin-drafts/' . $draft->id;
+
+        $lines = [];
+        $lines[] = '🛑 *Carousel slide tier-2 fallback failed*';
+        $lines[] = '';
+        $lines[] = 'Draft #' . $draft->id . ' slide ' . ($slideIndex + 1);
+        if (!empty($error)) {
+            $lines[] = '';
+            $lines[] = '```' . "\n" . $this->truncate($error, 300) . "\n" . '```';
+        }
+        $lines[] = '';
+        $lines[] = 'Operator action required — generic-stock prompt also rejected.';
+
+        $keyboard = [
+            'inline_keyboard' => [[
+                ['text' => '🛠 Open in admin', 'url' => $adminUrl],
+            ]],
+        ];
+
+        return $this->send(implode("\n", $lines), $keyboard);
+    }
+
+    /**
+     * Build the [Approve manual retry] [Cancel draft] [Open admin] inline
+     * keyboard for retry-exhaustion notifications. callback_data carries
+     * an HMAC so TelegramWebhookController can verify the click came from
+     * a legitimately-issued button (not a forged one).
+     */
+    private function buildResolveInlineKeyboard(string $kind, int $id, string $adminUrl): array
+    {
+        $secret = (string) $this->getSetting('telegram_webhook_secret');
+
+        return [
+            'inline_keyboard' => [
+                [
+                    ['text' => '🔁 Retry', 'callback_data' => self::signCallback('retry', $kind, $id, $secret)],
+                    ['text' => '✕ Cancel', 'callback_data' => self::signCallback('cancel', $kind, $id, $secret)],
+                ],
+                [
+                    ['text' => '🛠 Open in admin', 'url' => $adminUrl],
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * Sign callback_data with truncated HMAC so the webhook handler can
+     * verify the click. Format: "<action>:<kind>:<id>:<hmac12>".
+     * Telegram callback_data is hard-capped at 64 bytes, so we keep the
+     * HMAC at 12 hex chars (96 bits — adequate against honest forgery,
+     * not a security boundary by itself; the Telegram webhook secret
+     * header is the primary auth gate).
+     */
+    public static function signCallback(string $action, string $kind, int $id, string $secret): string
+    {
+        $base = "{$action}:{$kind}:{$id}";
+        if ($secret === '') {
+            // Pre-seeder boot: no secret yet. Embed sentinel so verifyCallback
+            // can return null cleanly instead of accepting unsigned data.
+            return $base . ':NOSECRET';
+        }
+        $hmac = substr(hash_hmac('sha256', $base . ':' . $secret, $secret), 0, 12);
+        return $base . ':' . $hmac;
+    }
+
+    /**
+     * Verify a callback_data string emitted by signCallback. Returns
+     * ['action' => ..., 'kind' => ..., 'id' => ...] on valid input or
+     * null when format is wrong / HMAC mismatches / secret missing.
+     * Constant-time comparison via hash_equals.
+     */
+    public static function verifyCallback(string $callbackData, string $secret): ?array
+    {
+        if ($secret === '') {
+            return null;
+        }
+        $parts = explode(':', $callbackData);
+        if (count($parts) !== 4) {
+            return null;
+        }
+        [$action, $kind, $idStr, $hmac] = $parts;
+        if (!ctype_digit($idStr)) {
+            return null;
+        }
+        $expected = substr(hash_hmac('sha256', "{$action}:{$kind}:{$idStr}:" . $secret, $secret), 0, 12);
+        if (!hash_equals($expected, $hmac)) {
+            return null;
+        }
+        return [
+            'action' => $action,
+            'kind' => $kind,
+            'id' => (int) $idStr,
+        ];
+    }
+
+    private function truncate(string $s, int $max): string
+    {
+        return mb_strlen($s) > $max ? mb_substr($s, 0, $max - 1) . '…' : $s;
+    }
+
+    /**
      * Send a test message using the current configured token + chat_id.
      * Does NOT check the per-type notification toggles (this is a config test).
      * Still respects the master telegram_enabled toggle via the token check.
