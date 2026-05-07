@@ -80,6 +80,10 @@ class PipelineErrorClassifier
         }
 
         // 5. Transient infra failures — worth retrying automatically.
+        //    Includes reaper-stuck signals (linkedin:reap-stuck cron marks
+        //    drafts that exceeded the SSH+job timeout budget — usually means
+        //    queue worker died mid-job or claude CLI hung; same prompt may
+        //    succeed on a fresh worker).
         if (str_contains($needle, 'connection timed out')
             || str_contains($needle, 'connect to host')
             || str_contains($needle, 'ssh timeout')
@@ -89,7 +93,11 @@ class PipelineErrorClassifier
             || str_contains($needle, '503 service unavailable')
             || str_contains($needle, '504 gateway timeout')
             || str_contains($needle, 'maxattemptsexceededexception')
-            || str_contains($needle, 'queue worker')) {
+            || str_contains($needle, 'queue worker')
+            || str_contains($needle, 'reaper:')
+            || str_contains($needle, 'stuck in ')
+            || str_contains($needle, 'process timed out')
+            || str_contains($needle, 'broken pipe')) {
             return PipelineErrorClass::Transient;
         }
 

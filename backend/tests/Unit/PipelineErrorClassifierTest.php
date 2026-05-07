@@ -134,4 +134,32 @@ class PipelineErrorClassifierTest extends TestCase
             $this->classifier->classify('Zod validation: expected enum, received "carousel_v2"')
         );
     }
+
+    public function test_reaper_stuck_in_generating_returns_transient(): void
+    {
+        // The linkedin:reap-stuck cron marks drafts exceeding the 20-min SSH
+        // budget as failed with "Reaper: stuck in <state> for Nm" — almost
+        // always the queue worker died mid-job. Fresh dispatch on a healthy
+        // worker has a strong chance of succeeding.
+        $this->assertSame(
+            PipelineErrorClass::Transient,
+            $this->classifier->classify('Reaper: stuck in generating for 21m (threshold=20m)')
+        );
+    }
+
+    public function test_stuck_in_validating_returns_transient(): void
+    {
+        $this->assertSame(
+            PipelineErrorClass::Transient,
+            $this->classifier->classify('stuck in validating for 25m (threshold=20m)')
+        );
+    }
+
+    public function test_process_timed_out_returns_transient(): void
+    {
+        $this->assertSame(
+            PipelineErrorClass::Transient,
+            $this->classifier->classify('Symfony Process timed out after 600 seconds')
+        );
+    }
 }
