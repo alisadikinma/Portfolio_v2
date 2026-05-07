@@ -581,4 +581,28 @@ router.beforeEach(async (to, from, next) => {
   }
 })
 
+// Stale-chunk recovery after deploy.
+// CI/CD rebuilds the frontend on every push, emitting new hashed chunk
+// names; tabs opened before the deploy still reference the old chunks
+// in their entry script, so Vue Router's lazy-import 404s. Force-reload
+// to fetch a fresh index.html. sessionStorage guard prevents an infinite
+// reload loop if the reload itself fails for some other reason.
+const CHUNK_RELOAD_KEY = 'router:chunkReloadAt'
+router.onError((error, to) => {
+  const message = error?.message || ''
+  const isChunkLoadError =
+    message.includes('Failed to fetch dynamically imported module') ||
+    message.includes('Importing a module script failed') ||
+    message.includes('error loading dynamically imported module')
+
+  if (!isChunkLoadError) return
+
+  const lastReload = Number(sessionStorage.getItem(CHUNK_RELOAD_KEY) || 0)
+  if (Date.now() - lastReload < 10000) return // already reloaded recently
+
+  sessionStorage.setItem(CHUNK_RELOAD_KEY, String(Date.now()))
+  const target = to?.fullPath || window.location.pathname + window.location.search
+  window.location.assign(target)
+})
+
 export default router
