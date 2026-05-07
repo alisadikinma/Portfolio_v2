@@ -35,6 +35,22 @@ WorkingDirectory=/var/www/Portfolio_v2/backend
 # --backoff=60,300,900 — escalating retry delay; matches GenerateLinkedInPost
 #                          + RegenerateLinkedInCarouselContent class settings.
 ExecStart=/usr/bin/php artisan queue:work --queue=default --sleep=3 --tries=3 --max-time=3600 --backoff=60,300,900
+# SIGKILL events (signal 9 = exit status 137) treated as success so the
+# unit doesn't hit StartLimitBurst on repeated kills (4× observed
+# May 6-7 2026; see investigation in CLAUDE.md). Without this, repeated
+# kills could disable the unit and silently halt the entire pipeline.
+SuccessExitStatus=137 SIGKILL
+# MemoryHigh sets kernel pressure threshold before any kill — the cgroup
+# gets gradual reclaim instead of sudden SIGKILL when claude subprocess
+# spikes during /carousel-gen runs. Combined with the 2GB swap activated
+# 2026-05-07 (/swapfile), gives kernel headroom to swap pages instead
+# of OOM-kill. 4G threshold leaves room for queue worker (~75MB), claude
+# subprocess (~250MB), plus burst overhead.
+MemoryHigh=4G
+# MaxRSS=6G as a hard ceiling — kernel will SIGKILL before exceeding
+# this (defense-in-depth; in practice MemoryHigh kicks in first and
+# reclaim kicks in via swap before MemoryMax is breached).
+MemoryMax=6G
 Restart=always
 RestartSec=10
 # Pipe stdout/stderr to journald — `journalctl -u portfolio-queue -f` to tail.
