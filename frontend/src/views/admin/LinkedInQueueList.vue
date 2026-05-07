@@ -388,6 +388,18 @@ const emptyMessage = computed(() => ({
           <!-- Issue -->
           <div class="md:self-center text-xs text-neutral-400 truncate min-w-0">
             {{ issueSummary(draft) }}
+            <span
+              v-if="(draft.auto_retry_count ?? 0) > 0"
+              class="ml-2 inline-block px-1.5 py-0.5 rounded text-[9px] font-mono tracking-normal whitespace-nowrap align-middle"
+              :class="{
+                'bg-emerald-950/60 text-emerald-300': draft.last_classified_error_class === 'transient',
+                'bg-amber-950/60 text-amber-300': draft.last_classified_error_class === 'deterministic_llm',
+                'bg-neutral-800 text-neutral-400': !['transient','deterministic_llm'].includes(draft.last_classified_error_class),
+              }"
+              :title="`Auto-retried ${draft.auto_retry_count}× (class: ${draft.last_classified_error_class || 'unknown'})`"
+            >
+              ↻ {{ draft.auto_retry_count }}×
+            </span>
           </div>
 
           <!-- Published (source blog's published_at, falls back to draft updated_at) -->

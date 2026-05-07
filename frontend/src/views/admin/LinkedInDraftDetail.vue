@@ -1324,7 +1324,18 @@ const showThumbnailUploadCaption = computed(() =>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-9 h-9 text-red-400 mb-2">
                       <path :d="ICON.alertTriangle" />
                     </svg>
-                    <p class="text-red-300 text-[10px] uppercase tracking-[0.18em] font-mono mb-2">Render failed</p>
+                    <p class="text-red-300 text-[10px] uppercase tracking-[0.18em] font-mono mb-2">
+                      Render failed
+                      <span v-if="carouselSlides[activeSlideIndex]?.last_classified_error_class" class="ml-2 inline-block px-1.5 py-0.5 rounded bg-red-950/60 text-red-200 text-[9px] tracking-normal">
+                        {{ carouselSlides[activeSlideIndex].last_classified_error_class }}
+                      </span>
+                      <span v-if="(carouselSlides[activeSlideIndex]?.image_rewrite_tier ?? 0) > 0" class="ml-1 inline-block px-1.5 py-0.5 rounded text-[9px] tracking-normal" :class="{
+                        'bg-amber-950/60 text-amber-200': carouselSlides[activeSlideIndex].image_rewrite_tier === 1,
+                        'bg-red-950/60 text-red-200': carouselSlides[activeSlideIndex].image_rewrite_tier === 2,
+                      }">
+                        Tier {{ carouselSlides[activeSlideIndex].image_rewrite_tier }}
+                      </span>
+                    </p>
                     <p class="text-red-200 text-xs mb-4 max-w-md font-mono">{{ carouselSlides[activeSlideIndex]?.image_error || 'Unknown error' }}</p>
                     <button
                       @click="regenerateSingleSlide(activeSlideIndex)"
