@@ -81,6 +81,92 @@ class PublerClient
     }
 
     /**
+     * List all workspace IDs accessible to the authenticated user.
+     * Tries /users/me.workspaces[] first, falls back to GET /workspaces.
+     * Returns empty array if neither path yields workspaces.
+     *
+     * @return array<int, array{id: string, name?: string}>
+     */
+    public function listWorkspaces(): array
+    {
+        $user = $this->me();
+
+        if (isset($user['workspaces']) && is_array($user['workspaces']) && !empty($user['workspaces'])) {
+            return array_values(array_filter(array_map(function ($ws) {
+                if (!is_array($ws)) {
+                    return is_string($ws) ? ['id' => $ws] : null;
+                }
+                return isset($ws['id']) && is_string($ws['id']) ? $ws : null;
+            }, $user['workspaces'])));
+        }
+
+        try {
+            $response = $this->client()->get($this->url('/workspaces'));
+            $data = $this->extractData($response, 'listWorkspaces');
+            if (is_array($data)) {
+                return array_values(array_filter(array_map(function ($ws) {
+                    return is_array($ws) && isset($ws['id']) && is_string($ws['id']) ? $ws : null;
+                }, $data)));
+            }
+        } catch (\Throwable $e) {
+            // Swallow — caller treats empty as "no workspaces enumerable"
+        }
+
+        return [];
+    }
+
+    /**
+     * Aggregate accounts across ALL workspaces the user has access to.
+     * Some Publer users organize by separate workspace per platform/client,
+     * which means /accounts on a single workspace returns only that
+     * workspace's accounts. This helper iterates every workspace and merges.
+     *
+     * @return array{accounts: array<int, array<string, mixed>>, workspaces: array<int, array<string, mixed>>}
+     */
+    public function listAllAccountsAcrossWorkspaces(): array
+    {
+        $workspaces = $this->listWorkspaces();
+
+        if (empty($workspaces)) {
+            // Fall back to single-default-workspace path so existing
+            // single-workspace users keep working.
+            return [
+                'accounts' => $this->listAccounts(),
+                'workspaces' => [],
+            ];
+        }
+
+        $allAccounts = [];
+        $seenIds = [];
+
+        foreach ($workspaces as $ws) {
+            try {
+                $accounts = $this->listAccounts($ws['id']);
+            } catch (\Throwable $e) {
+                continue;
+            }
+
+            foreach ($accounts as $account) {
+                $accountId = $account['id'] ?? null;
+                if (is_string($accountId) && isset($seenIds[$accountId])) {
+                    continue;
+                }
+                if (is_string($accountId)) {
+                    $seenIds[$accountId] = true;
+                }
+                $account['_workspace_id'] = $ws['id'];
+                $account['_workspace_name'] = $ws['name'] ?? null;
+                $allAccounts[] = $account;
+            }
+        }
+
+        return [
+            'accounts' => $allAccounts,
+            'workspaces' => $workspaces,
+        ];
+    }
+
+    /**
      * Resolve the operator's default workspace_id. Publer's API exposes
      * workspaces in different shapes depending on tenant tier — try multiple
      * paths in order:

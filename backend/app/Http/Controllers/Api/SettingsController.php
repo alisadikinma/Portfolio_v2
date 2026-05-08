@@ -1466,7 +1466,9 @@ class SettingsController extends Controller
     public function syncPublerAccounts(\App\Services\PublerClient $client): JsonResponse
     {
         try {
-            $accounts = $client->listAccounts();
+            $aggregate = $client->listAllAccountsAcrossWorkspaces();
+            $accounts = $aggregate['accounts'];
+            $workspaces = $aggregate['workspaces'];
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
@@ -1526,6 +1528,8 @@ class SettingsController extends Controller
             'data' => $grouped,
             'synced_at' => $now,
             'debug_raw_types' => array_values(array_unique($rawTypes)),
+            'debug_workspace_count' => count($workspaces),
+            'debug_total_accounts' => count($accounts),
         ]);
     }
 }
