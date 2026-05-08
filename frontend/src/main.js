@@ -49,29 +49,30 @@ try {
   // Non-fatal — localStorage may be disabled in some browsers
 }
 
-// Prefetch critical homepage data on app load for instant first render
+// Prefetch critical homepage data on app load for instant first render.
+// Gated by URL path so admin and auth routes don't pay for a 25KB
+// /api/settings/about payload (dominated by experience+gallery hydration —
+// see CLAUDE.md May 4 entry on Phase 11) that those pages never consume.
+// The router's beforeEach hook still synchronously prefetches on `home` route
+// navigation, so first-visit home stays warm via that path.
 ;(async () => {
+  const path = (typeof window !== 'undefined' && window.location?.pathname) || '/'
+  if (path.startsWith('/admin') || path.startsWith('/login') || path.startsWith('/auth')) {
+    return
+  }
   try {
-    console.log('[App] 🚀 Checking cache...')
-    
-    // Cek cache dulu
     const cachedAbout = queryClient.getQueryData(['about-settings'])
-    if (cachedAbout) {
-      console.log('[App] ⚡ CACHE HIT - about settings already loaded!')
-    } else {
-      console.log('[App] 📡 CACHE MISS - prefetching about settings...')
-      await queryClient.prefetchQuery({
-        queryKey: ['about-settings'],
-        queryFn: async () => {
-          const response = await api.get('/settings/about')
-          return response.data.success ? response.data.data : null
-        },
-        staleTime: 30 * 60 * 1000
-      })
-      console.log('[App] ✅ About settings prefetched!')
-    }
+    if (cachedAbout) return
+    await queryClient.prefetchQuery({
+      queryKey: ['about-settings'],
+      queryFn: async () => {
+        const response = await api.get('/settings/about')
+        return response.data.success ? response.data.data : null
+      },
+      staleTime: 30 * 60 * 1000
+    })
   } catch (error) {
-    console.log('[App] ⚠️ Prefetch failed (non-critical):', error.message)
+    // Non-fatal — public pages re-fetch on mount via useAboutSettings
   }
 })()
 
