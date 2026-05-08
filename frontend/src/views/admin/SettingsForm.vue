@@ -1716,13 +1716,24 @@ async function handlePublerSyncAccounts() {
       const total = (publerAccounts.value.facebook?.length || 0)
         + (publerAccounts.value.instagram?.length || 0)
         + (publerAccounts.value.tiktok?.length || 0)
-      publerSyncResult.value = { success: true, message: `✓ Synced ${total} accounts from Publer` }
+      const otherCount = publerAccounts.value.other?.length || 0
+      const debug = result.debug || {}
+      const diagBits = []
+      if (typeof debug.workspace_count === 'number') diagBits.push(`${debug.workspace_count} workspace${debug.workspace_count === 1 ? '' : 's'}`)
+      if (typeof debug.total_accounts === 'number') diagBits.push(`${debug.total_accounts} raw`)
+      if (otherCount > 0) diagBits.push(`${otherCount} unmatched`)
+      if (Array.isArray(debug.raw_types) && debug.raw_types.length) diagBits.push(`types: [${debug.raw_types.join(', ')}]`)
+      const diagSuffix = diagBits.length ? ` (${diagBits.join(' · ')})` : ''
+      publerSyncResult.value = {
+        success: true,
+        message: `✓ Synced ${total} accounts from Publer${diagSuffix}`,
+      }
       // Refresh settings so publer_last_account_sync_at updates
       await loadPublerSettings().catch(() => {})
     } else {
       publerSyncResult.value = { success: false, message: '✗ ' + (result.error || 'Failed to sync accounts') }
     }
-    setTimeout(() => { publerSyncResult.value = null }, 15000)
+    setTimeout(() => { publerSyncResult.value = null }, 30000)
   } finally {
     publerSyncing.value = false
   }

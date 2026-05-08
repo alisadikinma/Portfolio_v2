@@ -417,6 +417,11 @@ export const useSettingsStore = defineStore('settings', {
           accounts: response.data.data, // grouped: { facebook: [], instagram: [], tiktok: [], other: [] }
           synced_at: response.data.synced_at,
           error: response.data.error,
+          debug: {
+            workspace_count: response.data.debug_workspace_count,
+            total_accounts: response.data.debug_total_accounts,
+            raw_types: response.data.debug_raw_types,
+          },
         }
       } catch (error) {
         return {
