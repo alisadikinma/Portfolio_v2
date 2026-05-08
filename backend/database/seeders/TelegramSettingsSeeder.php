@@ -28,6 +28,13 @@ class TelegramSettingsSeeder extends Seeder
             ['key' => 'telegram_notify_linkedin_auto_retry_exhausted', 'value' => 'true', 'type' => 'text'],
             ['key' => 'telegram_notify_idea_auto_retry_exhausted',     'value' => 'true', 'type' => 'text'],
             ['key' => 'telegram_notify_carousel_tier2_failed',          'value' => 'true', 'type' => 'text'],
+
+            // Daily ack from content:pull-trending-daily so a silent cron
+            // failure (worker crash, schedule:run removed) surfaces within 24h
+            // instead of going unnoticed for days. Default 'true' on a fresh
+            // install per operator request — flip to 'false' via UI to silence.
+            ['key' => 'telegram_notify_trending_pulled',                'value' => 'true', 'type' => 'text'],
+
             ['key' => 'telegram_webhook_secret',                        'value' => bin2hex(random_bytes(16)), 'type' => 'text'],
         ];
 

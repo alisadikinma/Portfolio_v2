@@ -164,6 +164,34 @@ class TelegramNotificationService
     }
 
     /**
+     * Daily heartbeat after content:pull-trending-daily completes. Without this,
+     * a silent cron failure (queue worker crash, schedule:run cron removed, VPS
+     * reboot without systemd auto-start) only surfaces when the operator
+     * notices no new draft ideas, which can take days. Toggle key:
+     * telegram_notify_trending_pulled (default OFF — opt-in to avoid spamming
+     * operators who don't care about the daily ack).
+     */
+    public function sendTrendingDailyHeartbeat(int $imported, int $skippedDup, int $skippedLow, int $errors = 0): bool
+    {
+        if (!$this->isEnabledFor('trending_pulled')) {
+            return false;
+        }
+
+        $threshold = (int) config('content.trending.virality_threshold', 70);
+        $emoji = $errors > 0 ? '⚠️' : ($imported > 0 ? '📥' : '🪶');
+
+        $text = "{$emoji} *Trending pull* — Content Engine\n\n"
+            . "Imported: *{$imported}*\n"
+            . "Skipped (dup): {$skippedDup}\n"
+            . "Skipped (virality < {$threshold}): {$skippedLow}\n"
+            . ($errors > 0 ? "Errors: *{$errors}*\n" : '')
+            . "\n"
+            . "[Open Content Engine](" . rtrim((string) config('app.url'), '/') . "/admin/content-engine)";
+
+        return $this->send($text);
+    }
+
+    /**
      * Celebratory alert on successful article publish.
      */
     public function sendPublishSuccess(ContentIdea $idea): bool

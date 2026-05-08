@@ -951,13 +951,16 @@ function topicDisplayScore(topic) {
 }
 
 // Resolve the virality score shown in the ideas-list table.
-// Preference order: source_data.display_score (new, boosted) → idea.virality_score
-// (top-level column persisted at import) → source_data.composite_score (raw AI).
-// This keeps old ideas (imported before display_score existed) from rendering blank.
+// Preference order: idea.virality_score (top-level column — THIS is the field
+// PullTrendingDaily + ContentIdeaController::importTrending gate against, so
+// what the UI shows must match what was actually filtered) → source_data.display_score
+// (legacy boosted score) → source_data.composite_score (raw AI).
+// Without this alignment, the gate accepts virality_score=72 but the UI renders
+// source_data.display_score=61, looking like the gate let a sub-70 row through.
 function ideaViralityScore(idea) {
+  if (idea?.virality_score != null) return idea.virality_score
   const sd = idea?.source_data || {}
   if (sd.display_score != null) return sd.display_score
-  if (idea?.virality_score != null) return idea.virality_score
   if (sd.composite_score != null) return sd.composite_score
   return null
 }

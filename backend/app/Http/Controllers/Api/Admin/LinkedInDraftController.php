@@ -57,7 +57,21 @@ class LinkedInDraftController extends Controller
             'per_page' => ['nullable', 'integer', 'min:1', 'max:200'],
         ]);
 
-        $query = LinkedInPost::with(['post.translations', 'post.contentIdea:id,result_post_id,virality_score', 'account'])
+        // List endpoint over-fetched in two ways before this slim:
+        //   1. post.translations pulled the full HTML article body (~30KB/row × 2
+        //      languages) that the list UI never renders — it only needs title.
+        //   2. carousel_slides JSON shipped the plugin-authored image_prompt
+        //      (~1-2KB/slide × 9 slides/row) which the list also never renders.
+        // Per-row dropped: ~50-70KB. With per_page=100 in LinkedInQueueList.vue,
+        // that compounded into a ~5-10MB cold-load payload + identical body
+        // every 30s refetch (ETag md5'd over the full string before 304-ing).
+        // show() keeps the full payload (single row, detail page needs body).
+        $query = LinkedInPost::with([
+                'post' => fn ($q) => $q->select('id', 'slug', 'featured_image', 'published_at'),
+                'post.translations' => fn ($q) => $q->select('id', 'post_id', 'language', 'title'),
+                'post.contentIdea:id,result_post_id,virality_score',
+                'account',
+            ])
             ->orderByDesc('updated_at');
 
         if (!empty($validated['status'])) {
@@ -75,9 +89,25 @@ class LinkedInDraftController extends Controller
         $perPage = $validated['per_page'] ?? 15;
         $paginator = $query->paginate($perPage);
 
+        // Strip image_prompt + image_prompt_pre_safety from carousel_slides for
+        // list responses. The list UI consumes only image_status/image_url to
+        // render thumbnails and status badges. Detail page goes through show()
+        // which keeps the full slide payload.
+        $items = array_map(function ($draft) {
+            if ($draft->format === 'carousel' && is_array($draft->carousel_slides)) {
+                $draft->carousel_slides = array_map(
+                    fn ($slide) => is_array($slide)
+                        ? array_diff_key($slide, array_flip(['image_prompt', 'image_prompt_pre_safety']))
+                        : $slide,
+                    $draft->carousel_slides
+                );
+            }
+            return $draft;
+        }, $paginator->items());
+
         return response()->json([
             'success' => true,
-            'data' => $paginator->items(),
+            'data' => $items,
             'meta' => [
                 'current_page' => $paginator->currentPage(),
                 'last_page' => $paginator->lastPage(),

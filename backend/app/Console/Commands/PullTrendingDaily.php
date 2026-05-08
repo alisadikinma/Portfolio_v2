@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\ContentIdea;
+use App\Services\TelegramNotificationService;
 use App\Services\TopicDedupService;
 use App\Services\TrendingTopicService;
 use Illuminate\Console\Command;
@@ -16,7 +17,7 @@ class PullTrendingDaily extends Command
 
     protected $description = 'Pull trending topics daily, AI-score them, and import only those above the virality threshold as auto_mode content ideas';
 
-    public function handle(TrendingTopicService $trending, TopicDedupService $dedup): int
+    public function handle(TrendingTopicService $trending, TopicDedupService $dedup, TelegramNotificationService $telegram): int
     {
         $threshold = $this->option('threshold') !== null
             ? (int) $this->option('threshold')
@@ -109,6 +110,13 @@ class PullTrendingDaily extends Command
         );
         $this->info("Done. {$summary}");
         Log::info('[TrendingDaily] ' . $summary);
+
+        // Heartbeat to operator's Telegram so silent cron failures surface
+        // within 24h instead of going unnoticed for days. No-op when toggle
+        // off or in --dry-run (a dry-run heartbeat would be misleading).
+        if (!$dryRun) {
+            $telegram->sendTrendingDailyHeartbeat($imported, $skippedDup, $skippedLowVirality, $errors);
+        }
 
         return self::SUCCESS;
     }
