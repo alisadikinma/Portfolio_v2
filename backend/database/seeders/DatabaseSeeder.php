@@ -33,6 +33,7 @@ class DatabaseSeeder extends Seeder
             CreatorBrandSettingsSeeder::class, // creator watermark/filename branding
             TelegramSettingsSeeder::class, // telegram bot for manifest/failure/success alerts
             LinkedInSettingsSeeder::class, // linkedin admin UI publishing flags
+            PublerSettingsSeeder::class, // publer cross-post integration — api_key (encrypted) + 3 account IDs + master toggle
             BlogPromoSettingsSeeder::class, // blog.blog_promo_project_id for mid-article promo rotator
             CvSettingsSeeder::class, // /api/cv/export schema_version 2.0.0 — summary_variants, work_experience, skills_matrix, education
         ]);

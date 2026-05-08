@@ -315,6 +315,12 @@ Route::middleware(['auth:sanctum'])->prefix('admin/settings')->group(function ()
     Route::get('/mail', [SettingsController::class, 'getMailSettings']);
     Route::put('/mail', [SettingsController::class, 'updateMailSettings']);
     Route::post('/mail/test', [SettingsController::class, 'testMailConnection']);
+    // Publer cross-post integration (group=publer) — encrypted api_key + 3
+    // platform account IDs + master enable toggle. See PublerSettingsSeeder.
+    Route::get('/publer', [SettingsController::class, 'getPublerSettings']);
+    Route::put('/publer', [SettingsController::class, 'updatePublerSettings']);
+    Route::post('/publer/test', [SettingsController::class, 'testPublerConnection']);
+    Route::post('/publer/sync-accounts', [SettingsController::class, 'syncPublerAccounts']);
     // CV Master Export (group=cv) — feeds /api/cv/export schema_version 2.0.0
     Route::get('/cv', [SettingsController::class, 'getCvSettings']);
     Route::put('/cv', [SettingsController::class, 'updateCvSettings']);

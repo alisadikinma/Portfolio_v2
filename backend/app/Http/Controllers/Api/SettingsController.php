@@ -1310,4 +1310,202 @@ class SettingsController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * GET /api/admin/settings/publer — read Publer integration config.
+     * api_key value is NEVER returned; surfaces only `publer_api_key_configured`
+     * boolean flag + ***SET*** placeholder so the UI knows whether a key
+     * exists without exposing the actual encrypted blob.
+     */
+    public function getPublerSettings(): JsonResponse
+    {
+        try {
+            $rows = Setting::byGroup('publer')->get();
+
+            $data = [];
+            foreach ($rows as $setting) {
+                $data[$setting->key] = $setting->value;
+            }
+
+            // Defaults if seeder hasn't run yet
+            $data = array_merge([
+                'publer_api_key' => null,
+                'publer_enabled' => 'false',
+                'publer_facebook_account_id' => null,
+                'publer_instagram_account_id' => null,
+                'publer_tiktok_account_id' => null,
+                'publer_last_account_sync_at' => null,
+            ], $data);
+
+            // Mask api_key — UI never sees the real encrypted blob nor the plaintext.
+            $hasKey = !empty($data['publer_api_key']);
+            $data['publer_api_key'] = $hasKey ? '***SET***' : '';
+            $data['publer_api_key_configured'] = $hasKey;
+
+            return response()->json([
+                'success' => true,
+                'data' => $data,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to fetch publer settings', ['error' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch publer settings',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred',
+            ], 500);
+        }
+    }
+
+    /**
+     * PUT /api/admin/settings/publer — update Publer integration config.
+     * Empty publer_api_key is treated as "no change" (preserves existing
+     * encrypted value) so admin can edit other fields without re-entering.
+     * Non-empty value gets encrypted via Crypt::encryptString before storage.
+     */
+    public function updatePublerSettings(\Illuminate\Http\Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'publer_api_key' => ['nullable', 'string', 'max:512'],
+            'publer_enabled' => ['nullable', 'in:true,false,1,0'],
+            'publer_facebook_account_id' => ['nullable', 'string', 'max:100'],
+            'publer_instagram_account_id' => ['nullable', 'string', 'max:100'],
+            'publer_tiktok_account_id' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        DB::beginTransaction();
+        try {
+            // Empty / sentinel api_key = preserve existing
+            $keyValue = $request->input('publer_api_key');
+            if ($keyValue === null || $keyValue === '' || $keyValue === '***SET***') {
+                unset($validated['publer_api_key']);
+            } else {
+                $validated['publer_api_key'] = \Illuminate\Support\Facades\Crypt::encryptString($keyValue);
+            }
+
+            // Normalize boolean-ish enabled flag to consistent string
+            if (isset($validated['publer_enabled'])) {
+                $validated['publer_enabled'] = in_array(
+                    (string) $validated['publer_enabled'],
+                    ['true', '1'],
+                    true
+                ) ? 'true' : 'false';
+            }
+
+            foreach ($validated as $key => $value) {
+                Setting::updateOrCreate(
+                    ['key' => $key, 'group' => 'publer'],
+                    ['value' => $value, 'type' => 'text']
+                );
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Publer settings updated.',
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Failed to update publer settings', ['error' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update publer settings',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred',
+            ], 500);
+        }
+    }
+
+    /**
+     * POST /api/admin/settings/publer/test — synchronous Test Connection
+     * button. Calls PublerClient::me() to verify api_key works end-to-end.
+     * Returns user profile on success or operator-actionable error message.
+     */
+    public function testPublerConnection(\App\Services\PublerClient $client): JsonResponse
+    {
+        try {
+            $user = $client->me();
+            return response()->json([
+                'success' => true,
+                'message' => 'Publer connection OK.',
+                'data' => [
+                    'user_id' => $user['id'] ?? null,
+                    'email' => $user['email'] ?? null,
+                    'name' => $user['name'] ?? null,
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            // Don't 500 on auth failure — operator's error, not server's.
+            // Return 200 with success=false so frontend can render the
+            // error message inline without a console.error noise.
+            return response()->json([
+                'success' => false,
+                'message' => 'Publer connection failed.',
+                'error' => $e->getMessage(),
+            ], 200);
+        }
+    }
+
+    /**
+     * POST /api/admin/settings/publer/sync-accounts — fetch the operator's
+     * connected social accounts from Publer and return as dropdown options
+     * grouped by platform. Persists `publer_last_account_sync_at` timestamp
+     * so admin UI can show "Last synced: Xh ago".
+     *
+     * Returns shape:
+     *   {
+     *     success: true,
+     *     data: {
+     *       facebook: [{ id, name, picture? }, ...],
+     *       instagram: [...],
+     *       tiktok: [...],
+     *       other: [...]   // fallback bucket for unsupported types
+     *     },
+     *     synced_at: ISO 8601 timestamp
+     *   }
+     */
+    public function syncPublerAccounts(\App\Services\PublerClient $client): JsonResponse
+    {
+        try {
+            $accounts = $client->listAccounts();
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch Publer accounts.',
+                'error' => $e->getMessage(),
+            ], 200);
+        }
+
+        // Group by platform `type` field (publer returns: facebook, instagram,
+        // tiktok, twitter, linkedin, ...). Fallback bucket for unsupported.
+        $grouped = [
+            'facebook' => [],
+            'instagram' => [],
+            'tiktok' => [],
+            'other' => [],
+        ];
+
+        foreach ($accounts as $account) {
+            $type = $account['type'] ?? $account['provider'] ?? 'other';
+            $bucket = isset($grouped[$type]) ? $type : 'other';
+
+            $grouped[$bucket][] = [
+                'id' => $account['id'] ?? null,
+                'name' => $account['name'] ?? $account['display_name'] ?? '(unnamed)',
+                'picture' => $account['picture'] ?? $account['picture_url'] ?? null,
+            ];
+        }
+
+        $now = now()->toIso8601String();
+        Setting::updateOrCreate(
+            ['key' => 'publer_last_account_sync_at', 'group' => 'publer'],
+            ['value' => $now, 'type' => 'text']
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Publer accounts synced.',
+            'data' => $grouped,
+            'synced_at' => $now,
+        ]);
+    }
 }

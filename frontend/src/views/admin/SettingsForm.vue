@@ -542,6 +542,192 @@ LINKEDIN_OAUTH_REDIRECT_URI=https://alisadikinma.com/api/admin/linkedin/oauth/ca
       </section>
 
       <!-- ================================================================ -->
+      <!-- TAB: Publer Cross-Post Integration (May 8, 2026)                 -->
+      <!-- ================================================================ -->
+      <section
+        v-show="activeTab === 'publer'"
+        role="tabpanel"
+        id="tab-panel-publer"
+        aria-labelledby="tab-publer"
+      >
+        <BaseCard>
+          <h2 class="text-xl font-display font-semibold text-neutral-900 dark:text-neutral-100 mb-2">
+            Publer Integration — Cross-post to Facebook, Instagram, TikTok
+          </h2>
+          <p class="text-sm text-neutral-600 dark:text-neutral-400 mb-6">
+            Backend POSTs draft captions + LinkedIn carousel slides to Publer's REST API
+            (<code class="text-xs bg-neutral-100 dark:bg-neutral-800 px-1 rounded">app.publer.com/api/v1</code>),
+            which auto-publishes at the scheduled time. Operator approves per-platform in our admin queue first.
+            <strong>API key is encrypted at rest</strong> (Laravel Crypt) and never returned in API responses —
+            only the <code class="text-xs">***SET***</code> placeholder + a boolean flag.
+          </p>
+
+          <!-- Master enable toggle -->
+          <div class="mb-6 p-4 rounded-md border"
+               :class="publerEnabled
+                 ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50'
+                 : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/50'">
+            <label class="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                v-model="publerEnabled"
+                class="w-5 h-5 rounded border-neutral-300 text-primary-600 focus:ring-2 focus:ring-primary-500"
+              />
+              <span class="flex-1">
+                <strong class="block text-sm" :class="publerEnabled ? 'text-emerald-900 dark:text-emerald-200' : 'text-amber-900 dark:text-amber-200'">
+                  {{ publerEnabled ? '✓ Publer integration ENABLED' : '⚠ Publer integration DISABLED' }}
+                </strong>
+                <span class="text-xs" :class="publerEnabled ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'">
+                  {{ publerEnabled
+                    ? 'Approved drafts auto-publish via Publer at their scheduled_at time.'
+                    : 'Master kill switch — drafts queue normally but never POST to Publer until enabled.' }}
+                </span>
+              </span>
+            </label>
+          </div>
+
+          <form @submit.prevent="handlePublerSubmit" class="space-y-4">
+            <!-- API key -->
+            <div>
+              <label for="publer_api_key" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                API Key
+                <span v-if="publerKeyConfigured" class="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">
+                  ✓ Configured
+                </span>
+              </label>
+              <input
+                id="publer_api_key"
+                v-model="publerFormData.publer_api_key"
+                type="password"
+                autocomplete="new-password"
+                :placeholder="publerKeyConfigured ? 'Leave blank to keep current key' : 'Paste Publer API key here'"
+                class="w-full border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono text-sm"
+              />
+              <p class="text-xs text-neutral-500 mt-1">
+                Get from
+                <a href="https://app.publer.com/#/account/api" target="_blank" rel="noopener noreferrer" class="text-primary-600 hover:underline">app.publer.com → Account → API</a>.
+                Stored encrypted via Laravel <code class="text-xs">Crypt::encryptString</code>; never visible after save.
+                <strong class="text-amber-700 dark:text-amber-400">Rotate the key in Publer dashboard if it has ever been exposed.</strong>
+              </p>
+            </div>
+
+            <!-- Save + Test buttons -->
+            <div class="pt-3 border-t border-neutral-200 dark:border-neutral-700 flex flex-wrap gap-3">
+              <BaseButton
+                type="submit"
+                :disabled="publerSubmitting"
+                button-type="primary"
+              >
+                {{ publerSubmitting ? 'Saving...' : 'Save Publer Settings' }}
+              </BaseButton>
+              <BaseButton
+                type="button"
+                :disabled="publerTesting || !publerKeyConfigured"
+                :loading="publerTesting"
+                button-type="secondary"
+                @click="handlePublerTest"
+              >
+                🔌 Test Connection
+              </BaseButton>
+              <BaseButton
+                type="button"
+                :disabled="publerSyncing || !publerKeyConfigured"
+                :loading="publerSyncing"
+                button-type="secondary"
+                @click="handlePublerSyncAccounts"
+              >
+                🔄 Refresh Accounts
+              </BaseButton>
+            </div>
+
+            <p v-if="publerTestResult" :class="publerTestResult.success ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'" class="text-sm leading-relaxed">
+              {{ publerTestResult.message }}
+            </p>
+            <p v-if="publerSyncResult" :class="publerSyncResult.success ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'" class="text-sm leading-relaxed">
+              {{ publerSyncResult.message }}
+            </p>
+
+            <!-- Account dropdowns (3 platforms) -->
+            <div class="pt-4 border-t border-neutral-200 dark:border-neutral-700 space-y-4">
+              <div class="flex items-center justify-between">
+                <h3 class="text-sm font-semibold text-neutral-700 dark:text-neutral-300">Default Posting Accounts</h3>
+                <span v-if="publerLastSyncedRelative" class="text-xs text-neutral-500">
+                  Last synced: {{ publerLastSyncedRelative }}
+                </span>
+              </div>
+              <p class="text-xs text-neutral-500">
+                Click <em>Refresh Accounts</em> after configuring the API key to populate these dropdowns.
+                Each cross-post draft uses these as defaults.
+              </p>
+
+              <!-- Facebook -->
+              <div>
+                <label for="publer_facebook_account_id" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                  📘 Facebook Page
+                </label>
+                <select
+                  id="publer_facebook_account_id"
+                  v-model="publerFormData.publer_facebook_account_id"
+                  class="w-full border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="">(none selected)</option>
+                  <option v-if="publerFormData.publer_facebook_account_id && !publerAccounts.facebook?.length"
+                          :value="publerFormData.publer_facebook_account_id">
+                    {{ publerFormData.publer_facebook_account_id }} (saved — refresh to load names)
+                  </option>
+                  <option v-for="acc in publerAccounts.facebook" :key="acc.id" :value="acc.id">
+                    {{ acc.name }} — {{ acc.id }}
+                  </option>
+                </select>
+              </div>
+
+              <!-- Instagram -->
+              <div>
+                <label for="publer_instagram_account_id" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                  📸 Instagram
+                </label>
+                <select
+                  id="publer_instagram_account_id"
+                  v-model="publerFormData.publer_instagram_account_id"
+                  class="w-full border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="">(none selected)</option>
+                  <option v-if="publerFormData.publer_instagram_account_id && !publerAccounts.instagram?.length"
+                          :value="publerFormData.publer_instagram_account_id">
+                    {{ publerFormData.publer_instagram_account_id }} (saved — refresh to load names)
+                  </option>
+                  <option v-for="acc in publerAccounts.instagram" :key="acc.id" :value="acc.id">
+                    {{ acc.name }} — {{ acc.id }}
+                  </option>
+                </select>
+              </div>
+
+              <!-- TikTok -->
+              <div>
+                <label for="publer_tiktok_account_id" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                  🎵 TikTok
+                </label>
+                <select
+                  id="publer_tiktok_account_id"
+                  v-model="publerFormData.publer_tiktok_account_id"
+                  class="w-full border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="">(none selected)</option>
+                  <option v-if="publerFormData.publer_tiktok_account_id && !publerAccounts.tiktok?.length"
+                          :value="publerFormData.publer_tiktok_account_id">
+                    {{ publerFormData.publer_tiktok_account_id }} (saved — refresh to load names)
+                  </option>
+                  <option v-for="acc in publerAccounts.tiktok" :key="acc.id" :value="acc.id">
+                    {{ acc.name }} — {{ acc.id }}
+                  </option>
+                </select>
+              </div>
+            </div>
+          </form>
+        </BaseCard>
+      </section>
+
+      <!-- ================================================================ -->
       <!-- TAB: Email — SMTP Settings                                       -->
       <!-- ================================================================ -->
       <section
@@ -1114,6 +1300,7 @@ const { clearCache } = useSettings()
 const tabs = [
   { id: 'site',     label: 'Site' },
   { id: 'linkedin', label: 'LinkedIn' },
+  { id: 'publer',   label: 'Publer' },
   { id: 'email',    label: 'Email (SMTP)' },
   { id: 'telegram', label: 'Telegram' },
   { id: 'cv',       label: 'CV Export' },
@@ -1431,6 +1618,117 @@ async function handleMailTest() {
 }
 
 // ===========================================================================
+// PUBLER — Cross-post integration (May 8, 2026)
+//
+// Operator manages: encrypted api_key + master enable toggle + 3 default
+// account IDs (FB Page + IG + TikTok). Account IDs auto-discovered via
+// Publer GET /accounts after key entry — operator picks from dropdowns.
+// ===========================================================================
+const publerSubmitting = ref(false)
+const publerTesting = ref(false)
+const publerSyncing = ref(false)
+const publerTestResult = ref(null) // { success, message } | null
+const publerSyncResult = ref(null) // { success, message } | null
+const publerAccounts = ref({ facebook: [], instagram: [], tiktok: [], other: [] })
+
+const publerFormData = ref({
+  publer_api_key: '',
+  publer_enabled: 'false',
+  publer_facebook_account_id: '',
+  publer_instagram_account_id: '',
+  publer_tiktok_account_id: '',
+})
+
+const publerKeyConfigured = computed(() => settingsStore.publerSettings?.publer_api_key_configured === true)
+const publerEnabled = computed({
+  get: () => publerFormData.value.publer_enabled === 'true' || publerFormData.value.publer_enabled === true,
+  set: (v) => { publerFormData.value.publer_enabled = v ? 'true' : 'false' },
+})
+const publerLastSyncedAt = computed(() => settingsStore.publerSettings?.publer_last_account_sync_at)
+const publerLastSyncedRelative = computed(() => {
+  const ts = publerLastSyncedAt.value
+  if (!ts) return null
+  const ms = Date.now() - new Date(ts).getTime()
+  const min = Math.floor(ms / 60000)
+  if (min < 1) return 'just now'
+  if (min < 60) return `${min}m ago`
+  const hr = Math.floor(min / 60)
+  if (hr < 24) return `${hr}h ago`
+  const d = Math.floor(hr / 24)
+  return `${d}d ago`
+})
+
+async function loadPublerSettings() {
+  try {
+    await settingsStore.fetchPublerSettings()
+    const s = settingsStore.publerSettings
+    publerFormData.value = {
+      publer_api_key: '', // never bind the masked sentinel — let placeholder show
+      publer_enabled: s.publer_enabled || 'false',
+      publer_facebook_account_id: s.publer_facebook_account_id || '',
+      publer_instagram_account_id: s.publer_instagram_account_id || '',
+      publer_tiktok_account_id: s.publer_tiktok_account_id || '',
+    }
+  } catch (err) {
+    console.warn('[Settings] publer fetch failed — using defaults', err)
+  }
+}
+
+async function handlePublerSubmit() {
+  publerSubmitting.value = true
+  publerTestResult.value = null
+  try {
+    const payload = { ...publerFormData.value }
+    // Empty api_key = preserve existing (operator chose not to change)
+    if (!payload.publer_api_key) delete payload.publer_api_key
+
+    await settingsStore.updatePublerSettings(payload)
+    uiStore.showSuccess('Publer settings saved.', 'Saved')
+    publerFormData.value.publer_api_key = ''
+  } catch (err) {
+    uiStore.showError(err.response?.data?.message || err.message || 'Failed to save Publer settings', 'Save Failed')
+  } finally {
+    publerSubmitting.value = false
+  }
+}
+
+async function handlePublerTest() {
+  publerTesting.value = true
+  publerTestResult.value = null
+  try {
+    const result = await settingsStore.testPublerConnection()
+    publerTestResult.value = result.success
+      ? { success: true, message: '✓ Publer connection OK' + (result.data?.email ? ` (${result.data.email})` : '') }
+      : { success: false, message: '✗ ' + (result.error || result.message || 'Publer test failed') }
+    setTimeout(() => { publerTestResult.value = null }, 15000)
+  } finally {
+    publerTesting.value = false
+  }
+}
+
+async function handlePublerSyncAccounts() {
+  publerSyncing.value = true
+  publerSyncResult.value = null
+  try {
+    const result = await settingsStore.syncPublerAccounts()
+    if (result.success) {
+      publerAccounts.value = result.accounts || { facebook: [], instagram: [], tiktok: [], other: [] }
+      const total = (publerAccounts.value.facebook?.length || 0)
+        + (publerAccounts.value.instagram?.length || 0)
+        + (publerAccounts.value.tiktok?.length || 0)
+      publerSyncResult.value = { success: true, message: `✓ Synced ${total} accounts from Publer` }
+      // Refresh settings so publer_last_account_sync_at updates
+      await loadPublerSettings().catch(() => {})
+    } else {
+      publerSyncResult.value = { success: false, message: '✗ ' + (result.error || 'Failed to sync accounts') }
+    }
+    setTimeout(() => { publerSyncResult.value = null }, 15000)
+  } finally {
+    publerSyncing.value = false
+  }
+}
+
+// ===========================================================================
 // CV MASTER EXPORT — schema_version 2.0.0
 // ===========================================================================
 const cvVariantOrder = ['vibe_coding', 'ai_automation', 'ai_video']
@@ -1659,6 +1957,7 @@ onMounted(() => {
     loadSiteSettings(),
     loadTelegramSettings(),
     loadMailSettings(),
+    loadPublerSettings(),
     loadCvSettings(),
   ])
   consumeOauthFlash()

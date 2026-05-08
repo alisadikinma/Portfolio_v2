@@ -49,6 +49,18 @@ export const useSettingsStore = defineStore('settings', {
       mail_from_address: 'aiagent@alisadikinma.com',
       mail_from_name: 'Ali Sadikin',
     },
+    // Publer cross-post integration settings (group=publer, May 8, 2026).
+    // api_key encrypted at rest — UI sees ***SET*** placeholder + boolean flag.
+    // Account IDs auto-discovered via Publer GET /accounts (sync-accounts endpoint).
+    publerSettings: {
+      publer_api_key: '',
+      publer_api_key_configured: false,
+      publer_enabled: 'false',
+      publer_facebook_account_id: null,
+      publer_instagram_account_id: null,
+      publer_tiktok_account_id: null,
+      publer_last_account_sync_at: null,
+    },
     // CV Master Export settings (group=cv) — feeds /api/cv/export schema 2.0.0.
     // Each value is the JSON-decoded blob (object/array). UI textareas serialize
     // back to JSON strings before posting via updateCvSettings.
@@ -340,6 +352,76 @@ export const useSettingsStore = defineStore('settings', {
         return {
           success: false,
           error: error.response?.data?.error?.message || error.response?.data?.message || error.message || 'SMTP test failed',
+        }
+      }
+    },
+
+    // Publer cross-post integration (group=publer, May 8, 2026)
+    async fetchPublerSettings() {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await api.get('/admin/settings/publer')
+        if (response.data.success) {
+          this.publerSettings = response.data.data
+        }
+        return this.publerSettings
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to fetch publer settings'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async updatePublerSettings(payload) {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await api.put('/admin/settings/publer', payload)
+        if (response.data.success) {
+          // Refresh masked-key state from server
+          await this.fetchPublerSettings()
+        }
+        return response.data
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to update publer settings'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async testPublerConnection() {
+      try {
+        const response = await api.post('/admin/settings/publer/test')
+        return {
+          success: response.data.success,
+          message: response.data.message,
+          data: response.data.data,
+          error: response.data.error,
+        }
+      } catch (error) {
+        return {
+          success: false,
+          error: error.response?.data?.error || error.message || 'Publer connection test failed',
+        }
+      }
+    },
+
+    async syncPublerAccounts() {
+      try {
+        const response = await api.post('/admin/settings/publer/sync-accounts')
+        return {
+          success: response.data.success,
+          accounts: response.data.data, // grouped: { facebook: [], instagram: [], tiktok: [], other: [] }
+          synced_at: response.data.synced_at,
+          error: response.data.error,
+        }
+      } catch (error) {
+        return {
+          success: false,
+          error: error.response?.data?.error || error.message || 'Failed to sync Publer accounts',
         }
       }
     },
