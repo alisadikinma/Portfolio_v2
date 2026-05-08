@@ -81,31 +81,61 @@ class PublerClient
     }
 
     /**
-     * Resolve the operator's default workspace_id from /users/me.
-     * Publer's user payload includes a `workspaces` array; we pick the
-     * first one (Publer marks the default workspace first in its response).
+     * Resolve the operator's default workspace_id. Publer's API exposes
+     * workspaces in different shapes depending on tenant tier — try multiple
+     * paths in order:
+     *   1. /users/me.workspaces[0].id (most common)
+     *   2. /users/me.default_workspace.id
+     *   3. /users/me.workspace_id (single-workspace accounts)
+     *   4. GET /workspaces (dedicated endpoint)
+     *
+     * If none yield a workspace, throws with the raw /users/me payload so
+     * the operator can report the actual shape.
      */
     private function resolveDefaultWorkspaceId(): string
     {
         $user = $this->me();
-        $workspaces = $user['workspaces'] ?? [];
 
-        if (!is_array($workspaces) || empty($workspaces)) {
-            throw new RuntimeException(
-                'Publer /users/me returned no workspaces. Connect at least one workspace in app.publer.com first.'
-            );
+        // Path 1: workspaces array
+        if (isset($user['workspaces']) && is_array($user['workspaces']) && !empty($user['workspaces'])) {
+            $first = $user['workspaces'][0];
+            $id = is_array($first) ? ($first['id'] ?? null) : $first;
+            if (is_string($id) && $id !== '') {
+                return $id;
+            }
         }
 
-        $first = $workspaces[0];
-        $id = is_array($first) ? ($first['id'] ?? null) : $first;
-
-        if (!is_string($id) || $id === '') {
-            throw new RuntimeException(
-                'Could not extract workspace_id from Publer /users/me response. Shape: ' . json_encode($workspaces[0])
-            );
+        // Path 2: default_workspace object
+        if (isset($user['default_workspace']) && is_array($user['default_workspace'])) {
+            $id = $user['default_workspace']['id'] ?? null;
+            if (is_string($id) && $id !== '') {
+                return $id;
+            }
         }
 
-        return $id;
+        // Path 3: workspace_id scalar
+        if (isset($user['workspace_id']) && is_string($user['workspace_id']) && $user['workspace_id'] !== '') {
+            return $user['workspace_id'];
+        }
+
+        // Path 4: dedicated /workspaces endpoint
+        try {
+            $response = $this->client()->get($this->url('/workspaces'));
+            $data = $this->extractData($response, 'listWorkspaces');
+            if (is_array($data) && !empty($data)) {
+                $first = $data[0];
+                $id = is_array($first) ? ($first['id'] ?? null) : $first;
+                if (is_string($id) && $id !== '') {
+                    return $id;
+                }
+            }
+        } catch (\Throwable $e) {
+            // Fall through to error below
+        }
+
+        throw new RuntimeException(
+            'Could not resolve a Publer workspace_id. /users/me payload: ' . json_encode($user)
+        );
     }
 
     /**
