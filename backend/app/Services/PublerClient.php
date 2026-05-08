@@ -59,13 +59,53 @@ class PublerClient
      * workspace. Used by admin Settings UI to populate per-platform
      * dropdowns (operator picks default FB Page + IG account + TikTok account).
      *
+     * Publer's /accounts endpoint REQUIRES a workspace context via the
+     * `Publer-Workspace-Id` header — without it, the call returns empty
+     * (or only personal-scope accounts, which excludes connected social
+     * accounts). When $workspaceId is null, we auto-resolve it via /users/me
+     * (picks the first workspace, which is the operator's default).
+     *
      * Returns array of account objects with at least: id, name, type
      * (facebook|instagram|tiktok|twitter|...), provider, picture_url.
      */
-    public function listAccounts(): array
+    public function listAccounts(?string $workspaceId = null): array
     {
-        $response = $this->client()->get($this->url('/accounts'));
+        if ($workspaceId === null) {
+            $workspaceId = $this->resolveDefaultWorkspaceId();
+        }
+
+        $response = $this->client(['Publer-Workspace-Id' => $workspaceId])
+            ->get($this->url('/accounts'));
+
         return $this->extractData($response, 'listAccounts');
+    }
+
+    /**
+     * Resolve the operator's default workspace_id from /users/me.
+     * Publer's user payload includes a `workspaces` array; we pick the
+     * first one (Publer marks the default workspace first in its response).
+     */
+    private function resolveDefaultWorkspaceId(): string
+    {
+        $user = $this->me();
+        $workspaces = $user['workspaces'] ?? [];
+
+        if (!is_array($workspaces) || empty($workspaces)) {
+            throw new RuntimeException(
+                'Publer /users/me returned no workspaces. Connect at least one workspace in app.publer.com first.'
+            );
+        }
+
+        $first = $workspaces[0];
+        $id = is_array($first) ? ($first['id'] ?? null) : $first;
+
+        if (!is_string($id) || $id === '') {
+            throw new RuntimeException(
+                'Could not extract workspace_id from Publer /users/me response. Shape: ' . json_encode($workspaces[0])
+            );
+        }
+
+        return $id;
     }
 
     /**
@@ -205,19 +245,22 @@ class PublerClient
      * Build a configured Laravel HTTP client with auth header + retry policy.
      * Returns a fresh PendingRequest each call so api_key is re-resolved
      * (operator can rotate in admin UI without restart).
+     *
+     * @param  array<string,string>  $extraHeaders  Endpoint-specific headers
+     *         (e.g., Publer-Workspace-Id for workspace-scoped calls).
      */
-    private function client(): PendingRequest
+    private function client(array $extraHeaders = []): PendingRequest
     {
         $apiKey = $this->resolveApiKey();
         $timeout = (int) config('social-cross-post.publer.http_timeout_seconds', 30);
         $maxRetries = (int) config('social-cross-post.publer.max_retries', 3);
         $backoffMs = (int) config('social-cross-post.publer.retry_backoff_ms', 500);
 
-        return Http::withHeaders([
+        return Http::withHeaders(array_merge([
             'Authorization' => "Bearer-API {$apiKey}",
             'Content-Type' => 'application/json',
             'Accept' => 'application/json',
-        ])
+        ], $extraHeaders))
             ->timeout($timeout)
             ->retry($maxRetries, $backoffMs, function ($exception, $request) {
                 // Retry only on network errors + 5xx, not auth/validation failures

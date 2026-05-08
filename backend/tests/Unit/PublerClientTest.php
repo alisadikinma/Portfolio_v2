@@ -70,11 +70,48 @@ class PublerClientTest extends TestCase
         ]);
 
         $client = new PublerClient(apiKey: 'TEST_KEY');
-        $accounts = $client->listAccounts();
+        $accounts = $client->listAccounts(workspaceId: 'ws_test_123');
 
         $this->assertCount(3, $accounts);
         $this->assertSame('facebook', $accounts[0]['type']);
         $this->assertSame('tiktok', $accounts[2]['type']);
+
+        Http::assertSent(function ($request) {
+            return $request->hasHeader('Publer-Workspace-Id', 'ws_test_123');
+        });
+    }
+
+    public function test_list_accounts_auto_resolves_workspace_from_users_me(): void
+    {
+        Http::fake([
+            'app.publer.com/api/v1/users/me' => Http::response([
+                'success' => true,
+                'data' => [
+                    'id' => 'user_abc',
+                    'email' => 'ali@example.com',
+                    'workspaces' => [
+                        ['id' => 'ws_default_001', 'name' => 'Default'],
+                        ['id' => 'ws_other_002', 'name' => 'Other'],
+                    ],
+                ],
+            ], 200),
+            'app.publer.com/api/v1/accounts' => Http::response([
+                'success' => true,
+                'data' => [['id' => 'acc_x', 'type' => 'facebook', 'name' => 'Page X']],
+            ], 200),
+        ]);
+
+        $client = new PublerClient(apiKey: 'TEST_KEY');
+        $accounts = $client->listAccounts();
+
+        $this->assertCount(1, $accounts);
+
+        Http::assertSent(function ($request) {
+            if (str_contains($request->url(), '/accounts')) {
+                return $request->hasHeader('Publer-Workspace-Id', 'ws_default_001');
+            }
+            return true;
+        });
     }
 
     public function test_upload_media_from_url_returns_job_id(): void
