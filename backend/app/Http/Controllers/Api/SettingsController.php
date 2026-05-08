@@ -1499,14 +1499,7 @@ class SettingsController extends Controller
             ));
             $rawTypes[] = $rawType;
 
-            $bucket = 'other';
-            if (str_contains($rawType, 'facebook') || $rawType === 'fb') {
-                $bucket = 'facebook';
-            } elseif (str_contains($rawType, 'instagram') || $rawType === 'ig') {
-                $bucket = 'instagram';
-            } elseif (str_contains($rawType, 'tiktok') || $rawType === 'tt') {
-                $bucket = 'tiktok';
-            }
+            $bucket = \App\Services\PublerClient::bucketAccountType($rawType);
 
             $grouped[$bucket][] = [
                 'id' => $account['id'] ?? null,

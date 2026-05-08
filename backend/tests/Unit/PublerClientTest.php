@@ -307,6 +307,69 @@ class PublerClientTest extends TestCase
         $client->createPost(['bulk' => ['state' => 'scheduled', 'posts' => []]]);
     }
 
+    /**
+     * Regression: Publer returns short-form `fb_page` and `ig_business` types
+     * for some tenants. Earlier matcher used `str_contains($rawType, 'facebook')`
+     * which missed both, sending FB Page + IG accounts to the `other` bucket
+     * and hiding them from the admin Settings dropdowns.
+     *
+     * @dataProvider accountTypeProvider
+     */
+    public function test_bucket_account_type_classifies_known_variants(string $rawType, string $expectedBucket): void
+    {
+        $this->assertSame(
+            $expectedBucket,
+            PublerClient::bucketAccountType($rawType),
+            "Raw type '{$rawType}' should bucket as '{$expectedBucket}'"
+        );
+    }
+
+    public static function accountTypeProvider(): array
+    {
+        return [
+            // Long-form (already worked pre-fix)
+            'facebook long' => ['facebook', 'facebook'],
+            'facebook_page long' => ['facebook_page', 'facebook'],
+            'instagram long' => ['instagram', 'instagram'],
+            'instagram_business long' => ['instagram_business', 'instagram'],
+            'tiktok long' => ['tiktok', 'tiktok'],
+            'tiktok_business long' => ['tiktok_business', 'tiktok'],
+
+            // Short-form prefix (regression — broken pre-fix)
+            'fb_page short' => ['fb_page', 'facebook'],
+            'fb_group short' => ['fb_group', 'facebook'],
+            'ig_business short' => ['ig_business', 'instagram'],
+            'ig_creator short' => ['ig_creator', 'instagram'],
+            'tt_business short' => ['tt_business', 'tiktok'],
+
+            // Bare two-letter codes
+            'fb bare' => ['fb', 'facebook'],
+            'ig bare' => ['ig', 'instagram'],
+            'tt bare' => ['tt', 'tiktok'],
+
+            // Case-insensitive
+            'FB_PAGE upper' => ['FB_PAGE', 'facebook'],
+            'IG_Business mixed' => ['IG_Business', 'instagram'],
+
+            // Unknown / unsupported → other
+            'twitter' => ['twitter', 'other'],
+            'linkedin' => ['linkedin', 'other'],
+            'youtube' => ['youtube', 'other'],
+            'empty' => ['', 'other'],
+
+            // Defense: avoid false positives from `fb`/`ig`/`tt` substrings
+            // inside unrelated tokens. `str_starts_with` with `_` suffix
+            // requires the underscore, so these stay in `other`.
+            'fbi_account no false match' => ['fbi_account', 'other'],
+            'igloo no false match' => ['igloo', 'other'],
+        ];
+    }
+
+    public function test_bucket_account_type_handles_null(): void
+    {
+        $this->assertSame('other', PublerClient::bucketAccountType(null));
+    }
+
     public function test_url_composition_handles_trailing_slashes(): void
     {
         config([

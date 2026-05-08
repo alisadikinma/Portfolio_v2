@@ -45,6 +45,40 @@ class PublerClient
     }
 
     /**
+     * Classify a Publer account `type` string into a canonical platform bucket
+     * (`facebook`, `instagram`, `tiktok`, or `other`).
+     *
+     * Publer's `type` field varies by tenant/subtype. Observed in the wild:
+     *   - `facebook`, `facebook_page`, `fb`, `fb_page`
+     *   - `instagram`, `instagram_business`, `ig`, `ig_business`
+     *   - `tiktok`, `tiktok_business`, `tt`
+     *
+     * Matches both long-form (substring) and short-form prefix variants.
+     * The `*_` suffix on prefix checks (e.g. `fb_`) avoids false positives
+     * (e.g. a hypothetical `fbi_*` would not match).
+     */
+    public static function bucketAccountType(?string $rawType): string
+    {
+        $rawType = strtolower((string) $rawType);
+
+        if ($rawType === '') {
+            return 'other';
+        }
+
+        if (str_contains($rawType, 'facebook') || $rawType === 'fb' || str_starts_with($rawType, 'fb_')) {
+            return 'facebook';
+        }
+        if (str_contains($rawType, 'instagram') || $rawType === 'ig' || str_starts_with($rawType, 'ig_')) {
+            return 'instagram';
+        }
+        if (str_contains($rawType, 'tiktok') || $rawType === 'tt' || str_starts_with($rawType, 'tt_')) {
+            return 'tiktok';
+        }
+
+        return 'other';
+    }
+
+    /**
      * GET /users/me — used to validate api_key (Test Connection button).
      * Returns user profile array on success.
      */
