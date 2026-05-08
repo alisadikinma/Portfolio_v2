@@ -1475,23 +1475,42 @@ class SettingsController extends Controller
             ], 200);
         }
 
-        // Group by platform `type` field (publer returns: facebook, instagram,
-        // tiktok, twitter, linkedin, ...). Fallback bucket for unsupported.
+        // Group by platform `type` (or `provider` / `network`) field. Publer's
+        // type values vary by account subtype — `facebook_page`, `instagram_business`,
+        // `tiktok_business` are common. Substring match against the canonical
+        // platform name handles all variants.
         $grouped = [
             'facebook' => [],
             'instagram' => [],
             'tiktok' => [],
             'other' => [],
         ];
+        $rawTypes = [];
 
         foreach ($accounts as $account) {
-            $type = $account['type'] ?? $account['provider'] ?? 'other';
-            $bucket = isset($grouped[$type]) ? $type : 'other';
+            $rawType = strtolower((string) (
+                $account['type']
+                    ?? $account['provider']
+                    ?? $account['network']
+                    ?? $account['platform']
+                    ?? 'other'
+            ));
+            $rawTypes[] = $rawType;
+
+            $bucket = 'other';
+            if (str_contains($rawType, 'facebook') || $rawType === 'fb') {
+                $bucket = 'facebook';
+            } elseif (str_contains($rawType, 'instagram') || $rawType === 'ig') {
+                $bucket = 'instagram';
+            } elseif (str_contains($rawType, 'tiktok') || $rawType === 'tt') {
+                $bucket = 'tiktok';
+            }
 
             $grouped[$bucket][] = [
                 'id' => $account['id'] ?? null,
                 'name' => $account['name'] ?? $account['display_name'] ?? '(unnamed)',
                 'picture' => $account['picture'] ?? $account['picture_url'] ?? null,
+                'raw_type' => $rawType,
             ];
         }
 
@@ -1506,6 +1525,7 @@ class SettingsController extends Controller
             'message' => 'Publer accounts synced.',
             'data' => $grouped,
             'synced_at' => $now,
+            'debug_raw_types' => array_values(array_unique($rawTypes)),
         ]);
     }
 }
