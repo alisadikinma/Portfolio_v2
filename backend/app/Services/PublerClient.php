@@ -45,12 +45,12 @@ class PublerClient
     }
 
     /**
-     * GET /users — used to validate api_key (Test Connection button).
+     * GET /users/me — used to validate api_key (Test Connection button).
      * Returns user profile array on success.
      */
     public function me(): array
     {
-        $response = $this->client()->get($this->url('/users'));
+        $response = $this->client()->get($this->url('/users/me'));
         return $this->extractData($response, 'me');
     }
 

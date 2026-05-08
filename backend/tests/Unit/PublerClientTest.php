@@ -38,7 +38,7 @@ class PublerClientTest extends TestCase
     public function test_me_sends_correct_auth_header_and_returns_user_data(): void
     {
         Http::fake([
-            'app.publer.com/api/v1/users' => Http::response([
+            'app.publer.com/api/v1/users/me' => Http::response([
                 'success' => true,
                 'data' => ['id' => 'user_abc', 'email' => 'ali@example.com'],
             ], 200),
@@ -52,7 +52,7 @@ class PublerClientTest extends TestCase
         Http::assertSent(function ($request) {
             return $request->hasHeader('Authorization', 'Bearer-API TEST_KEY_001')
                 && $request->hasHeader('Content-Type', 'application/json')
-                && $request->url() === 'https://app.publer.com/api/v1/users';
+                && $request->url() === 'https://app.publer.com/api/v1/users/me';
         });
     }
 
@@ -218,7 +218,7 @@ class PublerClientTest extends TestCase
     public function test_throws_on_401_with_actionable_message(): void
     {
         Http::fake([
-            'app.publer.com/api/v1/users' => Http::response(['error' => 'Invalid token'], 401),
+            'app.publer.com/api/v1/users/me' => Http::response(['error' => 'Invalid token'], 401),
         ]);
 
         $this->expectException(RuntimeException::class);
@@ -244,7 +244,7 @@ class PublerClientTest extends TestCase
     public function test_throws_on_429_with_rate_limit_hint(): void
     {
         Http::fake([
-            'app.publer.com/api/v1/users' => Http::response(['error' => 'Rate limit exceeded'], 429),
+            'app.publer.com/api/v1/users/me' => Http::response(['error' => 'Rate limit exceeded'], 429),
         ]);
 
         $this->expectException(RuntimeException::class);
@@ -278,14 +278,14 @@ class PublerClientTest extends TestCase
         ]);
 
         Http::fake([
-            'app.publer.com/api/v1/users' => Http::response(['success' => true, 'data' => []], 200),
+            'app.publer.com/api/v1/users/me' => Http::response(['success' => true, 'data' => []], 200),
         ]);
 
         $client = new PublerClient(apiKey: 'TEST_KEY');
         $client->me();
 
         Http::assertSent(function ($request) {
-            return $request->url() === 'https://app.publer.com/api/v1/users';
+            return $request->url() === 'https://app.publer.com/api/v1/users/me';
         });
     }
 }
