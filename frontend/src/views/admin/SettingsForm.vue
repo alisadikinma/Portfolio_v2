@@ -656,8 +656,8 @@ LINKEDIN_OAUTH_REDIRECT_URI=https://alisadikinma.com/api/admin/linkedin/oauth/ca
                 </span>
               </div>
               <p class="text-xs text-neutral-500">
-                Click <em>Refresh Accounts</em> after configuring the API key to populate these dropdowns.
-                Each cross-post draft uses these as defaults.
+                Dropdowns auto-populate when the API key is configured. Click <em>Refresh Accounts</em>
+                if you connect new accounts in Publer. Each cross-post draft uses these as defaults.
               </p>
 
               <!-- Facebook -->
@@ -721,6 +721,17 @@ LINKEDIN_OAUTH_REDIRECT_URI=https://alisadikinma.com/api/admin/linkedin/oauth/ca
                     {{ acc.name }} — {{ acc.id }}
                   </option>
                 </select>
+              </div>
+
+              <!-- Save button (mirrors the one at top of form for discoverability) -->
+              <div class="pt-3 border-t border-neutral-200 dark:border-neutral-700">
+                <BaseButton
+                  type="submit"
+                  :disabled="publerSubmitting"
+                  button-type="primary"
+                >
+                  {{ publerSubmitting ? 'Saving...' : 'Save Selected Accounts' }}
+                </BaseButton>
               </div>
             </div>
           </form>
@@ -1669,8 +1680,31 @@ async function loadPublerSettings() {
       publer_instagram_account_id: s.publer_instagram_account_id || '',
       publer_tiktok_account_id: s.publer_tiktok_account_id || '',
     }
+    // Auto-populate dropdowns when api_key is configured and we haven't
+    // synced yet this session — saves the operator a manual click. Silent
+    // (no banner / spinner) so it doesn't visually compete with manual sync.
+    if (s.publer_api_key_configured === true && !publerAccountsLoaded.value) {
+      autoLoadPublerAccounts()
+    }
   } catch (err) {
     console.warn('[Settings] publer fetch failed — using defaults', err)
+  }
+}
+
+// Tracks whether the dropdowns have been populated at least once this
+// session — prevents duplicate auto-syncs across re-mounts of this view.
+const publerAccountsLoaded = ref(false)
+
+async function autoLoadPublerAccounts() {
+  try {
+    const result = await settingsStore.syncPublerAccounts()
+    if (result.success) {
+      publerAccounts.value = result.accounts || { facebook: [], instagram: [], tiktok: [], other: [] }
+      publerAccountsLoaded.value = true
+    }
+  } catch (err) {
+    // Silent — operator can still click "Refresh Accounts" to see the error
+    console.warn('[Settings] publer auto-sync skipped', err)
   }
 }
 
@@ -1713,6 +1747,7 @@ async function handlePublerSyncAccounts() {
     const result = await settingsStore.syncPublerAccounts()
     if (result.success) {
       publerAccounts.value = result.accounts || { facebook: [], instagram: [], tiktok: [], other: [] }
+      publerAccountsLoaded.value = true
       const total = (publerAccounts.value.facebook?.length || 0)
         + (publerAccounts.value.instagram?.length || 0)
         + (publerAccounts.value.tiktok?.length || 0)
