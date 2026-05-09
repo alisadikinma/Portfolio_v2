@@ -28,13 +28,56 @@ import {
   formatDateTime,
   ICON,
 } from './linkedinHelpers'
-import SocialPlatformTabs from '@/components/admin/SocialPlatformTabs.vue'
 
 const route = useRoute()
 const router = useRouter()
 
 const draftId = computed(() => Number(route.params.id))
 const { draft, isLoading, error, refetch } = useLinkedInDraft(draftId)
+
+// --- Per-platform caption switcher --------------------------------------
+// Operator toggles between LinkedIn / FB / IG / TikTok in-place — only
+// caption + hashtags + status pill swap. The carousel slide imagery is
+// always sourced from the LinkedIn draft (carousel images are reused
+// across platforms). Cross-post siblings are loaded by the show endpoint
+// as draft.facebook_post / instagram_post / tiktok_post.
+const activePlatform = ref('linkedin')
+
+const PLATFORM_META = {
+  linkedin: { label: 'LinkedIn', accent: 'text-sky-400', activeBg: 'bg-sky-500/10 text-sky-200 border-sky-400/40' },
+  facebook: { label: 'Facebook', accent: 'text-blue-400', activeBg: 'bg-blue-500/10 text-blue-200 border-blue-400/40' },
+  instagram: { label: 'Instagram', accent: 'text-fuchsia-400', activeBg: 'bg-fuchsia-500/10 text-fuchsia-200 border-fuchsia-400/40' },
+  tiktok: { label: 'TikTok', accent: 'text-rose-400', activeBg: 'bg-rose-500/10 text-rose-200 border-rose-400/40' },
+}
+
+const platformPostFor = (key) => {
+  if (!draft.value) return null
+  if (key === 'linkedin') {
+    return {
+      content: draft.value.content || '',
+      hashtags: Array.isArray(draft.value.hashtags) ? draft.value.hashtags : [],
+      status: draft.value.status,
+      external_url: draft.value.external_url || null,
+      published_at: draft.value.published_at || null,
+      scheduled_at: draft.value.scheduled_at || null,
+    }
+  }
+  // Backend returns snake_case relation keys (facebook_post, instagram_post,
+  // tiktok_post) by default Laravel serialization rules.
+  const sibling = draft.value[`${key}_post`]
+  if (!sibling) return null
+  return {
+    content: sibling.caption || '',
+    hashtags: Array.isArray(sibling.hashtags) ? sibling.hashtags : [],
+    status: sibling.status,
+    external_url: sibling.external_url || null,
+    published_at: sibling.published_at || null,
+    scheduled_at: sibling.scheduled_at || null,
+  }
+}
+
+const activePlatformPost = computed(() => platformPostFor(activePlatform.value))
+const activePlatformExists = computed(() => activePlatformPost.value !== null)
 
 const updateMutation = useUpdateLinkedInDraft()
 const approveMutation = useApproveLinkedInDraft()
@@ -1483,34 +1526,82 @@ const showThumbnailUploadCaption = computed(() =>
                 </div>
               </div>
 
-              <!-- Per-platform caption switcher — operator toggles between
-                   LinkedIn / Facebook / Instagram / TikTok variants of the
-                   same source. Linkedin shows the local draft caption; the
-                   other tabs navigate to that platform's cross-post queue. -->
+              <!-- Per-platform caption switcher — in-place tabs that swap
+                   ONLY the caption + hashtags + status. The carousel slide
+                   images above are shared across every platform (rendered
+                   once via /carousel-gen, reused for FB/IG/TikTok). Click
+                   does NOT navigate; it toggles the active platform copy
+                   below. -->
               <div class="pt-3 border-t border-neutral-800/60">
-                <SocialPlatformTabs current="linkedin" mode="queue" />
+                <nav
+                  class="inline-flex flex-wrap gap-1 rounded-lg border border-neutral-700/60 bg-neutral-950/40 p-1"
+                  role="tablist"
+                  aria-label="Switch caption per platform"
+                >
+                  <button
+                    v-for="(meta, key) in PLATFORM_META"
+                    :key="key"
+                    type="button"
+                    role="tab"
+                    :aria-selected="activePlatform === key ? 'true' : 'false'"
+                    @click="activePlatform = key"
+                    :class="[
+                      'inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium uppercase tracking-wider transition-colors',
+                      activePlatform === key
+                        ? `${meta.activeBg} shadow-sm`
+                        : 'border-transparent text-neutral-400 hover:bg-neutral-900/60 hover:text-neutral-200',
+                    ]"
+                  >
+                    <span :class="activePlatform === key ? '' : meta.accent">{{ meta.label }}</span>
+                    <span
+                      v-if="key !== 'linkedin' && !platformPostFor(key)"
+                      class="text-[9px] font-mono opacity-70"
+                      title="Cross-post variant not generated yet"
+                    >
+                      —
+                    </span>
+                  </button>
+                </nav>
               </div>
 
-              <!-- Post body caption — sits between slides and hashtags, mirroring
-                   the operator-preferred read order: see the visual first, then
-                   the supporting copy, then tags. Empty fallback warns operator
-                   that the carousel will publish without a body. -->
-              <div v-if="draft.content && draft.content.trim() !== ''" class="whitespace-pre-wrap text-neutral-200 leading-relaxed text-[15px]">
-                {{ draft.content }}
-              </div>
-              <div v-else class="rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-200">
-                <strong class="text-amber-300">No caption.</strong> The carousel will publish without a body — typically 50% lower reach. Click "Edit content" to add one.
-              </div>
+              <!-- Caption renders for the active platform. When a cross-post
+                   sibling doesn't exist yet (e.g. FB draft hasn't fanned out),
+                   show an explanatory empty state instead of LinkedIn copy. -->
+              <template v-if="activePlatformExists">
+                <!-- Status pill for non-LinkedIn platforms (LinkedIn already
+                     has its own status hero panel up top). -->
+                <div
+                  v-if="activePlatform !== 'linkedin'"
+                  class="text-[10px] font-mono uppercase tracking-[0.14em] text-neutral-500"
+                >
+                  {{ PLATFORM_META[activePlatform].label }} · {{ activePlatformPost.status || 'pending' }}
+                </div>
 
-              <div v-if="Array.isArray(draft.hashtags) && draft.hashtags.length > 0" class="flex flex-wrap gap-x-2 gap-y-1">
-                <span v-for="tag in draft.hashtags" :key="tag" class="text-cyan-400 text-sm">{{ tag }}</span>
-              </div>
+                <div v-if="activePlatformPost.content && activePlatformPost.content.trim() !== ''" class="whitespace-pre-wrap text-neutral-200 leading-relaxed text-[15px]">
+                  {{ activePlatformPost.content }}
+                </div>
+                <div v-else class="rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-200">
+                  <strong class="text-amber-300">No caption.</strong> This {{ PLATFORM_META[activePlatform].label }} variant will publish without a body — typically 50% lower reach.
+                </div>
 
-              <!-- First-comment bubble (link to original blog post). LinkedIn
-                   posts this 30s after the main post via PostLinkedInFirstComment
-                   job — avoids the 60% reach penalty from in-body URLs. -->
+                <div v-if="activePlatformPost.hashtags.length > 0" class="flex flex-wrap gap-x-2 gap-y-1">
+                  <span v-for="tag in activePlatformPost.hashtags" :key="tag" class="text-cyan-400 text-sm">{{ tag }}</span>
+                </div>
+              </template>
               <div
-                v-if="draft.link_comment"
+                v-else
+                class="rounded-lg border border-neutral-800 bg-neutral-900/40 px-4 py-3 text-sm text-neutral-400"
+              >
+                <p class="text-neutral-300 font-medium mb-1">{{ PLATFORM_META[activePlatform].label }} variant not generated yet.</p>
+                <p class="text-xs">The cross-post fan-out for this platform hasn't run. Slides above will be reused once it does.</p>
+              </div>
+
+              <!-- First-comment bubble (LinkedIn-specific — link in comment
+                   trick avoids the 60% reach penalty on body links). FB/IG/
+                   TikTok don't have an equivalent, so this only renders on
+                   the LinkedIn tab. -->
+              <div
+                v-if="activePlatform === 'linkedin' && draft.link_comment"
                 class="mt-2 p-3 rounded-lg border border-cyan-500/20 bg-cyan-500/5"
               >
                 <p class="text-[10px] text-cyan-400 font-mono uppercase tracking-[0.14em] mb-1">First comment (auto-posted +30s)</p>

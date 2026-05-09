@@ -120,7 +120,17 @@ class LinkedInDraftController extends Controller
 
     public function show(int $id): JsonResponse
     {
-        $draft = LinkedInPost::with(['post.translations', 'post.contentIdea:id,result_post_id,virality_score', 'account'])->find($id);
+        $draft = LinkedInPost::with([
+            'post.translations',
+            'post.contentIdea:id,result_post_id,virality_score',
+            'account',
+            // Cross-post siblings so the detail page can render in-place
+            // platform tabs (LinkedIn / FB / IG / TikTok) that swap caption
+            // + hashtags + status without navigating away.
+            'facebookPost:id,linkedin_post_id,status,caption,hashtags,scheduled_at,published_at,external_url',
+            'instagramPost:id,linkedin_post_id,status,caption,hashtags,scheduled_at,published_at,external_url',
+            'tiktokPost:id,linkedin_post_id,status,caption,hashtags,scheduled_at,published_at,external_url',
+        ])->find($id);
         if ($draft === null) {
             return $this->notFound();
         }

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class LinkedInPost extends Model
@@ -75,6 +76,26 @@ class LinkedInPost extends Model
     public function account(): BelongsTo
     {
         return $this->belongsTo(LinkedInAccount::class, 'linkedin_account_id');
+    }
+
+    // Cross-post siblings — one row per platform fanned out from this
+    // LinkedIn draft. Each carries its OWN caption + hashtags + status,
+    // but shares the source carousel slides via the parent LinkedIn post.
+    // The detail page surfaces these so the operator can flip platform
+    // tabs in-place to compare/edit per-platform copy.
+    public function facebookPost(): HasOne
+    {
+        return $this->hasOne(FacebookPost::class, 'linkedin_post_id');
+    }
+
+    public function instagramPost(): HasOne
+    {
+        return $this->hasOne(InstagramPost::class, 'linkedin_post_id');
+    }
+
+    public function tiktokPost(): HasOne
+    {
+        return $this->hasOne(TiktokPost::class, 'linkedin_post_id');
     }
 
     public function scopePublished(Builder $q): Builder
