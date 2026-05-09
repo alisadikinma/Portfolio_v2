@@ -505,14 +505,20 @@ const routes = [
     redirect: { name: 'admin-draft-posts' },
   },
   {
-    path: '/admin/linkedin-drafts/:id',
-    name: 'admin-linkedin-draft-detail',
+    path: '/admin/sosmed-drafts/:id',
+    name: 'admin-sosmed-draft-detail',
     component: () => import('@/views/admin/LinkedInDraftDetail.vue'),
     meta: {
-      title: 'LinkedIn Draft - Admin',
+      title: 'SOSMED Draft - Admin',
       requiresAuth: true,
       layout: 'admin'
     }
+  },
+  // Legacy alias — redirect old detail URLs (bookmarks, Telegram pings,
+  // session-storage breadcrumbs from before May 9 rename) to the new path.
+  {
+    path: '/admin/linkedin-drafts/:id',
+    redirect: (to) => ({ name: 'admin-sosmed-draft-detail', params: { id: to.params.id } }),
   },
 
   // Cross-post admin (Facebook + Instagram + TikTok).

@@ -602,7 +602,7 @@ async function doRegenerate() {
   if (!confirm('Restart from the blog post?\n\nThis draft will be archived and a brand-new one built from scratch (new draft ID, fresh caption + slides). Runtime ~5-7 min.')) return
   const result = await regenerateMutation.mutateAsync(draftId.value)
   const newId = result?.data?.id
-  if (newId) router.push({ name: 'admin-linkedin-draft-detail', params: { id: newId } })
+  if (newId) router.push({ name: 'admin-sosmed-draft-detail', params: { id: newId } })
 }
 
 // --- Carousel slides + image actions --------------------------------------

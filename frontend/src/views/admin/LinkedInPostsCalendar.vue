@@ -335,7 +335,7 @@ function openDetail(id) {
   // readers — silent mismatch produces a wrong-destination back button.
   sessionStorage.setItem(`${platformRef.value}:detail:origin`, 'feed')
   if (platformRef.value === 'linkedin') {
-    router.push({ name: 'admin-linkedin-draft-detail', params: { id } })
+    router.push({ name: 'admin-sosmed-draft-detail', params: { id } })
   } else {
     router.push({
       name: 'admin-cross-post-detail',

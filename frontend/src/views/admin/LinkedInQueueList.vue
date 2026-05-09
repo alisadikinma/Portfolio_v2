@@ -235,7 +235,7 @@ const tabs = [
 function openDetail(id) {
   // Tag origin so the detail page's back button knows where to return.
   sessionStorage.setItem('linkedin:detail:origin', 'queue')
-  router.push({ name: 'admin-linkedin-draft-detail', params: { id } })
+  router.push({ name: 'admin-sosmed-draft-detail', params: { id } })
 }
 
 function depthTone(score) {
