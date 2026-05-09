@@ -502,6 +502,29 @@ const routes = [
     }
   },
 
+  // Cross-post admin (Facebook + Instagram + TikTok). Single set of generic
+  // views handles all 3 platforms via the `:platform` route param.
+  {
+    path: '/admin/:platform(facebook|instagram|tiktok)-posts',
+    name: 'admin-cross-post-list',
+    component: () => import('@/views/admin/CrossPostList.vue'),
+    meta: {
+      title: 'Cross-Post - Admin',
+      requiresAuth: true,
+      layout: 'admin'
+    }
+  },
+  {
+    path: '/admin/:platform(facebook|instagram|tiktok)-drafts/:id',
+    name: 'admin-cross-post-detail',
+    component: () => import('@/views/admin/CrossPostDraftDetail.vue'),
+    meta: {
+      title: 'Cross-Post Draft - Admin',
+      requiresAuth: true,
+      layout: 'admin'
+    }
+  },
+
   {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
