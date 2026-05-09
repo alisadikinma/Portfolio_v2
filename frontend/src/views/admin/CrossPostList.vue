@@ -3,7 +3,6 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useCrossPostDraftsList } from '@/composables/useCrossPostDrafts'
 import { PLATFORMS, statusMeta, resolvePostTitle, relativeTime } from './socialPlatformHelpers'
-import SocialPlatformTabs from '@/components/admin/SocialPlatformTabs.vue'
 
 /**
  * Generic admin list view for cross-post drafts. Single component handles
@@ -91,12 +90,6 @@ const tabCounts = computed(() => {
       >
         Refresh
       </button>
-    </div>
-
-    <!-- Platform switcher (Phase 4) — current platform highlighted, click
-         another platform to navigate to its queue (or posts/feed view). -->
-    <div class="mb-4">
-      <SocialPlatformTabs :current="platform" :mode="activeTab === 'feed' ? 'posts' : 'queue'" />
     </div>
 
     <!-- Tab rail -->

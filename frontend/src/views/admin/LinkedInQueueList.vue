@@ -1,6 +1,8 @@
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
+import { useQueryClient } from '@tanstack/vue-query'
+import api from '@/services/api'
 import {
   useLinkedInDraftsList,
   useCancelLinkedInDraft,
@@ -18,7 +20,6 @@ import {
   QUEUE_TAB_KEY,
   ICON,
 } from './linkedinHelpers'
-import SocialPlatformTabs from '@/components/admin/SocialPlatformTabs.vue'
 
 const router = useRouter()
 
@@ -159,6 +160,39 @@ const cancelMutation = useCancelLinkedInDraft()
 const approveMutation = useApproveLinkedInDraft()
 const regenerateMutation = useRegenerateLinkedInDraft()
 
+// --- Manual blog scan (bypass daily cron) ---------------------------------
+// Queues `linkedin:scan-blog` via the admin scheduler endpoint so the
+// operator doesn't have to wait for the 03:00 WIB run after a new article
+// ships from Content Engine.
+const queryClient = useQueryClient()
+const scanRunning = ref(false)
+const scanFlash = ref(null) // { type: 'success'|'error', message: '...' }
+
+async function scanBlogNow() {
+  if (scanRunning.value) return
+  scanRunning.value = true
+  scanFlash.value = null
+  try {
+    await api.post('/admin/scheduler/linkedin:scan-blog/run')
+    scanFlash.value = {
+      type: 'success',
+      message: 'Scan queued. New drafts will appear here within ~30s.',
+    }
+    // Refetch the queue a few times so newly-created pending rows surface
+    // without forcing the operator to manually refresh.
+    setTimeout(() => queryClient.invalidateQueries({ queryKey: ['linkedin-drafts'] }), 5000)
+    setTimeout(() => queryClient.invalidateQueries({ queryKey: ['linkedin-drafts'] }), 30000)
+  } catch (err) {
+    scanFlash.value = {
+      type: 'error',
+      message: err?.response?.data?.error?.message || err?.message || 'Scan failed.',
+    }
+  } finally {
+    scanRunning.value = false
+    setTimeout(() => { scanFlash.value = null }, 8000)
+  }
+}
+
 const tabs = [
   { key: 'manual_review', label: 'Needs review', accent: 'text-amber-400' },
   { key: 'in_progress', label: 'In progress', accent: 'text-cyan-400' },
@@ -241,29 +275,50 @@ const emptyMessage = computed(() => ({
       <div>
         <p class="text-[11px] font-mono uppercase tracking-[0.18em] text-amber-400/80 mb-1">LinkedIn pipeline</p>
         <h1 class="text-3xl sm:text-4xl font-display font-semibold tracking-tight text-neutral-100">
-          Queue
+          Drafts
         </h1>
         <p class="text-sm text-neutral-400 mt-2 max-w-xl">
           Drafts that need a decision, are mid-generation, or hit an error. Successfully shipped posts live in
           <router-link to="/admin/linkedin-posts" class="text-amber-400 hover:underline">Posts</router-link>.
         </p>
       </div>
-      <router-link
-        to="/admin/linkedin-posts"
-        class="inline-flex items-center gap-2 px-3.5 py-2 text-sm text-neutral-300 border border-neutral-800 rounded-lg hover:border-amber-500/40 hover:bg-amber-500/5 hover:text-amber-300 transition"
-      >
-        <svg viewBox="0 0 24 24" fill="currentColor" class="w-3.5 h-3.5 text-[#0077B5]">
-          <path :d="ICON.linkedin" />
-        </svg>
-        View shipped posts
-      </router-link>
+      <div class="flex items-center gap-2">
+        <!-- Manual scan: pulls completed blog posts now instead of waiting
+             for the daily 03:00 WIB cron. Useful right after publishing a
+             new article from Content Engine. -->
+        <button
+          @click="scanBlogNow"
+          :disabled="scanRunning"
+          title="Scan completed blog posts and create LinkedIn drafts now (instead of waiting for the daily 03:00 cron)"
+          class="inline-flex items-center gap-2 px-3.5 py-2 text-sm text-neutral-100 border border-amber-500/40 bg-amber-500/10 rounded-lg hover:bg-amber-500/20 hover:border-amber-400/60 transition disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5" :class="scanRunning ? 'animate-spin' : ''">
+            <path :d="ICON.refresh" />
+          </svg>
+          {{ scanRunning ? 'Scanning…' : 'Scan blog now' }}
+        </button>
+        <router-link
+          to="/admin/linkedin-posts"
+          class="inline-flex items-center gap-2 px-3.5 py-2 text-sm text-neutral-300 border border-neutral-800 rounded-lg hover:border-amber-500/40 hover:bg-amber-500/5 hover:text-amber-300 transition"
+        >
+          <svg viewBox="0 0 24 24" fill="currentColor" class="w-3.5 h-3.5 text-[#0077B5]">
+            <path :d="ICON.linkedin" />
+          </svg>
+          View shipped posts
+        </router-link>
+      </div>
     </header>
 
-    <!-- Platform switcher — Phase 4 cross-post unification.
-         current is hard-coded "linkedin" because this view only handles
-         LinkedIn drafts; clicking another platform navigates to that
-         platform's dedicated queue route (CrossPostList in queue mode). -->
-    <SocialPlatformTabs current="linkedin" mode="queue" />
+    <!-- Scan flash message — auto-dismisses after 8s -->
+    <div
+      v-if="scanFlash"
+      class="rounded-lg px-3.5 py-2 text-sm border"
+      :class="scanFlash.type === 'success'
+        ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-300'
+        : 'border-red-500/30 bg-red-500/5 text-red-300'"
+    >
+      {{ scanFlash.message }}
+    </div>
 
     <!-- Tab rail (segmented control style, not generic pills) -->
     <nav class="flex flex-wrap gap-1 p-1 rounded-xl bg-neutral-900/50 border border-neutral-800/80 w-max max-w-full">

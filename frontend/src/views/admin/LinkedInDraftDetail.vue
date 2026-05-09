@@ -28,6 +28,7 @@ import {
   formatDateTime,
   ICON,
 } from './linkedinHelpers'
+import SocialPlatformTabs from '@/components/admin/SocialPlatformTabs.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -1482,11 +1483,19 @@ const showThumbnailUploadCaption = computed(() =>
                 </div>
               </div>
 
+              <!-- Per-platform caption switcher — operator toggles between
+                   LinkedIn / Facebook / Instagram / TikTok variants of the
+                   same source. Linkedin shows the local draft caption; the
+                   other tabs navigate to that platform's cross-post queue. -->
+              <div class="pt-3 border-t border-neutral-800/60">
+                <SocialPlatformTabs current="linkedin" mode="queue" />
+              </div>
+
               <!-- Post body caption — sits between slides and hashtags, mirroring
                    the operator-preferred read order: see the visual first, then
                    the supporting copy, then tags. Empty fallback warns operator
                    that the carousel will publish without a body. -->
-              <div v-if="draft.content && draft.content.trim() !== ''" class="whitespace-pre-wrap text-neutral-200 leading-relaxed text-[15px] pt-3 border-t border-neutral-800/60">
+              <div v-if="draft.content && draft.content.trim() !== ''" class="whitespace-pre-wrap text-neutral-200 leading-relaxed text-[15px]">
                 {{ draft.content }}
               </div>
               <div v-else class="rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-200">

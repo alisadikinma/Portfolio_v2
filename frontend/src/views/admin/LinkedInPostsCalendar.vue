@@ -6,7 +6,6 @@ import {
   useRefreshPostingRules,
 } from '@/composables/useLinkedInDrafts'
 import { useSocialCalendar } from '@/composables/useSocialCalendar'
-import SocialPlatformTabs from '@/components/admin/SocialPlatformTabs.vue'
 import {
   effectiveStatusMeta,
   MOOD_CLASSES,
@@ -400,9 +399,6 @@ function statusDotClass(status) {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" class="w-3.5 h-3.5"><path d="M9 18l6-6-6-6"/></svg>
       </router-link>
     </header>
-
-    <!-- Platform switcher — Phase 3 cross-post unification -->
-    <SocialPlatformTabs :current="platform" mode="posts" />
 
     <!-- Empty-state hint when posting_time_rules table has no rows for
          this platform (FB/IG/TikTok ship with rules empty until the
