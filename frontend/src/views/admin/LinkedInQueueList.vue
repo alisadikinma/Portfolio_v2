@@ -173,7 +173,7 @@ async function scanBlogNow() {
   scanRunning.value = true
   scanFlash.value = null
   try {
-    await api.post('/admin/scheduler/linkedin:scan-blog/run')
+    await api.post('/admin/linkedin-drafts/scan-blog-now')
     scanFlash.value = {
       type: 'success',
       message: 'Scan queued. New drafts will appear here within ~30s.',

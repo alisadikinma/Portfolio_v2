@@ -16,6 +16,7 @@ use App\Services\TelegramNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -942,6 +943,43 @@ class LinkedInDraftController extends Controller
                 'window_minutes' => $windowMinutes,
             ],
         ]);
+    }
+
+    /**
+     * POST /api/admin/linkedin-drafts/scan-blog-now
+     *
+     * Manual operator-trigger for `linkedin:scan-blog`. Bypasses the daily
+     * 03:00 WIB cron so newly-completed Content Engine articles can be pulled
+     * into the LinkedIn pipeline immediately. Queues via Artisan::queue() so
+     * the long-running SSH dispatches happen on the systemd queue worker, not
+     * the HTTP request thread.
+     */
+    public function scanBlogNow(Request $request): JsonResponse
+    {
+        $hours = (int) $request->input('hours', 24);
+        if ($hours < 1 || $hours > 720) {
+            $hours = 24;
+        }
+
+        try {
+            Artisan::queue('linkedin:scan-blog', ['--hours' => $hours]);
+        } catch (\Throwable $e) {
+            Log::error('Manual linkedin:scan-blog dispatch failed', [
+                'message' => $e->getMessage(),
+            ]);
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'scan_dispatch_failed',
+                    'message' => $e->getMessage(),
+                ],
+            ], 500);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "Blog scan queued (--hours={$hours}). New drafts will appear within ~30s.",
+        ], 202);
     }
 
     private function notFound(): JsonResponse
