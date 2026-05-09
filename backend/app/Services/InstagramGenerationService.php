@@ -185,8 +185,16 @@ class InstagramGenerationService extends BaseSocialGenerationService
         // for FacebookGenerationService to reuse on FB text posts.
         $crossPostTargets = $this->detectCrossPostTargets($linkedinPost);
 
-        $appUrl = rtrim((string) config('app.url', 'https://alisadikinma.com'), '/');
-        $blogUrl = $appUrl . '/blog/' . $post->slug;
+        // Use branded shortener with IG UTM attribution (May 10, 2026).
+        // IG caption body must NOT contain URL (schema rejects); blog_url is
+        // consumed by `text_only_caption` (FB-reuse variant where body URL is OK).
+        try {
+            $blogUrl = app(\App\Services\ShortLinkService::class)
+                ->forBlogPost($post, 'instagram');
+        } catch (\Throwable $e) {
+            $appUrl = rtrim((string) config('app.url', 'https://alisadikinma.com'), '/');
+            $blogUrl = $appUrl . '/blog/' . $post->slug;
+        }
 
         return [
             'blog' => [

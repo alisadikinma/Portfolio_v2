@@ -34,6 +34,9 @@ const props = defineProps({
   },
 })
 
+// Facebook hidden from cross-post tabs (May 10, 2026) — moved to direct Graph
+// API integration, no longer published via Publer. Backend FacebookPost model
+// + service + scanner branch intact for future revival.
 const PLATFORMS = [
   {
     key: 'linkedin',
@@ -41,12 +44,12 @@ const PLATFORMS = [
     accent: 'text-sky-500',
     activeBg: 'bg-sky-500/10 text-sky-200 border-sky-400/40',
   },
-  {
-    key: 'facebook',
-    label: 'Facebook',
-    accent: 'text-blue-500',
-    activeBg: 'bg-blue-500/10 text-blue-200 border-blue-400/40',
-  },
+  // {
+  //   key: 'facebook',
+  //   label: 'Facebook',
+  //   accent: 'text-blue-500',
+  //   activeBg: 'bg-blue-500/10 text-blue-200 border-blue-400/40',
+  // },
   {
     key: 'instagram',
     label: 'Instagram',

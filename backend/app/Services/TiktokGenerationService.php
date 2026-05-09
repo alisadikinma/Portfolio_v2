@@ -162,8 +162,16 @@ class TiktokGenerationService extends BaseSocialGenerationService
             return null;
         }
 
-        $appUrl = rtrim((string) config('app.url', 'https://alisadikinma.com'), '/');
-        $blogUrl = $appUrl . '/blog/' . $post->slug;
+        // Use branded shortener with TikTok UTM attribution (May 10, 2026).
+        // TikTok caption body carries the URL (no first-comment support on
+        // TikTok via Publer API); shortener saves ~70-95 chars on long slugs.
+        try {
+            $blogUrl = app(\App\Services\ShortLinkService::class)
+                ->forBlogPost($post, 'tiktok');
+        } catch (\Throwable $e) {
+            $appUrl = rtrim((string) config('app.url', 'https://alisadikinma.com'), '/');
+            $blogUrl = $appUrl . '/blog/' . $post->slug;
+        }
 
         return [
             'blog' => [

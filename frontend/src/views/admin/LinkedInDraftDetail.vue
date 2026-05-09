@@ -123,9 +123,13 @@ function platformStatusMeta(key) {
 // Aggregate health line shown above the chips: "3/4 published".
 const sosmedHealth = computed(() => {
   if (!draft.value) return null
+  // Facebook hidden from cross-post pipeline (May 10, 2026) — moved to direct
+  // Graph API integration (mirror LinkedIn pattern), no longer published via
+  // Publer. FB backend code (FacebookPost model + service + scanner branch)
+  // intact for future revival.
   const platforms = ['linkedin']
-  if (draft.value.format === 'text') platforms.push('facebook', 'threads')
-  if (draft.value.format === 'carousel') platforms.push('facebook', 'instagram', 'tiktok', 'threads')
+  if (draft.value.format === 'text') platforms.push('threads')
+  if (draft.value.format === 'carousel') platforms.push('instagram', 'tiktok', 'threads')
 
   let published = 0, inProgress = 0, failed = 0, notYet = 0
   for (const p of platforms) {
@@ -655,8 +659,8 @@ async function doPublishNow() {
 
 async function doPublishAll() {
   const platforms = draft.value?.format === 'carousel'
-    ? 'LinkedIn + Facebook + Instagram + TikTok + Threads'
-    : 'LinkedIn + Facebook + Threads'
+    ? 'LinkedIn + Instagram + TikTok + Threads'
+    : 'LinkedIn + Threads'
   const confirmMsg =
     `Publish to ALL platforms now?\n\n` +
     `→ ${platforms}\n` +
@@ -955,19 +959,13 @@ const showThumbnailUploadCaption = computed(() =>
                 <span class="font-mono uppercase tracking-[0.14em] text-neutral-500 mr-1">
                   Fanned out:
                 </span>
-                <button
-                  type="button"
-                  @click="activatePlatformAndScroll('facebook')"
-                  class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border border-blue-400/30 bg-blue-500/5 text-blue-300 hover:bg-blue-500/15 hover:text-blue-200 transition cursor-pointer"
-                  title="Show Facebook caption below"
-                >
-                  <span class="w-1.5 h-1.5 rounded-full bg-blue-400" />
-                  Facebook
-                  <span class="font-mono text-[9px] uppercase tracking-[0.1em] flex items-center gap-1 pl-1.5 ml-1 border-l border-blue-400/20">
-                    <span :class="['w-1 h-1 rounded-full', platformStatusMeta('facebook').dot]" />
-                    <span :class="platformStatusMeta('facebook').text">{{ platformStatusMeta('facebook').label }}</span>
-                  </span>
-                </button>
+                <!--
+                  Facebook chip hidden (May 10, 2026) — FB moved off Publer
+                  pipeline to direct Graph API integration. Backend code intact
+                  (PLATFORM_META.facebook + activatePlatformAndScroll('facebook')
+                  + draft.facebook_post still resolved server-side) for future
+                  revival when direct FB integration ships.
+                -->
                 <template v-if="draft.format === 'carousel'">
                   <button
                     type="button"

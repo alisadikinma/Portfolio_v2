@@ -985,16 +985,28 @@ class LinkedInGenerationService
     }
 
     /**
-     * Canonical blog URL for the draft's source post:
-     *   {APP_URL}/blog/{slug}
-     * Empty string when the post or slug is missing (defensive — prevents
-     * malformed URLs from leaking into LinkedIn comments).
+     * Canonical blog URL for the draft's source post — uses branded shortener
+     * with platform-attributed UTM (May 10, 2026).
+     *
+     * Returns short URL `https://alisadikinma.com/r/{code}` (~33 chars vs ~110
+     * for typical SEO-rich blog slugs) when the shortener succeeds. Falls back
+     * to full URL `{APP_URL}/blog/{slug}` if shortener fails or post missing.
+     * Empty string when post slug is missing (defensive — prevents malformed
+     * URLs from leaking into LinkedIn comments).
      */
     private function blogUrl(LinkedInPost $draft): string
     {
-        $appUrl = rtrim((string) config('app.url', ''), '/');
-        $slug = (string) ($draft->post?->slug ?? '');
-        return ($appUrl !== '' && $slug !== '') ? "{$appUrl}/blog/{$slug}" : '';
+        $post = $draft->post;
+        if ($post === null || empty($post->slug)) {
+            return '';
+        }
+        try {
+            return app(\App\Services\ShortLinkService::class)
+                ->forBlogPost($post, 'linkedin');
+        } catch (\Throwable $e) {
+            $appUrl = rtrim((string) config('app.url', ''), '/');
+            return $appUrl !== '' ? "{$appUrl}/blog/{$post->slug}" : '';
+        }
     }
 
     /**

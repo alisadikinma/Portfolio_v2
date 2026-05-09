@@ -154,12 +154,24 @@ class LinkedInPost extends Model
         if ($current !== '' && preg_match('#https?://#i', $current) === 1) {
             return false;
         }
-        $appUrl = rtrim((string) config('app.url'), '/');
-        $slug = (string) ($this->post?->slug ?? '');
-        if ($appUrl === '' || $slug === '') {
+        $post = $this->post;
+        if ($post === null || empty($post->slug)) {
             return false;
         }
-        $this->update(['link_comment' => "Full article: {$appUrl}/blog/{$slug}"]);
-        return true;
+
+        // Use branded shortener with platform-attributed UTM (May 10, 2026).
+        // Short URL is ~33 chars vs ~110 for typical SEO-rich blog slugs —
+        // saves caption budget AND tracks per-platform attribution via GA.
+        try {
+            $shortUrl = app(\App\Services\ShortLinkService::class)
+                ->forBlogPost($post, 'linkedin');
+            $this->update(['link_comment' => "Full article: {$shortUrl}"]);
+            return true;
+        } catch (\Throwable $e) {
+            // Defensive fallback to full URL if shortener fails — never block publish.
+            $appUrl = rtrim((string) config('app.url'), '/');
+            $this->update(['link_comment' => "Full article: {$appUrl}/blog/{$post->slug}"]);
+            return true;
+        }
     }
 }
