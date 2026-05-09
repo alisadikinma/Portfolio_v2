@@ -92,6 +92,13 @@
                 Gallery
               </router-link>
 
+              <!-- Social Media section — Content Engine (idea pipeline) +
+                   LinkedIn (Posts/Queue) + cross-post (FB/IG/TikTok). -->
+              <div class="my-4 border-t border-neutral-200 dark:border-neutral-700"></div>
+              <p class="px-4 text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+                Social Media
+              </p>
+
               <router-link
                 to="/admin/content-engine"
                 class="flex items-center px-4 py-3 rounded-lg text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
@@ -102,12 +109,6 @@
                 </svg>
                 Content Engine
               </router-link>
-
-              <!-- Social Media section — LinkedIn (Posts/Queue) + cross-post (FB/IG/TikTok) -->
-              <div class="my-4 border-t border-neutral-200 dark:border-neutral-700"></div>
-              <p class="px-4 text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
-                Social Media
-              </p>
 
               <router-link
                 to="/admin/linkedin-posts"
