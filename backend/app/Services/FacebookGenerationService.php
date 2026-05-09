@@ -6,6 +6,7 @@ use App\Enums\FacebookPostStatus;
 use App\Enums\InstagramPostStatus;
 use App\Models\FacebookPost;
 use App\Models\InstagramPost;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -160,6 +161,8 @@ class FacebookGenerationService extends BaseSocialGenerationService
                 'status' => $draft->status,
             ];
         }
+
+        $this->fireAwaitingReviewAlert($draft, $title, $caption);
 
         return [
             'success' => true,
@@ -419,11 +422,26 @@ class FacebookGenerationService extends BaseSocialGenerationService
             ];
         }
 
+        $this->fireAwaitingReviewAlert($draft, $title, $caption);
+
         return [
             'success' => true,
             'draft_id' => $draft->id,
             'status' => FacebookPostStatus::AwaitingReview->value,
         ];
+    }
+
+    private function fireAwaitingReviewAlert(FacebookPost $draft, string $title, string $caption): void
+    {
+        try {
+            App::make(\App\Services\TelegramNotificationService::class)
+                ->sendCrossPostAwaitingReview('facebook', $draft->id, $title, $caption);
+        } catch (\Throwable $e) {
+            Log::warning('[FacebookGenerationService] Telegram alert failed (non-fatal)', [
+                'draft_id' => $draft->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     protected function markFailed(FacebookPost $draft, string $reason): void
@@ -438,6 +456,17 @@ class FacebookGenerationService extends BaseSocialGenerationService
                 'draft_id' => $draft->id,
                 'reason' => $reason,
                 'transition_error' => $e->getMessage(),
+            ]);
+        }
+
+        // Phase G — Telegram alert (dormant by default).
+        try {
+            App::make(\App\Services\TelegramNotificationService::class)
+                ->sendCrossPostGenerationFailed('facebook', $draft->id, $reason);
+        } catch (\Throwable $e) {
+            Log::warning('[FacebookGenerationService] Telegram failed-alert errored', [
+                'draft_id' => $draft->id,
+                'error' => $e->getMessage(),
             ]);
         }
     }

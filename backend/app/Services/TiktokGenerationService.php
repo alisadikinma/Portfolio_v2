@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\TiktokPostStatus;
 use App\Models\TiktokPost;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -282,6 +283,17 @@ class TiktokGenerationService extends BaseSocialGenerationService
             ];
         }
 
+        // Phase G — Telegram alert (dormant by default).
+        try {
+            App::make(\App\Services\TelegramNotificationService::class)
+                ->sendCrossPostAwaitingReview('tiktok', $draft->id, $title, $caption);
+        } catch (\Throwable $e) {
+            Log::warning('[TiktokGenerationService] Telegram alert failed (non-fatal)', [
+                'draft_id' => $draft->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
         return [
             'success' => true,
             'draft_id' => $draft->id,
@@ -301,6 +313,17 @@ class TiktokGenerationService extends BaseSocialGenerationService
                 'draft_id' => $draft->id,
                 'reason' => $reason,
                 'transition_error' => $e->getMessage(),
+            ]);
+        }
+
+        // Phase G — Telegram alert (dormant by default).
+        try {
+            App::make(\App\Services\TelegramNotificationService::class)
+                ->sendCrossPostGenerationFailed('tiktok', $draft->id, $reason);
+        } catch (\Throwable $e) {
+            Log::warning('[TiktokGenerationService] Telegram failed-alert errored', [
+                'draft_id' => $draft->id,
+                'error' => $e->getMessage(),
             ]);
         }
     }

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\InstagramPostStatus;
 use App\Models\InstagramPost;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\App;
 
 /**
  * Bridges Portfolio_v2 backend to the `social-short-form-writer` plugin's
@@ -306,11 +307,27 @@ class InstagramGenerationService extends BaseSocialGenerationService
             ];
         }
 
+        // Phase G — Telegram alert. Dormant by default (no setting row → no-op).
+        $this->fireAwaitingReviewAlert($draft, $title, $caption);
+
         return [
             'success' => true,
             'draft_id' => $draft->id,
             'status' => InstagramPostStatus::AwaitingReview->value,
         ];
+    }
+
+    private function fireAwaitingReviewAlert(InstagramPost $draft, string $title, string $caption): void
+    {
+        try {
+            App::make(\App\Services\TelegramNotificationService::class)
+                ->sendCrossPostAwaitingReview('instagram', $draft->id, $title, $caption);
+        } catch (\Throwable $e) {
+            Log::warning('[InstagramGenerationService] Telegram alert failed (non-fatal)', [
+                'draft_id' => $draft->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     protected function markFailed(InstagramPost $draft, string $reason): void
@@ -325,6 +342,17 @@ class InstagramGenerationService extends BaseSocialGenerationService
                 'draft_id' => $draft->id,
                 'reason' => $reason,
                 'transition_error' => $e->getMessage(),
+            ]);
+        }
+
+        // Phase G — Telegram alert. Dormant by default.
+        try {
+            App::make(\App\Services\TelegramNotificationService::class)
+                ->sendCrossPostGenerationFailed('instagram', $draft->id, $reason);
+        } catch (\Throwable $e) {
+            Log::warning('[InstagramGenerationService] Telegram failed-alert errored', [
+                'draft_id' => $draft->id,
+                'error' => $e->getMessage(),
             ]);
         }
     }

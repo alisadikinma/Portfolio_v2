@@ -565,4 +565,156 @@ class TelegramNotificationService
     {
         return rtrim(config('app.url'), '/') . '/admin/content-engine?idea=' . $idea->id;
     }
+
+    /* ================================================================
+     * Phase G — Cross-post pipeline alerts (FB + IG + TT).
+     *
+     * Toggle keys (default false — dormant until operator opts in via
+     * admin Telegram settings panel):
+     *   telegram_notify_crosspost_fanout
+     *   telegram_notify_crosspost_generation_failed
+     *   telegram_notify_crosspost_awaiting_review
+     *   telegram_notify_crosspost_publish_success
+     *   telegram_notify_crosspost_publish_failed
+     *
+     * Each method takes a generic Eloquent draft (FacebookPost,
+     * InstagramPost, or TiktokPost) and renders a platform-aware Telegram
+     * card with admin deep-link.
+     * ================================================================ */
+
+    /**
+     * Fires from `social-cross-post:scan` when the scanner creates 1+
+     * cross-post rows for a LinkedIn draft. Single message lists all
+     * platforms fanned out.
+     *
+     * @param  array<int,string>  $platforms  e.g. ['facebook', 'instagram', 'tiktok']
+     */
+    public function sendCrossPostFanout(int $linkedinPostId, int $postId, array $platforms): bool
+    {
+        if (!$this->isEnabledFor('crosspost_fanout')) {
+            return false;
+        }
+        if (empty($platforms)) {
+            return false;
+        }
+
+        $platformList = implode(', ', array_map(fn ($p) => '`' . strtoupper($p) . '`', $platforms));
+        $adminUrl = rtrim((string) config('app.url'), '/') . '/admin/linkedin-drafts/' . $linkedinPostId;
+
+        $lines = [];
+        $lines[] = '🔀 *Cross-post fanout*';
+        $lines[] = '';
+        $lines[] = 'Source: LinkedIn draft #' . $linkedinPostId . ' (post #' . $postId . ')';
+        $lines[] = 'Fanned out to: ' . $platformList;
+        $lines[] = '';
+        $lines[] = '[Open source in admin](' . $adminUrl . ')';
+
+        return $this->send(implode("\n", $lines));
+    }
+
+    /**
+     * Fires from {Instagram,Tiktok,Facebook}GenerationService::markFailed
+     * after the plugin SSH dispatch / parser / validation fails.
+     */
+    public function sendCrossPostGenerationFailed(string $platform, int $draftId, string $error): bool
+    {
+        if (!$this->isEnabledFor('crosspost_generation_failed')) {
+            return false;
+        }
+
+        $platformLabel = strtoupper($platform);
+        $adminUrl = rtrim((string) config('app.url'), '/') . '/admin/' . strtolower($platform) . '-drafts/' . $draftId;
+
+        $lines = [];
+        $lines[] = '🛑 *' . $platformLabel . ' generation failed*';
+        $lines[] = '';
+        $lines[] = 'Draft #' . $draftId;
+        $lines[] = '';
+        $lines[] = '```' . "\n" . $this->truncate($error, 300) . "\n" . '```';
+        $lines[] = '';
+        $lines[] = '[Open in admin](' . $adminUrl . ')';
+
+        return $this->send(implode("\n", $lines));
+    }
+
+    /**
+     * Fires when generation completes and a draft hits AwaitingReview —
+     * signals operator there's something to review + approve in admin UI.
+     * Optional caption/title preview keeps the alert actionable.
+     */
+    public function sendCrossPostAwaitingReview(string $platform, int $draftId, ?string $title, ?string $caption): bool
+    {
+        if (!$this->isEnabledFor('crosspost_awaiting_review')) {
+            return false;
+        }
+
+        $platformLabel = strtoupper($platform);
+        $adminUrl = rtrim((string) config('app.url'), '/') . '/admin/' . strtolower($platform) . '-drafts/' . $draftId;
+
+        $lines = [];
+        $lines[] = '👀 *' . $platformLabel . ' draft ready for review*';
+        $lines[] = '';
+        $lines[] = 'Draft #' . $draftId;
+        if (!empty($title)) {
+            $lines[] = '_' . $this->escapeMarkdown($this->truncate($title, 100)) . '_';
+        }
+        if (!empty($caption)) {
+            $lines[] = '';
+            $lines[] = '> ' . $this->escapeMarkdown($this->truncate($caption, 200));
+        }
+        $lines[] = '';
+        $lines[] = '[Review in admin](' . $adminUrl . ')';
+
+        return $this->send(implode("\n", $lines));
+    }
+
+    /**
+     * Fires from PublishViaPubler when the publish job completes
+     * successfully (Phase H+). Includes the public Publer-confirmed
+     * external_url when available.
+     */
+    public function sendCrossPostPublishSuccess(string $platform, int $draftId, ?string $externalUrl): bool
+    {
+        if (!$this->isEnabledFor('crosspost_publish_success')) {
+            return false;
+        }
+
+        $platformLabel = strtoupper($platform);
+        $adminUrl = rtrim((string) config('app.url'), '/') . '/admin/' . strtolower($platform) . '-drafts/' . $draftId;
+
+        $lines = [];
+        $lines[] = '✅ *Published to ' . $platformLabel . '*';
+        $lines[] = '';
+        $lines[] = 'Draft #' . $draftId;
+        if (!empty($externalUrl)) {
+            $lines[] = '🔗 [Open on ' . $platformLabel . '](' . $externalUrl . ')';
+        }
+        $lines[] = '[Open in admin](' . $adminUrl . ')';
+
+        return $this->send(implode("\n", $lines));
+    }
+
+    /**
+     * Fires from PublishViaPubler when the publish job fails (Phase H+).
+     */
+    public function sendCrossPostPublishFailed(string $platform, int $draftId, string $error): bool
+    {
+        if (!$this->isEnabledFor('crosspost_publish_failed')) {
+            return false;
+        }
+
+        $platformLabel = strtoupper($platform);
+        $adminUrl = rtrim((string) config('app.url'), '/') . '/admin/' . strtolower($platform) . '-drafts/' . $draftId;
+
+        $lines = [];
+        $lines[] = '❌ *' . $platformLabel . ' publish failed*';
+        $lines[] = '';
+        $lines[] = 'Draft #' . $draftId;
+        $lines[] = '';
+        $lines[] = '```' . "\n" . $this->truncate($error, 300) . "\n" . '```';
+        $lines[] = '';
+        $lines[] = '[Open in admin](' . $adminUrl . ')';
+
+        return $this->send(implode("\n", $lines));
+    }
 }

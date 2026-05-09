@@ -1293,6 +1293,42 @@ Route::middleware(['auth:sanctum'])->prefix('admin/linkedin-drafts')->group(func
 });
 
 // ============================================================================
+// Cross-post drafts — Facebook + Instagram + TikTok admin CRUD.
+// Per docs/plans/2026-05-08-cross-post-publer-integration-plan.md Phase E.
+// 7 endpoints × 3 platforms = 21 routes, shared via HandlesCrossPostDraftActions
+// trait. Calendar uses GET /calendar (above resource routes for path-priority).
+// ============================================================================
+Route::middleware(['auth:sanctum'])->prefix('admin/facebook-drafts')->group(function () {
+    Route::get('/calendar', [\App\Http\Controllers\Api\Admin\FacebookDraftController::class, 'calendar']);
+    Route::get('/', [\App\Http\Controllers\Api\Admin\FacebookDraftController::class, 'index']);
+    Route::get('/{id}', [\App\Http\Controllers\Api\Admin\FacebookDraftController::class, 'show']);
+    Route::put('/{id}', [\App\Http\Controllers\Api\Admin\FacebookDraftController::class, 'update']);
+    Route::post('/{id}/regenerate', [\App\Http\Controllers\Api\Admin\FacebookDraftController::class, 'regenerate']);
+    Route::post('/{id}/approve', [\App\Http\Controllers\Api\Admin\FacebookDraftController::class, 'approve']);
+    Route::post('/{id}/cancel', [\App\Http\Controllers\Api\Admin\FacebookDraftController::class, 'cancel']);
+});
+
+Route::middleware(['auth:sanctum'])->prefix('admin/instagram-drafts')->group(function () {
+    Route::get('/calendar', [\App\Http\Controllers\Api\Admin\InstagramDraftController::class, 'calendar']);
+    Route::get('/', [\App\Http\Controllers\Api\Admin\InstagramDraftController::class, 'index']);
+    Route::get('/{id}', [\App\Http\Controllers\Api\Admin\InstagramDraftController::class, 'show']);
+    Route::put('/{id}', [\App\Http\Controllers\Api\Admin\InstagramDraftController::class, 'update']);
+    Route::post('/{id}/regenerate', [\App\Http\Controllers\Api\Admin\InstagramDraftController::class, 'regenerate']);
+    Route::post('/{id}/approve', [\App\Http\Controllers\Api\Admin\InstagramDraftController::class, 'approve']);
+    Route::post('/{id}/cancel', [\App\Http\Controllers\Api\Admin\InstagramDraftController::class, 'cancel']);
+});
+
+Route::middleware(['auth:sanctum'])->prefix('admin/tiktok-drafts')->group(function () {
+    Route::get('/calendar', [\App\Http\Controllers\Api\Admin\TiktokDraftController::class, 'calendar']);
+    Route::get('/', [\App\Http\Controllers\Api\Admin\TiktokDraftController::class, 'index']);
+    Route::get('/{id}', [\App\Http\Controllers\Api\Admin\TiktokDraftController::class, 'show']);
+    Route::put('/{id}', [\App\Http\Controllers\Api\Admin\TiktokDraftController::class, 'update']);
+    Route::post('/{id}/regenerate', [\App\Http\Controllers\Api\Admin\TiktokDraftController::class, 'regenerate']);
+    Route::post('/{id}/approve', [\App\Http\Controllers\Api\Admin\TiktokDraftController::class, 'approve']);
+    Route::post('/{id}/cancel', [\App\Http\Controllers\Api\Admin\TiktokDraftController::class, 'cancel']);
+});
+
+// ============================================================================
 // Posting Time Rules — AI-researched best posting times per platform.
 // Per docs/plans/2026-05-06-linkedin-calendar-and-ai-time-rules.md §6.1.
 // Seeded by `php artisan posting-rules:research --platform=linkedin`.

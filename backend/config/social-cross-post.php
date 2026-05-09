@@ -73,6 +73,12 @@ return [
     |
     */
     'publer' => [
+        // Master gate for the Publer publish path. Phase E Approve action
+        // returns 503 when this is false so drafts don't get stuck in
+        // `publishing` while Phase H+ (real Publer transport) is pending.
+        // Flip to true once PublishViaPubler stub is replaced with the
+        // real createPost + pollJob loop.
+        'enabled' => env('PUBLER_PUBLISH_ENABLED', false),
         'base_url' => env('PUBLER_BASE_URL', 'https://app.publer.com'),
         'api_path' => env('PUBLER_API_PATH', '/api/v1'),
         // Documented rate limit: 100 requests / 2 minutes per user. Our
