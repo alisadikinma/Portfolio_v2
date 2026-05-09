@@ -173,15 +173,27 @@ async function scanBlogNow() {
   scanRunning.value = true
   scanFlash.value = null
   try {
-    await api.post('/admin/linkedin-drafts/scan-blog-now')
+    const res = await api.post('/admin/linkedin-drafts/scan-blog-now')
+    const data = res?.data ?? {}
+    const created = data?.created ?? 0
     scanFlash.value = {
-      type: 'success',
-      message: 'Scan queued. New drafts will appear here within ~30s.',
+      type: created > 0 ? 'success' : 'info',
+      message: data?.message || (created > 0
+        ? `Created ${created} draft(s).`
+        : 'No new posts to convert.'),
     }
-    // Refetch the queue a few times so newly-created pending rows surface
-    // without forcing the operator to manually refresh.
-    setTimeout(() => queryClient.invalidateQueries({ queryKey: ['linkedin-drafts'] }), 5000)
-    setTimeout(() => queryClient.invalidateQueries({ queryKey: ['linkedin-drafts'] }), 30000)
+    if (created > 0) {
+      // Auto-jump to In Progress so the operator sees the freshly-created
+      // pending_generation rows rather than staring at an unchanged
+      // Manual Review tab.
+      activeTab.value = 'in_progress'
+      // Refresh the list a couple times — drafts go pending → generating
+      // within ~5s, then validating, then manual_review/awaiting_publish
+      // over the next 30-90s.
+      queryClient.invalidateQueries({ queryKey: ['linkedin-drafts'] })
+      setTimeout(() => queryClient.invalidateQueries({ queryKey: ['linkedin-drafts'] }), 5000)
+      setTimeout(() => queryClient.invalidateQueries({ queryKey: ['linkedin-drafts'] }), 30000)
+    }
   } catch (err) {
     scanFlash.value = {
       type: 'error',
@@ -189,7 +201,10 @@ async function scanBlogNow() {
     }
   } finally {
     scanRunning.value = false
-    setTimeout(() => { scanFlash.value = null }, 8000)
+    // Info / success messages auto-dismiss after 12s (operator needs longer
+    // to read the explanatory copy when zero drafts were created); errors
+    // also dismiss but you can read longer.
+    setTimeout(() => { scanFlash.value = null }, 12000)
   }
 }
 
@@ -309,13 +324,17 @@ const emptyMessage = computed(() => ({
       </div>
     </header>
 
-    <!-- Scan flash message — auto-dismisses after 8s -->
+    <!-- Scan flash message — auto-dismisses after 12s.
+         3 tones: success (drafts created), info (zero candidates),
+         error (request failed). -->
     <div
       v-if="scanFlash"
       class="rounded-lg px-3.5 py-2 text-sm border"
-      :class="scanFlash.type === 'success'
-        ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-300'
-        : 'border-red-500/30 bg-red-500/5 text-red-300'"
+      :class="{
+        'border-emerald-500/30 bg-emerald-500/5 text-emerald-300': scanFlash.type === 'success',
+        'border-amber-500/30 bg-amber-500/5 text-amber-200': scanFlash.type === 'info',
+        'border-red-500/30 bg-red-500/5 text-red-300': scanFlash.type === 'error',
+      }"
     >
       {{ scanFlash.message }}
     </div>

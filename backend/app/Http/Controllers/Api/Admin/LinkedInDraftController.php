@@ -949,20 +949,42 @@ class LinkedInDraftController extends Controller
      * POST /api/admin/linkedin-drafts/scan-blog-now
      *
      * Manual operator-trigger for `linkedin:scan-blog`. Bypasses the daily
-     * 03:00 WIB cron so newly-completed Content Engine articles can be pulled
-     * into the LinkedIn pipeline immediately. Queues via Artisan::queue() so
-     * the long-running SSH dispatches happen on the systemd queue worker, not
-     * the HTTP request thread.
+     * 03:00 WIB cron. Runs SYNCHRONOUSLY (Artisan::call, not ::queue) so the
+     * operator gets immediate feedback about how many drafts were created.
+     * The scan itself is just DB queries (fast); only the per-draft
+     * GenerateLinkedInPost jobs dispatch async to the queue worker, which
+     * happens in milliseconds — by the time this response returns, the new
+     * drafts already exist in `linkedin_posts` with status=pending_generation
+     * and the worker is picking them up.
+     *
+     * Defaults to 168h (7d) lookback window — wider than the daily cron's
+     * 24h since manual scans typically target a specific recent article that
+     * may have been missed for any reason.
+     *
+     * Optional payload:
+     *   hours        int    1..720    lookback window in hours (default 168)
+     *   min_virality int    0..100    override virality gate (0 = disable)
      */
     public function scanBlogNow(Request $request): JsonResponse
     {
-        $hours = (int) $request->input('hours', 24);
+        $hours = (int) $request->input('hours', 168);
         if ($hours < 1 || $hours > 720) {
-            $hours = 24;
+            $hours = 168;
+        }
+
+        $args = ['--hours' => $hours];
+        if ($request->has('min_virality')) {
+            $minVirality = (int) $request->input('min_virality');
+            if ($minVirality >= 0 && $minVirality <= 100) {
+                $args['--min-virality'] = $minVirality;
+            }
         }
 
         try {
-            Artisan::queue('linkedin:scan-blog', ['--hours' => $hours]);
+            // Synchronous so we can return real counts. Capture output for
+            // the operator to see which posts (if any) were picked up.
+            $exitCode = Artisan::call('linkedin:scan-blog', $args);
+            $output = trim(Artisan::output());
         } catch (\Throwable $e) {
             Log::error('Manual linkedin:scan-blog dispatch failed', [
                 'message' => $e->getMessage(),
@@ -970,16 +992,35 @@ class LinkedInDraftController extends Controller
             return response()->json([
                 'success' => false,
                 'error' => [
-                    'code' => 'scan_dispatch_failed',
+                    'code' => 'scan_failed',
                     'message' => $e->getMessage(),
                 ],
             ], 500);
         }
 
+        // Parse "Created N draft(s)." from the command output. Falls back
+        // to "No un-converted posts" detection for the zero case.
+        $created = 0;
+        if (preg_match('/Created (\d+) draft/i', $output, $m)) {
+            $created = (int) $m[1];
+        }
+        $foundZero = stripos($output, 'No un-converted posts') !== false;
+
+        if ($created > 0) {
+            $message = "Scan complete — {$created} new draft(s) created. They'll appear in the In Progress tab within ~30s as the worker picks them up.";
+        } elseif ($foundZero) {
+            $message = "Scan complete — no new posts to convert. Either every recent post in the last {$hours}h already has a draft, or no published posts pass the virality gate. Try increasing the window or setting min_virality=0.";
+        } else {
+            $message = "Scan complete (exit {$exitCode}). " . ($output ?: 'No output.');
+        }
+
         return response()->json([
             'success' => true,
-            'message' => "Blog scan queued (--hours={$hours}). New drafts will appear within ~30s.",
-        ], 202);
+            'created' => $created,
+            'hours' => $hours,
+            'output' => $output,
+            'message' => $message,
+        ]);
     }
 
     private function notFound(): JsonResponse
