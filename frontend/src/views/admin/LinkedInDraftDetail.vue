@@ -89,6 +89,57 @@ function activatePlatformAndScroll(key) {
   })
 }
 
+// --- Cross-post platform status visibility -------------------------------
+// Each Fanned-out chip shows a status pill so the operator can see at a
+// glance whether each platform succeeded WITHOUT navigating away. Status
+// values come from the per-platform sibling FSM enums:
+//   pending → orange (queued, not yet authored)
+//   generating / publishing → cyan (in progress)
+//   awaiting_review → amber (needs operator decision)
+//   published → emerald (live)
+//   failed / cancelled → red / neutral (terminal failure / aborted)
+const PLATFORM_STATUS_META = {
+  pending: { label: 'PENDING', dot: 'bg-orange-400', text: 'text-orange-300' },
+  generating: { label: 'AUTHORING', dot: 'bg-cyan-400 animate-pulse', text: 'text-cyan-300' },
+  validating: { label: 'VALIDATING', dot: 'bg-cyan-400 animate-pulse', text: 'text-cyan-300' },
+  awaiting_review: { label: 'NEEDS REVIEW', dot: 'bg-amber-400', text: 'text-amber-300' },
+  awaiting_manual_publish: { label: 'NEEDS REVIEW', dot: 'bg-amber-400', text: 'text-amber-300' },
+  publishing: { label: 'PUBLISHING', dot: 'bg-cyan-400 animate-pulse', text: 'text-cyan-300' },
+  published_externally: { label: 'PUBLISHED', dot: 'bg-emerald-400', text: 'text-emerald-300' },
+  published: { label: 'PUBLISHED', dot: 'bg-emerald-400', text: 'text-emerald-300' },
+  failed: { label: 'FAILED', dot: 'bg-red-400', text: 'text-red-300' },
+  cancelled: { label: 'CANCELLED', dot: 'bg-neutral-500', text: 'text-neutral-400' },
+}
+
+function platformStatusMeta(key) {
+  const sibling = draft.value?.[`${key}_post`]
+  if (!sibling) return { label: 'NOT YET', dot: 'bg-neutral-700', text: 'text-neutral-500' }
+  const status = sibling.status || 'pending'
+  return PLATFORM_STATUS_META[status] || { label: status.toUpperCase(), dot: 'bg-neutral-500', text: 'text-neutral-400' }
+}
+
+// Aggregate health line shown above the chips: "3/4 published".
+const sosmedHealth = computed(() => {
+  if (!draft.value) return null
+  const platforms = ['linkedin']
+  if (draft.value.format === 'text') platforms.push('facebook')
+  if (draft.value.format === 'carousel') platforms.push('facebook', 'instagram', 'tiktok')
+
+  let published = 0, inProgress = 0, failed = 0, notYet = 0
+  for (const p of platforms) {
+    const status = p === 'linkedin'
+      ? draft.value.status
+      : draft.value[`${p}_post`]?.status
+
+    if (!status) { notYet++; continue }
+    if (status === 'published' || status === 'published_externally') published++
+    else if (status === 'failed') failed++
+    else if (status === 'cancelled') {/* skip */}
+    else inProgress++
+  }
+  return { total: platforms.length, published, inProgress, failed, notYet }
+})
+
 const updateMutation = useUpdateLinkedInDraft()
 const approveMutation = useApproveLinkedInDraft()
 const cancelMutation = useCancelLinkedInDraft()
@@ -856,43 +907,76 @@ const showThumbnailUploadCaption = computed(() =>
             <div
               v-if="(draft.format === 'carousel' || draft.format === 'text')
                 && (draft.status === 'awaiting_publish' || draft.status === 'published')"
-              class="flex flex-wrap items-center gap-1.5 text-[11px]"
+              class="space-y-1.5"
             >
-              <span class="font-mono uppercase tracking-[0.14em] text-neutral-500 mr-1">
-                Fanned out:
-              </span>
-              <button
-                type="button"
-                @click="activatePlatformAndScroll('facebook')"
-                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-blue-400/30 bg-blue-500/5 text-blue-300 hover:bg-blue-500/15 hover:text-blue-200 transition cursor-pointer"
-                title="Show Facebook caption below"
-              >
-                <span class="w-1.5 h-1.5 rounded-full bg-blue-400" />
-                Facebook
-              </button>
-              <template v-if="draft.format === 'carousel'">
+              <!-- Aggregate health line — at-a-glance "X of N published"
+                   so the operator doesn't have to mentally aggregate the
+                   per-chip statuses below. -->
+              <div v-if="sosmedHealth" class="flex flex-wrap items-center gap-2 text-[11px] font-mono">
+                <span class="uppercase tracking-[0.14em] text-neutral-500">Sosmed health:</span>
+                <span :class="sosmedHealth.published === sosmedHealth.total ? 'text-emerald-300' : 'text-neutral-300'">
+                  {{ sosmedHealth.published }}/{{ sosmedHealth.total }} published
+                </span>
+                <span v-if="sosmedHealth.inProgress > 0" class="text-cyan-300">
+                  · {{ sosmedHealth.inProgress }} in progress
+                </span>
+                <span v-if="sosmedHealth.failed > 0" class="text-red-300">
+                  · {{ sosmedHealth.failed }} failed
+                </span>
+                <span v-if="sosmedHealth.notYet > 0" class="text-neutral-500">
+                  · {{ sosmedHealth.notYet }} not yet
+                </span>
+              </div>
+
+              <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
+                <span class="font-mono uppercase tracking-[0.14em] text-neutral-500 mr-1">
+                  Fanned out:
+                </span>
                 <button
                   type="button"
-                  @click="activatePlatformAndScroll('instagram')"
-                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-fuchsia-400/30 bg-fuchsia-500/5 text-fuchsia-300 hover:bg-fuchsia-500/15 hover:text-fuchsia-200 transition cursor-pointer"
-                  title="Show Instagram caption below"
+                  @click="activatePlatformAndScroll('facebook')"
+                  class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border border-blue-400/30 bg-blue-500/5 text-blue-300 hover:bg-blue-500/15 hover:text-blue-200 transition cursor-pointer"
+                  title="Show Facebook caption below"
                 >
-                  <span class="w-1.5 h-1.5 rounded-full bg-fuchsia-400" />
-                  Instagram
+                  <span class="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                  Facebook
+                  <span class="font-mono text-[9px] uppercase tracking-[0.1em] flex items-center gap-1 pl-1.5 ml-1 border-l border-blue-400/20">
+                    <span :class="['w-1 h-1 rounded-full', platformStatusMeta('facebook').dot]" />
+                    <span :class="platformStatusMeta('facebook').text">{{ platformStatusMeta('facebook').label }}</span>
+                  </span>
                 </button>
-                <button
-                  type="button"
-                  @click="activatePlatformAndScroll('tiktok')"
-                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-rose-400/30 bg-rose-500/5 text-rose-300 hover:bg-rose-500/15 hover:text-rose-200 transition cursor-pointer"
-                  title="Show TikTok caption below"
-                >
-                  <span class="w-1.5 h-1.5 rounded-full bg-rose-400" />
-                  TikTok
-                </button>
-              </template>
-              <span class="ml-1 text-neutral-600 hidden sm:inline">
-                · click to view caption below
-              </span>
+                <template v-if="draft.format === 'carousel'">
+                  <button
+                    type="button"
+                    @click="activatePlatformAndScroll('instagram')"
+                    class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border border-fuchsia-400/30 bg-fuchsia-500/5 text-fuchsia-300 hover:bg-fuchsia-500/15 hover:text-fuchsia-200 transition cursor-pointer"
+                    title="Show Instagram caption below"
+                  >
+                    <span class="w-1.5 h-1.5 rounded-full bg-fuchsia-400" />
+                    Instagram
+                    <span class="font-mono text-[9px] uppercase tracking-[0.1em] flex items-center gap-1 pl-1.5 ml-1 border-l border-fuchsia-400/20">
+                      <span :class="['w-1 h-1 rounded-full', platformStatusMeta('instagram').dot]" />
+                      <span :class="platformStatusMeta('instagram').text">{{ platformStatusMeta('instagram').label }}</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    @click="activatePlatformAndScroll('tiktok')"
+                    class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border border-rose-400/30 bg-rose-500/5 text-rose-300 hover:bg-rose-500/15 hover:text-rose-200 transition cursor-pointer"
+                    title="Show TikTok caption below"
+                  >
+                    <span class="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                    TikTok
+                    <span class="font-mono text-[9px] uppercase tracking-[0.1em] flex items-center gap-1 pl-1.5 ml-1 border-l border-rose-400/20">
+                      <span :class="['w-1 h-1 rounded-full', platformStatusMeta('tiktok').dot]" />
+                      <span :class="platformStatusMeta('tiktok').text">{{ platformStatusMeta('tiktok').label }}</span>
+                    </span>
+                  </button>
+                </template>
+                <span class="ml-1 text-neutral-600 hidden sm:inline">
+                  · click to view caption
+                </span>
+              </div>
             </div>
 
             <!-- Operator-facing sentence (suppressed when live progress panel is active) -->
