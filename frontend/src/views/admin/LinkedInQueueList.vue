@@ -275,11 +275,11 @@ const emptyMessage = computed(() => ({
       <div>
         <p class="text-[11px] font-mono uppercase tracking-[0.18em] text-amber-400/80 mb-1">LinkedIn pipeline</p>
         <h1 class="text-3xl sm:text-4xl font-display font-semibold tracking-tight text-neutral-100">
-          Drafts
+          Draft Posts
         </h1>
         <p class="text-sm text-neutral-400 mt-2 max-w-xl">
           Drafts that need a decision, are mid-generation, or hit an error. Successfully shipped posts live in
-          <router-link to="/admin/linkedin-posts" class="text-amber-400 hover:underline">Posts</router-link>.
+          <router-link to="/admin/linkedin-posts" class="text-amber-400 hover:underline">SOSMED Posts</router-link>.
         </p>
       </div>
       <div class="flex items-center gap-2">

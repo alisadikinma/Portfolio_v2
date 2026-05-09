@@ -384,11 +384,11 @@ function statusDotClass(status) {
           <span class="capitalize">{{ platform }}</span> pipeline
         </p>
         <h1 class="text-3xl sm:text-4xl font-display font-semibold tracking-tight text-neutral-100">
-          Posts
+          SOSMED Posts
         </h1>
         <p class="mt-2 text-sm text-neutral-400 max-w-xl">
           Calendar of scheduled and published drafts. For drafts that need attention, go to
-          <router-link :to="queueRouteForPlatform" class="text-cyan-400 hover:text-cyan-300 underline-offset-2 hover:underline">Queue</router-link>.
+          <router-link :to="queueRouteForPlatform" class="text-cyan-400 hover:text-cyan-300 underline-offset-2 hover:underline">Draft Posts</router-link>.
         </p>
       </div>
       <router-link
