@@ -45,11 +45,61 @@
       No scheduled commands registered yet.
     </div>
 
-    <!-- Grouped tables -->
+    <!-- Grouped tables (organised under sub-tabs to keep the page short) -->
     <template v-else>
+      <!-- Sub-tab strip -->
+      <div
+        role="tablist"
+        aria-label="Scheduler categories"
+        class="flex flex-wrap gap-1 border-b border-gray-200 dark:border-gray-700"
+      >
+        <button
+          v-for="tab in subTabsWithCounts"
+          :key="tab.id"
+          type="button"
+          role="tab"
+          :aria-selected="activeSubTab === tab.id"
+          :aria-controls="`scheduler-subtab-${tab.id}`"
+          :id="`scheduler-subtab-trigger-${tab.id}`"
+          :class="[
+            'relative px-4 py-2 text-sm font-medium transition-colors -mb-px border-b-2',
+            activeSubTab === tab.id
+              ? 'border-amber-500 text-gray-900 dark:text-amber-300'
+              : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200',
+            tab.count === 0 ? 'opacity-60' : '',
+          ]"
+          @click="setSubTab(tab.id)"
+        >
+          {{ tab.label }}
+          <span
+            class="ml-2 inline-flex items-center justify-center rounded-full px-2 py-0.5 text-xs font-normal"
+            :class="activeSubTab === tab.id
+              ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+              : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'"
+          >
+            {{ tab.count }}
+          </span>
+        </button>
+      </div>
+
+      <!-- Empty sub-tab message -->
+      <div
+        v-if="visibleGroups.length === 0"
+        :id="`scheduler-subtab-${activeSubTab}`"
+        role="tabpanel"
+        :aria-labelledby="`scheduler-subtab-trigger-${activeSubTab}`"
+        class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-8 text-center text-sm text-gray-500"
+      >
+        No schedules in this category yet.
+      </div>
+
+      <!-- Active sub-tab body — only render rows belonging to bucketed categories -->
       <section
-        v-for="(rows, category) in groups"
+        v-for="[category, rows] in visibleGroups"
         :key="category"
+        :id="`scheduler-subtab-${activeSubTab}`"
+        role="tabpanel"
+        :aria-labelledby="`scheduler-subtab-trigger-${activeSubTab}`"
         class="space-y-2"
       >
         <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
@@ -244,6 +294,52 @@ const runMutation = useRunScheduledCommand()
 
 const groups = computed(() => groupsData.value || {})
 const hasGroups = computed(() => Object.keys(groups.value).length > 0)
+
+// ---------------------------------------------------------------------------
+// Sub-tabs — bucket the 7 raw API categories into 4 operator-friendly tabs
+// so the page doesn't require scrolling. `system` (currently only holds
+// posting-rules:research --platform=linkedin) is bucketed under LinkedIn for
+// v1 since the only seeded variant is linkedin-platform research. When future
+// IG/TT/FB research commands ship under `system`, split into a 5th tab.
+// ---------------------------------------------------------------------------
+const SUB_TABS = [
+  { id: 'content_engine', label: 'Content Engine', categories: ['content_engine'] },
+  { id: 'linkedin',       label: 'LinkedIn',       categories: ['linkedin', 'system'] },
+  { id: 'social',         label: 'Social Media',   categories: ['instagram', 'facebook', 'tiktok'] },
+  { id: 'newsletter',     label: 'Newsletter',     categories: ['newsletter'] },
+]
+
+const SUBTAB_STORAGE_KEY = 'admin:scheduler:subtab'
+
+const activeSubTab = ref(
+  (typeof localStorage !== 'undefined' && localStorage.getItem(SUBTAB_STORAGE_KEY))
+  || 'content_engine'
+)
+
+function setSubTab(id) {
+  if (!SUB_TABS.find(t => t.id === id)) return
+  activeSubTab.value = id
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(SUBTAB_STORAGE_KEY, id)
+  }
+}
+
+// Sub-tab strip data: id + label + total job count across the tab's categories
+const subTabsWithCounts = computed(() => SUB_TABS.map(tab => ({
+  ...tab,
+  count: tab.categories.reduce((sum, cat) => sum + (groups.value[cat]?.length || 0), 0),
+})))
+
+// Active sub-tab's groups as [category, rows] entries — preserves category
+// sub-headers within the tab (e.g. Social tab shows separate IG / FB / TT
+// sections)
+const visibleGroups = computed(() => {
+  const tab = SUB_TABS.find(t => t.id === activeSubTab.value)
+  if (!tab) return []
+  return tab.categories
+    .map(cat => [cat, groups.value[cat]])
+    .filter(([, rows]) => rows && rows.length > 0)
+})
 
 // Per-row pending markers — multiple rows may be in-flight concurrently
 const updatingIds = ref(new Set())
