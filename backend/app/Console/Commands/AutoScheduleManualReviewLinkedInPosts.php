@@ -87,6 +87,29 @@ class AutoScheduleManualReviewLinkedInPosts extends Command
                 continue;
             }
 
+            // Carousel readiness gate. A carousel draft must have every slide
+            // rendered (image_status='done' + image_url present) before it
+            // can be promoted to awaiting_publish — otherwise the publish-
+            // time cron either ships a broken post or fails the publish gate
+            // and we waste the scheduled slot. Dispatch image gen (idempotent)
+            // and skip so the next tick (or manual operator action) picks
+            // it up after slides finish.
+            if ($draft->format === 'carousel' && ! $this->carouselSlidesReady($draft)) {
+                $skipped++;
+                if (! $dryRun) {
+                    $this->triggerImageGenIfSlidesPending($draft);
+                }
+                $this->line(sprintf(
+                    '  skipped #%d (carousel slides not ready)',
+                    $draft->id
+                ));
+                Log::info('[linkedin:auto-schedule] skipped (carousel_slides_not_ready)', [
+                    'draft_id' => $draft->id,
+                    'slides' => $this->slideStatusBreakdown($draft),
+                ]);
+                continue;
+            }
+
             $slot = $this->scheduler->nextAvailableSlot(
                 Carbon::now(),
                 $assignedSlots,
@@ -220,6 +243,42 @@ class AutoScheduleManualReviewLinkedInPosts extends Command
         if ($draft->format === 'carousel') {
             $this->triggerImageGenIfSlidesPending($draft);
         }
+    }
+
+    /**
+     * Carousel readiness gate: every slide must have image_status='done'
+     * AND a non-empty image_url. If even one slide is pending/generating/
+     * failed, the draft is NOT ready for promotion to awaiting_publish.
+     */
+    private function carouselSlidesReady(LinkedInPost $draft): bool
+    {
+        $slides = $draft->carousel_slides ?? [];
+        if (empty($slides)) {
+            return false;
+        }
+        foreach ($slides as $slide) {
+            $status = $slide['image_status'] ?? null;
+            $url = $slide['image_url'] ?? null;
+            if ($status !== 'done' || empty($url)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Compact summary of slide statuses for log lines + Telegram dispatch.
+     * Returns ['done'=>3, 'failed'=>6, 'generating'=>1, ...].
+     */
+    private function slideStatusBreakdown(LinkedInPost $draft): array
+    {
+        $breakdown = ['total' => 0];
+        foreach ($draft->carousel_slides ?? [] as $slide) {
+            $status = (string) ($slide['image_status'] ?? 'pending');
+            $breakdown[$status] = ($breakdown[$status] ?? 0) + 1;
+            $breakdown['total']++;
+        }
+        return $breakdown;
     }
 
     /**

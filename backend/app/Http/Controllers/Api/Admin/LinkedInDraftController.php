@@ -311,6 +311,47 @@ class LinkedInDraftController extends Controller
             'publish_at' => ['nullable', 'date', 'after:now'],
         ]);
 
+        // Server-side carousel readiness gate. UI disables the approve
+        // button when slides aren't all rendered (carouselReadyForApprove
+        // in LinkedInQueueList.vue), but a curl/script bypass should hit
+        // the same wall — defense-in-depth. Skipping this check let auto-
+        // schedule cron + manual approve push half-rendered carousels into
+        // awaiting_publish, where the publish cron would either ship a
+        // broken post or fail and waste the slot.
+        if ($draft->format === 'carousel'
+            && $draft->status !== LinkedInPostStatus::AwaitingPublish->value) {
+            $slides = $draft->carousel_slides ?? [];
+            $notReady = empty($slides) || collect($slides)->contains(
+                fn ($s) => ($s['image_status'] ?? null) !== 'done' || empty($s['image_url'])
+            );
+            if ($notReady) {
+                // Self-heal: kick image gen now so the operator can come
+                // back and try again once slides finish. Idempotent.
+                try {
+                    \App\Jobs\GenerateLinkedInCarouselImages::dispatch($draft->id);
+                } catch (\Throwable $e) {
+                    Log::warning('[LinkedInDraft] approve gate dispatch failed (non-fatal)', [
+                        'draft_id' => $draft->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+                $done = collect($slides)->filter(
+                    fn ($s) => ($s['image_status'] ?? null) === 'done' && ! empty($s['image_url'])
+                )->count();
+                return response()->json([
+                    'success' => false,
+                    'error' => [
+                        'code' => 'carousel_not_ready',
+                        'message' => sprintf(
+                            'Cannot approve: only %d of %d slides rendered. Image regeneration has been re-dispatched — try again once all slides show "done".',
+                            $done,
+                            count($slides)
+                        ),
+                    ],
+                ], 409);
+            }
+        }
+
         try {
             $windowMinutes = (int) config('linkedin.cancel_window_minutes', 15);
             $publishAt = ! empty($validated['publish_at'])
