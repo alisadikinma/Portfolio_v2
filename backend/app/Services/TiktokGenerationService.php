@@ -144,8 +144,10 @@ class TiktokGenerationService extends BaseSocialGenerationService
             return null;
         }
 
-        $translation = $post->translations->firstWhere('language', 'en')
-            ?? $post->translations->firstWhere('language', 'id')
+        // Prefer ID translation (plugin v0.3.0+ authors Bahasa Indonesia by default).
+        // Fall back to EN for legacy posts authored before article-translate pipeline shipped.
+        $translation = $post->translations->firstWhere('language', 'id')
+            ?? $post->translations->firstWhere('language', 'en')
             ?? $post->translations->first();
 
         if ($translation === null) {

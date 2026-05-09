@@ -34,6 +34,7 @@ class InstagramPost extends Model
         'status',
         'title',
         'caption',
+        'text_only_caption',
         'hashtags',
         'scheduled_at',
         'published_at',

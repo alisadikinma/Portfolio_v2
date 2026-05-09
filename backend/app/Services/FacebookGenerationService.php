@@ -15,10 +15,12 @@ use Illuminate\Support\Facades\Log;
  * Format-aware branching (per plan decision — saves ~1 day vs `/facebook-gen`
  * skill):
  *
- *   - format='text'     → read $draft->linkedinPost->content directly,
- *                          truncate to 1900 chars if >2000 (defense — LinkedIn
- *                          sweet spot is 1100-1300 so ≥99% of input fits),
- *                          set link_url to the blog URL (FB algorithm REWARDS
+ *   - format='text'     → prefer $draft->linkedinPost->instagramPost->text_only_caption
+ *                          (Bahasa Indonesia, plugin v0.3.0+ FB-text variant authored
+ *                          when cross_post_targets includes 'facebook'). Fall back
+ *                          to truncated $draft->linkedinPost->content (English) for
+ *                          legacy drafts where IG didn't author text_only_caption.
+ *                          Set link_url to the blog URL (FB algorithm REWARDS
  *                          link-in-body — auto-renders preview card; opposite
  *                          of LinkedIn's 60% reach penalty). NO plugin call.
  *
@@ -96,7 +98,12 @@ class FacebookGenerationService extends BaseSocialGenerationService
     {
         if (!$draft->relationLoaded('linkedinPost')
             || !$draft->relationLoaded('post')) {
-            $draft->loadMissing(['linkedinPost', 'post']);
+            $draft->loadMissing(['linkedinPost.instagramPost', 'post']);
+        } else {
+            // Ensure instagramPost is eager-loaded for text_only_caption read below.
+            if ($draft->linkedinPost && !$draft->linkedinPost->relationLoaded('instagramPost')) {
+                $draft->linkedinPost->loadMissing('instagramPost');
+            }
         }
 
         $linkedinPost = $draft->linkedinPost;
@@ -111,18 +118,32 @@ class FacebookGenerationService extends BaseSocialGenerationService
             ];
         }
 
-        $sourceContent = trim((string) $linkedinPost->content);
-        if ($sourceContent === '') {
-            $this->markFailed($draft, 'Source LinkedIn content is empty');
-            return [
-                'success' => false,
-                'draft_id' => $draft->id,
-                'status' => FacebookPostStatus::Failed->value,
-                'error' => 'Empty source',
-            ];
-        }
+        // Prefer Bahasa Indonesia FB-text variant from IG plugin output (v0.3.0+).
+        // Falls back to truncated LinkedIn (English) content for legacy drafts where
+        // IG hadn't authored text_only_caption — honors the new ID-first brand strategy
+        // when available, accepts the EN fallback rather than blocking publish.
+        $instagramPost = $linkedinPost->instagramPost;
+        $textOnlyCaption = $instagramPost !== null
+            ? trim((string) ($instagramPost->text_only_caption ?? ''))
+            : '';
 
-        $caption = $this->fitForFacebookText($sourceContent);
+        if ($textOnlyCaption !== '') {
+            $caption = $textOnlyCaption;
+            $captionSource = 'instagram_post.text_only_caption';
+        } else {
+            $sourceContent = trim((string) $linkedinPost->content);
+            if ($sourceContent === '') {
+                $this->markFailed($draft, 'Source LinkedIn content is empty AND IG text_only_caption unavailable');
+                return [
+                    'success' => false,
+                    'draft_id' => $draft->id,
+                    'status' => FacebookPostStatus::Failed->value,
+                    'error' => 'Empty source',
+                ];
+            }
+            $caption = $this->fitForFacebookText($sourceContent);
+            $captionSource = 'linkedin_post.content_fallback';
+        }
 
         $appUrl = rtrim((string) config('app.url', 'https://alisadikinma.com'), '/');
         $linkUrl = $appUrl . '/blog/' . $post->slug;
@@ -148,7 +169,7 @@ class FacebookGenerationService extends BaseSocialGenerationService
                 $draft,
                 FacebookPostStatus::AwaitingReview,
                 'text_format_reuse_complete',
-                ['source' => 'linkedin_post.content']
+                ['source' => $captionSource]
             );
         } catch (\App\Exceptions\InvalidStateTransitionException $e) {
             Log::error('[FacebookGenerationService] FSM transition failed (text path)', [
@@ -263,8 +284,10 @@ class FacebookGenerationService extends BaseSocialGenerationService
             return null;
         }
 
-        $translation = $post->translations->firstWhere('language', 'en')
-            ?? $post->translations->firstWhere('language', 'id')
+        // Prefer ID translation (plugin v0.3.0+ authors Bahasa Indonesia by default).
+        // Fall back to EN for legacy posts authored before article-translate pipeline shipped.
+        $translation = $post->translations->firstWhere('language', 'id')
+            ?? $post->translations->firstWhere('language', 'en')
             ?? $post->translations->first();
 
         if ($translation === null) {

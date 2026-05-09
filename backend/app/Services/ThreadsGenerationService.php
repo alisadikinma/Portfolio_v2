@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Log;
  *     title: string (≤140 char preview-cut hook),
  *     caption: string (280-450 sweet, ≤500 hard cap),
  *     hashtags: string[] (0-3, max 3),
- *     language: 'id'|'en'|'mixed' (default 'mixed'),
+ *     language: 'id'|'en'|'mixed' (default 'id'),
  *     suggested_time_slot?: {...},
  *     validation: {...} }
  *
@@ -158,11 +158,11 @@ class ThreadsGenerationService extends BaseSocialGenerationService
             return null;
         }
 
-        // Prefer EN translation for the preview-cut hook (broader reach
-        // via global discovery per Threads playbook); body will be authored
-        // mixed ID+EN by the plugin per default language='mixed'.
-        $translation = $post->translations->firstWhere('language', 'en')
-            ?? $post->translations->firstWhere('language', 'id')
+        // Prefer ID translation (plugin v0.3.0+ authors Bahasa Indonesia by default —
+        // language='id' default; was 'mixed' in v0.2.0). Fall back to EN for legacy
+        // posts authored before article-translate pipeline shipped.
+        $translation = $post->translations->firstWhere('language', 'id')
+            ?? $post->translations->firstWhere('language', 'en')
             ?? $post->translations->first();
 
         if ($translation === null) {
@@ -194,7 +194,7 @@ class ThreadsGenerationService extends BaseSocialGenerationService
             'carousel_slides' => $format === 'carousel' ? $this->normalizeSlides($slides) : [],
             'format' => $format === 'carousel' ? 'photo_carousel' : 'text_only',
             'posting_time_options' => [],
-            'language' => 'mixed', // ID+EN bilingual default — plugin can override per content
+            'language' => 'id', // Bahasa Indonesia by default (plugin v0.3.0+); 'en'/'mixed' available as override
         ];
     }
 

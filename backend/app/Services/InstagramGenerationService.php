@@ -160,9 +160,12 @@ class InstagramGenerationService extends BaseSocialGenerationService
             return null;
         }
 
-        // Prefer EN translation (mirrors LinkedIn pipeline May 6 decision).
-        $translation = $post->translations->firstWhere('language', 'en')
-            ?? $post->translations->firstWhere('language', 'id')
+        // Prefer ID translation (plugin v0.3.0+ authors Bahasa Indonesia by default).
+        // LinkedIn pipeline keeps EN preference (separate audience target). Fall
+        // back to EN if ID missing for legacy posts authored before article-translate
+        // pipeline shipped.
+        $translation = $post->translations->firstWhere('language', 'id')
+            ?? $post->translations->firstWhere('language', 'en')
             ?? $post->translations->first();
 
         if ($translation === null) {
@@ -177,6 +180,14 @@ class InstagramGenerationService extends BaseSocialGenerationService
             return null;
         }
 
+        // cross_post_targets — signals to plugin which OPTIONAL output fields to author.
+        // When 'facebook' is present, plugin v0.3.0+ MUST author text_only_caption
+        // for FacebookGenerationService to reuse on FB text posts.
+        $crossPostTargets = $this->detectCrossPostTargets($linkedinPost);
+
+        $appUrl = rtrim((string) config('app.url', 'https://alisadikinma.com'), '/');
+        $blogUrl = $appUrl . '/blog/' . $post->slug;
+
         return [
             'blog' => [
                 'title' => $title,
@@ -184,12 +195,36 @@ class InstagramGenerationService extends BaseSocialGenerationService
                 'excerpt' => $excerpt !== '' ? $excerpt : null,
                 'meta_keywords' => $metaKeywords !== '' ? $metaKeywords : null,
                 'slug' => $post->slug,
+                // blog_url consumed by text_only_caption when authored (FB body URL OK)
+                'blog_url' => $blogUrl,
             ],
             'content_idea' => $this->buildContentIdeaPayload($post),
             'carousel_slides' => $this->normalizeSlides($slides),
             'format' => 'photo_carousel',
             'posting_time_options' => [], // Phase D scanner will pre-query posting_time_rules
+            'cross_post_targets' => $crossPostTargets,
         ];
+    }
+
+    /**
+     * Detect which downstream platforms reuse this IG output.
+     *
+     * Returns ['facebook'] when a FacebookPost sibling exists for the same
+     * source LinkedInPost — plugin then authors text_only_caption that
+     * FacebookGenerationService::generateText reads.
+     *
+     * @return array<int, string>
+     */
+    private function detectCrossPostTargets(\App\Models\LinkedInPost $linkedinPost): array
+    {
+        if (!$linkedinPost->relationLoaded('facebookPost')) {
+            $linkedinPost->loadMissing('facebookPost');
+        }
+        $targets = [];
+        if ($linkedinPost->facebookPost !== null) {
+            $targets[] = 'facebook';
+        }
+        return $targets;
     }
 
     private function buildContentIdeaPayload(\App\Models\Post $post): ?array
@@ -253,6 +288,11 @@ class InstagramGenerationService extends BaseSocialGenerationService
     {
         $title = (string) ($parsed['title'] ?? '');
         $caption = (string) ($parsed['caption'] ?? '');
+        // OPTIONAL — plugin v0.3.0+ authors this when input has cross_post_targets=['facebook'].
+        // FacebookGenerationService::generateText reads it for FB text-post reuse.
+        $textOnlyCaption = isset($parsed['text_only_caption']) && is_string($parsed['text_only_caption'])
+            ? trim($parsed['text_only_caption'])
+            : null;
         $hashtags = is_array($parsed['hashtags'] ?? null) ? $parsed['hashtags'] : [];
         $validation = is_array($parsed['validation'] ?? null) ? $parsed['validation'] : [];
         $passed = (bool) ($validation['passed'] ?? false);
@@ -277,6 +317,7 @@ class InstagramGenerationService extends BaseSocialGenerationService
         $draft->update([
             'title' => $title,
             'caption' => $caption,
+            'text_only_caption' => $textOnlyCaption !== '' ? $textOnlyCaption : null,
             'hashtags' => array_values(array_map('strval', $hashtags)),
         ]);
 
