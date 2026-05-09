@@ -7,25 +7,43 @@ use App\Models\ThreadsPost;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Threads cross-post caption authoring (May 10, 2026 ship).
+ * Bridges Portfolio_v2 backend to the `social-short-form-writer` plugin's
+ * `/threads-gen` skill (https://github.com/alisadikinma/social-short-form-writer).
  *
- * Tier-2 platform — pure reuse, NO plugin call (saves /instagram-gen SSH
- * spend per draft). Trade-off: caption is a Threads-tone-transformed
- * LinkedIn caption, not a fresh first-line-hook authored by an LLM.
- * Acceptable for v1 since:
- *   - Threads sweet spot 280-500 char (LinkedIn 1100-1300 truncates cleanly)
- *   - Threads minimal hashtag culture (1-3) — strip LinkedIn's 5+
- *   - Threads carousel reuses same 4:5 PNGs from /carousel-gen (already rendered)
+ * Plugin emits ONE JSON envelope to stdout matching `ThreadsOutputEnvelopeSchema`:
+ *   { status: 'complete'|'failed',
+ *     title: string (≤140 char preview-cut hook),
+ *     caption: string (280-450 sweet, ≤500 hard cap),
+ *     hashtags: string[] (0-3, max 3),
+ *     language: 'id'|'en'|'mixed' (default 'mixed'),
+ *     suggested_time_slot?: {...},
+ *     validation: {...} }
  *
- * If engagement data later justifies a dedicated /threads-gen plugin, this
- * service can be swapped for an LLM-call version mirroring InstagramGenerationService.
+ * Per the plugin design, hard rules enforced by Zod:
+ *   - hashtags 0-3 (Threads minimal hashtag culture, 4+ = spam signal)
+ *   - caption ≤500 chars (Threads platform limit)
+ *   - title ≤140 chars (preview-cut "more" cutoff)
+ *   - NO URL in caption (Threads de-prioritizes body links)
  *
- * FSM:
- *   PendingGeneration|Failed|Cancelled → Generating → AwaitingReview
- *                                                ↘ Failed (any error)
+ * Tone: Pro-but-conversational (NEVER lowercase Gen-Z slang).
+ * Language: ID+EN bilingual mix by default — hook in English (preview reach),
+ * body mixed (cultural shorthand), engagement question in Indonesian.
+ *
+ * Execution is SYNCHRONOUS from this service's perspective — the plugin runs
+ * ~30-60s on the VPS. Always invoke from a queued `GenerateThreadsPost` job.
+ *
+ * FSM: PendingGeneration|Failed|Cancelled → Generating → AwaitingReview
+ *      (validation.passed=true) | Failed (validation.passed=false or any error)
+ *
+ * Upgraded from Tier-2 reuse (May 10 first commit) to Tier-1 native plugin
+ * (May 10 second commit) — Gen Z target market justifies dedicated authoring
+ * over LinkedIn-truncate-and-trim shortcut.
  */
-class ThreadsGenerationService
+class ThreadsGenerationService extends BaseSocialGenerationService
 {
+    protected string $skillName = 'threads-gen';
+    protected string $refsConfigKey = 'social-cross-post.generation.refs_threads';
+
     public function __construct(
         private readonly PipelineGuard $guard,
     ) {
@@ -56,57 +74,211 @@ class ThreadsGenerationService
             ];
         }
 
-        if (!$draft->relationLoaded('linkedinPost')) {
-            $draft->loadMissing('linkedinPost');
+        $input = $this->buildPluginInput($draft);
+        if ($input === null) {
+            $this->markFailed($draft, 'Cannot build plugin input — LinkedIn post or blog translation missing');
+            return [
+                'success' => false,
+                'draft_id' => $draft->id,
+                'status' => ThreadsPostStatus::Failed->value,
+                'error' => 'Source LinkedIn post or translation missing',
+            ];
         }
+
+        try {
+            $result = $this->invokePlugin($input, $draft->id);
+        } catch (\Throwable $e) {
+            $errMsg = 'SSH dispatch threw: ' . $e->getMessage();
+            $this->markFailed($draft, $errMsg);
+            return [
+                'success' => false,
+                'draft_id' => $draft->id,
+                'status' => ThreadsPostStatus::Failed->value,
+                'error' => $errMsg,
+            ];
+        }
+
+        if (!$result['success']) {
+            $errMsg = $result['error'] ?? 'Plugin invocation failed';
+            $this->markFailed($draft, $errMsg);
+            return [
+                'success' => false,
+                'draft_id' => $draft->id,
+                'status' => ThreadsPostStatus::Failed->value,
+                'error' => $errMsg,
+            ];
+        }
+
+        $parsed = $this->parseOrchestratorOutput($result['stdout']);
+        if ($parsed === null) {
+            $this->markFailed($draft, 'Could not parse /threads-gen JSON from stdout');
+            return [
+                'success' => false,
+                'draft_id' => $draft->id,
+                'status' => ThreadsPostStatus::Failed->value,
+                'error' => 'Invalid JSON from plugin',
+            ];
+        }
+
+        if (($parsed['status'] ?? null) === 'failed') {
+            $errMsg = $parsed['error'] ?? 'Plugin reported failed without message';
+            if (is_array($errMsg)) {
+                $errMsg = json_encode($errMsg);
+            }
+            $this->markFailed($draft, "Plugin failed: {$errMsg}");
+            return [
+                'success' => false,
+                'draft_id' => $draft->id,
+                'status' => ThreadsPostStatus::Failed->value,
+                'error' => (string) $errMsg,
+            ];
+        }
+
+        return $this->persistAndRoute($draft, $parsed);
+    }
+
+    /**
+     * Build the input payload shipped to the plugin via SSH.
+     *
+     * Threads accepts both text and carousel formats — pass slides when
+     * format=carousel (LinkedIn carousel reuse) so the plugin can reference
+     * slide context in the caption. For text format, slides[] is empty.
+     */
+    public function buildPluginInput(ThreadsPost $draft): ?array
+    {
+        if (!$draft->relationLoaded('linkedinPost')
+            || !$draft->relationLoaded('post')
+            || ($draft->post && !$draft->post->relationLoaded('translations'))) {
+            $draft->loadMissing(['linkedinPost', 'post.translations']);
+        }
+
+        $post = $draft->post;
         $linkedinPost = $draft->linkedinPost;
-        if ($linkedinPost === null) {
-            $this->markFailed($draft, 'Source LinkedIn post missing');
-            return [
-                'success' => false,
-                'draft_id' => $draft->id,
-                'status' => ThreadsPostStatus::Failed->value,
-                'error' => 'Source missing',
-            ];
+        if ($post === null || $linkedinPost === null) {
+            return null;
         }
 
-        $sourceContent = trim((string) $linkedinPost->content);
-        if ($sourceContent === '') {
-            $this->markFailed($draft, 'Source LinkedIn content is empty');
-            return [
-                'success' => false,
-                'draft_id' => $draft->id,
-                'status' => ThreadsPostStatus::Failed->value,
-                'error' => 'Empty source',
-            ];
+        // Prefer EN translation for the preview-cut hook (broader reach
+        // via global discovery per Threads playbook); body will be authored
+        // mixed ID+EN by the plugin per default language='mixed'.
+        $translation = $post->translations->firstWhere('language', 'en')
+            ?? $post->translations->firstWhere('language', 'id')
+            ?? $post->translations->first();
+
+        if ($translation === null) {
+            return null;
         }
 
-        $caption = $this->fitForThreads($sourceContent);
+        $title = trim((string) $translation->title);
+        $excerpt = trim((string) ($translation->excerpt ?? ''));
+        $metaKeywords = trim((string) ($translation->meta_keywords ?? ''));
 
-        $hashtags = is_array($linkedinPost->hashtags ?? null)
-            ? array_slice(array_values(array_map('strval', $linkedinPost->hashtags)), 0, 3)
+        if ($title === '') {
+            return null;
+        }
+
+        $format = (string) ($draft->format ?? 'text');
+        $slides = is_array($linkedinPost->carousel_slides ?? null)
+            ? $linkedinPost->carousel_slides
             : [];
 
-        $title = trim((string) $linkedinPost->title);
-        if ($title === '') {
-            $title = $this->extractFirstLine($caption);
+        return [
+            'blog' => [
+                'title' => $title,
+                'content' => $this->stripHtmlToText((string) $translation->content),
+                'excerpt' => $excerpt !== '' ? $excerpt : null,
+                'meta_keywords' => $metaKeywords !== '' ? $metaKeywords : null,
+                'slug' => $post->slug,
+            ],
+            'content_idea' => $this->buildContentIdeaPayload($post),
+            'carousel_slides' => $format === 'carousel' ? $this->normalizeSlides($slides) : [],
+            'format' => $format === 'carousel' ? 'photo_carousel' : 'text_only',
+            'posting_time_options' => [],
+            'language' => 'mixed', // ID+EN bilingual default — plugin can override per content
+        ];
+    }
+
+    private function buildContentIdeaPayload(\App\Models\Post $post): ?array
+    {
+        if (!$post->relationLoaded('contentIdea')) {
+            $post->loadMissing('contentIdea');
         }
+        $idea = $post->contentIdea;
+        if ($idea === null) {
+            return null;
+        }
+        return [
+            'pillar' => $idea->pillar,
+            'virality_score' => $idea->virality_score,
+        ];
+    }
+
+    private function normalizeSlides(array $slides): array
+    {
+        $normalized = [];
+        foreach ($slides as $slide) {
+            if (!is_array($slide)) {
+                continue;
+            }
+            $normalized[] = [
+                'slide_number' => (int) ($slide['slide_number'] ?? count($normalized) + 1),
+                'layout_hint' => (string) ($slide['layout_hint'] ?? 'body'),
+                'copy_id' => $slide['copy_id'] ?? null,
+                'copy_en' => $slide['copy_en'] ?? null,
+                'image_url' => (string) ($slide['image_url'] ?? ''),
+            ];
+        }
+        return $normalized;
+    }
+
+    private function stripHtmlToText(string $html): string
+    {
+        $text = preg_replace('/<\/(p|div|h[1-6]|li|blockquote|br)\s*>/i', "\n\n", $html);
+        $text = preg_replace('/<br\s*\/?>/i', "\n", (string) $text);
+        $text = strip_tags((string) $text);
+        $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $text = preg_replace("/\n{3,}/", "\n\n", (string) $text);
+        return trim((string) $text);
+    }
+
+    /**
+     * Persist plugin output + advance FSM.
+     *
+     * Routing:
+     *   validation.passed=true  → AwaitingReview (+ optional cascade to Publishing)
+     *   validation.passed=false → Failed (validation surfaced via last_error)
+     */
+    protected function persistAndRoute(ThreadsPost $draft, array $parsed): array
+    {
+        $title = (string) ($parsed['title'] ?? '');
+        $caption = (string) ($parsed['caption'] ?? '');
+        $hashtags = is_array($parsed['hashtags'] ?? null) ? $parsed['hashtags'] : [];
+        $validation = is_array($parsed['validation'] ?? null) ? $parsed['validation'] : [];
+        $passed = (bool) ($validation['passed'] ?? false);
 
         $draft->update([
             'title' => mb_substr($title, 0, 200),
             'caption' => $caption,
-            'hashtags' => $hashtags,
+            'hashtags' => array_slice(array_values(array_map('strval', $hashtags)), 0, 3),
         ]);
 
+        if (!$passed) {
+            $failures = is_array($validation['failures'] ?? null)
+                ? implode('; ', array_map('strval', $validation['failures']))
+                : 'Plugin validation reported passed=false without failure list';
+            $this->markFailed($draft, "Validation failed: {$failures}");
+            return [
+                'success' => false,
+                'draft_id' => $draft->id,
+                'status' => ThreadsPostStatus::Failed->value,
+                'error' => $failures,
+            ];
+        }
+
         try {
-            $this->guard->advance(
-                $draft,
-                ThreadsPostStatus::AwaitingReview,
-                'reuse_complete',
-                ['source' => 'linkedin_post.content', 'format' => $draft->format]
-            );
+            $this->guard->advance($draft, ThreadsPostStatus::AwaitingReview, 'generation_complete');
         } catch (\App\Exceptions\InvalidStateTransitionException $e) {
-            Log::error('[ThreadsGenerationService] FSM transition failed', [
+            Log::error('[ThreadsGenerationService] FSM transition Generating→AwaitingReview failed', [
                 'draft_id' => $draft->id,
                 'error' => $e->getMessage(),
             ]);
@@ -117,85 +289,21 @@ class ThreadsGenerationService
             ];
         }
 
-        $this->maybeCascadeToPublisher($draft);
+        // Publish-all cascade (May 10 ship). When parent LinkedIn flagged
+        // auto_approve_cross_posts, advance AwaitingReview → Publishing
+        // and dispatch Publer. Idempotent + non-fatal.
+        $this->maybeCascadeToPublisher(
+            $draft,
+            ThreadsPostStatus::Publishing,
+            ThreadsPost::class,
+            $this->guard
+        );
 
         return [
             'success' => true,
             'draft_id' => $draft->id,
             'status' => $draft->fresh()->status ?? ThreadsPostStatus::AwaitingReview->value,
         ];
-    }
-
-    /**
-     * Inline cascade — Threads service doesn't extend BaseSocialGenerationService
-     * (no plugin invocation needed) so we replicate the publish-all check
-     * locally. Same behavior: when parent LinkedIn has auto_approve_cross_posts
-     * set, advance AwaitingReview → Publishing + dispatch Publer. Non-fatal.
-     */
-    private function maybeCascadeToPublisher(ThreadsPost $draft): void
-    {
-        try {
-            if (!$draft->relationLoaded('linkedinPost')) {
-                $draft->loadMissing('linkedinPost');
-            }
-            $linkedinPost = $draft->linkedinPost;
-            if ($linkedinPost === null || !$linkedinPost->shouldAutoApproveCrossPosts()) {
-                return;
-            }
-
-            $this->guard->advance(
-                $draft,
-                ThreadsPostStatus::Publishing,
-                'auto_approve_cascade',
-                ['source' => 'linkedin_publish_all_flag']
-            );
-
-            \App\Jobs\PublishViaPubler::dispatch(ThreadsPost::class, $draft->id);
-
-            Log::info('[ThreadsGenerationService] Cascade promoted to Publishing', [
-                'draft_id' => $draft->id,
-            ]);
-        } catch (\Throwable $e) {
-            Log::warning('[ThreadsGenerationService] Cascade promotion failed (non-fatal)', [
-                'draft_id' => $draft->id,
-                'error' => $e->getMessage(),
-            ]);
-        }
-    }
-
-    /**
-     * Threads sweet spot 280-500 char. Hard cap 1000.
-     * Strategy: take first paragraph (typically the hook + setup),
-     * truncate at sentence boundary nearest to 480 char.
-     */
-    private function fitForThreads(string $content): string
-    {
-        $content = trim($content);
-        if (mb_strlen($content) <= 500) {
-            return $content;
-        }
-
-        // Keep up to first ~480 char, prefer to break at sentence terminator.
-        $window = mb_substr($content, 0, 500);
-        $lastPeriod = max(
-            mb_strrpos($window, '.'),
-            mb_strrpos($window, '!'),
-            mb_strrpos($window, '?'),
-            mb_strrpos($window, "\n\n")
-        );
-
-        if ($lastPeriod !== false && $lastPeriod >= 200) {
-            return rtrim(mb_substr($content, 0, $lastPeriod + 1));
-        }
-
-        // No good break — hard truncate with ellipsis
-        return rtrim(mb_substr($content, 0, 497)) . '...';
-    }
-
-    private function extractFirstLine(string $text): string
-    {
-        $first = trim(strtok($text, "\n"));
-        return $first !== '' ? $first : '';
     }
 
     private function markFailed(ThreadsPost $draft, string $reason): void

@@ -47,6 +47,9 @@ return [
         // refs file).
         'refs_instagram' => env('SOCIAL_GEN_REFS_INSTAGRAM', '/home/claudesn/refs-instagram.md'),
         'refs_tiktok' => env('SOCIAL_GEN_REFS_TIKTOK', '/home/claudesn/refs-tiktok.md'),
+        // refs_threads — May 10, 2026 Tier-1 upgrade. /threads-gen plugin
+        // (~21KB compiled bundle) lives alongside IG + TikTok refs on VPS.
+        'refs_threads' => env('SOCIAL_GEN_REFS_THREADS', '/home/claudesn/refs-threads.md'),
         // Empty MCP config — same protective override as LinkedIn pipeline
         // (CLAUDE.md April 29 entry). Without this, every `claude -p`
         // invocation spawns the operator's full MCP stack and obsidian-mcp
