@@ -79,6 +79,16 @@ const platformPostFor = (key) => {
 const activePlatformPost = computed(() => platformPostFor(activePlatform.value))
 const activePlatformExists = computed(() => activePlatformPost.value !== null)
 
+// Template ref for the caption tab nav so the top "Fanned out" chips
+// can scroll the operator down to the swapped caption after activating.
+const captionTabsRef = ref(null)
+function activatePlatformAndScroll(key) {
+  activePlatform.value = key
+  nextTick(() => {
+    captionTabsRef.value?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  })
+}
+
 const updateMutation = useUpdateLinkedInDraft()
 const approveMutation = useApproveLinkedInDraft()
 const cancelMutation = useCancelLinkedInDraft()
@@ -836,14 +846,13 @@ const showThumbnailUploadCaption = computed(() =>
             </div>
 
             <!-- Cross-post fan-out reminder (Q3.3 minimal badge cluster).
-                 Static informational chips that link to the corresponding
-                 platform queue. Scanner cron auto-fans-out every 2 min
-                 only AFTER LinkedIn reaches awaiting_publish or published,
-                 so we gate the cluster on those two FSM states — showing
-                 "Fanned out" on a pending/generating/failed/cancelled
-                 draft would mislead the operator since no fan-out has
-                 happened (or is going to happen) for those states.
-                 Carousel format fans to FB+IG+TT; text format fans to FB. -->
+                 Clicking a chip activates the matching tab in the caption
+                 section below + scrolls there — instead of router-link
+                 navigating away (which used to dump operators into the
+                 Facebook/Instagram/TikTok Queue List page, breaking the
+                 "stay in detail" mental model). Gated on awaiting_publish
+                 / published FSM states because the scanner cron only fans
+                 out after approval. Carousel → FB+IG+TT; text → FB only. -->
             <div
               v-if="(draft.format === 'carousel' || draft.format === 'text')
                 && (draft.status === 'awaiting_publish' || draft.status === 'published')"
@@ -852,34 +861,37 @@ const showThumbnailUploadCaption = computed(() =>
               <span class="font-mono uppercase tracking-[0.14em] text-neutral-500 mr-1">
                 Fanned out:
               </span>
-              <router-link
-                to="/admin/facebook-queue"
-                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-blue-400/30 bg-blue-500/5 text-blue-300 hover:bg-blue-500/15 hover:text-blue-200 transition"
-                title="Open Facebook queue"
+              <button
+                type="button"
+                @click="activatePlatformAndScroll('facebook')"
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-blue-400/30 bg-blue-500/5 text-blue-300 hover:bg-blue-500/15 hover:text-blue-200 transition cursor-pointer"
+                title="Show Facebook caption below"
               >
                 <span class="w-1.5 h-1.5 rounded-full bg-blue-400" />
                 Facebook
-              </router-link>
+              </button>
               <template v-if="draft.format === 'carousel'">
-                <router-link
-                  to="/admin/instagram-queue"
-                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-fuchsia-400/30 bg-fuchsia-500/5 text-fuchsia-300 hover:bg-fuchsia-500/15 hover:text-fuchsia-200 transition"
-                  title="Open Instagram queue"
+                <button
+                  type="button"
+                  @click="activatePlatformAndScroll('instagram')"
+                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-fuchsia-400/30 bg-fuchsia-500/5 text-fuchsia-300 hover:bg-fuchsia-500/15 hover:text-fuchsia-200 transition cursor-pointer"
+                  title="Show Instagram caption below"
                 >
                   <span class="w-1.5 h-1.5 rounded-full bg-fuchsia-400" />
                   Instagram
-                </router-link>
-                <router-link
-                  to="/admin/tiktok-queue"
-                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-rose-400/30 bg-rose-500/5 text-rose-300 hover:bg-rose-500/15 hover:text-rose-200 transition"
-                  title="Open TikTok queue"
+                </button>
+                <button
+                  type="button"
+                  @click="activatePlatformAndScroll('tiktok')"
+                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-rose-400/30 bg-rose-500/5 text-rose-300 hover:bg-rose-500/15 hover:text-rose-200 transition cursor-pointer"
+                  title="Show TikTok caption below"
                 >
                   <span class="w-1.5 h-1.5 rounded-full bg-rose-400" />
                   TikTok
-                </router-link>
+                </button>
               </template>
               <span class="ml-1 text-neutral-600 hidden sm:inline">
-                · scanner runs every 2 min after approve
+                · click to view caption below
               </span>
             </div>
 
@@ -1532,7 +1544,7 @@ const showThumbnailUploadCaption = computed(() =>
                    once via /carousel-gen, reused for FB/IG/TikTok). Click
                    does NOT navigate; it toggles the active platform copy
                    below. -->
-              <div class="pt-3 border-t border-neutral-800/60">
+              <div ref="captionTabsRef" class="pt-3 border-t border-neutral-800/60">
                 <nav
                   class="inline-flex flex-wrap gap-1 rounded-lg border border-neutral-700/60 bg-neutral-950/40 p-1"
                   role="tablist"
