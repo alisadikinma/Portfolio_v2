@@ -1276,6 +1276,20 @@ LINKEDIN_OAUTH_REDIRECT_URI=https://alisadikinma.com/api/admin/linkedin/oauth/ca
           </form>
         </BaseCard>
       </section>
+
+      <!-- ================================================================ -->
+      <!-- TAB: Scheduler & Cron Jobs                                       -->
+      <!-- ================================================================ -->
+      <section
+        v-show="activeTab === 'scheduler'"
+        role="tabpanel"
+        id="tab-panel-scheduler"
+        aria-labelledby="tab-scheduler"
+      >
+        <BaseCard>
+          <SchedulerSettings />
+        </BaseCard>
+      </section>
     </div>
   </div>
 </template>
@@ -1289,6 +1303,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useSettings } from '@/composables/useSettings'
 import BaseCard from '@/components/base/BaseCard.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
+import SchedulerSettings from './SchedulerSettings.vue'
 import {
   useLinkedInAccounts,
   useLinkedInSettings,
@@ -1315,6 +1330,7 @@ const tabs = [
   { id: 'email',    label: 'Email (SMTP)' },
   { id: 'telegram', label: 'Telegram' },
   { id: 'cv',       label: 'CV Export' },
+  { id: 'scheduler', label: 'Scheduler' },
 ]
 const tabIds = tabs.map(t => t.id)
 

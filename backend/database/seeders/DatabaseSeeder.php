@@ -36,6 +36,7 @@ class DatabaseSeeder extends Seeder
             PublerSettingsSeeder::class, // publer cross-post integration — api_key (encrypted) + 3 account IDs + master toggle
             BlogPromoSettingsSeeder::class, // blog.blog_promo_project_id for mid-article promo rotator
             CvSettingsSeeder::class, // /api/cv/export schema_version 2.0.0 — summary_variants, work_experience, skills_matrix, education
+            ScheduledCommandSeeder::class, // /admin/scheduler tab — 14 real artisan commands + 4 IG/FB/TikTok placeholders
         ]);
 
         $this->command->info('✅ Database seeding completed successfully!');

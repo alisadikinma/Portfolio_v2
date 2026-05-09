@@ -1304,6 +1304,20 @@ Route::middleware(['auth:sanctum'])->prefix('admin/posting-rules')->group(functi
         ->name('admin.posting-rules.refresh');
 });
 
+// ============================================================================
+// Admin Scheduler — operator-toggleable artisan schedule inventory.
+// Per docs/plans/2026-05-09-admin-scheduler-tab.md Phase E.
+// {cmd} resolves via default ID-based route-model binding to ScheduledCommand.
+// ============================================================================
+Route::middleware(['auth:sanctum'])->prefix('admin/scheduler')->group(function () {
+    Route::get('/', [\App\Http\Controllers\Api\Admin\SchedulerController::class, 'index'])
+        ->name('admin.scheduler.index');
+    Route::put('/{cmd}', [\App\Http\Controllers\Api\Admin\SchedulerController::class, 'update'])
+        ->name('admin.scheduler.update');
+    Route::post('/{cmd}/run', [\App\Http\Controllers\Api\Admin\SchedulerController::class, 'run'])
+        ->name('admin.scheduler.run');
+});
+
 // OAuth flow. `connect` is admin-only; `callback` is public (LinkedIn
 // redirects the browser here, then we redirect to the admin settings page).
 Route::middleware(['auth:sanctum'])->prefix('admin/linkedin')->group(function () {
