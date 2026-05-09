@@ -115,6 +115,15 @@ echo "▶ php artisan db:seed cv (idempotent)"
 php artisan db:seed --class=CvSettingsSeeder --force || \
   echo "  (seeder failed or already applied — continuing)"
 
+# Admin Scheduler (May 9, 2026): seeds 14 real artisan commands + 4 IG/FB/TikTok
+# placeholder rows into scheduled_commands. DynamicScheduleRegistrar reads this
+# table to materialize the cron schedule (replaces hardcoded routes/console.php
+# entries). Idempotent via firstOrCreate — operator-edited cron expressions and
+# enabled flags survive deploys.
+echo "▶ php artisan db:seed scheduled_commands (idempotent)"
+php artisan db:seed --class=ScheduledCommandSeeder --force || \
+  echo "  (seeder failed or already applied — continuing)"
+
 # ---- 4. Cache refresh --------------------------------------------------------
 echo "▶ Laravel cache refresh"
 php artisan config:clear
