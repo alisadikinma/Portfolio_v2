@@ -791,6 +791,54 @@ const showThumbnailUploadCaption = computed(() =>
               </span>
             </div>
 
+            <!-- Cross-post fan-out reminder (Q3.3 minimal badge cluster).
+                 Static informational chips that link to the corresponding
+                 platform queue. Scanner cron auto-fans-out every 2 min
+                 only AFTER LinkedIn reaches awaiting_publish or published,
+                 so we gate the cluster on those two FSM states — showing
+                 "Fanned out" on a pending/generating/failed/cancelled
+                 draft would mislead the operator since no fan-out has
+                 happened (or is going to happen) for those states.
+                 Carousel format fans to FB+IG+TT; text format fans to FB. -->
+            <div
+              v-if="(draft.format === 'carousel' || draft.format === 'text')
+                && (draft.status === 'awaiting_publish' || draft.status === 'published')"
+              class="flex flex-wrap items-center gap-1.5 text-[11px]"
+            >
+              <span class="font-mono uppercase tracking-[0.14em] text-neutral-500 mr-1">
+                Fanned out:
+              </span>
+              <router-link
+                to="/admin/facebook-queue"
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-blue-400/30 bg-blue-500/5 text-blue-300 hover:bg-blue-500/15 hover:text-blue-200 transition"
+                title="Open Facebook queue"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                Facebook
+              </router-link>
+              <template v-if="draft.format === 'carousel'">
+                <router-link
+                  to="/admin/instagram-queue"
+                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-fuchsia-400/30 bg-fuchsia-500/5 text-fuchsia-300 hover:bg-fuchsia-500/15 hover:text-fuchsia-200 transition"
+                  title="Open Instagram queue"
+                >
+                  <span class="w-1.5 h-1.5 rounded-full bg-fuchsia-400" />
+                  Instagram
+                </router-link>
+                <router-link
+                  to="/admin/tiktok-queue"
+                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-rose-400/30 bg-rose-500/5 text-rose-300 hover:bg-rose-500/15 hover:text-rose-200 transition"
+                  title="Open TikTok queue"
+                >
+                  <span class="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                  TikTok
+                </router-link>
+              </template>
+              <span class="ml-1 text-neutral-600 hidden sm:inline">
+                · scanner runs every 2 min after approve
+              </span>
+            </div>
+
             <!-- Operator-facing sentence (suppressed when live progress panel is active) -->
             <p
               v-if="!showProgressPanel"

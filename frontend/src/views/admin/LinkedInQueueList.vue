@@ -18,6 +18,7 @@ import {
   QUEUE_TAB_KEY,
   ICON,
 } from './linkedinHelpers'
+import SocialPlatformTabs from '@/components/admin/SocialPlatformTabs.vue'
 
 const router = useRouter()
 
@@ -257,6 +258,12 @@ const emptyMessage = computed(() => ({
         View shipped posts
       </router-link>
     </header>
+
+    <!-- Platform switcher — Phase 4 cross-post unification.
+         current is hard-coded "linkedin" because this view only handles
+         LinkedIn drafts; clicking another platform navigates to that
+         platform's dedicated queue route (CrossPostList in queue mode). -->
+    <SocialPlatformTabs current="linkedin" mode="queue" />
 
     <!-- Tab rail (segmented control style, not generic pills) -->
     <nav class="flex flex-wrap gap-1 p-1 rounded-xl bg-neutral-900/50 border border-neutral-800/80 w-max max-w-full">

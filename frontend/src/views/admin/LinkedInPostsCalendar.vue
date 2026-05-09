@@ -1,11 +1,12 @@
 <script setup>
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, toRef } from 'vue'
 import { useRouter } from 'vue-router'
 import {
-  useLinkedInCalendar,
   usePostingRules,
   useRefreshPostingRules,
 } from '@/composables/useLinkedInDrafts'
+import { useSocialCalendar } from '@/composables/useSocialCalendar'
+import SocialPlatformTabs from '@/components/admin/SocialPlatformTabs.vue'
 import {
   effectiveStatusMeta,
   MOOD_CLASSES,
@@ -16,19 +17,40 @@ import {
 } from './linkedinHelpers'
 
 /**
- * Calendar view for /admin/linkedin-posts.
+ * Generalized Posts calendar — used by LinkedIn + Facebook + Instagram +
+ * TikTok via the `platform` prop. Originally LinkedIn-only; Phase 3 of
+ * the cross-post sprint widened it to all 4 platforms with a shared
+ * SocialPlatformTabs strip + per-platform calendar feed via
+ * useSocialCalendar().
  *
- * Replaces the previous card grid (LinkedInPostsList.vue, archived as
- * .list-archive.vue) with a temporal layout that surfaces what's shipping
- * when. Per docs/plans/2026-05-06-linkedin-calendar-and-ai-time-rules.md §3.
+ * Per the brainstorm: 1 platform active at a time (B1) — switching tabs
+ * navigates to that platform's `/admin/{platform}-posts` route.
  *
  * Three view modes via toolbar toggle:
  *   - month: 7×6 grid with cell-click side panel
  *   - list:  card grid fallback (escape hatch when calendar grain is wrong)
  *
- * Heatmap (subtle 0-15% opacity tint) is sourced from posting_time_rules.
- * Side panel shows AI-recommended best slots for that day-of-week.
+ * Heatmap (subtle 0-15% opacity tint) is sourced from posting_time_rules
+ * keyed on the current platform. When no rules exist for the active
+ * platform (FB/IG/TikTok haven't been seeded yet on production VPS),
+ * the heatmap shows nothing and an empty-state hint surfaces the
+ * `posting-rules:research --platform=X` command operators need to run.
  */
+
+const props = defineProps({
+  platform: {
+    type: String,
+    default: 'linkedin',
+    validator: (v) => ['linkedin', 'facebook', 'instagram', 'tiktok'].includes(v),
+  },
+})
+
+const platformRef = toRef(props, 'platform')
+
+// Route resolver for the "go to Queue" link in the header. Every
+// platform has its own dedicated /admin/{platform}-queue route — see
+// router/index.js Phase 4 entries.
+const queueRouteForPlatform = computed(() => `/admin/${platformRef.value}-queue`)
 
 const router = useRouter()
 
@@ -117,13 +139,22 @@ const gridCells = computed(() => buildMonthGrid(cursorYear.value, cursorMonth.va
 // View mode + status filter
 // ---------------------------------------------------------------------------
 
-const VIEW_KEY = 'linkedin:calendar:view-mode'
+// View mode preference is platform-namespaced so operators can keep
+// LinkedIn on `month` while triaging Instagram on `list` (or whatever
+// they prefer per platform).
+const VIEW_KEY = computed(() => `${platformRef.value}:calendar:view-mode`)
 const viewMode = ref('month') // 'month' | 'list'
 onMounted(() => {
-  const saved = sessionStorage.getItem(VIEW_KEY)
+  const saved = sessionStorage.getItem(VIEW_KEY.value)
   if (saved === 'list' || saved === 'month') viewMode.value = saved
 })
-watch(viewMode, (v) => sessionStorage.setItem(VIEW_KEY, v))
+watch(viewMode, (v) => sessionStorage.setItem(VIEW_KEY.value, v))
+// Reload preference when platform changes — different per-platform
+// tabs may have different last-used view modes.
+watch(VIEW_KEY, (key) => {
+  const saved = sessionStorage.getItem(key)
+  viewMode.value = (saved === 'list' || saved === 'month') ? saved : 'month'
+})
 
 const STATUS_TABS = [
   { key: 'all', label: 'All', accent: 'text-neutral-300' },
@@ -149,7 +180,7 @@ const range = computed(() => {
   }
 })
 
-const { items: calendarItems, isLoading: calendarLoading, isFetching: calendarFetching } = useLinkedInCalendar(range)
+const { items: calendarItems, isLoading: calendarLoading, isFetching: calendarFetching } = useSocialCalendar(platformRef, range)
 
 // Bucket posts by pin_at day (YYYY-MM-DD key, WIB local date).
 // pin_at is ISO 8601 UTC from backend. Naive .slice(0,10) keys by UTC date,
@@ -190,7 +221,7 @@ function postsForDate(date) {
 // Posting rules heatmap data
 // ---------------------------------------------------------------------------
 
-const { daySummaries, lastResearchedAt, sources, ruleCount } = usePostingRules('linkedin')
+const { daySummaries, lastResearchedAt, sources, ruleCount } = usePostingRules(platformRef)
 const refreshRulesMutation = useRefreshPostingRules()
 
 const dayBestScore = computed(() => {
@@ -256,7 +287,7 @@ async function doRefreshRules() {
     if (!confirm('Rules were refreshed recently. Force refresh anyway?')) return
   }
   try {
-    await refreshRulesMutation.mutateAsync({ platform: 'linkedin' })
+    await refreshRulesMutation.mutateAsync({ platform: platformRef.value })
     alert('Refresh dispatched. New rules will appear within ~60 seconds.')
   } catch (e) {
     alert('Refresh failed: ' + (e?.message || 'unknown error'))
@@ -296,8 +327,22 @@ function formatHour(h) {
 }
 
 function openDetail(id) {
-  sessionStorage.setItem('linkedin:detail:origin', 'feed')
-  router.push({ name: 'admin-linkedin-draft-detail', params: { id } })
+  // Origin key contract:
+  //   sessionStorage[`${platform}:detail:origin`] = 'feed' | 'queue'
+  // Consumed by:
+  //   - LinkedInDraftDetail.vue (reads 'linkedin:detail:origin')
+  //   - CrossPostDraftDetail.vue (reads `${routeParam.platform}:detail:origin`)
+  // If you add a new write-site or change the key shape, audit both
+  // readers — silent mismatch produces a wrong-destination back button.
+  sessionStorage.setItem(`${platformRef.value}:detail:origin`, 'feed')
+  if (platformRef.value === 'linkedin') {
+    router.push({ name: 'admin-linkedin-draft-detail', params: { id } })
+  } else {
+    router.push({
+      name: 'admin-cross-post-detail',
+      params: { platform: platformRef.value, id },
+    })
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -332,25 +377,44 @@ function statusDotClass(status) {
     <!-- Header -->
     <header class="flex flex-wrap items-end justify-between gap-4">
       <div>
+        <!-- Tracking is uppercase via Tailwind, but platform values
+             arrive lowercase. CSS capitalize on the dynamic platform
+             span renders title-case ("Linkedin", "Facebook" etc.) within
+             the all-caps eyebrow row. -->
         <p class="text-[11px] font-mono uppercase tracking-[0.18em] text-emerald-400/80 mb-1">
-          LinkedIn pipeline
+          <span class="capitalize">{{ platform }}</span> pipeline
         </p>
         <h1 class="text-3xl sm:text-4xl font-display font-semibold tracking-tight text-neutral-100">
           Posts
         </h1>
         <p class="mt-2 text-sm text-neutral-400 max-w-xl">
           Calendar of scheduled and published drafts. For drafts that need attention, go to
-          <router-link to="/admin/linkedin-queue" class="text-cyan-400 hover:text-cyan-300 underline-offset-2 hover:underline">Queue</router-link>.
+          <router-link :to="queueRouteForPlatform" class="text-cyan-400 hover:text-cyan-300 underline-offset-2 hover:underline">Queue</router-link>.
         </p>
       </div>
       <router-link
-        to="/admin/linkedin-queue"
+        :to="queueRouteForPlatform"
         class="inline-flex items-center gap-1.5 rounded-lg border border-neutral-700/60 bg-neutral-900/40 px-3 py-1.5 text-sm text-neutral-200 hover:bg-neutral-800/60 transition"
       >
         Queue
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" class="w-3.5 h-3.5"><path d="M9 18l6-6-6-6"/></svg>
       </router-link>
     </header>
+
+    <!-- Platform switcher — Phase 3 cross-post unification -->
+    <SocialPlatformTabs :current="platform" mode="posts" />
+
+    <!-- Empty-state hint when posting_time_rules table has no rows for
+         this platform (FB/IG/TikTok ship with rules empty until the
+         operator runs `posting-rules:research --platform=X` on VPS). -->
+    <div
+      v-if="ruleCount === 0"
+      class="rounded-lg border border-amber-400/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-200/90"
+    >
+      AI posting rules for <strong class="font-semibold capitalize">{{ platform }}</strong> haven't been seeded yet. Heatmap will stay neutral until the operator runs
+      <code class="rounded bg-neutral-900/60 px-1.5 py-0.5 font-mono">php artisan posting-rules:research --platform={{ platform }}</code>
+      on VPS, or clicks Refresh AI above.
+    </div>
 
     <!-- Toolbar: date nav + view toggle + status filter + AI refresh -->
     <div class="rounded-xl border border-neutral-800/80 bg-neutral-950/40 p-4 space-y-3">

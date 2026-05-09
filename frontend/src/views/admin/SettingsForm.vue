@@ -303,13 +303,64 @@
       </section>
 
       <!-- ================================================================ -->
-      <!-- TAB: LinkedIn Integration                                        -->
+      <!-- TAB: Sosmed Connection (LinkedIn + Publer merged)                -->
+      <!-- Parent tab + 2 sub-tabs (LinkedIn / Publer). Deep-link via       -->
+      <!-- flat ?tab=sosmed_linkedin / ?tab=sosmed_publer.                  -->
       <!-- ================================================================ -->
       <section
-        v-show="activeTab === 'linkedin'"
+        v-show="activeTab === 'sosmed'"
         role="tabpanel"
-        id="tab-panel-linkedin"
-        aria-labelledby="tab-linkedin"
+        id="tab-panel-sosmed"
+        aria-labelledby="tab-sosmed"
+      >
+        <!-- Sub-tab nav -->
+        <nav
+          class="mb-6 inline-flex rounded-lg border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900/40 p-1"
+          role="tablist"
+          aria-label="Sosmed connection sub-sections"
+        >
+          <button
+            type="button"
+            role="tab"
+            id="sub-tab-sosmed-linkedin"
+            :aria-selected="activeSosmedSub === 'linkedin'"
+            aria-controls="sub-panel-sosmed-linkedin"
+            :class="[
+              'px-4 py-2 text-sm font-medium rounded-md transition-colors',
+              activeSosmedSub === 'linkedin'
+                ? 'bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 shadow-sm'
+                : 'text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200',
+            ]"
+            @click="setSosmedSub('linkedin')"
+          >
+            LinkedIn
+          </button>
+          <button
+            type="button"
+            role="tab"
+            id="sub-tab-sosmed-publer"
+            :aria-selected="activeSosmedSub === 'publer'"
+            aria-controls="sub-panel-sosmed-publer"
+            :class="[
+              'px-4 py-2 text-sm font-medium rounded-md transition-colors',
+              activeSosmedSub === 'publer'
+                ? 'bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 shadow-sm'
+                : 'text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200',
+            ]"
+            @click="setSosmedSub('publer')"
+          >
+            Publer
+          </button>
+        </nav>
+
+      <!-- ================================================================ -->
+      <!-- SUB-TAB: LinkedIn Integration                                    -->
+      <!-- ================================================================ -->
+      <section
+        v-show="activeSosmedSub === 'linkedin'"
+        role="tabpanel"
+        id="sub-panel-sosmed-linkedin"
+        aria-labelledby="sub-tab-sosmed-linkedin"
       >
         <BaseCard>
           <h2 class="text-xl font-display font-semibold text-neutral-900 dark:text-neutral-100 mb-2">
@@ -540,15 +591,16 @@ LINKEDIN_OAUTH_REDIRECT_URI=https://alisadikinma.com/api/admin/linkedin/oauth/ca
           </div>
         </BaseCard>
       </section>
+      <!-- /SUB-TAB LinkedIn -->
 
       <!-- ================================================================ -->
-      <!-- TAB: Publer Cross-Post Integration (May 8, 2026)                 -->
+      <!-- SUB-TAB: Publer Cross-Post Integration                           -->
       <!-- ================================================================ -->
       <section
-        v-show="activeTab === 'publer'"
+        v-show="activeSosmedSub === 'publer'"
         role="tabpanel"
-        id="tab-panel-publer"
-        aria-labelledby="tab-publer"
+        id="sub-panel-sosmed-publer"
+        aria-labelledby="sub-tab-sosmed-publer"
       >
         <BaseCard>
           <h2 class="text-xl font-display font-semibold text-neutral-900 dark:text-neutral-100 mb-2">
@@ -737,6 +789,9 @@ LINKEDIN_OAUTH_REDIRECT_URI=https://alisadikinma.com/api/admin/linkedin/oauth/ca
           </form>
         </BaseCard>
       </section>
+      <!-- /SUB-TAB Publer -->
+      </section>
+      <!-- /TAB sosmed (Sosmed Connection parent) -->
 
       <!-- ================================================================ -->
       <!-- TAB: Email — SMTP Settings                                       -->
@@ -1323,10 +1378,12 @@ const { clearCache } = useSettings()
 // ---------------------------------------------------------------------------
 // Tab navigation — synced to ?tab= so deep-linking works.
 // ---------------------------------------------------------------------------
+// Top-level tabs. LinkedIn + Publer formerly sat as siblings; merged
+// into one "Sosmed Connection" tab with nested sub-tabs to reduce
+// top-level cognitive load.
 const tabs = [
   { id: 'site',     label: 'Site' },
-  { id: 'linkedin', label: 'LinkedIn' },
-  { id: 'publer',   label: 'Publer' },
+  { id: 'sosmed',   label: 'Sosmed Connection' },
   { id: 'email',    label: 'Email (SMTP)' },
   { id: 'telegram', label: 'Telegram' },
   { id: 'cv',       label: 'CV Export' },
@@ -1334,7 +1391,28 @@ const tabs = [
 ]
 const tabIds = tabs.map(t => t.id)
 
-const activeTab = ref(tabIds.includes(route.query.tab) ? route.query.tab : 'site')
+// Sub-tabs live under the "sosmed" parent. Deep-link via flat IDs:
+//   ?tab=sosmed_linkedin → top tab "sosmed" + sub tab "linkedin"
+//   ?tab=sosmed_publer   → top tab "sosmed" + sub tab "publer"
+// The flat-ID approach (D2 in the brainstorm) avoids ?tab=sosmed&sub=
+// nested URL juggling and stays compatible with existing setTab/watch.
+const SOSMED_SUBS = ['linkedin', 'publer']
+const SOSMED_FLAT_IDS = SOSMED_SUBS.map((k) => `sosmed_${k}`)
+
+function resolveInitialTab(rawTab) {
+  if (rawTab && tabIds.includes(rawTab)) return { top: rawTab, sub: 'linkedin' }
+  if (rawTab && SOSMED_FLAT_IDS.includes(rawTab)) {
+    return { top: 'sosmed', sub: rawTab.slice('sosmed_'.length) }
+  }
+  // Legacy deep-links from before the merge — gracefully forward.
+  if (rawTab === 'linkedin') return { top: 'sosmed', sub: 'linkedin' }
+  if (rawTab === 'publer') return { top: 'sosmed', sub: 'publer' }
+  return { top: 'site', sub: 'linkedin' }
+}
+
+const initialResolved = resolveInitialTab(route.query.tab)
+const activeTab = ref(initialResolved.top)
+const activeSosmedSub = ref(initialResolved.sub)
 
 function setTab(id) {
   if (!tabIds.includes(id) || activeTab.value === id) return
@@ -1342,9 +1420,23 @@ function setTab(id) {
   router.replace({ query: { ...route.query, tab: id } })
 }
 
+function setSosmedSub(sub) {
+  if (!SOSMED_SUBS.includes(sub)) return
+  activeSosmedSub.value = sub
+  activeTab.value = 'sosmed'
+  router.replace({ query: { ...route.query, tab: `sosmed_${sub}` } })
+}
+
 watch(() => route.query.tab, (next) => {
-  if (next && tabIds.includes(next) && next !== activeTab.value) {
+  if (!next) return
+  if (tabIds.includes(next) && next !== activeTab.value) {
     activeTab.value = next
+    return
+  }
+  if (SOSMED_FLAT_IDS.includes(next)) {
+    const sub = next.slice('sosmed_'.length)
+    activeTab.value = 'sosmed'
+    activeSosmedSub.value = sub
   }
 })
 

@@ -1,8 +1,9 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useCrossPostDraftsList } from '@/composables/useCrossPostDrafts'
 import { PLATFORMS, statusMeta, resolvePostTitle, relativeTime } from './socialPlatformHelpers'
+import SocialPlatformTabs from '@/components/admin/SocialPlatformTabs.vue'
 
 /**
  * Generic admin list view for cross-post drafts. Single component handles
@@ -22,7 +23,33 @@ if (!platformInfo.value) {
   router.replace('/admin')
 }
 
-const activeTab = ref('queue') // queue | feed
+// Initial scope: route path signals queue vs feed for FB/IG/TT.
+// /admin/{platform}-queue → queue scope (default)
+// /admin/{platform}-posts → feed scope (Phase 4: separate from queue)
+// Fallback to query param `?scope=` for backward compatibility, then
+// finally default to 'queue' which is the operator's daily-workflow tab.
+//
+// Trailing-slash robust via .replace(/\/$/, '') before suffix check.
+function resolveScopeFromRoute(path, query) {
+  const cleanPath = (path || '').replace(/\/$/, '')
+  if (cleanPath.endsWith('-queue')) return 'queue'
+  if (cleanPath.endsWith('-posts')) return 'feed'
+  if (query?.scope === 'feed') return 'feed'
+  return 'queue'
+}
+
+const activeTab = ref(resolveScopeFromRoute(route.path, route.query))
+
+// Sync activeTab when the operator navigates between /admin/{platform}-posts
+// and /admin/{platform}-queue while Vue Router reuses the same component
+// instance (same matched route component, different path). Without this
+// watcher, activeTab would stay stale after the navigation.
+watch(
+  () => route.path,
+  (newPath) => {
+    activeTab.value = resolveScopeFromRoute(newPath, route.query)
+  }
+)
 
 const filters = computed(() => ({
   scope: activeTab.value === 'feed' ? 'feed' : 'queue',
@@ -51,7 +78,7 @@ const tabCounts = computed(() => {
     <div class="flex items-center justify-between mb-6">
       <div>
         <h1 class="text-2xl font-display font-bold text-neutral-900 dark:text-neutral-100">
-          {{ platformInfo.label }} Posts
+          {{ platformInfo.label }} {{ activeTab === 'feed' ? 'Posts' : 'Queue' }}
         </h1>
         <p class="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
           Cross-post drafts fanned out from LinkedIn carousels.
@@ -64,6 +91,12 @@ const tabCounts = computed(() => {
       >
         Refresh
       </button>
+    </div>
+
+    <!-- Platform switcher (Phase 4) — current platform highlighted, click
+         another platform to navigate to its queue (or posts/feed view). -->
+    <div class="mb-4">
+      <SocialPlatformTabs :current="platform" :mode="activeTab === 'feed' ? 'posts' : 'queue'" />
     </div>
 
     <!-- Tab rail -->

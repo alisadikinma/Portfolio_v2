@@ -9,7 +9,10 @@
     "preview": "vite preview",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:unit": "node src/utils/newsletterState.test.mjs && node src/utils/stripFaqSection.test.mjs && node src/utils/extractFaqFromHtml.test.mjs && node src/utils/imagePositioning.test.mjs"
+    "test:unit:node": "node src/utils/newsletterState.test.mjs && node src/utils/stripFaqSection.test.mjs && node src/utils/extractFaqFromHtml.test.mjs && node src/utils/imagePositioning.test.mjs",
+    "test:unit:vitest": "vitest run",
+    "test:unit:vitest:watch": "vitest",
+    "test:unit": "npm run test:unit:node && npm run test:unit:vitest"
   },
   "dependencies": {
     "@headlessui/vue": "^1.7.23",
@@ -31,10 +34,13 @@
     "@playwright/test": "^1.56.0",
     "@tailwindcss/postcss": "^4.1.14",
     "@vitejs/plugin-vue": "^6.0.1",
+    "@vue/test-utils": "^2.4.10",
     "autoprefixer": "^10.4.21",
+    "jsdom": "^25.0.1",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.14",
-    "vite": "npm:rolldown-vite@7.1.14"
+    "vite": "npm:rolldown-vite@7.1.14",
+    "vitest": "^3.2.4"
   },
   "overrides": {
     "vite": "npm:rolldown-vite@7.1.14"

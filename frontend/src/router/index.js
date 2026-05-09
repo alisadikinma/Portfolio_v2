@@ -502,14 +502,31 @@ const routes = [
     }
   },
 
-  // Cross-post admin (Facebook + Instagram + TikTok). Single set of generic
-  // views handles all 3 platforms via the `:platform` route param.
+  // Cross-post admin (Facebook + Instagram + TikTok).
+  //
+  // Phase 3+4 unification: /admin/{platform}-posts → calendar (same
+  // LinkedInPostsCalendar component, platform from props). Queue moves
+  // to its own dedicated route /admin/{platform}-queue, served by
+  // CrossPostList in queue scope. Both routes pull from the same
+  // platform tabs (SocialPlatformTabs) so operators can hop between
+  // calendar / queue / platform freely.
   {
     path: '/admin/:platform(facebook|instagram|tiktok)-posts',
-    name: 'admin-cross-post-list',
-    component: () => import('@/views/admin/CrossPostList.vue'),
+    name: 'admin-cross-post-calendar',
+    component: () => import('@/views/admin/LinkedInPostsCalendar.vue'),
+    props: true,
     meta: {
       title: 'Cross-Post - Admin',
+      requiresAuth: true,
+      layout: 'admin'
+    }
+  },
+  {
+    path: '/admin/:platform(facebook|instagram|tiktok)-queue',
+    name: 'admin-cross-post-queue',
+    component: () => import('@/views/admin/CrossPostList.vue'),
+    meta: {
+      title: 'Cross-Post Queue - Admin',
       requiresAuth: true,
       layout: 'admin'
     }
