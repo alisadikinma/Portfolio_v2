@@ -470,26 +470,39 @@ const routes = [
     }
   },
 
-  // LinkedIn admin views — success feed + triage queue + shared detail
+  // Social media admin views — drafts (pre-publish triage) + posts
+  // (calendar of scheduled / shipped). Routes were renamed from
+  // linkedin-* to match the menu labels operators actually see.
+  // Old paths kept as redirects so existing bookmarks still resolve.
   {
-    path: '/admin/linkedin-posts',
-    name: 'admin-linkedin-posts',
+    path: '/admin/sosmed-posts',
+    name: 'admin-sosmed-posts',
     component: () => import('@/views/admin/LinkedInPostsCalendar.vue'),
     meta: {
-      title: 'LinkedIn Posts - Admin',
+      title: 'SOSMED Posts - Admin',
       requiresAuth: true,
       layout: 'admin'
     }
   },
   {
-    path: '/admin/linkedin-queue',
-    name: 'admin-linkedin-queue',
+    path: '/admin/draft-posts',
+    name: 'admin-draft-posts',
     component: () => import('@/views/admin/LinkedInQueueList.vue'),
     meta: {
-      title: 'LinkedIn Queue - Admin',
+      title: 'Draft Posts - Admin',
       requiresAuth: true,
       layout: 'admin'
     }
+  },
+  // Legacy aliases — redirect to the renamed routes so bookmarks +
+  // the back-navigation origin sentinel ('queue' / 'posts') keep working.
+  {
+    path: '/admin/linkedin-posts',
+    redirect: { name: 'admin-sosmed-posts' },
+  },
+  {
+    path: '/admin/linkedin-queue',
+    redirect: { name: 'admin-draft-posts' },
   },
   {
     path: '/admin/linkedin-drafts/:id',

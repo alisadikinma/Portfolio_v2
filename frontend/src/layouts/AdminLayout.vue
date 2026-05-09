@@ -111,7 +111,7 @@
               </router-link>
 
               <router-link
-                to="/admin/linkedin-queue"
+                to="/admin/draft-posts"
                 class="flex items-center px-4 py-3 rounded-lg text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
                 active-class="bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 font-semibold"
               >
@@ -122,7 +122,7 @@
               </router-link>
 
               <router-link
-                to="/admin/linkedin-posts"
+                to="/admin/sosmed-posts"
                 class="flex items-center px-4 py-3 rounded-lg text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
                 active-class="bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 font-semibold"
               >

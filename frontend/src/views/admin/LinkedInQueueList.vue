@@ -25,10 +25,18 @@ const router = useRouter()
 
 // --- Tab persistence: restore the active tab on mount, save on change.
 // Lets the operator come back from a draft detail and land on the same tab.
-const activeTab = ref('manual_review')
+//
+// Tab simplification (May 9, 2026): merged 'manual_review' into 'in_progress'.
+// Anything pre-published (pending_generation / generating / validating /
+// manual_review / awaiting_publish) is now one bucket — operators can act
+// on it AND fan out to IG/TikTok/FB cross-post variants while it sits there.
+const activeTab = ref('in_progress')
 onMounted(() => {
   const saved = sessionStorage.getItem(QUEUE_TAB_KEY)
-  if (saved && ['manual_review', 'failed', 'in_progress', 'all'].includes(saved)) {
+  // Migrate legacy persisted 'manual_review' → 'in_progress'.
+  if (saved === 'manual_review') {
+    activeTab.value = 'in_progress'
+  } else if (saved && ['failed', 'in_progress', 'all'].includes(saved)) {
     activeTab.value = saved
   }
 })
@@ -62,18 +70,28 @@ const filters = computed(() => ({
 const { drafts: allDrafts, isLoading, error } = useLinkedInDraftsList(filters)
 
 function classifyForQueue(draft) {
-  if (['pending_generation', 'generating', 'validating'].includes(draft.status)) {
+  // Anything pre-published (pending → manual_review → awaiting_publish)
+  // lives in the In Progress bucket so operators can act on it AND fan
+  // out to Instagram / TikTok / Facebook variants from one place.
+  // Carousel drafts whose slides are still rendering (or all-failed)
+  // surface in the same bucket — render state shows in the issue column.
+  const inProgressStates = [
+    'pending_generation',
+    'generating',
+    'validating',
+    'manual_review',
+    'awaiting_publish',
+  ]
+  if (inProgressStates.includes(draft.status)) {
+    // Carousel-specific failure: every slide rejected → bucket as failed
+    // so the operator's action is "retry slides", not "review caption".
+    if (draft.status === 'manual_review' && draft.format === 'carousel') {
+      const imgState = inspectCarouselRenderState(draft)
+      if (imgState === 'failed') return 'failed'
+    }
     return 'in_progress'
   }
   if (draft.status === 'failed') return 'failed'
-
-  if (draft.status === 'manual_review') {
-    if (draft.format === 'text') return 'manual_review'
-    const imgState = inspectCarouselRenderState(draft)
-    if (imgState === 'pending' || imgState === 'generating') return 'in_progress'
-    if (imgState === 'failed') return 'failed'
-    return 'manual_review'
-  }
   return null
 }
 
@@ -148,7 +166,7 @@ function sortIndicator(key) {
 }
 
 const counts = computed(() => {
-  const c = { manual_review: 0, failed: 0, in_progress: 0 }
+  const c = { failed: 0, in_progress: 0 }
   for (const d of allDrafts.value) {
     const bucket = classifyForQueue(d)
     if (bucket && c[bucket] !== undefined) c[bucket]++
@@ -209,7 +227,6 @@ async function scanBlogNow() {
 }
 
 const tabs = [
-  { key: 'manual_review', label: 'Needs review', accent: 'text-amber-400' },
   { key: 'in_progress', label: 'In progress', accent: 'text-cyan-400' },
   { key: 'failed', label: 'Failed', accent: 'text-red-400' },
   { key: 'all', label: 'Everything', accent: 'text-neutral-300' },
@@ -276,8 +293,7 @@ async function doRegenerate(id) {
 }
 
 const emptyMessage = computed(() => ({
-  manual_review: { title: 'Inbox zero', body: 'Nothing waiting on your call. New drafts will land here when validation flags them.' },
-  in_progress: { title: 'Quiet on the wire', body: 'No drafts being generated right now.' },
+  in_progress: { title: 'Quiet on the wire', body: 'No drafts in the pipeline. Click "Scan blog now" to pull recent published posts.' },
   failed: { title: 'Nothing broken', body: 'No failed runs in the queue.' },
   all: { title: 'Queue is clear', body: 'No drafts in the pipeline.' },
 }[activeTab.value]))
@@ -294,7 +310,7 @@ const emptyMessage = computed(() => ({
         </h1>
         <p class="text-sm text-neutral-400 mt-2 max-w-xl">
           Drafts that need a decision, are mid-generation, or hit an error. Successfully shipped posts live in
-          <router-link to="/admin/linkedin-posts" class="text-amber-400 hover:underline">SOSMED Posts</router-link>.
+          <router-link to="/admin/sosmed-posts" class="text-amber-400 hover:underline">SOSMED Posts</router-link>.
         </p>
       </div>
       <div class="flex items-center gap-2">
@@ -313,7 +329,7 @@ const emptyMessage = computed(() => ({
           {{ scanRunning ? 'Scanning…' : 'Scan blog now' }}
         </button>
         <router-link
-          to="/admin/linkedin-posts"
+          to="/admin/sosmed-posts"
           class="inline-flex items-center gap-2 px-3.5 py-2 text-sm text-neutral-300 border border-neutral-800 rounded-lg hover:border-amber-500/40 hover:bg-amber-500/5 hover:text-amber-300 transition"
         >
           <svg viewBox="0 0 24 24" fill="currentColor" class="w-3.5 h-3.5 text-[#0077B5]">
@@ -497,7 +513,7 @@ const emptyMessage = computed(() => ({
           <div class="md:self-center md:text-right" @click.stop>
             <div class="inline-flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
               <button
-                v-if="draft.status === 'manual_review' && classifyForQueue(draft) === 'manual_review'"
+                v-if="draft.status === 'manual_review' && classifyForQueue(draft) === 'in_progress'"
                 @click="doApprove(draft.id)"
                 :disabled="approveMutation.isPending.value || !carouselReadyForApprove(draft)"
                 :title="carouselReadyForApprove(draft) ? 'Approve' : 'Carousel slides not all rendered yet'"

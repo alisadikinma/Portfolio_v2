@@ -48,14 +48,14 @@ const regenerateSlideMutation = useRegenerateSlideImage()
 
 // --- Smart back navigation: read the referring origin (queue vs feed) from
 // sessionStorage so "Back" returns to the right list view, with the tab
-// the operator was on. Falls back to /admin/linkedin-queue.
-const backTarget = ref({ name: 'admin-linkedin-queue', label: 'Queue' })
+// the operator was on. Falls back to /admin/draft-posts.
+const backTarget = ref({ name: 'admin-draft-posts', label: 'Draft Posts' })
 onMounted(() => {
   const origin = sessionStorage.getItem('linkedin:detail:origin')
   if (origin === 'feed') {
-    backTarget.value = { name: 'admin-linkedin-posts', label: 'Posts' }
+    backTarget.value = { name: 'admin-sosmed-posts', label: 'SOSMED Posts' }
   } else {
-    backTarget.value = { name: 'admin-linkedin-queue', label: 'Queue' }
+    backTarget.value = { name: 'admin-draft-posts', label: 'Draft Posts' }
   }
 })
 
