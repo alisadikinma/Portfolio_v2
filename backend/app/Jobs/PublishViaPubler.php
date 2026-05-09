@@ -4,9 +4,11 @@ namespace App\Jobs;
 
 use App\Enums\FacebookPostStatus;
 use App\Enums\InstagramPostStatus;
+use App\Enums\ThreadsPostStatus;
 use App\Enums\TiktokPostStatus;
 use App\Models\FacebookPost;
 use App\Models\InstagramPost;
+use App\Models\ThreadsPost;
 use App\Models\TiktokPost;
 use App\Services\PipelineGuard;
 use Illuminate\Bus\Queueable;
@@ -60,6 +62,7 @@ class PublishViaPubler implements ShouldQueue
             FacebookPost::class,
             InstagramPost::class,
             TiktokPost::class,
+            ThreadsPost::class,
         ];
 
         if (!in_array($this->modelClass, $allowed, true)) {

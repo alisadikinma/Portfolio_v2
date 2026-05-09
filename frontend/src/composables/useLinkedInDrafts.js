@@ -362,6 +362,27 @@ export function usePublishLinkedInDraftNow() {
 }
 
 /**
+ * POST /admin/linkedin-drafts/{id}/publish-all
+ *
+ * Cascade: publishes LinkedIn + flips auto_approve_cross_posts so the
+ * per-platform Generation jobs (FB/IG/TT/Threads) skip operator review and
+ * fire Publer publish directly. Same long-timeout pattern as publish-now
+ * since LinkedIn upload still happens synchronously (~30-60s for carousel).
+ */
+export function usePublishAllPlatforms() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) =>
+      api.post(`/admin/linkedin-drafts/${id}/publish-all`, {}, { timeout: 120000 })
+        .then(r => r.data),
+    onSuccess: (_, id) => {
+      qc.invalidateQueries({ queryKey: [LIST_KEY] })
+      qc.invalidateQueries({ queryKey: [LIST_KEY, id] })
+    },
+  })
+}
+
+/**
  * GET /admin/linkedin-posts/calendar?from=&to=&status=
  *
  * Date-range query for the calendar month grid. Returns compact per-row shape

@@ -8,6 +8,7 @@ import {
   useApproveLinkedInDraft,
   useCancelLinkedInDraft,
   usePublishLinkedInDraftNow,
+  usePublishAllPlatforms,
   useRegenerateLinkedInDraft,
   useRegenerateAllCarouselImages,
   useRerenderImagesOnly,
@@ -48,6 +49,7 @@ const PLATFORM_META = {
   facebook: { label: 'Facebook', accent: 'text-blue-400', activeBg: 'bg-blue-500/10 text-blue-200 border-blue-400/40' },
   instagram: { label: 'Instagram', accent: 'text-fuchsia-400', activeBg: 'bg-fuchsia-500/10 text-fuchsia-200 border-fuchsia-400/40' },
   tiktok: { label: 'TikTok', accent: 'text-rose-400', activeBg: 'bg-rose-500/10 text-rose-200 border-rose-400/40' },
+  threads: { label: 'Threads', accent: 'text-neutral-300', activeBg: 'bg-neutral-200/10 text-neutral-100 border-neutral-300/40' },
 }
 
 const platformPostFor = (key) => {
@@ -122,8 +124,8 @@ function platformStatusMeta(key) {
 const sosmedHealth = computed(() => {
   if (!draft.value) return null
   const platforms = ['linkedin']
-  if (draft.value.format === 'text') platforms.push('facebook')
-  if (draft.value.format === 'carousel') platforms.push('facebook', 'instagram', 'tiktok')
+  if (draft.value.format === 'text') platforms.push('facebook', 'threads')
+  if (draft.value.format === 'carousel') platforms.push('facebook', 'instagram', 'tiktok', 'threads')
 
   let published = 0, inProgress = 0, failed = 0, notYet = 0
   for (const p of platforms) {
@@ -144,6 +146,7 @@ const updateMutation = useUpdateLinkedInDraft()
 const approveMutation = useApproveLinkedInDraft()
 const cancelMutation = useCancelLinkedInDraft()
 const publishNowMutation = usePublishLinkedInDraftNow()
+const publishAllMutation = usePublishAllPlatforms()
 const regenerateMutation = useRegenerateLinkedInDraft()
 const regenerateAllImagesMutation = useRegenerateAllCarouselImages()
 const rerenderImagesOnlyMutation = useRerenderImagesOnly()
@@ -649,6 +652,26 @@ async function doPublishNow() {
     alert(err?.response?.data?.error?.message || 'Publish failed')
   }
 }
+
+async function doPublishAll() {
+  const platforms = draft.value?.format === 'carousel'
+    ? 'LinkedIn + Facebook + Instagram + TikTok + Threads'
+    : 'LinkedIn + Facebook + Threads'
+  const confirmMsg =
+    `Publish to ALL platforms now?\n\n` +
+    `→ ${platforms}\n` +
+    `→ Skips per-platform operator review (caption + hashtags will publish as authored)\n` +
+    `→ Cannot rollback after Publer schedules them\n\n` +
+    `Watch the "Sosmed health" indicator to monitor progress.\n` +
+    `LinkedIn fires now (~30-60s); cross-posts publish ~1-3 min later via Publer.`
+  if (!confirm(confirmMsg)) return
+  try {
+    await publishAllMutation.mutateAsync(draftId.value)
+    refetch()
+  } catch (err) {
+    alert(err?.response?.data?.error?.message || 'Publish-all failed')
+  }
+}
 async function doRegenerate() {
   if (!confirm('Restart from the blog post?\n\nThis draft will be archived and a brand-new one built from scratch (new draft ID, fresh caption + slides). Runtime ~5-7 min.')) return
   const result = await regenerateMutation.mutateAsync(draftId.value)
@@ -973,6 +996,20 @@ const showThumbnailUploadCaption = computed(() =>
                     </span>
                   </button>
                 </template>
+                <!-- Threads — fanned out for both text and carousel formats -->
+                <button
+                  type="button"
+                  @click="activatePlatformAndScroll('threads')"
+                  class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border border-neutral-300/30 bg-neutral-200/5 text-neutral-300 hover:bg-neutral-200/15 hover:text-neutral-100 transition cursor-pointer"
+                  title="Show Threads caption below"
+                >
+                  <span class="w-1.5 h-1.5 rounded-full bg-neutral-300" />
+                  Threads
+                  <span class="font-mono text-[9px] uppercase tracking-[0.1em] flex items-center gap-1 pl-1.5 ml-1 border-l border-neutral-300/20">
+                    <span :class="['w-1 h-1 rounded-full', platformStatusMeta('threads').dot]" />
+                    <span :class="platformStatusMeta('threads').text">{{ platformStatusMeta('threads').label }}</span>
+                  </span>
+                </button>
                 <span class="ml-1 text-neutral-600 hidden sm:inline">
                   · click to view caption
                 </span>
@@ -1201,14 +1238,33 @@ const showThumbnailUploadCaption = computed(() =>
             <button
               v-if="draft.status === 'awaiting_publish'"
               @click="doPublishNow"
-              :disabled="publishNowMutation.isPending.value || !slidesReadyForPublish"
-              :title="slidesReadyForPublish ? '' : slidesPendingMessage"
+              :disabled="publishNowMutation.isPending.value || publishAllMutation.isPending.value || !slidesReadyForPublish"
+              :title="slidesReadyForPublish ? 'Publish to LinkedIn only' : slidesPendingMessage"
               class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-amber-500 text-amber-950 hover:bg-amber-400 active:scale-[0.98] text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-amber-500 shadow-[0_8px_24px_-12px_rgba(212,168,67,0.5)]"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
                 <path :d="ICON.send" />
               </svg>
               {{ publishNowMutation.isPending.value ? 'Publishing…' : 'Publish now' }}
+            </button>
+
+            <!-- Publish-all cascade — LinkedIn + auto-approve FB/IG/TT/Threads
+                 via Publer. Skips per-platform operator review. Visually
+                 distinct (emerald gradient) so operator doesn't accidentally
+                 fire the cascade thinking it's regular publish-now. -->
+            <button
+              v-if="draft.status === 'awaiting_publish'"
+              @click="doPublishAll"
+              :disabled="publishNowMutation.isPending.value || publishAllMutation.isPending.value || !slidesReadyForPublish"
+              :title="slidesReadyForPublish
+                ? 'Publish LinkedIn AND auto-approve FB/IG/TT/Threads via Publer (skips per-platform review)'
+                : slidesPendingMessage"
+              class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-500 text-emerald-950 hover:bg-emerald-400 active:scale-[0.98] text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-emerald-500 shadow-[0_8px_24px_-12px_rgba(16,185,129,0.5)]"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
+                <path :d="ICON.send" />
+              </svg>
+              {{ publishAllMutation.isPending.value ? 'Publishing all…' : 'Publish to all platforms' }}
             </button>
 
             <!-- Published: external link is primary -->

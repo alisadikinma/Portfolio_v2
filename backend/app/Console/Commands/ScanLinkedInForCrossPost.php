@@ -6,13 +6,16 @@ use App\Enums\FacebookPostStatus;
 use App\Enums\InstagramPostStatus;
 use App\Enums\LinkedInPostStatus;
 use App\Enums\TiktokPostStatus;
+use App\Enums\ThreadsPostStatus;
 use App\Jobs\GenerateFacebookPost;
 use App\Jobs\GenerateInstagramPost;
+use App\Jobs\GenerateThreadsPost;
 use App\Jobs\GenerateTiktokPost;
 use App\Models\FacebookPost;
 use App\Models\InstagramPost;
 use App\Models\LinkedInPost;
 use App\Models\Setting;
+use App\Models\ThreadsPost;
 use App\Models\TiktokPost;
 use App\Services\TelegramNotificationService;
 use Illuminate\Console\Command;
@@ -54,7 +57,8 @@ class ScanLinkedInForCrossPost extends Command
         {--dry-run : Log candidates without creating rows or dispatching jobs}
         {--limit=20 : Max LinkedIn posts to fan out per run (safety cap)}
         {--hours=168 : Lookback window in hours (default 7 days)}
-        {--min-virality= : Override linkedin_virality_min_score (0 disables gate)}';
+        {--min-virality= : Override linkedin_virality_min_score (0 disables gate)}
+        {--draft-id= : Scan only the specified LinkedIn draft id (used by /publish-all cascade)}';
 
     protected $description = 'Fan out finished LinkedIn drafts to Facebook + Instagram + TikTok cross-post tables';
 
@@ -73,12 +77,23 @@ class ScanLinkedInForCrossPost extends Command
             LinkedInPostStatus::Published->value,
         ];
 
+        $draftIdFilter = $this->option('draft-id');
+
         $query = LinkedInPost::query()
             ->whereIn('status', $eligibleStatuses)
-            ->where('updated_at', '>=', now()->subHours($hours))
             ->with(['post.contentIdea:id,result_post_id,virality_score']);
 
-        if ($minVirality > 0) {
+        if ($draftIdFilter !== null && $draftIdFilter !== '') {
+            // Targeted scan from /publish-all cascade — bypass time window
+            // and virality gate. The operator already opted in by clicking
+            // the cascade button, fan-out is the explicit intent.
+            $query->where('id', (int) $draftIdFilter);
+            $this->info("Targeted scan: draft id={$draftIdFilter} (window + virality gates bypassed)");
+        } else {
+            $query->where('updated_at', '>=', now()->subHours($hours));
+        }
+
+        if ($minVirality > 0 && ($draftIdFilter === null || $draftIdFilter === '')) {
             $query->whereHas('post.contentIdea', function ($q) use ($minVirality) {
                 $q->where('virality_score', '>=', $minVirality);
             });
@@ -122,6 +137,9 @@ class ScanLinkedInForCrossPost extends Command
                     $this->createFacebook($linkedinPost, 'text');
                     $stats['fb_text']++;
                     $platforms[] = 'facebook';
+                    $this->createThreads($linkedinPost, 'text');
+                    $stats['threads_text'] = ($stats['threads_text'] ?? 0) + 1;
+                    $platforms[] = 'threads';
                 } elseif ($format === 'carousel') {
                     $this->createFacebook($linkedinPost, 'carousel');
                     $stats['fb_carousel']++;
@@ -132,6 +150,9 @@ class ScanLinkedInForCrossPost extends Command
                     $this->createTiktok($linkedinPost);
                     $stats['tt']++;
                     $platforms[] = 'tiktok';
+                    $this->createThreads($linkedinPost, 'carousel');
+                    $stats['threads_carousel'] = ($stats['threads_carousel'] ?? 0) + 1;
+                    $platforms[] = 'threads';
                 }
 
                 // Phase G — Telegram fanout alert. Dormant by default
@@ -200,6 +221,9 @@ class ScanLinkedInForCrossPost extends Command
         if ($this->hasLiveFacebookRow($linkedinPost)) {
             return 'facebook_posts row already exists (idempotent skip)';
         }
+        if ($this->hasLiveThreadsRow($linkedinPost)) {
+            return 'threads_posts row already exists (idempotent skip)';
+        }
         if ($format === 'carousel') {
             if ($this->hasLiveInstagramRow($linkedinPost)) {
                 return 'instagram_posts row already exists (idempotent skip)';
@@ -225,6 +249,11 @@ class ScanLinkedInForCrossPost extends Command
     private function hasLiveTiktokRow(LinkedInPost $li): bool
     {
         return TiktokPost::where('post_id', $li->post_id)->exists();
+    }
+
+    private function hasLiveThreadsRow(LinkedInPost $li): bool
+    {
+        return ThreadsPost::where('post_id', $li->post_id)->exists();
     }
 
     private function createFacebook(LinkedInPost $li, string $format): void
@@ -289,6 +318,29 @@ class ScanLinkedInForCrossPost extends Command
         Log::info('[CrossPostScan] TT draft created + dispatched', [
             'linkedin_post_id' => $li->id,
             'tiktok_post_id' => $draft->id,
+        ]);
+    }
+
+    private function createThreads(LinkedInPost $li, string $format): void
+    {
+        $draft = ThreadsPost::create([
+            'linkedin_post_id' => $li->id,
+            'post_id' => $li->post_id,
+            'format' => $format,
+            'status' => ThreadsPostStatus::PendingGeneration->value,
+            'pipeline_state_log' => [[
+                'from' => 'scan',
+                'to' => 'pending_generation',
+                'reason' => 'cross_post_scan_fanout',
+                'timestamp' => now()->toIso8601String(),
+            ]],
+        ]);
+
+        GenerateThreadsPost::dispatch($draft->id);
+        Log::info('[CrossPostScan] Threads draft created + dispatched', [
+            'linkedin_post_id' => $li->id,
+            'threads_post_id' => $draft->id,
+            'format' => $format,
         ]);
     }
 }

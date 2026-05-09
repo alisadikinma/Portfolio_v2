@@ -1283,6 +1283,8 @@ Route::middleware(['auth:sanctum'])->prefix('admin/linkedin-drafts')->group(func
     Route::post('/{id}/approve', [LinkedInDraftController::class, 'approve']);
     Route::post('/{id}/cancel', [LinkedInDraftController::class, 'cancel']);
     Route::post('/{id}/publish-now', [LinkedInDraftController::class, 'publishNow']);
+    Route::post('/{id}/publish-all', [LinkedInDraftController::class, 'publishAll'])
+        ->name('admin.linkedin-drafts.publish-all');
     // Carousel image dispatch — bulk + per-slide retry. Both endpoints fire
     // synchronously into LinkedInCarouselImageService (HTTP to GeminiGen).
     // Webhook completes asynchronously; frontend polls draft.show for status.

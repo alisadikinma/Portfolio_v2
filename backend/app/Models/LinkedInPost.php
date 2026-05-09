@@ -47,6 +47,7 @@ class LinkedInPost extends Model
         'progress_percentage',
         'current_step',
         'progress_log',
+        'auto_approve_cross_posts',
     ];
 
     protected $casts = [
@@ -61,6 +62,7 @@ class LinkedInPost extends Model
         'scheduled_at' => 'datetime',
         'cancel_window_ends_at' => 'datetime',
         'published_at' => 'datetime',
+        'auto_approve_cross_posts' => 'boolean',
     ];
 
     protected function statusEnumClass(): string
@@ -96,6 +98,21 @@ class LinkedInPost extends Model
     public function tiktokPost(): HasOne
     {
         return $this->hasOne(TiktokPost::class, 'linkedin_post_id');
+    }
+
+    public function threadsPost(): HasOne
+    {
+        return $this->hasOne(ThreadsPost::class, 'linkedin_post_id');
+    }
+
+    /**
+     * Check whether the operator opted into the publish-all cascade
+     * (auto-approve cross-post drafts). Reads the flag set by the
+     * /publish-all endpoint, falls back to false on any DB hiccup.
+     */
+    public function shouldAutoApproveCrossPosts(): bool
+    {
+        return (bool) ($this->getAttribute('auto_approve_cross_posts') ?? false);
     }
 
     public function scopePublished(Builder $q): Builder

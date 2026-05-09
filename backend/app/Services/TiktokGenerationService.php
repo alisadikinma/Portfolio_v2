@@ -294,10 +294,12 @@ class TiktokGenerationService extends BaseSocialGenerationService
             ]);
         }
 
+        $this->maybeCascadeToPublisher($draft, TiktokPostStatus::Publishing, TiktokPost::class, $this->guard);
+
         return [
             'success' => true,
             'draft_id' => $draft->id,
-            'status' => TiktokPostStatus::AwaitingReview->value,
+            'status' => $draft->fresh()->status ?? TiktokPostStatus::AwaitingReview->value,
         ];
     }
 

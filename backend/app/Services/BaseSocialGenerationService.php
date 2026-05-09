@@ -266,4 +266,56 @@ abstract class BaseSocialGenerationService
         }
         return $decoded;
     }
+
+    /**
+     * Publish-all cascade check (May 10, 2026). When the parent LinkedIn
+     * draft has `auto_approve_cross_posts=true`, promote AwaitingReview →
+     * Publishing and dispatch PublishViaPubler — skipping the operator
+     * review gate.
+     *
+     * Idempotent + non-fatal — failure to advance/dispatch is logged but
+     * doesn't fail the calling generate() call (the draft has already
+     * reached AwaitingReview successfully).
+     *
+     * @param  \Illuminate\Database\Eloquent\Model  $draft             Cross-post draft (FB/IG/TT/Threads)
+     * @param  \BackedEnum                           $publishingStatus  The {Status}::Publishing enum case
+     * @param  string                                $modelClass        FQCN for PublishViaPubler dispatch
+     * @param  \App\Services\PipelineGuard           $guard             Same guard the caller already injected
+     */
+    protected function maybeCascadeToPublisher(
+        \Illuminate\Database\Eloquent\Model $draft,
+        \BackedEnum $publishingStatus,
+        string $modelClass,
+        \App\Services\PipelineGuard $guard,
+    ): void {
+        try {
+            if (!$draft->relationLoaded('linkedinPost')) {
+                $draft->loadMissing('linkedinPost');
+            }
+            $linkedinPost = $draft->linkedinPost;
+            if ($linkedinPost === null || !$linkedinPost->shouldAutoApproveCrossPosts()) {
+                return;
+            }
+
+            $guard->advance(
+                $draft,
+                $publishingStatus,
+                'auto_approve_cascade',
+                ['source' => 'linkedin_publish_all_flag']
+            );
+
+            \App\Jobs\PublishViaPubler::dispatch($modelClass, $draft->id);
+
+            \Illuminate\Support\Facades\Log::info('[BaseSocialGen] Cascade promoted draft to Publishing', [
+                'platform' => class_basename($modelClass),
+                'draft_id' => $draft->id,
+            ]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('[BaseSocialGen] Cascade promotion failed (non-fatal)', [
+                'platform' => class_basename($modelClass),
+                'draft_id' => $draft->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
 }

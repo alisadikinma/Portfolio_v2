@@ -130,6 +130,7 @@ class LinkedInDraftController extends Controller
             'facebookPost:id,linkedin_post_id,status,caption,hashtags,scheduled_at,published_at,external_url',
             'instagramPost:id,linkedin_post_id,status,caption,hashtags,scheduled_at,published_at,external_url',
             'tiktokPost:id,linkedin_post_id,status,caption,hashtags,scheduled_at,published_at,external_url',
+            'threadsPost:id,linkedin_post_id,status,caption,hashtags,scheduled_at,published_at,external_url',
         ])->find($id);
         if ($draft === null) {
             return $this->notFound();
@@ -994,6 +995,97 @@ class LinkedInDraftController extends Controller
                 'window_minutes' => $windowMinutes,
             ],
         ]);
+    }
+
+    /**
+     * POST /api/admin/linkedin-drafts/{id}/publish-all
+     *
+     * Cascade orchestrator — operator clicks one button, all 5 platforms
+     * (LinkedIn + FB + IG + TT + Threads) flow through publish without
+     * per-platform manual review.
+     *
+     * Steps:
+     *   1. Validate LinkedIn status = awaiting_publish
+     *   2. Set auto_approve_cross_posts=true so per-platform gen jobs
+     *      auto-promote AwaitingReview → Publishing → dispatch Publer
+     *      instead of waiting for operator review.
+     *   3. Run publishNow() — LinkedIn live via direct API.
+     *   4. Targeted scanner trigger via Artisan::queue with --draft-id.
+     *      Scanner fans out FB/IG/TT/Threads rows, each generation job
+     *      reads the auto-approve flag and chains to publish.
+     *
+     * Returns 202 with the LinkedIn publish result. Cross-post platforms
+     * polled async via the existing per-sibling status (visible in the
+     * "Sosmed health" indicator on the detail page).
+     */
+    public function publishAll(int $id): JsonResponse
+    {
+        $draft = LinkedInPost::find($id);
+        if ($draft === null) {
+            return $this->notFound();
+        }
+
+        if ($draft->status !== 'awaiting_publish') {
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'invalid_status',
+                    'message' => "publish-all requires status 'awaiting_publish', got '{$draft->status}'",
+                ],
+            ], 422);
+        }
+
+        // Mark cascade BEFORE LinkedIn publish so any race condition
+        // (e.g. cron-fired social-cross-post:scan firing in the same
+        // window) still sees the flag and auto-approves.
+        $draft->update(['auto_approve_cross_posts' => true]);
+
+        $result = $this->publisher->publish($draft);
+        if (!$result['success']) {
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'linkedin_publish_failed',
+                    'message' => $result['error'] ?? 'LinkedIn publish failed',
+                ],
+                'data' => $draft,
+            ], 503);
+        }
+
+        try {
+            $this->guard->advance(
+                $draft,
+                LinkedInPostStatus::Published,
+                'admin_publish_all',
+                ['draft_id' => $draft->id]
+            );
+            $draft->update([
+                'published_at' => now(),
+                'linkedin_post_urn' => $result['post_urn'] ?? null,
+                'linkedin_post_url' => $result['post_url'] ?? null,
+            ]);
+        } catch (InvalidStateTransitionException $e) {
+            return $this->illegalTransition($e);
+        }
+
+        // Trigger fan-out scanner targeted to this draft only — bypasses
+        // time + virality windows since the operator already opted in.
+        try {
+            \Illuminate\Support\Facades\Artisan::queue('social-cross-post:scan', [
+                '--draft-id' => $draft->id,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('[publishAll] Fan-out scanner dispatch failed (non-fatal)', [
+                'draft_id' => $draft->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'LinkedIn published. Cross-post fan-out queued — FB/IG/TT/Threads will publish automatically (~1-3 min). Watch the Sosmed health indicator.',
+            'data' => $draft->fresh(['post.translations', 'post.contentIdea:id,result_post_id,virality_score', 'account']),
+        ], 202);
     }
 
     /**

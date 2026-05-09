@@ -164,10 +164,12 @@ class FacebookGenerationService extends BaseSocialGenerationService
 
         $this->fireAwaitingReviewAlert($draft, $title, $caption);
 
+        $this->maybeCascadeToPublisher($draft, FacebookPostStatus::Publishing, FacebookPost::class, $this->guard);
+
         return [
             'success' => true,
             'draft_id' => $draft->id,
-            'status' => FacebookPostStatus::AwaitingReview->value,
+            'status' => $draft->fresh()->status ?? FacebookPostStatus::AwaitingReview->value,
         ];
     }
 
@@ -424,10 +426,12 @@ class FacebookGenerationService extends BaseSocialGenerationService
 
         $this->fireAwaitingReviewAlert($draft, $title, $caption);
 
+        $this->maybeCascadeToPublisher($draft, FacebookPostStatus::Publishing, FacebookPost::class, $this->guard);
+
         return [
             'success' => true,
             'draft_id' => $draft->id,
-            'status' => FacebookPostStatus::AwaitingReview->value,
+            'status' => $draft->fresh()->status ?? FacebookPostStatus::AwaitingReview->value,
         ];
     }
 

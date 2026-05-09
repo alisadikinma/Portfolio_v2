@@ -310,10 +310,12 @@ class InstagramGenerationService extends BaseSocialGenerationService
         // Phase G — Telegram alert. Dormant by default (no setting row → no-op).
         $this->fireAwaitingReviewAlert($draft, $title, $caption);
 
+        $this->maybeCascadeToPublisher($draft, InstagramPostStatus::Publishing, InstagramPost::class, $this->guard);
+
         return [
             'success' => true,
             'draft_id' => $draft->id,
-            'status' => InstagramPostStatus::AwaitingReview->value,
+            'status' => $draft->fresh()->status ?? InstagramPostStatus::AwaitingReview->value,
         ];
     }
 
