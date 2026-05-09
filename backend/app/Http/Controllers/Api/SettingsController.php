@@ -1334,6 +1334,7 @@ class SettingsController extends Controller
                 'publer_facebook_account_id' => null,
                 'publer_instagram_account_id' => null,
                 'publer_tiktok_account_id' => null,
+                'publer_threads_account_id' => null,
                 'publer_last_account_sync_at' => null,
             ], $data);
 
@@ -1370,6 +1371,7 @@ class SettingsController extends Controller
             'publer_facebook_account_id' => ['nullable', 'string', 'max:100'],
             'publer_instagram_account_id' => ['nullable', 'string', 'max:100'],
             'publer_tiktok_account_id' => ['nullable', 'string', 'max:100'],
+            'publer_threads_account_id' => ['nullable', 'string', 'max:100'],
         ]);
 
         DB::beginTransaction();
@@ -1485,6 +1487,7 @@ class SettingsController extends Controller
             'facebook' => [],
             'instagram' => [],
             'tiktok' => [],
+            'threads' => [],
             'other' => [],
         ];
         $rawTypes = [];

@@ -16,9 +16,10 @@ use Illuminate\Database\Seeder;
  *                                  updatePublerSettings); masked as ***SET***
  *                                  in API responses
  *   publer_enabled                 master kill switch ('true' / 'false')
- *   publer_facebook_account_id     selected from /accounts dropdown
+ *   publer_facebook_account_id     selected from /accounts dropdown (UI-hidden May 10, 2026 — direct Graph API path planned)
  *   publer_instagram_account_id    same
  *   publer_tiktok_account_id       same
+ *   publer_threads_account_id      same (added May 10, 2026)
  *   publer_last_account_sync_at    timestamp of last successful sync-accounts call
  *
  * Defaults intentionally null — operator must enter API key + click Test
@@ -38,6 +39,7 @@ class PublerSettingsSeeder extends Seeder
             ['key' => 'publer_facebook_account_id',     'value' => null,    'type' => 'text'],
             ['key' => 'publer_instagram_account_id',    'value' => null,    'type' => 'text'],
             ['key' => 'publer_tiktok_account_id',       'value' => null,    'type' => 'text'],
+            ['key' => 'publer_threads_account_id',      'value' => null,    'type' => 'text'],
             ['key' => 'publer_last_account_sync_at',    'value' => null,    'type' => 'text'],
         ];
 

@@ -52,10 +52,16 @@ class PublerClient
      *   - `facebook`, `facebook_page`, `fb`, `fb_page`
      *   - `instagram`, `instagram_business`, `ig`, `ig_business`
      *   - `tiktok`, `tiktok_business`, `tt`
+     *   - `threads` (added May 10, 2026 — Meta-owned, distinct API from IG)
      *
      * Matches both long-form (substring) and short-form prefix variants.
      * The `*_` suffix on prefix checks (e.g. `fb_`) avoids false positives
      * (e.g. a hypothetical `fbi_*` would not match).
+     *
+     * Threads is checked BEFORE instagram because some Publer responses tag
+     * Threads accounts with type strings containing both 'threads' and
+     * 'instagram' (parent-platform mention) — order matters to bucket
+     * correctly.
      */
     public static function bucketAccountType(?string $rawType): string
     {
@@ -65,6 +71,9 @@ class PublerClient
             return 'other';
         }
 
+        if (str_contains($rawType, 'threads')) {
+            return 'threads';
+        }
         if (str_contains($rawType, 'facebook') || $rawType === 'fb' || str_starts_with($rawType, 'fb_')) {
             return 'facebook';
         }

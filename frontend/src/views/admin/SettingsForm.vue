@@ -604,7 +604,7 @@ LINKEDIN_OAUTH_REDIRECT_URI=https://alisadikinma.com/api/admin/linkedin/oauth/ca
       >
         <BaseCard>
           <h2 class="text-xl font-display font-semibold text-neutral-900 dark:text-neutral-100 mb-2">
-            Publer Integration — Cross-post to Facebook, Instagram, TikTok
+            Publer Integration — Cross-post to Instagram, TikTok, Threads
           </h2>
           <p class="text-sm text-neutral-600 dark:text-neutral-400 mb-6">
             Backend POSTs draft captions + LinkedIn carousel slides to Publer's REST API
@@ -712,7 +712,13 @@ LINKEDIN_OAUTH_REDIRECT_URI=https://alisadikinma.com/api/admin/linkedin/oauth/ca
                 if you connect new accounts in Publer. Each cross-post draft uses these as defaults.
               </p>
 
-              <!-- Facebook -->
+              <!--
+                Facebook dropdown hidden (May 10, 2026) — FB moved off Publer
+                pipeline to direct Graph API integration. The publer_facebook_account_id
+                setting + backend grouped['facebook'] response key + FacebookPost
+                model + scanner branch all intact for future revival. Re-enable
+                by uncommenting this block + restoring publer_facebook_account_id
+                in publerFormData defaults.
               <div>
                 <label for="publer_facebook_account_id" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
                   📘 Facebook Page
@@ -732,6 +738,7 @@ LINKEDIN_OAUTH_REDIRECT_URI=https://alisadikinma.com/api/admin/linkedin/oauth/ca
                   </option>
                 </select>
               </div>
+              -->
 
               <!-- Instagram -->
               <div>
@@ -770,6 +777,27 @@ LINKEDIN_OAUTH_REDIRECT_URI=https://alisadikinma.com/api/admin/linkedin/oauth/ca
                     {{ publerFormData.publer_tiktok_account_id }} (saved — refresh to load names)
                   </option>
                   <option v-for="acc in publerAccounts.tiktok" :key="acc.id" :value="acc.id">
+                    {{ acc.name }} — {{ acc.id }}
+                  </option>
+                </select>
+              </div>
+
+              <!-- Threads (added May 10, 2026 — Tier-1 native authoring via /threads-gen plugin) -->
+              <div>
+                <label for="publer_threads_account_id" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                  🧵 Threads
+                </label>
+                <select
+                  id="publer_threads_account_id"
+                  v-model="publerFormData.publer_threads_account_id"
+                  class="w-full border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="">(none selected)</option>
+                  <option v-if="publerFormData.publer_threads_account_id && !publerAccounts.threads?.length"
+                          :value="publerFormData.publer_threads_account_id">
+                    {{ publerFormData.publer_threads_account_id }} (saved — refresh to load names)
+                  </option>
+                  <option v-for="acc in publerAccounts.threads" :key="acc.id" :value="acc.id">
                     {{ acc.name }} — {{ acc.id }}
                   </option>
                 </select>
@@ -1756,6 +1784,7 @@ const publerFormData = ref({
   publer_facebook_account_id: '',
   publer_instagram_account_id: '',
   publer_tiktok_account_id: '',
+  publer_threads_account_id: '',
 })
 
 const publerKeyConfigured = computed(() => settingsStore.publerSettings?.publer_api_key_configured === true)
@@ -1787,6 +1816,7 @@ async function loadPublerSettings() {
       publer_facebook_account_id: s.publer_facebook_account_id || '',
       publer_instagram_account_id: s.publer_instagram_account_id || '',
       publer_tiktok_account_id: s.publer_tiktok_account_id || '',
+      publer_threads_account_id: s.publer_threads_account_id || '',
     }
     // Auto-populate dropdowns when api_key is configured and we haven't
     // synced yet this session — saves the operator a manual click. Silent
