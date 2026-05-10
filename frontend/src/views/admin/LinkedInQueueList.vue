@@ -292,11 +292,15 @@ async function doRegenerate(id) {
   await regenerateMutation.mutateAsync(id)
 }
 
-const emptyMessage = computed(() => ({
-  in_progress: { title: 'Quiet on the wire', body: 'No drafts in the pipeline. Click "Scan blog now" to pull recent published posts.' },
-  failed: { title: 'Nothing broken', body: 'No failed runs in the queue.' },
-  all: { title: 'Queue is clear', body: 'No drafts in the pipeline.' },
-}[activeTab.value]))
+const emptyMessage = computed(() => {
+  const map = {
+    need_reviews: { title: 'Inbox zero', body: 'No drafts waiting for your review. New ones land here once /linkedin-gen finishes generating + validating.' },
+    in_progress: { title: 'Quiet on the wire', body: 'No drafts in the pipeline. Click "Scan blog now" to pull recent published posts.' },
+    failed: { title: 'Nothing broken', body: 'No failed runs in the queue.' },
+    all: { title: 'Queue is clear', body: 'No drafts in the pipeline.' },
+  }
+  return map[activeTab.value] || map.all
+})
 </script>
 
 <template>
