@@ -256,9 +256,26 @@ class ThreadsGenerationService extends BaseSocialGenerationService
         $validation = is_array($parsed['validation'] ?? null) ? $parsed['validation'] : [];
         $passed = (bool) ($validation['passed'] ?? false);
 
+        // Persist branded short URL for first-comment publishing (Publer comments[]
+        // field, Phase H+ real impl). Format mirrors LinkedInPost.link_comment.
+        $linkComment = null;
+        if ($draft->post && !empty($draft->post->slug)) {
+            try {
+                $shortUrl = app(\App\Services\ShortLinkService::class)
+                    ->forBlogPost($draft->post, 'threads');
+                $linkComment = "Full article: {$shortUrl}";
+            } catch (\Throwable $e) {
+                Log::warning('[ThreadsGenerationService] short link generation failed', [
+                    'draft_id' => $draft->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
         $draft->update([
             'title' => mb_substr($title, 0, 200),
             'caption' => $caption,
+            'link_comment' => $linkComment,
             'hashtags' => array_slice(array_values(array_map('strval', $hashtags)), 0, 3),
         ]);
 

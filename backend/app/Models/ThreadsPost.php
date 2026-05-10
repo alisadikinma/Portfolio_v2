@@ -34,6 +34,7 @@ class ThreadsPost extends Model
         'format',
         'title',
         'caption',
+        'link_comment',
         'hashtags',
         'scheduled_at',
         'published_at',

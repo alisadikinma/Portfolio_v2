@@ -1280,6 +1280,8 @@ Route::middleware(['auth:sanctum'])->prefix('admin/linkedin-drafts')->group(func
     Route::get('/{id}/progress', [LinkedInDraftController::class, 'progress']);
     Route::put('/{id}', [LinkedInDraftController::class, 'update']);
     Route::post('/{id}/regenerate', [LinkedInDraftController::class, 'regenerate']);
+    Route::post('/{id}/generate-threads', [LinkedInDraftController::class, 'generateThreads'])
+        ->name('admin.linkedin-drafts.generate-threads');
     Route::post('/{id}/approve', [LinkedInDraftController::class, 'approve']);
     Route::post('/{id}/cancel', [LinkedInDraftController::class, 'cancel']);
     Route::post('/{id}/publish-now', [LinkedInDraftController::class, 'publishNow']);

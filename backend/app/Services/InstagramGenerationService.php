@@ -322,10 +322,27 @@ class InstagramGenerationService extends BaseSocialGenerationService
             ];
         }
 
+        // Persist branded short URL for first-comment publishing (Publer comments[]
+        // field, Phase H+ real impl). Format mirrors LinkedInPost.link_comment.
+        $linkComment = null;
+        if ($draft->post && !empty($draft->post->slug)) {
+            try {
+                $shortUrl = app(\App\Services\ShortLinkService::class)
+                    ->forBlogPost($draft->post, 'instagram');
+                $linkComment = "Full article: {$shortUrl}";
+            } catch (\Throwable $e) {
+                Log::warning('[InstagramGenerationService] short link generation failed', [
+                    'draft_id' => $draft->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
         $draft->update([
             'title' => $title,
             'caption' => $caption,
             'text_only_caption' => $textOnlyCaption !== '' ? $textOnlyCaption : null,
+            'link_comment' => $linkComment,
             'hashtags' => array_values(array_map('strval', $hashtags)),
         ]);
 

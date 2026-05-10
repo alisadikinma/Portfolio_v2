@@ -306,6 +306,65 @@ class LinkedInDraftController extends Controller
         ], 201);
     }
 
+    /**
+     * POST /admin/linkedin-drafts/{id}/generate-threads
+     *
+     * One-off Threads cross-post sibling creation for an existing LinkedIn
+     * draft that doesn't yet have one. Used when the LinkedIn draft pre-dates
+     * the /threads-gen plugin (May 10, 2026 ship). Idempotent — returns 409 if
+     * a Threads sibling already exists.
+     *
+     * Mirrors `ScanLinkedInForCrossPost::createThreads()` for one specific
+     * LinkedIn draft. The bulk equivalent is the
+     * `linkedin:backfill-threads` artisan command.
+     */
+    public function generateThreads(int $id): JsonResponse
+    {
+        $draft = LinkedInPost::with('threadsPost')->find($id);
+        if ($draft === null) {
+            return $this->notFound();
+        }
+
+        if ($draft->threadsPost !== null) {
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'threads_sibling_exists',
+                    'message' => "Threads draft #{$draft->threadsPost->id} already exists for this LinkedIn post.",
+                ],
+            ], 409);
+        }
+
+        $format = $draft->format ?? 'text';
+
+        $threadsDraft = \App\Models\ThreadsPost::create([
+            'linkedin_post_id' => $draft->id,
+            'post_id' => $draft->post_id,
+            'format' => $format,
+            'status' => \App\Enums\ThreadsPostStatus::PendingGeneration->value,
+            'pipeline_state_log' => [[
+                'from' => 'admin_one_off',
+                'to' => 'pending_generation',
+                'reason' => 'admin_generate_threads_button',
+                'timestamp' => now()->toIso8601String(),
+            ]],
+        ]);
+
+        \App\Jobs\GenerateThreadsPost::dispatch($threadsDraft->id);
+
+        Log::info('[LinkedInDraft] Threads sibling created via admin button', [
+            'linkedin_post_id' => $draft->id,
+            'threads_post_id' => $threadsDraft->id,
+            'format' => $format,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'data' => ['threads_post_id' => $threadsDraft->id, 'format' => $format],
+            'message' => 'Threads draft created. Worker will generate caption shortly.',
+        ], 201);
+    }
+
     public function approve(int $id, Request $request): JsonResponse
     {
         $draft = LinkedInPost::find($id);

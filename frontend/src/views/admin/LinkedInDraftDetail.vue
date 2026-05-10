@@ -15,6 +15,7 @@ import {
   useRegenerateCaption,
   useRegenerateSlideImage,
   useConflictCheck,
+  useGenerateThreads,
   postTitle,
 } from '@/composables/useLinkedInDrafts'
 import {
@@ -151,6 +152,7 @@ const approveMutation = useApproveLinkedInDraft()
 const cancelMutation = useCancelLinkedInDraft()
 const publishNowMutation = usePublishLinkedInDraftNow()
 const publishAllMutation = usePublishAllPlatforms()
+const generateThreadsMutation = useGenerateThreads()
 const regenerateMutation = useRegenerateLinkedInDraft()
 const regenerateAllImagesMutation = useRegenerateAllCarouselImages()
 const rerenderImagesOnlyMutation = useRerenderImagesOnly()
@@ -681,6 +683,30 @@ async function doRegenerate() {
   const result = await regenerateMutation.mutateAsync(draftId.value)
   const newId = result?.data?.id
   if (newId) router.push({ name: 'admin-sosmed-draft-detail', params: { id: newId } })
+}
+
+// One-off Threads cross-post sibling creation for LinkedIn drafts that
+// pre-date the /threads-gen plugin (May 10, 2026 ship). Surfaces as button
+// inside the Threads tab section when threads_post is null. Bulk equivalent
+// is `php artisan linkedin:backfill-threads`.
+async function doGenerateThreads() {
+  if (!confirm('Generate Threads variant for this LinkedIn draft?\n\nA new Threads draft will be created and queued for caption authoring (~30s).')) return
+  try {
+    await generateThreadsMutation.mutateAsync(draftId.value)
+    refetch()
+  } catch (err) {
+    alert(err?.response?.data?.error?.message || 'Generate Threads failed')
+  }
+}
+
+// Read the link_comment field from the active platform's draft. LinkedIn
+// stores it on the draft itself; cross-posts (IG/TikTok/Threads) store it on
+// their own draft row exposed via draft.<platform>_post relation.
+function getActivePlatformLinkComment() {
+  if (!draft.value) return null
+  if (activePlatform.value === 'linkedin') return draft.value.link_comment || null
+  const sibling = draft.value[`${activePlatform.value}_post`]
+  return sibling?.link_comment || null
 }
 
 // --- Carousel slides + image actions --------------------------------------
@@ -1743,19 +1769,39 @@ const showThumbnailUploadCaption = computed(() =>
                 class="rounded-lg border border-neutral-800 bg-neutral-900/40 px-4 py-3 text-sm text-neutral-400"
               >
                 <p class="text-neutral-300 font-medium mb-1">{{ PLATFORM_META[activePlatform].label }} variant not generated yet.</p>
-                <p class="text-xs">The cross-post fan-out for this platform hasn't run. Slides above will be reused once it does.</p>
+                <p class="text-xs mb-3">The cross-post fan-out for this platform hasn't run. Slides above will be reused once it does.</p>
+
+                <!-- One-off "Generate Threads" button — useful for LinkedIn drafts
+                     that pre-date the /threads-gen plugin (May 10, 2026). Only
+                     surfaces on the Threads tab to avoid clutter on FB/IG/TT
+                     where there's no equivalent backfill flow yet. -->
+                <button
+                  v-if="activePlatform === 'threads'"
+                  type="button"
+                  @click="doGenerateThreads"
+                  :disabled="generateThreadsMutation.isPending.value"
+                  class="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-mono uppercase tracking-[0.12em] rounded-md border border-purple-500/40 bg-purple-500/10 text-purple-300 hover:bg-purple-500/20 hover:text-purple-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span v-if="generateThreadsMutation.isPending.value">⟳ Generating…</span>
+                  <span v-else>🧵 Generate Threads now</span>
+                </button>
               </div>
 
-              <!-- First-comment bubble (LinkedIn-specific — link in comment
-                   trick avoids the 60% reach penalty on body links). FB/IG/
-                   TikTok don't have an equivalent, so this only renders on
-                   the LinkedIn tab. -->
+              <!-- First-comment bubble — surfaces the branded short URL that
+                   will be auto-posted as first comment on platforms that
+                   support it (LinkedIn native, IG/Threads via Publer). TikTok
+                   shows for parity but URL actually lives in caption body
+                   (Publer API can't post first-comment to TikTok). -->
               <div
-                v-if="activePlatform === 'linkedin' && draft.link_comment"
+                v-if="['linkedin', 'instagram', 'threads', 'tiktok'].includes(activePlatform) && getActivePlatformLinkComment()"
                 class="mt-2 p-3 rounded-lg border border-cyan-500/20 bg-cyan-500/5"
               >
-                <p class="text-[10px] text-cyan-400 font-mono uppercase tracking-[0.14em] mb-1">First comment (auto-posted +30s)</p>
-                <p class="text-sm text-neutral-300 break-all">{{ draft.link_comment }}</p>
+                <p class="text-[10px] text-cyan-400 font-mono uppercase tracking-[0.14em] mb-1">
+                  {{ activePlatform === 'tiktok'
+                      ? 'Link in caption body (TikTok has no first-comment API)'
+                      : 'First comment (auto-posted +1 min)' }}
+                </p>
+                <p class="text-sm text-neutral-300 break-all">{{ getActivePlatformLinkComment() }}</p>
               </div>
             </div>
           </article>

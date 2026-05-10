@@ -260,9 +260,27 @@ class TiktokGenerationService extends BaseSocialGenerationService
             ];
         }
 
+        // Persist branded short URL for parity with other platforms (TikTok
+        // doesn't support Publer first-comment; URL lives in caption body via
+        // plugin input. Column populated for visibility / admin UI parity).
+        $linkComment = null;
+        if ($draft->post && !empty($draft->post->slug)) {
+            try {
+                $shortUrl = app(\App\Services\ShortLinkService::class)
+                    ->forBlogPost($draft->post, 'tiktok');
+                $linkComment = "Full article: {$shortUrl}";
+            } catch (\Throwable $e) {
+                Log::warning('[TiktokGenerationService] short link generation failed', [
+                    'draft_id' => $draft->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
         $draft->update([
             'title' => $title,
             'caption' => $caption,
+            'link_comment' => $linkComment,
             'hashtags' => array_values(array_map('strval', $hashtags)),
         ]);
 

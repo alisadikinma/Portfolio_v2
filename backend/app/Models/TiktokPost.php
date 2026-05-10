@@ -33,6 +33,7 @@ class TiktokPost extends Model
         'status',
         'title',
         'caption',
+        'link_comment',
         'hashtags',
         'music_suggestion',
         'scheduled_at',

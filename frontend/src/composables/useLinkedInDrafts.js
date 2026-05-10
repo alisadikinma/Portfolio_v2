@@ -383,6 +383,26 @@ export function usePublishAllPlatforms() {
 }
 
 /**
+ * POST /admin/linkedin-drafts/{id}/generate-threads
+ *
+ * One-off Threads cross-post sibling creation for a LinkedIn draft that
+ * pre-dates the /threads-gen plugin (May 10, 2026). Fans out a single Threads
+ * draft + dispatches generation. Returns 409 if Threads sibling already exists.
+ *
+ * Bulk equivalent: `php artisan linkedin:backfill-threads` (CLI only).
+ */
+export function useGenerateThreads() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) =>
+      api.post(`/admin/linkedin-drafts/${id}/generate-threads`).then(r => r.data),
+    onSuccess: (_, id) => {
+      qc.invalidateQueries({ queryKey: [LIST_KEY, id] })
+    },
+  })
+}
+
+/**
  * GET /admin/linkedin-posts/calendar?from=&to=&status=
  *
  * Date-range query for the calendar month grid. Returns compact per-row shape
