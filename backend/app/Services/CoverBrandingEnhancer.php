@@ -22,8 +22,22 @@ class CoverBrandingEnhancer
         'pengembang', 'perancang', 'mahasiswa', 'wirausaha',
     ];
 
+    // Single-language fallback: used when EN translation is unavailable. Same
+    // typographic feel as the bilingual variant (white sans-serif, drop shadow,
+    // 2-4 emphasis words in amber #F5A623) but no subtitle line.
     private const TITLE_INSTRUCTION_TEMPLATE =
-        '. Add large bold thumbnail-style title text "{TITLE}" overlaid in the upper-left third of the frame. Use clean sans-serif typography in white with a subtle dark drop shadow for high contrast against the background. Styled like a premium YouTube thumbnail — text must be clearly legible and not obscure focal subjects. Do not stretch, distort, or duplicate the text.';
+        '. Add large bold thumbnail-style title text "{TITLE}" overlaid in the upper-left third of the frame. Use clean sans-serif typography in white with a subtle dark drop shadow for high contrast against the background. Within the title, render two to four key emphasis words (numbers, intensifiers, named subjects) in warm amber/gold #F5A623 to draw the eye; the remaining words stay pure white. Styled like a premium magazine cover headline — text must be clearly legible and not obscure focal subjects. Do not stretch, distort, or duplicate the text.';
+
+    // Bilingual variant — mirrors CarouselSlideEnhancer chrome rules so blog
+    // cover and carousel slides have a consistent visual language. Indonesian
+    // headline dominates; English subtitle is smaller, sentence-case white.
+    // Specs scaled for 16:9 cover canvas (vs carousel 4:5):
+    //   - ID headline: ~80-95px on a 1920x1080 canvas (target 6-8% canvas height)
+    //   - EN subtitle: ~32-38px (~40% of ID headline size)
+    //   - 2-4 amber #F5A623 emphasis words in ID headline only
+    //   - Subtitle stays white (NEVER amber, NEVER bold, NEVER italic)
+    private const BILINGUAL_TITLE_INSTRUCTION_TEMPLATE =
+        '. Add a bilingual headline overlay in the upper-left third of the frame. Render the Indonesian main headline "{TITLE_ID}" in large bold uppercase white sans-serif typography (target eighty to ninety-five pixels tall on a 1920x1080 canvas, tight letter-spacing, condensed weight, one to two lines maximum). Within the Indonesian headline, render two to four key emphasis words (numbers, intensifiers, named subjects) in warm amber/gold #F5A623 to draw the eye; the remaining words stay pure white. Directly below the Indonesian headline, render the English subtitle "{TITLE_EN}" on a single line at approximately forty percent of the Indonesian headline\'s font size (target thirty-two to thirty-eight pixels tall), in clean regular-weight white sans-serif (NOT bold, NOT italic, NOT uppercase — sentence case only), never wider than the Indonesian headline above it. The English subtitle is white — never amber — and never visually rivals the Indonesian headline. Both copies must be short, punchy, editorial. Apply a subtle dark drop shadow on both lines for high contrast against the background. The Indonesian headline is roughly two-and-a-half times the visual size of the English subtitle. Do not stretch, distort, or duplicate the text. Text must be clearly legible and not obscure focal subjects.';
 
     public function enhance(array $prompt, ContentIdea $idea): array
     {
@@ -34,18 +48,33 @@ class CoverBrandingEnhancer
         $type = $prompt['type'] ?? null;
 
         if ($type === 'cover') {
-            // 1. Inject title instruction into prompt_text.
-            // Source priority: user-editable caption first, then article title.
+            // 1. Inject title instruction into prompt_text — bilingual when
+            // both ID + EN translations available (mirrors CarouselSlideEnhancer
+            // chrome rules), single-language fallback otherwise.
+            //
+            // Source priority for primary (ID):
+            //   user-editable caption → article.id.title → article.title → idea.title
             // Caption is the field users actually edit in the admin UI — per
             // CLAUDE.md it's "article title (exact or light SEO paraphrase)"
             // for covers, so using it as the overlay source matches user mental
             // model (edit caption → see it rendered) and keeps semantics intact.
             $caption = is_string($prompt['caption'] ?? null) ? trim($prompt['caption']) : '';
-            $titleSource = $caption !== '' ? $caption : $this->resolveTitle($idea);
-            $title = $this->sanitizeTitle($titleSource);
-            $title = $this->truncateTitle($title);
+            $titleIdSource = $caption !== '' ? $caption : $this->resolveTitle($idea);
+            $titleId = $this->truncateTitle($this->sanitizeTitle($titleIdSource));
+
+            // EN subtitle: pull from generated_article.en.title when present.
+            // No fallback to ID copy — if EN translation is missing the cover
+            // renders single-language (avoids EN==ID echo, which would look
+            // like a typography bug).
+            $titleEnSource = $this->resolveTitleEn($idea);
+            $titleEn = $titleEnSource !== ''
+                ? $this->truncateTitle($this->sanitizeTitle($titleEnSource))
+                : '';
+
             $promptText = $prompt['prompt_text'] ?? '';
-            $prompt['prompt_text'] = $this->injectTitleInstruction($promptText, $title);
+            $prompt['prompt_text'] = $titleEn !== ''
+                ? $this->injectBilingualTitleInstruction($promptText, $titleId, $titleEn)
+                : $this->injectTitleInstruction($promptText, $titleId);
 
             // 2. Named-entity gate (see docs/plans/2026-04-20-named-entity-aware-cover-generation.md).
             // When the cover subject is a detected public figure (person
@@ -357,6 +386,28 @@ class CoverBrandingEnhancer
     }
 
     /**
+     * Inject the bilingual title overlay instruction (ID main + EN subtitle)
+     * matching CarouselSlideEnhancer chrome rules. Used when the article has
+     * both an Indonesian and an English translation.
+     *
+     * Idempotency: if the prompt already contains a bilingual instruction
+     * (detected by the canonical "bilingual headline overlay" phrase), skips
+     * append to avoid double-injection on retries.
+     */
+    public function injectBilingualTitleInstruction(string $promptText, string $titleId, string $titleEn): string
+    {
+        if (str_contains($promptText, 'bilingual headline overlay')) {
+            return $promptText;
+        }
+        $instruction = str_replace(
+            ['{TITLE_ID}', '{TITLE_EN}'],
+            [$titleId, $titleEn],
+            self::BILINGUAL_TITLE_INSTRUCTION_TEMPLATE
+        );
+        return $promptText . $instruction;
+    }
+
+    /**
      * Merge entity_refs[].url values into file_urls (dedupe-preserving).
      * Called on covers when the plugin has populated entity_refs from
      * /article-images Phase 3.5b Wikidata lookup. GeminiGen consumes
@@ -475,6 +526,52 @@ class CoverBrandingEnhancer
             ?? $article['title']
             ?? $idea->title
             ?? '';
+    }
+
+    /**
+     * Resolve the English title for bilingual subtitle rendering. Returns ''
+     * when EN translation absent — caller falls back to single-language overlay.
+     *
+     * Source priority:
+     *   1. generated_article.en.title (authored by /article-translate pipeline)
+     *   2. result Post's en post_translations.title (post-publish backfill case)
+     *   3. '' (no EN — caller skips subtitle injection)
+     *
+     * Never returns the ID title as fallback — an EN==ID echo would render as
+     * a typography bug (same text twice in different sizes).
+     */
+    private function resolveTitleEn(ContentIdea $idea): string
+    {
+        $article = $idea->generated_article ?? [];
+        $enNode = $article['en'] ?? null;
+        $enTitle = is_array($enNode) ? ($enNode['title'] ?? null) : null;
+
+        if (is_string($enTitle) && trim($enTitle) !== '') {
+            return $enTitle;
+        }
+
+        // Post-publish path: idea→Post→post_translations.en
+        $postId = $idea->result_post_id ?? null;
+        if ($postId !== null) {
+            try {
+                $enTranslation = \App\Models\PostTranslation::query()
+                    ->where('post_id', $postId)
+                    ->where('language', 'en')
+                    ->value('title');
+                if (is_string($enTranslation) && trim($enTranslation) !== '') {
+                    return $enTranslation;
+                }
+            } catch (\Throwable $e) {
+                // Defensive — never fail prompt enhancement on a translation lookup.
+                Log::warning('Cover branding: EN translation lookup failed', [
+                    'idea_id' => $idea->id,
+                    'post_id' => $postId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return '';
     }
 
     private function sanitizeTitle(string $title): string
