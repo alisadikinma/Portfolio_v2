@@ -53,6 +53,15 @@ const PLATFORM_META = {
   threads: { label: 'Threads', accent: 'text-neutral-300', activeBg: 'bg-neutral-200/10 text-neutral-100 border-neutral-300/40' },
 }
 
+// Platforms shown in the caption tab strip. Facebook hidden (May 10, 2026)
+// — moved off Publer to direct Graph API integration, no UI surface yet.
+// PLATFORM_META.facebook stays intact so server-side lookups (labels, status
+// chips, draft.facebook_post deserialization) keep working.
+const VISIBLE_PLATFORMS = ['linkedin', 'instagram', 'tiktok', 'threads']
+const VISIBLE_PLATFORM_META = computed(() =>
+  Object.fromEntries(VISIBLE_PLATFORMS.map((k) => [k, PLATFORM_META[k]]))
+)
+
 const platformPostFor = (key) => {
   if (!draft.value) return null
   if (key === 'linkedin') {
@@ -1715,7 +1724,7 @@ const showThumbnailUploadCaption = computed(() =>
                   aria-label="Switch caption per platform"
                 >
                   <button
-                    v-for="(meta, key) in PLATFORM_META"
+                    v-for="(meta, key) in VISIBLE_PLATFORM_META"
                     :key="key"
                     type="button"
                     role="tab"
