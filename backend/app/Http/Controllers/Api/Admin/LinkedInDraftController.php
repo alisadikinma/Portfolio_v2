@@ -127,10 +127,10 @@ class LinkedInDraftController extends Controller
             // Cross-post siblings so the detail page can render in-place
             // platform tabs (LinkedIn / FB / IG / TikTok) that swap caption
             // + hashtags + status without navigating away.
-            'facebookPost:id,linkedin_post_id,status,caption,hashtags,scheduled_at,published_at,external_url',
-            'instagramPost:id,linkedin_post_id,status,caption,hashtags,scheduled_at,published_at,external_url',
-            'tiktokPost:id,linkedin_post_id,status,caption,hashtags,scheduled_at,published_at,external_url',
-            'threadsPost:id,linkedin_post_id,status,caption,hashtags,scheduled_at,published_at,external_url',
+            'facebookPost:id,linkedin_post_id,status,caption,hashtags,link_comment,scheduled_at,published_at,external_url',
+            'instagramPost:id,linkedin_post_id,status,caption,hashtags,link_comment,scheduled_at,published_at,external_url',
+            'tiktokPost:id,linkedin_post_id,status,caption,hashtags,link_comment,scheduled_at,published_at,external_url',
+            'threadsPost:id,linkedin_post_id,status,caption,hashtags,link_comment,scheduled_at,published_at,external_url',
         ])->find($id);
         if ($draft === null) {
             return $this->notFound();
