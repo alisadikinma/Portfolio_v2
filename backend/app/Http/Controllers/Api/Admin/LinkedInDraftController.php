@@ -131,9 +131,12 @@ class LinkedInDraftController extends Controller
             // hidden from UI per May 10 cleanup; revive when direct FB
             // Graph API integration ships — add migration + re-add field).
             'facebookPost:id,linkedin_post_id,status,caption,hashtags,scheduled_at,published_at,external_url',
-            'instagramPost:id,linkedin_post_id,status,caption,hashtags,link_comment,scheduled_at,published_at,external_url',
-            'tiktokPost:id,linkedin_post_id,status,caption,hashtags,link_comment,scheduled_at,published_at,external_url',
-            'threadsPost:id,linkedin_post_id,status,caption,hashtags,link_comment,scheduled_at,published_at,external_url',
+            'instagramPost:id,linkedin_post_id,status,title,caption,hashtags,link_comment,scheduled_at,published_at,external_url',
+            // tiktok title is REQUIRED by Publer for photo carousel posts
+            // (max 90 chars per Publer API spec). Plugin emits it; surface
+            // to UI so operator sees what'll ship to TikTok.
+            'tiktokPost:id,linkedin_post_id,status,title,caption,hashtags,link_comment,scheduled_at,published_at,external_url',
+            'threadsPost:id,linkedin_post_id,status,title,caption,hashtags,link_comment,scheduled_at,published_at,external_url',
         ])->find($id);
         if ($draft === null) {
             return $this->notFound();

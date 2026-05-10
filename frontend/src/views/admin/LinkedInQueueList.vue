@@ -26,17 +26,20 @@ const router = useRouter()
 // --- Tab persistence: restore the active tab on mount, save on change.
 // Lets the operator come back from a draft detail and land on the same tab.
 //
-// Tab simplification (May 9, 2026): merged 'manual_review' into 'in_progress'.
-// Anything pre-published (pending_generation / generating / validating /
-// manual_review / awaiting_publish) is now one bucket — operators can act
-// on it AND fan out to IG/TikTok/FB cross-post variants while it sits there.
-const activeTab = ref('in_progress')
+// Tab structure (May 10, 2026 partial revert of May 9 simplification):
+//   - need_reviews → manual_review status (operator must approve/reject before publish)
+//   - in_progress  → pending_generation / generating / validating (worker active)
+//   - failed       → terminal-failed runs (regenerate or cancel)
+//   - all          → catch-all
+// awaiting_publish was bulk-flipped back to manual_review per operator
+// request (artisan linkedin:flip-awaiting-to-manual-review).
+const activeTab = ref('need_reviews')
 onMounted(() => {
   const saved = sessionStorage.getItem(QUEUE_TAB_KEY)
-  // Migrate legacy persisted 'manual_review' → 'in_progress'.
+  // Migrate legacy persisted tab values
   if (saved === 'manual_review') {
-    activeTab.value = 'in_progress'
-  } else if (saved && ['failed', 'in_progress', 'all'].includes(saved)) {
+    activeTab.value = 'need_reviews'
+  } else if (saved && ['need_reviews', 'in_progress', 'failed', 'all'].includes(saved)) {
     activeTab.value = saved
   }
 })
@@ -70,27 +73,23 @@ const filters = computed(() => ({
 const { drafts: allDrafts, isLoading, error } = useLinkedInDraftsList(filters)
 
 function classifyForQueue(draft) {
-  // Anything pre-published (pending → manual_review → awaiting_publish)
-  // lives in the In Progress bucket so operators can act on it AND fan
-  // out to Instagram / TikTok / Facebook variants from one place.
-  // Carousel drafts whose slides are still rendering (or all-failed)
-  // surface in the same bucket — render state shows in the issue column.
-  const inProgressStates = [
-    'pending_generation',
-    'generating',
-    'validating',
-    'manual_review',
-    'awaiting_publish',
-  ]
-  if (inProgressStates.includes(draft.status)) {
+  // need_reviews bucket — operator gate before publish.
+  //   manual_review = caption authored, awaiting human approval
+  //   awaiting_publish = legacy state (should now be 0 after the bulk
+  //     flip artisan; kept here as fallback so any future drafts that
+  //     land back in awaiting_publish still surface for review).
+  if (draft.status === 'manual_review' || draft.status === 'awaiting_publish') {
     // Carousel-specific failure: every slide rejected → bucket as failed
-    // so the operator's action is "retry slides", not "review caption".
-    if (draft.status === 'manual_review' && draft.format === 'carousel') {
+    // so operator's action is "retry slides", not "review caption".
+    if (draft.format === 'carousel') {
       const imgState = inspectCarouselRenderState(draft)
       if (imgState === 'failed') return 'failed'
     }
-    return 'in_progress'
+    return 'need_reviews'
   }
+  // in_progress bucket — worker actively running, just wait.
+  const activelyRunning = ['pending_generation', 'generating', 'validating']
+  if (activelyRunning.includes(draft.status)) return 'in_progress'
   if (draft.status === 'failed') return 'failed'
   return null
 }
@@ -166,7 +165,7 @@ function sortIndicator(key) {
 }
 
 const counts = computed(() => {
-  const c = { failed: 0, in_progress: 0 }
+  const c = { need_reviews: 0, in_progress: 0, failed: 0 }
   for (const d of allDrafts.value) {
     const bucket = classifyForQueue(d)
     if (bucket && c[bucket] !== undefined) c[bucket]++
@@ -227,6 +226,7 @@ async function scanBlogNow() {
 }
 
 const tabs = [
+  { key: 'need_reviews', label: 'Need Reviews', accent: 'text-amber-400' },
   { key: 'in_progress', label: 'In progress', accent: 'text-cyan-400' },
   { key: 'failed', label: 'Failed', accent: 'text-red-400' },
   { key: 'all', label: 'Everything', accent: 'text-neutral-300' },

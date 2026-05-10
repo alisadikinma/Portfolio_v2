@@ -83,6 +83,7 @@ const platformPostFor = (key) => {
   const sibling = draft.value[`${key}_post`]
   if (!sibling) return null
   return {
+    title: sibling.title || '', // TikTok REQUIRES this for photo carousel (Publer ≤90 chars)
     content: sibling.caption || '',
     hashtags: Array.isArray(sibling.hashtags) ? sibling.hashtags : [],
     status: sibling.status,
@@ -1950,6 +1951,25 @@ const showThumbnailUploadCaption = computed(() =>
                   {{ PLATFORM_META[activePlatform].label }} · {{ activePlatformPost.status || 'pending' }}
                 </div>
 
+                <!-- Title — REQUIRED by Publer for TikTok photo carousel
+                     (≤90 chars per Publer API spec). Plugin emits this
+                     separately from caption. Render above caption with
+                     visual prominence so operator sees what'll ship. -->
+                <div
+                  v-if="activePlatform !== 'linkedin' && activePlatformPost.title"
+                  class="rounded-md border border-neutral-800/60 bg-neutral-950/40 px-3 py-2"
+                >
+                  <p class="text-[10px] font-mono uppercase tracking-[0.14em] text-neutral-500 mb-1">
+                    Title
+                    <span class="ml-1 text-neutral-600">· {{ activePlatformPost.title.length }}/90</span>
+                    <span
+                      v-if="activePlatform === 'tiktok' && activePlatformPost.title.length > 90"
+                      class="ml-2 text-red-400"
+                    >TikTok hard cap exceeded</span>
+                  </p>
+                  <p class="text-[15px] text-neutral-100 font-medium leading-snug">{{ activePlatformPost.title }}</p>
+                </div>
+
                 <div v-if="activePlatformPost.content && activePlatformPost.content.trim() !== ''" class="whitespace-pre-wrap text-neutral-200 leading-relaxed text-[15px]">
                   {{ activePlatformPost.content }}
                 </div>
@@ -2025,17 +2045,16 @@ const showThumbnailUploadCaption = computed(() =>
 
               <!-- First-comment bubble — surfaces the branded short URL that
                    will be auto-posted as first comment on platforms that
-                   support it (LinkedIn native, IG/Threads via Publer). TikTok
-                   shows for parity but URL actually lives in caption body
-                   (Publer API can't post first-comment to TikTok). -->
+                   support it (LinkedIn native, IG/Threads via Publer).
+                   TikTok intentionally excluded — Publer API has no
+                   first-comment support for TikTok, URL lives directly in
+                   the caption body so the bubble would just duplicate. -->
               <div
-                v-if="['linkedin', 'instagram', 'threads', 'tiktok'].includes(activePlatform) && getActivePlatformLinkComment()"
+                v-if="['linkedin', 'instagram', 'threads'].includes(activePlatform) && getActivePlatformLinkComment()"
                 class="mt-2 p-3 rounded-lg border border-cyan-500/20 bg-cyan-500/5"
               >
                 <p class="text-[10px] text-cyan-400 font-mono uppercase tracking-[0.14em] mb-1">
-                  {{ activePlatform === 'tiktok'
-                      ? 'Link in caption body (TikTok has no first-comment API)'
-                      : 'First comment (auto-posted +1 min)' }}
+                  First comment (auto-posted +1 min)
                 </p>
                 <p class="text-sm text-neutral-300 break-all">{{ getActivePlatformLinkComment() }}</p>
               </div>
