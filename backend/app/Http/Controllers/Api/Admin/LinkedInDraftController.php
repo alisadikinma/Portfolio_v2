@@ -466,11 +466,17 @@ class LinkedInDraftController extends Controller
             ];
         }
 
-        $inProgress = ['pending_generation', 'generating', 'validating'];
-        if (in_array($sibling->status, $inProgress, true)) {
+        // Only block when worker is ACTIVELY processing (generating/validating).
+        // pending_generation can be a real queued job OR an orphan (status set
+        // but no job in queue — happens when worker crashes mid-dispatch or
+        // queue table gets manually pruned). Re-dispatching pending_generation
+        // is safe: Laravel queue will execute the job; if a duplicate exists,
+        // both runs hit the same FSM transition path which is idempotent.
+        $activelyRunning = ['generating', 'validating'];
+        if (in_array($sibling->status, $activelyRunning, true)) {
             return [
                 'outcome' => 'in_progress',
-                'message' => "{$platformLabel} already mid-pipeline (status={$sibling->status}).",
+                'message' => "{$platformLabel} actively running (status={$sibling->status}).",
                 'sibling_id' => $sibling->id,
             ];
         }
@@ -542,10 +548,12 @@ class LinkedInDraftController extends Controller
                 ? ['outcome' => 'refreshed', 'mode' => 'sync', 'message' => 'LinkedIn caption refreshed (sync)']
                 : ['outcome' => 'failed', 'mode' => 'sync', 'message' => $captionResult['error'] ?? 'Caption regen failed'];
         } else {
-            // text format — full pipeline (post body IS the caption)
-            $linkedInInProgress = ['pending_generation', 'generating', 'validating'];
-            if (in_array($draft->status, $linkedInInProgress, true)) {
-                $results['linkedin'] = ['outcome' => 'in_progress', 'mode' => 'async', 'message' => "LinkedIn already mid-pipeline (status={$draft->status})"];
+            // text format — full pipeline (post body IS the caption).
+            // Only block actively-running statuses; pending_generation may be
+            // an orphan (job dropped from queue) so allow re-dispatch.
+            $linkedInRunning = ['generating', 'validating'];
+            if (in_array($draft->status, $linkedInRunning, true)) {
+                $results['linkedin'] = ['outcome' => 'in_progress', 'mode' => 'async', 'message' => "LinkedIn actively running (status={$draft->status})"];
             } else {
                 $previousStatus = $draft->status;
                 $draft->update([
