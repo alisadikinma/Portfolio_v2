@@ -127,7 +127,10 @@ class LinkedInDraftController extends Controller
             // Cross-post siblings so the detail page can render in-place
             // platform tabs (LinkedIn / FB / IG / TikTok) that swap caption
             // + hashtags + status without navigating away.
-            'facebookPost:id,linkedin_post_id,status,caption,hashtags,link_comment,scheduled_at,published_at,external_url',
+            // facebook_posts intentionally has NO link_comment column (FB
+            // hidden from UI per May 10 cleanup; revive when direct FB
+            // Graph API integration ships — add migration + re-add field).
+            'facebookPost:id,linkedin_post_id,status,caption,hashtags,scheduled_at,published_at,external_url',
             'instagramPost:id,linkedin_post_id,status,caption,hashtags,link_comment,scheduled_at,published_at,external_url',
             'tiktokPost:id,linkedin_post_id,status,caption,hashtags,link_comment,scheduled_at,published_at,external_url',
             'threadsPost:id,linkedin_post_id,status,caption,hashtags,link_comment,scheduled_at,published_at,external_url',
