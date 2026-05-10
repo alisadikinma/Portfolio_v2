@@ -16,6 +16,9 @@ import {
   useRegenerateSlideImage,
   useConflictCheck,
   useGenerateThreads,
+  useRegenerateInstagram,
+  useRegenerateTiktok,
+  useRegenerateThreads,
   postTitle,
 } from '@/composables/useLinkedInDrafts'
 import {
@@ -162,6 +165,9 @@ const cancelMutation = useCancelLinkedInDraft()
 const publishNowMutation = usePublishLinkedInDraftNow()
 const publishAllMutation = usePublishAllPlatforms()
 const generateThreadsMutation = useGenerateThreads()
+const regenerateInstagramMutation = useRegenerateInstagram()
+const regenerateTiktokMutation = useRegenerateTiktok()
+const regenerateThreadsMutation = useRegenerateThreads()
 const regenerateMutation = useRegenerateLinkedInDraft()
 const regenerateAllImagesMutation = useRegenerateAllCarouselImages()
 const rerenderImagesOnlyMutation = useRerenderImagesOnly()
@@ -705,6 +711,40 @@ async function doGenerateThreads() {
     refetch()
   } catch (err) {
     alert(err?.response?.data?.error?.message || 'Generate Threads failed')
+  }
+}
+
+// Per-platform caption regen — IG/TT/Threads cross-post siblings. Resets the
+// sibling's caption + hashtags + link_comment, dispatches Generate*Post job
+// (~30s). FSM-gated server-side (409 if mid-pipeline). LinkedIn carousel uses
+// doRegenerateLinkedInCaption (sync ~1s) instead since slides stay untouched.
+const platformRegenMap = {
+  instagram: { mutation: regenerateInstagramMutation, label: 'Instagram' },
+  tiktok: { mutation: regenerateTiktokMutation, label: 'TikTok' },
+  threads: { mutation: regenerateThreadsMutation, label: 'Threads' },
+}
+async function doRegeneratePlatform(platform) {
+  const cfg = platformRegenMap[platform]
+  if (!cfg) return
+  if (!confirm(`Regenerate ${cfg.label} caption?\n\nThe existing caption + hashtags will be discarded and re-authored from scratch (~30s).`)) return
+  try {
+    await cfg.mutation.mutateAsync(draftId.value)
+    refetch()
+  } catch (err) {
+    alert(err?.response?.data?.error?.message || `${cfg.label} regen failed`)
+  }
+}
+
+// LinkedIn carousel caption-only refresh — sync ~1s, slides untouched.
+// (Text-format LinkedIn must use the full Regenerate button since post body
+// IS the caption — needs /linkedin-gen plugin.)
+async function doRegenerateLinkedInCaption() {
+  if (!confirm('Re-synth LinkedIn caption + hashtags from existing slides?\n\nSlide images stay untouched. Sync, ~1 second.')) return
+  try {
+    await regenerateCaptionMutation.mutateAsync(draftId.value)
+    refetch()
+  } catch (err) {
+    alert(err?.response?.data?.error?.message || 'Caption regen failed')
   }
 }
 
@@ -1771,6 +1811,45 @@ const showThumbnailUploadCaption = computed(() =>
 
                 <div v-if="activePlatformPost.hashtags.length > 0" class="flex flex-wrap gap-x-2 gap-y-1">
                   <span v-for="tag in activePlatformPost.hashtags" :key="tag" class="text-cyan-400 text-sm">{{ tag }}</span>
+                </div>
+
+                <!-- Per-platform caption regen buttons. LinkedIn carousel uses
+                     the sync caption-only path (~1s, slides untouched).
+                     Instagram/TikTok/Threads use the full Generate*Post job
+                     dispatch (~30s — no slides on those platforms). LinkedIn
+                     text format intentionally omitted: caption IS the post body
+                     so it requires the main Regenerate button (full pipeline).
+                     Server enforces FSM gating (409 if mid-pipeline). -->
+                <div class="flex items-center gap-2 pt-2 border-t border-neutral-800/60">
+                  <button
+                    v-if="activePlatform === 'linkedin' && draft.format === 'carousel'"
+                    type="button"
+                    @click="doRegenerateLinkedInCaption"
+                    :disabled="regenerateCaptionMutation.isPending.value"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono uppercase tracking-[0.12em] rounded-md border border-cyan-500/40 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 hover:text-cyan-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Re-synth caption + hashtags + link from existing slides (slides untouched, ~1s sync)"
+                  >
+                    <span v-if="regenerateCaptionMutation.isPending.value">⟳ Refreshing…</span>
+                    <span v-else>↻ Regenerate caption · sync</span>
+                  </button>
+
+                  <button
+                    v-if="['instagram', 'tiktok', 'threads'].includes(activePlatform)"
+                    type="button"
+                    @click="doRegeneratePlatform(activePlatform)"
+                    :disabled="platformRegenMap[activePlatform].mutation.isPending.value"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono uppercase tracking-[0.12em] rounded-md border border-cyan-500/40 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 hover:text-cyan-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    :title="`Reset ${PLATFORM_META[activePlatform].label} caption + hashtags + dispatch fresh job (~30s)`"
+                  >
+                    <span v-if="platformRegenMap[activePlatform].mutation.isPending.value">⟳ Dispatching…</span>
+                    <span v-else>↻ Regenerate {{ PLATFORM_META[activePlatform].label }} caption</span>
+                  </button>
+
+                  <span class="text-[10px] font-mono uppercase tracking-[0.12em] text-neutral-500 ml-auto">
+                    <template v-if="activePlatform === 'linkedin' && draft.format === 'text'">
+                      Use top-right Regenerate for text — full pipeline
+                    </template>
+                  </span>
                 </div>
               </template>
               <div

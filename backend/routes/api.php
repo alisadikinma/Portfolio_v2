@@ -1282,6 +1282,11 @@ Route::middleware(['auth:sanctum'])->prefix('admin/linkedin-drafts')->group(func
     Route::post('/{id}/regenerate', [LinkedInDraftController::class, 'regenerate']);
     Route::post('/{id}/generate-threads', [LinkedInDraftController::class, 'generateThreads'])
         ->name('admin.linkedin-drafts.generate-threads');
+    // Per-platform regen — IG/TT/Threads cross-post siblings (full pipeline,
+    // ~30s each via Generate*Post job dispatch). Idempotent / FSM-gated.
+    Route::post('/{id}/regenerate-instagram', [LinkedInDraftController::class, 'regenerateInstagram']);
+    Route::post('/{id}/regenerate-tiktok', [LinkedInDraftController::class, 'regenerateTiktok']);
+    Route::post('/{id}/regenerate-threads', [LinkedInDraftController::class, 'regenerateThreads']);
     Route::post('/{id}/approve', [LinkedInDraftController::class, 'approve']);
     Route::post('/{id}/cancel', [LinkedInDraftController::class, 'cancel']);
     Route::post('/{id}/publish-now', [LinkedInDraftController::class, 'publishNow']);

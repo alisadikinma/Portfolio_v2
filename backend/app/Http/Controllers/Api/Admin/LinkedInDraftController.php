@@ -365,6 +365,128 @@ class LinkedInDraftController extends Controller
         ], 201);
     }
 
+    /**
+     * Re-generate the cross-post sibling for a single platform without touching
+     * the LinkedIn parent. Resets the sibling's caption/hashtags/link_comment
+     * + flips status to pending_generation, then re-dispatches the platform's
+     * Generate*Post job. Used by the per-platform "Regenerate" buttons in
+     * LinkedInDraftDetail.vue's platform tab strip.
+     *
+     * Idempotent — refuses to fire while sibling is mid-pipeline (409).
+     */
+    public function regenerateInstagram(int $id): JsonResponse
+    {
+        return $this->regenerateCrossPost(
+            id: $id,
+            relation: 'instagramPost',
+            platformLabel: 'Instagram',
+            jobClass: \App\Jobs\GenerateInstagramPost::class,
+            statusEnum: \App\Enums\InstagramPostStatus::class,
+            extraResetFields: ['text_only_caption' => null],
+        );
+    }
+
+    public function regenerateTiktok(int $id): JsonResponse
+    {
+        return $this->regenerateCrossPost(
+            id: $id,
+            relation: 'tiktokPost',
+            platformLabel: 'TikTok',
+            jobClass: \App\Jobs\GenerateTiktokPost::class,
+            statusEnum: \App\Enums\TiktokPostStatus::class,
+        );
+    }
+
+    public function regenerateThreads(int $id): JsonResponse
+    {
+        return $this->regenerateCrossPost(
+            id: $id,
+            relation: 'threadsPost',
+            platformLabel: 'Threads',
+            jobClass: \App\Jobs\GenerateThreadsPost::class,
+            statusEnum: \App\Enums\ThreadsPostStatus::class,
+        );
+    }
+
+    /**
+     * Shared cross-post regen helper. All 3 platforms (IG/TT/Threads) reset
+     * the same shape of fields and dispatch their platform's Generate*Post
+     * job — only the relation name + job class + status enum differ.
+     */
+    private function regenerateCrossPost(
+        int $id,
+        string $relation,
+        string $platformLabel,
+        string $jobClass,
+        string $statusEnum,
+        array $extraResetFields = []
+    ): JsonResponse {
+        $draft = LinkedInPost::with($relation)->find($id);
+        if ($draft === null) {
+            return $this->notFound();
+        }
+
+        $sibling = $draft->{$relation};
+        if ($sibling === null) {
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'sibling_missing',
+                    'message' => "{$platformLabel} draft does not exist for this LinkedIn post. Use the Generate {$platformLabel} button first.",
+                ],
+            ], 404);
+        }
+
+        $inProgress = ['pending_generation', 'generating', 'validating'];
+        if (in_array($sibling->status, $inProgress, true)) {
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'regenerate_in_progress',
+                    'message' => "{$platformLabel} regeneration already in progress (status={$sibling->status}).",
+                ],
+            ], 409);
+        }
+
+        $previousStatus = $sibling->status;
+        $resetFields = array_merge([
+            'status' => $statusEnum::PendingGeneration->value,
+            'caption' => null,
+            'link_comment' => null,
+            'hashtags' => [],
+            'last_error' => null,
+        ], $extraResetFields);
+
+        $sibling->update($resetFields);
+
+        $log = is_array($sibling->pipeline_state_log) ? $sibling->pipeline_state_log : [];
+        $log[] = [
+            'from' => $previousStatus,
+            'to' => $statusEnum::PendingGeneration->value,
+            'reason' => 'admin_regenerate_button',
+            'timestamp' => now()->toIso8601String(),
+        ];
+        $sibling->update(['pipeline_state_log' => array_slice($log, -20)]);
+
+        $jobClass::dispatch($sibling->id);
+
+        Log::info("[LinkedInDraft] {$platformLabel} sibling regen dispatched", [
+            'linkedin_post_id' => $draft->id,
+            'sibling_id' => $sibling->id,
+            'previous_status' => $previousStatus,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'sibling_id' => $sibling->id,
+                'previous_status' => $previousStatus,
+                'new_status' => $statusEnum::PendingGeneration->value,
+            ],
+            'message' => "{$platformLabel} draft reset + dispatched. Worker will regenerate caption shortly (~30s).",
+        ]);
+    }
+
     public function approve(int $id, Request $request): JsonResponse
     {
         $draft = LinkedInPost::find($id);

@@ -402,6 +402,36 @@ export function useGenerateThreads() {
   })
 }
 
+/** POST /admin/linkedin-drafts/{id}/regenerate-instagram — reset IG sibling caption + dispatch (~30s) */
+export function useRegenerateInstagram() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) =>
+      api.post(`/admin/linkedin-drafts/${id}/regenerate-instagram`).then(r => r.data),
+    onSuccess: (_, id) => qc.invalidateQueries({ queryKey: [LIST_KEY, id] }),
+  })
+}
+
+/** POST /admin/linkedin-drafts/{id}/regenerate-tiktok — reset TikTok sibling caption + dispatch (~30s) */
+export function useRegenerateTiktok() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) =>
+      api.post(`/admin/linkedin-drafts/${id}/regenerate-tiktok`).then(r => r.data),
+    onSuccess: (_, id) => qc.invalidateQueries({ queryKey: [LIST_KEY, id] }),
+  })
+}
+
+/** POST /admin/linkedin-drafts/{id}/regenerate-threads — reset Threads sibling caption + dispatch (~30s) */
+export function useRegenerateThreads() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) =>
+      api.post(`/admin/linkedin-drafts/${id}/regenerate-threads`).then(r => r.data),
+    onSuccess: (_, id) => qc.invalidateQueries({ queryKey: [LIST_KEY, id] }),
+  })
+}
+
 /**
  * GET /admin/linkedin-posts/calendar?from=&to=&status=
  *
