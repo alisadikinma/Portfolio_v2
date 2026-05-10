@@ -19,8 +19,10 @@ import {
   useRegenerateInstagram,
   useRegenerateTiktok,
   useRegenerateThreads,
+  useRegenerateAllCaptions,
   postTitle,
 } from '@/composables/useLinkedInDrafts'
+import { useToast } from '@/composables/useToast'
 import {
   statusMeta,
   effectiveStatusMeta,
@@ -168,7 +170,24 @@ const generateThreadsMutation = useGenerateThreads()
 const regenerateInstagramMutation = useRegenerateInstagram()
 const regenerateTiktokMutation = useRegenerateTiktok()
 const regenerateThreadsMutation = useRegenerateThreads()
+const regenerateAllCaptionsMutation = useRegenerateAllCaptions()
 const regenerateMutation = useRegenerateLinkedInDraft()
+const toast = useToast()
+
+// Inline result panel for the unified "Regenerate ALL captions" button.
+// Auto-clears after 12s so it doesn't linger forever, but stays long
+// enough for operator to read per-platform outcomes.
+const regenAllResults = ref(null) // { linkedin: {outcome,...}, instagram: {...}, ... }
+const regenAllStartedAt = ref(null)
+let regenAllClearTimer = null
+function clearRegenAllResults() {
+  regenAllResults.value = null
+  regenAllStartedAt.value = null
+  if (regenAllClearTimer) {
+    clearTimeout(regenAllClearTimer)
+    regenAllClearTimer = null
+  }
+}
 const regenerateAllImagesMutation = useRegenerateAllCarouselImages()
 const rerenderImagesOnlyMutation = useRerenderImagesOnly()
 const regenerateCaptionMutation = useRegenerateCaption()
@@ -747,6 +766,56 @@ async function doRegenerateLinkedInCaption() {
     alert(err?.response?.data?.error?.message || 'Caption regen failed')
   }
 }
+
+// Unified fan-out — regen caption across all 4 platforms in one click.
+// Backend returns per-platform outcomes; we render an inline result panel
+// showing colored badges per platform + fire a toast summary so operator
+// sees something happen IMMEDIATELY (no silent disabled-button limbo).
+async function doRegenerateAllCaptions() {
+  const platformsList = ['LinkedIn', 'Instagram', 'TikTok', 'Threads']
+  const lines = [
+    'Regenerate captions across all platforms?',
+    '',
+    `Will refresh: ${platformsList.join(', ')}`,
+    '',
+    'LinkedIn carousel = sync ~1s · LinkedIn text = ~30-90s',
+    'Instagram / TikTok / Threads = ~30s each (queued)',
+    '',
+    'Slide images stay untouched.',
+  ].join('\n')
+  if (!confirm(lines)) return
+
+  clearRegenAllResults()
+  regenAllStartedAt.value = Date.now()
+  toast.success('Caption fan-out started — refreshing all platforms…', 4000)
+
+  try {
+    const resp = await regenerateAllCaptionsMutation.mutateAsync(draftId.value)
+    regenAllResults.value = resp?.data || null
+
+    // Per-platform tally for toast summary
+    const counts = { refreshed: 0, dispatched: 0, in_progress: 0, missing: 0, failed: 0 }
+    for (const r of Object.values(resp?.data || {})) {
+      counts[r.outcome] = (counts[r.outcome] || 0) + 1
+    }
+    const summary = Object.entries(counts).filter(([, n]) => n > 0).map(([k, n]) => `${n} ${k}`).join(' · ')
+    toast.success(`Caption regen complete — ${summary}`, 6000)
+    refetch()
+
+    // Auto-clear panel after 12s (operator's eye has moved on by then)
+    regenAllClearTimer = setTimeout(() => {
+      clearRegenAllResults()
+    }, 12000)
+  } catch (err) {
+    const msg = err?.response?.data?.error?.message || err?.message || 'Caption fan-out failed'
+    toast.error(`Regen failed: ${msg}`, 8000)
+    regenAllResults.value = null
+  }
+}
+
+onBeforeUnmount(() => {
+  if (regenAllClearTimer) clearTimeout(regenAllClearTimer)
+})
 
 // Read the link_comment field from the active platform's draft. LinkedIn
 // stores it on the draft itself; cross-posts (IG/TikTok/Threads) store it on
@@ -1757,7 +1826,110 @@ const showThumbnailUploadCaption = computed(() =>
                    once via /carousel-gen, reused for FB/IG/TikTok). Click
                    does NOT navigate; it toggles the active platform copy
                    below. -->
-              <div ref="captionTabsRef" class="pt-3 border-t border-neutral-800/60">
+              <div ref="captionTabsRef" class="pt-3 border-t border-neutral-800/60 space-y-3">
+                <!-- Unified "Regenerate ALL captions" — single action, fans out
+                     across LinkedIn + IG + TT + Threads. Per-platform outcomes
+                     surface in the result panel below + a toast notification.
+                     Always visible regardless of active tab so operator can
+                     trigger fan-out from any platform context. -->
+                <div class="flex items-center justify-between gap-3">
+                  <span class="text-[10px] font-mono uppercase tracking-[0.14em] text-neutral-500">
+                    Per-platform captions
+                  </span>
+
+                  <button
+                    type="button"
+                    @click="doRegenerateAllCaptions"
+                    :disabled="regenerateAllCaptionsMutation.isPending.value"
+                    class="inline-flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs font-mono uppercase tracking-[0.12em] text-amber-200 hover:bg-amber-500/20 hover:text-amber-100 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-sm shrink-0"
+                    title="Refresh caption + hashtags + link_comment across LinkedIn / Instagram / TikTok / Threads in one click"
+                  >
+                    <svg
+                      v-if="regenerateAllCaptionsMutation.isPending.value"
+                      viewBox="0 0 24 24"
+                      class="h-3.5 w-3.5 animate-spin"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <circle cx="12" cy="12" r="9" stroke-opacity="0.25" />
+                      <path d="M21 12a9 9 0 0 0-9-9" stroke-linecap="round" />
+                    </svg>
+                    <svg v-else viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="23 4 23 10 17 10" />
+                      <polyline points="1 20 1 14 7 14" />
+                      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                    </svg>
+                    <span v-if="regenerateAllCaptionsMutation.isPending.value">Refreshing all platforms…</span>
+                    <span v-else>Regenerate all captions</span>
+                  </button>
+                </div>
+
+                <!-- Inline result panel — shows per-platform outcomes after
+                     the unified fan-out completes. Auto-clears after 12s. -->
+                <div
+                  v-if="regenAllResults || regenerateAllCaptionsMutation.isPending.value"
+                  class="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3"
+                >
+                  <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.14em] text-amber-300">
+                      <span v-if="regenerateAllCaptionsMutation.isPending.value" class="inline-block h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
+                      <span v-else class="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                      <span v-if="regenerateAllCaptionsMutation.isPending.value">Caption fan-out in progress…</span>
+                      <span v-else>Caption fan-out complete</span>
+                    </div>
+                    <button
+                      v-if="regenAllResults"
+                      type="button"
+                      @click="clearRegenAllResults"
+                      class="text-[10px] font-mono uppercase tracking-[0.12em] text-neutral-500 hover:text-neutral-300 transition"
+                    >
+                      dismiss ✕
+                    </button>
+                  </div>
+
+                  <!-- Per-platform badge grid -->
+                  <div v-if="regenAllResults" class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div
+                      v-for="(result, platform) in regenAllResults"
+                      :key="platform"
+                      :class="[
+                        'rounded-md border px-2 py-1.5 text-[11px] flex flex-col gap-0.5',
+                        result.outcome === 'refreshed' && 'border-emerald-400/40 bg-emerald-500/5 text-emerald-200',
+                        result.outcome === 'dispatched' && 'border-cyan-400/40 bg-cyan-500/5 text-cyan-200',
+                        result.outcome === 'in_progress' && 'border-amber-400/40 bg-amber-500/5 text-amber-200',
+                        result.outcome === 'missing' && 'border-neutral-700/60 bg-neutral-900/40 text-neutral-500',
+                        result.outcome === 'failed' && 'border-red-400/40 bg-red-500/5 text-red-200',
+                      ]"
+                    >
+                      <div class="flex items-center justify-between">
+                        <span class="font-medium uppercase tracking-wider text-[10px]">{{ platform }}</span>
+                        <span class="font-mono text-[14px] leading-none">
+                          <span v-if="result.outcome === 'refreshed'">✓</span>
+                          <span v-else-if="result.outcome === 'dispatched'">→</span>
+                          <span v-else-if="result.outcome === 'in_progress'">⟳</span>
+                          <span v-else-if="result.outcome === 'missing'">—</span>
+                          <span v-else-if="result.outcome === 'failed'">✕</span>
+                          <span v-else>?</span>
+                        </span>
+                      </div>
+                      <span class="text-[10px] opacity-80">{{ result.message || result.outcome }}</span>
+                    </div>
+                  </div>
+
+                  <!-- Pending state placeholder grid -->
+                  <div v-else class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div
+                      v-for="p in ['linkedin', 'instagram', 'tiktok', 'threads']"
+                      :key="p"
+                      class="rounded-md border border-neutral-700/40 bg-neutral-900/40 px-2 py-1.5 text-[11px] flex items-center justify-between text-neutral-500"
+                    >
+                      <span class="font-medium uppercase tracking-wider text-[10px]">{{ p }}</span>
+                      <span class="inline-block h-3 w-3 border border-neutral-600 border-t-amber-400 rounded-full animate-spin" />
+                    </div>
+                  </div>
+                </div>
+
                 <nav
                   class="inline-flex flex-wrap gap-1 rounded-lg border border-neutral-700/60 bg-neutral-950/40 p-1"
                   role="tablist"

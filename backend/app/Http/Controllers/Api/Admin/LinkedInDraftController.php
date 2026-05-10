@@ -409,9 +409,7 @@ class LinkedInDraftController extends Controller
     }
 
     /**
-     * Shared cross-post regen helper. All 3 platforms (IG/TT/Threads) reset
-     * the same shape of fields and dispatch their platform's Generate*Post
-     * job — only the relation name + job class + status enum differ.
+     * Per-platform JsonResponse wrapper around dispatchSiblingRegen.
      */
     private function regenerateCrossPost(
         int $id,
@@ -426,26 +424,55 @@ class LinkedInDraftController extends Controller
             return $this->notFound();
         }
 
+        $result = $this->dispatchSiblingRegen($draft, $relation, $platformLabel, $jobClass, $statusEnum, $extraResetFields);
+
+        if ($result['outcome'] === 'missing') {
+            return response()->json(['success' => false, 'error' => ['code' => 'sibling_missing', 'message' => $result['message']]], 404);
+        }
+        if ($result['outcome'] === 'in_progress') {
+            return response()->json(['success' => false, 'error' => ['code' => 'regenerate_in_progress', 'message' => $result['message']]], 409);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'sibling_id' => $result['sibling_id'],
+                'previous_status' => $result['previous_status'],
+                'new_status' => $statusEnum::PendingGeneration->value,
+            ],
+            'message' => "{$platformLabel} draft reset + dispatched. Worker will regenerate caption shortly (~30s).",
+        ]);
+    }
+
+    /**
+     * Shared cross-post regen core. Returns array with outcome + diagnostics
+     * so both single-platform endpoints AND regenerateAllCaptions can reuse.
+     *
+     * Outcomes: 'dispatched' | 'missing' | 'in_progress'
+     */
+    private function dispatchSiblingRegen(
+        LinkedInPost $draft,
+        string $relation,
+        string $platformLabel,
+        string $jobClass,
+        string $statusEnum,
+        array $extraResetFields = []
+    ): array {
         $sibling = $draft->{$relation};
         if ($sibling === null) {
-            return response()->json([
-                'success' => false,
-                'error' => [
-                    'code' => 'sibling_missing',
-                    'message' => "{$platformLabel} draft does not exist for this LinkedIn post. Use the Generate {$platformLabel} button first.",
-                ],
-            ], 404);
+            return [
+                'outcome' => 'missing',
+                'message' => "{$platformLabel} sibling does not exist.",
+            ];
         }
 
         $inProgress = ['pending_generation', 'generating', 'validating'];
         if (in_array($sibling->status, $inProgress, true)) {
-            return response()->json([
-                'success' => false,
-                'error' => [
-                    'code' => 'regenerate_in_progress',
-                    'message' => "{$platformLabel} regeneration already in progress (status={$sibling->status}).",
-                ],
-            ], 409);
+            return [
+                'outcome' => 'in_progress',
+                'message' => "{$platformLabel} already mid-pipeline (status={$sibling->status}).",
+                'sibling_id' => $sibling->id,
+            ];
         }
 
         $previousStatus = $sibling->status;
@@ -476,14 +503,112 @@ class LinkedInDraftController extends Controller
             'previous_status' => $previousStatus,
         ]);
 
+        return [
+            'outcome' => 'dispatched',
+            'sibling_id' => $sibling->id,
+            'previous_status' => $previousStatus,
+        ];
+    }
+
+    /**
+     * Unified "regenerate ALL platform captions" — single button that fans
+     * out across LinkedIn (carousel sync OR text full-pipeline) + IG + TT
+     * + Threads. Per-platform outcomes returned so frontend can render a
+     * granular toast: "LinkedIn ✓ refreshed · Instagram → dispatched ·
+     * TikTok skipped (mid-pipeline) · Threads — no sibling".
+     *
+     * LinkedIn behavior:
+     *   - format=carousel → sync regenerateCaption (~1s, slides untouched)
+     *   - format=text     → flips to pending_generation + dispatches full
+     *                       GenerateLinkedInPost (~30-90s)
+     *
+     * Cross-post siblings reuse dispatchSiblingRegen (~30s each, async).
+     * Missing siblings reported but never created (operator must explicitly
+     * use Generate Threads / wait for cron to create IG/TT).
+     */
+    public function regenerateAllCaptions(int $id, LinkedInGenerationService $linkedInGen): JsonResponse
+    {
+        $draft = LinkedInPost::with(['post.translations', 'instagramPost', 'tiktokPost', 'threadsPost'])->find($id);
+        if ($draft === null) {
+            return $this->notFound();
+        }
+
+        $results = [];
+
+        // LinkedIn — branch by format
+        if ($draft->format === 'carousel') {
+            $captionResult = $linkedInGen->regenerateCaption($draft);
+            $results['linkedin'] = $captionResult['success']
+                ? ['outcome' => 'refreshed', 'mode' => 'sync', 'message' => 'LinkedIn caption refreshed (sync)']
+                : ['outcome' => 'failed', 'mode' => 'sync', 'message' => $captionResult['error'] ?? 'Caption regen failed'];
+        } else {
+            // text format — full pipeline (post body IS the caption)
+            $linkedInInProgress = ['pending_generation', 'generating', 'validating'];
+            if (in_array($draft->status, $linkedInInProgress, true)) {
+                $results['linkedin'] = ['outcome' => 'in_progress', 'mode' => 'async', 'message' => "LinkedIn already mid-pipeline (status={$draft->status})"];
+            } else {
+                $previousStatus = $draft->status;
+                $draft->update([
+                    'status' => LinkedInPostStatus::PendingGeneration->value,
+                    'content' => '',
+                    'link_comment' => null,
+                    'hashtags' => [],
+                    'last_error' => null,
+                ]);
+                $log = is_array($draft->pipeline_state_log) ? $draft->pipeline_state_log : [];
+                $log[] = [
+                    'from' => $previousStatus,
+                    'to' => LinkedInPostStatus::PendingGeneration->value,
+                    'reason' => 'admin_regenerate_all_captions',
+                    'timestamp' => now()->toIso8601String(),
+                ];
+                $draft->update(['pipeline_state_log' => array_slice($log, -20)]);
+                GenerateLinkedInPost::dispatch($draft->id);
+                $results['linkedin'] = ['outcome' => 'dispatched', 'mode' => 'async', 'message' => 'LinkedIn text reset + dispatched (full pipeline ~30-90s)'];
+            }
+        }
+
+        // Cross-post siblings — fan out via shared helper
+        $platforms = [
+            'instagram' => ['relation' => 'instagramPost', 'label' => 'Instagram', 'job' => \App\Jobs\GenerateInstagramPost::class, 'enum' => \App\Enums\InstagramPostStatus::class, 'extra' => ['text_only_caption' => null]],
+            'tiktok' => ['relation' => 'tiktokPost', 'label' => 'TikTok', 'job' => \App\Jobs\GenerateTiktokPost::class, 'enum' => \App\Enums\TiktokPostStatus::class, 'extra' => []],
+            'threads' => ['relation' => 'threadsPost', 'label' => 'Threads', 'job' => \App\Jobs\GenerateThreadsPost::class, 'enum' => \App\Enums\ThreadsPostStatus::class, 'extra' => []],
+        ];
+
+        foreach ($platforms as $key => $cfg) {
+            $r = $this->dispatchSiblingRegen($draft, $cfg['relation'], $cfg['label'], $cfg['job'], $cfg['enum'], $cfg['extra']);
+            $results[$key] = match ($r['outcome']) {
+                'dispatched' => ['outcome' => 'dispatched', 'mode' => 'async', 'message' => "{$cfg['label']} reset + dispatched (~30s)"],
+                'in_progress' => ['outcome' => 'in_progress', 'mode' => 'async', 'message' => $r['message']],
+                'missing' => ['outcome' => 'missing', 'mode' => 'none', 'message' => "{$cfg['label']} sibling does not exist — skipped"],
+                default => ['outcome' => 'unknown', 'mode' => 'none', 'message' => 'unknown outcome'],
+            };
+        }
+
+        Log::info('[LinkedInDraft] Unified regenerate-all-captions fan-out', [
+            'linkedin_post_id' => $draft->id,
+            'results' => $results,
+        ]);
+
+        // Build human summary for toast
+        $summaryParts = [];
+        foreach ($results as $platform => $r) {
+            $icon = match ($r['outcome']) {
+                'refreshed' => '✓',
+                'dispatched' => '→',
+                'in_progress' => '⟳',
+                'missing' => '—',
+                'failed' => '✕',
+                default => '?',
+            };
+            $summaryParts[] = "{$icon} " . ucfirst($platform);
+        }
+        $summary = implode(' · ', $summaryParts);
+
         return response()->json([
             'success' => true,
-            'data' => [
-                'sibling_id' => $sibling->id,
-                'previous_status' => $previousStatus,
-                'new_status' => $statusEnum::PendingGeneration->value,
-            ],
-            'message' => "{$platformLabel} draft reset + dispatched. Worker will regenerate caption shortly (~30s).",
+            'data' => $results,
+            'message' => "Captions regen fan-out: {$summary}",
         ]);
     }
 

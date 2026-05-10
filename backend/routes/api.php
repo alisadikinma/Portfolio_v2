@@ -1287,6 +1287,9 @@ Route::middleware(['auth:sanctum'])->prefix('admin/linkedin-drafts')->group(func
     Route::post('/{id}/regenerate-instagram', [LinkedInDraftController::class, 'regenerateInstagram']);
     Route::post('/{id}/regenerate-tiktok', [LinkedInDraftController::class, 'regenerateTiktok']);
     Route::post('/{id}/regenerate-threads', [LinkedInDraftController::class, 'regenerateThreads']);
+    // Unified fan-out — refresh ALL platform captions in one click. Returns
+    // per-platform outcomes for granular toast feedback.
+    Route::post('/{id}/regenerate-all-captions', [LinkedInDraftController::class, 'regenerateAllCaptions']);
     Route::post('/{id}/approve', [LinkedInDraftController::class, 'approve']);
     Route::post('/{id}/cancel', [LinkedInDraftController::class, 'cancel']);
     Route::post('/{id}/publish-now', [LinkedInDraftController::class, 'publishNow']);

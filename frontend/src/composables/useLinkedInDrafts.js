@@ -433,6 +433,24 @@ export function useRegenerateThreads() {
 }
 
 /**
+ * POST /admin/linkedin-drafts/{id}/regenerate-all-captions — fan-out
+ * caption regen across LinkedIn + IG + TT + Threads in one call. Returns
+ * per-platform outcomes ({outcome, mode, message}) so UI can render
+ * granular result feedback. Auto-refetches both list + single-draft cache.
+ */
+export function useRegenerateAllCaptions() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) =>
+      api.post(`/admin/linkedin-drafts/${id}/regenerate-all-captions`).then(r => r.data),
+    onSuccess: (_, id) => {
+      qc.invalidateQueries({ queryKey: [LIST_KEY] })
+      qc.invalidateQueries({ queryKey: [LIST_KEY, id] })
+    },
+  })
+}
+
+/**
  * GET /admin/linkedin-posts/calendar?from=&to=&status=
  *
  * Date-range query for the calendar month grid. Returns compact per-row shape
