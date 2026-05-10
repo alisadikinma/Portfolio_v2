@@ -13,8 +13,9 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Queued wrapper around ThreadsGenerationService::generate(). No plugin
- * dispatch — service is pure-reuse from LinkedIn content. Sub-second.
+ * Queued wrapper around ThreadsGenerationService::generate(). Post-May 10
+ * Tier-1 upgrade: SSH-invokes Claude CLI with /threads-gen plugin
+ * (~30-90s typical). Older "sub-second pure-reuse" comment was stale.
  */
 class GenerateThreadsPost implements ShouldQueue
 {
@@ -22,7 +23,10 @@ class GenerateThreadsPost implements ShouldQueue
 
     public int $tries = 2;
     public array $backoff = [60, 300];
-    public int $timeout = 60;
+    // 360s = matches IG/TikTok job timeout post-Tier-1 upgrade. Plugin
+    // SSH-invoke + Sonnet output cap can spike past 60s; lower timeout
+    // would mark legitimate slow runs as failed.
+    public int $timeout = 360;
 
     private const STALE_THRESHOLD_MINUTES = 15;
 

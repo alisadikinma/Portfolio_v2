@@ -729,10 +729,33 @@ class LinkedInDraftController extends Controller
                 }
             }
 
+            // Auto fan-out cross-posts at the same scheduled timing.
+            // Per operator request May 10: reschedule should also push the
+            // schedule to Publer so cross-posts publish at the SAME future
+            // time as LinkedIn. Sets cascade flag + triggers
+            // social-cross-post:scan targeted to this draft only — bypasses
+            // time + virality gates since operator explicitly approved.
+            // Publer scheduled-publish API support is on the
+            // PublishViaPubler real-impl roadmap (currently STUB —
+            // cross-post drafts get created + queued, but actual Publer
+            // shipment with the scheduled_at timestamp lands when the
+            // PublishViaPubler real impl ships per CLAUDE.md note).
+            $draft->update(['auto_approve_cross_posts' => true]);
+            try {
+                \Illuminate\Support\Facades\Artisan::queue('social-cross-post:scan', [
+                    '--draft-id' => $draft->id,
+                ]);
+            } catch (\Throwable $e) {
+                Log::warning('[LinkedInDraft] approve cross-post fan-out dispatch failed (non-fatal)', [
+                    'draft_id' => $draft->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
             return response()->json([
                 'success' => true,
                 'data' => $draft->fresh(['post.translations', 'post.contentIdea:id,result_post_id,virality_score', 'account']),
-                'message' => 'Scheduled for ' . $publishAt->toIso8601String(),
+                'message' => 'Scheduled for ' . $publishAt->toIso8601String() . ' — cross-post fan-out queued to Publer.',
             ]);
         } catch (InvalidStateTransitionException $e) {
             return $this->illegalTransition($e);
@@ -821,10 +844,27 @@ class LinkedInDraftController extends Controller
             ]);
         }
 
+        // Auto fan-out cross-posts (Publer publish for IG/TT/Threads/FB).
+        // Per operator request May 10: "Publish now" should publish to ALL
+        // platforms, not just LinkedIn. Sets the cascade flag + triggers
+        // social-cross-post:scan targeted to this draft only — bypasses
+        // time/virality gates since operator already opted in.
+        $draft->update(['auto_approve_cross_posts' => true]);
+        try {
+            \Illuminate\Support\Facades\Artisan::queue('social-cross-post:scan', [
+                '--draft-id' => $draft->id,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('[LinkedInDraftController] Cross-post fan-out dispatch failed (non-fatal)', [
+                'draft_id' => $draft->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
         return response()->json([
             'success' => true,
             'data' => $draft->fresh(['post.translations', 'post.contentIdea:id,result_post_id,virality_score', 'account']),
-            'message' => 'Published to LinkedIn.',
+            'message' => 'LinkedIn published. Cross-post fan-out queued — IG/TikTok/Threads will publish via Publer (~1-3 min).',
         ]);
     }
 
