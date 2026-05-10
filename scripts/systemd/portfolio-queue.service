@@ -30,11 +30,17 @@ WorkingDirectory=/var/www/Portfolio_v2/backend
 # --sleep=3       — poll interval when queue is empty (3s = responsive but
 #                     not busy-loopy).
 # --tries=3       — match the per-job ::tries for jobs that don't override.
+# --timeout=600   — per-job hard timeout (10 min). Must be >= the longest
+#                     job class $timeout. GenerateInstagram/Tiktok/Threads
+#                     jobs have $timeout=360 (SSH-invoke claude can take
+#                     30-90s typical, occasionally 5min). Without this flag
+#                     worker defaults to 60s which kills SSH plugin runs
+#                     prematurely (failed_jobs row #6 May 10 confirms).
 # --max-time=3600 — recycle worker every hour to release accumulated memory.
 #                     systemd Restart=always brings it back instantly.
 # --backoff=60,300,900 — escalating retry delay; matches GenerateLinkedInPost
 #                          + RegenerateLinkedInCarouselContent class settings.
-ExecStart=/usr/bin/php artisan queue:work --queue=default --sleep=3 --tries=3 --max-time=3600 --backoff=60,300,900
+ExecStart=/usr/bin/php artisan queue:work --queue=default --sleep=3 --tries=3 --timeout=600 --max-time=3600 --backoff=60,300,900
 # SIGKILL events (signal 9 = exit status 137) treated as success so the
 # unit doesn't hit StartLimitBurst on repeated kills (4× observed
 # May 6-7 2026; see investigation in CLAUDE.md). Without this, repeated
