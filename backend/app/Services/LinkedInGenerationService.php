@@ -1074,16 +1074,19 @@ class LinkedInGenerationService
 
         $newCaption = $this->buildCarouselCaption('', $carousel, $brief, $draft);
         $newHashtags = $this->resolveHashtags(null, $brief['hashtags'] ?? null, $draft);
+        $newLinkComment = $this->resolveLinkComment('', $draft);
 
         $draft->update([
             'content' => $newCaption,
             'hashtags' => $newHashtags,
+            'link_comment' => $newLinkComment,
         ]);
 
         Log::info('[LinkedInGeneration] Caption regenerated', [
             'draft_id' => $draft->id,
             'caption_length' => mb_strlen($newCaption),
             'hashtag_count' => count($newHashtags),
+            'link_comment_has_url' => preg_match('#https?://#i', $newLinkComment) === 1,
         ]);
 
         return [
@@ -1091,6 +1094,7 @@ class LinkedInGenerationService
             'draft_id' => $draft->id,
             'content' => $newCaption,
             'hashtags' => $newHashtags,
+            'link_comment' => $newLinkComment,
         ];
     }
 

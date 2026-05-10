@@ -15,6 +15,7 @@ use App\Models\LinkedInPost;
 use App\Models\ThreadsPost;
 use App\Models\TiktokPost;
 use App\Services\ArticleGenerationService;
+use App\Services\LinkedInGenerationService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -48,7 +49,7 @@ class RegenerateNonPublishedCrossPosts extends Command
 
     protected $description = 'Regenerate non-published cross-post drafts to pick up latest plugin/config (English LinkedIn, Bahasa Indonesia IG/TikTok/Threads, shortener URLs)';
 
-    public function handle(ArticleGenerationService $articleGen): int
+    public function handle(ArticleGenerationService $articleGen, LinkedInGenerationService $linkedInGen): int
     {
         $platform = strtolower((string) $this->option('platform'));
         $limit = $this->option('limit');
@@ -70,7 +71,7 @@ class RegenerateNonPublishedCrossPosts extends Command
 
         if ($platform === 'all' || $platform === 'linkedin') {
             [$totals['linkedin'], $skipped['linkedin']] = $this->processLinkedIn(
-                $limit, $dryRun, $skipTranslate, $articleGen
+                $limit, $dryRun, $skipTranslate, $articleGen, $linkedInGen
             );
         }
         if ($platform === 'all' || $platform === 'instagram') {
@@ -100,9 +101,24 @@ class RegenerateNonPublishedCrossPosts extends Command
 
     /**
      * @return array{0:int,1:int} [queued, skipped]
+     *
+     * Format-aware routing:
+     *  - format=text     → full pipeline (GenerateLinkedInPost) since the
+     *                      post body IS the caption — needs /linkedin-gen
+     *                      to re-author.
+     *  - format=carousel → SYNC caption-only refresh (regenerateCaption)
+     *                      that re-synth content + hashtags + link_comment
+     *                      from existing slides via ShortLinkService.
+     *                      Skips the expensive /carousel-gen + image render
+     *                      (~5-7 min) because slide PNGs are already done.
      */
-    private function processLinkedIn(?int $limit, bool $dryRun, bool $skipTranslate, ArticleGenerationService $articleGen): array
-    {
+    private function processLinkedIn(
+        ?int $limit,
+        bool $dryRun,
+        bool $skipTranslate,
+        ArticleGenerationService $articleGen,
+        LinkedInGenerationService $linkedInGen
+    ): array {
         $nonTerminal = array_diff(
             array_map(fn($s) => $s->value, LinkedInPostStatus::cases()),
             [LinkedInPostStatus::Published->value, LinkedInPostStatus::Cancelled->value, LinkedInPostStatus::Failed->value]
@@ -127,6 +143,34 @@ class RegenerateNonPublishedCrossPosts extends Command
                 continue;
             }
 
+            // Carousel = sync caption-only refresh, no full pipeline.
+            // Skips expensive /carousel-gen + image render (~5-7 min) since
+            // slide PNGs are already done — only caption + hashtags + link_comment
+            // need to be re-synth from existing slides.
+            if ($draft->format === 'carousel') {
+                if ($dryRun) {
+                    $this->line("  → Would re-synth caption for carousel draft #{$draft->id} (post '{$post->slug}', SYNC ~1s, no full regen)");
+                    $queued++;
+                    continue;
+                }
+                try {
+                    $result = $linkedInGen->regenerateCaption($draft);
+                    if ($result['success'] ?? false) {
+                        $captionLen = mb_strlen((string) ($result['content'] ?? ''));
+                        $this->line("  ✓ Carousel draft #{$draft->id} caption refreshed (sync, {$captionLen} chars, no slide re-render)");
+                        $queued++;
+                    } else {
+                        $this->warn("  ✗ Carousel draft #{$draft->id} caption refresh failed: " . ($result['error'] ?? 'unknown'));
+                        $skipped++;
+                    }
+                } catch (\Throwable $e) {
+                    $this->warn("  ✗ Carousel draft #{$draft->id} threw: {$e->getMessage()}");
+                    $skipped++;
+                }
+                continue;
+            }
+
+            // Text format: full pipeline (post body IS the caption).
             $hasEnTranslation = $post->translations->contains('language', 'en');
             if (!$hasEnTranslation) {
                 if ($skipTranslate) {
@@ -151,7 +195,7 @@ class RegenerateNonPublishedCrossPosts extends Command
             }
 
             if ($dryRun) {
-                $this->line("  → Would regen LinkedIn draft #{$draft->id} (post '{$post->slug}', status={$draft->status})");
+                $this->line("  → Would regen text LinkedIn draft #{$draft->id} (post '{$post->slug}', status={$draft->status}, FULL pipeline)");
                 $queued++;
                 continue;
             }
@@ -174,7 +218,7 @@ class RegenerateNonPublishedCrossPosts extends Command
                 $draft->update(['pipeline_state_log' => array_slice($log, -20)]);
             });
             GenerateLinkedInPost::dispatch($draft->id);
-            $this->line("  ✓ LinkedIn draft #{$draft->id} reset + dispatched");
+            $this->line("  ✓ Text LinkedIn draft #{$draft->id} reset + dispatched (full pipeline)");
             $queued++;
         }
 
