@@ -96,6 +96,24 @@ const platformPostFor = (key) => {
 const activePlatformPost = computed(() => platformPostFor(activePlatform.value))
 const activePlatformExists = computed(() => activePlatformPost.value !== null)
 
+// TikTok: plugin currently emits title as caption first line too (hook
+// echo). Until plugin authors distinct title/caption, dedupe display-side
+// — strip the matching first line if it equals title verbatim. Other
+// platforms render caption as-is (no title field shown for them).
+const captionDisplayBody = computed(() => {
+  const post = activePlatformPost.value
+  if (!post?.content) return ''
+  if (activePlatform.value !== 'tiktok' || !post.title) return post.content
+  const lines = post.content.split('\n')
+  const firstNonEmpty = lines.findIndex((l) => l.trim() !== '')
+  if (firstNonEmpty === -1) return post.content
+  if (lines[firstNonEmpty].trim() !== post.title.trim()) return post.content
+  // Drop the matching line + any leading blank line(s) right after it.
+  const remaining = lines.slice(firstNonEmpty + 1)
+  while (remaining.length && remaining[0].trim() === '') remaining.shift()
+  return remaining.join('\n')
+})
+
 // Template ref for the caption tab nav so the top "Fanned out" chips
 // can scroll the operator down to the swapped caption after activating.
 const captionTabsRef = ref(null)
@@ -1952,26 +1970,30 @@ const showThumbnailUploadCaption = computed(() =>
                 </div>
 
                 <!-- Title — REQUIRED by Publer for TikTok photo carousel
-                     (≤90 chars per Publer API spec). Plugin emits this
-                     separately from caption. Render above caption with
-                     visual prominence so operator sees what'll ship. -->
+                     (≤90 chars per Publer API spec). LinkedIn/IG/Threads
+                     don't need it as a separate field — caption hook
+                     covers the same role. -->
                 <div
-                  v-if="activePlatform !== 'linkedin' && activePlatformPost.title"
+                  v-if="activePlatform === 'tiktok' && activePlatformPost.title"
                   class="rounded-md border border-neutral-800/60 bg-neutral-950/40 px-3 py-2"
                 >
                   <p class="text-[10px] font-mono uppercase tracking-[0.14em] text-neutral-500 mb-1">
                     Title
                     <span class="ml-1 text-neutral-600">· {{ activePlatformPost.title.length }}/90</span>
                     <span
-                      v-if="activePlatform === 'tiktok' && activePlatformPost.title.length > 90"
+                      v-if="activePlatformPost.title.length > 90"
                       class="ml-2 text-red-400"
-                    >TikTok hard cap exceeded</span>
+                    >Publer hard cap exceeded</span>
                   </p>
                   <p class="text-[15px] text-neutral-100 font-medium leading-snug">{{ activePlatformPost.title }}</p>
                 </div>
 
-                <div v-if="activePlatformPost.content && activePlatformPost.content.trim() !== ''" class="whitespace-pre-wrap text-neutral-200 leading-relaxed text-[15px]">
-                  {{ activePlatformPost.content }}
+                <!-- Caption body — for TikTok, strip duplicate first line
+                     when it exactly matches the title (plugin currently
+                     echoes title as caption hook; until plugin v0.5.0
+                     fixes this, dedupe display-side). -->
+                <div v-if="captionDisplayBody && captionDisplayBody.trim() !== ''" class="whitespace-pre-wrap text-neutral-200 leading-relaxed text-[15px]">
+                  {{ captionDisplayBody }}
                 </div>
                 <div v-else class="rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-200">
                   <strong class="text-amber-300">No caption.</strong> This {{ PLATFORM_META[activePlatform].label }} variant will publish without a body — typically 50% lower reach.
