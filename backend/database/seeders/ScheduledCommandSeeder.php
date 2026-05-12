@@ -83,8 +83,14 @@ class ScheduledCommandSeeder extends Seeder
 
             // ─────────────── LinkedIn (7) ───────────────
             [
-                'signature' => 'linkedin:process-scheduled',
-                'display_name' => 'LinkedIn — Process Scheduled Posts',
+                // P5 (May 12, 2026): atomic orchestrator replaces
+                // linkedin:process-scheduled. Same * * * * * tick, but knows
+                // about carousel siblings (IG/TT/TH) and dispatches all to
+                // fire same minute when ready. Legacy linkedin:process-scheduled
+                // remains in ProcessScheduledLinkedInPosts.php as a delegating
+                // stub through P7, then deleted.
+                'signature' => 'social:publish-slot',
+                'display_name' => 'Social — Atomic Publish at Slot (LinkedIn + IG/TT/TH)',
                 'category' => 'linkedin',
                 'cron_expression' => '* * * * *',
                 'without_overlapping_minutes' => 5,
@@ -180,6 +186,13 @@ class ScheduledCommandSeeder extends Seeder
                 ])
             );
         }
+
+        // P5 (May 12, 2026) — retire the legacy linkedin:process-scheduled
+        // scheduled row. The Artisan command itself remains as a delegating
+        // alias (calls social:publish-slot) through P7 for any external
+        // caller that hardcoded the old signature. But the cron-driven row
+        // must be removed so we don't double-publish every minute.
+        ScheduledCommand::where('signature', 'linkedin:process-scheduled')->delete();
 
         // ─────────────── Placeholders (4 — disabled, reserved for roadmap) ───────────────
         $placeholders = [

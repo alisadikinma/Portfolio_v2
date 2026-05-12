@@ -64,6 +64,10 @@ class LinkedInSettingsSeeder extends Seeder
             ['key' => 'linkedin_format_carousel_target_ratio', 'value' => '0.8',   'type' => 'text'],
             ['key' => 'linkedin_format_lookback_window',       'value' => '10',    'type' => 'text'],
             ['key' => 'linkedin_format_governor_enabled',      'value' => 'true',  'type' => 'text'],
+            // Atomic slot orchestrator (May 12) — max times a carousel draft
+            // can be postponed when siblings aren't ready, before LinkedIn
+            // ships solo + siblings drop to manual_review.
+            ['key' => 'linkedin_max_postpones',                 'value' => '2',     'type' => 'text'],
         ];
 
         foreach ($settings as $setting) {

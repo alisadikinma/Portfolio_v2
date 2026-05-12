@@ -720,6 +720,15 @@ class LinkedInDraftController extends Controller
                 'cancel_window_ends_at' => $publishAt,
             ]);
 
+            // P5 (May 12): propagate slot to cross-post siblings so the
+            // social:publish-slot atomic orchestrator finds them at the same
+            // minute tick. Scanner's 2-min cron handles drafts whose siblings
+            // don't exist yet at approve time.
+            $draft->load(['facebookPost', 'instagramPost', 'tiktokPost', 'threadsPost']);
+            foreach (['facebookPost', 'instagramPost', 'tiktokPost', 'threadsPost'] as $rel) {
+                $draft->$rel?->update(['scheduled_at' => $publishAt]);
+            }
+
             // Self-heal: a carousel draft can land in manual_review with non-done
             // slides if the original Scenario-C dispatch in persistAndRoute
             // silently failed (logged but swallowed) or if the draft predates

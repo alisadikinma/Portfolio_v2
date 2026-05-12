@@ -161,6 +161,18 @@ class ScanLinkedInForCrossPost extends Command
                     app(TelegramNotificationService::class)
                         ->sendCrossPostFanout($linkedinPost->id, $linkedinPost->post_id, $platforms);
                 }
+
+                // P5 (May 12) — propagate LinkedIn slot to newly-created
+                // siblings so social:publish-slot orchestrator finds them at
+                // the same minute tick on carousel-atomic-publish.
+                if ($linkedinPost->scheduled_at !== null) {
+                    \Illuminate\Support\Facades\DB::transaction(function () use ($linkedinPost) {
+                        $linkedinPost->refresh()->load(['facebookPost', 'instagramPost', 'tiktokPost', 'threadsPost']);
+                        foreach (['facebookPost', 'instagramPost', 'tiktokPost', 'threadsPost'] as $rel) {
+                            $linkedinPost->$rel?->update(['scheduled_at' => $linkedinPost->scheduled_at]);
+                        }
+                    });
+                }
             } catch (\Throwable $e) {
                 $this->error("    failed: {$e->getMessage()}");
                 Log::error('[CrossPostScan] Failed to fan out LinkedIn draft', [
