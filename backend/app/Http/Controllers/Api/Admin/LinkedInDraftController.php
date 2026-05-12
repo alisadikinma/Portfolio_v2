@@ -684,10 +684,19 @@ class LinkedInDraftController extends Controller
         }
 
         try {
-            $windowMinutes = (int) config('linkedin.cancel_window_minutes', 15);
-            $publishAt = ! empty($validated['publish_at'])
-                ? \Carbon\Carbon::parse($validated['publish_at'])
-                : now()->addMinutes($windowMinutes);
+            // Fixed-slot scheduling (May 12, 2026): when operator doesn't
+            // specify publish_at, assign the next available slot from
+            // linkedin_publish_slots (default [5,6,7,12,17,18,19,20] WIB).
+            // 1-post-per-slot FIFO. Replaces legacy now+15min cancel_window
+            // behaviour so posts fire at predictable hours.
+            //
+            // Operator-provided publish_at still honoured (manual override).
+            if (! empty($validated['publish_at'])) {
+                $publishAt = \Carbon\Carbon::parse($validated['publish_at']);
+            } else {
+                $publishAt = app(\App\Services\LinkedInFixedSlotScheduler::class)
+                    ->nextAvailableSlot();
+            }
 
             // For drafts already in awaiting_publish, this endpoint becomes
             // a "reschedule" — only update timestamps without an FSM
@@ -701,11 +710,13 @@ class LinkedInDraftController extends Controller
                 );
             }
 
-            // scheduled_at = when the operator approved/scheduled (immutable
-            // record of operator action). cancel_window_ends_at = when
-            // publish actually fires (the cron checks this).
+            // Post-May-12: scheduled_at AND cancel_window_ends_at both =
+            // the slot time. Operator can cancel anytime between approve
+            // click and slot fire (could be hours). LinkedIn process-
+            // scheduled cron fires when cancel_window_ends_at <= now()
+            // — same trigger logic, just at predictable slot times.
             $draft->update([
-                'scheduled_at' => now(),
+                'scheduled_at' => $publishAt,
                 'cancel_window_ends_at' => $publishAt,
             ]);
 

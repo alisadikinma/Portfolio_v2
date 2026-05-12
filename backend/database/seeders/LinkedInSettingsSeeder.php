@@ -42,6 +42,16 @@ class LinkedInSettingsSeeder extends Seeder
             // slot (14-day lookahead). Default OFF — feature dormant until
             // operator opts in via AboutSettings UI.
             ['key' => 'linkedin_auto_approve_enabled',         'value' => 'false', 'type' => 'text'],
+            // Fixed-slot scheduler (May 12, 2026):
+            // - linkedin_publish_slots: JSON array of int hours (0-23 WIB).
+            //   LinkedInFixedSlotScheduler iterates these in order, 1-post-
+            //   per-slot FIFO. Replaces the AI-researched posting_time_rules
+            //   score>=85 lookup of LinkedInAutoSchedulerService.
+            // - linkedin_slot_lead_time_minutes: minimum minutes between now()
+            //   and a slot for it to be eligible. Guards against approving at
+            //   04:59 and trying to publish at 05:00 (cancel window collapses).
+            ['key' => 'linkedin_publish_slots',                'value' => '[5,6,7,12,17,18,19,20]', 'type' => 'json'],
+            ['key' => 'linkedin_slot_lead_time_minutes',       'value' => '5',     'type' => 'text'],
         ];
 
         foreach ($settings as $setting) {

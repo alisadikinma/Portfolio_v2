@@ -917,7 +917,53 @@ class SettingsController extends Controller
             'linkedin_cancel_window_minutes' => ['nullable', 'integer', 'between:1,1440'],
             'linkedin_first_comment_enabled' => ['nullable', 'in:true,false,1,0'],
             'linkedin_first_comment_delay_seconds' => ['nullable', 'integer', 'between:0,3600'],
+            // Fixed-slot scheduler (May 12) — slots accepted as JSON-encoded
+            // string OR array; normalized to JSON string in storage.
+            'linkedin_publish_slots' => ['nullable'],
+            'linkedin_slot_lead_time_minutes' => ['nullable', 'integer', 'between:0,1440'],
         ]);
+
+        // Normalize + validate slots: accept array or JSON string, dedupe,
+        // sort, enforce hours 0-23 and 1-24 entries.
+        if (array_key_exists('linkedin_publish_slots', $validated) && $validated['linkedin_publish_slots'] !== null) {
+            $raw = $validated['linkedin_publish_slots'];
+            if (is_string($raw)) {
+                $decoded = json_decode($raw, true);
+                if (! is_array($decoded)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'linkedin_publish_slots must be a JSON array of integers 0-23',
+                    ], 422);
+                }
+                $raw = $decoded;
+            }
+            if (! is_array($raw)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'linkedin_publish_slots must be an array',
+                ], 422);
+            }
+            $clean = [];
+            foreach ($raw as $h) {
+                $int = (int) $h;
+                if ($int < 0 || $int > 23) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "linkedin_publish_slots entries must be 0-23 (got: {$h})",
+                    ], 422);
+                }
+                $clean[$int] = true;
+            }
+            if (empty($clean) || count($clean) > 24) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'linkedin_publish_slots must contain 1-24 unique hours',
+                ], 422);
+            }
+            $keys = array_keys($clean);
+            sort($keys);
+            $validated['linkedin_publish_slots'] = json_encode($keys);
+        }
 
         DB::beginTransaction();
 
@@ -930,9 +976,10 @@ class SettingsController extends Controller
             }
 
             foreach ($validated as $key => $value) {
+                $type = $key === 'linkedin_publish_slots' ? 'json' : 'text';
                 Setting::updateOrCreate(
                     ['key' => $key, 'group' => 'linkedin'],
-                    ['value' => (string) $value, 'type' => 'text']
+                    ['value' => (string) $value, 'type' => $type]
                 );
             }
 

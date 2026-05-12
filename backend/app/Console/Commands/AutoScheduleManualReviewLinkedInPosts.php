@@ -8,7 +8,8 @@ use App\Enums\LinkedInPostStatus;
 use App\Jobs\GenerateLinkedInCarouselImages;
 use App\Models\LinkedInPost;
 use App\Models\Setting;
-use App\Services\LinkedInAutoSchedulerService;
+use App\Exceptions\NoAvailableSlotException;
+use App\Services\LinkedInFixedSlotScheduler;
 use App\Services\PipelineGuard;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
@@ -44,7 +45,7 @@ class AutoScheduleManualReviewLinkedInPosts extends Command
     private const KILL_SWITCH_LOOP_GUARD_HOURS = 24;
 
     public function __construct(
-        private readonly LinkedInAutoSchedulerService $scheduler,
+        private readonly LinkedInFixedSlotScheduler $scheduler,
         private readonly PipelineGuard $guard,
     ) {
         parent::__construct();
@@ -110,17 +111,30 @@ class AutoScheduleManualReviewLinkedInPosts extends Command
                 continue;
             }
 
-            $slot = $this->scheduler->nextAvailableSlot(
-                Carbon::now(),
-                $assignedSlots,
-                LinkedInAutoSchedulerService::DEFAULT_MIN_SCORE,
-                $lookahead
-            );
-
-            if ($slot === null) {
-                Log::warning('[linkedin:auto-schedule] lookahead exhausted — backlog larger than ideal capacity', [
+            // Post-May-12: use fixed-slot scheduler (5/6/7/12/17/18/19/20 WIB
+            // by default). DB collision query inside scheduler dedupes against
+            // already-promoted drafts. For dry-run, $assignedSlots tracks the
+            // simulated promotions so multiple dry runs don't all show the
+            // same slot.
+            try {
+                if ($dryRun && !empty($assignedSlots)) {
+                    // Walk forward past simulated slots
+                    $from = Carbon::now();
+                    do {
+                        $slot = $this->scheduler->nextAvailableSlot($from);
+                        if (! in_array($slot->toIso8601String(), $assignedSlots, true)) {
+                            break;
+                        }
+                        $from = $slot->copy()->addMinute();
+                    } while (true);
+                } else {
+                    $slot = $this->scheduler->nextAvailableSlot();
+                }
+            } catch (NoAvailableSlotException $e) {
+                Log::warning('[linkedin:auto-schedule] lookahead exhausted — backlog larger than slot capacity', [
                     'remaining_drafts' => $candidates->count() - $promoted - $skipped - $failed,
                     'lookahead_days' => $lookahead,
+                    'reason' => $e->getMessage(),
                 ]);
                 break;
             }
@@ -224,8 +238,11 @@ class AutoScheduleManualReviewLinkedInPosts extends Command
     private function promoteDraft(LinkedInPost $draft, Carbon $slot): void
     {
         DB::transaction(function () use ($draft, $slot): void {
+            // Post-May-12: scheduled_at = slot (when publish fires), same as
+            // cancel_window_ends_at. linkedin:process-scheduled cron triggers
+            // on cancel_window_ends_at <= now() — both fields aligned.
             $draft->update([
-                'scheduled_at' => Carbon::now(),
+                'scheduled_at' => $slot,
                 'cancel_window_ends_at' => $slot,
             ]);
 
