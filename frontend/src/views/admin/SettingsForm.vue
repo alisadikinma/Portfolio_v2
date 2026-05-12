@@ -528,7 +528,7 @@ LINKEDIN_OAUTH_REDIRECT_URI=https://alisadikinma.com/api/admin/linkedin/oauth/ca
 
               <div>
                 <label for="linkedin_cancel_window_minutes" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                  Cancel window (minutes)
+                  Cancel window (minutes) <span class="text-xs text-neutral-500 font-normal">— legacy, ignored post May-12</span>
                 </label>
                 <input
                   id="linkedin_cancel_window_minutes"
@@ -539,7 +539,127 @@ LINKEDIN_OAUTH_REDIRECT_URI=https://alisadikinma.com/api/admin/linkedin/oauth/ca
                   class="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-amber-500"
                 >
                 <p class="text-xs text-neutral-500 mt-1">
-                  Time between "awaiting_publish" and actual publish. Allows last-minute cancel via Telegram.
+                  Pre-May-12 behavior. Now <code class="text-[10px] bg-neutral-100 dark:bg-neutral-800 px-1 rounded">scheduled_at</code> = next fixed slot below; cancel window = full approve→slot duration.
+                </p>
+              </div>
+            </div>
+
+            <!-- Fixed-Slot Scheduler (May 12, 2026 P1) -->
+            <div class="pt-4 border-t border-neutral-200 dark:border-neutral-700 space-y-3">
+              <h3 class="text-sm font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider">
+                Fixed-Slot Scheduler
+              </h3>
+              <p class="text-xs text-neutral-500">
+                Posts fire ONLY at these hours WIB. 1 post per slot, FIFO. Three approvals in same minute land in three consecutive slots.
+              </p>
+
+              <div>
+                <label for="linkedin_publish_slots_text" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                  Publish slots (hours WIB, comma-separated)
+                </label>
+                <input
+                  id="linkedin_publish_slots_text"
+                  v-model="linkedinFormData.linkedin_publish_slots_text"
+                  type="text"
+                  placeholder="5,6,7,12,17,18,19,20"
+                  class="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-mono text-sm focus:outline-none focus:border-amber-500"
+                >
+                <p class="text-xs text-neutral-500 mt-1">
+                  Default <code class="text-[10px] bg-neutral-100 dark:bg-neutral-800 px-1 rounded">5,6,7,12,17,18,19,20</code> (8 slots/day, peak engagement windows). Values 0-23.
+                </p>
+              </div>
+
+              <div>
+                <label for="linkedin_slot_lead_time_minutes" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                  Slot lead time (minutes)
+                </label>
+                <input
+                  id="linkedin_slot_lead_time_minutes"
+                  v-model="linkedinFormData.linkedin_slot_lead_time_minutes"
+                  type="number"
+                  min="0"
+                  max="60"
+                  class="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-amber-500"
+                >
+                <p class="text-xs text-neutral-500 mt-1">
+                  Skip slots starting in &lt; N minutes (avoids approving at 04:59 → publish at 05:00 = 1-min cancel window).
+                </p>
+              </div>
+
+              <div>
+                <label for="linkedin_max_postpones" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                  Max postpones (carousel sibling readiness)
+                </label>
+                <input
+                  id="linkedin_max_postpones"
+                  v-model="linkedinFormData.linkedin_max_postpones"
+                  type="number"
+                  min="0"
+                  max="5"
+                  class="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-amber-500"
+                >
+                <p class="text-xs text-neutral-500 mt-1">
+                  When carousel siblings (IG/TT/Threads) aren't ready at slot fire, postpone to next slot up to N times. Then ship LinkedIn solo, demote siblings to manual_review.
+                </p>
+              </div>
+            </div>
+
+            <!-- Format-Mix Governor (May 12, 2026 P2) -->
+            <div class="pt-4 border-t border-neutral-200 dark:border-neutral-700 space-y-3">
+              <h3 class="text-sm font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider">
+                Format-Mix Governor
+              </h3>
+              <p class="text-xs text-neutral-500">
+                Backend over-rides plugin when carousel/text ratio drifts. Carousel format fans out to IG + TikTok + Threads cross-posts; text only fans to FB + Threads.
+              </p>
+
+              <label class="flex items-center gap-3 cursor-pointer">
+                <input
+                  :checked="linkedinFormData.linkedin_format_governor_enabled === 'true'"
+                  type="checkbox"
+                  class="w-4 h-4 text-amber-600 border-neutral-300 rounded focus:ring-amber-500"
+                  @change="e => linkedinFormData.linkedin_format_governor_enabled = e.target.checked ? 'true' : 'false'"
+                >
+                <span class="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                  Enable format-mix governor
+                </span>
+              </label>
+              <p class="text-xs text-neutral-500 -mt-2 pl-7">
+                When OFF, plugin's natural format decision (usually text-biased) is always honored.
+              </p>
+
+              <div>
+                <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                  Target carousel ratio
+                  <span class="font-mono text-amber-500 ml-2">{{ Math.round(parseFloat(linkedinFormData.linkedin_format_carousel_target_ratio) * 100) }}%</span>
+                </label>
+                <input
+                  v-model="linkedinFormData.linkedin_format_carousel_target_ratio"
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  class="w-full accent-amber-500"
+                >
+                <p class="text-xs text-neutral-500 mt-1">
+                  Default 80% carousel / 20% text. When recent ratio drifts below target AND plugin emitted text, re-dispatch plugin with <code class="text-[10px] bg-neutral-100 dark:bg-neutral-800 px-1 rounded">format_preference=carousel</code> (requires plugin v0.7.0).
+                </p>
+              </div>
+
+              <div>
+                <label for="linkedin_format_lookback_window" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                  Lookback window (drafts)
+                </label>
+                <input
+                  id="linkedin_format_lookback_window"
+                  v-model="linkedinFormData.linkedin_format_lookback_window"
+                  type="number"
+                  min="1"
+                  max="100"
+                  class="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-amber-500"
+                >
+                <p class="text-xs text-neutral-500 mt-1">
+                  How many recent drafts to sample for ratio computation. Bootstrap (no override) until history fills.
                 </p>
               </div>
             </div>
@@ -2011,6 +2131,16 @@ const linkedinFormData = ref({
   linkedin_first_comment_delay_seconds: '30',
   linkedin_last_test_connection_at: null,
   linkedin_last_test_connection_result: null,
+  // Fixed-slot scheduler (May 12) — slots displayed as comma-separated
+  // string for textarea editing, normalized to JSON array on save.
+  linkedin_publish_slots_text: '5,6,7,12,17,18,19,20',
+  linkedin_slot_lead_time_minutes: '5',
+  // Format-mix governor (May 12)
+  linkedin_format_carousel_target_ratio: '0.8',
+  linkedin_format_lookback_window: '10',
+  linkedin_format_governor_enabled: 'true',
+  // Atomic slot orchestrator (May 12)
+  linkedin_max_postpones: '2',
 })
 
 const {
@@ -2035,6 +2165,20 @@ const linkedinLoading = computed(() =>
 
 watch(linkedinSettings, (s) => {
   if (!s) return
+  // Parse slots JSON for display as comma-separated string
+  let slotsText = '5,6,7,12,17,18,19,20'
+  if (s.linkedin_publish_slots) {
+    try {
+      const parsed = typeof s.linkedin_publish_slots === 'string'
+        ? JSON.parse(s.linkedin_publish_slots)
+        : s.linkedin_publish_slots
+      if (Array.isArray(parsed)) {
+        slotsText = parsed.join(',')
+      }
+    } catch (e) {
+      // Fallback to default; admin can fix in UI
+    }
+  }
   linkedinFormData.value = {
     linkedin_auto_publish: s.linkedin_auto_publish ?? 'false',
     linkedin_auto_approve_enabled: s.linkedin_auto_approve_enabled ?? 'false',
@@ -2044,12 +2188,29 @@ watch(linkedinSettings, (s) => {
     linkedin_first_comment_delay_seconds: s.linkedin_first_comment_delay_seconds ?? '30',
     linkedin_last_test_connection_at: s.linkedin_last_test_connection_at ?? null,
     linkedin_last_test_connection_result: s.linkedin_last_test_connection_result ?? null,
+    linkedin_publish_slots_text: slotsText,
+    linkedin_slot_lead_time_minutes: s.linkedin_slot_lead_time_minutes ?? '5',
+    linkedin_format_carousel_target_ratio: s.linkedin_format_carousel_target_ratio ?? '0.8',
+    linkedin_format_lookback_window: s.linkedin_format_lookback_window ?? '10',
+    linkedin_format_governor_enabled: s.linkedin_format_governor_enabled ?? 'true',
+    linkedin_max_postpones: s.linkedin_max_postpones ?? '2',
   }
 }, { immediate: true })
 
 async function handleLinkedInSubmit() {
   linkedinSubmitting.value = true
   try {
+    // Parse slots from comma-separated text to int array. Backend validator
+    // accepts both string + array; sends as JSON array for cleanness.
+    const slotsArr = linkedinFormData.value.linkedin_publish_slots_text
+      .split(',')
+      .map(s => parseInt(s.trim(), 10))
+      .filter(n => Number.isFinite(n) && n >= 0 && n <= 23)
+    if (slotsArr.length === 0) {
+      uiStore.showError('Publish slots must contain at least 1 hour (0-23)', 'Save Failed')
+      linkedinSubmitting.value = false
+      return
+    }
     await saveLinkedinSettings({
       linkedin_auto_publish: linkedinFormData.value.linkedin_auto_publish,
       linkedin_auto_approve_enabled: linkedinFormData.value.linkedin_auto_approve_enabled,
@@ -2057,6 +2218,12 @@ async function handleLinkedInSubmit() {
       linkedin_cancel_window_minutes: parseInt(linkedinFormData.value.linkedin_cancel_window_minutes, 10),
       linkedin_first_comment_enabled: linkedinFormData.value.linkedin_first_comment_enabled,
       linkedin_first_comment_delay_seconds: parseInt(linkedinFormData.value.linkedin_first_comment_delay_seconds, 10),
+      linkedin_publish_slots: slotsArr,
+      linkedin_slot_lead_time_minutes: parseInt(linkedinFormData.value.linkedin_slot_lead_time_minutes, 10),
+      linkedin_format_carousel_target_ratio: parseFloat(linkedinFormData.value.linkedin_format_carousel_target_ratio),
+      linkedin_format_lookback_window: parseInt(linkedinFormData.value.linkedin_format_lookback_window, 10),
+      linkedin_format_governor_enabled: linkedinFormData.value.linkedin_format_governor_enabled,
+      linkedin_max_postpones: parseInt(linkedinFormData.value.linkedin_max_postpones, 10),
     })
     uiStore.showSuccess('LinkedIn settings saved', 'Saved')
   } catch (err) {

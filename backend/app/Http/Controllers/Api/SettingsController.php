@@ -925,6 +925,8 @@ class SettingsController extends Controller
             'linkedin_format_carousel_target_ratio' => ['nullable', 'numeric', 'between:0,1'],
             'linkedin_format_lookback_window' => ['nullable', 'integer', 'between:1,100'],
             'linkedin_format_governor_enabled' => ['nullable', 'in:true,false,1,0'],
+            // Atomic orchestrator (May 12) — max postpones before LinkedIn solo
+            'linkedin_max_postpones' => ['nullable', 'integer', 'between:0,10'],
         ]);
 
         // Normalize new governor boolean (joins existing boolean normalization

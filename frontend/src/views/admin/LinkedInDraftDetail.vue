@@ -578,6 +578,34 @@ const liveCountdown = computed(() => {
     : ''
 })
 
+// P5 (May 12) — count how many times this draft was postponed by the
+// atomic orchestrator because cross-post siblings weren't ready at slot
+// fire. Surfaces as amber chip near the live countdown.
+const postponeCount = computed(() => {
+  const log = Array.isArray(draft.value?.pipeline_state_log)
+    ? draft.value.pipeline_state_log
+    : []
+  return log.filter(e => e?.reason === 'slot_postponed_siblings_not_ready').length
+})
+
+// Format the slot scheduled_at as "13 May · 05:00 WIB" — post-May-12 it's
+// the actual publish time, not now() + cancel window.
+const scheduledSlotLabel = computed(() => {
+  const iso = draft.value?.scheduled_at
+  if (!iso) return ''
+  const d = new Date(iso)
+  const opts = {
+    timeZone: 'Asia/Jakarta',
+    day: '2-digit', month: 'short',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  }
+  try {
+    return new Intl.DateTimeFormat('en-GB', opts).format(d).replace(',', ' ·') + ' WIB'
+  } catch {
+    return iso
+  }
+})
+
 // --- Schedule picker ------------------------------------------------------
 // `isScheduling` toggles the inline datetime-local input. `scheduleAt` is
 // the datetime-local value (browser-formatted "YYYY-MM-DDTHH:mm" — no
@@ -1298,13 +1326,26 @@ const showThumbnailUploadCaption = computed(() =>
               </div>
             </div>
 
-            <!-- Live countdown for awaiting_publish -->
-            <div v-if="draft.status === 'awaiting_publish' && draft.cancel_window_ends_at" class="inline-flex items-center gap-2 text-sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-amber-400">
-                <path :d="ICON.clock" />
-              </svg>
-              <span class="text-neutral-400">Publishes in</span>
-              <span class="font-mono font-bold text-amber-400 text-base">{{ liveCountdown }}</span>
+            <!-- Live countdown + slot label for awaiting_publish -->
+            <div v-if="draft.status === 'awaiting_publish' && draft.cancel_window_ends_at" class="flex flex-wrap items-center gap-2 text-sm">
+              <div class="inline-flex items-center gap-2">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-amber-400">
+                  <path :d="ICON.clock" />
+                </svg>
+                <span class="text-neutral-400">Scheduled for</span>
+                <span class="font-mono text-neutral-100 text-sm">{{ scheduledSlotLabel }}</span>
+                <span class="text-neutral-500">·</span>
+                <span class="text-neutral-400">in</span>
+                <span class="font-mono font-bold text-amber-400 text-base">{{ liveCountdown }}</span>
+              </div>
+              <!-- P5: postpone chip when carousel siblings forced delays -->
+              <span
+                v-if="postponeCount > 0"
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-mono"
+                :title="`Atomic orchestrator postponed this draft ${postponeCount} time(s) waiting for cross-post siblings to be ready`"
+              >
+                ↻ postponed {{ postponeCount }}×
+              </span>
             </div>
 
             <!-- Last error (only when status terminal-bad or stuck-in-review) -->
