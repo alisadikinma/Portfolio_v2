@@ -31,11 +31,17 @@ class GenerateLinkedInPost implements ShouldQueue
     public array $backoff = [60, 300];
 
     // Timeout sits above the service's SSH timeout so the job doesn't get
-    // killed mid-Sonnet. Service default raised to 600s after a production
-    // run on blog #24 measured 369s wall — see config/linkedin.php for the
-    // analysis. Job gets 60s extra to handle parsing + persistence after
-    // SSH returns.
-    public int $timeout = 660;
+    // killed mid-Sonnet. Budgeted for TWO consecutive 600s SSH calls because
+    // the format-mix governor (May 12, 2026 — LinkedInGenerationService line
+    // 180) may re-dispatch /linkedin-gen with format_preference=carousel when
+    // the recent draft mix is text-heavy. Single-call jobs still fit
+    // comfortably; only governor over-rides need the full budget.
+    //
+    // 2 × 600s SSH + 60s parse/persist margin = 1260s. Pre-May-12 value of
+    // 660s killed jobs mid-second-call before markFailed could run, leaving
+    // rows stuck in `generating` until the reaper picked them up (production
+    // incident May 13: 7 text-format drafts reaped at 22-24m).
+    public int $timeout = 1260;
 
     public function __construct(public int $draftId)
     {
@@ -43,12 +49,13 @@ class GenerateLinkedInPost implements ShouldQueue
 
     /**
      * How long a draft can sit in generating/validating before we consider
-     * its in-flight attempt dead. Threshold sits above the 10-min SSH
-     * budget (LINKEDIN_GEN_TIMEOUT_SECONDS=600s) + 60s job-margin so
-     * legitimate slow runs are NOT clobbered. Mirror of the reaper cron
-     * threshold so both recovery paths agree on what "stuck" means.
+     * its in-flight attempt dead. Threshold sits above the worst-case
+     * 2 × 600s SSH budget (initial /linkedin-gen + governor re-dispatch) +
+     * 60s job-margin = 21min wall, so legitimate slow runs are NOT
+     * clobbered. Mirror of the reaper cron threshold so both recovery
+     * paths agree on what "stuck" means.
      */
-    private const STALE_THRESHOLD_MINUTES = 20;
+    private const STALE_THRESHOLD_MINUTES = 25;
 
     public function handle(LinkedInGenerationService $service): void
     {

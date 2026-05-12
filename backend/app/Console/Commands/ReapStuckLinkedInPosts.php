@@ -18,9 +18,11 @@ use Illuminate\Support\Facades\Log;
  * `pending_generation` (see GenerateLinkedInPost::handle and the
  * "already in progress" guard in LinkedInGenerationService::generate).
  *
- * Threshold default 20 minutes — comfortably above the 10-min SSH
- * budget (LINKEDIN_GEN_TIMEOUT_SECONDS=600s) plus a 60s job-timeout
- * margin. Slow-but-live generations are NOT clobbered.
+ * Threshold default 25 minutes — comfortably above the worst-case
+ * 2 × 600s SSH budget (initial /linkedin-gen + format-mix governor
+ * re-dispatch, see LinkedInGenerationService line 180) plus a 60s
+ * job-timeout margin = 21min wall. Slow-but-live generations are NOT
+ * clobbered. Mirror of GenerateLinkedInPost::STALE_THRESHOLD_MINUTES.
  *
  * Action: reaped rows transition to `failed` with a clear `last_error`
  * stamp. Operator can then click "Restart from blog" in admin UI to
@@ -31,7 +33,7 @@ use Illuminate\Support\Facades\Log;
 class ReapStuckLinkedInPosts extends Command
 {
     protected $signature = 'linkedin:reap-stuck
-        {--threshold=20 : Minutes after which generating/validating is considered stuck}
+        {--threshold=25 : Minutes after which generating/validating is considered stuck}
         {--dry-run : Log candidates without mutating}';
 
     protected $description = 'Mark stuck generating/validating LinkedIn drafts as failed (recovery for SSH timeouts and queue crashes)';
