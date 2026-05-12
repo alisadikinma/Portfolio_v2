@@ -168,7 +168,9 @@ class CrossPostDraftControllersTest extends TestCase
             ->assertOk();
 
         Queue::assertPushed(PublishViaPubler::class, function ($job) {
-            return $job->modelClass === \App\Models\TiktokPost::class;
+            // P4 signature change (May 12): job carries short platform string
+            // ('tiktok'|'instagram'|'threads'|'facebook'), not FQN modelClass.
+            return $job->platform === 'tiktok';
         });
     }
 

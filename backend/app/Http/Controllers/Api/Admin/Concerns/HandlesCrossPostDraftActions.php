@@ -267,8 +267,18 @@ trait HandlesCrossPostDraftActions
             ], 422);
         }
 
-        // Stub Publer dispatch — actual publishing wires up in Phase H+.
-        PublishViaPubler::dispatch($modelClass, $draft->id);
+        // Publer dispatch (real impl shipped May 12 — see PublishViaPubler P4).
+        // New signature is (string $platform, int $siblingPostId) — map the
+        // FQN model class to the short platform name the job's loadSibling
+        // method expects.
+        $platform = match ($modelClass) {
+            \App\Models\FacebookPost::class => 'facebook',
+            \App\Models\InstagramPost::class => 'instagram',
+            \App\Models\TiktokPost::class => 'tiktok',
+            \App\Models\ThreadsPost::class => 'threads',
+            default => throw new \InvalidArgumentException("Unknown cross-post model: {$modelClass}"),
+        };
+        PublishViaPubler::dispatch($platform, $draft->id);
 
         return response()->json([
             'success' => true,
