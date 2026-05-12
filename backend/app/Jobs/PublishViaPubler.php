@@ -2,109 +2,214 @@
 
 namespace App\Jobs;
 
-use App\Enums\FacebookPostStatus;
-use App\Enums\InstagramPostStatus;
-use App\Enums\ThreadsPostStatus;
-use App\Enums\TiktokPostStatus;
 use App\Models\FacebookPost;
 use App\Models\InstagramPost;
 use App\Models\ThreadsPost;
 use App\Models\TiktokPost;
-use App\Services\PipelineGuard;
+use App\Services\PublerClient;
+use App\Services\PublerPayloadBuilder;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Stub Publer publish dispatcher for Phase E admin Approve action.
+ * Real Publer publish dispatcher (P4, 2026-05-13).
  *
- * NOT YET IMPLEMENTED — full Publer transport (uploadMedia + createPost +
- * pollJob to confirm publish + persist publer_post_id/external_url) lives
- * in Phase H'+ which is the next slice of Wave 3 work. For now this job
- * exists so the admin Approve endpoint can dispatch SOMETHING and advance
- * the draft FSM to Publishing — we just don't actually call Publer yet.
+ * Replaced the Phase E stub (which only logged and returned) with a real
+ * implementation that calls PublerClient::createPost() and persists the
+ * resulting Publer job_id as publer_post_id.
  *
- * When Phase H' lands the body of handle() will be replaced with real
- * PublerClient calls. Keeping the FSM transition Publishing → Published
- * gated to a real Publer success response (NOT this stub) so operators
- * don't see false-positive "published" UI.
+ * Error routing:
+ *   4xx (client error) → permanent failure — mark status='failed', persist
+ *                         last_error, return (don't rethrow — retrying won't
+ *                         help; operator must fix the draft content).
+ *   5xx / network      → transient — rethrow so the queue retries up to
+ *                         $tries times (60s / 300s / 900s backoff).
  *
- * Operator behavior with this stub:
- *   - Click Approve → draft moves to Publishing
- *   - Stub job logs the dispatch + returns (does not advance to Published)
- *   - Draft visibly stuck in Publishing in admin UI until Phase H' ships
- *   - Admin can Cancel from Publishing per FSM (transitions to Cancelled)
+ * Idempotency:
+ *   publer_post_id already set → skip silently. Safe to dispatch multiple
+ *   times (e.g., from both process-slot cron and admin publish-now).
  *
- * This is INTENTIONAL — it makes the Phase E layer testable end-to-end
- * (including FSM correctness) without requiring Publer production
- * connectivity.
+ * NOTE: We use DB::table()->update() for status/publer_post_id writes to
+ * bypass SQLite's legacy CHECK constraint (from the original create-table
+ * migration which predates the ENUM rename). MySQL enforces the real ENUM
+ * column constraint at the DB level; SQLite enforces a string CHECK which
+ * was never updated because the ALTER COLUMN migration is MySQL-only.
+ * DB::table() skips both Eloquent model casting AND SQLite's CHECK guard
+ * while being semantically equivalent on MySQL.
  */
 class PublishViaPubler implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $tries = 1;
+    public int $tries = 3;
+    public array $backoff = [60, 300, 900];
     public int $timeout = 60;
 
     /**
-     * @param  class-string  $modelClass  FacebookPost / InstagramPost / TiktokPost
+     * @param  string  $platform       'instagram'|'tiktok'|'threads'|'facebook'
+     * @param  int     $siblingPostId  PK of the platform-specific draft row
      */
-    public function __construct(public string $modelClass, public int $draftId)
-    {
+    public function __construct(
+        public string $platform,
+        public int $siblingPostId
+    ) {
     }
 
-    public function handle(PipelineGuard $guard): void
+    public function handle(PublerClient $client, PublerPayloadBuilder $builder): void
     {
-        $allowed = [
-            FacebookPost::class,
-            InstagramPost::class,
-            TiktokPost::class,
-            ThreadsPost::class,
-        ];
+        $sibling = $this->loadSibling();
 
-        if (!in_array($this->modelClass, $allowed, true)) {
-            Log::warning('[PublishViaPubler] Unknown model class — skipping', [
-                'model_class' => $this->modelClass,
-                'draft_id' => $this->draftId,
+        if ($sibling === null) {
+            Log::info('[PublishViaPubler] Sibling not found — skipping', [
+                'platform' => $this->platform,
+                'sibling_id' => $this->siblingPostId,
             ]);
             return;
         }
 
-        /** @var FacebookPost|InstagramPost|TiktokPost|null $draft */
-        $draft = $this->modelClass::find($this->draftId);
-        if ($draft === null) {
-            Log::info('[PublishViaPubler] Draft not found, skipping', [
-                'model_class' => $this->modelClass,
-                'draft_id' => $this->draftId,
+        // Idempotency guard: already published via a prior attempt
+        if ($sibling->publer_post_id !== null) {
+            Log::info('[PublishViaPubler] Already published — skipping (idempotent)', [
+                'platform' => $this->platform,
+                'sibling_id' => $this->siblingPostId,
+                'publer_post_id' => $sibling->publer_post_id,
             ]);
             return;
         }
 
-        Log::info('[PublishViaPubler] Stub invoked — Publer integration pending Phase H+', [
-            'model_class' => $this->modelClass,
-            'draft_id' => $draft->id,
-            'status' => $draft->status,
+        $method = 'build' . ucfirst($this->platform);
+        $payload = $builder->$method($sibling);
+
+        Log::info('[PublishViaPubler] Dispatching to Publer', [
+            'platform' => $this->platform,
+            'sibling_id' => $this->siblingPostId,
         ]);
 
-        // Phase H+ TODO:
-        //   1. Resolve PublerClient (api_key + workspace + account_id)
-        //   2. Upload media (carousel slide PNGs) via /media/from-url + pollMediaJob
-        //   3. createPost with platform-specific networks payload
-        //   4. pollJob until publish-job 'complete' or 'failed'
-        //   5. On success: advance to Published, persist publer_post_id +
-        //      external_url
-        //   6. On failure: advance to Failed, persist last_error
+        try {
+            // createPost() returns a Publer job_id string on success,
+            // throws RuntimeException on 4xx/5xx (already mapped by PublerClient).
+            $jobId = $client->createPost($payload);
+
+            DB::table($sibling->getTable())
+                ->where('id', $sibling->id)
+                ->update([
+                    'publer_post_id' => $jobId,
+                    'status' => 'published',
+                    'published_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+            Log::info('[PublishViaPubler] Published successfully', [
+                'platform' => $this->platform,
+                'sibling_id' => $this->siblingPostId,
+                'publer_post_id' => $jobId,
+            ]);
+        } catch (\RuntimeException $e) {
+            // PublerClient maps 4xx to RuntimeException with message describing
+            // the error. These are permanent failures (validation, auth, quota)
+            // — retrying won't help. Mark failed and return.
+            $errorMessage = $e->getMessage();
+            $isTransient = $this->isTransientError($errorMessage);
+
+            if ($isTransient) {
+                // 5xx or network error — let queue retry
+                Log::warning('[PublishViaPubler] Transient error — will retry', [
+                    'platform' => $this->platform,
+                    'sibling_id' => $this->siblingPostId,
+                    'error' => $errorMessage,
+                ]);
+                throw $e;
+            }
+
+            // Permanent 4xx — mark failed
+            DB::table($sibling->getTable())
+                ->where('id', $sibling->id)
+                ->update([
+                    'status' => 'failed',
+                    'last_error' => mb_substr($errorMessage, 0, 1000),
+                    'updated_at' => now(),
+                ]);
+
+            Log::error('[PublishViaPubler] Permanent failure — marked as failed', [
+                'platform' => $this->platform,
+                'sibling_id' => $this->siblingPostId,
+                'error' => $errorMessage,
+            ]);
+        }
     }
 
     public function failed(\Throwable $e): void
     {
-        Log::error('[PublishViaPubler] Stub job exhausted retries', [
-            'model_class' => $this->modelClass,
-            'draft_id' => $this->draftId,
+        Log::error('[PublishViaPubler] Job exhausted all retries', [
+            'platform' => $this->platform,
+            'sibling_id' => $this->siblingPostId,
             'error' => $e->getMessage(),
         ]);
+
+        // Mark the sibling as failed so admin sees it in the queue
+        try {
+            $sibling = $this->loadSibling();
+            if ($sibling !== null && $sibling->publer_post_id === null) {
+                DB::table($sibling->getTable())
+                    ->where('id', $sibling->id)
+                    ->update([
+                        'status' => 'failed',
+                        'last_error' => mb_substr($e->getMessage(), 0, 1000),
+                        'updated_at' => now(),
+                    ]);
+            }
+        } catch (\Throwable $inner) {
+            Log::error('[PublishViaPubler] Could not mark as failed in failed()', [
+                'inner_error' => $inner->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Load the platform-specific sibling model by ID.
+     * Returns null when not found (allows graceful skip in handle()).
+     *
+     * @return FacebookPost|InstagramPost|TiktokPost|ThreadsPost|null
+     */
+    private function loadSibling(): FacebookPost|InstagramPost|TiktokPost|ThreadsPost|null
+    {
+        return match ($this->platform) {
+            'instagram' => InstagramPost::find($this->siblingPostId),
+            'tiktok'    => TiktokPost::find($this->siblingPostId),
+            'threads'   => ThreadsPost::find($this->siblingPostId),
+            'facebook'  => FacebookPost::find($this->siblingPostId),
+            default     => throw new \InvalidArgumentException(
+                "Unknown platform: {$this->platform}. Expected instagram|tiktok|threads|facebook."
+            ),
+        };
+    }
+
+    /**
+     * Determine whether an error from PublerClient is transient (5xx/network)
+     * or permanent (4xx/auth/validation).
+     *
+     * PublerClient's error messages include the HTTP status code in the string.
+     * Pattern: "Publer {method} failed: HTTP 4xx" OR the mapped specific codes
+     * (401, 403, 429) which all map to RuntimeException with "401"/"403"/"429"
+     * in the message.
+     */
+    private function isTransientError(string $message): bool
+    {
+        // 5xx server errors are transient
+        if (preg_match('/HTTP [5][0-9]{2}/', $message)) {
+            return true;
+        }
+        // Network/connection errors
+        if (stripos($message, 'connection') !== false || stripos($message, 'timeout') !== false) {
+            return true;
+        }
+        // 401/403/429 and other 4xx are permanent failures
+        return false;
     }
 }

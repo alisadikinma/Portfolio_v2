@@ -40,6 +40,7 @@ class InstagramPost extends Model
         'scheduled_at',
         'published_at',
         'external_url',
+        'publer_post_id',
         'last_error',
         'pipeline_state_log',
         'created_by_user_id',
