@@ -17,6 +17,7 @@ import {
   formatChip,
   relativeTime,
   generatingProgress,
+  generatingProgressMeta,
   QUEUE_TAB_KEY,
   ICON,
 } from './linkedinHelpers'
@@ -479,9 +480,13 @@ const emptyMessage = computed(() => {
             >
               <span class="w-1 h-1 rounded-full" :class="MOOD_CLASSES[effectiveStatusMeta(draft).mood]?.dot" />
               {{ effectiveStatusMeta(draft).short }}
-              <!-- Comma-operator forces tick subscription without breaking the function call -->
-              <template v-if="(tick, generatingProgress(draft)) !== null">
-                <span class="opacity-70">~{{ generatingProgress(draft) }}%</span>
+              <!-- Comma-operator forces tick subscription without breaking the function call.
+                   Renders REAL progress when available (no leading "~"), synthetic with "~",
+                   and flags `· stuck` when elapsed >> 5× baseline with no advancement. -->
+              <template v-if="(tick, generatingProgressMeta(draft)) !== null">
+                <span class="opacity-70" :class="generatingProgressMeta(draft).stuck ? 'text-red-300' : ''">
+                  {{ generatingProgressMeta(draft).source === 'synthetic' ? '~' : '' }}{{ generatingProgressMeta(draft).pct }}%<template v-if="generatingProgressMeta(draft).stuck"> · stuck</template>
+                </span>
               </template>
             </span>
           </div>

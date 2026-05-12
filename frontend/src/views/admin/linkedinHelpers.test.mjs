@@ -5,7 +5,7 @@
 // Scope: generatingProgress(draft) — synthetic % indicator derived from
 // pipeline_state_log[] timestamps + format-aware baselines.
 
-import { generatingProgress } from './linkedinHelpers.js'
+import { generatingProgress, generatingProgressMeta } from './linkedinHelpers.js'
 
 let failed = 0
 let passed = 0
@@ -117,6 +117,50 @@ assertEqual(
     format: 'text',
     pipeline_state_log: [{ from: 'pending_generation', to: 'generating', timestamp: 'not-a-date' }],
   }),
+  null,
+)
+
+console.log('--- generatingProgressMeta tests (real vs synthetic + stuck) ---')
+
+// 8. Real progress takes precedence over synthetic
+{
+  const draft = {
+    ...mkDraft({ status: 'generating', format: 'text', offsetMs: 30_000 }),
+    progress_percentage: 60,
+  }
+  const meta = generatingProgressMeta(draft)
+  assertEqual('real progress 60 preferred over synthetic ~50', meta?.pct, 60)
+  assertEqual('source flagged as real', meta?.source, 'real')
+  assertEqual('not stuck when real=60', meta?.stuck, false)
+}
+
+// 9. Stuck detection: real=5, elapsed > 5× baseline (text 60s baseline → 360s)
+{
+  const draft = {
+    ...mkDraft({ status: 'generating', format: 'text', offsetMs: 400_000 }),
+    progress_percentage: 5,
+  }
+  const meta = generatingProgressMeta(draft)
+  assertEqual('stuck flagged when real=5 + elapsed >> baseline', meta?.stuck, true)
+  assertEqual('real pct still surfaced when stuck', meta?.pct, 5)
+}
+
+// 10. No real progress → synthetic source label
+{
+  const meta = generatingProgressMeta(mkDraft({ status: 'generating', format: 'text', offsetMs: 30_000 }))
+  assertEqual('source flagged as synthetic when no real progress', meta?.source, 'synthetic')
+}
+
+// 11. Synthetic stuck: no real progress + elapsed >> 5× baseline (text 300s+)
+{
+  const meta = generatingProgressMeta(mkDraft({ status: 'generating', format: 'text', offsetMs: 400_000 }))
+  assertEqual('synthetic stuck when elapsed >> 5× baseline', meta?.stuck, true)
+}
+
+// 12. Out-of-scope returns null
+assertEqual(
+  'generatingProgressMeta returns null for published',
+  generatingProgressMeta({ status: 'published', format: 'text' }),
   null,
 )
 

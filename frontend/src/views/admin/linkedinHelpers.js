@@ -332,42 +332,90 @@ export function formatPinTimeWIB(dt) {
 }
 
 // --- Generating progress % ---------------------------------------------------
-// Synthetic progress indicator for drafts in generating/validating/pending_generation
-// state. Reads pipeline_state_log[] timestamps + format-aware baselines.
+// Resolves a percentage for drafts in generating/validating/pending_generation.
 //
-// Why synthetic: /linkedin-gen and /carousel-gen run as one-shot synchronous SSH
-// invocations — the plugin emits no mid-run progress callback. P50 baselines
-// (text 60s, carousel 360s) are derived from observed run durations; tune via
-// the GEN_BASELINES_MS constant below if the pattern drifts.
+// Two sources, ranked:
+//   1. REAL progress (`draft.progress_percentage`) emitted by
+//      LinkedInProgressEmitter. Plugin steps emit 5/60/85/95/100; carousel
+//      slide rendering emits intermediate values via the webhook handler.
+//      When real progress is > 0, it's always preferred — it's the truth.
+//   2. SYNTHETIC time-based fallback used only when progress_percentage is
+//      missing or zero (older drafts pre-emitter, race conditions). Computes
+//      elapsed-vs-baseline from the latest pipeline_state_log entry into
+//      generating/validating.
 //
-// Hard cap at 95% during generating so operators never see a misleading "100%"
-// on a still-running draft. Validating ramps 95→99 (validating phase is short).
+// Stuck detection: when REAL progress hasn't advanced past 5% AND elapsed >
+// STUCK_MULTIPLIER × baseline, flag the run as stuck so the queue list shows
+// "5%·stuck" instead of a misleading synthetic "95%" that lulls the operator.
+// Same threshold the reaper command uses to redispatch.
 const GEN_BASELINES_MS = {
   text:     { generating: 60_000,  validating: 8_000 },
   carousel: { generating: 360_000, validating: 8_000 },
 }
+const STUCK_MULTIPLIER = 5 // elapsed > 5× baseline with no real progress → stuck
 
+function findStateEntryTimestamp(draft, target) {
+  const log = Array.isArray(draft?.pipeline_state_log) ? draft.pipeline_state_log : []
+  const entry = [...log].reverse().find((e) => e?.to === target)
+  if (!entry?.timestamp) return null
+  const t = new Date(entry.timestamp).getTime()
+  return Number.isFinite(t) ? t : null
+}
+
+/**
+ * Return a number 0-99 for in-flight drafts, or null when not applicable.
+ * Prefers real progress when present; falls back to synthetic ramp.
+ */
 export function generatingProgress(draft) {
+  const meta = generatingProgressMeta(draft)
+  return meta ? meta.pct : null
+}
+
+/**
+ * Detailed progress signal for in-flight drafts. Returns:
+ *   { pct: 0-99, source: 'real'|'synthetic', stuck: boolean } or null.
+ *
+ * Callers that just need a number use generatingProgress(). Callers that
+ * want to render a "stuck" warning use generatingProgressMeta().
+ */
+export function generatingProgressMeta(draft) {
   if (!draft) return null
   const status = draft.status
   if (!['generating', 'validating', 'pending_generation'].includes(status)) {
     return null
   }
-  const log = Array.isArray(draft.pipeline_state_log) ? draft.pipeline_state_log : []
+
   const target = status === 'validating' ? 'validating' : 'generating'
-  // findLast — most recent transition into the target state (handles regen cycles)
-  const entry = [...log].reverse().find((e) => e?.to === target)
-  if (!entry?.timestamp) return null
-  const startedAt = new Date(entry.timestamp).getTime()
-  if (!Number.isFinite(startedAt)) return null
-  const elapsed = Date.now() - startedAt
-  if (elapsed < 0) return null
   const baseline = GEN_BASELINES_MS[draft.format ?? 'text']?.[target] ?? 60_000
+  const startedAt = findStateEntryTimestamp(draft, target)
+  const elapsed = startedAt ? Math.max(0, Date.now() - startedAt) : null
+
+  // Source 1: REAL progress from LinkedInProgressEmitter.
+  const real = Number.isFinite(Number(draft.progress_percentage))
+    ? Math.max(0, Math.min(99, Math.floor(Number(draft.progress_percentage))))
+    : 0
+  if (real > 0) {
+    const stuck =
+      elapsed !== null &&
+      elapsed > STUCK_MULTIPLIER * baseline &&
+      real <= 10 // hasn't moved past the dispatch step
+    return { pct: real, source: 'real', stuck }
+  }
+
+  // Source 2: synthetic time-based ramp.
+  if (elapsed === null) return null
   const raw = (elapsed / baseline) * 100
   if (target === 'validating') {
-    return Math.min(99, Math.max(95, Math.floor(95 + raw / 25)))
+    return {
+      pct: Math.min(99, Math.max(95, Math.floor(95 + raw / 25))),
+      source: 'synthetic',
+      stuck: false,
+    }
   }
-  return Math.min(95, Math.max(0, Math.floor(raw)))
+  const pct = Math.min(95, Math.max(0, Math.floor(raw)))
+  // Synthetic 95% cap reached + no real progress emitted at all = stuck.
+  const stuck = elapsed > STUCK_MULTIPLIER * baseline
+  return { pct, source: 'synthetic', stuck }
 }
 
 // --- SVG icon paths ----------------------------------------------------------
