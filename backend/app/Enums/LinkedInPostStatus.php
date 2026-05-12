@@ -20,6 +20,12 @@ enum LinkedInPostStatus: string
      *     LINKEDIN_AUTO_PUBLISH=false at fire time (reason: 'kill_switch_demotion')
      *   - Cancelled/Failed → Generating : regenerate endpoint
      *     (reason: 'admin_regenerate')
+     *   - Failed → PendingGeneration : bounded auto-retry cron
+     *     (linkedin:retry-failed, reason: 'auto_retry_class_*'). Distinct
+     *     from regenerate edge — the cron re-queues the draft and lets the
+     *     service own the eventual PendingGeneration → Generating transition,
+     *     and the intermediate status change naturally excludes the row from
+     *     the next cron tick's `status=failed` filter (no double-dispatch).
      *   - Published : terminal. Regenerate from published creates a NEW row
      *     (old one soft-deleted first; uniqueness enforced in controller).
      *   - Self-transition on Generating allowed: plugin may re-enter generation
@@ -31,7 +37,7 @@ enum LinkedInPostStatus: string
         'validating' => ['awaiting_publish', 'manual_review', 'failed', 'cancelled'],
         'manual_review' => ['awaiting_publish', 'validating', 'cancelled'],
         'awaiting_publish' => ['published', 'cancelled', 'manual_review'],
-        'failed' => ['generating', 'cancelled'],
+        'failed' => ['generating', 'cancelled', 'pending_generation'],
         'published' => [],
         'cancelled' => ['generating'],
     ];
