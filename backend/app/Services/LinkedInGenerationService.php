@@ -34,7 +34,38 @@ class LinkedInGenerationService
     public function __construct(
         private readonly PipelineGuard $guard,
         private readonly CarouselGenOutputAdapter $carouselAdapter = new CarouselGenOutputAdapter(),
+        private readonly ?LinkedInFormatMixGovernor $governor = null,
     ) {
+    }
+
+    private function governor(): LinkedInFormatMixGovernor
+    {
+        return $this->governor ?? new LinkedInFormatMixGovernor();
+    }
+
+    /**
+     * Append a non-state-transition entry to pipeline_state_log[].
+     * Used for governor decisions (format_overridden_by_governor,
+     * plugin_refused_format_override) where status doesn't change but we
+     * want the audit trail. Mirrors HasStatusTransitions::transitionTo
+     * shape (from/to/reason/timestamp/context) with from === to.
+     */
+    private function appendNonTransitionLogEntry(LinkedInPost $draft, string $reason, array $context = []): void
+    {
+        $log = $draft->pipeline_state_log ?? [];
+        $log[] = [
+            'from' => $draft->status,
+            'to' => $draft->status,
+            'reason' => $reason,
+            'timestamp' => now()->toIso8601String(),
+            'context' => $context,
+        ];
+        // Cap at 20 entries (same as HasStatusTransitions)
+        if (count($log) > 20) {
+            $log = array_slice($log, -20);
+        }
+        $draft->pipeline_state_log = $log;
+        $draft->save();
     }
 
     /**
@@ -140,6 +171,71 @@ class LinkedInGenerationService
                 : "Plugin output parsed — format={$detectedFormat}"
         );
 
+        // Step 4.5 (May 12, 2026): format-mix governor decides whether to
+        // re-dispatch the plugin with format_preference=carousel when the
+        // recent draft ratio drifts below the configured target (default 80%
+        // carousel / 20% text). Cap at 1 re-dispatch per draft to prevent
+        // infinite loop if plugin refuses override (plugin v0.6.0 ignores
+        // the field entirely → returns text again → we accept).
+        if ($detectedFormat === 'text' && ! $isCarouselRoute
+            && $this->governor()->shouldOverrideToCarousel($draft, $detectedFormat)) {
+            \Illuminate\Support\Facades\Log::info(
+                '[LinkedInGen] Format-mix governor over-rides plugin text→carousel',
+                [
+                    'draft_id' => $draft->id,
+                    'plugin_emitted' => $detectedFormat,
+                    'carousel_ratio_pre_override' => $this->governor()->computeRatio($draft),
+                ]
+            );
+            $this->appendNonTransitionLogEntry($draft, 'format_overridden_by_governor', [
+                'plugin_emitted' => $detectedFormat,
+                'target' => 'carousel',
+            ]);
+
+            // Re-build payload WITH format_preference, re-invoke plugin
+            $reblog = $this->buildBlogPayload($draft, 'carousel');
+            if ($reblog !== null) {
+                LinkedInProgressEmitter::emit(
+                    $draft,
+                    'governor_redispatch',
+                    35,
+                    'Format-mix governor re-dispatching plugin with format_preference=carousel'
+                );
+                try {
+                    $reresult = $this->invokePlugin($reblog, $draft->id);
+                    if ($reresult['success']) {
+                        $reparsed = $this->parseOrchestratorOutput($reresult['stdout']);
+                        if ($reparsed !== null) {
+                            // Plugin honored override OR refused (still text).
+                            // Either way, this is the canonical response now.
+                            $reFormat = $reparsed['format'] ?? 'unknown';
+                            if ($reFormat === 'text') {
+                                \Illuminate\Support\Facades\Log::info(
+                                    '[LinkedInGen] Plugin refused format override — accepting text',
+                                    ['draft_id' => $draft->id]
+                                );
+                                $this->appendNonTransitionLogEntry(
+                                    $draft,
+                                    'plugin_refused_format_override',
+                                    ['override_reason' => $reparsed['format_override_reason'] ?? null]
+                                );
+                            }
+                            $parsed = $reparsed;
+                            $detectedFormat = $reFormat;
+                            $isCarouselRoute = ($reparsed['status'] ?? null) === 'route_to_carousel_gen';
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    // Governor re-dispatch failure is NON-FATAL — keep
+                    // original $parsed (text) and let normal flow continue.
+                    \Illuminate\Support\Facades\Log::warning(
+                        '[LinkedInGen] Governor re-dispatch threw — falling back to original plugin output',
+                        ['draft_id' => $draft->id, 'error' => $e->getMessage()]
+                    );
+                }
+            }
+        }
+
         // Step 5: Handle plugin-reported failure
         if (($parsed['status'] ?? null) === 'failed') {
             $errStep = $parsed['error']['step'] ?? 'unknown';
@@ -213,7 +309,7 @@ class LinkedInGenerationService
      * Returns null when no translation has both a non-empty title and ≥100
      * chars of content (plugin's hard requirement for usable input).
      */
-    public function buildBlogPayload(LinkedInPost $draft): ?array
+    public function buildBlogPayload(LinkedInPost $draft, ?string $formatPreference = null): ?array
     {
         // Skip loadMissing when relations are already pre-loaded — keeps unit
         // tests (vanilla PHPUnit\TestCase, no DB resolver) green while
@@ -248,7 +344,16 @@ class LinkedInGenerationService
         $appUrl = rtrim((string) config('app.url', 'https://alisadikinma.com'), '/');
         $url = $appUrl . '/blog/' . $post->slug;
 
-        return compact('url', 'title', 'content');
+        $payload = compact('url', 'title', 'content');
+
+        // Format-mix governor override (May 12, 2026). Backwards-compat: when
+        // null, key omitted entirely so plugin v0.6.0 sees identical input.
+        // Plugin v0.7.0+ reads format_preference and honors as soft override.
+        if ($formatPreference !== null) {
+            $payload['format_preference'] = $formatPreference;
+        }
+
+        return $payload;
     }
 
     /**

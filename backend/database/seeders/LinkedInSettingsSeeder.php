@@ -52,6 +52,18 @@ class LinkedInSettingsSeeder extends Seeder
             //   04:59 and trying to publish at 05:00 (cancel window collapses).
             ['key' => 'linkedin_publish_slots',                'value' => '[5,6,7,12,17,18,19,20]', 'type' => 'json'],
             ['key' => 'linkedin_slot_lead_time_minutes',       'value' => '5',     'type' => 'text'],
+            // Format-mix governor (May 12, 2026):
+            // - linkedin_format_carousel_target_ratio: fraction 0.0-1.0,
+            //   default 0.8 (80% carousel). LinkedInFormatMixGovernor
+            //   re-dispatches plugin with format_preference=carousel when
+            //   recent ratio drifts below this.
+            // - linkedin_format_lookback_window: how many recent drafts to
+            //   sample for ratio computation (default 10, bootstrap when <).
+            // - linkedin_format_governor_enabled: master kill-switch. When
+            //   'false', plugin's natural format decision is always honored.
+            ['key' => 'linkedin_format_carousel_target_ratio', 'value' => '0.8',   'type' => 'text'],
+            ['key' => 'linkedin_format_lookback_window',       'value' => '10',    'type' => 'text'],
+            ['key' => 'linkedin_format_governor_enabled',      'value' => 'true',  'type' => 'text'],
         ];
 
         foreach ($settings as $setting) {

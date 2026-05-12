@@ -921,7 +921,14 @@ class SettingsController extends Controller
             // string OR array; normalized to JSON string in storage.
             'linkedin_publish_slots' => ['nullable'],
             'linkedin_slot_lead_time_minutes' => ['nullable', 'integer', 'between:0,1440'],
+            // Format-mix governor (May 12)
+            'linkedin_format_carousel_target_ratio' => ['nullable', 'numeric', 'between:0,1'],
+            'linkedin_format_lookback_window' => ['nullable', 'integer', 'between:1,100'],
+            'linkedin_format_governor_enabled' => ['nullable', 'in:true,false,1,0'],
         ]);
+
+        // Normalize new governor boolean (joins existing boolean normalization
+        // block below by adding key to that loop's array).
 
         // Normalize + validate slots: accept array or JSON string, dedupe,
         // sort, enforce hours 0-23 and 1-24 entries.
@@ -969,7 +976,7 @@ class SettingsController extends Controller
 
         try {
             // Normalize booleans to canonical 'true'/'false' strings
-            foreach (['linkedin_auto_publish', 'linkedin_auto_approve_enabled', 'linkedin_first_comment_enabled'] as $boolKey) {
+            foreach (['linkedin_auto_publish', 'linkedin_auto_approve_enabled', 'linkedin_first_comment_enabled', 'linkedin_format_governor_enabled'] as $boolKey) {
                 if (isset($validated[$boolKey])) {
                     $validated[$boolKey] = in_array($validated[$boolKey], [true, 'true', 1, '1'], true) ? 'true' : 'false';
                 }
