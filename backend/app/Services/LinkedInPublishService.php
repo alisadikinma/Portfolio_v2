@@ -5,7 +5,9 @@ namespace App\Services;
 use App\Jobs\PostLinkedInFirstComment;
 use App\Models\LinkedInAccount;
 use App\Models\LinkedInPost;
+use App\Models\Setting;
 use Illuminate\Http\Client\Response;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -48,6 +50,23 @@ class LinkedInPublishService
                 'post_urn' => null,
                 'post_url' => null,
                 'error' => 'LinkedIn publisher not ready: OAuth not configured or no valid account connected',
+            ];
+        }
+
+        // Circuit breaker — after a 429 from LinkedIn, the quota-pause setting
+        // is written 24h forward. While active, every publish call is a no-op
+        // that returns success=false with a descriptive error. Prevents the
+        // social:publish-slot cron from continuing to hammer the API after
+        // quota exhaustion — the production incident 2026-05-13 was caused by
+        // 3 stuck awaiting_publish drafts × every-minute cron = 180 wasted
+        // 429 calls per hour, deepening the quota deficit and blocking any
+        // chance of partial recovery within the 24h reset window.
+        if ($pauseUntil = $this->quotaPauseActiveUntil()) {
+            return [
+                'success' => false,
+                'post_urn' => null,
+                'post_url' => null,
+                'error' => "LinkedIn quota paused until {$pauseUntil->toIso8601String()} (24h after last 429). Operator can clear setting linkedin_quota_pause_until to override.",
             ];
         }
 
@@ -192,6 +211,9 @@ class LinkedInPublishService
                 'status' => $response->status(),
                 'body' => mb_substr((string) $response->body(), 0, 500),
             ]);
+            if ($response->status() === 429) {
+                $this->activateQuotaPause('publishText', $draft->id);
+            }
             return [
                 'success' => false,
                 'post_urn' => null,
@@ -370,6 +392,9 @@ class LinkedInPublishService
                 'status' => $response->status(),
                 'body' => mb_substr((string) $response->body(), 0, 500),
             ]);
+            if ($response->status() === 429) {
+                $this->activateQuotaPause('publishCarousel', $draft->id);
+            }
             return $this->carouselFailure(
                 $draft,
                 "LinkedIn API {$response->status()}: " . $this->extractApiError($response)
@@ -614,6 +639,9 @@ class LinkedInPublishService
                 'status' => $registerResponse->status(),
                 'body' => mb_substr((string) $registerResponse->body(), 0, 300),
             ]);
+            if ($registerResponse->status() === 429) {
+                $this->activateQuotaPause('registerUpload', null);
+            }
             return null;
         }
 
@@ -686,5 +714,63 @@ class LinkedInPublishService
         ]);
 
         return $assetUrn;
+    }
+
+    /**
+     * Quota pause guard — returns the pause-expiry Carbon if active, null if
+     * no pause is set OR if a previously set pause has elapsed (which the
+     * caller may treat as "publish freely again").
+     *
+     * Reads Setting{key=linkedin_quota_pause_until} ISO8601 timestamp; the
+     * value is written by activateQuotaPause() after a 429 response. After
+     * the 24h LinkedIn daily quota window resets, the timestamp naturally
+     * elapses and returns null — no manual setting cleanup required.
+     */
+    private function quotaPauseActiveUntil(): ?Carbon
+    {
+        $row = Setting::where('key', 'linkedin_quota_pause_until')->first();
+        if (!$row || empty($row->value)) {
+            return null;
+        }
+        try {
+            $expiry = Carbon::parse($row->value);
+        } catch (\Throwable) {
+            return null;
+        }
+        return $expiry->isFuture() ? $expiry : null;
+    }
+
+    /**
+     * Persist a 24h forward pause flag after a 429 response from LinkedIn.
+     *
+     * Subsequent publish() calls return early without an API call until
+     * either (a) 24h elapses naturally, or (b) operator manually clears the
+     * setting via tinker / admin UI. 24h matches LinkedIn's APPLICATION_AND
+     * _MEMBER DAY quota reset window.
+     *
+     * Idempotent — if a pause is already active, this call refreshes the
+     * deadline (since the 429 indicates the quota is STILL exhausted).
+     *
+     * @param  string  $origin  caller identifier for the log (publishText /
+     *                           publishCarousel / registerUpload)
+     * @param  int|null  $draftId optional draft ID for log correlation
+     */
+    private function activateQuotaPause(string $origin, ?int $draftId): void
+    {
+        $until = now()->addHours(24);
+        Setting::updateOrCreate(
+            ['key' => 'linkedin_quota_pause_until'],
+            [
+                'value' => $until->toIso8601String(),
+                'type' => 'string',
+                'group' => 'linkedin',
+            ]
+        );
+        Log::warning('[LinkedInPublish] quota pause activated (LinkedIn 429)', [
+            'origin' => $origin,
+            'draft_id' => $draftId,
+            'pause_until' => $until->toIso8601String(),
+            'expected_clear' => 'auto-elapses after 24h, or operator clears Setting{key=linkedin_quota_pause_until}',
+        ]);
     }
 }

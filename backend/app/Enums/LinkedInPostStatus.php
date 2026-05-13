@@ -30,13 +30,18 @@ enum LinkedInPostStatus: string
      *     (old one soft-deleted first; uniqueness enforced in controller).
      *   - Self-transition on Generating allowed: plugin may re-enter generation
      *     if cron retries a stuck draft.
+     *   - AwaitingPublish → Failed : publish API errors (LinkedIn 429 quota,
+     *     5xx, network). Without this edge, social:publish-slot loops forever
+     *     hammering a failed publish call every minute — production incident
+     *     2026-05-13 burned LinkedIn daily quota in ~30 min via 3 stuck
+     *     drafts × 60 ticks/hr = 180 wasted 429 calls/hr.
      */
     public const TRANSITIONS = [
         'pending_generation' => ['generating', 'cancelled'],
         'generating' => ['generating', 'validating', 'failed', 'cancelled'],
         'validating' => ['awaiting_publish', 'manual_review', 'failed', 'cancelled'],
         'manual_review' => ['awaiting_publish', 'validating', 'cancelled'],
-        'awaiting_publish' => ['published', 'cancelled', 'manual_review'],
+        'awaiting_publish' => ['published', 'cancelled', 'manual_review', 'failed'],
         'failed' => ['generating', 'cancelled', 'pending_generation'],
         'published' => [],
         'cancelled' => ['generating'],
