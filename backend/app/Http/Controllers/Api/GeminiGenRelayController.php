@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Services\GeminiGenSignatureVerifier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Laravel\Sanctum\PersonalAccessToken;
 
@@ -69,14 +70,49 @@ class GeminiGenRelayController extends Controller
             return $this->error('INVALID_SIGNATURE', 'RSA signature verification failed', 403);
         }
 
-        // Phase E will add the forward logic here.
-        Log::info('[GeminiGenRelay] gates passed (forward not yet implemented)', [
+        // 4. Forward payload to caller. Always return 200 to GeminiGen so it doesn't
+        //    retry-storm us when the caller is down; caller-down is logged for debug.
+        $tokenPrefix = substr($tokenString, 0, 8);
+        $timeout = (int) config('geminigen-relay.forward_timeout', 15);
+        $retries = (int) config('geminigen-relay.forward_retries', 2);
+        $retryDelay = (int) config('geminigen-relay.forward_retry_delay_ms', 1000);
+
+        $startMs = (int) (microtime(true) * 1000);
+        $forwardStatus = null;
+        $relayed = false;
+        $forwardError = null;
+
+        try {
+            $response = Http::timeout($timeout)
+                ->retry($retries, $retryDelay, throw: false)
+                ->withHeaders(['X-Portfolio-Relay-Token' => $tokenPrefix])
+                ->withBody($rawBody, 'application/json')
+                ->post($decoded);
+            $forwardStatus = $response->status();
+            $relayed = $response->successful();
+        } catch (\Throwable $e) {
+            $forwardError = $e->getMessage();
+        }
+
+        $durationMs = ((int) (microtime(true) * 1000)) - $startMs;
+
+        Log::info('[GeminiGenRelay] forwarded', [
             'event' => $request->input('event'),
             'uuid' => $request->input('uuid'),
             'cb_host' => parse_url($decoded, PHP_URL_HOST),
+            'forward_status' => $forwardStatus,
+            'relayed' => $relayed,
+            'duration_ms' => $durationMs,
+            'error' => $forwardError,
         ]);
 
-        return response()->json(['success' => true, 'data' => ['gates_passed' => true]], 200);
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'relayed' => $relayed,
+                'forward_status' => $forwardStatus,
+            ],
+        ], 200);
     }
 
     private function error(string $code, string $message, int $status): JsonResponse

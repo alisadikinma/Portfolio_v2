@@ -147,4 +147,115 @@ class GeminiGenRelayWebhookTest extends TestCase
         );
         $r->assertStatus(403)->assertJsonPath('error.code', 'INVALID_SIGNATURE');
     }
+
+    public function test_forwards_to_decoded_callback_with_token_prefix_header(): void
+    {
+        \Illuminate\Support\Facades\Http::fake([
+            'caller.example/cb' => \Illuminate\Support\Facades\Http::response(['received' => true], 200),
+        ]);
+
+        $body = ['event' => 'IMAGE_GENERATION_COMPLETED', 'uuid' => 'uuid-1', 'data' => ['generated_image' => [['image_url' => 'https://r2.example/x.png']]]];
+        $bodyJson = json_encode($body);
+        $sigHex = $this->signBody($bodyJson);
+
+        $r = $this->call(
+            'POST',
+            '/api/automation/geminigen/webhook?cb='.$this->validCbParam('https://caller.example/cb').'&token='.$this->tokenString,
+            [],
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/json', 'HTTP_X_SIGNATURE' => $sigHex],
+            $bodyJson
+        );
+
+        $r->assertStatus(200);
+        $r->assertJson(['success' => true, 'data' => ['relayed' => true, 'forward_status' => 200]]);
+
+        \Illuminate\Support\Facades\Http::assertSent(function ($request) {
+            if ($request->url() !== 'https://caller.example/cb') {
+                return false;
+            }
+            $relayHeader = $request->header('X-Portfolio-Relay-Token')[0] ?? null;
+            if (! $relayHeader || strlen($relayHeader) !== 8) {
+                return false;
+            }
+            if ($relayHeader !== substr($this->tokenString, 0, 8)) {
+                return false;
+            }
+            $data = $request->data();
+            return ($data['event'] ?? null) === 'IMAGE_GENERATION_COMPLETED'
+                && ($data['uuid'] ?? null) === 'uuid-1';
+        });
+    }
+
+    public function test_caller_5xx_after_retries_still_returns_200(): void
+    {
+        \Illuminate\Support\Facades\Http::fake([
+            'caller.example/down' => \Illuminate\Support\Facades\Http::response('', 500),
+        ]);
+
+        $body = ['event' => 'IMAGE_GENERATION_COMPLETED', 'uuid' => 'uuid-2', 'data' => []];
+        $bodyJson = json_encode($body);
+        $sigHex = $this->signBody($bodyJson);
+
+        $r = $this->call(
+            'POST',
+            '/api/automation/geminigen/webhook?cb='.$this->validCbParam('https://caller.example/down').'&token='.$this->tokenString,
+            [], [], [],
+            ['CONTENT_TYPE' => 'application/json', 'HTTP_X_SIGNATURE' => $sigHex],
+            $bodyJson
+        );
+
+        $r->assertStatus(200);
+        $r->assertJsonPath('success', true);
+        $r->assertJsonPath('data.forward_status', 500);
+        $r->assertJsonPath('data.relayed', false);
+    }
+
+    public function test_caller_timeout_returns_200_with_null_status(): void
+    {
+        \Illuminate\Support\Facades\Http::fake(function () {
+            throw new \Illuminate\Http\Client\ConnectionException('Connection timed out');
+        });
+
+        $body = ['event' => 'IMAGE_GENERATION_COMPLETED', 'uuid' => 'uuid-3', 'data' => []];
+        $bodyJson = json_encode($body);
+        $sigHex = $this->signBody($bodyJson);
+
+        $r = $this->call(
+            'POST',
+            '/api/automation/geminigen/webhook?cb='.$this->validCbParam('https://caller.example/timeout').'&token='.$this->tokenString,
+            [], [], [],
+            ['CONTENT_TYPE' => 'application/json', 'HTTP_X_SIGNATURE' => $sigHex],
+            $bodyJson
+        );
+
+        $r->assertStatus(200);
+        $r->assertJsonPath('success', true);
+        $r->assertJsonPath('data.forward_status', null);
+        $r->assertJsonPath('data.relayed', false);
+    }
+
+    public function test_token_last_used_at_is_bumped_on_successful_forward(): void
+    {
+        \Illuminate\Support\Facades\Http::fake(['caller.example/cb' => \Illuminate\Support\Facades\Http::response([], 200)]);
+
+        $tokenRow = \Laravel\Sanctum\PersonalAccessToken::findToken($this->tokenString);
+        $this->assertNull($tokenRow->last_used_at);
+
+        $body = ['event' => 'X', 'uuid' => 'y', 'data' => []];
+        $bodyJson = json_encode($body);
+        $sigHex = $this->signBody($bodyJson);
+
+        $this->call(
+            'POST',
+            '/api/automation/geminigen/webhook?cb='.$this->validCbParam('https://caller.example/cb').'&token='.$this->tokenString,
+            [], [], [],
+            ['CONTENT_TYPE' => 'application/json', 'HTTP_X_SIGNATURE' => $sigHex],
+            $bodyJson
+        );
+
+        $tokenRow->refresh();
+        $this->assertNotNull($tokenRow->last_used_at);
+    }
 }
