@@ -362,6 +362,12 @@ Route::prefix('automation')->group(function () {
     // carousel_slides JSON column, not Post.featured_image / ContentIdea).
     Route::post('/linkedin/carousel-image-webhook', \App\Http\Controllers\Api\LinkedInCarouselImageWebhookController::class);
 
+    // Stateless GeminiGen webhook relay for the geminigen-api-client plugin.
+    // Public route — auth is manual in the controller because GeminiGen cannot
+    // send custom headers, so the Sanctum bearer rides in ?token= alongside
+    // ?cb=<base64url callback URL>. See docs/plans/2026-05-14-geminigen-relay-webhook.md
+    Route::post('/geminigen/webhook', \App\Http\Controllers\Api\GeminiGenRelayController::class);
+
     // Carousel webhook (Content Engine calls this to save carousel draft)
     Route::post('/carousel/save-draft', [CarouselDraftController::class, 'saveDraft']);
 
