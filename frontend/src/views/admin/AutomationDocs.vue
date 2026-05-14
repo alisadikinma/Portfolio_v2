@@ -6,7 +6,7 @@
         API Documentation
       </h1>
       <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-        Reference for the two API surfaces. Switch tabs to flip between specs, then export the active surface as a markdown document you can hand to another agent.
+        Reference for the three API surfaces. Switch tabs to flip between specs, then export the active surface as a markdown document you can hand to another agent.
       </p>
     </div>
 
@@ -26,7 +26,7 @@
         >
           <span
             class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
-            :class="t.slug === 'cv' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200' : 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'"
+            :class="tabBadgeClass(t.slug)"
           >
             {{ t.badge }}
           </span>
@@ -345,6 +345,200 @@ Accept: application/json</code></pre>
         </div>
       </div>
     </div>
+
+    <!-- ============================================================= -->
+    <!-- GeminiGen Relay tab ========================================= -->
+    <!-- ============================================================= -->
+    <div v-if="activeTab === 'geminigen'">
+      <!-- Quick Start -->
+      <div class="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-6 dark:border-amber-900 dark:bg-amber-950">
+        <h2 class="text-lg font-semibold text-amber-900 dark:text-amber-100">GeminiGen Relay — Quick Start</h2>
+        <p class="mt-2 text-sm text-amber-800 dark:text-amber-200">
+          Stateless webhook receiver for the <code class="rounded bg-amber-100 px-1.5 dark:bg-amber-900">geminigen-api-client</code> plugin. Caller skills (LinkedIn carousel v2, video pipeline, etc.) call GeminiGen.ai directly with their own API key; this endpoint receives the callback, verifies RSA signature, and forwards to the caller's own webhook URL.
+        </p>
+        <ol class="mt-4 space-y-2 text-sm text-amber-800 dark:text-amber-200">
+          <li>1. Operator: download GeminiGen webhook public key <code>.pem</code> from the plugin's GeminiGen account → upload to VPS at <code>/home/claudesn/geminigen-relay-public.pem</code> (mode 0640, owner <code>claudesn:www-data</code>).</li>
+          <li>2. Operator: set <code>GEMINIGEN_RELAY_PUBLIC_KEY_PATH</code> in <code>.env</code> → <code>php artisan config:cache</code>.</li>
+          <li>3. Operator: <router-link to="/admin/automation/tokens" class="underline">mint a relay token</router-link> → pick category <code class="rounded bg-amber-100 px-1.5 dark:bg-amber-900">geminigen_relay</code> → ability <code>geminigen:relay</code> → copy plaintext.</li>
+          <li>4. Plugin: include the token in the <code>?token=</code> query string of the <code>webhook_url</code> sent to GeminiGen on dispatch.</li>
+          <li>5. Plugin: include the caller callback URL in <code>?cb={base64url(callback)}</code> on the same <code>webhook_url</code>.</li>
+        </ol>
+        <p class="mt-3 text-xs text-amber-700 dark:text-amber-300">
+          Full operator runbook: <code>docs/runbooks/geminigen-relay-setup.md</code> in the repo.
+        </p>
+      </div>
+
+      <!-- Architecture -->
+      <div class="mb-6 rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Architecture</h2>
+        <p class="mt-2 text-sm text-gray-700 dark:text-gray-300">
+          Plugin owns the GeminiGen API key (NOT this server). Portfolio_v2 is a pure stateless relay — no DB writes per webhook, no asset mirroring. The plugin's GeminiGen account is intentionally separate from the existing key that powers blog + linkedin-carousel image generation (different billing, different webhook public key).
+        </p>
+        <pre class="mt-3 overflow-x-auto rounded-lg bg-gray-900 p-4 text-xs text-green-400"><code>caller skill (linkedin-v2, video-image, etc.)
+  └─ invokes /geminigen-generate-image
+plugin geminigen-api-client
+  ├─ holds GeminiGen API key + relay token
+  ├─ constructs webhook_url:
+  │   {{ baseUrl }}/automation/geminigen/webhook
+  │     ?cb={base64url(caller_callback)}
+  │     &token={sanctum_relay_token}
+  └─ POST geminigen.ai/v1/generate_image
+GeminiGen → webhook callback (with X-Signature RSA header)
+Portfolio_v2 relay:
+  1. validate ?token= via PersonalAccessToken (ability: geminigen:relay)
+  2. RSA-verify X-Signature against /home/claudesn/geminigen-relay-public.pem
+  3. base64url-decode ?cb= → URL
+  4. POST decoded cb URL with body + X-Portfolio-Relay-Token header (first 8 chars of token)
+  5. return 200 OK to GeminiGen
+caller endpoint:
+  1. verify X-Portfolio-Relay-Token matches expected
+  2. download asset from data.generated_image[0].image_url IMMEDIATELY (signed URL expires)
+  3. process</code></pre>
+      </div>
+
+      <!-- Authentication -->
+      <div class="mb-6 rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Authentication</h2>
+        <ul class="mt-3 space-y-2 text-sm text-gray-700 dark:text-gray-300">
+          <li><strong>Inbound (GeminiGen → relay):</strong> Sanctum bearer in <code>?token=</code> query string — NOT <code>Authorization</code> header (GeminiGen webhooks cannot carry custom headers, only the URL we register on dispatch).</li>
+          <li><strong>Token prefix:</strong> <code>geminigen-</code> (admin UI auto-applies; you type only the suffix).</li>
+          <li><strong>Token ability:</strong> <code>geminigen:relay</code></li>
+          <li><strong>Signature:</strong> <code>X-Signature</code> header — hex-encoded RSA-PKCS1v15 signature of <code>md5(body, raw=true)</code> with SHA256 inner hash, per <a href="https://docs.geminigen.ai/getting-started/webhooks" class="underline" target="_blank" rel="noopener">GeminiGen docs</a>.</li>
+          <li><strong>Outbound (relay → caller):</strong> <code>X-Portfolio-Relay-Token</code> header echoes the first 8 chars of the inbound token so caller can verify provenance without us leaking the full secret.</li>
+          <li><strong>No replay protection v1</strong> — caller is trusted infra; revisit if attack pattern observed.</li>
+        </ul>
+      </div>
+
+      <!-- Endpoint -->
+      <div class="mb-6 rounded-lg border border-amber-200 bg-white p-6 shadow-sm dark:border-amber-900 dark:bg-gray-800">
+        <div class="flex flex-wrap items-center gap-3">
+          <span class="rounded bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-800 dark:bg-blue-900 dark:text-blue-200">POST</span>
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">/api/automation/geminigen/webhook</h3>
+          <span class="text-xs text-gray-500 dark:text-gray-400">Public route · manual auth in controller body</span>
+        </div>
+        <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+          Required query string: <code>?cb=&lt;base64url-encoded URL&gt;&amp;token=&lt;sanctum&gt;</code>. Required header: <code>X-Signature</code>. Body: GeminiGen's <code>{event, uuid, data}</code> envelope, forwarded as-is.
+        </p>
+
+        <h4 class="mt-4 text-sm font-semibold text-gray-900 dark:text-white">Plugin-side example (constructing webhook_url)</h4>
+        <pre class="mt-2 overflow-x-auto rounded-lg bg-gray-900 p-4 text-xs text-green-400"><code>// Python (or any language)
+import base64
+from urllib.parse import urlencode
+
+caller_cb = "https://my-skill.example/webhook"
+cb_b64url = base64.urlsafe_b64encode(caller_cb.encode()).rstrip(b"=").decode()
+relay_token = "geminigen-prod|<64-char-secret>"  # from /admin/automation/tokens
+
+webhook_url = (
+    "{{ baseUrl }}/automation/geminigen/webhook"
+    f"?cb={cb_b64url}&token={relay_token}"
+)
+
+# Pass webhook_url to GeminiGen on dispatch
+requests.post(
+    "https://geminigen.ai/v1/generate_image",
+    headers={"Authorization": f"Bearer {GEMINIGEN_API_KEY}"},
+    json={"prompt": "...", "webhook_url": webhook_url, ...},
+)</code></pre>
+
+        <h4 class="mt-4 text-sm font-semibold text-gray-900 dark:text-white">Caller-side example (receiving the forwarded callback)</h4>
+        <pre class="mt-2 overflow-x-auto rounded-lg bg-gray-900 p-4 text-xs text-green-400"><code>POST /webhook HTTP/1.1
+Host: my-skill.example
+Content-Type: application/json
+X-Portfolio-Relay-Token: geminige  (first 8 chars of original relay token)
+
+{
+  "event": "IMAGE_GENERATION_COMPLETED",
+  "uuid": "abc-123",
+  "data": {
+    "generated_image": [
+      { "image_url": "https://r2.geminigen.ai/signed/..." }
+    ]
+  }
+}</code></pre>
+        <p class="mt-2 text-xs text-amber-700 dark:text-amber-300">
+          <strong>Race warning:</strong> the <code>image_url</code> is an R2 signed URL that expires fast. Download it synchronously in your webhook handler before queueing any downstream processing.
+        </p>
+      </div>
+
+      <!-- Error response shapes -->
+      <div class="mb-6 rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Error Responses</h2>
+        <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+          All errors return JSON shape <code>{ success: false, error: { code, message } }</code>. Gates fail in cheap-first order — token validation runs before RSA verify so a flood of bogus tokens doesn't waste CPU on signature math.
+        </p>
+        <div class="mt-4 overflow-x-auto">
+          <table class="min-w-full text-sm">
+            <thead class="text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              <tr>
+                <th class="py-2 pr-4">HTTP</th>
+                <th class="py-2 pr-4">error.code</th>
+                <th class="py-2">Triggered when</th>
+              </tr>
+            </thead>
+            <tbody class="text-gray-700 dark:text-gray-300">
+              <tr class="border-t border-gray-200 dark:border-gray-700"><td class="py-2 pr-4"><code>401</code></td><td class="py-2 pr-4"><code>MISSING_TOKEN</code></td><td class="py-2">No <code>?token=</code> in query string.</td></tr>
+              <tr class="border-t border-gray-200 dark:border-gray-700"><td class="py-2 pr-4"><code>401</code></td><td class="py-2 pr-4"><code>UNAUTHENTICATED</code></td><td class="py-2">Token invalid OR missing <code>geminigen:relay</code> ability.</td></tr>
+              <tr class="border-t border-gray-200 dark:border-gray-700"><td class="py-2 pr-4"><code>422</code></td><td class="py-2 pr-4"><code>MISSING_CB</code></td><td class="py-2">No <code>?cb=</code> in query string.</td></tr>
+              <tr class="border-t border-gray-200 dark:border-gray-700"><td class="py-2 pr-4"><code>422</code></td><td class="py-2 pr-4"><code>INVALID_CB</code></td><td class="py-2"><code>cb</code> not decodable as base64url OR not a valid URL.</td></tr>
+              <tr class="border-t border-gray-200 dark:border-gray-700"><td class="py-2 pr-4"><code>403</code></td><td class="py-2 pr-4"><code>MISSING_SIGNATURE</code></td><td class="py-2">No <code>X-Signature</code> header.</td></tr>
+              <tr class="border-t border-gray-200 dark:border-gray-700"><td class="py-2 pr-4"><code>403</code></td><td class="py-2 pr-4"><code>INVALID_SIGNATURE</code></td><td class="py-2">RSA verify failed (tampered body, wrong public key, malformed hex).</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Success shape + caller-down behavior -->
+      <div class="mb-6 rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Success Response</h2>
+        <pre class="mt-3 overflow-x-auto rounded-lg bg-gray-900 p-4 text-sm text-green-400"><code>HTTP/2 200
+Content-Type: application/json
+
+{
+  "success": true,
+  "data": {
+    "relayed": true,           // false when caller returned non-2xx or timed out
+    "forward_status": 200       // null when forward failed entirely (timeout)
+  }
+}</code></pre>
+        <p class="mt-3 text-sm text-gray-700 dark:text-gray-300">
+          The relay <strong>always returns 200 OK to GeminiGen</strong>, even when the downstream caller is down. This is deliberate: GeminiGen retries failed webhooks 3 times at 1-hour intervals, which would amplify the outage. <code>relayed=false</code> + <code>forward_status=5xx|null</code> in our log entry tells you the callback was lost.
+        </p>
+        <p class="mt-2 text-sm text-gray-700 dark:text-gray-300">
+          Forward retry budget: <code>{{ relayConfig.retries }}</code> retries × <code>{{ relayConfig.retryDelayMs }}ms</code> delay before giving up. Forward timeout: <code>{{ relayConfig.timeoutSeconds }}s</code>.
+        </p>
+      </div>
+
+      <!-- Smoke test -->
+      <div class="mb-6 rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Smoke Test</h2>
+        <p class="mt-2 text-sm text-gray-700 dark:text-gray-300">
+          Confirm the endpoint is wired by forcing a 403 with a bogus signature — proves the token + cb gates pass and RSA verify runs.
+        </p>
+        <pre class="mt-3 overflow-x-auto rounded-lg bg-gray-900 p-4 text-xs text-green-400"><code>TOKEN="geminigen-prod|paste-secret-here"
+CB=$(echo -n "https://example.com/cb" | base64 | tr '+/' '-_' | tr -d '=')
+
+curl -i -X POST \
+  "{{ baseUrl }}/automation/geminigen/webhook?cb=${CB}&token=${TOKEN}" \
+  -H "Content-Type: application/json" \
+  -H "X-Signature: deadbeef" \
+  -d '{"event":"IMAGE_GENERATION_COMPLETED","uuid":"smoke","data":{}}'
+
+# Expected: HTTP/2 403
+# {"success":false,"error":{"code":"INVALID_SIGNATURE","message":"RSA signature verification failed"}}</code></pre>
+      </div>
+
+      <!-- Observability -->
+      <div class="mb-6 rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Observability</h2>
+        <p class="mt-2 text-sm text-gray-700 dark:text-gray-300">
+          Per-webhook log entry in <code>storage/logs/laravel.log</code> tagged <code>[GeminiGenRelay]</code>. Contains <code>event</code>, <code>uuid</code>, <code>cb_host</code> (host only — full URL not logged for privacy), <code>forward_status</code>, <code>relayed</code>, <code>duration_ms</code>, <code>error</code> (null on success). Tail with:
+        </p>
+        <pre class="mt-3 overflow-x-auto rounded-lg bg-gray-900 p-4 text-xs text-green-400"><code>ssh claudesn@&lt;vps&gt;
+cd /var/www/Portfolio_v2/backend
+tail -f storage/logs/laravel.log | grep GeminiGenRelay</code></pre>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -363,10 +557,26 @@ const activeTab = ref(sessionStorage.getItem(TAB_KEY) || 'cv')
 watch(activeTab, (v) => sessionStorage.setItem(TAB_KEY, v))
 
 const tabs = [
-  { slug: 'cv',         label: 'CV API',         badge: 'CV' },
-  { slug: 'automation', label: 'Automation API', badge: 'AUTO' },
+  { slug: 'cv',         label: 'CV API',            badge: 'CV' },
+  { slug: 'automation', label: 'Automation API',    badge: 'AUTO' },
+  { slug: 'geminigen',  label: 'GeminiGen Relay',   badge: 'RELAY' },
 ]
 const activeTabConfig = computed(() => tabs.find((t) => t.slug === activeTab.value) || tabs[0])
+
+// Tab badge palette — keep distinct per surface so the operator can
+// recognize which API they're reading at a glance.
+function tabBadgeClass(slug) {
+  switch (slug) {
+    case 'cv':
+      return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200'
+    case 'automation':
+      return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+    case 'geminigen':
+      return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200'
+    default:
+      return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+  }
+}
 
 function setTab(slug) {
   activeTab.value = slug
@@ -1094,16 +1304,216 @@ function buildAutomationDocsMd() {
   ].join('\n')
 }
 
+// --- GeminiGen Relay docs ---------------------------------------------------
+// Mirrors backend defaults in config/geminigen-relay.php. Surfaced in the
+// template so operators see real numbers instead of literal "15s / 2 / 1000".
+const relayConfig = {
+  timeoutSeconds: 15,
+  retries: 2,
+  retryDelayMs: 1000,
+}
+
+function buildGeminigenDocsMd() {
+  const webhookUrl = `${baseUrl}/automation/geminigen/webhook`
+  return [
+    '# GeminiGen Relay — API Documentation',
+    '',
+    'Stateless webhook receiver for the `geminigen-api-client` Claude Code plugin.',
+    'Plugins running in Claude Code sessions cannot expose public HTTPS endpoints,',
+    'so GeminiGen.ai webhook callbacks must land at this Portfolio_v2 endpoint and',
+    'get forwarded to a caller-provided callback URL.',
+    '',
+    'The plugin uses a **separate GeminiGen account** from the existing key that',
+    'powers blog + linkedin-carousel image generation (different billing,',
+    'different webhook public key).',
+    '',
+    '## Architecture',
+    '',
+    '```',
+    'caller skill (linkedin-v2, video-image, etc.)',
+    '  └─ invokes /geminigen-generate-image',
+    'plugin geminigen-api-client',
+    '  ├─ holds GeminiGen API key + relay token',
+    '  ├─ constructs webhook_url:',
+    `  │   ${webhookUrl}`,
+    '  │     ?cb={base64url(caller_callback)}',
+    '  │     &token={sanctum_relay_token}',
+    '  └─ POST geminigen.ai/v1/generate_image',
+    'GeminiGen → webhook callback (with X-Signature RSA header)',
+    'Portfolio_v2 relay:',
+    '  1. validate ?token= via PersonalAccessToken (ability: geminigen:relay)',
+    '  2. RSA-verify X-Signature against /home/claudesn/geminigen-relay-public.pem',
+    '  3. base64url-decode ?cb= → URL',
+    '  4. POST decoded cb URL with body + X-Portfolio-Relay-Token header (first 8 chars of token)',
+    '  5. return 200 OK to GeminiGen',
+    'caller endpoint:',
+    '  1. verify X-Portfolio-Relay-Token matches expected',
+    '  2. download asset from data.generated_image[0].image_url IMMEDIATELY (signed URL expires)',
+    '  3. process',
+    '```',
+    '',
+    '## Authentication',
+    '',
+    '- **Inbound (GeminiGen → relay):** Sanctum bearer in `?token=` query string — NOT `Authorization` header.',
+    '  GeminiGen webhooks cannot carry custom headers, only the URL we register on dispatch.',
+    '- **Token prefix:** `geminigen-`',
+    '- **Token ability:** `geminigen:relay`',
+    '- **Signature:** `X-Signature` header — hex-encoded RSA-PKCS1v15 of `md5(body, raw=true)` with SHA256.',
+    '- **Outbound (relay → caller):** `X-Portfolio-Relay-Token` header echoes the first 8 chars of the inbound token.',
+    '',
+    '## Endpoint',
+    '',
+    '### `POST ' + webhookUrl + '`',
+    '',
+    'Required query string: `?cb=<base64url-encoded URL>&token=<sanctum>`',
+    'Required header: `X-Signature`',
+    'Body: GeminiGen `{event, uuid, data}` envelope, forwarded as-is',
+    '',
+    '#### Plugin-side example (constructing `webhook_url`)',
+    '',
+    '```python',
+    'import base64',
+    '',
+    'caller_cb = "https://my-skill.example/webhook"',
+    'cb_b64url = base64.urlsafe_b64encode(caller_cb.encode()).rstrip(b"=").decode()',
+    'relay_token = "geminigen-prod|<64-char-secret>"  # from /admin/automation/tokens',
+    '',
+    'webhook_url = (',
+    `    "${webhookUrl}"`,
+    '    f"?cb={cb_b64url}&token={relay_token}"',
+    ')',
+    '',
+    '# Pass webhook_url to GeminiGen on dispatch',
+    'requests.post(',
+    '    "https://geminigen.ai/v1/generate_image",',
+    '    headers={"Authorization": f"Bearer {GEMINIGEN_API_KEY}"},',
+    '    json={"prompt": "...", "webhook_url": webhook_url, "..." : "..."},',
+    ')',
+    '```',
+    '',
+    '#### Caller-side example (receiving the forwarded callback)',
+    '',
+    '```http',
+    'POST /webhook HTTP/1.1',
+    'Host: my-skill.example',
+    'Content-Type: application/json',
+    'X-Portfolio-Relay-Token: geminige  # first 8 chars of original relay token',
+    '',
+    '{',
+    '  "event": "IMAGE_GENERATION_COMPLETED",',
+    '  "uuid": "abc-123",',
+    '  "data": {',
+    '    "generated_image": [',
+    '      { "image_url": "https://r2.geminigen.ai/signed/..." }',
+    '    ]',
+    '  }',
+    '}',
+    '```',
+    '',
+    '> **Race warning:** `image_url` is an R2 signed URL that expires fast.',
+    '> Download it synchronously in your webhook handler before queueing any',
+    '> downstream processing.',
+    '',
+    '## Error Responses',
+    '',
+    'All errors return JSON shape `{ success: false, error: { code, message } }`.',
+    'Gates fail in cheap-first order — token validation runs before RSA verify.',
+    '',
+    '| HTTP | `error.code`         | Triggered when                                                                  |',
+    '|------|----------------------|---------------------------------------------------------------------------------|',
+    '| 401  | `MISSING_TOKEN`      | No `?token=` in query string.                                                   |',
+    '| 401  | `UNAUTHENTICATED`    | Token invalid OR missing `geminigen:relay` ability.                             |',
+    '| 422  | `MISSING_CB`         | No `?cb=` in query string.                                                      |',
+    '| 422  | `INVALID_CB`         | `cb` not decodable as base64url OR not a valid URL.                             |',
+    '| 403  | `MISSING_SIGNATURE`  | No `X-Signature` header.                                                        |',
+    '| 403  | `INVALID_SIGNATURE`  | RSA verify failed (tampered body, wrong public key, malformed hex).             |',
+    '',
+    '## Success Response',
+    '',
+    '```http',
+    'HTTP/2 200',
+    'Content-Type: application/json',
+    '',
+    '{',
+    '  "success": true,',
+    '  "data": {',
+    '    "relayed": true,         // false when caller returned non-2xx or timed out',
+    '    "forward_status": 200    // null when forward failed entirely (timeout)',
+    '  }',
+    '}',
+    '```',
+    '',
+    'The relay **always returns 200 OK to GeminiGen**, even when the downstream',
+    'caller is down. This is deliberate: GeminiGen retries failed webhooks 3 times',
+    "at 1-hour intervals, which would amplify the outage. `relayed=false` +",
+    '`forward_status=5xx|null` in our log entry tells you the callback was lost.',
+    '',
+    `Forward retry budget: ${relayConfig.retries} retries × ${relayConfig.retryDelayMs}ms delay.`,
+    `Forward timeout: ${relayConfig.timeoutSeconds}s.`,
+    '',
+    '## Smoke Test',
+    '',
+    'Confirm the endpoint is wired by forcing a 403 with a bogus signature —',
+    'proves the token + cb gates pass and RSA verify runs.',
+    '',
+    '```bash',
+    'TOKEN="geminigen-prod|paste-secret-here"',
+    'CB=$(echo -n "https://example.com/cb" | base64 | tr \'+/\' \'-_\' | tr -d \'=\')',
+    '',
+    'curl -i -X POST \\',
+    `  "${webhookUrl}?cb=\${CB}&token=\${TOKEN}" \\`,
+    '  -H "Content-Type: application/json" \\',
+    '  -H "X-Signature: deadbeef" \\',
+    '  -d \'{"event":"IMAGE_GENERATION_COMPLETED","uuid":"smoke","data":{}}\'',
+    '',
+    '# Expected: HTTP/2 403',
+    '# {"success":false,"error":{"code":"INVALID_SIGNATURE","message":"RSA signature verification failed"}}',
+    '```',
+    '',
+    '## Observability',
+    '',
+    'Per-webhook log entry in `storage/logs/laravel.log` tagged `[GeminiGenRelay]`.',
+    'Contains `event`, `uuid`, `cb_host` (host only — full URL not logged for',
+    'privacy), `forward_status`, `relayed`, `duration_ms`, `error`.',
+    '',
+    '```bash',
+    'ssh claudesn@<vps>',
+    'cd /var/www/Portfolio_v2/backend',
+    'tail -f storage/logs/laravel.log | grep GeminiGenRelay',
+    '```',
+    '',
+    '## Operator Runbook',
+    '',
+    'Full step-by-step setup (public key upload, .env config, token mint,',
+    'plugin wiring, smoke test, rollback) lives in the repo at',
+    '`docs/runbooks/geminigen-relay-setup.md`.',
+    '',
+    '---',
+    '',
+    '_Generated from ' + baseUrl.replace('/api','') + '/admin/automation/docs on ' + new Date().toISOString().slice(0,10) + '_',
+    '',
+  ].join('\n')
+}
+
 // --- Export actions ---------------------------------------------------------
 const justCopied = ref(false)
 
 function activeDocsContent() {
-  return activeTab.value === 'cv' ? buildCvDocsMd() : buildAutomationDocsMd()
+  switch (activeTab.value) {
+    case 'cv':         return buildCvDocsMd()
+    case 'automation': return buildAutomationDocsMd()
+    case 'geminigen':  return buildGeminigenDocsMd()
+    default:           return buildCvDocsMd()
+  }
 }
 
 function activeDocsFilename() {
-  const slug = activeTab.value === 'cv' ? 'cv-api-docs' : 'automation-api-docs'
-  return slug + '.md'
+  switch (activeTab.value) {
+    case 'cv':         return 'cv-api-docs.md'
+    case 'automation': return 'automation-api-docs.md'
+    case 'geminigen':  return 'geminigen-relay-api-docs.md'
+    default:           return 'api-docs.md'
+  }
 }
 
 async function copyActiveDocs() {
