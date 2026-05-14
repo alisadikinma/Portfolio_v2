@@ -43,6 +43,12 @@ class TokenController extends Controller
             'abilities' => ['cv:read'],
             'description' => 'Read-only CV export for jobhunter platform (JSON Resume + master.md)',
         ],
+        'geminigen_relay' => [
+            'label' => 'GeminiGen Relay',
+            'prefix' => 'geminigen-',
+            'abilities' => ['geminigen:relay'],
+            'description' => 'Webhook callbacks from GeminiGen.ai (used by geminigen-api-client plugin).',
+        ],
     ];
 
     /**
