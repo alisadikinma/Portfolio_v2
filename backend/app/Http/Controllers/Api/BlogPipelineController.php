@@ -8,6 +8,7 @@ use App\Models\Category;
 use App\Models\ImageGenerationJob;
 use App\Services\TrendingTopicService;
 use App\Services\ImageGenerationService;
+use App\Services\GeminiGenCircuitBreaker;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -190,7 +191,7 @@ class BlogPipelineController extends Controller
      * GeminiGen calls this when image generation completes or fails.
      * Public endpoint (no auth) — verified by GeminiGen signature.
      */
-    public function imageWebhook(Request $request, ImageGenerationService $imageService): JsonResponse
+    public function imageWebhook(Request $request, ImageGenerationService $imageService, GeminiGenCircuitBreaker $breaker): JsonResponse
     {
         $event = $request->input('event');
         $uuid = $request->input('uuid');
@@ -202,12 +203,50 @@ class BlogPipelineController extends Controller
             return response()->json(['error' => 'Missing event or uuid'], 400);
         }
 
+        // Circuit breaker accounting — record outcome BEFORE delegating to the
+        // service so UUIDs that don't match any job (network drops, late
+        // retries) still inform breaker state. Safety-class refusals
+        // (PUBLIC_ERROR_*) are classified internally as 'prompt_class' and
+        // bypass the breaker; they're handled by the April 28 auto-rewrite
+        // path in ImageGenerationService.
+        if ($event === 'IMAGE_GENERATION_COMPLETED') {
+            $breaker->recordSuccess();
+        } elseif ($event === 'IMAGE_GENERATION_FAILED') {
+            $errorCode = $data['error_code'] ?? null;
+            // Classify by error_code first. Webhooks don't carry the original
+            // upstream HTTP status, so we synthesize one based on the code:
+            // - safety codes → 400 (routes to prompt_class → no-op, bypass breaker)
+            // - everything else → 500 (counts toward trip threshold)
+            $synthesizedStatus = $this->isSafetyErrorCode($errorCode) ? 400 : 500;
+            $breaker->recordFailure($synthesizedStatus, $errorCode);
+        }
+
         $success = $imageService->handleWebhook($uuid, $event, $data);
 
         return response()->json([
             'success' => $success,
             'message' => $success ? 'Image processed' : 'Failed to process',
         ]);
+    }
+
+    /**
+     * Whether an error_code from a GeminiGen webhook is a safety-class
+     * refusal (prompt content rejected by the safety filter) rather than
+     * a server-side outage signal. Safety codes are handled by the
+     * April 28 auto-rewrite path and MUST bypass the circuit breaker.
+     */
+    private function isSafetyErrorCode(?string $errorCode): bool
+    {
+        if ($errorCode === null) {
+            return false;
+        }
+        $safetyCodes = [
+            'PUBLIC_ERROR_PROMINENT_PEOPLE_UPLOAD',
+            'PUBLIC_ERROR_MINORS',
+            'PUBLIC_ERROR_UNSAFE_CONTENT',
+            'PUBLIC_ERROR_SEXUAL_CONTENT',
+        ];
+        return in_array($errorCode, $safetyCodes, true);
     }
 
     /**
