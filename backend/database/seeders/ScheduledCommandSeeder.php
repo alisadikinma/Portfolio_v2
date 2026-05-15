@@ -163,7 +163,7 @@ class ScheduledCommandSeeder extends Seeder
                 'sort_order' => 10,
             ],
 
-            // ─────────────── System (1) ───────────────
+            // ─────────────── System (2) ───────────────
             [
                 'signature' => 'posting-rules:research',
                 'display_name' => 'Posting Rules — Quarterly Research (LinkedIn)',
@@ -172,6 +172,17 @@ class ScheduledCommandSeeder extends Seeder
                 'without_overlapping_minutes' => 15,
                 'arguments' => ['--platform=linkedin'],
                 'sort_order' => 10,
+            ],
+            [
+                // Phase H (May 15, 2026) — GeminiGen circuit breaker canary
+                // probe. No-ops unless breaker is OPEN past next_probe_at.
+                'signature' => 'geminigen:circuit-probe',
+                'display_name' => 'GeminiGen — Circuit Breaker Canary Probe',
+                'category' => 'system',
+                'cron_expression' => '*/5 * * * *',
+                'without_overlapping_minutes' => 5,
+                'arguments' => null,
+                'sort_order' => 20,
             ],
         ];
 
