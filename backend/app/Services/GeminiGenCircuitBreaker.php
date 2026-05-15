@@ -8,11 +8,7 @@ use Illuminate\Support\Facades\Log;
 
 class GeminiGenCircuitBreaker
 {
-    // Hardcoded for Phase A. Phase C will move these to config().
-    private const FAILURE_THRESHOLD = 5;
-    private const WINDOW_SECONDS = 600;          // 10 min sliding window
-    private const PROBE_INTERVAL_SECONDS = 300;  // 5 min
-    private const STATE_TTL_SECONDS = 3600;      // 1 hour
+    // Read from config('geminigen-circuit.*') — env-overridable per deployment.
 
     private const KEY_STATE = 'geminigen:circuit:state';
     private const KEY_FAILURE_LOG = 'geminigen:circuit:failure_log';
@@ -61,7 +57,7 @@ class GeminiGenCircuitBreaker
         if (count($log) > 50) {
             $log = array_slice($log, -50);
         }
-        Cache::put(self::KEY_FAILURE_LOG, $log, self::STATE_TTL_SECONDS);
+        Cache::put(self::KEY_FAILURE_LOG, $log, (int) config('geminigen-circuit.state_ttl_seconds', 3600));
 
         $currentState = $this->state();
         $countInWindow = $this->failureCountInWindow();
@@ -74,12 +70,12 @@ class GeminiGenCircuitBreaker
 
         if ($currentState === 'open') {
             // Already open — bump next probe forward
-            Cache::put(self::KEY_NEXT_PROBE_AT, $now->copy()->addSeconds(self::PROBE_INTERVAL_SECONDS)->toIso8601String(), self::STATE_TTL_SECONDS);
+            Cache::put(self::KEY_NEXT_PROBE_AT, $now->copy()->addSeconds((int) config('geminigen-circuit.probe_interval_seconds', 300))->toIso8601String(), (int) config('geminigen-circuit.state_ttl_seconds', 3600));
             return;
         }
 
         // closed → check trip threshold
-        if ($countInWindow >= self::FAILURE_THRESHOLD) {
+        if ($countInWindow >= (int) config('geminigen-circuit.failure_threshold', 5)) {
             $this->setOpen('threshold_reached');
         }
     }
@@ -103,7 +99,7 @@ class GeminiGenCircuitBreaker
 
     public function transitionToHalfOpen(): void
     {
-        Cache::put(self::KEY_STATE, 'half_open', self::STATE_TTL_SECONDS);
+        Cache::put(self::KEY_STATE, 'half_open', (int) config('geminigen-circuit.state_ttl_seconds', 3600));
         Log::info('[GeminiGenCircuit] half_open — awaiting next real dispatch');
     }
 
@@ -113,7 +109,7 @@ class GeminiGenCircuitBreaker
             'at' => Carbon::now()->toIso8601String(),
             'status_code' => $statusCode,
             'error' => $error,
-        ], self::STATE_TTL_SECONDS);
+        ], (int) config('geminigen-circuit.state_ttl_seconds', 3600));
     }
 
     public static function classifyFailure(?int $httpStatus, ?string $errorCode = null, ?\Throwable $exception = null): string
@@ -161,22 +157,22 @@ class GeminiGenCircuitBreaker
     private function getFailuresInWindow(): array
     {
         $log = Cache::get(self::KEY_FAILURE_LOG, []);
-        $cutoff = Carbon::now()->subSeconds(self::WINDOW_SECONDS);
+        $cutoff = Carbon::now()->subSeconds((int) config('geminigen-circuit.window_seconds', 600));
         return array_filter($log, fn($iso) => Carbon::parse($iso)->greaterThanOrEqualTo($cutoff));
     }
 
     private function setOpen(string $reason): void
     {
         $now = Carbon::now();
-        Cache::put(self::KEY_STATE, 'open', self::STATE_TTL_SECONDS);
-        Cache::put(self::KEY_OPENED_AT, $now->toIso8601String(), self::STATE_TTL_SECONDS);
-        Cache::put(self::KEY_NEXT_PROBE_AT, $now->copy()->addSeconds(self::PROBE_INTERVAL_SECONDS)->toIso8601String(), self::STATE_TTL_SECONDS);
+        Cache::put(self::KEY_STATE, 'open', (int) config('geminigen-circuit.state_ttl_seconds', 3600));
+        Cache::put(self::KEY_OPENED_AT, $now->toIso8601String(), (int) config('geminigen-circuit.state_ttl_seconds', 3600));
+        Cache::put(self::KEY_NEXT_PROBE_AT, $now->copy()->addSeconds((int) config('geminigen-circuit.probe_interval_seconds', 300))->toIso8601String(), (int) config('geminigen-circuit.state_ttl_seconds', 3600));
         Log::warning('[GeminiGenCircuit] OPEN', ['reason' => $reason, 'failure_count' => $this->failureCountInWindow()]);
     }
 
     private function setClosed(string $reason): void
     {
-        Cache::put(self::KEY_STATE, 'closed', self::STATE_TTL_SECONDS);
+        Cache::put(self::KEY_STATE, 'closed', (int) config('geminigen-circuit.state_ttl_seconds', 3600));
         Cache::forget(self::KEY_FAILURE_LOG);
         Cache::forget(self::KEY_OPENED_AT);
         Cache::forget(self::KEY_NEXT_PROBE_AT);

@@ -199,4 +199,12 @@ class GeminiGenCircuitBreakerTest extends TestCase
         $this->assertSame('ignore', GeminiGenCircuitBreaker::classifyFailure(204, null));
         $this->assertSame('ignore', GeminiGenCircuitBreaker::classifyFailure(null, null));
     }
+
+    public function test_config_keys_are_resolvable(): void
+    {
+        $this->assertSame(5,    config('geminigen-circuit.failure_threshold'));
+        $this->assertSame(600,  config('geminigen-circuit.window_seconds'));
+        $this->assertSame(300,  config('geminigen-circuit.probe_interval_seconds'));
+        $this->assertSame(3600, config('geminigen-circuit.state_ttl_seconds'));
+    }
 }
