@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\ContentIdea;
+use App\Services\GeminiGenCircuitBreaker;
 use App\Services\ImageGenerationService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -34,6 +35,23 @@ class RetryImageSegmentJob implements ShouldQueue
 
     public function handle(ImageGenerationService $service): void
     {
+        // Phase F gate: if the GeminiGen circuit is open, this is an
+        // outage-class failure — re-queue with a 5-minute delay rather
+        // than burning the operator's auto-retry budget (max 2 auto
+        // attempts per segment per CLAUDE.md April 21 entry). The
+        // retry_count is NOT incremented; it stays reserved for genuine
+        // prompt-class failures.
+        $breaker = app(GeminiGenCircuitBreaker::class);
+        if ($breaker->state() === 'open') {
+            Log::info('[GeminiGenCircuit] retry job deferred — circuit open', [
+                'idea_id' => $this->contentIdeaId,
+                'segment_index' => $this->segmentIndex,
+            ]);
+            self::dispatch($this->contentIdeaId, $this->segmentIndex)
+                ->delay(now()->addMinutes(5));
+            return;
+        }
+
         $idea = ContentIdea::find($this->contentIdeaId);
         if ($idea === null) {
             Log::info('RetryImageSegmentJob: idea missing, skipping', [
