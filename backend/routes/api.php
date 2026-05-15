@@ -182,6 +182,11 @@ Route::middleware(['auth:sanctum'])->prefix('admin/dashboard')->group(function (
     Route::get('/stats', [DashboardController::class, 'stats']);
 });
 
+// Admin GeminiGen Circuit Breaker Status (read-only, Phase J of geminigen-circuit-breaker plan)
+Route::middleware(['auth:sanctum'])->prefix('admin/geminigen')->group(function () {
+    Route::get('/circuit-status', \App\Http\Controllers\Api\Admin\GeminigenStatusController::class);
+});
+
 // Admin Awards Routes
 Route::middleware(['auth:sanctum'])->prefix('admin/awards')->group(function () {
     Route::get('/', [AwardController::class, 'indexForAdmin']);
