@@ -868,17 +868,32 @@ class ImageGenerationService
             if ($newCount >= self::MAX_SEGMENT_ATTEMPTS) {
                 $segment['terminal_at'] = now()->toIso8601String();
 
-                \App\Jobs\DispatchTelegramNotification::dispatch($idea->id, 'segment_retry_exhausted');
+                // Phase I — Suppress per-segment Telegram dispatches while the
+                // GeminiGen circuit is non-closed. During an outage the operator
+                // already gets ONE circuit_open alert; firing segment_failed +
+                // cover_critical for every retry-exhausted segment just spams
+                // the channel without giving new information. Failures are
+                // still logged here for audit + admin UI surfacing.
+                $circuitState = app(\App\Services\GeminiGenCircuitBreaker::class)->state();
+                if ($circuitState === 'closed') {
+                    \App\Jobs\DispatchTelegramNotification::dispatch($idea->id, 'segment_retry_exhausted');
 
-                if ($matchIndex === 0) {
-                    // Runtime guard: cover-critical dispatch assumes index 0
-                    // is the cover. Plugin contract says image_prompts[0] is
-                    // always the cover, but log a warning if the type field
-                    // disagrees so we catch schema drift early.
-                    if (($segment['type'] ?? null) !== 'cover') {
-                        Log::warning("[ImageGen] cover_critical dispatched for segment 0 but type={$segment['type']} on idea #{$idea->id}");
+                    if ($matchIndex === 0) {
+                        // Runtime guard: cover-critical dispatch assumes index 0
+                        // is the cover. Plugin contract says image_prompts[0] is
+                        // always the cover, but log a warning if the type field
+                        // disagrees so we catch schema drift early.
+                        if (($segment['type'] ?? null) !== 'cover') {
+                            Log::warning("[ImageGen] cover_critical dispatched for segment 0 but type={$segment['type']} on idea #{$idea->id}");
+                        }
+                        \App\Jobs\DispatchTelegramNotification::dispatch($idea->id, 'cover_critical');
                     }
-                    \App\Jobs\DispatchTelegramNotification::dispatch($idea->id, 'cover_critical');
+                } else {
+                    Log::info('[ImageGen] segment_retry_exhausted Telegram suppressed during outage', [
+                        'idea_id' => $idea->id,
+                        'segment_index' => $matchIndex,
+                        'breaker_state' => $circuitState,
+                    ]);
                 }
 
                 Log::warning("[ImageGen] Segment {$matchIndex} on idea #{$idea->id} reached terminal failure after {$newCount} attempts");

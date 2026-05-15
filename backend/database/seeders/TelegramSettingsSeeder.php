@@ -35,6 +35,14 @@ class TelegramSettingsSeeder extends Seeder
             // install per operator request — flip to 'false' via UI to silence.
             ['key' => 'telegram_notify_trending_pulled',                'value' => 'true', 'type' => 'text'],
 
+            // Phase I — GeminiGen circuit breaker state-transition alerts.
+            // System-level (no ContentIdea context). When the breaker trips,
+            // per-segment segment_retry_exhausted + cover_critical alerts are
+            // suppressed in ImageGenerationService — operator gets exactly ONE
+            // outage alert instead of N segment-spam messages.
+            ['key' => 'telegram_notify_geminigen_circuit_open',         'value' => 'true', 'type' => 'text'],
+            ['key' => 'telegram_notify_geminigen_circuit_close',        'value' => 'true', 'type' => 'text'],
+
             ['key' => 'telegram_webhook_secret',                        'value' => bin2hex(random_bytes(16)), 'type' => 'text'],
         ];
 

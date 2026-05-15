@@ -197,18 +197,42 @@ class GeminiGenCircuitBreaker
     private function setOpen(string $reason): void
     {
         $now = Carbon::now();
+        $nextProbeAt = $now->copy()->addSeconds((int) config('geminigen-circuit.probe_interval_seconds', 300));
+
         Cache::put(self::KEY_STATE, 'open', (int) config('geminigen-circuit.state_ttl_seconds', 3600));
         Cache::put(self::KEY_OPENED_AT, $now->toIso8601String(), (int) config('geminigen-circuit.state_ttl_seconds', 3600));
-        Cache::put(self::KEY_NEXT_PROBE_AT, $now->copy()->addSeconds((int) config('geminigen-circuit.probe_interval_seconds', 300))->toIso8601String(), (int) config('geminigen-circuit.state_ttl_seconds', 3600));
+        Cache::put(self::KEY_NEXT_PROBE_AT, $nextProbeAt->toIso8601String(), (int) config('geminigen-circuit.state_ttl_seconds', 3600));
         Log::warning('[GeminiGenCircuit] OPEN', ['reason' => $reason, 'failure_count' => $this->failureCountInWindow()]);
+
+        // Phase I — Telegram alert. Wrapped in try/catch so a Telegram outage
+        // (HTTP timeout, missing token, etc.) never blocks the state transition.
+        try {
+            app(\App\Services\TelegramNotificationService::class)
+                ->sendGeminigenCircuitOpen($now, $nextProbeAt, $reason);
+        } catch (\Throwable $e) {
+            Log::warning('[GeminiGenCircuit] Telegram OPEN dispatch failed', ['error' => $e->getMessage()]);
+        }
     }
 
     private function setClosed(string $reason): void
     {
+        // Capture opened_at BEFORE forgetting the cache key so the alert can
+        // report outage duration.
+        $openedAt = $this->openedAt();
+
         Cache::put(self::KEY_STATE, 'closed', (int) config('geminigen-circuit.state_ttl_seconds', 3600));
         Cache::forget(self::KEY_FAILURE_LOG);
         Cache::forget(self::KEY_OPENED_AT);
         Cache::forget(self::KEY_NEXT_PROBE_AT);
         Log::info('[GeminiGenCircuit] CLOSED', ['reason' => $reason]);
+
+        // Phase I — Telegram alert. Wrapped in try/catch so a Telegram outage
+        // never blocks recovery.
+        try {
+            app(\App\Services\TelegramNotificationService::class)
+                ->sendGeminigenCircuitClose($openedAt);
+        } catch (\Throwable $e) {
+            Log::warning('[GeminiGenCircuit] Telegram CLOSE dispatch failed', ['error' => $e->getMessage()]);
+        }
     }
 }

@@ -694,6 +694,79 @@ class TelegramNotificationService
         return $this->send(implode("\n", $lines));
     }
 
+    /* ================================================================
+     * Phase I — GeminiGen circuit breaker state-transition alerts.
+     *
+     * Toggle keys (gated by isEnabledFor()):
+     *   telegram_notify_geminigen_circuit_open   (default 'true')
+     *   telegram_notify_geminigen_circuit_close  (default 'true')
+     *
+     * These are SYSTEM-LEVEL alerts (no ContentIdea / LinkedInPost
+     * context) — fired directly from GeminiGenCircuitBreaker::setOpen
+     * and ::setClosed. Per-segment Telegram alerts (segment_failed,
+     * cover_critical) are suppressed in ImageGenerationService when
+     * the breaker state != closed, so the operator gets exactly ONE
+     * outage alert instead of N segment spam messages.
+     * ================================================================ */
+
+    /**
+     * Fires when the circuit transitions closed → open (or external
+     * forceOpen). Includes opened_at, next probe time, and a short
+     * reason label for telemetry.
+     */
+    public function sendGeminigenCircuitOpen(?\Carbon\Carbon $openedAt = null, ?\Carbon\Carbon $nextProbeAt = null, ?string $reason = null): bool
+    {
+        if (!$this->isEnabledFor('geminigen_circuit_open')) {
+            return false;
+        }
+
+        $openedAtStr = $openedAt
+            ? $openedAt->copy()->setTimezone('Asia/Jakarta')->format('H:i')
+            : 'now';
+        $probeStr = $nextProbeAt
+            ? $nextProbeAt->copy()->setTimezone('Asia/Jakarta')->format('H:i')
+            : 'in 5 min';
+        $reasonStr = $reason !== null && $reason !== ''
+            ? $this->escapeMarkdown($reason)
+            : 'failure threshold reached';
+
+        $lines = [];
+        $lines[] = '🔴 *GeminiGen outage detected*';
+        $lines[] = '';
+        $lines[] = 'Opened at: `' . $openedAtStr . ' WIB`';
+        $lines[] = 'Reason: `' . $reasonStr . '`';
+        $lines[] = 'Next probe: `' . $probeStr . ' WIB`';
+        $lines[] = '';
+        $lines[] = 'Pausing image dispatches. Per-segment alerts suppressed while circuit is open.';
+
+        return $this->send(implode("\n", $lines));
+    }
+
+    /**
+     * Fires when the circuit transitions half_open → closed (recovery
+     * confirmed by a successful real dispatch). Reports outage duration
+     * so operator can correlate with downstream queue backlog.
+     */
+    public function sendGeminigenCircuitClose(?\Carbon\Carbon $openedAt = null): bool
+    {
+        if (!$this->isEnabledFor('geminigen_circuit_close')) {
+            return false;
+        }
+
+        $duration = $openedAt
+            ? $openedAt->diffForHumans(\Carbon\Carbon::now(), ['parts' => 2, 'short' => true, 'syntax' => \Carbon\CarbonInterface::DIFF_ABSOLUTE])
+            : 'unknown duration';
+
+        $lines = [];
+        $lines[] = '🟢 *GeminiGen recovered*';
+        $lines[] = '';
+        $lines[] = 'Outage duration: `' . $this->escapeMarkdown($duration) . '`';
+        $lines[] = '';
+        $lines[] = 'Resuming image dispatches. Stuck retries will pick up on the next worker tick.';
+
+        return $this->send(implode("\n", $lines));
+    }
+
     /**
      * Fires from PublishViaPubler when the publish job fails (Phase H+).
      */
