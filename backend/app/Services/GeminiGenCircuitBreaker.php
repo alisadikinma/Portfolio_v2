@@ -118,22 +118,43 @@ class GeminiGenCircuitBreaker
 
     public static function classifyFailure(?int $httpStatus, ?string $errorCode = null, ?\Throwable $exception = null): string
     {
-        // Phase B will own the full classifier. Phase A stub:
+        // Network-level failures count as outage signal
         if ($exception instanceof \Illuminate\Http\Client\ConnectionException) {
             return 'count';
         }
+
+        // No status code at all — can't classify; treat as ignore
         if ($httpStatus === null) {
             return 'ignore';
         }
+
+        // Server-side outage signals
         if ($httpStatus >= 500) {
             return 'count';
         }
+
+        // Rate limit — backing off helps; count toward trip
         if ($httpStatus === 429) {
             return 'count';
         }
+
+        // 4xx range — distinguish prompt-class safety refusals (handled by
+        // the April 28 safety auto-rewrite, NOT an outage signal) from
+        // generic 4xx (bad request shape, auth, etc.).
         if ($httpStatus >= 400 && $httpStatus < 500) {
-            return 'ignore';  // Phase B refines this
+            $promptClassCodes = [
+                'PUBLIC_ERROR_PROMINENT_PEOPLE_UPLOAD',
+                'PUBLIC_ERROR_MINORS',
+                'PUBLIC_ERROR_UNSAFE_CONTENT',
+                'PUBLIC_ERROR_SEXUAL_CONTENT',
+            ];
+            if (in_array($errorCode, $promptClassCodes, true)) {
+                return 'prompt_class';
+            }
+            return 'ignore';
         }
+
+        // 2xx + 3xx → not a failure at all
         return 'ignore';
     }
 

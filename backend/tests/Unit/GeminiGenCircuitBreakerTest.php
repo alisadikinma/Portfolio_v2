@@ -141,4 +141,62 @@ class GeminiGenCircuitBreakerTest extends TestCase
         // next probe pushed forward by 1 min (recordFailure resets next_probe_at = now + 5min)
         $this->assertTrue($secondProbeAt->greaterThan($firstProbeAt));
     }
+
+    // =================================================================
+    // Phase B — Failure classifier tests
+    // =================================================================
+
+    public function test_classifier_5xx_returns_count(): void
+    {
+        $this->assertSame('count', GeminiGenCircuitBreaker::classifyFailure(500, null));
+        $this->assertSame('count', GeminiGenCircuitBreaker::classifyFailure(502, null));
+        $this->assertSame('count', GeminiGenCircuitBreaker::classifyFailure(503, null));
+        $this->assertSame('count', GeminiGenCircuitBreaker::classifyFailure(504, null));
+    }
+
+    public function test_classifier_429_returns_count(): void
+    {
+        $this->assertSame('count', GeminiGenCircuitBreaker::classifyFailure(429, null));
+    }
+
+    public function test_classifier_connection_exception_returns_count(): void
+    {
+        $exception = new \Illuminate\Http\Client\ConnectionException('Connection timed out');
+        $this->assertSame('count', GeminiGenCircuitBreaker::classifyFailure(null, null, $exception));
+    }
+
+    public function test_classifier_prompt_class_4xx_returns_prompt_class(): void
+    {
+        $promptCodes = [
+            'PUBLIC_ERROR_PROMINENT_PEOPLE_UPLOAD',
+            'PUBLIC_ERROR_MINORS',
+            'PUBLIC_ERROR_UNSAFE_CONTENT',
+            'PUBLIC_ERROR_SEXUAL_CONTENT',
+        ];
+
+        foreach ($promptCodes as $code) {
+            $this->assertSame(
+                'prompt_class',
+                GeminiGenCircuitBreaker::classifyFailure(400, $code),
+                "Expected '$code' to classify as prompt_class"
+            );
+        }
+    }
+
+    public function test_classifier_generic_4xx_returns_ignore(): void
+    {
+        $this->assertSame('ignore', GeminiGenCircuitBreaker::classifyFailure(400, null));
+        $this->assertSame('ignore', GeminiGenCircuitBreaker::classifyFailure(401, null));
+        $this->assertSame('ignore', GeminiGenCircuitBreaker::classifyFailure(404, null));
+        $this->assertSame('ignore', GeminiGenCircuitBreaker::classifyFailure(422, null));
+        // 4xx with unrecognized errorCode also ignored
+        $this->assertSame('ignore', GeminiGenCircuitBreaker::classifyFailure(400, 'SOME_OTHER_ERROR_CODE'));
+    }
+
+    public function test_classifier_2xx_returns_ignore(): void
+    {
+        $this->assertSame('ignore', GeminiGenCircuitBreaker::classifyFailure(200, null));
+        $this->assertSame('ignore', GeminiGenCircuitBreaker::classifyFailure(204, null));
+        $this->assertSame('ignore', GeminiGenCircuitBreaker::classifyFailure(null, null));
+    }
 }
