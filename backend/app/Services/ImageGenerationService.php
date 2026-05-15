@@ -18,10 +18,14 @@ class ImageGenerationService
 
     private string $apiKey;
     private string $baseUrl = 'https://api.geminigen.ai/uapi/v1';
+    private GeminiGenCircuitBreaker $breaker;
 
-    public function __construct()
+    public function __construct(?GeminiGenCircuitBreaker $breaker = null)
     {
         $this->apiKey = config('services.geminigen.api_key', '');
+        // Constructor-optional injection so the legacy `new ImageGenerationService()`
+        // callers (if any) still work; production code goes through the container.
+        $this->breaker = $breaker ?? app(GeminiGenCircuitBreaker::class);
     }
 
     /**
@@ -92,10 +96,49 @@ class ImageGenerationService
                 $multipart[] = ['name' => 'file_urls', 'contents' => $refUrl];
             }
 
-            $response = Http::timeout(30)
-                ->withHeaders(['x-api-key' => $this->apiKey])
-                ->asMultipart()
-                ->post("{$this->baseUrl}/generate_image", $multipart);
+            // Circuit breaker gate. When the breaker is OPEN we refuse to fire
+            // the HTTP call at all — GeminiGen is paused and probes happen on
+            // the next real dispatch after the cool-down window. Throws to the
+            // caller (triggerForIdea / retrySegment) so the FSM doesn't silently
+            // mark a segment as "dispatched" while no UUID exists.
+            if ($this->breaker->state() === 'open') {
+                throw new \App\Exceptions\GeminiGenCircuitOpenException(
+                    $this->breaker->openedAt(),
+                    $this->breaker->nextProbeAt()
+                );
+            }
+
+            // Wrap HTTP in try/catch so ConnectionException (network outage)
+            // is recorded as a failure signal before re-throwing. Without
+            // this the breaker would never see the network-level outage class.
+            try {
+                $response = Http::timeout(30)
+                    ->withHeaders(['x-api-key' => $this->apiKey])
+                    ->asMultipart()
+                    ->post("{$this->baseUrl}/generate_image", $multipart);
+            } catch (\Illuminate\Http\Client\ConnectionException $connEx) {
+                $this->breaker->recordFailure(null, null, $connEx);
+                throw $connEx;
+            }
+
+            // Record outcome with the breaker BEFORE branching on response.
+            // - 2xx → recordSuccess (clears stale failure log)
+            // - 5xx / 429 → recordFailure counts toward trip
+            // - 4xx with PUBLIC_ERROR_* → recordFailure classifies as
+            //   prompt_class and does NOT count (handled by April 28 safety
+            //   auto-rewrite, not an outage signal)
+            // - other 4xx → recordFailure classifies as ignore (auth, bad
+            //   request shape — operator concern, not an outage)
+            if ($response->successful()) {
+                $this->breaker->recordSuccess();
+            } else {
+                $errorCode = null;
+                $jsonError = $response->json('error');
+                if (is_string($jsonError) && $jsonError !== '') {
+                    $errorCode = $jsonError;
+                }
+                $this->breaker->recordFailure($response->status(), $errorCode);
+            }
 
             if (!$response->successful()) {
                 Log::error("[ImageGen] API error: HTTP {$response->status()} — {$response->body()}");
@@ -149,6 +192,13 @@ class ImageGenerationService
             Log::info("[ImageGen] Queued: {$type} for post {$postId}, UUID={$uuid}");
             return $uuid;
 
+        } catch (\App\Exceptions\GeminiGenCircuitOpenException $e) {
+            // Circuit-open is operationally distinct from a generic exception:
+            // we must NOT swallow it because the caller (triggerForIdea, the
+            // FSM orchestrator, etc.) needs to know that NO dispatch happened
+            // — silently returning null would let the FSM mark the segment as
+            // "dispatched" without a real UUID. Re-throw verbatim.
+            throw $e;
         } catch (\Exception $e) {
             Log::error("[ImageGen] Exception: {$e->getMessage()}");
             return null;
