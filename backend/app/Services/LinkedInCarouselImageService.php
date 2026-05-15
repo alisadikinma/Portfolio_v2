@@ -36,7 +36,8 @@ class LinkedInCarouselImageService
     private string $baseUrl = 'https://api.geminigen.ai/uapi/v1';
 
     public function __construct(
-        private readonly CarouselSlideEnhancer $enhancer
+        private readonly CarouselSlideEnhancer $enhancer,
+        private readonly GeminiGenCircuitBreaker $breaker
     ) {
         $this->apiKey = (string) config('services.geminigen.api_key', '');
     }
@@ -55,6 +56,19 @@ class LinkedInCarouselImageService
 
         if (empty($this->apiKey)) {
             Log::error('[LinkedInCarouselImage] GEMINIGEN_API_KEY missing — cannot dispatch');
+            return 0;
+        }
+
+        // Circuit breaker gate — when GeminiGen is in an outage window, skip
+        // dispatch entirely. Slides stay in their current status (typically
+        // 'pending'), so the operator sees "awaiting service recovery" rather
+        // than N slides flipped to 'failed'. The probe + ReapStuck cron will
+        // re-attempt once the breaker closes.
+        if ($this->breaker->state() === 'open') {
+            Log::warning('[LinkedInCarouselImage] dispatchAllSlides skipped — circuit OPEN', [
+                'draft_id' => $draft->id,
+                'slide_count' => count($slides),
+            ]);
             return 0;
         }
 
@@ -96,6 +110,17 @@ class LinkedInCarouselImageService
      */
     public function dispatchSingleSlide(LinkedInPost $draft, int $slideIndex): ?string
     {
+        // Circuit breaker gate — same rationale as dispatchAllSlides. Slide
+        // status stays unchanged so the operator can retry once the breaker
+        // recovers.
+        if ($this->breaker->state() === 'open') {
+            Log::warning('[LinkedInCarouselImage] dispatchSingleSlide skipped — circuit OPEN', [
+                'draft_id' => $draft->id,
+                'slide_index' => $slideIndex,
+            ]);
+            return null;
+        }
+
         $slides = $draft->carousel_slides ?? [];
         if (! isset($slides[$slideIndex])) {
             Log::warning('[LinkedInCarouselImage] dispatchSingleSlide: slide index out of range', [
@@ -193,6 +218,15 @@ class LinkedInCarouselImageService
                 ->withHeaders(['x-api-key' => $this->apiKey])
                 ->asMultipart()
                 ->post("{$this->baseUrl}/generate_image", $multipart);
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            // Network-level failure — counts toward circuit trip.
+            $this->breaker->recordFailure(null, null, $e);
+            Log::error('[LinkedInCarouselImage] HTTP connection exception', [
+                'draft_id' => $draft->id,
+                'slide_index' => $slideIndex,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
         } catch (\Throwable $e) {
             Log::error('[LinkedInCarouselImage] HTTP exception', [
                 'draft_id' => $draft->id,
@@ -203,6 +237,12 @@ class LinkedInCarouselImageService
         }
 
         if (! $response->successful()) {
+            // Classify failure for the breaker — 5xx + 429 count, prompt-class
+            // 4xx (PUBLIC_ERROR_*) are ignored because the April 28 safety
+            // auto-rewrite handles them.
+            $errorCode = $response->json('error_code') ?? null;
+            $this->breaker->recordFailure($response->status(), $errorCode);
+
             Log::error('[LinkedInCarouselImage] GeminiGen non-2xx', [
                 'draft_id' => $draft->id,
                 'slide_index' => $slideIndex,
@@ -211,6 +251,9 @@ class LinkedInCarouselImageService
             ]);
             return null;
         }
+
+        // 2xx — record success so isolated 5xx don't accumulate.
+        $this->breaker->recordSuccess();
 
         $data = $response->json();
         $uuid = $data['uuid'] ?? null;
@@ -281,6 +324,32 @@ class LinkedInCarouselImageService
      */
     public function handleWebhook(string $uuid, string $event, array $data): bool
     {
+        // Record failures against the breaker BEFORE looking up the job row —
+        // even orphan webhooks (job row deleted, race condition) should count
+        // toward the outage signal if they carry a server-class error code.
+        // Safety-class refusals (PUBLIC_ERROR_*) are filtered out by
+        // GeminiGenCircuitBreaker::classifyFailure — handled by the April 28
+        // safety auto-rewrite, not an outage indicator.
+        if ($event === 'IMAGE_GENERATION_FAILED') {
+            $errorCode = $data['error_code'] ?? null;
+            $errorCodeStr = is_string($errorCode) ? $errorCode : null;
+
+            // GeminiGenCircuitBreaker::classifyFailure inspects error_code only
+            // within the 4xx range — but webhook failures carry no real HTTP
+            // status. Classify under 400 first so prompt-class codes
+            // (PUBLIC_ERROR_*) are filtered out (handled by April 28 safety
+            // auto-rewrite, NOT an outage signal). If the 400-range path
+            // returns 'ignore', fall back to 500 to treat unrecognized
+            // failures as server-side outage signal.
+            $classification = GeminiGenCircuitBreaker::classifyFailure(400, $errorCodeStr);
+            if ($classification === 'ignore') {
+                $classification = GeminiGenCircuitBreaker::classifyFailure(500, $errorCodeStr);
+            }
+            if ($classification === 'count') {
+                $this->breaker->recordFailure(500, $errorCodeStr);
+            }
+        }
+
         $job = ImageGenerationJob::where('uuid', $uuid)
             ->where('type', 'carousel_slide')
             ->first();
@@ -291,6 +360,9 @@ class LinkedInCarouselImageService
         }
 
         if ($event === 'IMAGE_GENERATION_COMPLETED') {
+            // Successful render — counts as healthy service signal for the breaker.
+            $this->breaker->recordSuccess();
+
             $remoteUrl = $data['media_url'] ?? null;
             if (! $remoteUrl) {
                 $job->update(['status' => 'failed', 'error_message' => 'No media_url in webhook']);
