@@ -33,4 +33,11 @@ return [
 
     'canary_prompt' => env('GEMINIGEN_CIRCUIT_CANARY_PROMPT', 'circuit probe — solid color square'),
 
+    // Phase M — Firecrawl status-page accelerator (early trip at failure #3)
+    'firecrawl_api_key' => env('FIRECRAWL_API_KEY'),
+    'firecrawl_base_url' => env('FIRECRAWL_BASE_URL', 'https://api.firecrawl.dev/v2'),
+    'status_page_url' => env('GEMINIGEN_STATUS_PAGE_URL', 'https://geminigen.ai/status'),
+    'status_model_name' => env('GEMINIGEN_STATUS_MODEL_NAME', 'Nano Banana Pro'),
+    'status_cache_seconds' => (int) env('GEMINIGEN_STATUS_CACHE_SECONDS', 300),
+
 ];

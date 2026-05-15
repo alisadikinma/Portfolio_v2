@@ -16,6 +16,11 @@ class GeminiGenCircuitBreaker
     private const KEY_NEXT_PROBE_AT = 'geminigen:circuit:next_probe_at';
     private const KEY_LAST_PROBE_RESULT = 'geminigen:circuit:last_probe_result';
 
+    // Phase M — status-page early-trip accelerator
+    private const KEY_STATUS_CHECK_LOCK = 'geminigen:circuit:status_check_in_flight';
+    private const STATUS_CHECK_LOCK_TTL = 300;  // 5 min — prevents concurrent dispatches
+    private const STATUS_CHECK_TRIGGER_COUNT = 3;
+
     public function state(): string
     {
         return Cache::get(self::KEY_STATE, 'closed');
@@ -74,6 +79,19 @@ class GeminiGenCircuitBreaker
             return;
         }
 
+        // Phase M — Early-trip accelerator. When 3 consec failures hit and breaker is
+        // still closed, ask GeminiGen's status page via Firecrawl. If our model is
+        // confirmed in outage, force-open immediately (skip waiting for failure #5).
+        // Cache lock prevents thundering when many segments fail simultaneously.
+        if (
+            $currentState === 'closed'
+            && $countInWindow === self::STATUS_CHECK_TRIGGER_COUNT
+            && Cache::missing(self::KEY_STATUS_CHECK_LOCK)
+        ) {
+            Cache::put(self::KEY_STATUS_CHECK_LOCK, true, self::STATUS_CHECK_LOCK_TTL);
+            \App\Jobs\CheckGeminiGenStatusJob::dispatch();
+        }
+
         // closed → check trip threshold
         if ($countInWindow >= (int) config('geminigen-circuit.failure_threshold', 5)) {
             $this->setOpen('threshold_reached');
@@ -101,6 +119,21 @@ class GeminiGenCircuitBreaker
     {
         Cache::put(self::KEY_STATE, 'half_open', (int) config('geminigen-circuit.state_ttl_seconds', 3600));
         Log::info('[GeminiGenCircuit] half_open — awaiting next real dispatch');
+    }
+
+    /**
+     * Force the circuit to OPEN state from external triggers (e.g. status-page
+     * confirmation of outage). Does NOT touch the failure_log — this is an
+     * out-of-band override, not a counter operation.
+     *
+     * @param  string  $reason  Telemetry label appearing in logs and Telegram alert.
+     */
+    public function forceOpen(string $reason): void
+    {
+        if ($this->state() === 'open') {
+            return;  // idempotent — already open, no-op
+        }
+        $this->setOpen($reason);
     }
 
     public function recordProbeResult(int $statusCode, ?string $error = null): void

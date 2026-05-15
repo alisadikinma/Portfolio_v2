@@ -207,4 +207,22 @@ class GeminiGenCircuitBreakerTest extends TestCase
         $this->assertSame(300,  config('geminigen-circuit.probe_interval_seconds'));
         $this->assertSame(3600, config('geminigen-circuit.state_ttl_seconds'));
     }
+
+    public function test_dispatches_status_check_job_at_3rd_failure_when_closed(): void
+    {
+        \Illuminate\Support\Facades\Queue::fake();
+
+        // 2 failures — no dispatch yet
+        $this->breaker->recordFailure(503);
+        $this->breaker->recordFailure(503);
+        \Illuminate\Support\Facades\Queue::assertNothingPushed();
+
+        // 3rd failure — should dispatch CheckGeminiGenStatusJob exactly once
+        $this->breaker->recordFailure(503);
+        \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\CheckGeminiGenStatusJob::class, 1);
+
+        // 4th failure within the same lock window — must NOT dispatch a 2nd
+        $this->breaker->recordFailure(503);
+        \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\CheckGeminiGenStatusJob::class, 1);
+    }
 }
