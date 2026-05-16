@@ -2,6 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 🧠 Vault Context Link
+
+Pre-read MANDATORY via `obsidian` MCP `read-note`:
+- `20-Projects/Portfolio_v2/README.md` — current state, decisions, blockers
+- `10-Identity/ali.md` — voice & style (auto-loaded global, no re-read needed)
+- `30-Knowledge/content-strategy-shared.md` — kalau task menyentuh blog/article
+
+Persist decisions: append ke vault README section "Decision Log" via `obsidian` MCP `edit-note`. JANGAN minta user re-explain context yang sudah ada di vault.
+
 ## Project Overview
 
 Portfolio_v2 is a full-stack portfolio, blog, and CMS platform using Laravel 12 (backend API) and Vue 3 (frontend SPA). Development on Windows 11.
