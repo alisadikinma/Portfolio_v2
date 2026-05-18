@@ -129,16 +129,19 @@
                   :class="row.is_placeholder ? 'bg-amber-50/40 dark:bg-amber-900/10' : ''"
                 >
                   <!-- Name -->
-                  <td class="px-4 py-3 align-top">
+                  <td class="px-4 py-3 align-top max-w-md">
                     <div class="font-medium text-gray-900 dark:text-gray-100">
                       {{ row.display_name }}
                     </div>
-                    <div class="mt-0.5 text-xs font-mono text-gray-500 dark:text-gray-400 break-all">
+                    <div class="mt-0.5 text-[11px] font-mono text-gray-400 dark:text-gray-500 break-all">
                       {{ row.signature }}<template v-if="row.arguments?.length"> {{ row.arguments.join(' ') }}</template>
                     </div>
-                    <div v-if="row.description" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    <p
+                      v-if="row.description"
+                      class="mt-1.5 text-xs leading-relaxed text-gray-600 dark:text-gray-300"
+                    >
                       {{ row.description }}
-                    </div>
+                    </p>
                     <span
                       v-if="row.is_placeholder"
                       class="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300"

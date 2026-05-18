@@ -38,6 +38,7 @@ class ScheduledCommandSeeder extends Seeder
             [
                 'signature' => 'content:process-scheduled',
                 'display_name' => 'Content Engine — Process Scheduled Ideas',
+                'description' => 'Jalanin artikel yang punya jadwal manual (kolom scheduled_at). Tiap menit cek, kalau waktunya udah lewat → start research. Untuk timing release spesifik (mis. follow-up news cycle).',
                 'category' => 'content_engine',
                 'cron_expression' => '* * * * *',
                 'without_overlapping_minutes' => null,
@@ -47,6 +48,7 @@ class ScheduledCommandSeeder extends Seeder
             [
                 'signature' => 'blog:process-images',
                 'display_name' => 'Content Engine — Poll GeminiGen Images',
+                'description' => 'Fallback poller untuk GeminiGen. Kalau webhook gambar drop / lambat, command ini cek manual dan download yang sudah ready. Wajib ENABLE saat clear backlog.',
                 'category' => 'content_engine',
                 'cron_expression' => '* * * * *',
                 'without_overlapping_minutes' => null,
@@ -56,6 +58,7 @@ class ScheduledCommandSeeder extends Seeder
             [
                 'signature' => 'content:process-pending-translations',
                 'display_name' => 'Content Engine — Retry Pending Translations',
+                'description' => 'Retry translation EN untuk post yang gagal ditranslate (max 3x). Tiap 5 menit.',
                 'category' => 'content_engine',
                 'cron_expression' => '*/5 * * * *',
                 'without_overlapping_minutes' => 5,
@@ -64,7 +67,8 @@ class ScheduledCommandSeeder extends Seeder
             ],
             [
                 'signature' => 'content:auto-pipeline',
-                'display_name' => 'Content Engine — Auto Pipeline (8x daily)',
+                'display_name' => 'Content Engine — Auto Pipeline (Bulk Auto-Publish)',
+                'description' => 'Antrian otomatis: pick 1 idea dengan Auto=ON & virality tertinggi → jalanin full pipeline (research → write → score → images → publish) sampai selesai, lanjut ke berikutnya. Untuk clear backlog set ke "Every minute".',
                 'category' => 'content_engine',
                 'cron_expression' => '0 5,6,12,15,17,18,19,20 * * *',
                 'without_overlapping_minutes' => 10,
@@ -74,6 +78,7 @@ class ScheduledCommandSeeder extends Seeder
             [
                 'signature' => 'content:pull-trending-daily',
                 'display_name' => 'Content Engine — Pull Trending Daily',
+                'description' => 'Tiap pagi jam 5: ambil trending dari Google News + Trends, AI-score, import yang virality ≥ 70 sebagai draft auto-mode. Sumber utama backlog idea.',
                 'category' => 'content_engine',
                 'cron_expression' => '0 5 * * *',
                 'without_overlapping_minutes' => null,
@@ -91,6 +96,7 @@ class ScheduledCommandSeeder extends Seeder
                 // stub through P7, then deleted.
                 'signature' => 'social:publish-slot',
                 'display_name' => 'Social — Atomic Publish at Slot (LinkedIn + IG/TT/TH)',
+                'description' => 'Tiap menit cek antrian LinkedIn + sibling IG/TikTok/Threads. Kalau ada draft siap publish di slot waktu sekarang → fire ke API platform secara atomic (semua platform jalan bareng).',
                 'category' => 'linkedin',
                 'cron_expression' => '* * * * *',
                 'without_overlapping_minutes' => 5,
@@ -100,6 +106,7 @@ class ScheduledCommandSeeder extends Seeder
             [
                 'signature' => 'linkedin:scan-blog',
                 'display_name' => 'LinkedIn — Scan Blog for Conversion',
+                'description' => 'Tiap pagi jam 3: scan blog post baru 24 jam terakhir. Yang virality ≥ 60 dan belum punya draft LinkedIn → buat draft pending generation.',
                 'category' => 'linkedin',
                 'cron_expression' => '0 3 * * *',
                 'without_overlapping_minutes' => 30,
@@ -109,6 +116,7 @@ class ScheduledCommandSeeder extends Seeder
             [
                 'signature' => 'linkedin:reap-stuck',
                 'display_name' => 'LinkedIn — Reap Stuck Generation',
+                'description' => 'Tiap 5 menit: cek draft yang stuck di pending_generation > 30 menit → re-dispatch atau mark failed.',
                 'category' => 'linkedin',
                 'cron_expression' => '*/5 * * * *',
                 'without_overlapping_minutes' => 5,
@@ -118,6 +126,7 @@ class ScheduledCommandSeeder extends Seeder
             [
                 'signature' => 'linkedin:retry-failed',
                 'display_name' => 'LinkedIn — Auto-Retry Failed Drafts',
+                'description' => 'Tiap 10 menit: retry draft failed yang error class-nya transient (network glitch, timeout). Skip permanent error.',
                 'category' => 'linkedin',
                 'cron_expression' => '*/10 * * * *',
                 'without_overlapping_minutes' => 15,
@@ -127,6 +136,7 @@ class ScheduledCommandSeeder extends Seeder
             [
                 'signature' => 'linkedin:reap-stuck-carousel-images',
                 'display_name' => 'LinkedIn — Reap Stuck Carousel Images',
+                'description' => 'Tiap 5 menit: cek slide carousel yang stuck rendering > 15 menit → re-dispatch ke GeminiGen. Catches webhook drops.',
                 'category' => 'linkedin',
                 'cron_expression' => '*/5 * * * *',
                 'without_overlapping_minutes' => 5,
@@ -136,6 +146,7 @@ class ScheduledCommandSeeder extends Seeder
             [
                 'signature' => 'linkedin:purge-low-virality',
                 'display_name' => 'LinkedIn — Purge Low-Virality Drafts',
+                'description' => 'Tiap pagi jam 4: soft-delete draft yang virality source idea-nya turun < 50. Skip yang udah published / cancelled / awaiting_publish.',
                 'category' => 'linkedin',
                 'cron_expression' => '0 4 * * *',
                 'without_overlapping_minutes' => 15,
@@ -145,6 +156,7 @@ class ScheduledCommandSeeder extends Seeder
             [
                 'signature' => 'linkedin:auto-schedule',
                 'display_name' => 'LinkedIn — Auto-Schedule Manual Review',
+                'description' => 'Tiap pagi jam 4:30: promote draft manual_review → awaiting_publish di slot waktu kosong (urut virality DESC). Gated by master kill switch (default OFF).',
                 'category' => 'linkedin',
                 'cron_expression' => '30 4 * * *',
                 'without_overlapping_minutes' => 15,
@@ -156,6 +168,7 @@ class ScheduledCommandSeeder extends Seeder
             [
                 'signature' => 'newsletter:send-weekly',
                 'display_name' => 'Newsletter — Weekly Friday Digest',
+                'description' => 'Jumat jam 9 pagi: kirim weekly digest ke semua subscriber. Skip kalau seminggu nggak ada blog post baru (no spam).',
                 'category' => 'newsletter',
                 'cron_expression' => '0 9 * * 5',
                 'without_overlapping_minutes' => 60,
@@ -167,6 +180,7 @@ class ScheduledCommandSeeder extends Seeder
             [
                 'signature' => 'posting-rules:research',
                 'display_name' => 'Posting Rules — Quarterly Research (LinkedIn)',
+                'description' => 'Tiap 3 bulan (Jan/Apr/Jul/Okt jam 3 pagi): AI riset jam-jam terbaik publish LinkedIn untuk audience b2b_tech. Output ke posting_time_rules table — dipakai LinkedIn auto-scheduler.',
                 'category' => 'system',
                 'cron_expression' => '0 3 1 */3 *',
                 'without_overlapping_minutes' => 15,
@@ -178,6 +192,7 @@ class ScheduledCommandSeeder extends Seeder
                 // probe. No-ops unless breaker is OPEN past next_probe_at.
                 'signature' => 'geminigen:circuit-probe',
                 'display_name' => 'GeminiGen — Circuit Breaker Canary Probe',
+                'description' => 'Tiap 5 menit cek status GeminiGen.ai (hanya saat circuit OPEN). Kalau status page healthy → coba half_open. Hemat kuota saat outage.',
                 'category' => 'system',
                 'cron_expression' => '*/5 * * * *',
                 'without_overlapping_minutes' => 5,
@@ -187,7 +202,7 @@ class ScheduledCommandSeeder extends Seeder
         ];
 
         foreach ($rows as $row) {
-            ScheduledCommand::firstOrCreate(
+            $cmd = ScheduledCommand::firstOrCreate(
                 ['signature' => $row['signature']],
                 array_merge($row, [
                     'timezone' => 'Asia/Jakarta',
@@ -196,6 +211,16 @@ class ScheduledCommandSeeder extends Seeder
                     'last_status' => 'never',
                 ])
             );
+
+            // Sync description on every re-seed so operator-edited cron/enabled
+            // stays intact but documentation stays in lockstep with code.
+            // Operator never edits description from the UI — it's docs, not config.
+            if ($cmd->description !== ($row['description'] ?? null)) {
+                $cmd->update([
+                    'description' => $row['description'] ?? null,
+                    'display_name' => $row['display_name'],
+                ]);
+            }
         }
 
         // P5 (May 12, 2026) — retire the legacy linkedin:process-scheduled
