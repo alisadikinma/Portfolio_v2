@@ -17,6 +17,16 @@
           {{ healthOnline ? 'Engine Online' : 'Engine Offline' }}
         </span>
 
+        <!-- GeminiGen circuit breaker badge (Phase K, read-only) -->
+        <span
+          :class="circuitBadgeClass"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
+          :title="circuitTooltip"
+        >
+          <span class="w-2 h-2 rounded-full" :class="circuitDotClass"></span>
+          {{ circuitLabel }}
+        </span>
+
         <!-- Pull Trending Dropdown -->
         <div class="relative">
           <button
@@ -735,7 +745,50 @@ import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useContentEngine } from '@/composables/useContentEngine'
 import { useToast } from '@/composables/useToast'
+import { useGeminigenCircuit } from '@/composables/useGeminigenCircuit'
 import api from '@/services/api'
+
+// --- GeminiGen circuit breaker indicator (Phase K) ------------------------
+// Polls /api/admin/geminigen/circuit-status every 30s via TanStack Query
+// and surfaces breaker state as a small read-only badge next to the
+// existing Engine Online / Offline pill in the header.
+const circuit = useGeminigenCircuit()
+
+const circuitBadgeClass = computed(() => {
+  const state = circuit.data.value?.state
+  if (state === 'open') return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+  if (state === 'half_open') return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+  return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+})
+
+const circuitDotClass = computed(() => {
+  const state = circuit.data.value?.state
+  if (state === 'open') return 'bg-red-500 animate-pulse'
+  if (state === 'half_open') return 'bg-amber-500 animate-pulse'
+  return 'bg-emerald-500'
+})
+
+const circuitLabel = computed(() => {
+  const data = circuit.data.value
+  if (!data) return 'GeminiGen …'
+  if (data.state === 'closed') return 'GeminiGen OK'
+  if (data.state === 'half_open') return 'GeminiGen probing…'
+  const openedAt = data.opened_at
+    ? new Date(data.opened_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+    : '—'
+  return `GeminiGen down — paused ${openedAt}`
+})
+
+const circuitTooltip = computed(() => {
+  const data = circuit.data.value
+  if (!data) return 'Loading GeminiGen circuit status…'
+  const parts = [`State: ${data.state}`]
+  if (data.opened_at) parts.push(`Opened: ${data.opened_at}`)
+  if (data.next_probe_at) parts.push(`Next probe: ${data.next_probe_at}`)
+  if (data.last_probe_result?.error) parts.push(`Last error: ${data.last_probe_result.error}`)
+  if (data.failure_count_in_window) parts.push(`Failures in window: ${data.failure_count_in_window}`)
+  return parts.join(' • ')
+})
 
 const router = useRouter()
 const route = useRoute()

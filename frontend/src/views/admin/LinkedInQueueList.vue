@@ -21,6 +21,48 @@ import {
   QUEUE_TAB_KEY,
   ICON,
 } from './linkedinHelpers'
+import { useGeminigenCircuit } from '@/composables/useGeminigenCircuit'
+
+// --- GeminiGen circuit breaker indicator (Phase K) ------------------------
+// Polls /api/admin/geminigen/circuit-status every 30s via TanStack Query
+// and surfaces breaker state as a small read-only badge in the header.
+const circuit = useGeminigenCircuit()
+
+const circuitBadgeClass = computed(() => {
+  const state = circuit.data.value?.state
+  if (state === 'open') return 'bg-red-50 text-red-700 ring-1 ring-red-200 dark:bg-red-900/20 dark:text-red-300 dark:ring-red-800'
+  if (state === 'half_open') return 'bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:ring-amber-800'
+  return 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:ring-emerald-800'
+})
+
+const circuitDotClass = computed(() => {
+  const state = circuit.data.value?.state
+  if (state === 'open') return 'bg-red-500 animate-pulse'
+  if (state === 'half_open') return 'bg-amber-500 animate-pulse'
+  return 'bg-emerald-500'
+})
+
+const circuitLabel = computed(() => {
+  const data = circuit.data.value
+  if (!data) return 'GeminiGen …'
+  if (data.state === 'closed') return 'GeminiGen OK'
+  if (data.state === 'half_open') return 'GeminiGen probing…'
+  const openedAt = data.opened_at
+    ? new Date(data.opened_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+    : '—'
+  return `GeminiGen down — paused ${openedAt}`
+})
+
+const circuitTooltip = computed(() => {
+  const data = circuit.data.value
+  if (!data) return 'Loading GeminiGen circuit status…'
+  const parts = [`State: ${data.state}`]
+  if (data.opened_at) parts.push(`Opened: ${data.opened_at}`)
+  if (data.next_probe_at) parts.push(`Next probe: ${data.next_probe_at}`)
+  if (data.last_probe_result?.error) parts.push(`Last error: ${data.last_probe_result.error}`)
+  if (data.failure_count_in_window) parts.push(`Failures in window: ${data.failure_count_in_window}`)
+  return parts.join(' • ')
+})
 
 const router = useRouter()
 
@@ -319,6 +361,15 @@ const emptyMessage = computed(() => {
         </p>
       </div>
       <div class="flex items-center gap-2">
+        <!-- GeminiGen circuit breaker badge (Phase K, read-only). -->
+        <span
+          :class="circuitBadgeClass"
+          class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium"
+          :title="circuitTooltip"
+        >
+          <span class="h-1.5 w-1.5 rounded-full" :class="circuitDotClass"></span>
+          {{ circuitLabel }}
+        </span>
         <!-- Manual scan: pulls completed blog posts now instead of waiting
              for the daily 03:00 WIB cron. Useful right after publishing a
              new article from Content Engine. -->
