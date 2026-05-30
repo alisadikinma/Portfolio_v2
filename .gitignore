@@ -189,7 +189,7 @@ $RECYCLE.BIN/
 # ====================================
 
 # Database dumps (optional - uncomment if needed)
-# *.sql
+*.sql
 # *.sqlite
 # *.db
 
@@ -227,3 +227,8 @@ backend/public/uploads/*
 !backend/storage/app/public/projects/placeholder.png
 backend/nul
 scripts/managed-agents/node_modules/
+node_modules
+node_modules
+
+# graphify generated output
+graphify-out/
