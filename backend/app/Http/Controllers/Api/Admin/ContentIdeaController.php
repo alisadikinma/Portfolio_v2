@@ -76,8 +76,18 @@ class ContentIdeaController extends Controller
         // Surface blog-live timestamp to the admin UI. Frontend prefers this
         // over source_data.pub_date on Completed rows so the Published column
         // shows "posted 30m ago" instead of "news article published 3d ago".
+        // Strip heavy detail-only fields from the LIST payload. These three
+        // alone were ~96% of a 5.4MB response (generated_article 86%,
+        // progress_log 5.5%, research_data 4.5%) — the full article HTML,
+        // streaming progress log, and raw research JSON are never rendered in
+        // the list table and routinely tripped the 15s axios timeout on the
+        // Content Engine page (symptom: tabs show 0 / "No ideas found").
+        // Detail/preview/finalize views fetch the full row via the show()
+        // endpoint (GET /ideas/{id}); the progress modal refills progress_log
+        // from getProgress() polling. Cuts the payload to ~210KB.
         $data = collect($ideas->items())->map(function (ContentIdea $idea) {
             $arr = $idea->toArray();
+            unset($arr['generated_article'], $arr['progress_log'], $arr['research_data']);
             $arr['result_post_published_at'] = $idea->post?->published_at?->toIso8601String();
             return $arr;
         })->all();
