@@ -53,5 +53,14 @@ return [
         // Lower this to widen the funnel during slow news cycles, raise it
         // when the queue is overflowing with mid-tier topics.
         'virality_threshold' => (int) env('TRENDING_VIRALITY_THRESHOLD', 70),
+
+        // Freshness gate applied at pull time (manual "Pull Trending" modal
+        // AND the daily PullTrendingDaily cron). News items carrying a
+        // pub_date older than this many days are dropped before scoring —
+        // stale articles never reach the modal or content_ideas. Set to 1
+        // for ~same-day-only ("hari H"). Items with no pub_date (Google
+        // Trends / TikTok / YouTube — inherently live trend feeds) are kept.
+        // 0 disables the gate.
+        'max_age_days' => (int) env('TRENDING_MAX_AGE_DAYS', 3),
     ],
 ];

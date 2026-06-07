@@ -29,6 +29,18 @@ class ApiETag
             return $response;
         }
 
+        // The SPA admin client (axios) treats 304 as an error — its default
+        // validateStatus accepts only 200-299. A revalidated admin GET would
+        // therefore surface as a failed/empty response (e.g. Content Engine
+        // rendering "0 ideas" on every reload: first load 200, next load
+        // If-None-Match -> 304 -> axios throws -> ideas list stays empty).
+        // ETag/304 saves ~nothing on these per-user authenticated payloads,
+        // so skip them entirely. Public GETs (posts/categories/llms.txt) and
+        // the tool-consumed CV export endpoints keep their ETag revalidation.
+        if ($request->is('api/admin/*') || $request->is('admin/*')) {
+            return $response;
+        }
+
         $status = $response->getStatusCode();
         if ($status < 200 || $status >= 300) {
             return $response;

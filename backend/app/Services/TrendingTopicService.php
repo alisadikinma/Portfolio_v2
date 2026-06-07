@@ -623,12 +623,52 @@ class TrendingTopicService
             }
         }
         unset($t);
+        // Freshness gate: drop news items older than the configured window
+        // (default 3 days) BEFORE clustering/scoring so stale articles never
+        // surface in the modal or get imported as ideas. Items without a
+        // pub_date (Google Trends / TikTok / YouTube live feeds) are kept.
+        $techTrends = $this->filterByRecency($techTrends);
         // Cluster near-duplicate topics so cross-publisher coverage becomes a
         // virality signal rather than list-spam.
         $techTrends = $this->dedupAndRank($techTrends);
         usort($techTrends, fn($a, $b) => ($b['score'] ?? 0) <=> ($a['score'] ?? 0));
 
         return $techTrends;
+    }
+
+    /**
+     * Drop topics whose pub_date is older than content.trending.max_age_days.
+     * News items (RFC-822 pub_date) past the window are removed; items with no
+     * pub_date — Google Trends / TikTok / YouTube live feeds — are always kept
+     * (they have no meaningful "age" and are inherently current). Unparseable
+     * pub_dates are kept rather than silently dropped. max_age_days <= 0 = off.
+     */
+    private function filterByRecency(array $trends): array
+    {
+        $maxAgeDays = (int) config('content.trending.max_age_days', 3);
+        if ($maxAgeDays <= 0) {
+            return $trends;
+        }
+
+        $cutoff = now()->subDays($maxAgeDays)->timestamp;
+        $kept = array_values(array_filter($trends, function ($t) use ($cutoff) {
+            $pub = $t['pub_date'] ?? null;
+            if (empty($pub)) {
+                return true;
+            }
+            $ts = strtotime((string) $pub);
+            if ($ts === false || $ts === 0) {
+                return true;
+            }
+            return $ts >= $cutoff;
+        }));
+
+        $dropped = count($trends) - count($kept);
+        if ($dropped > 0) {
+            Log::info("[TrendingTopic] Recency gate dropped {$dropped} stale item(s) older than {$maxAgeDays}d");
+        }
+
+        return $kept;
     }
 
     /**
