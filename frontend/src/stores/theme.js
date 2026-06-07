@@ -1,30 +1,53 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-export const useThemeStore = defineStore('theme', () => {
-  // State - ALWAYS LIGHT MODE
-  const isDark = ref(false)
-  const colorScheme = ref('light')
+const STORAGE_KEY = 'theme'
 
-  // Initialize theme - PERMANENT LIGHT MODE
-  const initTheme = () => {
-    console.log('🎨 Setting permanent light mode...')
-    isDark.value = false
-    colorScheme.value = 'light'
-    localStorage.setItem('theme', 'light')
+export const useThemeStore = defineStore('theme', () => {
+  // State — dark by default (matches the OLED Deep design system)
+  const isDark = ref(true)
+  const colorScheme = ref('dark')
+
+  // Resolve the persisted preference; default to dark when none is stored.
+  const resolvePersisted = () => {
+    const stored = localStorage.getItem(STORAGE_KEY)
+    return stored === 'light' ? false : true
+  }
+
+  // Apply current theme to <html> + mobile browser chrome.
+  const applyTheme = () => {
+    const html = document.documentElement
+    if (isDark.value) {
+      html.classList.add('dark')
+      html.classList.remove('light')
+    } else {
+      html.classList.add('light')
+      html.classList.remove('dark')
+    }
+    // Inline style wins over the @layer base `color-scheme: dark` rule.
+    html.style.colorScheme = isDark.value ? 'dark' : 'light'
+    html.setAttribute('data-theme', isDark.value ? 'dark' : 'light')
+    updateMetaThemeColor(isDark.value ? '#050505' : '#ffffff')
+  }
+
+  const setDark = (value) => {
+    isDark.value = value
+    colorScheme.value = value ? 'dark' : 'light'
+    localStorage.setItem(STORAGE_KEY, colorScheme.value)
     applyTheme()
   }
 
-  // Apply theme to document - ALWAYS LIGHT
-  const applyTheme = () => {
-    const html = document.documentElement
-    html.classList.remove('dark')
-    html.classList.add('light')
-    html.setAttribute('data-theme', 'light')
-    updateMetaThemeColor('#ffffff')
+  // Initialize from persisted preference (or dark default).
+  const initTheme = () => {
+    setDark(resolvePersisted())
   }
 
-  // Update mobile browser theme color
+  // Toggle between dark and light, persisting the choice.
+  const toggleDark = () => {
+    setDark(!isDark.value)
+  }
+
+  // Update mobile browser theme color.
   const updateMetaThemeColor = (color) => {
     let metaTheme = document.querySelector('meta[name="theme-color"]')
     if (!metaTheme) {
@@ -36,12 +59,14 @@ export const useThemeStore = defineStore('theme', () => {
   }
 
   return {
-    // State (read-only)
+    // State
     isDark,
     colorScheme,
 
     // Actions
     initTheme,
-    applyTheme
+    applyTheme,
+    toggleDark,
+    setDark,
   }
 })

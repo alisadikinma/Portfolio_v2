@@ -1,6 +1,11 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+/* Class-based dark mode (Tailwind v4) — `dark:` variants follow the `.dark`
+   class on <html> instead of the OS prefers-color-scheme media query.
+   Controlled by the theme store (src/stores/theme.js). Dark is the default. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ============================================
    ULTRA PORTFOLIO — Ethereal Glass Design System
    $150k Agency-Tier · Ali Sadikin Ma
