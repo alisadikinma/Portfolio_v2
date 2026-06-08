@@ -30,10 +30,14 @@ ok('generative video discipline present', () => {
   assert.ok(t, 'expected a Generative Video discipline')
 })
 
-ok('every tab has a cta with label + to', () => {
+ok('every tab cta scrolls to the newsletter waitlist (no dead routes)', () => {
   for (const t of tabs) {
-    assert.ok(t.cta && t.cta.label && t.cta.to, `tab ${t.id} missing cta`)
+    assert.ok(t.cta && t.cta.label, `tab ${t.id} missing cta label`)
+    assert.equal(t.cta.anchor, 'join-the-build', `tab ${t.id} cta must scroll to #join-the-build`)
   }
+  const json = JSON.stringify(tabs)
+  assert.ok(!json.includes('/courses'), 'no dead /courses route in cta data')
+  assert.ok(!json.includes('/projects/mandor-ai'), 'no dead /projects/mandor-ai route in cta data')
 })
 
 console.log(`\n${passed} checks passed.`)

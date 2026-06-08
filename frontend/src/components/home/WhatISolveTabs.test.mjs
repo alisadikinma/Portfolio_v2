@@ -29,4 +29,10 @@ ok('no double-arrow on CTA (data label already has →)', () => {
   assert.ok(!src.includes('{{ active.cta.label }} →'), 'remove trailing → after cta.label')
 })
 
+// Follow-up pass 3: CTA scrolls to the newsletter waitlist (no dead RouterLink).
+ok('CTA scrolls to a section anchor (waitlist)', () => {
+  assert.ok(src.includes('scrollIntoView'), 'CTA must scroll to a section anchor')
+  assert.ok(src.includes('cta.anchor'), 'CTA must read active.cta.anchor')
+})
+
 console.log(`\n${passed} checks passed.`)

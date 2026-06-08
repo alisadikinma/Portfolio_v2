@@ -132,16 +132,17 @@
               </li>
             </ul>
 
-            <!-- CTA -->
+            <!-- CTA — scrolls to the newsletter waitlist (#join-the-build) until /courses ships -->
             <div>
-              <RouterLink
-                :to="active.cta.to"
+              <button
+                type="button"
+                @click="scrollToAnchor(active.cta.anchor)"
                 class="inline-flex items-center gap-2 rounded-md border bg-white/5 px-5 py-2.5 text-sm font-medium uppercase tracking-[0.18em] text-[var(--fg-primary,#EDEDEF)] backdrop-blur transition-all duration-200 hover:bg-white/10"
                 :class="accentBorderClass(active.accent)"
                 style="font-family: 'JetBrains Mono', ui-monospace, monospace;"
               >
                 {{ active.cta.label }}
-              </RouterLink>
+              </button>
             </div>
           </div>
 
@@ -189,12 +190,28 @@
 </template>
 
 <script setup>
-import { computed, ref, reactive } from 'vue'
-import { RouterLink } from 'vue-router'
+import { computed, ref, reactive, onMounted, onUnmounted } from 'vue'
 import { tabs } from '@/data/whatISolve'
 
 const activeId = ref(tabs[0].id)
 const videoBroken = reactive({})
+
+// Reduced-motion-aware scroll. CTAs route to the newsletter waitlist
+// (#join-the-build) until dedicated /courses + MANDOR pages ship.
+const reducedMotion = ref(false)
+let mq
+function syncMotion(e) { reducedMotion.value = e.matches }
+onMounted(() => {
+  mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+  reducedMotion.value = mq.matches
+  mq.addEventListener?.('change', syncMotion)
+})
+onUnmounted(() => mq?.removeEventListener?.('change', syncMotion))
+
+function scrollToAnchor(id) {
+  const el = id && document.getElementById(id)
+  if (el) el.scrollIntoView({ behavior: reducedMotion.value ? 'auto' : 'smooth', block: 'start' })
+}
 
 const active = computed(
   () => tabs.find((t) => t.id === activeId.value) ?? tabs[0]

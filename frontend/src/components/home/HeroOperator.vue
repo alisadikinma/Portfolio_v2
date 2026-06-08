@@ -69,13 +69,14 @@
         >
           Follow the build
         </a>
-        <RouterLink
-          to="/courses"
+        <button
+          type="button"
+          @click="scrollToAnchor('join-the-build')"
           class="inline-flex items-center rounded-[10px] border border-[var(--fg-muted,#8A8F98)]/55 px-7 py-4 text-[0.95rem] font-medium text-[var(--fg-primary,#EDEDEF)] backdrop-blur transition-colors duration-200 hover:border-[var(--accent-gold,#D4A843)] hover:bg-white/5"
           style="font-family: 'Inter', sans-serif;"
         >
           Learn AI with me
-        </RouterLink>
+        </button>
         <RouterLink
           to="/blog"
           class="inline-flex items-center px-2 py-4 text-[0.95rem] font-medium text-[var(--fg-primary,#EDEDEF)] transition-colors duration-200 hover:text-[var(--accent-gold,#D4A843)]"
@@ -148,6 +149,13 @@ onMounted(() => {
   mq.addEventListener?.('change', syncMotion)
 })
 onUnmounted(() => mq?.removeEventListener?.('change', syncMotion))
+
+// "Learn AI with me" scrolls to the newsletter waitlist (#join-the-build)
+// until a dedicated /courses page ships. Reduced-motion → instant jump.
+function scrollToAnchor(id) {
+  const el = id && document.getElementById(id)
+  if (el) el.scrollIntoView({ behavior: reducedMotion.value ? 'auto' : 'smooth', block: 'start' })
+}
 </script>
 
 <style scoped>

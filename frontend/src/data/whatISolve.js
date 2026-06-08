@@ -26,7 +26,7 @@ export const tabs = [
       'Average build time: 3-7 days from first prompt to live deployment',
     ],
     videoSrc: '/videos/vibe-coding.mp4',
-    cta: { label: 'Learn it →', to: '/courses#vibe-coding' },
+    cta: { label: 'Learn it →', anchor: 'join-the-build' },
   },
   {
     id: 'ai-agent-os',
@@ -46,7 +46,7 @@ export const tabs = [
       'Self-hostable — agents execute on your own runtimes via a local daemon',
     ],
     videoSrc: '/videos/ai-agents.mp4',
-    cta: { label: 'Explore MANDOR AI →', to: '/projects/mandor-ai' },
+    cta: { label: 'Explore MANDOR AI →', anchor: 'join-the-build' },
   },
   {
     id: 'ai-video',
@@ -65,6 +65,6 @@ export const tabs = [
       'Multi-platform: VEO 3.1 (Google), Kling AI (Kuaishou), Seedance 2.0 (ByteDance)',
     ],
     videoSrc: '/videos/ai-video.mp4',
-    cta: { label: 'Learn it →', to: '/courses#video-generation' },
+    cta: { label: 'Learn it →', anchor: 'join-the-build' },
   },
 ]

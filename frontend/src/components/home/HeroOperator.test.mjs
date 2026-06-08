@@ -42,4 +42,12 @@ ok('hero poster wired to generated still', () => {
     'posterSrc must be assigned /videos/hero-poster.jpg')
 })
 
+// Follow-up pass 3: "Learn AI with me" scrolls to the newsletter waitlist
+// instead of the dead /courses route.
+ok('Learn AI CTA scrolls to #join-the-build (no dead /courses route)', () => {
+  assert.ok(src.includes('join-the-build'), 'Learn AI CTA must target #join-the-build')
+  assert.ok(!src.includes("to=\"/courses\"") && !src.includes("to='/courses'"),
+    'no dead /courses RouterLink')
+})
+
 console.log(`\n${passed} checks passed.`)
