@@ -34,22 +34,22 @@
             </span>
           </router-link>
 
-          <!-- Desktop Navigation Links -->
+          <!-- Desktop Navigation Links — homepage section anchors -->
           <div class="hidden md:flex items-center gap-1">
-            <router-link
-              v-for="item in navItems"
-              :key="item.name"
-              :to="item.path"
-              class="relative px-3.5 py-1.5 rounded-full text-sm font-medium text-fg-muted transition-all duration-700 ease-spring flex items-center gap-1.5"
+            <a
+              v-for="item in sectionLinks"
+              :key="item.id"
+              :href="`#${item.id}`"
+              @click.prevent="goToSection(item.id)"
+              class="relative px-3.5 py-1.5 rounded-full text-sm font-medium text-fg-muted transition-all duration-700 ease-spring cursor-pointer"
               :class="[
-                isActive(item.path)
+                isActive(item.id)
                   ? 'text-accent-gold bg-accent-gold/8'
                   : 'hover:text-fg-primary hover:bg-white/5'
               ]"
             >
-              <IconDisplay v-if="item.icon" :name="item.icon" class="w-3.5 h-3.5" />
               {{ item.name }}
-            </router-link>
+            </a>
           </div>
 
           <!-- Language Switcher (desktop) -->
@@ -120,22 +120,21 @@
             enter-from-class="opacity-0 translate-y-8"
             enter-to-class="opacity-100 translate-y-0"
           >
-            <router-link
-              v-for="(item, index) in navItems"
-              :key="item.name"
-              :to="item.path"
-              @click="closeMenu"
-              class="w-full max-w-xs flex items-center justify-center gap-3 px-8 py-5 rounded-2xl text-2xl font-display font-semibold text-fg-muted transition-all duration-700 ease-spring"
+            <a
+              v-for="(item, index) in sectionLinks"
+              :key="item.id"
+              :href="`#${item.id}`"
+              @click.prevent="goToSection(item.id)"
+              class="w-full max-w-xs flex items-center justify-center gap-3 px-8 py-5 rounded-2xl text-2xl font-display font-semibold text-fg-muted transition-all duration-700 ease-spring cursor-pointer"
               :class="[
-                isActive(item.path)
+                isActive(item.id)
                   ? 'text-accent-gold bg-white/5 border border-accent-gold/20'
                   : 'hover:text-fg-primary hover:bg-white/5'
               ]"
               :style="{ transitionDelay: `${100 + index * 80}ms` }"
             >
-              <IconDisplay v-if="item.icon" :name="item.icon" class="w-5 h-5" />
               {{ item.name }}
-            </router-link>
+            </a>
           </TransitionGroup>
           <!-- Language Switcher (mobile) -->
           <div class="mt-6">
@@ -149,39 +148,50 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useUIStore } from '@/stores/ui'
-import { useMenuItems } from '@/composables/useMenuItems'
 import { useSiteSettings } from '@/composables/useSiteSettings'
-import IconDisplay from '@/components/admin/IconDisplay.vue'
 import LanguageSwitcher from '@/components/LanguageSwitcher.vue'
 
 const { locale } = useI18n()
 
 const route = useRoute()
+const router = useRouter()
 const uiStore = useUIStore()
-const { menuItems, fetchActiveMenuItems } = useMenuItems()
 const { siteName, siteLogo, fetchSiteSettings } = useSiteSettings()
 
 const isScrolled = ref(false)
 const menuOpen = ref(false)
+const activeSection = ref('')
+const reducedMotion = ref(false)
 
-const navItems = computed(() => {
-  const lang = route.params.lang || locale.value || 'en'
-  return menuItems.value.map(item => ({
-    name: item.title,
-    path: `/${lang}${item.url}`,
-    icon: item.icon
-  }))
-})
+// The header menu IS the homepage section spine. Each item smooth-scrolls to its
+// section on the homepage, or routes home + hash from any other page (the router
+// scrollBehavior resolves the hash with a smooth scroll on arrival).
+const sectionLinks = [
+  { name: 'Who I Am', id: 'who-i-am' },
+  { name: 'What I Solve', id: 'what-i-solve' },
+  { name: 'Proof', id: 'receipts' },
+  { name: 'Stages', id: 'international-stages' },
+  { name: 'Work', id: 'selected-work' },
+  { name: 'Writing', id: 'latest-writing' },
+  { name: 'Contact', id: 'join-the-build' },
+]
 
-function isActive(path) {
-  if (route.path === path) return true
-  if (route.path.startsWith(path + '/')) return true
-  // Also match if path is just the lang root (e.g., /en) and we're on home
-  const lang = route.params.lang || locale.value || 'en'
-  return path === `/${lang}` && route.path === `/${lang}`
+function goToSection(id) {
+  closeMenu()
+  if (isHomePage.value) {
+    const el = document.getElementById(id)
+    if (el) el.scrollIntoView({ behavior: reducedMotion.value ? 'auto' : 'smooth' })
+  } else {
+    const lang = route.params.lang || locale.value || 'en'
+    router.push({ name: 'home', params: { lang }, hash: `#${id}` })
+  }
+}
+
+function isActive(id) {
+  return isHomePage.value && activeSection.value === id
 }
 
 function toggleMenu() {
@@ -218,19 +228,42 @@ watch(isHomePage, (isHome) => {
   }
 })
 
+let mqMotion
+let sectionObserver
+let observerTimer
+function syncMotion(e) { reducedMotion.value = e.matches }
+
 onMounted(async () => {
   // Set initial state before scroll listener
   if (!isHomePage.value) {
     isScrolled.value = true
   }
   window.addEventListener('scroll', handleScroll, { passive: true })
-  await Promise.all([
-    fetchActiveMenuItems(),
-    fetchSiteSettings(true)
-  ])
+
+  mqMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
+  reducedMotion.value = mqMotion.matches
+  mqMotion.addEventListener?.('change', syncMotion)
+
+  // Active-section highlight (cosmetic). Fails gracefully to no highlight if the
+  // section DOM isn't mounted yet or IntersectionObserver is unavailable.
+  observerTimer = setTimeout(() => {
+    if (!isHomePage.value || !('IntersectionObserver' in window)) return
+    sectionObserver = new IntersectionObserver((entries) => {
+      for (const e of entries) if (e.isIntersecting) activeSection.value = e.target.id
+    }, { rootMargin: '-45% 0px -50% 0px', threshold: 0 })
+    sectionLinks.forEach((l) => {
+      const el = document.getElementById(l.id)
+      if (el) sectionObserver.observe(el)
+    })
+  }, 600)
+
+  await fetchSiteSettings(true)
 })
 
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
+  mqMotion?.removeEventListener?.('change', syncMotion)
+  clearTimeout(observerTimer)
+  sectionObserver?.disconnect()
 })
 </script>

@@ -7,42 +7,42 @@
     </div>
 
     <!-- 2. WHO I AM — answer-shaped about block + portrait (LLM-quotable) -->
-    <div class="snap-section" v-if="isSectionActive('who-i-am')">
+    <div id="who-i-am" class="snap-section scroll-mt-24" v-if="isSectionActive('who-i-am')">
       <WhoIAm />
     </div>
 
     <!-- 3. WHAT I BUILD — three-discipline tabbed switcher (incl. MANDOR AI) -->
-    <div class="snap-section" v-if="isSectionActive('what-i-solve')">
+    <div id="what-i-solve" class="snap-section scroll-mt-24" v-if="isSectionActive('what-i-solve')">
       <WhatISolveTabs />
     </div>
 
     <!-- 4. THE RECEIPTS — 6-tile proof bento -->
-    <div class="snap-section" v-if="isSectionActive('receipts')">
+    <div id="receipts" class="snap-section scroll-mt-24" v-if="isSectionActive('receipts')">
       <ReceiptsBento />
     </div>
 
     <!-- 5. INTERNATIONAL STAGES — global reach cards -->
-    <div class="snap-section" v-if="isSectionActive('international-stages')">
+    <div id="international-stages" class="snap-section scroll-mt-24" v-if="isSectionActive('international-stages')">
       <InternationalStages />
     </div>
 
     <!-- 6. SELECTED WORK — metric-led project cards -->
-    <div class="snap-section" v-if="isSectionActive('selected-work')">
+    <div id="selected-work" class="snap-section scroll-mt-24" v-if="isSectionActive('selected-work')">
       <SelectedWork />
     </div>
 
     <!-- 7. TESTIMONIALS — LinkedIn-sourced quotes -->
-    <div class="snap-section" v-if="isSectionActive('testimonials')">
+    <div id="testimonials" class="snap-section scroll-mt-24" v-if="isSectionActive('testimonials')">
       <TestimonialsCarousel />
     </div>
 
     <!-- 8. LATEST WRITING — editorial feed + Content Engine meta-flex -->
-    <div class="snap-section" v-if="isSectionActive('latest-writing')">
+    <div id="latest-writing" class="snap-section scroll-mt-24" v-if="isSectionActive('latest-writing')">
       <LatestWriting />
     </div>
 
     <!-- 9. JOIN THE BUILD — follow + newsletter + WhatsApp -->
-    <div class="snap-section" v-if="isSectionActive('join-the-build')">
+    <div id="join-the-build" class="snap-section scroll-mt-24" v-if="isSectionActive('join-the-build')">
       <JoinTheBuild />
     </div>
 

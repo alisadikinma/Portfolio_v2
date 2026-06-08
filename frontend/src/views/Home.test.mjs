@@ -54,4 +54,10 @@ ok('retired sections no longer imported', () => {
     assert.ok(!new RegExp(`import\\s+${c}\\s+from`).test(src), `should not import retired: ${c}`)
 })
 
+// Task 5: header menu scrolls to sections → each nav-target needs a DOM id anchor.
+ok('nav-target sections carry DOM id anchors', () => {
+  for (const id of ['who-i-am', 'what-i-solve', 'receipts', 'international-stages', 'selected-work', 'latest-writing', 'join-the-build'])
+    assert.ok(new RegExp(`id="${id}"`).test(src), `missing anchor id="${id}"`)
+})
+
 console.log(`\n${passed} checks passed.`)
