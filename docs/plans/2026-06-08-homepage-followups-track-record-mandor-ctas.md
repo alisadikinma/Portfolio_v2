@@ -20,14 +20,30 @@
 
 ---
 
-### Item 1 — Hero video (DEFERRED, no-op this pass)
+### Item 1 — Hero video (NEW DIRECTION — produce in next session)
 
-Constraint (CLAUDE.md): geminigen MCP is **image-only**, no video tool. Operator is building a dedicated video-gen MCP and will deliver `hero-loop.webm` / `.mp4`. Current state is already graceful:
-- `posterSrc = /videos/hero-poster.jpg` (warrior still) — renders immediately + reduced-motion/slow-conn fallback.
-- `mp4Src = /videos/hero-bg.mp4` (interim loop).
-- `webmSrc = ''`.
+**Decision (2026-06-08):** **Drop the warrior concept.** The hero video must make a viewer
+**instantly understand Ali is an AI expert** just by watching — no caption needed.
 
-**Action when asset lands:** drop `hero-loop.webm`/`.mp4` into `public/videos/`, set `webmSrc`/`mp4Src` in `HeroOperator.vue`. Nothing to do until then. (Note: `warrior-front/left/right.mp4` already exist on disk if a quick interim is ever wanted.)
+**Toolchain (geminigen REMOVED):** `indusia-image-gen` (default nano-banana-2) → keyframe(s);
+`indusia-video-gen` → image-to-video loop. Both require a fresh session to register the MCP servers.
+
+**North-star:** in the first 2 seconds, a stranger thinks *"this person commands AI."* The clickable
+CTA stays as the crisp HTML buttons (Follow the build / Learn AI / Read the blog); the video's job is
+attention + authority + choreographing the eye toward the gold button (motion CTA, **no baked text** —
+legibility + i18n). Left third stays dark/low-motion for wordmark + manifesto legibility.
+
+**Candidate concepts (pick in next session):**
+
+| Concept | What the viewer sees | Why it reads "AI expert" |
+|---------|----------------------|--------------------------|
+| **A · Operator at the console (REC)** | Ali (real, from `settings.about.profile_photo` face ref) in a dark cinematic studio, a wall of screens streaming live AI work — agents running, code generating, image/video rendering, dashboards. Slow push-in; screens flicker; he glances to camera. | He visibly *commands* multiple AI systems at once — authority + scale. |
+| **B · AI materializing around him** | Ali centered; holographic AI artifacts (neural mesh, generated images, agent task-boards, video frames) assemble/orbit around him. | He is the source the AI outputs flow from. |
+| **C · Output montage** | Quick cinematic cuts of his real outputs (Sparkfluence, INDUSIA inspection, gen-video, carousels) with Ali as the through-line. | Proof-by-portfolio — receipts in motion. |
+
+**Recommended:** Concept A (real face = strongest expert signal; single strong keyframe → indusia-video-gen loop). Confirm concept in next session, then: keyframe → 8s loop → wire `webmSrc`/`mp4Src` in `HeroOperator.vue` (poster already wired). Specs: 1920×1080, 16:9, 8s seamless, muted, webm+mp4, <4MB.
+
+**Interim (unchanged):** `posterSrc=/videos/hero-poster.jpg` + `mp4Src=/videos/hero-bg.mp4` keep the page alive until the new loop ships. (The warrior poster will be replaced by the new concept's keyframe.)
 
 ---
 
@@ -52,7 +68,7 @@ No new routes, no dead links left.
 **Problem:** the ai-agent-os tab renders `/videos/ai-agents.mp4` — the OpenClaw orchestrator diagram. Operator wants a **kanban-board** visual (assign issues to AI agents) representing MANDOR AI, no OpenClaw branding.
 
 **Plan:**
-1. **Generate** via geminigen (`nano-banana-2` preferred — premium models congested per CLAUDE.md), 16:9 to match the tab's `aspect-video` frame. Spec: a dark-cinema Linear/Kanban board UI — columns (Backlog / In Progress / In Review / Done), issue cards each with a small **AI-agent avatar** (robot/glyph, not human photos), left sidebar reading "Agents · Runtimes · Skills", subtle gold/cyan accent matching the design system, **"MANDOR AI"** wordmark top-left. No OpenClaw, no real logos. Save to `public/images/whatisolve/mandor-board.jpg` (+ optimized).
+1. **Generate** via `indusia-image-gen` (default nano-banana-2; geminigen REMOVED), 16:9 to match the tab's `aspect-video` frame. Spec: a dark-cinema Linear/Kanban board UI — columns (Backlog / In Progress / In Review / Done), issue cards each with a small **AI-agent avatar** (robot/glyph, not human photos), left sidebar reading "Agents · Runtimes · Skills", subtle gold/cyan accent matching the design system, **"MANDOR AI"** wordmark top-left. No OpenClaw, no real logos. Save to `public/images/whatisolve/mandor-board.jpg` (+ optimized).
 2. **Render path:** `WhatISolveTabs.vue` currently only does `<video>`. Add an optional `imageSrc` on the tab object → when present, render `<img>` (lazy, object-cover) instead of `<video>`; video stays the fallback for the other two tabs. Minimal, additive.
 3. `whatISolve.js` ai-agent-os: add `imageSrc: '/images/whatisolve/mandor-board.jpg'` (keep `videoSrc` as deprecated fallback or remove).
 
@@ -96,7 +112,7 @@ From the factory floor to the world's stages — one continuous arc.   (sub)
 |---------|-------------|-----------|-------|
 | Hero video loop | `public/videos/hero-loop.*` | ❌ pending operator MCP | No-op this pass |
 | "Learn AI with me" + tab CTAs | static / scroll `#join-the-build` | ✅ JoinTheBuild section exists | No backend |
-| MANDOR board image | geminigen-generated `public/images/whatisolve/mandor-board.jpg` | ❌ generate in execute | Static asset, image tool works |
+| MANDOR board image | `indusia-image-gen`-generated `public/images/whatisolve/mandor-board.jpg` | ❌ next session (MCP not loaded) | Static asset; geminigen removed |
 | WhatISolveTabs `imageSrc` | `src/data/whatISolve.js` | ✅ data file exists | Additive field + `<img>` render path |
 | Career chapters | static array in `InternationalStages.vue` (facts from vault `experience.md`) | ✅ vault verified | No API — curated narrative, like `stages` |
 | Stage cards (5) | `/api/awards/{id}/galleries` via `useStageGalleries` | ✅ unchanged | IDBYTE removed |
@@ -248,3 +264,25 @@ Vue 3.5 `<script setup>` · Tailwind 4 · Vite (rolldown) · smoke tests = file-
 ### Post-implementation
 - Update root `CLAUDE.md` "Last Updated" + Page Sections Mapping note (Stages → Track Record reframe; WhatISolveTabs `imageSrc`).
 - Commit only — do not push (operator authorizes).
+
+---
+
+## Session Handoff — 2026-06-08 (paused for MCP reload)
+
+**Why paused:** `indusia-image-gen` + `indusia-video-gen` MCP servers aren't registered in the
+current session (geminigen removed). Operator restarting Claude Code to load them.
+
+**Status:**
+- ✅ **Phase B DONE + committed** (`c517123e`) — all 4 dead CTAs scroll to `#join-the-build`. Tests + build green.
+- ⏳ **Phase C (MANDOR board)** — code path (`imageSrc` in WhatISolveTabs) + image gen via `indusia-image-gen` not started. Blocked on MCP.
+- ⏳ **Phase D (Track Record)** — career band + drop IDBYTE. **No image needed — can run anytime** (was deferred only because operator chose to restart).
+- ⏳ **Hero video** — NEW direction locked: drop warrior, "instantly reads as AI expert", Concept A recommended (Operator-at-the-console). Produce via `indusia-image-gen` → `indusia-video-gen`.
+
+**Resume steps (new session):**
+1. Read this plan file. Re-invoke `gaspol-execute` for `2026-06-08-homepage-followups-track-record-mandor-ctas.md`.
+2. Confirm `indusia-image-gen` + `indusia-video-gen` are callable (ToolSearch).
+3. **Phase D** (no MCP) → **Phase C** (generate MANDOR board via indusia-image-gen, wire imageSrc) → **Hero video** (confirm Concept A, keyframe → loop → wire HeroOperator).
+4. Per phase: TDD smoke test → implement → `npm run build` → commit (no push).
+5. Final: `gaspol-sync-docs` → update root CLAUDE.md "Last Updated".
+
+**Face ref for hero + any human imagery:** `settings.about.profile_photo` (admin-managed). Career facts: vault `10-Identity/experience.md` (already transcribed into the Design "Career chapter data" table above).
