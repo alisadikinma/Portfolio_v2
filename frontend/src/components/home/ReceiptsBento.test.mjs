@@ -41,7 +41,8 @@ ok('no placeholder / TODO markers', () =>
 
 // Task 3: every tile carries a cinematic background image + a legibility overlay.
 ok('all 6 tiles carry a /images/proof/ background image', () => {
-  const m = src.match(/image:\s*['"]\/images\/proof\/[a-z0-9-]+\.jpg['"]/g) || []
+  // image values are template literals with a ?v= cache-bust, e.g. `/images/proof/demoday.jpg?v=${v}`
+  const m = src.match(/image:\s*[`'"]\/images\/proof\/[a-z0-9-]+\.jpg/g) || []
   assert.equal(m.length, 6, `expected 6 proof images, found ${m.length}`)
 })
 
