@@ -95,10 +95,14 @@ const yearsCount = computed(() => stats.value.years_experience ?? 17)
 
 // Six proof tiles. Live: products + years (from /api/homepage/featured stats).
 // Static-locked: Demo Day #1, $318K+ impact, 16 countries, ≥95% accuracy.
+// Cache-bust tag: bump `v` whenever a proof image is regenerated. The server
+// serves /images/* as `immutable, max-age=1y`, so the filename alone never
+// refetches at the edge or in the browser — the query param forces a new URL.
+const v = '20260608b'
 const tiles = computed(() => [
   {
     id: 'tile-demoday',
-    image: '/images/proof/demoday.jpg',
+    image: `/images/proof/demoday.jpg?v=${v}`,
     lead: true,
     icon: '🥇',
     value: '#1',
@@ -107,35 +111,35 @@ const tiles = computed(() => [
   },
   {
     id: 'tile-impact',
-    image: '/images/proof/impact.jpg',
+    image: `/images/proof/impact.jpg?v=${v}`,
     icon: '💰',
     value: '$318K+',
     sub: 'Documented business impact delivered.',
   },
   {
     id: 'tile-products',
-    image: '/images/proof/products.jpg',
+    image: `/images/proof/products.jpg?v=${v}`,
     icon: '📦',
     value: `${productsCount.value}+`,
     sub: 'Enterprise products shipped.',
   },
   {
     id: 'tile-years',
-    image: '/images/proof/years.jpg',
+    image: `/images/proof/years.jpg?v=${v}`,
     icon: '⏳',
     value: String(yearsCount.value),
     sub: 'Years building, hands-on.',
   },
   {
     id: 'tile-countries',
-    image: '/images/proof/countries.jpg',
+    image: `/images/proof/countries.jpg?v=${v}`,
     icon: '🌏',
     value: '16',
     sub: 'Countries — work shipped & presented.',
   },
   {
     id: 'tile-accuracy',
-    image: '/images/proof/accuracy.jpg',
+    image: `/images/proof/accuracy.jpg?v=${v}`,
     icon: '🎯',
     value: '≥95%',
     sub: 'Edge-AI visual inspection — better & cheaper than Keyence-class AOI.',
