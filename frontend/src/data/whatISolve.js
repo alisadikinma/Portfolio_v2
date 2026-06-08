@@ -1,11 +1,13 @@
-// Static content for the What I Solve tabbed switcher (Phase 3 — expanded
-// to 4 disciplines after operator request to merge old SkillShowcase
-// content into this single tab section).
+// Static content for the "What I Build" tabbed switcher (The Operator redesign,
+// 2026-06-08). Three disciplines that double as Ali's course topics:
+// Vibe Coding · AI Agent OS (MANDOR AI) · Generative Video.
+// (AI Automation dropped from the homepage switcher — folded into Vibe
+// Coding / AI Agent OS narratives; still part of the broader skill set.)
 //
 // Default selection = vibe-coding (first in array).
-// Accent palette: gold | cyan | indigo (rotates per tab).
-// Video paths point at /videos/{id}.mp4 — same files the old
-// SkillShowcase used.
+// Accent palette: gold | cyan | indigo.
+// `product` + `badge` are optional; when present the tab renders as a
+// featured/"Introducing" discipline (see WhatISolveTabs.vue).
 export const tabs = [
   {
     id: 'vibe-coding',
@@ -18,55 +20,37 @@ export const tabs = [
     description:
       'I turn prompts into deployed production apps. Claude Code is my IDE — I describe what I want, the AI writes the code, I review and ship. Not prototypes. Real products, live in production.',
     bullets: [
-      'Shipped 3 production apps via vibe coding: Sparkfluence Studio, this portfolio, Indusia AI HMI',
-      'Author of 3 open-source Claude Code plugins with active installs',
+      'Shipped production apps via vibe coding: Sparkfluence Studio, this portfolio, Indusia AI HMI',
+      'Author of open-source Claude Code plugins with active installs',
       'Full-stack: Vue 3, Laravel 12, Tailwind CSS 4, MySQL, deployed on production VPS',
       'Average build time: 3-7 days from first prompt to live deployment',
     ],
     videoSrc: '/videos/vibe-coding.mp4',
-    cta: { label: 'Case study', to: '/work#vibe-coding' },
+    cta: { label: 'Learn it →', to: '/courses#vibe-coding' },
   },
   {
-    id: 'ai-automation',
-    label: 'AI Automation',
-    icon: '⚙️',
-    accent: 'cyan',
-    subtitle: 'Zero Manual Work',
-    headline:
-      'I wire APIs, databases, and AI models into pipelines that run 24/7.',
-    description:
-      'Using n8n and custom integrations, I replace entire manual workflows with self-executing automation that never sleeps and never asks for a raise.',
-    bullets: [
-      'Built 56+ automation workflows across e-commerce, manufacturing, and SaaS',
-      'Integrated n8n with OpenAI, Claude, WhatsApp Business API, Google Sheets, MySQL',
-      'Reduced manual data entry by 92% for a logistics company (DHL supply chain project)',
-      'API orchestration: webhook triggers, conditional routing, error retry, dead-letter queues',
-    ],
-    videoSrc: '/videos/ai-automation.mp4',
-    cta: { label: 'See workflows', to: '/work#ai-automation' },
-  },
-  {
-    id: 'ai-agents',
-    label: 'AI Agents',
+    id: 'ai-agent-os',
+    label: 'AI Agent OS',
+    product: 'MANDOR AI',
+    badge: 'Introducing',
     icon: '🤖',
-    accent: 'indigo',
-    subtitle: 'Autonomous Task Execution',
-    headline:
-      'Multi-agent systems that handle complex business workflows autonomously.',
+    accent: 'cyan',
+    subtitle: 'The OS for your AI workforce',
+    headline: 'The operating system for your AI workforce.',
     description:
-      'I architect multi-agent systems where specialized AI workers coordinate autonomously. Researcher, Coder, Reviewer — each purpose-built, then wired into an orchestration layer.',
+      'MANDOR AI turns coding agents into real teammates. Assign tasks like you would to a colleague — they pick up the work, write code, report blockers, and compound skills over time. Squads, Autopilots, and reusable Skills. Your next 10 hires won’t be human.',
     bullets: [
-      'Built multi-agent systems with 3-5 specialized agents coordinating per task',
-      'gaspol-dev plugin uses orchestrator + specialist agents for parallel code execution',
-      'Agent architectures: sequential pipelines, parallel fan-out, hierarchical delegation',
-      'Tools integration: web search, file system, database queries, API calls per agent',
+      'Open-source managed-agents platform — assign issues to agents on a shared board',
+      'Works with 11+ agent CLIs (Claude Code, Codex, Copilot, Cursor, Gemini…)',
+      'Squads route work to the right agent; Autopilots run recurring jobs on a schedule',
+      'Self-hostable — agents execute on your own runtimes via a local daemon',
     ],
     videoSrc: '/videos/ai-agents.mp4',
-    cta: { label: 'See live demo', to: '/work#ai-agents' },
+    cta: { label: 'Explore MANDOR AI →', to: '/projects/mandor-ai' },
   },
   {
     id: 'ai-video',
-    label: 'Video Generation',
+    label: 'Generative Video',
     icon: '🎬',
     accent: 'gold',
     subtitle: 'From Prompt to Film',
@@ -77,10 +61,10 @@ export const tabs = [
     bullets: [
       'End-to-end AI video pipeline: script, storyboard, keyframes, video, audio — all AI-generated',
       'Published promotional videos on YouTube with real client projects',
-      'Built ai-video-promo-engine: 6-phase production system as Claude Code plugin',
+      'Built ai-video-promo-engine: 6-phase production system as a Claude Code plugin',
       'Multi-platform: VEO 3.1 (Google), Kling AI (Kuaishou), Seedance 2.0 (ByteDance)',
     ],
     videoSrc: '/videos/ai-video.mp4',
-    cta: { label: 'Watch reel', to: '/work#ai-video' },
+    cta: { label: 'Learn it →', to: '/courses#video-generation' },
   },
 ]
