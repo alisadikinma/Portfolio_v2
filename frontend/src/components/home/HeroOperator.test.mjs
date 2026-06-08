@@ -33,4 +33,13 @@ ok('manifesto uses business-outcomes framing (no "factories" count)', () => {
   assert.ok(!/16 countries/.test(src), 'must not contain ambiguous "16 countries"')
 })
 
+// Task 1: a real generated hero still is wired as the poster (shows immediately +
+// serves as the reduced-motion / slow-connection fallback).
+ok('hero poster wired to generated still', () => {
+  // strip line comments so we match the real assignment, not the doc comment
+  const code = src.replace(/^\s*\/\/.*$/gm, '')
+  assert.ok(/const\s+posterSrc\s*=\s*['"]\/videos\/hero-poster\.jpg['"]/.test(code),
+    'posterSrc must be assigned /videos/hero-poster.jpg')
+})
+
 console.log(`\n${passed} checks passed.`)
