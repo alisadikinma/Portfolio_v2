@@ -1,43 +1,49 @@
 <template>
   <div class="min-h-screen">
 
-    <!-- 1. HERO — VEO Warrior Video -->
+    <!-- 1. HERO — person-forward montage, wordmark, manifesto, stat triad -->
     <div class="snap-section" v-if="isSectionActive('hero')">
-      <CinematicHero />
+      <HeroOperator />
     </div>
 
-    <!-- 2. SKILLS REEL — Kinetic Marquee (no snap, flows naturally) -->
-    <SkillsReel v-if="isSectionActive('skills-reel')" />
+    <!-- 2. WHO I AM — answer-shaped about block + portrait (LLM-quotable) -->
+    <div class="snap-section" v-if="isSectionActive('who-i-am')">
+      <WhoIAm />
+    </div>
 
-    <!-- 2.5 WHAT I SOLVE — Three-discipline tabbed switcher (Phase 3) -->
+    <!-- 3. WHAT I BUILD — three-discipline tabbed switcher (incl. MANDOR AI) -->
     <div class="snap-section" v-if="isSectionActive('what-i-solve')">
       <WhatISolveTabs />
     </div>
 
-    <!-- 3-6. (RETIRED) The 4 standalone SkillShowcase sections (vibe-coding,
-         ai-automation, ai-agents, ai-video) have been merged into the
-         WhatISolveTabs component above. Their video + description + bullet
-         content lives in frontend/src/data/whatISolve.js. -->
-
-    <!-- 7. FEATURED PROJECTS -->
-    <div class="snap-section" v-if="isSectionActive('featured-projects')">
-      <ProjectsBento />
+    <!-- 4. THE RECEIPTS — 6-tile proof bento -->
+    <div class="snap-section" v-if="isSectionActive('receipts')">
+      <ReceiptsBento />
     </div>
 
-    <!-- 8. LATEST BLOG -->
-    <div class="snap-section" v-if="isSectionActive('latest-blog')">
-      <LatestBlog />
+    <!-- 5. INTERNATIONAL STAGES — global reach cards -->
+    <div class="snap-section" v-if="isSectionActive('international-stages')">
+      <InternationalStages />
     </div>
 
-    <!-- 8.5 TESTIMONIALS — LinkedIn-sourced quotes (Phase 6 partial, May 5) -->
+    <!-- 6. SELECTED WORK — metric-led project cards -->
+    <div class="snap-section" v-if="isSectionActive('selected-work')">
+      <SelectedWork />
+    </div>
+
+    <!-- 7. TESTIMONIALS — LinkedIn-sourced quotes -->
     <div class="snap-section" v-if="isSectionActive('testimonials')">
       <TestimonialsCarousel />
     </div>
 
-    <!-- 9. STATS + CTA -->
-    <div class="snap-section" v-if="isSectionActive('stats-cta')">
-      <StatsBar />
-      <CTASection />
+    <!-- 8. LATEST WRITING — editorial feed + Content Engine meta-flex -->
+    <div class="snap-section" v-if="isSectionActive('latest-writing')">
+      <LatestWriting />
+    </div>
+
+    <!-- 9. JOIN THE BUILD — follow + newsletter + WhatsApp -->
+    <div class="snap-section" v-if="isSectionActive('join-the-build')">
+      <JoinTheBuild />
     </div>
 
   </div>
@@ -47,23 +53,26 @@
 import { onMounted, onUnmounted } from 'vue'
 import { usePageSections } from '@/composables/usePageSections'
 
-import CinematicHero from '@/components/CinematicHero.vue'
-import SkillsReel from '@/components/home/SkillsReel.vue'
+import HeroOperator from '@/components/home/HeroOperator.vue'
+import WhoIAm from '@/components/home/WhoIAm.vue'
 import WhatISolveTabs from '@/components/home/WhatISolveTabs.vue'
-import ProjectsBento from '@/components/home/ProjectsBento.vue'
-import LatestBlog from '@/components/home/LatestBlog.vue'
+import ReceiptsBento from '@/components/home/ReceiptsBento.vue'
+import InternationalStages from '@/components/home/InternationalStages.vue'
+import SelectedWork from '@/components/home/SelectedWork.vue'
 import TestimonialsCarousel from '@/components/home/TestimonialsCarousel.vue'
-import StatsBar from '@/components/home/StatsBar.vue'
-import CTASection from '@/components/home/CTASection.vue'
+import LatestWriting from '@/components/home/LatestWriting.vue'
+import JoinTheBuild from '@/components/home/JoinTheBuild.vue'
 
 const { sections, fetchActiveSections } = usePageSections()
 
 function isSectionActive(sectionType) {
-  // If sections not loaded yet, show all (will re-evaluate once data arrives)
+  // Before sections load, show everything (re-evaluates once data arrives).
   if (!sections.value || sections.value.length === 0) return true
   const section = sections.value.find(s => s.section_type === sectionType)
-  // If section exists in DB, respect is_active. If not found in DB, hide it.
-  return section ? !!section.is_active : false
+  // Row exists → respect its is_active toggle. Row absent → default-on: the
+  // Operator spine ships before PageSectionSeeder runs (Phase E), so unknown
+  // (not-yet-seeded) types must still render rather than vanish.
+  return section ? !!section.is_active : true
 }
 
 onMounted(() => {

@@ -12,15 +12,15 @@
       muted
       playsinline
       preload="metadata"
-      poster="/videos/hero-poster.jpg"
+      :poster="posterSrc"
       aria-hidden="true"
     >
-      <source src="/videos/hero-loop.webm" type="video/webm" />
-      <source src="/videos/hero-loop.mp4" type="video/mp4" />
+      <source :src="webmSrc" type="video/webm" />
+      <source :src="mp4Src" type="video/mp4" />
     </video>
     <img
       v-else
-      src="/videos/hero-poster.jpg"
+      :src="posterSrc"
       alt=""
       class="absolute inset-0 h-full w-full object-cover"
       aria-hidden="true"
@@ -113,6 +113,13 @@ import { RouterLink } from 'vue-router'
 import { useHomepageFeatured } from '@/composables/useHomepageFeatured'
 
 const linkedinUrl = 'https://www.linkedin.com/in/alisadikinma/'
+
+// Public-folder media (dropped in during Phase I). Bound as runtime URLs so
+// Vite does NOT try to resolve them at build time — missing files degrade
+// gracefully (video → no source, poster → empty bg) until the assets land.
+const posterSrc = '/videos/hero-poster.jpg'
+const webmSrc = '/videos/hero-loop.webm'
+const mp4Src = '/videos/hero-loop.mp4'
 
 const { data } = useHomepageFeatured()
 
