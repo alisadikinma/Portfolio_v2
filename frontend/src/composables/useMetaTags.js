@@ -2,6 +2,8 @@
  * Composable for managing dynamic meta tags and SEO
  * All meta tags loaded from database settings (no hardcoded values)
  */
+import { buildPersonSchema, buildFaqSchema } from '@/utils/personSchema'
+
 export function useMetaTags() {
   // Track if observer is already set up
   let metaObserver = null
@@ -509,6 +511,37 @@ export function useMetaTags() {
     document.head.appendChild(script)
   }
 
+  /**
+   * Inject the homepage Person entity JSON-LD (GEO lever G2). Scoped via
+   * data-schema="person" so it coexists with article/breadcrumb/FAQ schemas.
+   * @param {object} [opts] forwarded to buildPersonSchema ({ image, sameAs })
+   */
+  const injectPersonSchema = (opts = {}) => {
+    const schema = buildPersonSchema(opts)
+    const old = document.querySelector('script[data-schema="person"]')
+    if (old) old.remove()
+    const script = document.createElement('script')
+    script.type = 'application/ld+json'
+    script.dataset.schema = 'person'
+    script.textContent = JSON.stringify(schema)
+    document.head.appendChild(script)
+  }
+
+  /**
+   * Inject the homepage FAQPage JSON-LD (GEO lever G3). Scoped via
+   * data-schema="faq".
+   */
+  const injectFaqSchema = () => {
+    const schema = buildFaqSchema()
+    const old = document.querySelector('script[data-schema="faq"]')
+    if (old) old.remove()
+    const script = document.createElement('script')
+    script.type = 'application/ld+json'
+    script.dataset.schema = 'faq'
+    script.textContent = JSON.stringify(schema)
+    document.head.appendChild(script)
+  }
+
   return {
     setMetaFromSettings,
     updatePageMeta,
@@ -520,6 +553,8 @@ export function useMetaTags() {
     injectArticleSchema,
     injectProjectSchema,
     injectStructuredData,
+    injectPersonSchema,
+    injectFaqSchema,
     updateHreflang
   }
 }

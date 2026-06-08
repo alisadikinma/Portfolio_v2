@@ -50,8 +50,10 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted } from 'vue'
+import { nextTick, onMounted, onUnmounted } from 'vue'
 import { usePageSections } from '@/composables/usePageSections'
+import { useMetaTags } from '@/composables/useMetaTags'
+import { useAboutSettings } from '@/composables/useAboutSettings'
 
 import HeroOperator from '@/components/home/HeroOperator.vue'
 import WhoIAm from '@/components/home/WhoIAm.vue'
@@ -64,6 +66,8 @@ import LatestWriting from '@/components/home/LatestWriting.vue'
 import JoinTheBuild from '@/components/home/JoinTheBuild.vue'
 
 const { sections, fetchActiveSections } = usePageSections()
+const { injectPersonSchema, injectFaqSchema } = useMetaTags()
+const { aboutSettings } = useAboutSettings()
 
 function isSectionActive(sectionType) {
   // Before sections load, show everything (re-evaluates once data arrives).
@@ -75,9 +79,24 @@ function isSectionActive(sectionType) {
   return section ? !!section.is_active : true
 }
 
-onMounted(() => {
+onMounted(async () => {
   fetchActiveSections('homepage')
   document.documentElement.classList.add('snap-page')
+
+  // GEO: Person + FAQ JSON-LD (G2/G3). Inject curated schema immediately so
+  // crawlers always see it; enrich the portrait + sameAs from live CMS settings
+  // when they resolve (overrides are optional — curated defaults stand alone).
+  injectPersonSchema()
+  injectFaqSchema()
+
+  await nextTick()
+  const about = aboutSettings.value || {}
+  const sameAs = Array.isArray(about.social_links)
+    ? about.social_links.map((l) => l?.url).filter(Boolean)
+    : []
+  if (about.profile_photo || sameAs.length) {
+    injectPersonSchema({ image: about.profile_photo || undefined, sameAs })
+  }
 })
 
 onUnmounted(() => {
