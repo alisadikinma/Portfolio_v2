@@ -172,10 +172,10 @@ const reducedMotion = ref(false)
 const sectionLinks = [
   { name: 'Who I Am', id: 'who-i-am' },
   { name: 'What I Solve', id: 'what-i-solve' },
-  { name: 'Proof', id: 'receipts' },
-  { name: 'Stages', id: 'international-stages' },
-  { name: 'Work', id: 'selected-work' },
-  { name: 'Writing', id: 'latest-writing' },
+  { name: 'Receipts', id: 'receipts' },
+  { name: 'Awards', id: 'international-stages' },
+  { name: 'My Projects', id: 'selected-work' },
+  { name: 'Blogs', id: 'latest-writing' },
   { name: 'Contact', id: 'join-the-build' },
 ]
 
