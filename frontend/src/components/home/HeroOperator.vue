@@ -12,14 +12,14 @@
       muted
       playsinline
       preload="metadata"
-      :poster="posterSrc"
+      :poster="posterSrc || undefined"
       aria-hidden="true"
     >
-      <source :src="webmSrc" type="video/webm" />
-      <source :src="mp4Src" type="video/mp4" />
+      <source v-if="webmSrc" :src="webmSrc" type="video/webm" />
+      <source v-if="mp4Src" :src="mp4Src" type="video/mp4" />
     </video>
     <img
-      v-else
+      v-else-if="posterSrc"
       :src="posterSrc"
       alt=""
       class="absolute inset-0 h-full w-full object-cover"
@@ -114,12 +114,19 @@ import { useHomepageFeatured } from '@/composables/useHomepageFeatured'
 
 const linkedinUrl = 'https://www.linkedin.com/in/alisadikinma/'
 
-// Public-folder media (dropped in during Phase I). Bound as runtime URLs so
-// Vite does NOT try to resolve them at build time — missing files degrade
-// gracefully (video → no source, poster → empty bg) until the assets land.
-const posterSrc = '/videos/hero-poster.jpg'
-const webmSrc = '/videos/hero-loop.webm'
-const mp4Src = '/videos/hero-loop.mp4'
+// Public-folder media. Bound as runtime URLs so Vite does NOT resolve them at
+// build time; missing files degrade gracefully (sources are v-if'd, poster
+// optional → falls back to the dark section bg + cinematic glow).
+//
+// INTERIM (Phase I in progress): reuse the existing /videos/hero-bg.mp4 as the
+// loop so the hero renders today. When the person-forward montage ships, swap to
+// the final assets:
+//   posterSrc = '/videos/hero-poster.jpg'
+//   webmSrc   = '/videos/hero-loop.webm'
+//   mp4Src    = '/videos/hero-loop.mp4'
+const posterSrc = ''
+const webmSrc = ''
+const mp4Src = '/videos/hero-bg.mp4'
 
 const { data } = useHomepageFeatured()
 
