@@ -365,3 +365,18 @@ Suggested: gaspol-parallel for C1–C7 (independent files) and F/G; sequential f
 | 3 | Empty-state blank viewport | `v-if` on `.snap-section` wrapper (CLAUDE.md gotcha) |
 | 4 | Page-section ghost toggles | Phase E keeps seeder ↔ component map in sync + CLAUDE.md table |
 | 5 | Hero video not ready at launch | Ship poster placeholder; video lands via Phase I later |
+
+---
+
+## Phase H — Prerender spike result (2026-06-08)
+
+**Decision: defer full route prerender (vite-ssg NOT adopted). Shipped a static JSON-LD slice instead.**
+
+Spike findings:
+- Build runs on **`npm:rolldown-vite@7.1.14`** (a Vite fork, pinned via `overrides`). `vite-ssg` hooks Vite's build internals deeply; compatibility with the rolldown fork is unproven and high-risk.
+- `src/main.js` does `createApp(App).mount('#app')` and touches `localStorage` at module load. `vite-ssg` renders routes in **Node**, so adopting it requires refactoring the entry to the `ViteSSG(...)` pattern **and** guarding every module-load browser access (`window`, `localStorage`, `matchMedia`, service worker) across the app — invasive and regression-prone.
+- The homepage fetches `/api/homepage/featured`; on the current dev machine there is **no PHP/MySQL backend**, so any SSG/prerender output **cannot be verified locally**. Shipping unverifiable invasive build changes violates the execution Iron Laws.
+
+**Shipped (low-risk, verifiable, high GEO value):** the curated **Person + FAQ JSON-LD is now baked statically into `index.html`** (`data-schema="person"|"faq"`), so non-JS LLM crawlers (GPTBot/ClaudeBot/PerplexityBot/Google-Extended) get the entity graph + answer-shaped Q/A with zero JS execution. The Phase F runtime injectors remove-then-add by `data-schema`, so JS clients cleanly replace these (Person enriched with the live portrait) — no duplicate entities. Verified: `dist/index.html` contains both blocks and they `JSON.parse` cleanly.
+
+**Deferred follow-up (needs backend access, separate session):** full-content route prerender via **post-build Puppeteer on the VPS/CI** (render the live preview against the real API, snapshot hydrated HTML over `dist/index.html` + key routes). This is the plan's documented fallback and avoids the vite-ssg/rolldown refactor risk entirely. Recommended over vite-ssg unless/until rolldown-vite ships first-class SSG support.
