@@ -175,12 +175,12 @@ const stages = [
   {
     id: 'stage-fenox',
     awardId: 8,
-    flag: '🌏',
-    location: 'Startup World Cup',
+    flag: '🇺🇸',
+    location: 'Silicon Valley, USA',
     year: '2017',
     event: 'Fenox Startup World Cup',
     result: '🥇 Wild Card Winner',
-    note: 'BEKRAF × Fenox VC — global-stage startup competition feeding into the Silicon Valley finals.',
+    note: 'BEKRAF × Fenox VC — global-stage Startup World Cup, grand finale in Silicon Valley.',
   },
   {
     id: 'stage-idbyte',

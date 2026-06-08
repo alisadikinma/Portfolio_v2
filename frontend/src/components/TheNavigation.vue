@@ -5,8 +5,8 @@
       class="pointer-events-auto mt-5 mx-4 transition-all duration-700 ease-spring"
       :class="[
         isScrolled || menuOpen
-          ? 'w-full max-w-3xl opacity-100 translate-y-0'
-          : 'w-full max-w-2xl opacity-0 -translate-y-4'
+          ? 'w-full max-w-6xl opacity-100 translate-y-0'
+          : 'w-full max-w-4xl opacity-0 -translate-y-4'
       ]"
     >
       <!-- Outer Bezel Shell -->
@@ -29,7 +29,7 @@
             <div v-else class="w-8 h-8 rounded-xl bg-gradient-to-br from-accent-gold to-accent-cyan flex items-center justify-center transition-all duration-700 ease-spring group-hover:shadow-glow-gold">
               <span class="text-bg-deep font-bold text-sm">{{ siteName.charAt(0).toUpperCase() }}</span>
             </div>
-            <span class="text-xs sm:text-sm font-display font-bold text-gradient">
+            <span class="whitespace-nowrap text-xs sm:text-sm font-display font-bold text-gradient">
               {{ siteName }}
             </span>
           </router-link>
@@ -41,7 +41,7 @@
               :key="item.id"
               :href="`#${item.id}`"
               @click.prevent="goToSection(item.id)"
-              class="relative px-3.5 py-1.5 rounded-full text-sm font-medium text-fg-muted transition-all duration-700 ease-spring cursor-pointer"
+              class="relative whitespace-nowrap px-3 py-1.5 rounded-full text-sm font-medium text-fg-muted transition-all duration-700 ease-spring cursor-pointer"
               :class="[
                 isActive(item.id)
                   ? 'text-accent-gold bg-accent-gold/8'
