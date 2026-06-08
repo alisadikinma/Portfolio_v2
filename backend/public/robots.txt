@@ -18,11 +18,21 @@ Crawl-delay: 1
 # AI Crawlers — welcome
 User-agent: GPTBot
 Allow: /
+User-agent: OAI-SearchBot
+Allow: /
+User-agent: ChatGPT-User
+Allow: /
 User-agent: ClaudeBot
+Allow: /
+User-agent: Claude-Web
 Allow: /
 User-agent: PerplexityBot
 Allow: /
+User-agent: Google-Extended
+Allow: /
 User-agent: GoogleOther
+Allow: /
+User-agent: Applebot-Extended
 Allow: /
 
 # Disallow admin and sensitive areas

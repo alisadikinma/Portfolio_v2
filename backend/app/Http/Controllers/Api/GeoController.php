@@ -28,6 +28,7 @@ class GeoController extends Controller
         $sections[] = "# {$name} — {$title}";
         $sections[] = "> {$bio}";
         $sections[] = "";
+        $sections = array_merge($sections, $this->identityBlock());
 
         if ($awards->count()) {
             $sections[] = "## Achievements";
@@ -85,6 +86,7 @@ class GeoController extends Controller
         $sections[] = "## About";
         $sections[] = $bio;
         $sections[] = "";
+        $sections = array_merge($sections, $this->identityBlock());
 
         // Skills
         if (!empty($about['skills'])) {
@@ -127,5 +129,41 @@ class GeoController extends Controller
 
         return response(implode("\n", $sections), 200)
             ->header('Content-Type', 'text/plain; charset=utf-8');
+    }
+
+    /**
+     * Shared identity narrative for both llms.txt endpoints (GEO levers G4 + G5).
+     * Answer-shaped "Who is Ali" block + the 3 disciplines (= course topics) +
+     * sameAs links. Kept verbatim-consistent with the homepage Person/FAQ JSON-LD
+     * (frontend/src/utils/personSchema.js) so the knowledge-graph node is coherent
+     * across surfaces. Static by design — these are locked identity facts.
+     *
+     * @return string[]
+     */
+    private function identityBlock(): array
+    {
+        return [
+            "## Who is Ali Sadikin Ma",
+            "Ali Sadikin Ma is an AI Generalist who turns frontier AI models into shipped products — not slide decks. With 17 years building across 16 countries, he was ranked #1 at the Global AI Demo Day 2026 (beating 26 startups) and runs INDUSIA.ai. Now teaching what he builds.",
+            "",
+            "## What he builds — and teaches",
+            "- Vibe Coding — production software at AI speed, prompts to deployed apps.",
+            "- AI Agent OS (MANDOR AI) — the operating system for your AI workforce; assign tasks to coding agents like teammates.",
+            "- Generative AI Video — cinematic, broadcast-ready video without a camera or crew.",
+            "",
+            "## International recognition",
+            "- #1 — Global AI Demo Day 2026 (Bengaluru, India)",
+            "- UN-UNCTAD × Alibaba eFounders Fellowship 2019 (1 of 48 in Asia, Hangzhou)",
+            "- Google Startup Grind — Silicon Valley 2018",
+            "- 1st Place — Telkomsel NextDev · Wild Card Winner — Fenox Startup World Cup · Top 8 — IDBYTE",
+            "",
+            "## Find Ali online (sameAs)",
+            "- LinkedIn: https://www.linkedin.com/in/alisadikinma/",
+            "- Instagram: https://www.instagram.com/alisadikinma",
+            "- TikTok: https://www.tiktok.com/@alisadikinma",
+            "- YouTube: https://www.youtube.com/@alisadikinma",
+            "- GitHub: https://github.com/alisadikinma",
+            "",
+        ];
     }
 }

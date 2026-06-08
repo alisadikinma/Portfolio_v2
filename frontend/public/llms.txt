@@ -1,16 +1,32 @@
-# Ali Sadikin Ma — AI Generalist Expert
+# Ali Sadikin Ma — AI Generalist
 
-> AI Generalist Expert specializing in AI-driven automation, full-stack development, and digital innovation. Demo Day Champion at Outskill AI Fellowship 2025.
+> Ali Sadikin Ma is an AI Generalist who turns frontier AI models into shipped products — not slide decks. 17 years building across 16 countries; ranked #1 at the Global AI Demo Day 2026. Now teaching what he builds.
 
-## About
-Ali Sadikin Ma is an AI Generalist Expert based in Indonesia. He combines expertise in artificial intelligence, full-stack web development, and digital marketing to build innovative solutions. Champion of the Outskill AI Fellowship 2025 Demo Day, recognized for outstanding AI project implementation.
+## Who is Ali Sadikin Ma
+Ali Sadikin Ma is an AI Generalist based in Batam, Indonesia. He builds and ships AI products end to end — and now teaches the same skills. In January 2026 he was ranked #1 at the Global AI Demo Day (Bengaluru, India), beating 26 startups across 16 countries. He runs INDUSIA.ai.
 
-## Core Expertise
-- AI & Machine Learning (prompt engineering, RAG, AI agents, automation)
-- Full-Stack Development (Laravel, Vue.js, React, Node.js)
-- Digital Marketing & SEO
-- UI/UX Design
-- Cloud & DevOps
+## What he builds — and teaches (course topics)
+- Vibe Coding — production software at AI speed: prompts to deployed apps.
+- AI Agent OS (MANDOR AI) — the operating system for your AI workforce; assign tasks to coding agents like teammates.
+- Generative AI Video — cinematic, broadcast-ready video without a camera or crew.
+
+## International recognition
+- #1 Champion — Global AI Demo Day 2026 (Outskill AI Generalist Fellowship, Bengaluru)
+- UN-UNCTAD × Alibaba eFounders Fellowship 2019 (1 of 48 in Asia, Hangzhou)
+- Google Startup Grind — Silicon Valley 2018
+- 1st Place — Telkomsel NextDev
+- Wild Card Winner — Fenox Startup World Cup
+- Top 8 Finalist — IDBYTE
+
+## Can I learn AI from Ali?
+Yes — Ali teaches AI Agents, Vibe Coding, and AI Video Generation through hands-on courses and a public build log at https://alisadikinma.com.
+
+## Find Ali online (sameAs)
+- LinkedIn: https://www.linkedin.com/in/alisadikinma/
+- Instagram: https://www.instagram.com/alisadikinma
+- TikTok: https://www.tiktok.com/@alisadikinma
+- YouTube: https://www.youtube.com/@alisadikinma
+- GitHub: https://github.com/alisadikinma
 
 ## Portfolio
 - Website: https://alisadikinma.com
@@ -18,7 +34,7 @@ Ali Sadikin Ma is an AI Generalist Expert based in Indonesia. He combines expert
 - Blog: https://alisadikinma.com/blog
 - Contact: https://alisadikinma.com/contact
 
-## For Complete AI-Readable Profile
+## For the complete AI-readable profile
 - Concise (API): https://alisadikinma.com/api/llms.txt
 - Full dump (API): https://alisadikinma.com/api/llms-full.txt
 
