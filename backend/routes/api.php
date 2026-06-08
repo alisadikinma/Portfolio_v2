@@ -239,6 +239,7 @@ Route::middleware(['auth:sanctum'])->prefix('admin/galleries')->group(function (
     Route::get('/{galleryId}/items', [GalleryItemController::class, 'index']);
     Route::post('/{galleryId}/items', [GalleryItemController::class, 'store']);
     Route::post('/{galleryId}/items/bulk-upload', [GalleryItemController::class, 'bulkUpload']);
+    Route::put('/{galleryId}/items/reorder', [GalleryItemController::class, 'reorder']); // before /{id}
     Route::get('/{galleryId}/items/{id}', [GalleryItemController::class, 'show']);
     Route::put('/{galleryId}/items/{id}', [GalleryItemController::class, 'update']);
     Route::delete('/{galleryId}/items/{id}', [GalleryItemController::class, 'destroy']);
@@ -257,6 +258,7 @@ Route::middleware(['auth:sanctum'])->prefix('admin/gallery')->group(function () 
     Route::get('/{galleryId}/items', [GalleryItemController::class, 'index']);
     Route::post('/{galleryId}/items', [GalleryItemController::class, 'store']);
     Route::post('/{galleryId}/items/bulk-upload', [GalleryItemController::class, 'bulkUpload']);
+    Route::put('/{galleryId}/items/reorder', [GalleryItemController::class, 'reorder']); // before /{id}
     Route::get('/{galleryId}/items/{id}', [GalleryItemController::class, 'show']);
     Route::put('/{galleryId}/items/{id}', [GalleryItemController::class, 'update']);
     Route::delete('/{galleryId}/items/{id}', [GalleryItemController::class, 'destroy']);

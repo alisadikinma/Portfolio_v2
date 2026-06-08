@@ -567,7 +567,7 @@
 
           <!-- Existing items list -->
           <div>
-            <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center justify-between mb-1">
               <h4 class="text-sm font-medium text-neutral-700 dark:text-neutral-300">
                 Current Images
               </h4>
@@ -581,6 +581,13 @@
                 Refresh
               </button>
             </div>
+            <p
+              v-if="editItems.length > 1"
+              class="mb-2 text-xs text-neutral-500 dark:text-neutral-400"
+            >
+              Drag the <span class="inline-flex items-center align-middle"><svg class="w-3.5 h-3.5 mx-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"/></svg></span> handle to reorder — the <span class="font-medium text-primary-600 dark:text-primary-400">first image is the cover</span> shown on the website.
+              <span v-if="isSavingOrder" class="ml-1 italic">Saving…</span>
+            </p>
 
             <div v-if="isLoadingEditItems" class="flex items-center justify-center py-8">
               <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
@@ -593,10 +600,11 @@
               No images yet. Use the upload box above to add some.
             </div>
 
-            <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[50vh] overflow-y-auto pr-1">
+            <div v-else ref="editItemsGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[50vh] overflow-y-auto pr-1">
               <div
-                v-for="item in editItems"
+                v-for="(item, idx) in editItems"
                 :key="item.id"
+                :data-id="item.id"
                 class="relative group bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden"
               >
                 <div class="aspect-square bg-neutral-100 dark:bg-neutral-900 overflow-hidden">
@@ -607,6 +615,24 @@
                     @click="openLightbox(item.file_url)"
                   />
                 </div>
+                <!-- Cover badge on the first image -->
+                <span
+                  v-if="idx === 0"
+                  class="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-primary-600 text-white text-[10px] font-semibold uppercase tracking-wide shadow pointer-events-none"
+                >
+                  Cover
+                </span>
+                <!-- Drag handle -->
+                <button
+                  type="button"
+                  class="drag-handle absolute bottom-2 left-2 p-1.5 bg-neutral-900/70 hover:bg-neutral-900 text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
+                  title="Drag to reorder"
+                  @click.prevent
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16" />
+                  </svg>
+                </button>
                 <div v-if="item.title" class="p-2">
                   <p class="text-xs text-neutral-600 dark:text-neutral-400 truncate">{{ item.title }}</p>
                 </div>
@@ -646,7 +672,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick, onBeforeUnmount, watch } from 'vue'
+import Sortable from 'sortablejs'
 import { useGallery } from '@/composables/useGallery'
 import { useUiStore } from '@/stores/ui'
 import BaseCard from '@/components/base/BaseCard.vue'
@@ -667,7 +694,8 @@ const {
   bulkDeleteGalleryItems,
   fetchItemsForGallery,
   addItemsToGallery,
-  deleteItem
+  deleteItem,
+  reorderItems
 } = useGallery()
 
 const uiStore = useUiStore()
@@ -717,6 +745,58 @@ const editForm = ref({
 const editTab = ref('details')
 const editItems = ref([])
 const isLoadingEditItems = ref(false)
+const editItemsGrid = ref(null)
+const isSavingOrder = ref(false)
+let editSortable = null
+
+// Enable drag-to-reorder on the Current Images grid. First image = website cover.
+function destroyEditSortable() {
+  if (editSortable) { editSortable.destroy(); editSortable = null }
+}
+
+async function initEditSortable() {
+  await nextTick()
+  destroyEditSortable()
+  if (!editItemsGrid.value || editItems.value.length < 2) return
+  editSortable = Sortable.create(editItemsGrid.value, {
+    animation: 150,
+    handle: '.drag-handle',
+    ghostClass: 'opacity-40',
+    onEnd: (evt) => {
+      if (evt.oldIndex === evt.newIndex) return
+      const arr = [...editItems.value]
+      const [moved] = arr.splice(evt.oldIndex, 1)
+      arr.splice(evt.newIndex, 0, moved)
+      editItems.value = arr
+      persistEditOrder()
+    },
+  })
+}
+
+async function persistEditOrder() {
+  if (!editForm.value.id) return
+  const orderedIds = editItems.value.map((i) => i.id)
+  isSavingOrder.value = true
+  try {
+    const result = await reorderItems(editForm.value.id, orderedIds)
+    if (result.success) {
+      uiStore.showSuccess?.('Image order saved')
+    } else {
+      uiStore.showError(result.error || 'Failed to save order')
+      await reloadEditItems() // resync from server on failure
+    }
+  } finally {
+    isSavingOrder.value = false
+  }
+}
+
+onBeforeUnmount(destroyEditSortable)
+
+// Re-init when entering the Images tab (grid is v-if-gated by editTab).
+watch(editTab, (tab) => {
+  if (tab === 'images') initEditSortable()
+  else destroyEditSortable()
+})
 const editThumbnailInput = ref(null)
 const editThumbnailPreview = ref('')
 const addItemsInput = ref(null)
@@ -938,6 +1018,7 @@ function handleEdit(item) {
 }
 
 function closeEditModal() {
+  destroyEditSortable()
   showEditModal.value = false
   editThumbnailPreview.value = ''
   addItemsFiles.value = []
@@ -970,6 +1051,7 @@ async function reloadEditItems() {
     const result = await fetchItemsForGallery(editForm.value.id)
     if (result.success) {
       editItems.value = result.data
+      if (editTab.value === 'images') initEditSortable()
     } else {
       uiStore.showError(result.error || 'Failed to load images')
     }

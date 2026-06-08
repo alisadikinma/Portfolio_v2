@@ -352,6 +352,25 @@ export function useGallery(initialParams = {}) {
     }
   }
 
+  // Reorder gallery items — persists `sequence` from the given ordered id list.
+  // Controls the cover (items[0]) shown on the homepage International Stages cards.
+  const reorderItems = async (galleryId, orderedIds) => {
+    try {
+      const response = await api.put(`/admin/galleries/${galleryId}/items/reorder`, {
+        items: orderedIds,
+      })
+      queryClient.invalidateQueries(['gallery', galleryId])
+      setCache(`gallery_${galleryId}`, null, 0)
+      setCache(getItemsCacheKey(galleryId), null, 0)
+      return { success: true, data: response.data.data || [] }
+    } catch (err) {
+      return {
+        success: false,
+        error: err.response?.data?.message || 'Reorder failed',
+      }
+    }
+  }
+
   // Bulk delete gallery items
   const bulkDeleteGalleryItems = async (ids) => {
     try {
@@ -401,6 +420,7 @@ export function useGallery(initialParams = {}) {
     fetchItemsForGallery,
     addItemsToGallery,
     updateItem,
-    deleteItem
+    deleteItem,
+    reorderItems
   }
 }

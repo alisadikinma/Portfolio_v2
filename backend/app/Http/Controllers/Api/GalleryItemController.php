@@ -42,6 +42,37 @@ class GalleryItemController extends Controller
     }
 
     /**
+     * Persist a new display order for a gallery's items.
+     * Accepts an ordered array of item ids; writes each item's `sequence` to its
+     * position. The public award-galleries endpoint reads items via the
+     * Gallery::items() relation (ordered by `sequence`), so this controls the
+     * homepage cover (items[0]) for the International Stages cards.
+     */
+    public function reorder(Request $request, string $galleryId): JsonResponse
+    {
+        $gallery = Gallery::findOrFail($galleryId);
+
+        $validated = $request->validate([
+            'items' => ['required', 'array', 'min:1'],
+            'items.*' => ['integer'],
+        ]);
+
+        DB::transaction(function () use ($gallery, $validated) {
+            foreach ($validated['items'] as $index => $itemId) {
+                $gallery->items()->whereKey($itemId)->update(['sequence' => $index]);
+            }
+        });
+
+        $items = $gallery->items()->get(); // relation is ordered by `sequence`
+
+        return response()->json([
+            'success' => true,
+            'data' => GalleryItemResource::collection($items),
+            'message' => 'Image order updated',
+        ]);
+    }
+
+    /**
      * Store a newly created gallery item.
      */
     public function store(Request $request, string $galleryId): JsonResponse
