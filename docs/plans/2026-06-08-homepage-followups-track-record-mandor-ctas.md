@@ -272,11 +272,11 @@ Vue 3.5 `<script setup>` · Tailwind 4 · Vite (rolldown) · smoke tests = file-
 **Why paused:** `indusia-image-gen` + `indusia-video-gen` MCP servers aren't registered in the
 current session (geminigen removed). Operator restarting Claude Code to load them.
 
-**Status:**
-- ✅ **Phase B DONE + committed** (`c517123e`) — all 4 dead CTAs scroll to `#join-the-build`. Tests + build green.
-- ⏳ **Phase C (MANDOR board)** — code path (`imageSrc` in WhatISolveTabs) + image gen via `indusia-image-gen` not started. Blocked on MCP.
-- ⏳ **Phase D (Track Record)** — career band + drop IDBYTE. **No image needed — can run anytime** (was deferred only because operator chose to restart).
-- ⏳ **Hero video** — NEW direction locked: drop warrior, "instantly reads as AI expert", Concept A recommended (Operator-at-the-console). Produce via `indusia-image-gen` → `indusia-video-gen`.
+**Status: ALL COMPLETE (2026-06-08 session 2 — MCP registered).**
+- ✅ **Phase B DONE + committed** (`c517123e`) — all 4 dead CTAs scroll to `#join-the-build`.
+- ✅ **Phase C DONE** (`d908ca33`) — MANDOR kanban board (`indusia-image-gen` nano-banana-pro) + `imageSrc` render path in WhatISolveTabs.
+- ✅ **Phase D DONE** (`2d39c692`) — Track Record reframe + 3 career chapters (vault-corrected dates), IDBYTE dropped. **Plus** career-card real photos via new `useExperienceGalleries` (`41707ac0`+`4242de28`).
+- ✅ **Hero video DONE** (`88e8e721`) — final concept = trendy blazer+tee operator + central JARVIS HUD orchestrating 3 labeled screens (VIBE CODING · AI AGENT OS · VIDEO GEN). Keyframe (indusia-image-gen) → VEO loop (indusia-video-gen) → ffmpeg delogo (strip Veo watermark) → webm 2.92MB/mp4 3.40MB wired + sw.js v2 pre-cache. **Diverged from plan's Concept A** (single operator facing camera) per operator's live direction: added JARVIS core + 3 labeled discipline screens + costume change.
 
 **Resume steps (new session):**
 1. Read this plan file. Re-invoke `gaspol-execute` for `2026-06-08-homepage-followups-track-record-mandor-ctas.md`.
