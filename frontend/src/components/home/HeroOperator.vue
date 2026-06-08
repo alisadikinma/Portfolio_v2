@@ -1,12 +1,30 @@
 <template>
   <section
-    class="hero-operator relative flex min-h-screen w-full flex-col justify-center overflow-hidden bg-[var(--bg-deep,#050506)] px-6 pb-20 pt-28 lg:px-20 lg:pb-28"
+    class="hero-operator relative flex min-h-screen w-full flex-col justify-start overflow-hidden bg-[var(--bg-deep,#050506)] px-6 pb-20 pt-24 lg:px-20 lg:pb-28 lg:pt-28"
     aria-label="Ali Sadikin Ma — AI Generalist"
   >
-    <!-- Background: person-forward montage video (poster fallback for reduced-motion / slow conn) -->
+    <!-- Background: person-forward montage video. Separate 9:16 (mobile) + 16:9 (desktop)
+         loops toggled by viewport so neither orientation gets zoom-cropped. Poster fallback
+         for reduced-motion / slow conn. -->
+    <!-- Mobile portrait 9:16 -->
     <video
       v-if="!reducedMotion"
-      class="absolute inset-0 h-full w-full object-cover"
+      class="absolute inset-0 h-full w-full object-cover object-center lg:hidden"
+      autoplay
+      loop
+      muted
+      playsinline
+      preload="metadata"
+      :poster="posterSrc916 || undefined"
+      aria-hidden="true"
+    >
+      <source :src="webmSrc916" type="video/webm" />
+      <source :src="mp4Src916" type="video/mp4" />
+    </video>
+    <!-- Desktop landscape 16:9 -->
+    <video
+      v-if="!reducedMotion"
+      class="absolute inset-0 hidden h-full w-full object-cover object-center lg:block"
       autoplay
       loop
       muted
@@ -15,14 +33,22 @@
       :poster="posterSrc || undefined"
       aria-hidden="true"
     >
-      <source v-if="webmSrc" :src="webmSrc" type="video/webm" />
-      <source v-if="mp4Src" :src="mp4Src" type="video/mp4" />
+      <source :src="webmSrc" type="video/webm" />
+      <source :src="mp4Src" type="video/mp4" />
     </video>
+    <!-- Reduced-motion / no-video: static poster, responsive orientation -->
     <img
-      v-else-if="posterSrc"
+      v-if="reducedMotion"
+      :src="posterSrc916"
+      alt=""
+      class="absolute inset-0 h-full w-full object-cover object-center lg:hidden"
+      aria-hidden="true"
+    />
+    <img
+      v-if="reducedMotion"
       :src="posterSrc"
       alt=""
-      class="absolute inset-0 h-full w-full object-cover"
+      class="absolute inset-0 hidden h-full w-full object-cover object-center lg:block"
       aria-hidden="true"
     />
 
@@ -33,21 +59,21 @@
     <!-- Content (lower-left) -->
     <div class="relative z-10 mx-auto w-full max-w-7xl">
       <p
-        class="mb-4 text-[0.72rem] uppercase tracking-[0.3em] text-[var(--accent-gold,#D4A843)]"
+        class="mb-4 text-[0.72rem] uppercase tracking-[0.2em] text-[var(--accent-gold,#D4A843)] sm:tracking-[0.3em]"
         style="font-family: 'JetBrains Mono', ui-monospace, monospace;"
       >
-        AI Generalist · since 2008
+        AI Generalist · in tech since 2008
       </p>
 
       <h1
-        class="mb-6 text-5xl font-bold leading-[0.95] tracking-tight text-[var(--fg-primary,#EDEDEF)] sm:text-6xl lg:text-[6.5rem]"
+        class="mb-6 text-4xl font-bold leading-[0.95] tracking-tight text-[var(--fg-primary,#EDEDEF)] sm:text-5xl lg:text-[4.5rem]"
         style="font-family: 'Space Grotesk', sans-serif;"
       >
         ALI SADIKIN MA
       </h1>
 
       <p
-        class="mb-8 max-w-3xl text-lg leading-relaxed text-[var(--fg-primary,#EDEDEF)] lg:text-xl"
+        class="mb-8 max-w-2xl text-sm leading-relaxed text-[var(--fg-primary,#EDEDEF)] lg:mb-44 lg:text-base"
         style="font-family: 'Inter', sans-serif; font-weight: 300;"
       >
         I build AI that turns frontier models into
@@ -59,7 +85,7 @@
       </p>
 
       <!-- CTAs -->
-      <div class="mb-12 flex flex-wrap items-center gap-4">
+      <div class="mb-10 flex flex-col items-start gap-3 sm:mb-12 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
         <a
           :href="linkedinUrl"
           target="_blank"
@@ -87,7 +113,7 @@
       </div>
 
       <!-- Stat triad -->
-      <div class="flex flex-wrap gap-x-14 gap-y-6">
+      <div class="grid grid-cols-3 gap-x-4 gap-y-6 sm:flex sm:flex-wrap sm:gap-x-14">
         <div v-for="stat in heroStats" :key="stat.label">
           <div
             class="text-4xl font-bold tracking-tight lg:text-[2.4rem]"
@@ -123,9 +149,15 @@ const linkedinUrl = 'https://www.linkedin.com/in/alisadikinma/'
 // face ref (indusia-image-gen), then animated into an 8s seamless loop via VEO
 // (indusia-video-gen, image-to-video). webm primary (1.95MB) / mp4 fallback (2.44MB);
 // the poster (frame 0) shows immediately + serves the reduced-motion / slow-conn path.
+// Desktop landscape 16:9
 const posterSrc = '/videos/hero-poster.jpg'
 const webmSrc = '/videos/hero-loop.webm'
 const mp4Src = '/videos/hero-loop.mp4'
+// Mobile portrait 9:16 — generated from the same JARVIS-operator concept, recomposed
+// vertical (indusia-image-gen keyframe → VEO image-to-video → ffmpeg delogo → 720x1280)
+const posterSrc916 = '/videos/hero-poster-9x16.jpg'
+const webmSrc916 = '/videos/hero-loop-9x16.webm'
+const mp4Src916 = '/videos/hero-loop-9x16.mp4'
 
 const { data } = useHomepageFeatured()
 
