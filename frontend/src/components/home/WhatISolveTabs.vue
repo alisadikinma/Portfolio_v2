@@ -1,14 +1,14 @@
 <template>
   <section
     class="what-i-solve relative flex min-h-[80vh] w-full flex-col justify-center overflow-hidden bg-[var(--bg-deep,#050506)] px-4 py-20 lg:px-12 lg:py-28"
-    aria-label="What I solve — four AI disciplines"
+    aria-label="What I build — three AI disciplines"
   >
     <!-- Eyebrow -->
     <p
       class="mb-3 text-center text-[0.7rem] uppercase tracking-[0.32em] text-[var(--accent-gold,#D4A843)]"
       style="font-family: 'JetBrains Mono', ui-monospace, monospace;"
     >
-      what i solve
+      what i build
     </p>
 
     <!-- Section title -->
@@ -16,8 +16,8 @@
       class="mb-12 text-center text-3xl font-bold text-[var(--fg-primary,#EDEDEF)] md:text-4xl lg:text-5xl"
       style="font-family: 'Space Grotesk', sans-serif;"
     >
-      Four disciplines.
-      <span class="text-[var(--accent-gold,#D4A843)]">One operator.</span>
+      Three disciplines I build —
+      <span class="text-[var(--accent-gold,#D4A843)]">and now teach.</span>
     </h2>
 
     <!-- Tab strip (mobile = horizontal scroll snap; desktop = centered row) -->
@@ -74,6 +74,23 @@
               {{ active.subtitle }}
             </p>
 
+            <!-- Product name + Introducing badge (featured discipline, e.g. MANDOR AI) -->
+            <div
+              v-if="active.product || active.badge"
+              class="mb-4 flex flex-wrap items-center gap-3"
+            >
+              <span
+                v-if="active.product"
+                class="text-lg font-bold text-[var(--fg-primary,#EDEDEF)]"
+                style="font-family: 'Space Grotesk', sans-serif;"
+              >{{ active.product }}</span>
+              <span
+                v-if="active.badge"
+                class="rounded-full bg-[var(--accent-gold,#D4A843)] px-3 py-1 text-[0.6rem] font-semibold uppercase tracking-[0.15em] text-[#0A0A0C]"
+                style="font-family: 'JetBrains Mono', ui-monospace, monospace;"
+              >{{ active.badge }}</span>
+            </div>
+
             <h3
               class="mb-5 text-2xl leading-tight text-[var(--fg-primary,#EDEDEF)] md:text-3xl lg:text-[2.1rem] lg:leading-[1.18]"
               style="font-family: 'Space Grotesk', sans-serif; font-weight: 600;"
@@ -123,7 +140,7 @@
                 :class="accentBorderClass(active.accent)"
                 style="font-family: 'JetBrains Mono', ui-monospace, monospace;"
               >
-                {{ active.cta.label }} →
+                {{ active.cta.label }}
               </RouterLink>
             </div>
           </div>
