@@ -54,9 +54,10 @@
           style="font-family: 'Inter', sans-serif; font-weight: 300;"
         >
           Based in <span class="text-[var(--fg-primary,#EDEDEF)]">Batam, Indonesia</span>, I've spent
-          <span class="text-[var(--fg-primary,#EDEDEF)]">17 years building across 16 countries</span> — from
-          factory floors running edge-AI inspection to global startup stages. Today I ship production software
-          with AI as my co-builder, and publish
+          <span class="text-[var(--fg-primary,#EDEDEF)]">17 years building</span> — from factory floors
+          running edge-AI inspection to startup stages
+          <span class="text-[var(--fg-primary,#EDEDEF)]">across 16 countries</span>. Today I ship production
+          software with AI as my co-builder, and publish
           <span class="text-[var(--fg-primary,#EDEDEF)]">20+ open-source repos</span> so others can build the
           same way.
         </p>
