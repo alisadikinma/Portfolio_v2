@@ -174,5 +174,14 @@ class Post extends Model
                 $post->reading_time = ceil($wordCount / 200); // Average reading speed: 200 words/minute
             }
         });
+
+        // Purge the SSR-enrichment HTML cache (homepage + blog surfaces) whenever
+        // a post changes, so crawlers see fresh content before the 1h TTL lapses.
+        // See App\Http\Controllers\SpaPrerenderController::purgeForPost().
+        $purge = function ($post) {
+            \App\Http\Controllers\SpaPrerenderController::purgeForPost($post);
+        };
+        static::saved($purge);
+        static::deleted($purge);
     }
 }

@@ -22,11 +22,18 @@ class GeoController extends Controller
 
         $awards = Award::select('title', 'description')->get();
         $projects = Project::select('title', 'description')->limit(20)->get();
-        $posts = Post::select('title')->where('published', true)->latest()->limit(10)->get();
+        $posts = Post::with('translations')
+            ->where('published', true)
+            ->latest('published_at')
+            ->limit(10)
+            ->get();
 
         $sections = [];
         $sections[] = "# {$name} — {$title}";
         $sections[] = "> {$bio}";
+        if ($fresh = $this->latestContentTimestamp()) {
+            $sections[] = "> Last updated: {$fresh}";
+        }
         $sections[] = "";
         $sections = array_merge($sections, $this->identityBlock());
 
@@ -50,7 +57,12 @@ class GeoController extends Controller
         if ($posts->count()) {
             $sections[] = "## Recent Blog Posts";
             foreach ($posts as $p) {
-                $sections[] = "- {$p->title}";
+                $date = optional($p->published_at)->toFormattedDateString();
+                $line = "- {$p->title}" . ($date ? " ({$date})" : "");
+                if ($summary = $this->postSummary($p)) {
+                    $line .= " — " . \Illuminate\Support\Str::limit($summary, 160);
+                }
+                $sections[] = $line;
             }
             $sections[] = "";
         }
@@ -78,10 +90,13 @@ class GeoController extends Controller
 
         $awards = Award::all();
         $projects = Project::all();
-        $posts = Post::where('published', true)->latest()->get();
+        $posts = Post::with('translations')->where('published', true)->latest('published_at')->get();
 
         $sections = [];
         $sections[] = "# {$name} — {$title} (Full Profile)";
+        if ($fresh = $this->latestContentTimestamp()) {
+            $sections[] = "> Last updated: {$fresh}";
+        }
         $sections[] = "";
         $sections[] = "## About";
         $sections[] = $bio;
@@ -122,13 +137,47 @@ class GeoController extends Controller
             $sections[] = "## Blog Posts ({$posts->count()})";
             foreach ($posts as $p) {
                 $sections[] = "### {$p->title}";
-                $sections[] = $p->excerpt ?? \Illuminate\Support\Str::limit(strip_tags($p->content), 300);
+                if ($date = optional($p->published_at)->toFormattedDateString()) {
+                    $sections[] = "_Published: {$date}_";
+                }
+                $sections[] = $this->postSummary($p)
+                    ?? \Illuminate\Support\Str::limit(strip_tags($p->content), 300);
                 $sections[] = "";
             }
         }
 
         return response(implode("\n", $sections), 200)
             ->header('Content-Type', 'text/plain; charset=utf-8');
+    }
+
+    /**
+     * GEO summary for a post: prefer the AI-optimized summary (ai_summary lives
+     * on post_translations), else the post excerpt. Returns null when neither
+     * exists so callers can fall back to a content snippet.
+     */
+    private function postSummary(Post $post): ?string
+    {
+        $translation = $post->relationLoaded('translations')
+            ? ($post->translations->firstWhere('language', 'en') ?? $post->translations->first())
+            : null;
+
+        $summary = $translation->ai_summary ?? null;
+        if (!empty($summary)) {
+            return $summary;
+        }
+
+        return $post->excerpt ?: null;
+    }
+
+    /**
+     * Most recent published-content timestamp (ISO 8601) for the freshness line
+     * crawlers/LLMs use to gauge recency. Null when there are no posts.
+     */
+    private function latestContentTimestamp(): ?string
+    {
+        $latest = Post::where('published', true)->max('updated_at');
+
+        return $latest ? \Illuminate\Support\Carbon::parse($latest)->toAtomString() : null;
     }
 
     /**

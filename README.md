@@ -291,9 +291,10 @@ Carousels:    GET /api/automation/carousel/accounts, /drafts
 
 ### SEO & i18n
 - HasSeoFields trait: meta_title, meta_description, og_image, schema_markup, canonical_url
-- XML sitemap generation (posts, projects)
+- XML sitemap generation (posts, projects) with per-post `lastmod`
 - Post & Project translations via translation tables
 - GEO optimization fields (ai_summary, tech_stack_details)
+- **SSR-enrichment for homepage + blog (June 2026):** Laravel `SpaPrerenderController` splices per-page `<head>`, a JSON-LD entity graph (BlogPosting / BreadcrumbList / FAQPage / WebSite / ItemList / CollectionPage), hreflang, and a crawlable `<article>` body into the built Vue SPA shell so non-JS search/LLM crawlers (ChatGPT, Perplexity, Claude, Google AI) index + cite real content; Vue still hydrates on top (progressive enhancement). 1h HTML cache with purge-on-edit. `llms.txt`/`llms-full.txt` carry freshness + `ai_summary`. Requires a one-time nginx widening — see [docs/runbooks/seo-geo-ssr-deploy.md](./docs/runbooks/seo-geo-ssr-deploy.md).
 
 ### Automation
 - n8n/Zapier/Make.com integration via REST API

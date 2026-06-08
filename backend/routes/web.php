@@ -3,26 +3,13 @@
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use App\Http\Controllers\ShortLinkController;
+use App\Http\Controllers\SpaPrerenderController;
 use App\Models\Project;
-use App\Models\Post;
-
-Route::get('/', function () {
-    return view('welcome');
-});
 
 // Redirect login route to Filament admin login
 Route::get('/login', function () {
     return redirect('/admin/login');
 })->name('login');
-
-// Named routes used by the sitemap / route() helper. These redirect to the
-// Vite dev server in local development; in production the webserver should
-// short-circuit them to the SPA before they ever hit Laravel.
-Route::get('/', function () { return redirect('http://localhost:5173'); })->name('home');
-Route::get('/blog', function () { return redirect('http://localhost:5173/blog'); })->name('blog');
-Route::get('/projects', function () { return redirect('http://localhost:5173/projects'); })->name('projects');
-Route::get('/about', function () { return redirect('http://localhost:5173/about'); })->name('about');
-Route::get('/contact', function () { return redirect('http://localhost:5173/contact'); })->name('contact');
 
 Route::get('/test-route', function () {
     return 'Routes are working! User: ' . (auth()->check() ? auth()->user()->email : 'Not logged in');
@@ -38,30 +25,59 @@ Route::get('/r/{code}', [ShortLinkController::class, 'redirect'])
 
 /*
 |--------------------------------------------------------------------------
-| Crawler-friendly OG meta SSR for blog posts and projects
+| SSR-enrichment for SEO + GEO (homepage + blog surfaces)
 |--------------------------------------------------------------------------
 |
-| LinkedIn / Facebook / Twitter / WhatsApp link-preview crawlers do not
-| execute JavaScript, so the SPA's runtime meta-tag injection (see
-| frontend/src/composables/useMetaTags.js) is invisible to them. These
-| routes load the built SPA shell from frontend/dist/index.html, splice
-| the per-post / per-project OG and Twitter tags in, and return the
-| resulting HTML. Vue still hydrates on top for real users.
+| Search engines and LLM/GEO crawlers (ChatGPT, Perplexity, Claude, Google
+| AI) do not execute JavaScript, so the Vue SPA's runtime meta/schema/body
+| injection is invisible to them — they see an empty <div id="app">. These
+| routes load the built SPA shell (frontend/dist/index.html), splice in the
+| per-page <head>, a JSON-LD entity graph, hreflang, and (for blog detail) a
+| crawlable <article> body, then return the HTML. Vue still hydrates over #app
+| for real users, who are unaffected.
 |
-| Two URL shapes are supported:
-|   /blog/{slug}                — legacy bare path (backwards-compat)
-|   /{lang}/blog/{slug}         — locale-prefixed (current production URLs)
-| Same pair for /projects.
+| Handled by App\Http\Controllers\SpaPrerenderController. Projects keep their
+| OG-only closure below (out of scope for this layer).
 |
-| For these routes to actually fire in production, the webserver vhost
-| must route the matching paths to PHP-FPM BEFORE falling back to the
-| SPA's index.html. Nginx example:
+| For these to fire in production, the webserver must route the matching
+| paths to PHP-FPM BEFORE the SPA's try_files fallback — see
+| scripts/nginx/portfolio-8080.conf (widened in the SSR-deploy runbook).
 |
-|   location ~ ^/(?:en|id)?/?(blog|projects)/[^/]+/?$ {
-|       try_files $uri @backend;
-|   }
-|   location @backend { proxy_pass http://php-fpm-upstream; }
-|
+| ROUTE ORDER MATTERS: /blog/category/{slug} is registered before
+| /blog/{slug} so the {slug} wildcard never swallows "category".
+*/
+
+// Homepage — adds WebSite schema + a crawlable identity/recent-posts summary.
+// (Person + FAQPage already live as static blocks in frontend/index.html.)
+Route::get('/', [SpaPrerenderController::class, 'home'])->name('home');
+
+// Blog category (locale-prefixed + bare) — register BEFORE the detail wildcard.
+Route::get('/{lang}/blog/category/{slug}', [SpaPrerenderController::class, 'blogCategory'])
+    ->where(['lang' => 'en|id']);
+Route::get('/blog/category/{slug}', [SpaPrerenderController::class, 'blogCategory']);
+
+// Blog index (locale-prefixed + bare).
+Route::get('/{lang}/blog', [SpaPrerenderController::class, 'blogIndex'])
+    ->where(['lang' => 'en|id']);
+Route::get('/blog', [SpaPrerenderController::class, 'blogIndex'])->name('blog');
+
+// Blog detail (locale-prefixed + bare).
+Route::get('/{lang}/blog/{slug}', [SpaPrerenderController::class, 'blogDetail'])
+    ->where(['lang' => 'en|id']);
+Route::get('/blog/{slug}', [SpaPrerenderController::class, 'blogDetail']);
+
+// ---- Static SPA named routes (sitemap route() helpers; dev redirect) -------
+
+Route::get('/projects', function () { return redirect('http://localhost:5173/projects'); })->name('projects');
+Route::get('/about', function () { return redirect('http://localhost:5173/about'); })->name('about');
+Route::get('/contact', function () { return redirect('http://localhost:5173/contact'); })->name('contact');
+
+/*
+|--------------------------------------------------------------------------
+| Crawler-friendly OG meta SSR for projects (OG-only — unchanged)
+|--------------------------------------------------------------------------
+| Project detail pages keep the lighter OG/Twitter/canonical injection. The
+| full schema-graph + crawlable-body treatment is scoped to blog for now.
 */
 
 // Resolve a stored image reference (relative path, /storage/* path, or
@@ -94,19 +110,21 @@ $injectOg = function (string $url, string $title, string $description, ?string $
     $imageEsc = $image ? htmlspecialchars($image, ENT_QUOTES | ENT_HTML5, 'UTF-8') : null;
     $locale = $lang === 'id' ? 'id_ID' : 'en_US';
 
+    // Literal-return callbacks so values containing "$N" are never read as
+    // regex backreferences (the latent bug SeoHtmlComposer also fixes).
     $replacements = [
-        '/<title>[^<]*<\/title>/i'                                                => '<title>' . $titleEsc . '</title>',
-        '/<meta\s+name="title"\s+content="[^"]*"\s*\/?>/i'                        => '<meta name="title" content="' . $titleEsc . '">',
-        '/<meta\s+name="description"\s+content="[^"]*"\s*\/?>/i'                  => '<meta name="description" content="' . $descEsc . '">',
-        '/<meta\s+property="og:type"\s+content="[^"]*"\s*\/?>/i'                  => '<meta property="og:type" content="article">',
-        '/<meta\s+property="og:url"\s+content="[^"]*"\s*\/?>/i'                   => '<meta property="og:url" content="' . $urlEsc . '">',
-        '/<meta\s+property="og:title"\s+content="[^"]*"\s*\/?>/i'                 => '<meta property="og:title" content="' . $titleEsc . '">',
-        '/<meta\s+property="og:description"\s+content="[^"]*"\s*\/?>/i'           => '<meta property="og:description" content="' . $descEsc . '">',
-        '/<meta\s+property="og:locale"\s+content="[^"]*"\s*\/?>/i'                => '<meta property="og:locale" content="' . $locale . '">',
-        '/<meta\s+name="twitter:url"\s+content="[^"]*"\s*\/?>/i'                  => '<meta name="twitter:url" content="' . $urlEsc . '">',
-        '/<meta\s+name="twitter:title"\s+content="[^"]*"\s*\/?>/i'                => '<meta name="twitter:title" content="' . $titleEsc . '">',
-        '/<meta\s+name="twitter:description"\s+content="[^"]*"\s*\/?>/i'          => '<meta name="twitter:description" content="' . $descEsc . '">',
-        '/<link\s+rel="canonical"\s+href="[^"]*"\s*\/?>/i'                        => '<link rel="canonical" href="' . $urlEsc . '">',
+        '/<title>[^<]*<\/title>/i'                                       => '<title>' . $titleEsc . '</title>',
+        '/<meta\s+name="title"\s+content="[^"]*"\s*\/?>/i'               => '<meta name="title" content="' . $titleEsc . '">',
+        '/<meta\s+name="description"\s+content="[^"]*"\s*\/?>/i'         => '<meta name="description" content="' . $descEsc . '">',
+        '/<meta\s+property="og:type"\s+content="[^"]*"\s*\/?>/i'         => '<meta property="og:type" content="article">',
+        '/<meta\s+property="og:url"\s+content="[^"]*"\s*\/?>/i'          => '<meta property="og:url" content="' . $urlEsc . '">',
+        '/<meta\s+property="og:title"\s+content="[^"]*"\s*\/?>/i'        => '<meta property="og:title" content="' . $titleEsc . '">',
+        '/<meta\s+property="og:description"\s+content="[^"]*"\s*\/?>/i'  => '<meta property="og:description" content="' . $descEsc . '">',
+        '/<meta\s+property="og:locale"\s+content="[^"]*"\s*\/?>/i'       => '<meta property="og:locale" content="' . $locale . '">',
+        '/<meta\s+name="twitter:url"\s+content="[^"]*"\s*\/?>/i'         => '<meta name="twitter:url" content="' . $urlEsc . '">',
+        '/<meta\s+name="twitter:title"\s+content="[^"]*"\s*\/?>/i'       => '<meta name="twitter:title" content="' . $titleEsc . '">',
+        '/<meta\s+name="twitter:description"\s+content="[^"]*"\s*\/?>/i' => '<meta name="twitter:description" content="' . $descEsc . '">',
+        '/<link\s+rel="canonical"\s+href="[^"]*"\s*\/?>/i'               => '<link rel="canonical" href="' . $urlEsc . '">',
     ];
 
     if ($imageEsc !== null) {
@@ -115,65 +133,11 @@ $injectOg = function (string $url, string $title, string $description, ?string $
     }
 
     foreach ($replacements as $pattern => $replacement) {
-        $html = preg_replace($pattern, $replacement, $html);
+        $html = preg_replace_callback($pattern, fn () => $replacement, $html);
     }
 
     return $html;
 };
-
-// ---- Blog ------------------------------------------------------------------
-
-$serveBlogOg = function (string $slug, string $lang) use ($injectOg, $resolveImage) {
-    $post = Post::with(['translations', 'category'])
-        ->where('slug', $slug)
-        ->where('published', true)
-        ->first();
-    if (!$post) {
-        abort(404);
-    }
-
-    // Prefer the requested language; fall back to English, then any translation,
-    // then the post's own primary-language fields (title/excerpt/content live on
-    // posts too as the authored source of truth).
-    $translation = $post->translation($lang)
-        ?? $post->translation('en')
-        ?? $post->translations->first();
-
-    $title = $translation->meta_title
-        ?? $translation->og_title
-        ?? $translation->title
-        ?? $post->title
-        ?? $slug;
-
-    $description = $translation->meta_description
-        ?? $translation->og_description
-        ?? $translation->excerpt
-        ?? $post->excerpt
-        ?? Str::limit(strip_tags($translation->content ?? $post->content ?? ''), 160);
-
-    $baseUrl = rtrim(config('app.url'), '/');
-    $image = $resolveImage($post->og_image ?: $post->featured_image, $baseUrl);
-    $url = $baseUrl . ($lang === '' ? "/blog/{$slug}" : "/{$lang}/blog/{$slug}");
-
-    $html = $injectOg($url, $title, $description, $image, $lang ?: 'en');
-    if ($html === null) {
-        return redirect($url, 302);
-    }
-
-    return response($html)
-        ->header('Content-Type', 'text/html; charset=UTF-8')
-        ->header('Cache-Control', 'public, max-age=300');
-};
-
-Route::get('/{lang}/blog/{slug}', function (string $lang, string $slug) use ($serveBlogOg) {
-    return $serveBlogOg($slug, $lang);
-})->where(['lang' => 'en|id']);
-
-Route::get('/blog/{slug}', function (string $slug) use ($serveBlogOg) {
-    return $serveBlogOg($slug, '');
-});
-
-// ---- Projects --------------------------------------------------------------
 
 $serveProjectOg = function (string $slug, string $lang) use ($injectOg, $resolveImage) {
     $project = Project::where('slug', $slug)->first();
