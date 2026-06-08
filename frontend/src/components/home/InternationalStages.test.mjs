@@ -19,13 +19,15 @@ const ok = (n, fn) => { fn(); passed++; console.log(`  ✓ ${n}`) }
 ok('reframed to Track Record', () =>
   assert.ok(/Track Record/i.test(src), 'must use the "Track Record" reframe heading/eyebrow'))
 
-ok('five stages present (IDBYTE dropped)', () => {
-  for (const s of ['Hangzhou', 'Silicon Valley', 'Fenox', 'Bengaluru', 'NextDev'])
+ok('six stages present (IDBYTE restored)', () => {
+  for (const s of ['Hangzhou', 'Silicon Valley', 'Fenox', 'Bengaluru', 'NextDev', 'IDBYTE'])
     assert.ok(src.includes(s), `missing stage: ${s}`)
 })
 
-ok('IDBYTE removed', () =>
-  assert.ok(!/IDBYTE/i.test(src), 'IDBYTE must be dropped from the stages list'))
+ok('IDBYTE stage restored (Top 8 Finalist 2017)', () => {
+  assert.ok(/IDBYTE 2017 Connected/.test(src), 'must include the IDBYTE 2017 Connected event')
+  assert.ok(/Top 8 Finalist/.test(src), 'must show the Top 8 Finalist result')
+})
 
 ok('career band present (3 chapters, vault-verified)', () => {
   for (const c of ['Sat Nusapersada', 'Marlin', 'exSYS'])
@@ -39,6 +41,11 @@ ok('career cards pull real experience-gallery photos (gallery_id based)', () => 
   assert.ok(/\b14\b/.test(src), 'Singapore chapter must map to gallery 14')
 })
 
+ok('Marlin card uses the purpose-built illustration cover', () => {
+  assert.ok(/coverOverride/.test(src), 'Marlin must carry a coverOverride')
+  assert.ok(/marlin-booking\.jpg/.test(src), 'cover must point at the Marlin illustration')
+})
+
 ok('Alibaba / UN-UNCTAD framing (1 of 48 Asia)', () => {
   assert.ok(/UNCTAD/i.test(src), 'must reference UN-UNCTAD')
   assert.ok(/48/.test(src), 'must reference 1 of 48 Asian entrepreneurs')
@@ -47,18 +54,18 @@ ok('Alibaba / UN-UNCTAD framing (1 of 48 Asia)', () => {
 ok('NextDev funded the Silicon Valley trip (relationship surfaced)', () =>
   assert.ok(/funded/i.test(src), 'must surface NextDev → funded SV relationship'))
 
-ok('exactly 5 stage entries', () => {
+ok('exactly 6 stage entries', () => {
   const m = src.match(/id:\s*['"]stage-/g) || []
-  assert.equal(m.length, 5, `expected 5 stages, found ${m.length}`)
+  assert.equal(m.length, 6, `expected 6 stages, found ${m.length}`)
 })
 
 ok('no placeholder / TODO markers', () =>
   assert.ok(!/TODO|FIXME|PLACEHOLDER|lorem ipsum/i.test(src), 'no placeholder markers'))
 
 // Task 4 (unchanged): each curated stage maps to a real award gallery and shows a photo.
-ok('all 5 stages carry an awardId', () => {
+ok('all 6 stages carry an awardId', () => {
   const m = src.match(/awardId:\s*\d+/g) || []
-  assert.equal(m.length, 5, `expected 5 awardId mappings, found ${m.length}`)
+  assert.equal(m.length, 6, `expected 6 awardId mappings, found ${m.length}`)
 })
 
 ok('consumes useStageGalleries + BaseGalleryModal', () => {

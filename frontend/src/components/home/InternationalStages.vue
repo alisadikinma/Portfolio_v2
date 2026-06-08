@@ -274,6 +274,16 @@ const stages = [
     result: '🥇 Wild Card Winner',
     note: 'BEKRAF × Fenox VC — global-stage Startup World Cup, grand finale in Silicon Valley.',
   },
+  {
+    id: 'stage-idbyte',
+    awardId: 9,
+    flag: '🇮🇩',
+    location: 'Jakarta, Indonesia',
+    year: '2017',
+    event: 'IDBYTE 2017 Connected',
+    result: 'Top 8 Finalist',
+    note: "Among the top finalists at one of Indonesia's largest digital-economy conferences.",
+  },
 ]
 
 // 17-year career arc — three chapters, text-only (no gallery). Facts verbatim from the
@@ -299,6 +309,10 @@ const careerChapters = [
     role: 'Co-Founder & CEO',
     org: 'Marlin Booking',
     note: 'Digitized Indonesian ports for the Ministry of Transportation — $5M valuation, leading to UN-UNCTAD × Alibaba eFounders (1 of 48 in Asia).',
+    // Marlin's linked galleries are competition wins (already shown as stage cards),
+    // so the card cover is a purpose-built illustration of the platform itself —
+    // a maritime passenger booking system across Batam/Karimun/Palembang/SE-Sulawesi/Ambon ports.
+    coverOverride: '/images/career/marlin-booking.jpg',
     galleryIds: [9, 11, 13, 10, 12],
   },
   {
@@ -331,7 +345,7 @@ const { coverFor: careerCoverFor, itemsFor: careerItemsFor } =
   useExperienceGalleries(careerGalleryIds)
 
 function chapterCover(chapter) {
-  return careerCoverFor(chapter.galleryIds)
+  return chapter.coverOverride || careerCoverFor(chapter.galleryIds)
 }
 function chapterItems(chapter) {
   return careerItemsFor(chapter.galleryIds)

@@ -26,7 +26,9 @@ export function useExperienceGalleries(galleryIds) {
             const res = await api.get(`/galleries/${id}`)
             const g = res.data?.data ?? res.data ?? {}
             const items = Array.isArray(g.items) ? g.items : []
-            const cover = items[0]?.file_url || items[0]?.file_path || items[0]?.image || null
+            // Prefer the gallery's curated composite thumbnail (the hero card image
+            // shown in the admin picker) over the raw first item.
+            const cover = g.thumbnail || items[0]?.file_url || items[0]?.file_path || items[0]?.image || null
             return [id, { cover, items, title: g.title || '' }]
           } catch {
             return [id, null]

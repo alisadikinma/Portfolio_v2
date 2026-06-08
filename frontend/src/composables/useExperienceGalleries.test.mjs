@@ -19,8 +19,10 @@ ok('fetches the /galleries/{id} endpoint (gallery_id based, not award)', () => {
   assert.ok(!/\/awards\//.test(src), 'career galleries are gallery_id based, not award based')
 })
 
-ok('prefers file_url (full CDN URL from /galleries endpoint)', () =>
-  assert.ok(/file_url/.test(src), 'must read file_url so covers + modal resolve'))
+ok('cover prefers the gallery thumbnail, falls back to item file_url', () => {
+  assert.ok(/g\.thumbnail/.test(src), 'cover must prefer the curated gallery.thumbnail')
+  assert.ok(/file_url/.test(src), 'must fall back to item file_url so modal resolves')
+})
 
 ok('parallel fetch + per-id isolation (Promise.all + try/catch → null)', () => {
   assert.ok(/Promise\.all/.test(src), 'must fetch in parallel')
