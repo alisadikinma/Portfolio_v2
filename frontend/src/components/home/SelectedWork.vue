@@ -50,12 +50,12 @@
       </p>
 
       <!-- Project cards -->
-      <div v-else class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <div v-else class="card-rail -mx-6 flex snap-x snap-mandatory gap-6 overflow-x-auto px-6 pb-2 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-3">
         <RouterLink
           v-for="project in projects"
           :key="project.id"
           :to="`/projects/${project.slug}`"
-          class="work-card group relative flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--bg-elevated,#0C0C0F)]"
+          class="work-card group relative flex w-[82%] shrink-0 snap-start flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--bg-elevated,#0C0C0F)] sm:w-auto sm:shrink"
         >
           <!-- Image -->
           <div class="relative aspect-[16/10] w-full overflow-hidden bg-black/40">
@@ -164,6 +164,9 @@ function techOf(p) {
 </script>
 
 <style scoped>
+/* Mobile horizontal card rail — hide scrollbar (snap-scroll affords the gesture) */
+.card-rail::-webkit-scrollbar { display: none; }
+.card-rail { -ms-overflow-style: none; scrollbar-width: none; }
 .work-card {
   transition: transform 200ms ease-out, border-color 200ms ease-out;
 }

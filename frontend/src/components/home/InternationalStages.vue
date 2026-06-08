@@ -32,11 +32,11 @@
       >
         the 17-year arc
       </p>
-      <div class="mb-14 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div class="card-rail -mx-6 mb-14 flex snap-x snap-mandatory gap-4 overflow-x-auto px-6 pb-2 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-3">
         <article
           v-for="chapter in careerChapters"
           :key="chapter.id"
-          class="career-card group relative flex flex-col overflow-hidden rounded-2xl border border-[var(--accent-gold,#D4A843)]/20 bg-[var(--bg-deep,#050506)] p-6 lg:p-7"
+          class="career-card group relative flex w-[82%] shrink-0 snap-start flex-col overflow-hidden rounded-2xl border border-[var(--accent-gold,#D4A843)]/20 bg-[var(--bg-deep,#050506)] p-6 sm:w-auto sm:shrink lg:p-7"
           :class="chapterCover(chapter) ? 'cursor-pointer' : ''"
           :role="chapterCover(chapter) ? 'button' : undefined"
           :tabindex="chapterCover(chapter) ? 0 : undefined"
@@ -117,11 +117,11 @@
         global stages
       </p>
       <!-- Stage cards -->
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div class="card-rail -mx-6 flex snap-x snap-mandatory gap-4 overflow-x-auto px-6 pb-2 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-3">
         <article
           v-for="stage in stages"
           :key="stage.id"
-          class="stage-card group relative flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--bg-deep,#050506)] p-6 lg:p-7"
+          class="stage-card group relative flex w-[82%] shrink-0 snap-start flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--bg-deep,#050506)] p-6 sm:w-auto sm:shrink lg:p-7"
           :class="[
             { 'ring-1 ring-[var(--accent-gold,#D4A843)]/40': stage.highlight },
             coverFor(stage) ? 'cursor-pointer' : '',
@@ -374,6 +374,9 @@ function openChapter(chapter) {
 </script>
 
 <style scoped>
+/* Mobile horizontal card rail — hide scrollbar (snap-scroll affords the gesture) */
+.card-rail::-webkit-scrollbar { display: none; }
+.card-rail { -ms-overflow-style: none; scrollbar-width: none; }
 .stage-card,
 .career-card {
   transition: transform 200ms ease-out, border-color 200ms ease-out;

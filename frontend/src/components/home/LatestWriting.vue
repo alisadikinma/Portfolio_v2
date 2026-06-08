@@ -73,12 +73,12 @@
       </p>
 
       <!-- Article cards -->
-      <div v-else class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <div v-else class="card-rail -mx-6 flex snap-x snap-mandatory gap-6 overflow-x-auto px-6 pb-2 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-3">
         <RouterLink
           v-for="post in articles"
           :key="post.id"
           :to="`/blog/${post.slug}`"
-          class="article-card group relative flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--bg-deep,#050506)]"
+          class="article-card group relative flex w-[82%] shrink-0 snap-start flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--bg-deep,#050506)] sm:w-auto sm:shrink"
         >
           <div class="relative aspect-[16/9] w-full overflow-hidden bg-black/40">
             <BaseImage
@@ -165,6 +165,9 @@ function formatDate(value) {
 </script>
 
 <style scoped>
+/* Mobile horizontal card rail — hide scrollbar (snap-scroll affords the gesture) */
+.card-rail::-webkit-scrollbar { display: none; }
+.card-rail { -ms-overflow-style: none; scrollbar-width: none; }
 .meta-flex {
   background:
     radial-gradient(110% 100% at 0% 0%, rgba(6, 182, 212, 0.10), transparent 60%),
