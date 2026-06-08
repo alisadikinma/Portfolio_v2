@@ -30,9 +30,39 @@
         <article
           v-for="stage in stages"
           :key="stage.id"
-          class="stage-card group relative flex flex-col rounded-2xl border border-white/10 bg-[var(--bg-deep,#050506)] p-6 lg:p-7"
-          :class="{ 'ring-1 ring-[var(--accent-gold,#D4A843)]/40': stage.highlight }"
+          class="stage-card group relative flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--bg-deep,#050506)] p-6 lg:p-7"
+          :class="[
+            { 'ring-1 ring-[var(--accent-gold,#D4A843)]/40': stage.highlight },
+            coverFor(stage) ? 'cursor-pointer' : '',
+          ]"
+          :role="coverFor(stage) ? 'button' : undefined"
+          :tabindex="coverFor(stage) ? 0 : undefined"
+          :aria-label="coverFor(stage) ? `View ${stage.event} photos` : undefined"
+          @click="openStage(stage)"
+          @keydown.enter.prevent="openStage(stage)"
+          @keydown.space.prevent="openStage(stage)"
         >
+          <!-- Real event photo (from the matching award gallery). Missing → text-only. -->
+          <div
+            v-if="coverFor(stage)"
+            class="stage-cover relative -mx-6 -mt-6 mb-5 overflow-hidden lg:-mx-7 lg:-mt-7"
+          >
+            <img
+              :src="coverFor(stage)"
+              :alt="`${stage.event} — ${stage.location}`"
+              class="aspect-video w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+              loading="lazy"
+              decoding="async"
+            />
+            <div class="stage-cover-grad pointer-events-none absolute inset-0" aria-hidden="true"></div>
+            <span
+              class="absolute bottom-2 right-2 rounded-full bg-black/55 px-2 py-0.5 text-[0.6rem] text-white/85 backdrop-blur-sm"
+              style="font-family: 'JetBrains Mono', ui-monospace, monospace;"
+            >
+              {{ itemsFor(stage).length }} photos
+            </span>
+          </div>
+
           <!-- Location -->
           <div class="mb-4 flex items-center gap-2">
             <span class="text-base" aria-hidden="true">{{ stage.flag }}</span>
@@ -77,19 +107,33 @@
         </article>
       </div>
     </div>
+
+    <!-- Full event gallery (reuses the shared modal — same pattern as About.vue) -->
+    <BaseGalleryModal
+      :show="galleryOpen"
+      :title="activeStage?.event || ''"
+      :description="activeStage ? `${activeStage.location} · ${activeStage.year}` : ''"
+      :items="activeItems"
+      empty-message="No photos in this gallery yet"
+      @close="galleryOpen = false"
+    />
   </section>
 </template>
 
 <script setup>
-// Hand-curated international stages — facts sourced from the WHY-vault
-// (10-Identity/awards.md). Static by design: these are locked identity facts the
-// operator reviewed and corrected (NextDev added — it funded the Google Startup
-// Grind Silicon Valley trip). Not pulled from the generic /api/awards CRUD table
-// because the curated narrative framing (UNCTAD 1-of-48, NextDev→SV link) has no
-// column there.
+import { ref, computed } from 'vue'
+import { useStageGalleries } from '@/composables/useStageGalleries'
+import BaseGalleryModal from '@/components/base/BaseGalleryModal.vue'
+
+// Hand-curated international stages — narrative facts sourced from the WHY-vault
+// (10-Identity/awards.md): the curated framing (UNCTAD 1-of-48, NextDev→SV link)
+// has no column in the generic /api/awards CRUD table. But the REAL event photos
+// DO live there — each stage maps to its award via `awardId` and pulls the
+// gallery (cover + full set) from /api/awards/{id}/galleries for trust + proof.
 const stages = [
   {
     id: 'stage-bengaluru',
+    awardId: 13,
     flag: '🇮🇳',
     location: 'Bengaluru, India',
     year: '2026',
@@ -100,6 +144,7 @@ const stages = [
   },
   {
     id: 'stage-hangzhou',
+    awardId: 10,
     flag: '🇨🇳',
     location: 'Hangzhou, China',
     year: '2019',
@@ -109,6 +154,7 @@ const stages = [
   },
   {
     id: 'stage-sv',
+    awardId: 11,
     flag: '🇺🇸',
     location: 'Silicon Valley, USA',
     year: '2018',
@@ -118,6 +164,7 @@ const stages = [
   },
   {
     id: 'stage-nextdev',
+    awardId: 7,
     flag: '🇮🇩',
     location: 'Jakarta, Indonesia',
     year: '2018',
@@ -127,6 +174,7 @@ const stages = [
   },
   {
     id: 'stage-fenox',
+    awardId: 8,
     flag: '🌏',
     location: 'Startup World Cup',
     year: '2017',
@@ -136,6 +184,7 @@ const stages = [
   },
   {
     id: 'stage-idbyte',
+    awardId: 9,
     flag: '🇮🇩',
     location: 'Jakarta, Indonesia',
     year: '2017',
@@ -144,11 +193,38 @@ const stages = [
     note: "Among the top finalists at one of Indonesia's largest digital-economy conferences.",
   },
 ]
+
+// Resolve real event photos per stage from the matching award gallery.
+const { galleries } = useStageGalleries(stages.map((s) => s.awardId))
+
+function coverFor(stage) {
+  return galleries.value[stage.awardId]?.cover || null
+}
+function itemsFor(stage) {
+  return galleries.value[stage.awardId]?.items || []
+}
+
+// Lightbox state — open the full event gallery on card click (only when photos exist).
+const galleryOpen = ref(false)
+const activeStage = ref(null)
+const activeItems = computed(() => (activeStage.value ? itemsFor(activeStage.value) : []))
+
+function openStage(stage) {
+  if (!coverFor(stage)) return
+  activeStage.value = stage
+  galleryOpen.value = true
+}
 </script>
 
 <style scoped>
 .stage-card {
   transition: transform 200ms ease-out, border-color 200ms ease-out;
+}
+.stage-cover-grad {
+  background: linear-gradient(to top, rgba(5, 5, 6, 0.55) 0%, transparent 55%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .stage-card .stage-cover img { transition: none; }
 }
 .stage-card:hover {
   transform: translateY(-2px);

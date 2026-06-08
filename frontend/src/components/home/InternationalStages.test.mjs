@@ -37,4 +37,21 @@ ok('exactly 6 stage entries', () => {
 ok('no placeholder / TODO markers', () =>
   assert.ok(!/TODO|FIXME|PLACEHOLDER|lorem ipsum/i.test(src), 'no placeholder markers'))
 
+// Task 4: each curated stage maps to a real award gallery and shows a photo.
+ok('all 6 stages carry an awardId', () => {
+  const m = src.match(/awardId:\s*\d+/g) || []
+  assert.equal(m.length, 6, `expected 6 awardId mappings, found ${m.length}`)
+})
+
+ok('consumes useStageGalleries + BaseGalleryModal', () => {
+  assert.ok(/useStageGalleries/.test(src), 'must use useStageGalleries composable')
+  assert.ok(/BaseGalleryModal/.test(src), 'must wire BaseGalleryModal for the photo grid')
+})
+
+ok('renders a cover photo with a v-if guard (text-only fallback)', () => {
+  assert.ok(/<img/.test(src), 'must render a cover <img>')
+  assert.ok(/cover/i.test(src), 'cover must come from the resolved gallery cover')
+  assert.ok(/v-if=/.test(src), 'cover must be guarded so missing photos fall back to text-only')
+})
+
 console.log(`\n${passed} checks passed.`)
