@@ -29,7 +29,22 @@
             ? 'is-lead border-[var(--accent-gold,#D4A843)]/45 sm:col-span-2 lg:col-span-2 lg:row-span-2'
             : 'border-white/10 bg-[var(--bg-elevated,#0C0C0F)]'"
         >
-          <div class="flex items-start justify-between gap-3">
+          <!-- Cinematic background (generated) + dark overlay for stat legibility -->
+          <img
+            :src="tile.image"
+            alt=""
+            aria-hidden="true"
+            class="tile-bg pointer-events-none absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
+            loading="lazy"
+            decoding="async"
+          />
+          <div
+            class="pointer-events-none absolute inset-0"
+            :class="tile.lead ? 'tile-overlay-lead' : 'tile-overlay'"
+            aria-hidden="true"
+          ></div>
+
+          <div class="relative z-10 flex items-start justify-between gap-3">
             <span class="text-2xl lg:text-3xl" aria-hidden="true">{{ tile.icon }}</span>
             <span
               v-if="tile.lead"
@@ -38,7 +53,7 @@
             >Champion</span>
           </div>
 
-          <div :class="tile.lead ? 'mt-8' : 'mt-6'">
+          <div class="relative z-10" :class="tile.lead ? 'mt-8' : 'mt-6'">
             <div
               class="font-bold tracking-tight"
               :class="tile.lead
@@ -83,6 +98,7 @@ const yearsCount = computed(() => stats.value.years_experience ?? 17)
 const tiles = computed(() => [
   {
     id: 'tile-demoday',
+    image: '/images/proof/demoday.jpg',
     lead: true,
     icon: '🥇',
     value: '#1',
@@ -91,30 +107,35 @@ const tiles = computed(() => [
   },
   {
     id: 'tile-impact',
+    image: '/images/proof/impact.jpg',
     icon: '💰',
     value: '$318K+',
     sub: 'Documented business impact delivered.',
   },
   {
     id: 'tile-products',
+    image: '/images/proof/products.jpg',
     icon: '📦',
     value: `${productsCount.value}+`,
     sub: 'Enterprise products shipped.',
   },
   {
     id: 'tile-years',
+    image: '/images/proof/years.jpg',
     icon: '⏳',
     value: String(yearsCount.value),
     sub: 'Years building, hands-on.',
   },
   {
     id: 'tile-countries',
+    image: '/images/proof/countries.jpg',
     icon: '🌏',
     value: '16',
     sub: 'Countries — work shipped & presented.',
   },
   {
     id: 'tile-accuracy',
+    image: '/images/proof/accuracy.jpg',
     icon: '🎯',
     value: '≥95%',
     sub: 'Edge-AI visual inspection — better & cheaper than Keyence-class AOI.',
@@ -133,6 +154,22 @@ const tiles = computed(() => [
   background:
     radial-gradient(120% 100% at 0% 0%, rgba(212, 168, 67, 0.16), transparent 60%),
     var(--bg-elevated, #0C0C0F);
+}
+.tile-overlay {
+  background: linear-gradient(
+    to top,
+    rgba(5, 5, 6, 0.93) 0%,
+    rgba(5, 5, 6, 0.58) 45%,
+    rgba(5, 5, 6, 0.22) 100%
+  );
+}
+.tile-overlay-lead {
+  background:
+    radial-gradient(120% 100% at 0% 100%, rgba(212, 168, 67, 0.32), transparent 55%),
+    linear-gradient(to top, rgba(5, 5, 6, 0.92) 0%, rgba(5, 5, 6, 0.5) 45%, rgba(5, 5, 6, 0.18) 100%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .receipt-tile .tile-bg { transition: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .receipt-tile { transition: none; }

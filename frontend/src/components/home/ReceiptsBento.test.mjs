@@ -39,4 +39,16 @@ ok('renders exactly 6 tiles', () => {
 ok('no placeholder / TODO markers', () =>
   assert.ok(!/TODO|FIXME|PLACEHOLDER|lorem ipsum/i.test(src), 'no placeholder markers'))
 
+// Task 3: every tile carries a cinematic background image + a legibility overlay.
+ok('all 6 tiles carry a /images/proof/ background image', () => {
+  const m = src.match(/image:\s*['"]\/images\/proof\/[a-z0-9-]+\.jpg['"]/g) || []
+  assert.equal(m.length, 6, `expected 6 proof images, found ${m.length}`)
+})
+
+ok('renders the tile background image + dark legibility overlay', () => {
+  assert.ok(/<img/.test(src), 'must render a background <img> per tile')
+  assert.ok(/tile\.image/.test(src), 'background must bind tile.image')
+  assert.ok(/overlay/i.test(src), 'must layer a dark overlay so the stat text stays legible')
+})
+
 console.log(`\n${passed} checks passed.`)
