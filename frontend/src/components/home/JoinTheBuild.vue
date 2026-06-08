@@ -192,6 +192,9 @@ const FALLBACK_SOCIALS = [
   { platform: 'youtube', url: 'https://www.youtube.com/@alisadikinma' },
 ]
 
+// Platforms intentionally excluded from the follow row (Ali isn't active on X).
+const EXCLUDED_SOCIALS = new Set(['twitter', 'x'])
+
 const socials = computed(() => {
   const live = aboutSettings.value?.social_links
   const rows = Array.isArray(live) && live.length
@@ -199,7 +202,9 @@ const socials = computed(() => {
         .filter((l) => l && l.url && l.platform)
         .map((l) => ({ platform: String(l.platform).toLowerCase(), url: l.url }))
     : FALLBACK_SOCIALS
-  return rows.map((r) => ({ ...r, icon: ICONS[r.platform] ?? '↗' }))
+  return rows
+    .filter((r) => !EXCLUDED_SOCIALS.has(r.platform))
+    .map((r) => ({ ...r, icon: ICONS[r.platform] ?? '↗' }))
 })
 
 // WhatsApp soft CTA — from site contact phone; safe fallback to the handle's bio link.

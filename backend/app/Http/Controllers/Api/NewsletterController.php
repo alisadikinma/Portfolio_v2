@@ -14,6 +14,7 @@ class NewsletterController extends Controller
         'inline_card',
         'floating_banner',
         'footer_bar',
+        'homepage_join',
     ];
 
     public function subscribe(Request $request)
