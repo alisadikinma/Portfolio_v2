@@ -35,4 +35,11 @@ ok('CTA scrolls to a section anchor (waitlist)', () => {
   assert.ok(src.includes('cta.anchor'), 'CTA must read active.cta.anchor')
 })
 
+// Follow-up pass 3: a tab may render a branded still image (MANDOR board) instead of video.
+ok('renders an image panel when active.imageSrc is present', () => {
+  assert.ok(src.includes('active.imageSrc'), 'panel must support active.imageSrc')
+  assert.ok(/v-if="active\.imageSrc"/.test(src), 'image must be the prioritized v-if branch')
+  assert.ok(/v-else-if="active\.videoSrc/.test(src), 'video must fall to v-else-if so other tabs still play')
+})
+
 console.log(`\n${passed} checks passed.`)

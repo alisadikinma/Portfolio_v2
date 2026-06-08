@@ -30,6 +30,12 @@ ok('generative video discipline present', () => {
   assert.ok(t, 'expected a Generative Video discipline')
 })
 
+ok('ai-agent-os tab shows a branded MANDOR board image (not the OpenClaw video)', () => {
+  const t = tabs.find(t => t.id === 'ai-agent-os')
+  assert.ok(t.imageSrc, "ai-agent-os tab must carry an imageSrc")
+  assert.ok(/mandor-board/.test(t.imageSrc), `imageSrc must point at the MANDOR board asset, got ${t.imageSrc}`)
+})
+
 ok('every tab cta scrolls to the newsletter waitlist (no dead routes)', () => {
   for (const t of tabs) {
     assert.ok(t.cta && t.cta.label, `tab ${t.id} missing cta label`)

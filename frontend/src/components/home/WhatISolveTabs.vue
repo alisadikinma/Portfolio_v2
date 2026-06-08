@@ -151,9 +151,19 @@
             <div
               class="relative aspect-video w-full overflow-hidden rounded-xl border border-white/5 bg-[var(--bg-elevated,#0C0C0F)] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.6)]"
             >
+              <!-- Branded still image (e.g. MANDOR AI board) takes priority when present -->
+              <img
+                v-if="active.imageSrc"
+                :key="active.imageSrc"
+                :src="active.imageSrc"
+                :alt="`${active.product || active.label} — preview`"
+                class="h-full w-full object-cover"
+                loading="lazy"
+                decoding="async"
+              />
               <!-- Video element — autoplay muted loop, lazy preload until in viewport -->
               <video
-                v-if="!videoBroken[active.id]"
+                v-else-if="active.videoSrc && !videoBroken[active.id]"
                 :key="active.videoSrc"
                 :src="active.videoSrc"
                 class="h-full w-full object-cover"

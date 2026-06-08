@@ -45,7 +45,9 @@ export const tabs = [
       'Squads route work to the right agent; Autopilots run recurring jobs on a schedule',
       'Self-hostable — agents execute on your own runtimes via a local daemon',
     ],
-    videoSrc: '/videos/ai-agents.mp4',
+    // Branded MANDOR AI kanban-board mockup (replaces the generic orchestrator
+    // video). When imageSrc is set the panel renders a still <img>, not <video>.
+    imageSrc: '/images/whatisolve/mandor-board.jpg',
     cta: { label: 'Explore MANDOR AI →', anchor: 'join-the-build' },
   },
   {
