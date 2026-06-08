@@ -32,6 +32,13 @@ ok('career band present (3 chapters, vault-verified)', () => {
     assert.ok(src.includes(c), `missing career chapter reference: ${c}`)
 })
 
+ok('career cards pull real experience-gallery photos (gallery_id based)', () => {
+  assert.ok(/useExperienceGalleries/.test(src), 'must consume useExperienceGalleries')
+  assert.ok(/galleryIds:/.test(src), 'career chapters must carry galleryIds')
+  // Singapore career journey = gallery 14 (verified via /api/galleries/14)
+  assert.ok(/\b14\b/.test(src), 'Singapore chapter must map to gallery 14')
+})
+
 ok('Alibaba / UN-UNCTAD framing (1 of 48 Asia)', () => {
   assert.ok(/UNCTAD/i.test(src), 'must reference UN-UNCTAD')
   assert.ok(/48/.test(src), 'must reference 1 of 48 Asian entrepreneurs')

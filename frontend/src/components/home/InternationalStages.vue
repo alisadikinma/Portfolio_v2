@@ -36,8 +36,36 @@
         <article
           v-for="chapter in careerChapters"
           :key="chapter.id"
-          class="career-card relative flex flex-col overflow-hidden rounded-2xl border border-[var(--accent-gold,#D4A843)]/20 bg-[var(--bg-deep,#050506)] p-6 lg:p-7"
+          class="career-card group relative flex flex-col overflow-hidden rounded-2xl border border-[var(--accent-gold,#D4A843)]/20 bg-[var(--bg-deep,#050506)] p-6 lg:p-7"
+          :class="chapterCover(chapter) ? 'cursor-pointer' : ''"
+          :role="chapterCover(chapter) ? 'button' : undefined"
+          :tabindex="chapterCover(chapter) ? 0 : undefined"
+          :aria-label="chapterCover(chapter) ? `View ${chapter.org} photos` : undefined"
+          @click="openChapter(chapter)"
+          @keydown.enter.prevent="openChapter(chapter)"
+          @keydown.space.prevent="openChapter(chapter)"
         >
+          <!-- Real workplace photo (from the linked experience gallery). Missing → text-only. -->
+          <div
+            v-if="chapterCover(chapter)"
+            class="stage-cover relative -mx-6 -mt-6 mb-5 overflow-hidden lg:-mx-7 lg:-mt-7"
+          >
+            <img
+              :src="chapterCover(chapter)"
+              :alt="`${chapter.org} — ${chapter.location}`"
+              class="aspect-video w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+              loading="lazy"
+              decoding="async"
+            />
+            <div class="stage-cover-grad pointer-events-none absolute inset-0" aria-hidden="true"></div>
+            <span
+              class="absolute bottom-2 right-2 rounded-full bg-black/55 px-2 py-0.5 text-[0.6rem] text-white/85 backdrop-blur-sm"
+              style="font-family: 'JetBrains Mono', ui-monospace, monospace;"
+            >
+              {{ chapterItems(chapter).length }} photos
+            </span>
+          </div>
+
           <!-- Location + years -->
           <div class="mb-4 flex items-center gap-2">
             <span class="text-base" aria-hidden="true">{{ chapter.flag }}</span>
@@ -174,8 +202,8 @@
     <!-- Full event gallery (reuses the shared modal — same pattern as About.vue) -->
     <BaseGalleryModal
       :show="galleryOpen"
-      :title="activeStage?.event || ''"
-      :description="activeStage ? `${activeStage.location} · ${activeStage.year}` : ''"
+      :title="activeTitle"
+      :description="activeDescription"
       :items="activeItems"
       empty-message="No photos in this gallery yet"
       @close="galleryOpen = false"
@@ -186,6 +214,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useStageGalleries } from '@/composables/useStageGalleries'
+import { useExperienceGalleries } from '@/composables/useExperienceGalleries'
 import BaseGalleryModal from '@/components/base/BaseGalleryModal.vue'
 
 // Hand-curated international stages — narrative facts sourced from the WHY-vault
@@ -259,6 +288,8 @@ const careerChapters = [
     role: 'Software Consultant → Solution Support',
     org: 'exSYS · DHL Supply Chain · Thales/Gemalto · MPA Singapore',
     note: 'Eight years of Java/J2EE/Oracle enterprise delivery for Asia-Pacific MNC clients.',
+    // "Singapore Career Journey" gallery (linked to all 4 SG roles via experience.gallery_ids)
+    galleryIds: [14],
   },
   {
     id: 'career-marlin',
@@ -268,6 +299,7 @@ const careerChapters = [
     role: 'Co-Founder & CEO',
     org: 'Marlin Booking',
     note: 'Digitized Indonesian ports for the Ministry of Transportation — $5M valuation, leading to UN-UNCTAD × Alibaba eFounders (1 of 48 in Asia).',
+    galleryIds: [9, 11, 13, 10, 12],
   },
   {
     id: 'career-satnusa',
@@ -277,6 +309,7 @@ const careerChapters = [
     role: 'Head of Digital Transformation 4.0',
     org: 'PT Sat Nusapersada (Satnusa), Batam',
     note: 'Led a team of 31 shipping 56+ enterprise AI/IoT products and the MySatnusa Super App — $318K+ documented impact, which seeded INDUSIA.ai.',
+    galleryIds: [], // no gallery linked yet → text-only fallback
   },
 ]
 
@@ -290,15 +323,38 @@ function itemsFor(stage) {
   return galleries.value[stage.awardId]?.items || []
 }
 
-// Lightbox state — open the full event gallery on card click (only when photos exist).
+// Resolve real workplace photos per career chapter from its linked experience
+// galleries (gallery_id based — Singapore → 14, Marlin → 9-13, Satnusa → none).
+const careerGalleryIds = careerChapters.flatMap((c) => c.galleryIds || [])
+const { coverFor: careerCoverFor, itemsFor: careerItemsFor } =
+  useExperienceGalleries(careerGalleryIds)
+
+function chapterCover(chapter) {
+  return careerCoverFor(chapter.galleryIds)
+}
+function chapterItems(chapter) {
+  return careerItemsFor(chapter.galleryIds)
+}
+
+// Shared lightbox — opened by stage cards OR career cards (only when photos exist).
 const galleryOpen = ref(false)
-const activeStage = ref(null)
-const activeItems = computed(() => (activeStage.value ? itemsFor(activeStage.value) : []))
+const activeTitle = ref('')
+const activeDescription = ref('')
+const activeItems = ref([])
+
+function openGallery(title, description, items) {
+  if (!items || !items.length) return
+  activeTitle.value = title
+  activeDescription.value = description
+  activeItems.value = items
+  galleryOpen.value = true
+}
 
 function openStage(stage) {
-  if (!coverFor(stage)) return
-  activeStage.value = stage
-  galleryOpen.value = true
+  openGallery(stage.event, `${stage.location} · ${stage.year}`, itemsFor(stage))
+}
+function openChapter(chapter) {
+  openGallery(chapter.org, `${chapter.location} · ${chapter.years}`, chapterItems(chapter))
 }
 </script>
 
