@@ -52,10 +52,10 @@
         @mouseleave="resume"
         @keydown="handleKey"
       >
-        <div class="overflow-hidden px-1">
+        <div class="testi-rail overflow-hidden px-1 max-md:snap-x max-md:snap-mandatory max-md:overflow-x-auto">
           <div
-            class="flex gap-5 transition-transform duration-500 ease-out"
-            :style="{ transform: `translateX(calc(${activeIdx} * (100% + 1.25rem) / ${visibleCards} * -1))` }"
+            class="flex gap-5 md:transition-transform md:duration-500 md:ease-out"
+            :style="visibleCards === 1 ? {} : { transform: `translateX(calc(${activeIdx} * (100% + 1.25rem) / ${visibleCards} * -1))` }"
           >
             <component
               :is="t.linkedin_url ? 'a' : 'article'"
@@ -64,7 +64,7 @@
               :href="t.linkedin_url || null"
               :target="t.linkedin_url ? '_blank' : null"
               :rel="t.linkedin_url ? 'noopener noreferrer' : null"
-              class="card-slide group flex flex-col rounded-xl border border-white/5 bg-white/[0.04] p-6 backdrop-blur-md transition-all duration-300 md:p-7"
+              class="card-slide group flex snap-start flex-col rounded-xl border border-white/5 bg-white/[0.04] p-6 backdrop-blur-md transition-all duration-300 md:p-7"
               :class="t.linkedin_url
                 ? 'cursor-pointer hover:-translate-y-1 hover:border-[var(--accent-gold,#D4A843)]/40 hover:bg-white/[0.06]'
                 : ''"
@@ -167,7 +167,7 @@
         <button
           v-if="canSlide"
           type="button"
-          class="nav-arrow nav-arrow-prev"
+          class="nav-arrow nav-arrow-prev max-md:hidden"
           :disabled="activeIdx === 0"
           aria-label="Previous testimonials"
           @click="prev"
@@ -179,7 +179,7 @@
         <button
           v-if="canSlide"
           type="button"
-          class="nav-arrow nav-arrow-next"
+          class="nav-arrow nav-arrow-next max-md:hidden"
           :disabled="activeIdx >= maxIdx"
           aria-label="Next testimonials"
           @click="next"
@@ -192,7 +192,7 @@
         <!-- Dots -->
         <div
           v-if="canSlide"
-          class="mt-8 flex items-center justify-center gap-3"
+          class="mt-8 flex items-center justify-center gap-3 max-md:hidden"
           role="tablist"
           aria-label="Testimonial slide nav"
         >
@@ -360,6 +360,13 @@ watch([maxIdx], () => {
   if (activeIdx.value > maxIdx.value) activeIdx.value = maxIdx.value
 })
 
+// Crossing the mobile↔desktop breakpoint flips between native scroll-snap
+// (no timer) and the JS carousel (timer) — re-evaluate on every change.
+watch(visibleCards, () => {
+  if (visibleCards.value === 1) activeIdx.value = 0
+  startTimer()
+})
+
 let timer = null
 let isPaused = false
 let mqlLg = null
@@ -367,6 +374,8 @@ let mqlMd = null
 
 function startTimer() {
   if (timer) clearInterval(timer)
+  // Mobile uses native CSS scroll-snap (1 card per view) — no JS auto-rotate.
+  if (visibleCards.value === 1) return
   if (!canSlide.value) return
   timer = setInterval(() => {
     if (isPaused) return
@@ -488,12 +497,17 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+/* Mobile: native scroll-snap rail — show ~85% of one card so the next peeks. */
 .card-slide {
-  flex: 0 0 100%;
+  flex: 0 0 85%;
+  scroll-snap-align: start;
   min-height: 24rem;
   text-decoration: none;
   color: inherit;
 }
+/* Hide the mobile rail scrollbar (snap-scroll affords the gesture). */
+.testi-rail::-webkit-scrollbar { display: none; }
+.testi-rail { -ms-overflow-style: none; scrollbar-width: none; }
 @media (min-width: 768px) {
   .card-slide { flex-basis: calc((100% - 1.25rem) / 2); }
 }

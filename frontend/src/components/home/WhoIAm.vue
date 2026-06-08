@@ -50,27 +50,13 @@
         </h2>
 
         <p
-          class="mb-5 max-w-2xl text-base leading-relaxed text-[var(--fg-muted,#8A8F98)] lg:text-[1.08rem]"
+          class="mb-8 max-w-2xl text-base leading-relaxed text-[var(--fg-muted,#8A8F98)] lg:text-[1.08rem]"
           style="font-family: 'Inter', sans-serif; font-weight: 300;"
         >
-          Based in <span class="text-[var(--fg-primary,#EDEDEF)]">Batam, Indonesia</span>, I've spent
-          <span class="text-[var(--fg-primary,#EDEDEF)]">17 years building</span> — from factory floors
-          running edge-AI inspection to startup stages
-          <span class="text-[var(--fg-primary,#EDEDEF)]">across 16 countries</span>. Today I ship production
-          software with AI as my co-builder, and publish
-          <span class="text-[var(--fg-primary,#EDEDEF)]">20+ open-source repos</span> so others can build the
-          same way.
+          Based in <span class="text-[var(--fg-primary,#EDEDEF)]">Batam, Indonesia</span>, I ship
+          production software with AI as my co-builder — from factory-floor inspection systems to
+          startup stages around the world, building in the open the whole way.
         </p>
-
-        <!-- Live bio from settings.about.bio — rich HTML (admin-authored), rendered
-             sanitized so <p>/<strong>/<em> format correctly instead of leaking as text. -->
-        <div
-          v-if="showLiveBio"
-          class="who-bio mb-8 max-w-2xl border-l-2 border-[var(--accent-gold,#D4A843)]/40 pl-4 text-sm leading-relaxed text-[var(--fg-muted,#8A8F98)]"
-          style="font-family: 'Inter', sans-serif;"
-          v-html="cleanBio"
-        ></div>
-        <div v-else class="mb-8"></div>
 
         <!-- Identity chips -->
         <ul class="flex flex-wrap gap-3" aria-label="Identity facts">
@@ -92,7 +78,7 @@
 import { computed } from 'vue'
 import { useAboutSettings } from '@/composables/useAboutSettings'
 
-const { heroName, heroBio, heroAvatar } = useAboutSettings()
+const { heroName, heroAvatar } = useAboutSettings()
 
 const name = computed(() => heroName.value || 'Ali Sadikin Ma')
 
@@ -107,43 +93,11 @@ const portrait = computed(() => {
   return raw
 })
 
-// The static opener is the canonical answer block. Surface the live CMS bio only
-// when it is non-empty and not a near-duplicate of the static copy.
-const liveBio = computed(() => (heroBio.value || '').trim())
-const showLiveBio = computed(() => {
-  const b = liveBio.value
-  if (!b) return false
-  // Skip the generic default copy and any echo of the static manifesto.
-  if (/exceptional digital experiences/i.test(b)) return false
-  if (/AI Generalist/i.test(b) && /shipped products/i.test(b)) return false
-  return b.length > 24
-})
-
-// Sanitize the admin-authored bio HTML to a tiny allowlist before v-html.
-// Keeps <p> <strong> <em> <br>; drops every other tag (text preserved),
-// strips all attributes (so no on*/style/href survive), removes script/style
-// blocks with their content. Content is first-party (admin-only) — this is
-// defense-in-depth, not the primary trust boundary.
-const BIO_ALLOWED = new Set(['p', 'strong', 'em', 'br'])
-const cleanBio = computed(() => {
-  let html = liveBio.value
-  if (!html) return ''
-  html = html.replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, '')
-  html = html.replace(/<\/?([a-z0-9]+)\b[^>]*?>/gi, (m, tag) => {
-    const t = tag.toLowerCase()
-    if (!BIO_ALLOWED.has(t)) return ''
-    if (m[1] === '/') return `</${t}>`
-    return t === 'br' ? '<br>' : `<${t}>`
-  })
-  return html
-})
-
 const chips = [
   'AI Generalist',
-  'Batam → 16 countries',
   '17 years building',
+  'Batam → 16 countries',
   '20+ open-source repos',
-  'Trilingual · ID · EN · Mandarin',
 ]
 </script>
 
@@ -158,18 +112,5 @@ const chips = [
 }
 .portrait-vignette {
   background: linear-gradient(to top, rgba(5, 5, 6, 0.45) 0%, transparent 45%);
-}
-.who-bio :deep(p) {
-  margin-bottom: 0.65rem;
-}
-.who-bio :deep(p:last-child) {
-  margin-bottom: 0;
-}
-.who-bio :deep(strong) {
-  color: var(--fg-primary, #EDEDEF);
-  font-weight: 600;
-}
-.who-bio :deep(em) {
-  font-style: italic;
 }
 </style>
