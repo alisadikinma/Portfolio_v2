@@ -42,6 +42,15 @@ ok('hero poster wired to generated still', () => {
     'posterSrc must be assigned /videos/hero-poster.jpg')
 })
 
+// Follow-up pass 3 (hero video): the final person-forward loop is wired as the
+// mp4 source (replaces the interim hero-bg.mp4). Concept A — operator at console.
+ok('hero loop video wired (Concept A, replaces interim bg)', () => {
+  const code = src.replace(/^\s*\/\/.*$/gm, '')
+  assert.ok(/const\s+mp4Src\s*=\s*['"]\/videos\/hero-loop\.mp4['"]/.test(code),
+    'mp4Src must be assigned /videos/hero-loop.mp4 (the rendered hero loop)')
+  assert.ok(!/hero-bg\.mp4/.test(code), 'interim hero-bg.mp4 must be replaced')
+})
+
 // Follow-up pass 3: "Learn AI with me" scrolls to the newsletter waitlist
 // instead of the dead /courses route.
 ok('Learn AI CTA scrolls to #join-the-build (no dead /courses route)', () => {

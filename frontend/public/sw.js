@@ -1,7 +1,7 @@
 // Service Worker — Media Cache
 // Caches videos and images on first load, serves from cache on repeat visits
 
-const CACHE_NAME = 'media-cache-v1'
+const CACHE_NAME = 'media-cache-v2'
 
 // Patterns to cache (videos + images from public folder)
 const CACHEABLE_EXTENSIONS = ['.mp4', '.webp', '.png', '.jpg', '.jpeg', '.svg', '.gif', '.avif']
@@ -18,11 +18,11 @@ function isCacheable(url) {
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      // Pre-cache the hero videos (always needed)
+      // Pre-cache the hero loop (Operator-at-console) + poster — load on every visit
       return cache.addAll([
-        '/videos/warrior-left.mp4',
-        '/videos/warrior-front.mp4',
-        '/videos/warrior-right.mp4',
+        '/videos/hero-loop.webm',
+        '/videos/hero-loop.mp4',
+        '/videos/hero-poster.jpg',
         '/alisadikin-logo.png'
       ]).catch(() => {
         // Non-fatal: files might not exist yet

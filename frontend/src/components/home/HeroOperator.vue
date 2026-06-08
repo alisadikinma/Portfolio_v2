@@ -119,14 +119,13 @@ const linkedinUrl = 'https://www.linkedin.com/in/alisadikinma/'
 // build time; missing files degrade gracefully (sources are v-if'd, poster
 // optional → falls back to the dark section bg + cinematic glow).
 //
-// Hero still (generated from the face ref via geminigen) is the poster — shows
-// immediately + serves as the reduced-motion / slow-connection fallback. The
-// interim /videos/hero-bg.mp4 stays as the loop until the operator renders the
-// person-forward montage per docs/plans/hero-video/operator-render-brief.md
-// (then set webmSrc/mp4Src to hero-loop.webm/.mp4).
+// Hero media — "Operator at the console" (Concept A). Keyframe generated from the
+// face ref (indusia-image-gen), then animated into an 8s seamless loop via VEO
+// (indusia-video-gen, image-to-video). webm primary (1.95MB) / mp4 fallback (2.44MB);
+// the poster (frame 0) shows immediately + serves the reduced-motion / slow-conn path.
 const posterSrc = '/videos/hero-poster.jpg'
-const webmSrc = ''
-const mp4Src = '/videos/hero-bg.mp4'
+const webmSrc = '/videos/hero-loop.webm'
+const mp4Src = '/videos/hero-loop.mp4'
 
 const { data } = useHomepageFeatured()
 
