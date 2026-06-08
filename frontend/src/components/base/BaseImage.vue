@@ -125,7 +125,9 @@ function onError() {
   overflow: hidden;
   width: 100%;
   height: 100%;
-  background: rgb(243 244 246);
+  /* Dark placeholder so lazy-loading images blend with the dark theme instead
+     of flashing a light box before the <img> fades in (opacity 0 → 1 on load). */
+  background: var(--bg-elevated, #0c0c0f);
 }
 
 .base-image-lqip {

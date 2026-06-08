@@ -55,7 +55,7 @@
         <div class="overflow-hidden px-1">
           <div
             class="flex gap-5 transition-transform duration-500 ease-out"
-            :style="{ transform: `translateX(-${activeIdx * slidePctPerStep}%)` }"
+            :style="{ transform: `translateX(calc(${activeIdx} * (100% + 1.25rem) / ${visibleCards} * -1))` }"
           >
             <component
               :is="t.linkedin_url ? 'a' : 'article'"
@@ -351,7 +351,8 @@ const maxIdx = computed(() =>
   Math.max(0, testimonials.value.length - visibleCards.value)
 )
 const canSlide = computed(() => maxIdx.value > 0)
-const slidePctPerStep = computed(() => 100 / visibleCards.value)
+// Per-step distance is gap-aware: one card + one gap = (100% + gap) / visibleCards.
+// (gap-5 = 1.25rem; kept in sync with the track's `gap-5` class in the template.)
 
 const activeIdx = ref(0)
 
