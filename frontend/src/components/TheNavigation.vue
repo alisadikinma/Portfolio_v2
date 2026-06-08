@@ -209,6 +209,32 @@ const isHomePage = computed(() => {
   return route.path === '/' || route.path === `/${lang}`
 })
 
+// Scroll-spy: highlight the nav item for the section currently under a reference
+// line ~38% down the viewport. Queries section positions LIVE on each scroll, so
+// it's robust to mount timing (no one-shot observer that misses late-rendered
+// sections) and naturally lands on the last section (Contact) at page bottom.
+function updateActiveSection() {
+  if (!isHomePage.value) return
+  const line = window.innerHeight * 0.38
+  let current = ''
+  // sectionLinks is in document order → the last section whose top has crossed
+  // above the line is the one occupying the viewport's reading zone.
+  for (const l of sectionLinks) {
+    const el = document.getElementById(l.id)
+    if (!el) continue
+    if (el.getBoundingClientRect().top <= line) current = l.id
+  }
+  // Near the very bottom, make sure the final section wins even if its top never
+  // reaches the line (short last section / tall viewport).
+  if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2) {
+    const last = [...sectionLinks].reverse().find((l) => document.getElementById(l.id))
+    if (last) current = last.id
+  }
+  if (!current) current = sectionLinks[0].id
+  if (activeSection.value !== current) activeSection.value = current
+}
+
+let scrollRaf = null
 const handleScroll = () => {
   if (isHomePage.value) {
     // Home page only: hide at top, reveal after scrolling past hero
@@ -217,6 +243,12 @@ const handleScroll = () => {
     // All other pages: always visible
     isScrolled.value = true
   }
+  // rAF-throttle the active-section recompute (scroll fires very frequently).
+  if (scrollRaf) return
+  scrollRaf = requestAnimationFrame(() => {
+    scrollRaf = null
+    updateActiveSection()
+  })
 }
 
 // When route changes, immediately update visibility
@@ -225,12 +257,14 @@ watch(isHomePage, (isHome) => {
     isScrolled.value = true
   } else {
     handleScroll()
+    // Sections need a tick to mount after the route resolves.
+    clearTimeout(activeSectionTimer)
+    activeSectionTimer = setTimeout(updateActiveSection, 400)
   }
 })
 
 let mqMotion
-let sectionObserver
-let observerTimer
+let activeSectionTimer
 function syncMotion(e) { reducedMotion.value = e.matches }
 
 onMounted(async () => {
@@ -244,18 +278,10 @@ onMounted(async () => {
   reducedMotion.value = mqMotion.matches
   mqMotion.addEventListener?.('change', syncMotion)
 
-  // Active-section highlight (cosmetic). Fails gracefully to no highlight if the
-  // section DOM isn't mounted yet or IntersectionObserver is unavailable.
-  observerTimer = setTimeout(() => {
-    if (!isHomePage.value || !('IntersectionObserver' in window)) return
-    sectionObserver = new IntersectionObserver((entries) => {
-      for (const e of entries) if (e.isIntersecting) activeSection.value = e.target.id
-    }, { rootMargin: '-45% 0px -50% 0px', threshold: 0 })
-    sectionLinks.forEach((l) => {
-      const el = document.getElementById(l.id)
-      if (el) sectionObserver.observe(el)
-    })
-  }, 600)
+  // Initial active-section highlight. Recompute once immediately and again after
+  // sections have had a tick to render (homepage data + section v-if resolve).
+  updateActiveSection()
+  activeSectionTimer = setTimeout(updateActiveSection, 400)
 
   await fetchSiteSettings(true)
 })
@@ -263,7 +289,7 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
   mqMotion?.removeEventListener?.('change', syncMotion)
-  clearTimeout(observerTimer)
-  sectionObserver?.disconnect()
+  clearTimeout(activeSectionTimer)
+  if (scrollRaf) cancelAnimationFrame(scrollRaf)
 })
 </script>
