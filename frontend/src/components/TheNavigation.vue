@@ -44,7 +44,7 @@
               class="relative whitespace-nowrap px-3 py-1.5 rounded-full text-sm font-medium text-fg-muted transition-all duration-700 ease-spring cursor-pointer"
               :class="[
                 isActive(item.id)
-                  ? 'text-accent-gold bg-accent-gold/15 ring-1 ring-accent-gold/50 font-semibold shadow-glow-gold'
+                  ? '!text-accent-gold bg-accent-gold/15 ring-1 ring-accent-gold/50 font-semibold shadow-glow-gold'
                   : 'hover:text-fg-primary hover:bg-white/5'
               ]"
             >
@@ -128,7 +128,7 @@
               class="w-full max-w-xs flex items-center justify-center gap-3 px-8 py-5 rounded-2xl text-2xl font-display font-semibold text-fg-muted transition-all duration-700 ease-spring cursor-pointer"
               :class="[
                 isActive(item.id)
-                  ? 'text-accent-gold bg-accent-gold/10 border border-accent-gold/50 shadow-glow-gold'
+                  ? '!text-accent-gold bg-accent-gold/10 border border-accent-gold/50 shadow-glow-gold'
                   : 'hover:text-fg-primary hover:bg-white/5'
               ]"
               :style="{ transitionDelay: `${100 + index * 80}ms` }"
