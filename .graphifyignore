@@ -1,0 +1,23 @@
+# Composer PHP dependencies — not our architecture (biggest noise source)
+vendor/
+# Published/compiled frontend vendor assets (Filament, Livewire, etc.)
+backend/public/js/
+backend/public/vendor/
+# Test run artifacts
+playwright-report/
+frontend/playwright-report/
+# Build outputs
+dist/
+build/
+.next/
+out/
+coverage/
+# Minified bundles & source maps — generated noise
+*.min.js
+*.min.css
+*.map
+*.bundle.js
+# Lockfiles & DB dumps — not code
+*-lock.json
+composer.lock
+*.sql
