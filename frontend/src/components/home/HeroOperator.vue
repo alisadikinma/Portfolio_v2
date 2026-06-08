@@ -1,6 +1,6 @@
 <template>
   <section
-    class="hero-operator relative flex min-h-screen w-full flex-col justify-end overflow-hidden bg-[var(--bg-deep,#050506)] px-6 pb-20 pt-28 lg:px-20 lg:pb-28"
+    class="hero-operator relative flex min-h-screen w-full flex-col justify-center overflow-hidden bg-[var(--bg-deep,#050506)] px-6 pb-20 pt-28 lg:px-20 lg:pb-28"
     aria-label="Ali Sadikin Ma — AI Generalist"
   >
     <!-- Background: person-forward montage video (poster fallback for reduced-motion / slow conn) -->
