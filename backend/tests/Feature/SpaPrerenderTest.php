@@ -195,4 +195,34 @@ HTML;
         $this->assertFalse(Cache::has('seo_html:home'));
         $this->assertFalse(Cache::has('seo_html:blog_index:'));
     }
+
+    public function test_slug_rename_purges_the_old_slug_detail_cache(): void
+    {
+        $post = $this->makePost();
+
+        $this->get('/blog/shipping-ai-agents')->assertStatus(200);
+        $this->assertTrue(Cache::has('seo_html:blog_detail::shipping-ai-agents'));
+
+        // Renaming the slug must purge the OLD slug's cache (getOriginal), not
+        // just the new one — otherwise the dead URL serves a stale 200 for 1h.
+        $post->update(['slug' => 'shipping-ai-agents-v2']);
+        $this->assertFalse(Cache::has('seo_html:blog_detail::shipping-ai-agents'));
+    }
+
+    public function test_category_save_purges_category_and_member_detail_cache(): void
+    {
+        $post = $this->makePost();
+        $category = $post->category;
+
+        $this->get('/blog/category/ai-agents')->assertStatus(200);
+        $this->get('/blog/shipping-ai-agents')->assertStatus(200);
+        $this->assertTrue(Cache::has('seo_html:blog_category::ai-agents'));
+        $this->assertTrue(Cache::has('seo_html:blog_detail::shipping-ai-agents'));
+
+        // Category rename must purge its page (under the OLD slug) + member
+        // post detail pages whose breadcrumb embeds the category name.
+        $category->update(['name' => 'AI Agents Renamed']);
+        $this->assertFalse(Cache::has('seo_html:blog_category::ai-agents'));
+        $this->assertFalse(Cache::has('seo_html:blog_detail::shipping-ai-agents'));
+    }
 }

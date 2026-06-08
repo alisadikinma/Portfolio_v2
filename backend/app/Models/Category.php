@@ -52,4 +52,19 @@ class Category extends Model
     {
         return $this->posts()->published()->count();
     }
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        // Purge the SSR-enrichment HTML cache (category page + its posts'
+        // breadcrumbs + blog index/home) on a category rename/delete so
+        // crawlers see the new name before the 1h TTL lapses.
+        // See App\Http\Controllers\SpaPrerenderController::purgeForCategory().
+        $purge = function ($category) {
+            \App\Http\Controllers\SpaPrerenderController::purgeForCategory($category);
+        };
+        static::saved($purge);
+        static::deleted($purge);
+    }
 }

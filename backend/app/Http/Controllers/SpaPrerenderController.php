@@ -195,9 +195,7 @@ class SpaPrerenderController extends Controller
                 ->where('published', true)
                 ->first();
 
-            $t = $post->translation($lang ?: 'en')
-                ?? $post->translation('en')
-                ?? $post->translations->first();
+            $t = $this->pickTranslation($post, $lang);
 
             $headline = ($t->title ?? null) ?: ($post->title ?: $slug);
             $title = ($t->meta_title ?? null) ?: ($t->og_title ?? null) ?: ($headline . ' | Blog');
@@ -227,7 +225,9 @@ class SpaPrerenderController extends Controller
                 'datePublished' => $publishedIso,
                 'dateModified' => $modifiedIso,
                 'authorName' => self::AUTHOR,
-                'inLanguage' => $lang ?: 'en',
+                // Reflect the language actually served (an ID-only post at the
+                // bare /blog/{slug} URL should report id, not the url default).
+                'inLanguage' => ($t->language ?? null) ?: ($lang ?: 'en'),
                 'keywords' => $keywords,
             ]);
 
@@ -286,19 +286,85 @@ class SpaPrerenderController extends Controller
     {
         Cache::forget('seo_html:home');
 
+        // Cover the current slug AND a renamed-from slug. getOriginal() returns
+        // the pre-save value; on a non-slug change it equals the current slug,
+        // and array_unique dedupes the duplicate away.
+        $slugs = array_unique(array_filter([
+            $post->slug,
+            $post->getOriginal('slug'),
+        ]));
+
         foreach (self::LANGS as $lang) {
             Cache::forget("seo_html:blog_index:{$lang}");
-            if ($post->slug) {
-                Cache::forget("seo_html:blog_detail:{$lang}:{$post->slug}");
+            foreach ($slugs as $slug) {
+                Cache::forget("seo_html:blog_detail:{$lang}:{$slug}");
             }
         }
 
-        $categorySlug = $post->category->slug ?? null;
-        if ($categorySlug) {
+        // Purge the current category AND the category the post moved out of, so
+        // both category listings drop/add the post immediately.
+        $categorySlugs = array_unique(array_filter([
+            $post->category->slug ?? null,
+            self::categorySlugForId($post->getOriginal('category_id')),
+        ]));
+        foreach ($categorySlugs as $slug) {
+            self::purgeCategorySlug($slug);
+        }
+    }
+
+    /**
+     * Purge home + blog-index + the category page + every published-post detail
+     * page in the category (their breadcrumb embeds the category name). Wired
+     * from Category::boot() saved/deleted so a rename/delete refreshes promptly.
+     */
+    public static function purgeForCategory(Category $category): void
+    {
+        Cache::forget('seo_html:home');
+        foreach (self::LANGS as $lang) {
+            Cache::forget("seo_html:blog_index:{$lang}");
+        }
+
+        $slugs = array_unique(array_filter([
+            $category->slug,
+            $category->getOriginal('slug'),
+        ]));
+        foreach ($slugs as $slug) {
+            self::purgeCategorySlug($slug);
+        }
+
+        foreach ($category->posts()->where('published', true)->pluck('slug') as $postSlug) {
             foreach (self::LANGS as $lang) {
-                Cache::forget("seo_html:blog_category:{$lang}:{$categorySlug}");
+                Cache::forget("seo_html:blog_detail:{$lang}:{$postSlug}");
             }
         }
+    }
+
+    private static function purgeCategorySlug(?string $slug): void
+    {
+        if (!$slug) {
+            return;
+        }
+        foreach (self::LANGS as $lang) {
+            Cache::forget("seo_html:blog_category:{$lang}:{$slug}");
+        }
+    }
+
+    private static function categorySlugForId($id): ?string
+    {
+        return empty($id) ? null : optional(Category::find($id))->slug;
+    }
+
+    /**
+     * Resolve the best translation from the ALREADY-EAGER-LOADED collection
+     * (firstWhere is zero-query) instead of Post::translation() which re-queries
+     * the DB and would defeat the with('translations') eager load. Fallback:
+     * requested lang → en → first available.
+     */
+    private function pickTranslation(Post $post, string $lang)
+    {
+        return $post->translations->firstWhere('language', $lang ?: 'en')
+            ?? $post->translations->firstWhere('language', 'en')
+            ?? $post->translations->first();
     }
 
     // ---- Helpers ------------------------------------------------------------
@@ -431,9 +497,7 @@ class SpaPrerenderController extends Controller
     /** @return array{title:string,name:string,excerpt:string,url:string} */
     private function postItem(Post $post, string $lang): array
     {
-        $t = $post->translation($lang ?: 'en')
-            ?? $post->translation('en')
-            ?? $post->translations->first();
+        $t = $this->pickTranslation($post, $lang);
 
         $title = ($t->title ?? null) ?: ($post->title ?: $post->slug);
         $excerpt = ($t->excerpt ?? null)
