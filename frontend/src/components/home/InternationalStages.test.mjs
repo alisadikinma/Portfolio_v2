@@ -1,10 +1,10 @@
-// Smoke test for InternationalStages.vue (The Operator §5). File-content checks.
+// Smoke test for InternationalStages.vue (The Operator §5 → "Track Record"). File-content checks.
 // Run: node src/components/home/InternationalStages.test.mjs
 //
-// §5 = international reach as a 6-card row. Content is hand-curated identity fact
-// (operator corrected the list to include NextDev/Telkomsel, which funded the
-// Google Startup Grind Silicon Valley trip). Facts sourced from the WHY-vault
-// awards.md — must stay accurate.
+// Reframed (Follow-up Pass 3): the section is now "Track Record" — two labeled bands:
+// a 3-chapter 17-year CAREER band (Singapore MNC IT · Marlin Booking · Sat Nusapersada)
+// ABOVE the existing 5 speaking/competition STAGE cards. IDBYTE dropped (weakest).
+// Career facts sourced from the WHY-vault 10-Identity/experience.md — must stay accurate.
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -16,9 +16,20 @@ const src = readFileSync(join(here, 'InternationalStages.vue'), 'utf8') // throw
 let passed = 0
 const ok = (n, fn) => { fn(); passed++; console.log(`  ✓ ${n}`) }
 
-ok('all six stages present', () => {
-  for (const s of ['Hangzhou', 'Silicon Valley', 'Fenox', 'IDBYTE', 'Bengaluru', 'NextDev'])
+ok('reframed to Track Record', () =>
+  assert.ok(/Track Record/i.test(src), 'must use the "Track Record" reframe heading/eyebrow'))
+
+ok('five stages present (IDBYTE dropped)', () => {
+  for (const s of ['Hangzhou', 'Silicon Valley', 'Fenox', 'Bengaluru', 'NextDev'])
     assert.ok(src.includes(s), `missing stage: ${s}`)
+})
+
+ok('IDBYTE removed', () =>
+  assert.ok(!/IDBYTE/i.test(src), 'IDBYTE must be dropped from the stages list'))
+
+ok('career band present (3 chapters, vault-verified)', () => {
+  for (const c of ['Sat Nusapersada', 'Marlin', 'exSYS'])
+    assert.ok(src.includes(c), `missing career chapter reference: ${c}`)
 })
 
 ok('Alibaba / UN-UNCTAD framing (1 of 48 Asia)', () => {
@@ -29,18 +40,18 @@ ok('Alibaba / UN-UNCTAD framing (1 of 48 Asia)', () => {
 ok('NextDev funded the Silicon Valley trip (relationship surfaced)', () =>
   assert.ok(/funded/i.test(src), 'must surface NextDev → funded SV relationship'))
 
-ok('exactly 6 stage entries', () => {
+ok('exactly 5 stage entries', () => {
   const m = src.match(/id:\s*['"]stage-/g) || []
-  assert.equal(m.length, 6, `expected 6 stages, found ${m.length}`)
+  assert.equal(m.length, 5, `expected 5 stages, found ${m.length}`)
 })
 
 ok('no placeholder / TODO markers', () =>
   assert.ok(!/TODO|FIXME|PLACEHOLDER|lorem ipsum/i.test(src), 'no placeholder markers'))
 
-// Task 4: each curated stage maps to a real award gallery and shows a photo.
-ok('all 6 stages carry an awardId', () => {
+// Task 4 (unchanged): each curated stage maps to a real award gallery and shows a photo.
+ok('all 5 stages carry an awardId', () => {
   const m = src.match(/awardId:\s*\d+/g) || []
-  assert.equal(m.length, 6, `expected 6 awardId mappings, found ${m.length}`)
+  assert.equal(m.length, 5, `expected 5 awardId mappings, found ${m.length}`)
 })
 
 ok('consumes useStageGalleries + BaseGalleryModal', () => {

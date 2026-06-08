@@ -1,7 +1,7 @@
 <template>
   <section
     class="intl-stages relative w-full overflow-hidden bg-[var(--bg-elevated,#0C0C0F)] px-6 py-24 lg:px-20 lg:py-32"
-    aria-label="International stages"
+    aria-label="Track record — career and international stages"
   >
     <div class="relative z-10 mx-auto w-full max-w-7xl">
       <!-- Header -->
@@ -9,22 +9,85 @@
         class="mb-3 text-[0.7rem] uppercase tracking-[0.32em] text-[var(--accent-cyan,#06B6D4)]"
         style="font-family: 'JetBrains Mono', ui-monospace, monospace;"
       >
-        international stages
+        track record
       </p>
       <h2
         class="mb-3 max-w-3xl text-3xl font-bold leading-tight text-[var(--fg-primary,#EDEDEF)] md:text-4xl lg:text-5xl"
         style="font-family: 'Space Grotesk', sans-serif;"
       >
-        Invited to the world's
-        <span class="text-[var(--accent-cyan,#06B6D4)]">stages.</span>
+        16 countries. 17 years.
+        <span class="text-[var(--accent-gold,#D4A843)]">One operator.</span>
       </h2>
       <p
         class="mb-12 max-w-2xl text-base leading-relaxed text-[var(--fg-muted,#8A8F98)]"
         style="font-family: 'Inter', sans-serif; font-weight: 300;"
       >
-        From Hangzhou to Silicon Valley to Bengaluru — recognized on global stages across 16 countries.
+        From the factory floor to the world's stages — one continuous arc.
       </p>
 
+      <!-- Career band -->
+      <p
+        class="mb-5 text-[0.7rem] uppercase tracking-[0.28em] text-[var(--accent-gold,#D4A843)]"
+        style="font-family: 'JetBrains Mono', ui-monospace, monospace;"
+      >
+        the 17-year arc
+      </p>
+      <div class="mb-14 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <article
+          v-for="chapter in careerChapters"
+          :key="chapter.id"
+          class="career-card relative flex flex-col overflow-hidden rounded-2xl border border-[var(--accent-gold,#D4A843)]/20 bg-[var(--bg-deep,#050506)] p-6 lg:p-7"
+        >
+          <!-- Location + years -->
+          <div class="mb-4 flex items-center gap-2">
+            <span class="text-base" aria-hidden="true">{{ chapter.flag }}</span>
+            <span
+              class="text-[0.7rem] uppercase tracking-[0.18em] text-[var(--accent-gold,#D4A843)]"
+              style="font-family: 'JetBrains Mono', ui-monospace, monospace;"
+            >
+              {{ chapter.location }}
+            </span>
+            <span
+              class="ml-auto text-[0.7rem] tracking-[0.1em] text-[var(--fg-muted,#8A8F98)]"
+              style="font-family: 'JetBrains Mono', ui-monospace, monospace;"
+            >
+              {{ chapter.years }}
+            </span>
+          </div>
+
+          <!-- Role -->
+          <h3
+            class="mb-1 text-lg font-semibold leading-snug text-[var(--fg-primary,#EDEDEF)] lg:text-xl"
+            style="font-family: 'Space Grotesk', sans-serif;"
+          >
+            {{ chapter.role }}
+          </h3>
+
+          <!-- Org -->
+          <p
+            class="mb-3 text-sm font-medium text-[var(--accent-gold,#D4A843)]"
+            style="font-family: 'Inter', sans-serif;"
+          >
+            {{ chapter.org }}
+          </p>
+
+          <!-- Proof line -->
+          <p
+            class="mt-auto text-[0.84rem] leading-relaxed text-[var(--fg-muted,#8A8F98)]"
+            style="font-family: 'Inter', sans-serif; font-weight: 300;"
+          >
+            {{ chapter.note }}
+          </p>
+        </article>
+      </div>
+
+      <!-- Stages band -->
+      <p
+        class="mb-5 text-[0.7rem] uppercase tracking-[0.28em] text-[var(--accent-cyan,#06B6D4)]"
+        style="font-family: 'JetBrains Mono', ui-monospace, monospace;"
+      >
+        global stages
+      </p>
       <!-- Stage cards -->
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <article
@@ -182,15 +245,38 @@ const stages = [
     result: '🥇 Wild Card Winner',
     note: 'BEKRAF × Fenox VC — global-stage Startup World Cup, grand finale in Silicon Valley.',
   },
+]
+
+// 17-year career arc — three chapters, text-only (no gallery). Facts verbatim from the
+// WHY-vault (10-Identity/experience.md): Singapore MNC IT → Marlin Booking → Sat Nusapersada.
+// Curated identity narrative; no /api column exists for it (mirrors the `stages` pattern).
+const careerChapters = [
   {
-    id: 'stage-idbyte',
-    awardId: 9,
+    id: 'career-singapore',
+    flag: '🇸🇬',
+    location: 'Singapore — Multinational IT',
+    years: '2008–2015',
+    role: 'Software Consultant → Solution Support',
+    org: 'exSYS · DHL Supply Chain · Thales/Gemalto · MPA Singapore',
+    note: 'Eight years of Java/J2EE/Oracle enterprise delivery for Asia-Pacific MNC clients.',
+  },
+  {
+    id: 'career-marlin',
     flag: '🇮🇩',
-    location: 'Jakarta, Indonesia',
-    year: '2017',
-    event: 'IDBYTE Connected',
-    result: 'Top 8 Finalist',
-    note: "Among the top finalists at one of Indonesia's largest digital-economy conferences.",
+    location: 'Indonesia — Startup',
+    years: '2016–2019',
+    role: 'Co-Founder & CEO',
+    org: 'Marlin Booking',
+    note: 'Digitized Indonesian ports for the Ministry of Transportation — $5M valuation, leading to UN-UNCTAD × Alibaba eFounders (1 of 48 in Asia).',
+  },
+  {
+    id: 'career-satnusa',
+    flag: '🇮🇩',
+    location: 'Indonesia — Manufacturing',
+    years: '2023–2025',
+    role: 'Head of Digital Transformation 4.0',
+    org: 'PT Sat Nusapersada (Satnusa), Batam',
+    note: 'Led a team of 31 shipping 56+ enterprise AI/IoT products and the MySatnusa Super App — $318K+ documented impact, which seeded INDUSIA.ai.',
   },
 ]
 
@@ -217,8 +303,17 @@ function openStage(stage) {
 </script>
 
 <style scoped>
-.stage-card {
+.stage-card,
+.career-card {
   transition: transform 200ms ease-out, border-color 200ms ease-out;
+}
+.career-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(212, 168, 67, 0.4);
+}
+@media (prefers-reduced-motion: reduce) {
+  .career-card { transition: none; }
+  .career-card:hover { transform: none; }
 }
 .stage-cover-grad {
   background: linear-gradient(to top, rgba(5, 5, 6, 0.55) 0%, transparent 55%);
