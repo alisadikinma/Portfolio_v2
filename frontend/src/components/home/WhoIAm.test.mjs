@@ -40,4 +40,16 @@ ok('origin + trilingual grounding', () => {
 ok('no placeholder / TODO markers', () =>
   assert.ok(!/TODO|FIXME|PLACEHOLDER|lorem ipsum/i.test(src), 'no placeholder markers'))
 
+// Task 2: the live bio is real HTML — must render sanitized, not escaped.
+ok('renders live bio via sanitized v-html (not escaped interpolation)', () => {
+  assert.ok(/v-html="cleanBio"/.test(src), 'missing v-html cleanBio binding')
+  assert.ok(/const\s+cleanBio\s*=\s*computed/.test(src), 'missing cleanBio computed')
+  assert.ok(!/\{\{\s*liveBio\s*\}\}/.test(src), 'must not raw-escape liveBio via interpolation')
+})
+
+ok('cleanBio sanitizes (allowlist + strips script/attrs)', () => {
+  assert.ok(/script/i.test(src) && /replace/.test(src), 'cleanBio must strip script/attributes')
+  assert.ok(/strong|em|<p|br/i.test(src), 'cleanBio must keep an emphasis/paragraph allowlist')
+})
+
 console.log(`\n${passed} checks passed.`)
