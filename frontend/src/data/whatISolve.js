@@ -18,7 +18,7 @@ export const tabs = [
     headline:
       'I ship production code at AI speed — without sacrificing architecture quality.',
     description:
-      'I turn prompts into deployed production apps. Claude Code is my IDE — I describe what I want, the AI writes the code, I review and ship. Not prototypes. Real products, live in production.',
+      'I turn prompts into deployed production apps — real products live in production, not prototypes.',
     bullets: [
       'Shipped production apps via vibe coding: Sparkfluence Studio, this portfolio, Indusia AI HMI',
       'Author of open-source Claude Code plugins with active installs',
@@ -38,7 +38,7 @@ export const tabs = [
     subtitle: 'The OS for your AI workforce',
     headline: 'The operating system for your AI workforce.',
     description:
-      'MANDOR AI turns coding agents into real teammates. Assign tasks like you would to a colleague — they pick up the work, write code, report blockers, and compound skills over time. Squads, Autopilots, and reusable Skills. Your next 10 hires won’t be human.',
+      'MANDOR AI turns coding agents into real teammates you assign work to — your next 10 hires won’t be human.',
     bullets: [
       'Open-source managed-agents platform — assign issues to agents on a shared board',
       'Works with 11+ agent CLIs (Claude Code, Codex, Copilot, Cursor, Gemini…)',
@@ -59,7 +59,7 @@ export const tabs = [
     headline:
       'Cinematic AI video at scale — for products, ads, and brand storytelling.',
     description:
-      'I produce broadcast-ready video without a camera or crew. Script to keyframes to cinematic render — all AI-generated with 3-layer audio and frame-accurate lip sync.',
+      'I produce broadcast-ready video without a camera or crew — script to cinematic render, fully AI-generated.',
     bullets: [
       'End-to-end AI video pipeline: script, storyboard, keyframes, video, audio — all AI-generated',
       'Published promotional videos on YouTube with real client projects',

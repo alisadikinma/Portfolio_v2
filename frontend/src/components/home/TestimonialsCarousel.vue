@@ -165,9 +165,9 @@
 
         <!-- Prev/Next arrows -->
         <button
-          v-if="canSlide"
+          v-if="showControls"
           type="button"
-          class="nav-arrow nav-arrow-prev max-md:hidden"
+          class="nav-arrow nav-arrow-prev"
           :disabled="activeIdx === 0"
           aria-label="Previous testimonials"
           @click="prev"
@@ -177,9 +177,9 @@
           </svg>
         </button>
         <button
-          v-if="canSlide"
+          v-if="showControls"
           type="button"
-          class="nav-arrow nav-arrow-next max-md:hidden"
+          class="nav-arrow nav-arrow-next"
           :disabled="activeIdx >= maxIdx"
           aria-label="Next testimonials"
           @click="next"
@@ -191,8 +191,8 @@
 
         <!-- Dots -->
         <div
-          v-if="canSlide"
-          class="mt-8 flex items-center justify-center gap-3 max-md:hidden"
+          v-if="showControls"
+          class="mt-8 flex items-center justify-center gap-3"
           role="tablist"
           aria-label="Testimonial slide nav"
         >
@@ -351,6 +351,12 @@ const maxIdx = computed(() =>
   Math.max(0, testimonials.value.length - visibleCards.value)
 )
 const canSlide = computed(() => maxIdx.value > 0)
+// JS-carousel controls (arrows + dots) only exist when the JS carousel is the
+// active driver — i.e. tablet/desktop (visibleCards > 1). On mobile the native
+// CSS scroll-snap rail handles navigation, so the controls are not rendered
+// (v-if), which also sidesteps the scoped `.nav-arrow` specificity beating a
+// `max-md:hidden` utility.
+const showControls = computed(() => canSlide.value && visibleCards.value > 1)
 // Per-step distance is gap-aware: one card + one gap = (100% + gap) / visibleCards.
 // (gap-5 = 1.25rem; kept in sync with the track's `gap-5` class in the template.)
 
