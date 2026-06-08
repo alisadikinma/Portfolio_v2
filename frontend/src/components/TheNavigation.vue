@@ -282,6 +282,14 @@ onMounted(async () => {
   // sections have had a tick to render (homepage data + section v-if resolve).
   updateActiveSection()
   activeSectionTimer = setTimeout(updateActiveSection, 400)
+  // Lazy media above the viewport can shift section offsets after load while the
+  // user is stationary — recompute once everything has loaded so the highlight
+  // isn't left stale until the next scroll.
+  if (document.readyState === 'complete') {
+    setTimeout(updateActiveSection, 1200)
+  } else {
+    window.addEventListener('load', updateActiveSection, { once: true })
+  }
 
   await fetchSiteSettings(true)
 })
