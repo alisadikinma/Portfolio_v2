@@ -12,8 +12,17 @@ class PageSectionSeeder extends Seeder
      */
     public function run(): void
     {
+        // The Operator redesign (2026-06-08): homepage renders a fixed 9-section
+        // spine (kebab-case). Drop the legacy snake_case ghosts the new Home.vue
+        // no longer renders so they don't linger as ghost toggles in the admin.
+        // Scoped to page_type='homepage' — about/projects/blog rows untouched.
+        // Idempotent: a no-op once the ghosts are gone.
+        PageSection::where('page_type', 'homepage')
+            ->whereIn('section_type', ['featured_projects', 'latest_blog', 'awards', 'gallery', 'cta'])
+            ->delete();
+
         $sections = [
-            // Homepage sections (all active)
+            // Homepage — The Operator 9-section spine (all active), in render order.
             [
                 'page_type' => 'homepage',
                 'section_type' => 'hero',
@@ -22,39 +31,51 @@ class PageSectionSeeder extends Seeder
             ],
             [
                 'page_type' => 'homepage',
-                'section_type' => 'featured_projects',
+                'section_type' => 'who-i-am',
                 'is_active' => true,
                 'sequence' => 1,
             ],
             [
                 'page_type' => 'homepage',
-                'section_type' => 'latest_blog',
+                'section_type' => 'what-i-solve',
                 'is_active' => true,
                 'sequence' => 2,
             ],
             [
                 'page_type' => 'homepage',
-                'section_type' => 'awards',
+                'section_type' => 'receipts',
                 'is_active' => true,
                 'sequence' => 3,
             ],
             [
                 'page_type' => 'homepage',
-                'section_type' => 'gallery',
+                'section_type' => 'international-stages',
                 'is_active' => true,
                 'sequence' => 4,
             ],
             [
                 'page_type' => 'homepage',
-                'section_type' => 'testimonials',
+                'section_type' => 'selected-work',
                 'is_active' => true,
                 'sequence' => 5,
             ],
             [
                 'page_type' => 'homepage',
-                'section_type' => 'cta',
+                'section_type' => 'testimonials',
                 'is_active' => true,
                 'sequence' => 6,
+            ],
+            [
+                'page_type' => 'homepage',
+                'section_type' => 'latest-writing',
+                'is_active' => true,
+                'sequence' => 7,
+            ],
+            [
+                'page_type' => 'homepage',
+                'section_type' => 'join-the-build',
+                'is_active' => true,
+                'sequence' => 8,
             ],
 
             // About Page sections (all inactive by default)

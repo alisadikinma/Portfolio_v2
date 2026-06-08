@@ -947,25 +947,29 @@ After updating `.env`, run `php artisan config:cache && systemctl restart portfo
 
 `/admin/page-sections` rows are keyed by `(page_type, section_type)`. The table below lists which view reads which `section_type` — if a row exists in DB but isn't listed here, toggling it is a **ghost toggle** (no render effect). Always keep this in sync when adding/removing sections from views.
 
+**The Operator redesign (June 8, 2026):** homepage recomposed into a fixed 9-section identity-led spine. All homepage `section_type`s are kebab-case; `PageSectionSeeder` deletes the obsolete snake_case homepage ghosts (`featured_projects`, `latest_blog`, `awards`, `gallery`, `cta`) on seed. `Home.vue::isSectionActive` is **default-on for rows absent from DB** (so the spine renders before the seeder runs), and respects `is_active` for rows that exist.
+
 | page_type | section_type | Rendered by | Component |
 |---|---|---|---|
-| `homepage` | `hero` | [Home.vue](frontend/src/views/Home.vue) | `CinematicHero` |
-| `homepage` | `skills-reel` | Home.vue | `SkillsReel` |
-| `homepage` | `what-i-solve` | Home.vue | `WhatISolveTabs` (Phase 3 expanded May 5 — 4-discipline tabbed switcher with autoplay loop muted video per tab; absorbed Vibe Coding + AI Automation + AI Agents + AI Video Gen content from the 4 retired SkillShowcase sections) |
-| ~~`skill-vibe-coding`~~ | ~~Home.vue~~ | ~~`SkillShowcase`~~ | RETIRED May 5 — content merged into `what-i-solve` |
-| ~~`skill-ai-automation`~~ | ~~Home.vue~~ | ~~`SkillShowcase`~~ | RETIRED May 5 — content merged into `what-i-solve` |
-| ~~`skill-ai-agents`~~ | ~~Home.vue~~ | ~~`SkillShowcase`~~ | RETIRED May 5 — content merged into `what-i-solve` |
-| ~~`skill-ai-video`~~ | ~~Home.vue~~ | ~~`SkillShowcase`~~ | RETIRED May 5 — content merged into `what-i-solve` |
-| `homepage` | `featured-projects` | Home.vue | `ProjectsBento` |
-| `homepage` | `latest-blog` | Home.vue | `LatestBlog` (1 hero + 3 stacked secondary; per_page=4) |
+| `homepage` | `hero` | [Home.vue](frontend/src/views/Home.vue) | `HeroOperator` (person-forward montage video + ALI SADIKIN MA wordmark + manifesto + 3 CTAs + stat triad; reduced-motion poster fallback. Replaced `CinematicHero` June 8.) |
+| `homepage` | `who-i-am` | Home.vue | `WhoIAm` (answer-shaped LLM-quotable about block + real portrait from `settings.about.profile_photo` + identity chips) |
+| `homepage` | `what-i-solve` | Home.vue | `WhatISolveTabs` (3-discipline tabbed switcher: Vibe Coding · AI Agent OS **MANDOR AI** `Introducing` · Generative Video; autoplay muted video per tab) |
+| `homepage` | `receipts` | Home.vue | `ReceiptsBento` (6-tile proof bento, gold lead = #1 Global AI Demo Day 2026; live 56+/17yr from stats, static $318K+/16/≥95%) |
+| `homepage` | `international-stages` | Home.vue | `InternationalStages` (6 curated stage cards: Bengaluru/Hangzhou-UNCTAD/Silicon Valley/NextDev/Fenox/IDBYTE — static identity facts) |
+| `homepage` | `selected-work` | Home.vue | `SelectedWork` (live `featured.featured_projects` cards → `/projects/{slug}`; footer "All N projects") |
 | `homepage` | `testimonials` | Home.vue | `TestimonialsCarousel` (LinkedIn-sourced quotes, 8s auto-rotate, pause-on-hover, dots nav, keyboard ←/→) |
-| `homepage` | `stats-cta` | Home.vue | `StatsBar` + `CTASection` (home variant) |
+| `homepage` | `latest-writing` | Home.vue | `LatestWriting` (live `featured.latest_articles` feed + Content Engine meta-flex "this blog writes itself") |
+| `homepage` | `join-the-build` | Home.vue | `JoinTheBuild` (follow @alisadikinma IG·TikTok·LI·YT + live newsletter signup name/email/WA E.164 + soft WhatsApp CTA) |
+| ~~`homepage` `skills-reel`~~ | ~~Home.vue~~ | ~~`SkillsReel`~~ | RETIRED June 8 — dropped from The Operator spine |
+| ~~`homepage` `featured-projects`~~ | ~~Home.vue~~ | ~~`ProjectsBento`~~ | RETIRED June 8 — superseded by `selected-work` / `SelectedWork` |
+| ~~`homepage` `latest-blog`~~ | ~~Home.vue~~ | ~~`LatestBlog`~~ | RETIRED June 8 — superseded by `latest-writing` / `LatestWriting` |
+| ~~`homepage` `stats-cta`~~ | ~~Home.vue~~ | ~~`StatsBar`+`CTASection`~~ | RETIRED June 8 — superseded by `receipts` + `join-the-build` |
 | `about` | `cta` | [About.vue](frontend/src/views/About.vue) | `CTASection` (root variant, WhatsApp + social) |
 | `projects` | `cta` | [Projects.vue](frontend/src/views/Projects.vue) | `CTASection` (root variant) |
 | `gallery` | `cta` | [Gallery.vue](frontend/src/views/Gallery.vue) | `CTASection` (root variant) |
 | `blog` | `cta` | [BlogDetail.vue](frontend/src/views/BlogDetail.vue) | `CTASection` (root variant) — **article detail, NOT list** |
 
-**Naming convention:** `section_type` is kebab-case. Legacy snake_case rows (`featured_projects`, `latest_blog`, `cta` on homepage) exist in production DB as orphan ghosts from the original seeder — views do not read them. Don't revive snake_case; always use kebab-case for new sections and keep `PageSectionSeeder` in sync.
+**Naming convention:** `section_type` is kebab-case. The retired homepage components (`SkillsReel`, `SkillShowcase`, `ProjectsBento`, `LatestBlog`, `StatsBar`, `CTASection` home-variant, `CinematicHero`) still exist on disk until the Phase J cleanup. Don't revive snake_case; always use kebab-case for new sections and keep `PageSectionSeeder` in sync.
 
 **Home.vue snap-section gotcha:** `.snap-section` wrapper has `min-height: 100dvh` — putting `v-if="isSectionActive(...)"` on the inner component while keeping the wrapper always-rendered leaves a full-viewport blank space when the section is toggled off. Always put the `v-if` on the `<div class="snap-section">` wrapper itself so the whole section collapses.
 
