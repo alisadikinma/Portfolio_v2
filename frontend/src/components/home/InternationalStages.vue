@@ -309,7 +309,8 @@ const careerChapters = [
     role: 'Head of Digital Transformation 4.0',
     org: 'PT Sat Nusapersada (Satnusa), Batam',
     note: 'Led a team of 31 shipping 56+ enterprise AI/IoT products and the MySatnusa Super App — $318K+ documented impact, which seeded INDUSIA.ai.',
-    galleryIds: [], // no gallery linked yet → text-only fallback
+    // "Digital Transformation Leadership — Building AI-Driven Efficiency" gallery
+    galleryIds: [16],
   },
 ]
 
