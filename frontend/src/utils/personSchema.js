@@ -9,6 +9,7 @@
 const SITE = 'https://alisadikinma.com'
 
 const DEFAULT_SAME_AS = [
+  'https://www.wikidata.org/wiki/Q140135628',
   'https://www.linkedin.com/in/alisadikinma/',
   'https://www.instagram.com/alisadikinma',
   'https://www.tiktok.com/@alisadikinma',

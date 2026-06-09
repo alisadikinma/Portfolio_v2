@@ -40,6 +40,11 @@ ok('sameAs[] entity graph (LinkedIn present)', () => {
     'sameAs must include LinkedIn')
 })
 
+ok('sameAs[] links the Wikidata entity (Q140135628)', () => {
+  assert.ok(person.sameAs.some((u) => /wikidata\.org\/wiki\/Q140135628/.test(u)),
+    'sameAs must include the Wikidata Q-ID for Knowledge Graph reconciliation')
+})
+
 ok('accepts overrides (image + sameAs)', () => {
   const o = buildPersonSchema({ image: 'https://x/y.jpg', sameAs: ['https://example.com/a'] })
   assert.equal(o.image, 'https://x/y.jpg')
