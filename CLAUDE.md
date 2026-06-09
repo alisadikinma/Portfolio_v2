@@ -11,6 +11,19 @@ Pre-read MANDATORY via `obsidian` MCP `read-note`:
 
 Persist decisions: append ke vault README section "Decision Log" via `obsidian` MCP `edit-note`. JANGAN minta user re-explain context yang sudah ada di vault.
 
+## 🕸️ graphify (code-structure brain — HOW)
+
+This repo has a knowledge graph at `graphify-out/` (god nodes, community structure, cross-file relationships). Two-brain split: **graphify = HOW (code structure)**, the Obsidian vault = WHY (intent/decisions).
+
+**Rules:**
+- **Graph for structure, grep for literals — complementary, not either/or.** Use `graphify query "<question>"` for "where/how is X / what calls Y / which files relate" — it returns a scoped subgraph, usually far smaller than `GRAPH_REPORT.md` or raw output (local graph default `graphify-out/graph.json`). Keep using grep/Read for literal strings AND for code edited since the last `graphify update` (the graph is AST-indexed, not live — fresh edits may be stale until re-indexed).
+- Cross-project questions (spanning repos, or "don't know which project") → query the federated graph: `graphify query "<question>" --graph ~/.graphify/global-graph.json`.
+- If `graphify-out/wiki/index.md` exists, use it for broad navigation before raw source browsing.
+- Read `graphify-out/GRAPH_REPORT.md` only for broad architecture review when query/path/explain don't surface enough.
+- **After modifying code, run `graphify update .`** to keep the local graph current (AST-only, no API cost). To refresh the global brain for this project: `graphify global add graphify-out/graph.json --as Portfolio_v2`.
+
+**Two-brain bridge (loose-coupled by design):** graphify (HOW) and the vault (WHY) are NOT edge-linked — routing happens at agent/query time per `~/CLAUDE.md`. When recording a durable decision in the vault README "Decision Log", add a `file:line` (or symbol name) backlink to the implementing code so decision↔code is a 1-hop jump. Vault recall is sequential file-read (not semantic), so keep notes lean/high-signal (R1) — this stays fine while the vault is small; vector-RAG was deliberately dropped (YAGNI), re-evaluate only if the vault exceeds ~5000 files AND keyword/graph recall proves insufficient.
+
 ## Project Overview
 
 Portfolio_v2 is a full-stack portfolio, blog, and CMS platform using Laravel 12 (backend API) and Vue 3 (frontend SPA). Development on Windows 11.
