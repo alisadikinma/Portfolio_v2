@@ -6,6 +6,7 @@ use App\Models\ImageGenerationJob;
 use App\Models\LinkedInPost;
 use App\Models\Setting;
 use App\Support\LinkedInProgressEmitter;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -386,6 +387,14 @@ class LinkedInCarouselImageService
                 'slide_index' => $job->slide_index,
                 'url' => $localUrl,
             ]);
+
+            // Early parallel fan-out (June 9, 2026): the moment THIS completion
+            // makes every slide 'done', kick off the cross-post fan-out
+            // immediately instead of waiting up to 2 min for the next
+            // social-cross-post:scan tick. Dispatches the targeted scan
+            // (bypasses window + virality gates per the operator opt-in).
+            $this->maybeDispatchCrossPostFanout($job->linkedin_post_id);
+
             return true;
         }
 
@@ -807,6 +816,73 @@ class LinkedInCarouselImageService
 
             $draft->update(['carousel_slides' => $slides]);
         });
+    }
+
+    /**
+     * Early parallel fan-out trigger (Phase C, 2026-06-09). When THIS slide
+     * completion makes every carousel slide 'done', enqueue the targeted
+     * social-cross-post:scan so IG/TikTok/Threads/FB siblings generate right
+     * away instead of waiting up to 2 min for the next reaper tick.
+     *
+     * Idempotent — skips when: format != carousel, any slide not yet 'done',
+     * or a sibling row already exists (a later per-slide retry re-completing
+     * won't re-fan-out). The scan command also does its own idempotency check;
+     * this is belt-and-suspenders. Dispatch failure is non-fatal — the
+     * every-2-min social-cross-post:scan reaper (Phase D widened gate) still
+     * catches the draft.
+     */
+    private function maybeDispatchCrossPostFanout(?int $draftId): void
+    {
+        if ($draftId === null) {
+            return;
+        }
+
+        $draft = LinkedInPost::find($draftId);
+        if (! $draft || $draft->format !== 'carousel') {
+            return;
+        }
+
+        $slides = is_array($draft->carousel_slides) ? $draft->carousel_slides : [];
+        if ($slides === []) {
+            return;
+        }
+        foreach ($slides as $slide) {
+            if (($slide['image_status'] ?? null) !== 'done') {
+                return; // not all rendered yet
+            }
+        }
+
+        // Already fanned out? skip (avoids re-dispatch when a per-slide retry
+        // re-completes after siblings were created).
+        if ($draft->instagramPost()->exists()
+            || $draft->tiktokPost()->exists()
+            || $draft->threadsPost()->exists()
+            || $draft->facebookPost()->exists()) {
+            return;
+        }
+
+        try {
+            $this->dispatchCrossPostScan($draftId);
+            Log::info('[LinkedInCarouselImage] all slides done — dispatched targeted cross-post fan-out', [
+                'draft_id' => $draftId,
+                'slide_count' => count($slides),
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('[LinkedInCarouselImage] cross-post fan-out dispatch failed (reaper will retry)', [
+                'draft_id' => $draftId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Enqueue the targeted cross-post scan. Extracted as a protected seam so
+     * tests can assert the fan-out decision without depending on Laravel's
+     * queued-command internals.
+     */
+    protected function dispatchCrossPostScan(int $draftId): void
+    {
+        Artisan::queue('social-cross-post:scan', ['--draft-id' => $draftId]);
     }
 
     /**
