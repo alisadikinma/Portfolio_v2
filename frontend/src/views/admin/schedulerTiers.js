@@ -12,6 +12,10 @@
  * The ~8 schedules the operator legitimately retimes or runs on demand.
  * Everything NOT in this set (and not a placeholder) is treated as a
  * self-healing internal and hidden behind a collapsed accordion.
+ *
+ * MAINTENANCE: when a new operator-tunable command ships, add its signature
+ * here — otherwise it silently classifies as 'system' (collapsed). The size
+ * assertion in schedulerTiers.test.mjs will fail as a forcing reminder.
  */
 export const OPERATOR_SIGNATURES = new Set([
   'content:auto-pipeline',
