@@ -9,7 +9,8 @@ dispatch but never execute, schedules are defined but never fire.
 
 | File | Purpose |
 |---|---|
-| `portfolio-queue.service` | systemd unit running `php artisan queue:work` |
+| `portfolio-queue.service` | systemd unit running `php artisan queue:work` on the `default` queue |
+| `portfolio-crosspost@.service` | systemd **template** unit — N parallel workers on the `social-crosspost` queue (cross-post caption-gen) |
 | `portfolio-scheduler.crontab` | crontab line running `php artisan schedule:run` every minute |
 
 ## One-time installation (manual operator step)
@@ -33,6 +34,32 @@ sudo journalctl -u portfolio-queue.service -f --since "5 minutes ago"
 
 You should see `[INFO] Processing jobs from the [default] queue.` (idle) or
 job batch lines (active).
+
+### 1b. Cross-post worker pool (systemd template — June 9, 2026)
+
+The default-carousel pipeline fans out each blog post to Instagram + TikTok +
+Threads + Facebook at once. Those caption-gen jobs run on the dedicated
+`social-crosspost` queue so they execute **in parallel** instead of serially
+behind the `default` worker. Run 4 instances (one per platform):
+
+```bash
+# On VPS, as root:
+sudo cp /var/www/Portfolio_v2/scripts/systemd/portfolio-crosspost@.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now portfolio-crosspost@{1..4}
+
+# Verify all 4 are active:
+sudo systemctl list-units 'portfolio-crosspost@*'
+sudo journalctl -u 'portfolio-crosspost@*' -f --since "5 minutes ago"
+```
+
+You should see `[INFO] Processing jobs from the [social-crosspost] queue.`
+
+**RAM check first:** each instance ≈ worker (~75MB) + one claude subprocess
+(~250MB) during a caption-gen → ~1.3GB peak for 4. Run `free -h` and confirm
+headroom before enabling all 4; drop to `@{1..2}` on a constrained box (still
+2× faster than serial). Without this pool the fan-out still works — it just
+runs serially on the `default` worker (~2–6 min for 4 platforms).
 
 ### 2. Scheduler (crontab)
 

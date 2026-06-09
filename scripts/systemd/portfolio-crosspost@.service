@@ -1,0 +1,59 @@
+[Unit]
+# Parallel cross-post caption-gen worker pool for Portfolio_v2 (June 9, 2026).
+#
+# The default-carousel pipeline fans out a blog post to 4 platforms
+# (Instagram / TikTok / Threads / Facebook) at once. Each platform's
+# Generate*Post job is an independent SSH->claude caption-gen call (~30-90s).
+# The single `portfolio-queue.service` worker on the `default` queue runs jobs
+# SERIALLY, so 4 fan-out jobs would take ~2-6 min end-to-end. This TEMPLATE
+# unit runs N instances dedicated to the `social-crosspost` queue so the 4
+# caption-gens execute CONCURRENTLY ("di-trigger jalan bersamaan").
+#
+# Cross-post Generate*Post jobs are dispatched ->onQueue('social-crosspost')
+# by ScanLinkedInForCrossPost. The default worker keeps owning `default`
+# (LinkedIn gen, carousel image rendering) so cross-post load never starves
+# the primary pipeline.
+#
+# Install on VPS (recommended 4 instances = one per platform):
+#   sudo cp scripts/systemd/portfolio-crosspost@.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now portfolio-crosspost@{1..4}
+#   sudo systemctl status 'portfolio-crosspost@*'
+#
+# Verify concurrency:
+#   systemctl list-units 'portfolio-crosspost@*'   # → 4 active units
+#
+# `php artisan queue:restart` (deploy.sh step 7) gracefully reloads ALL
+# workers including this pool after a deploy.
+#
+# RAM: each instance holds the worker (~75MB) + one claude subprocess
+# (~250MB) during a caption-gen. 4 instances ≈ ~1.3GB peak. Confirm VPS
+# headroom (free -h) before enabling all 4 — the leak-safe --mcp-config
+# empty config is carried via .env (LINKEDIN_GEN_EMPTY_MCP_CONFIG), so no
+# obsidian-mcp leak per the April 29 2026 fix.
+Description=Portfolio_v2 cross-post caption-gen worker (instance %i)
+After=network.target mysql.service
+
+[Service]
+Type=simple
+User=claudesn
+Group=claudesn
+WorkingDirectory=/var/www/Portfolio_v2/backend
+# --queue=social-crosspost — dedicated lane for IG/TikTok/Threads/FB caption-gen.
+# --timeout=900           — per-job ceiling; Generate{IG,TT,TH,FB}Post have
+#                            $timeout=360, comfortably under this.
+# --max-time=3600         — recycle hourly to release memory; Restart=always
+#                            brings the instance straight back.
+# --backoff=60,300,900    — matches the platform job class retry settings.
+ExecStart=/usr/bin/php artisan queue:work --queue=social-crosspost --sleep=3 --tries=3 --timeout=900 --max-time=3600 --backoff=60,300,900
+SuccessExitStatus=137 SIGKILL
+MemoryHigh=2G
+MemoryMax=3G
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=portfolio-crosspost@%i
+
+[Install]
+WantedBy=multi-user.target

@@ -19,6 +19,7 @@ use App\Models\ThreadsPost;
 use App\Models\TiktokPost;
 use App\Services\TelegramNotificationService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -72,34 +73,58 @@ class ScanLinkedInForCrossPost extends Command
             ? max(0, (int) $this->option('min-virality'))
             : (int) Setting::get('linkedin_virality_min_score', 60);
 
-        $eligibleStatuses = [
+        $publishReadyStatuses = [
             LinkedInPostStatus::AwaitingPublish->value,
             LinkedInPostStatus::Published->value,
         ];
+        $terminalStatuses = [
+            LinkedInPostStatus::Cancelled->value,
+            LinkedInPostStatus::Failed->value,
+        ];
 
         $draftIdFilter = $this->option('draft-id');
+        $targeted = $draftIdFilter !== null && $draftIdFilter !== '';
 
         $query = LinkedInPost::query()
-            ->whereIn('status', $eligibleStatuses)
             ->with(['post.contentIdea:id,result_post_id,virality_score']);
 
-        if ($draftIdFilter !== null && $draftIdFilter !== '') {
-            // Targeted scan from /publish-all cascade — bypass time window
-            // and virality gate. The operator already opted in by clicking
-            // the cascade button, fan-out is the explicit intent.
+        if ($targeted) {
+            // Targeted scan — from the /publish-all cascade OR the event-driven
+            // all-slides-done dispatch in LinkedInCarouselImageService. Bypass
+            // status + window + virality gates: the caller explicitly opted in.
+            // disqualify() still enforces format + all-slides-done + idempotency,
+            // so a carousel in manual_review/validating with rendered slides
+            // fans out, while an unrendered one is still skipped.
             $query->where('id', (int) $draftIdFilter);
-            $this->info("Targeted scan: draft id={$draftIdFilter} (window + virality gates bypassed)");
+            $this->info("Targeted scan: draft id={$draftIdFilter} (status + window + virality gates bypassed)");
         } else {
-            $query->where('updated_at', '>=', now()->subHours($hours));
-        }
-
-        if ($minVirality > 0 && ($draftIdFilter === null || $draftIdFilter === '')) {
-            $query->whereHas('post.contentIdea', function ($q) use ($minVirality) {
-                $q->where('virality_score', '>=', $minVirality);
+            // Reaper gate (June 9, 2026 — widened for default-carousel). Pick up:
+            //   (a) any draft at awaiting_publish/published (text + carousel,
+            //       the original behavior), OR
+            //   (b) any CAROUSEL draft in a non-terminal state — so it fans out
+            //       the moment its slides render (disqualify() enforces
+            //       all-slides-done), without waiting for the LinkedIn FSM to
+            //       reach awaiting_publish.
+            // Text drafts still require awaiting_publish/published — they have
+            // no slides to gate on, so operator/scheduler readiness stays the
+            // trigger (avoids fanning out text siblings mid-generation).
+            $query->where(function ($q) use ($publishReadyStatuses, $terminalStatuses) {
+                $q->whereIn('status', $publishReadyStatuses)
+                    ->orWhere(function ($q2) use ($terminalStatuses) {
+                        $q2->where('format', 'carousel')
+                            ->whereNotIn('status', $terminalStatuses);
+                    });
             });
-            $this->info("Virality gate active: contentIdea.virality_score >= {$minVirality}");
-        } else {
-            $this->info('Virality gate disabled (min-virality=0)');
+            $query->where('updated_at', '>=', now()->subHours($hours));
+
+            if ($minVirality > 0) {
+                $query->whereHas('post.contentIdea', function ($q) use ($minVirality) {
+                    $q->where('virality_score', '>=', $minVirality);
+                });
+                $this->info("Virality gate active: contentIdea.virality_score >= {$minVirality}");
+            } else {
+                $this->info('Virality gate disabled (min-virality=0)');
+            }
         }
 
         $candidates = $query
@@ -117,10 +142,27 @@ class ScanLinkedInForCrossPost extends Command
         $stats = ['fb_text' => 0, 'fb_carousel' => 0, 'ig' => 0, 'tt' => 0, 'skipped' => 0];
 
         foreach ($candidates as $linkedinPost) {
+            // Per-draft mutex (June 9, 2026): the cross-post tables have NO DB
+            // unique constraint on post_id (MySQL can't do partial unique
+            // indexes on deleted_at — see the create_*_posts migrations), so
+            // disqualify()'s check-then-create is a TOCTOU window. The new
+            // event-driven fan-out (LinkedInCarouselImageService) raises how
+            // often a targeted --draft-id scan overlaps the every-2-min reaper
+            // scan (cron vs default worker = separate processes). A non-blocking
+            // lock keyed by draft id serializes concurrent scans of the SAME
+            // draft so two can't both pass disqualify() and double-create.
+            $lock = Cache::lock("crosspost-fanout:{$linkedinPost->id}", 60);
+            if (! $lock->get()) {
+                $this->line("  - skip LI#{$linkedinPost->id}: fan-out lock held by a concurrent scan");
+                $stats['skipped']++;
+                continue;
+            }
+
             $reason = $this->disqualify($linkedinPost);
             if ($reason !== null) {
                 $this->line("  - skip LI#{$linkedinPost->id} (post #{$linkedinPost->post_id}): {$reason}");
                 $stats['skipped']++;
+                $lock->release();
                 continue;
             }
 
@@ -128,6 +170,7 @@ class ScanLinkedInForCrossPost extends Command
             $this->line("  + LI#{$linkedinPost->id} (post #{$linkedinPost->post_id}) format={$format}");
 
             if ($dryRun) {
+                $lock->release();
                 continue;
             }
 
@@ -181,6 +224,8 @@ class ScanLinkedInForCrossPost extends Command
                     'format' => $format,
                     'error' => $e->getMessage(),
                 ]);
+            } finally {
+                $lock->release();
             }
         }
 
@@ -283,7 +328,7 @@ class ScanLinkedInForCrossPost extends Command
             ]],
         ]);
 
-        GenerateFacebookPost::dispatch($draft->id);
+        GenerateFacebookPost::dispatch($draft->id)->onQueue('social-crosspost');
         Log::info('[CrossPostScan] FB draft created + dispatched', [
             'linkedin_post_id' => $li->id,
             'facebook_post_id' => $draft->id,
@@ -305,7 +350,7 @@ class ScanLinkedInForCrossPost extends Command
             ]],
         ]);
 
-        GenerateInstagramPost::dispatch($draft->id);
+        GenerateInstagramPost::dispatch($draft->id)->onQueue('social-crosspost');
         Log::info('[CrossPostScan] IG draft created + dispatched', [
             'linkedin_post_id' => $li->id,
             'instagram_post_id' => $draft->id,
@@ -326,7 +371,7 @@ class ScanLinkedInForCrossPost extends Command
             ]],
         ]);
 
-        GenerateTiktokPost::dispatch($draft->id);
+        GenerateTiktokPost::dispatch($draft->id)->onQueue('social-crosspost');
         Log::info('[CrossPostScan] TT draft created + dispatched', [
             'linkedin_post_id' => $li->id,
             'tiktok_post_id' => $draft->id,
@@ -348,7 +393,7 @@ class ScanLinkedInForCrossPost extends Command
             ]],
         ]);
 
-        GenerateThreadsPost::dispatch($draft->id);
+        GenerateThreadsPost::dispatch($draft->id)->onQueue('social-crosspost');
         Log::info('[CrossPostScan] Threads draft created + dispatched', [
             'linkedin_post_id' => $li->id,
             'threads_post_id' => $draft->id,
