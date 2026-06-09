@@ -161,19 +161,22 @@
                 loading="lazy"
                 decoding="async"
               />
-              <!-- Video element — autoplay muted loop, lazy preload until in viewport -->
+              <!-- Video element — autoplay muted loop; webm with mp4 fallback, jpg poster -->
               <video
                 v-else-if="active.videoSrc && !videoBroken[active.id]"
-                :key="active.videoSrc"
-                :src="active.videoSrc"
+                :key="active.id"
                 class="h-full w-full object-cover"
                 autoplay
                 loop
                 muted
                 playsinline
                 preload="metadata"
+                :poster="active.poster || undefined"
                 @error="onVideoError(active.id)"
-              />
+              >
+                <source v-if="active.videoWebmSrc" :src="active.videoWebmSrc" type="video/webm" />
+                <source :src="active.videoSrc" type="video/mp4" />
+              </video>
               <!-- Fallback: gradient placeholder with icon -->
               <div
                 v-else
