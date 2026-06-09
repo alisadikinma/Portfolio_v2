@@ -600,7 +600,7 @@
                   </div>
                   <p v-else-if="tier === 'auto'" class="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">Auto-picks Deep for virality_score ≥ 70</p>
                   <p v-else-if="tier === 'quick'" class="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">Sonnet, 5-8 data points, fast</p>
-                  <p v-else class="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">Opus, 20-30 data points + entities + personas</p>
+                  <p v-else class="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">Sonnet, 20-30 data points + entities + personas</p>
                 </div>
               </label>
             </div>
@@ -1130,13 +1130,15 @@ const configInstructions = ref('')
 const configResearchTier = ref('auto')  // 'auto' | 'quick' | 'deep'
 
 const tierPreview = computed(() => {
+  // Model pinned to Sonnet for all tiers (VPS env ARTICLE_GEN_MODEL_RESEARCH_*
+  // = sonnet, June 2026 cost flip). Tier still drives research depth/time.
   const tier = configResearchTier.value
   const score = currentIdea.value?.virality_score
   if (tier === 'quick') return { model: 'Sonnet', time: '1-2 min' }
-  if (tier === 'deep') return { model: 'Opus', time: '5-8 min' }
+  if (tier === 'deep') return { model: 'Sonnet', time: '5-8 min' }
   // auto
   if (score == null) return { model: 'Sonnet', time: '1-2 min', note: 'no score yet → Quick' }
-  if (score >= 70) return { model: 'Opus', time: '5-8 min', note: `score ${score} ≥ 70 → Deep` }
+  if (score >= 70) return { model: 'Sonnet', time: '5-8 min', note: `score ${score} ≥ 70 → Deep` }
   return { model: 'Sonnet', time: '1-2 min', note: `score ${score} < 70 → Quick` }
 })
 
@@ -1242,16 +1244,13 @@ const articleGenerationPhases = pipelinePhases.filter(p => p.gate !== 'images')
 // Flatten for backward compat — keeps all phase step names including images
 const progressSteps = pipelinePhases.flatMap(p => p.steps)
 
-// Resolves the Claude model badge for the Research phase (dynamic based on
-// idea.research_tier_override + idea.virality_score). Quick tier → Sonnet,
-// Deep tier → Opus, Auto → Opus if virality_score ≥ 70 else Sonnet.
+// Resolves the Claude model badge for the Research phase. Cost-policy flip
+// (June 2026): the VPS pins ARTICLE_GEN_MODEL_RESEARCH_DEEP and _QUICK to
+// `sonnet`, so every research tier actually runs on Sonnet regardless of
+// tier/virality. The badge mirrors that env decision (was: deep/≥70 → Opus).
+// The deep vs quick tier still differs in depth/time, just not in model.
 function resolvedResearchModel(idea) {
-  if (!idea) return 'Sonnet'
-  const tier = idea.research_tier_override ?? 'auto'
-  if (tier === 'deep') return 'Opus'
-  if (tier === 'quick') return 'Sonnet'
-  // auto
-  return (idea.virality_score != null && idea.virality_score >= 70) ? 'Opus' : 'Sonnet'
+  return 'Sonnet'
 }
 
 // Research preview
