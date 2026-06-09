@@ -156,7 +156,11 @@ class SpaPrerenderController extends Controller
 
     public function blogCategory(Request $request, string $slug, ?string $lang = null)
     {
-        $lang = $this->normalizeLang($lang);
+        // Route params bind positionally in URI order, so for
+        // /{lang}/blog/category/{slug} the locale lands in $slug. Resolve by
+        // name so both the bare and locale-prefixed routes bind correctly.
+        $slug = $request->route('slug');
+        $lang = $this->normalizeLang($request->route('lang'));
         if (!$this->distExists()) {
             return $this->devFallback($this->categoryPath($lang, $slug));
         }
@@ -216,7 +220,11 @@ class SpaPrerenderController extends Controller
 
     public function blogDetail(Request $request, string $slug, ?string $lang = null)
     {
-        $lang = $this->normalizeLang($lang);
+        // Route params bind positionally in URI order, so for /{lang}/blog/{slug}
+        // the locale lands in $slug. Resolve by name so both the bare and
+        // locale-prefixed routes bind correctly.
+        $slug = $request->route('slug');
+        $lang = $this->normalizeLang($request->route('lang'));
         if (!$this->distExists()) {
             return $this->devFallback($this->blogDetailPath($lang, $slug));
         }
