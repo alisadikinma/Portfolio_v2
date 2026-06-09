@@ -15,6 +15,10 @@ const idea = ref(null)
 const loadError = ref(null)
 const activeLang = ref('id')
 const publishing = ref(false)
+// Set true when the user makes a change on this page (e.g. re-runs translation)
+// after the idea was already published — re-enables Publish so the updated
+// content can be re-published. Reset on a fresh load.
+const dirty = ref(false)
 
 // Translation state
 const translating = ref(false)
@@ -49,6 +53,7 @@ async function runTranslation() {
     const result = await translateArticle(idea.value.id)
     if (result.success && result.data) {
       idea.value = result.data
+      dirty.value = true
       toast.success('English translation ready.')
     } else {
       translationError.value = result.error || 'Translation failed.'
@@ -171,14 +176,23 @@ const translationMissing = computed(() => {
   return !en || en === id
 })
 
+// Idea already shipped to the blog (FSM terminal state). Re-publishing is only
+// meaningful after a fresh modification on this page (tracked via `dirty`).
+const alreadyPublished = computed(() => idea.value?.status === 'completed')
+
 const canPublish = computed(() =>
-  !publishing.value && !translating.value && !translationMissing.value
+  !publishing.value &&
+  !translating.value &&
+  !translationMissing.value &&
+  (!alreadyPublished.value || dirty.value)
 )
 
 const publishButtonLabel = computed(() => {
   if (publishing.value) return 'Publishing...'
   if (translating.value) return 'Waiting for English translation...'
   if (translationMissing.value) return 'Translation needed to publish'
+  if (alreadyPublished.value && !dirty.value) return 'Already Published'
+  if (alreadyPublished.value && dirty.value) return 'Re-publish to Blog'
   return 'Publish to Blog'
 })
 
@@ -327,25 +341,33 @@ async function handlePublish() {
 
       <!-- Bottom Bar -->
       <div class="sticky bottom-0 z-30 bg-white dark:bg-neutral-800 border-t border-neutral-200 dark:border-neutral-700 shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
-        <div class="max-w-3xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
-          <button @click="router.push(`/admin/content-engine/${idea.id}/images`)" class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg border border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
-            Back to Images
-          </button>
+        <div class="max-w-3xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <button @click="router.push({ name: 'admin-content-engine' })" class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg border border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+              Back to Content Engine
+            </button>
+            <button @click="router.push(`/admin/content-engine/${idea.id}/images`)" class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg border border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+              Back to Images
+            </button>
+          </div>
           <button
             @click="handlePublish"
             :disabled="!canPublish"
-            :title="translating ? 'English translation in progress — publish will enable when complete.' : (translationMissing ? 'Run English translation before publishing.' : '')"
+            :title="translating ? 'English translation in progress — publish will enable when complete.' : (translationMissing ? 'Run English translation before publishing.' : (alreadyPublished && !dirty ? 'Already published — modify the article to re-publish.' : ''))"
             :class="[
               'inline-flex items-center gap-1.5 px-5 py-2 text-sm font-medium rounded-lg text-white transition-colors disabled:opacity-70 disabled:cursor-not-allowed',
               translating ? 'bg-amber-500 hover:bg-amber-500' :
               translationMissing ? 'bg-neutral-400 hover:bg-neutral-400' :
+              (alreadyPublished && !dirty) ? 'bg-neutral-400 hover:bg-neutral-400' :
               'bg-green-600 hover:bg-green-700',
             ]"
           >
             <svg v-if="translating" class="animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+            <svg v-if="alreadyPublished && !dirty" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
             {{ publishButtonLabel }}
-            <svg v-if="!translating && !translationMissing" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+            <svg v-if="!translating && !translationMissing && !(alreadyPublished && !dirty)" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
           </button>
         </div>
       </div>
