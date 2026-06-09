@@ -584,9 +584,11 @@ class PublerClient
      */
     public function deletePost(string $postId): bool
     {
-        // post_ids MUST ride as a query-string array (the client forces a JSON
-        // content-type, so a body array wouldn't reach Publer's query parser).
-        $url = $this->url('/posts') . '?' . http_build_query(['post_ids' => [$postId]]);
+        // post_ids MUST ride as a query-string array with BARE brackets
+        // (`post_ids[]=id`). Publer ignores http_build_query's indexed form
+        // (`post_ids[0]=id`) and silently deletes nothing (deleted_ids:[]).
+        // Validated live June 10, 2026: bare brackets → deleted_ids populated.
+        $url = $this->url('/posts') . '?post_ids[]=' . urlencode($postId);
 
         $response = $this->client(['Publer-Workspace-Id' => $this->workspaceId()])
             ->delete($url);
