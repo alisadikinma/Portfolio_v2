@@ -101,6 +101,12 @@ echo "▶ php artisan db:seed telegram (idempotent)"
 php artisan db:seed --class=TelegramSettingsSeeder --force || \
   echo "  (seeder failed or already applied — continuing)"
 
+# LinkedIn operator flags (incl. linkedin_force_carousel, June 9 2026).
+# Idempotent via firstOrCreate — operator-edited values survive deploys.
+echo "▶ php artisan db:seed linkedin (idempotent)"
+php artisan db:seed --class=LinkedInSettingsSeeder --force || \
+  echo "  (seeder failed or already applied — continuing)"
+
 # Phase 6 partial — May 5: 4 LinkedIn-sourced testimonials. Idempotent
 # via updateOrCreate keyed on (client_name, source). Safe to re-run.
 echo "▶ php artisan db:seed linkedin_testimonials (idempotent)"
