@@ -4,7 +4,6 @@ use App\Services\DynamicScheduleRegistrar;
 use Illuminate\Console\Scheduling\Schedule as ScheduleClass;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -19,15 +18,8 @@ Artisan::command('inspire', function () {
 app(DynamicScheduleRegistrar::class)->register(app(ScheduleClass::class));
 
 /*
- * Static fallback schedule entries — registered alongside the dynamic
- * registry above. `withoutOverlapping(N)` makes them safe to run if the
- * DB-table-driven scheduler also picks them up (cron will simply no-op).
- *
- * social-cross-post:scan — every 2 minutes. Fans out finished LinkedIn
- * drafts to facebook_posts (always) + instagram_posts + tiktok_posts
- * (carousel format only). See ScanLinkedInForCrossPost for routing logic.
+ * social-cross-post:scan was the last static fallback here — promoted to a
+ * DB-driven row in ScheduledCommandSeeder (June 9, 2026) so it's operator-
+ * tunable from /admin/settings?tab=scheduler like every other schedule.
+ * All schedules are now DB-driven via the registrar above.
  */
-Schedule::command('social-cross-post:scan')
-    ->everyTwoMinutes()
-    ->withoutOverlapping(5)
-    ->runInBackground();

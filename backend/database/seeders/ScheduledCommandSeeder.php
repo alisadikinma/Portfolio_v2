@@ -13,18 +13,17 @@ use Illuminate\Database\Seeder;
  * routes/console.php plus 4 placeholder slots reserved for the IG/FB/TikTok
  * roadmap.
  *
- * Counts:
- *   - 5 content_engine
- *   - 7 linkedin
+ * Counts (real commands grow over time; placeholders fixed at 4):
+ *   - 5 content_engine (+ content:flag-stale-posts, see June 9 ship)
+ *   - 8 linkedin (incl. social-cross-post:scan, promoted from a static
+ *                 routes/console.php fallback — June 9, 2026)
  *   - 1 newsletter
- *   - 1 system (posting-rules:research)
- *   = 14 real, all enabled, is_placeholder=false
- *   + 4 placeholder (instagram x2, facebook x1, tiktok x1)
- *   = 18 rows total
+ *   - 1+ system (posting-rules:research, geminigen:circuit-probe)
+ *   + 4 placeholder (instagram x2, facebook x1, tiktok x1), is_placeholder=true
  *
- * (The plan draft mentioned "19 rows" but the actual real-command count
- * tallies to 14; the 4 placeholders bring the seed total to 18. The
- * /admin/scheduler tab still has space to add more roadmap rows later.)
+ * The exact total drifts as commands ship — the /admin/scheduler tab renders
+ * whatever is seeded. Treat the per-category lists below as authoritative,
+ * not the summary count.
  *
  * Idempotent via firstOrCreate keyed on `signature` — safe to re-run on
  * production (deploy.sh step 4 runs idempotent seeders).
@@ -172,6 +171,23 @@ class ScheduledCommandSeeder extends Seeder
                 'without_overlapping_minutes' => 15,
                 'arguments' => null,
                 'sort_order' => 70,
+            ],
+            [
+                // Default-carousel fan-out reaper (June 9, 2026). Promoted from
+                // a static routes/console.php fallback to a DB-driven row so it
+                // shows up in /admin/settings?tab=scheduler and is operator-
+                // tunable. Every 2 min: fan out carousel LinkedIn drafts whose
+                // slides are 'done' to IG/TikTok/Threads/FB (event-driven
+                // dispatch from the carousel webhook is the fast path; this is
+                // the safety reaper).
+                'signature' => 'social-cross-post:scan',
+                'display_name' => 'Social — Cross-Post Fan-Out (IG/TikTok/Threads/FB)',
+                'description' => 'Tiap 2 menit: fan out draft LinkedIn carousel yang slide-nya sudah selesai render ke Instagram + TikTok + Threads + Facebook. Idempotent — skip yang sudah punya sibling.',
+                'category' => 'linkedin',
+                'cron_expression' => '*/2 * * * *',
+                'without_overlapping_minutes' => 5,
+                'arguments' => null,
+                'sort_order' => 80,
             ],
 
             // ─────────────── Newsletter (1) ───────────────
