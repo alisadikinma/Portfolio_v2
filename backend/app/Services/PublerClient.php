@@ -500,14 +500,14 @@ class PublerClient
      * "missing the social network params" or "media incompatible"). Returns:
      *   ['ok' => bool, 'post_id' => ?string, 'error' => ?string]
      */
-    public function awaitPublishResult(string $jobId, int $maxTries = 15): array
+    public function awaitPublishResult(string $jobId, int $maxTries = 60): array
     {
         for ($i = 0; $i < $maxTries; $i++) {
             $job = $this->pollJob($jobId);
             $status = $job['status'] ?? 'unknown';
 
             if ($status === 'failed') {
-                return ['ok' => false, 'post_id' => null, 'error' => $job['error'] ?? 'Publer job failed'];
+                return ['ok' => false, 'timed_out' => false, 'post_id' => null, 'error' => $job['error'] ?? 'Publer job failed'];
             }
 
             if ($status === 'complete') {
@@ -515,16 +515,18 @@ class PublerClient
                 $failures = is_array($payload) ? ($payload['failures'] ?? null) : null;
 
                 if (!empty($failures)) {
-                    return ['ok' => false, 'post_id' => null, 'error' => $this->firstFailureMessage($failures)];
+                    return ['ok' => false, 'timed_out' => false, 'post_id' => null, 'error' => $this->firstFailureMessage($failures)];
                 }
 
-                return ['ok' => true, 'post_id' => $this->extractPostId($payload), 'error' => null];
+                return ['ok' => true, 'timed_out' => false, 'post_id' => $this->extractPostId($payload), 'error' => null];
             }
 
             usleep(1_500_000);
         }
 
-        return ['ok' => false, 'post_id' => null, 'error' => "Publer publish job {$jobId} did not complete in time"];
+        // Job still processing — NOT a failure. The caller must NOT mark the
+        // sibling failed (the post may yet publish → a retry would duplicate it).
+        return ['ok' => false, 'timed_out' => true, 'post_id' => null, 'error' => "Publer publish job {$jobId} still processing after poll window"];
     }
 
     /** Pull the first human-readable failure message out of payload.failures. */
@@ -555,6 +557,15 @@ class PublerClient
     {
         if (!is_array($payload)) {
             return null;
+        }
+
+        // Immediate-publish shape (validated live): payload is a list of job
+        // entries, each carrying the published post: [{type:"job", post:{id}}].
+        if (array_is_list($payload)) {
+            $postId = $payload[0]['post']['id'] ?? ($payload[0]['id'] ?? null);
+            if (is_string($postId) && $postId !== '') {
+                return $postId;
+            }
         }
 
         foreach (['post_ids', 'ids', 'posts'] as $key) {

@@ -116,45 +116,70 @@ class PublishViaPubler implements ShouldQueue
             // 2. Assemble the single post object (networks + accounts + comments).
             $post = $this->assemblePost($spec, $mediaIds);
 
-            // 3. Publish immediately, then CONFIRM via the async job result
-            //    (a 200 + job_id alone does not mean it published).
+            // 3. Submit the publish job.
             $jobId = $client->publishNow($post);
+
+            // Persist the Publer job id IMMEDIATELY (before awaiting) + mark
+            // 'publishing'. This is the duplicate guard: if the confirmation
+            // poll times out or the worker dies, publer_post_id is already set,
+            // so the idempotency check at the top of handle() blocks any retry
+            // from publishing a SECOND copy. (Real immediate publishes can take
+            // 30-90s; the publish is async on Publer's side.)
+            DB::table($sibling->getTable())
+                ->where('id', $sibling->id)
+                ->update(['publer_post_id' => $jobId, 'status' => 'publishing', 'updated_at' => now()]);
+
+            // 4. Confirm via the async job result (200 + job_id != published).
             $result = $client->awaitPublishResult($jobId);
 
-            if (!($result['ok'] ?? false)) {
-                // Permanent — bad params / incompatible media. Mark failed with
-                // the operator-actionable message Publer returned.
-                $msg = $result['error'] ?? 'Publer publish job reported failure';
+            if ($result['ok'] ?? false) {
                 DB::table($sibling->getTable())
                     ->where('id', $sibling->id)
                     ->update([
-                        'status' => 'failed',
-                        'last_error' => mb_substr($msg, 0, 1000),
+                        'publer_post_id' => $result['post_id'] ?? $jobId,
+                        'status' => 'published',
+                        'published_at' => now(),
                         'updated_at' => now(),
                     ]);
-                Log::error('[PublishViaPubler] Publish job reported failure — marked failed', [
+                Log::info('[PublishViaPubler] Published successfully', [
                     'platform' => $this->platform,
                     'sibling_id' => $this->siblingPostId,
-                    'job_id' => $jobId,
-                    'error' => $msg,
+                    'publer_post_id' => $result['post_id'] ?? $jobId,
                 ]);
                 return;
             }
 
+            if ($result['timed_out'] ?? false) {
+                // Still processing — NOT a failure. Leave as 'publishing' with
+                // the job id set; the post may yet go live and a retry would
+                // duplicate it. Operator/reconcile resolves the final state via
+                // the Publer job status.
+                Log::warning('[PublishViaPubler] Publish still processing — left as publishing (no retry, no dup)', [
+                    'platform' => $this->platform,
+                    'sibling_id' => $this->siblingPostId,
+                    'job_id' => $jobId,
+                ]);
+                return;
+            }
+
+            // Genuine failure (Publer reported per-account problems / job
+            // failed). Clear the job id so the operator can retry cleanly.
+            $msg = $result['error'] ?? 'Publer publish job reported failure';
             DB::table($sibling->getTable())
                 ->where('id', $sibling->id)
                 ->update([
-                    'publer_post_id' => $result['post_id'] ?? $jobId,
-                    'status' => 'published',
-                    'published_at' => now(),
+                    'publer_post_id' => null,
+                    'status' => 'failed',
+                    'last_error' => mb_substr($msg, 0, 1000),
                     'updated_at' => now(),
                 ]);
-
-            Log::info('[PublishViaPubler] Published successfully', [
+            Log::error('[PublishViaPubler] Publish job reported failure — marked failed', [
                 'platform' => $this->platform,
                 'sibling_id' => $this->siblingPostId,
-                'publer_post_id' => $result['post_id'] ?? $jobId,
+                'job_id' => $jobId,
+                'error' => $msg,
             ]);
+            return;
         } catch (\RuntimeException $e) {
             // PublerClient maps 4xx to RuntimeException with message describing
             // the error. These are permanent failures (validation, auth, quota)
