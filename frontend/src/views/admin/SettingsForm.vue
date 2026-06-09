@@ -379,6 +379,9 @@
           </div>
 
           <div v-else class="space-y-5">
+            <h3 class="text-sm font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider">
+              Connection
+            </h3>
             <!-- OAuth flash messages -->
             <div v-if="linkedinOauthFlash" class="rounded-lg px-4 py-3 text-sm" :class="{
               'bg-emerald-500/10 border border-emerald-500/40 text-emerald-700 dark:text-emerald-400': linkedinOauthFlash.type === 'success',
@@ -476,7 +479,7 @@ LINKEDIN_OAUTH_REDIRECT_URI=https://alisadikinma.com/api/admin/linkedin/oauth/ca
             <!-- Publishing controls -->
             <div class="pt-4 border-t border-neutral-200 dark:border-neutral-700 space-y-4">
               <h3 class="text-sm font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider">
-                Publishing Controls
+                Publishing
               </h3>
 
               <label class="flex items-center gap-3 cursor-pointer">
@@ -509,42 +512,9 @@ LINKEDIN_OAUTH_REDIRECT_URI=https://alisadikinma.com/api/admin/linkedin/oauth/ca
                 Daily 04:30 WIB cron <code class="text-[10px] bg-neutral-100 dark:bg-neutral-800 px-1 rounded">linkedin:auto-schedule</code> promotes <code class="text-[10px] bg-neutral-100 dark:bg-neutral-800 px-1 rounded">manual_review</code> drafts to the next ideal posting slot (<code class="text-[10px] bg-neutral-100 dark:bg-neutral-800 px-1 rounded">posting_time_rules.score &ge; 85</code>, 14-day lookahead). Pairs with auto-publish — flip both ON for hands-off pipeline.
               </p>
 
-              <div>
-                <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                  Depth Score threshold
-                  <span class="font-mono text-amber-500 ml-2">{{ linkedinFormData.linkedin_depth_score_threshold }} / 100</span>
-                </label>
-                <input
-                  v-model="linkedinFormData.linkedin_depth_score_threshold"
-                  type="range"
-                  min="60"
-                  max="95"
-                  class="w-full accent-amber-500"
-                >
-                <p class="text-xs text-neutral-500 mt-1">
-                  Drafts scoring below this go to <code class="text-[10px] bg-neutral-100 dark:bg-neutral-800 px-1 rounded">manual_review</code>. Recommended 80 (quality gate), 70 (relaxed during ramp-up).
-                </p>
-              </div>
-
-              <div>
-                <label for="linkedin_cancel_window_minutes" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                  Cancel window (minutes) <span class="text-xs text-neutral-500 font-normal">— legacy, ignored post May-12</span>
-                </label>
-                <input
-                  id="linkedin_cancel_window_minutes"
-                  v-model="linkedinFormData.linkedin_cancel_window_minutes"
-                  type="number"
-                  min="1"
-                  max="1440"
-                  class="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-amber-500"
-                >
-                <p class="text-xs text-neutral-500 mt-1">
-                  Pre-May-12 behavior. Now <code class="text-[10px] bg-neutral-100 dark:bg-neutral-800 px-1 rounded">scheduled_at</code> = next fixed slot below; cancel window = full approve→slot duration.
-                </p>
-              </div>
             </div>
 
-            <!-- Fixed-Slot Scheduler (May 12, 2026 P1) -->
+            <!-- Fixed-Slot Scheduler (May 12, 2026 P1) — part of Publishing group -->
             <div class="pt-4 border-t border-neutral-200 dark:border-neutral-700 space-y-3">
               <h3 class="text-sm font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider">
                 Fixed-Slot Scheduler
@@ -604,70 +574,10 @@ LINKEDIN_OAUTH_REDIRECT_URI=https://alisadikinma.com/api/admin/linkedin/oauth/ca
               </div>
             </div>
 
-            <!-- Format-Mix Governor (May 12, 2026 P2) -->
-            <div class="pt-4 border-t border-neutral-200 dark:border-neutral-700 space-y-3">
-              <h3 class="text-sm font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider">
-                Format-Mix Governor
-              </h3>
-              <p class="text-xs text-neutral-500">
-                Backend over-rides plugin when carousel/text ratio drifts. Carousel format fans out to IG + TikTok + Threads cross-posts; text only fans to FB + Threads.
-              </p>
-
-              <label class="flex items-center gap-3 cursor-pointer">
-                <input
-                  :checked="linkedinFormData.linkedin_format_governor_enabled === 'true'"
-                  type="checkbox"
-                  class="w-4 h-4 text-amber-600 border-neutral-300 rounded focus:ring-amber-500"
-                  @change="e => linkedinFormData.linkedin_format_governor_enabled = e.target.checked ? 'true' : 'false'"
-                >
-                <span class="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                  Enable format-mix governor
-                </span>
-              </label>
-              <p class="text-xs text-neutral-500 -mt-2 pl-7">
-                When OFF, plugin's natural format decision (usually text-biased) is always honored.
-              </p>
-
-              <div>
-                <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                  Target carousel ratio
-                  <span class="font-mono text-amber-500 ml-2">{{ Math.round(parseFloat(linkedinFormData.linkedin_format_carousel_target_ratio) * 100) }}%</span>
-                </label>
-                <input
-                  v-model="linkedinFormData.linkedin_format_carousel_target_ratio"
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  class="w-full accent-amber-500"
-                >
-                <p class="text-xs text-neutral-500 mt-1">
-                  Default 80% carousel / 20% text. When recent ratio drifts below target AND plugin emitted text, re-dispatch plugin with <code class="text-[10px] bg-neutral-100 dark:bg-neutral-800 px-1 rounded">format_preference=carousel</code> (requires plugin v0.7.0).
-                </p>
-              </div>
-
-              <div>
-                <label for="linkedin_format_lookback_window" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                  Lookback window (drafts)
-                </label>
-                <input
-                  id="linkedin_format_lookback_window"
-                  v-model="linkedinFormData.linkedin_format_lookback_window"
-                  type="number"
-                  min="1"
-                  max="100"
-                  class="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-amber-500"
-                >
-                <p class="text-xs text-neutral-500 mt-1">
-                  How many recent drafts to sample for ratio computation. Bootstrap (no override) until history fills.
-                </p>
-              </div>
-            </div>
-
             <!-- First comment automation -->
             <div class="pt-4 border-t border-neutral-200 dark:border-neutral-700 space-y-3">
               <h3 class="text-sm font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider">
-                First Comment Automation
+                First comment
               </h3>
 
               <label class="flex items-center gap-3 cursor-pointer">
