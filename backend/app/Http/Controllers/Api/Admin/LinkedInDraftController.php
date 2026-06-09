@@ -887,6 +887,34 @@ class LinkedInDraftController extends Controller
             ]);
         }
 
+        // Directly publish any sibling whose caption is ALREADY generated.
+        // The scan above only (re)dispatches caption-gen for MISSING /
+        // regenerating siblings, and the auto-publish hook
+        // (BaseSocialGenerationService) only fires on caption-gen COMPLETION —
+        // so a sibling already in awaiting_review would otherwise sit there
+        // forever and never reach Publer (the bug behind "published to LinkedIn
+        // but nothing in Publer"). Mirrors PublishSlotOrchestrator's
+        // scheduled-path dispatch. Idempotent via PublishViaPubler's
+        // publer_post_id guard; siblings still generating are left to the
+        // caption-gen completion hook.
+        $draft->load(['instagramPost', 'tiktokPost', 'threadsPost', 'facebookPost']);
+        foreach (['instagram', 'tiktok', 'threads', 'facebook'] as $platform) {
+            $sibling = $draft->{$platform . 'Post'};
+            if ($sibling !== null
+                && in_array($sibling->status, ['awaiting_review', 'publishing'], true)
+                && $sibling->publer_post_id === null) {
+                try {
+                    \App\Jobs\PublishViaPubler::dispatch($platform, $sibling->id);
+                } catch (\Throwable $e) {
+                    Log::warning('[LinkedInDraftController] direct sibling publish dispatch failed', [
+                        'draft_id' => $draft->id,
+                        'platform' => $platform,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+        }
+
         return response()->json([
             'success' => true,
             'data' => $draft->fresh(['post.translations', 'post.contentIdea:id,result_post_id,virality_score', 'account']),

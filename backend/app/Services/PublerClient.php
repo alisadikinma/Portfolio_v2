@@ -39,9 +39,28 @@ class PublerClient
 {
     private ?string $apiKeyOverride = null;
 
+    /** Cached default workspace_id so workspace-scoped calls don't re-hit /users/me each time. */
+    private ?string $cachedWorkspaceId = null;
+
     public function __construct(?string $apiKey = null)
     {
         $this->apiKeyOverride = $apiKey;
+    }
+
+    /**
+     * Resolve (and memoize) the default workspace_id for workspace-scoped
+     * calls. Publer's /posts/schedule, /media/from-url, /posts/{id} and
+     * /job_status REQUIRE a `Publer-Workspace-Id` header — without it Publer
+     * returns 401 "You don't have access on this workspace" even with a valid
+     * api_key (the key authenticates the user, the header scopes the call to
+     * the workspace that owns the connected social accounts). listAccounts()
+     * always passed this header; createPost() historically did NOT, which is
+     * why every cross-post publish 401'd. Memoized per instance (one
+     * /users/me lookup per job).
+     */
+    private function workspaceId(): string
+    {
+        return $this->cachedWorkspaceId ??= $this->resolveDefaultWorkspaceId();
     }
 
     /**
@@ -277,7 +296,7 @@ class PublerClient
      */
     public function uploadMediaFromUrl(string $url): string
     {
-        $response = $this->client()->post(
+        $response = $this->client(['Publer-Workspace-Id' => $this->workspaceId()])->post(
             $this->url('/media/from-url'),
             ['url' => $url]
         );
@@ -309,7 +328,8 @@ class PublerClient
      */
     public function pollJob(string $jobId): array
     {
-        $response = $this->client()->get($this->url("/job_status/{$jobId}"));
+        $response = $this->client(['Publer-Workspace-Id' => $this->workspaceId()])
+            ->get($this->url("/job_status/{$jobId}"));
         $data = $this->extractData($response, 'pollJob');
 
         return [
@@ -365,7 +385,8 @@ class PublerClient
      */
     public function createPost(array $payload): string
     {
-        $response = $this->client()->post($this->url('/posts/schedule'), $payload);
+        $response = $this->client(['Publer-Workspace-Id' => $this->workspaceId()])
+            ->post($this->url('/posts/schedule'), $payload);
         $data = $this->extractData($response, 'createPost');
 
         $jobId = $data['job_id'] ?? null;
@@ -389,7 +410,8 @@ class PublerClient
      */
     public function deletePost(string $postId): bool
     {
-        $response = $this->client()->delete($this->url("/posts/{$postId}"));
+        $response = $this->client(['Publer-Workspace-Id' => $this->workspaceId()])
+            ->delete($this->url("/posts/{$postId}"));
 
         // 404 = already gone — idempotent success
         if ($response->status() === 404) {
