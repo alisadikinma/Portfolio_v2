@@ -68,6 +68,16 @@ class LinkedInSettingsSeeder extends Seeder
             // can be postponed when siblings aren't ready, before LinkedIn
             // ships solo + siblings drop to manual_review.
             ['key' => 'linkedin_max_postpones',                 'value' => '2',     'type' => 'text'],
+            // Default-carousel (June 9, 2026):
+            // When 'true', LinkedInGenerationService ALWAYS routes carousel
+            // format to /carousel-gen regardless of what /linkedin-gen decides
+            // — bypasses the unreliable format_preference governor entirely
+            // (plugin ignores that field). /carousel-gen failure → manual_review,
+            // never a silent text downgrade. This makes every blog post produce
+            // a carousel for all 4 platforms (LinkedIn/IG/TikTok/Threads), since
+            // the cross-post fan-out only creates IG/TikTok/Threads-carousel
+            // siblings when LinkedIn format=carousel. Operator-tunable.
+            ['key' => 'linkedin_force_carousel',                'value' => 'true',  'type' => 'text'],
         ];
 
         foreach ($settings as $setting) {
@@ -100,7 +110,7 @@ class LinkedInSettingsSeeder extends Seeder
         }
 
         if ($this->command) {
-            $this->command->info('✅ LinkedIn settings seeded (10 linkedin + 4 telegram_notify_linkedin_* keys)');
+            $this->command->info('✅ LinkedIn settings seeded (linkedin group + 4 telegram_notify_linkedin_* keys)');
         }
     }
 }
