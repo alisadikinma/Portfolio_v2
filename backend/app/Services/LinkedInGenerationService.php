@@ -115,154 +115,184 @@ class LinkedInGenerationService
             ];
         }
 
-        // Step 3: Invoke plugin
-        // Wrap in try/catch — Laravel's Process::timeout()->run() throws
-        // ProcessTimedOutException when SSH dispatch hangs past the budget
-        // (Sonnet output cap exhaustion, MCP leak, network), and Symfony's
-        // process layer can throw RuntimeException on exec(); without this
-        // catch the exception propagates up and `markFailed` never runs,
-        // leaving the FSM stuck in `generating` until the 20-min reaper
-        // surfaces it as a misleading "Reaper: stuck" message — operators
-        // saw this loop on drafts #59/#63/#65 with regenerate not breaking
-        // out. Catching here turns the SSH timeout into an actionable
-        // Failed transition with a clean error message.
-        try {
-            $result = $this->invokePlugin($blog, $draft->id);
-        } catch (\Throwable $e) {
-            $errMsg = 'SSH dispatch threw: ' . $e->getMessage();
-            $this->markFailed($draft, $errMsg);
-            return [
-                'success' => false,
-                'draft_id' => $draft->id,
-                'status' => 'failed',
-                'error' => $errMsg,
-            ];
-        }
-        if (!$result['success']) {
-            $this->markFailed($draft, $result['error'] ?? 'Plugin invocation failed');
-            return [
-                'success' => false,
-                'draft_id' => $draft->id,
-                'status' => 'failed',
-                'error' => $result['error'],
-            ];
-        }
-
-        // Step 4: Parse JSON stdout
-        $parsed = $this->parseOrchestratorOutput($result['stdout']);
-        if ($parsed === null) {
-            $this->markFailed($draft, 'Could not parse orchestrator JSON from stdout');
-            return [
-                'success' => false,
-                'draft_id' => $draft->id,
-                'status' => 'failed',
-                'error' => 'Invalid JSON from plugin',
-            ];
-        }
-
-        $detectedFormat = $parsed['format'] ?? 'unknown';
-        $isCarouselRoute = ($parsed['status'] ?? null) === 'route_to_carousel_gen';
-
-        // Default-carousel (June 9, 2026): when linkedin_force_carousel is on,
-        // override the plugin's text decision and route EVERY draft through
-        // /carousel-gen. forceCarouselEnvelope() rewrites the envelope to a
-        // route_to_carousel_gen shape so the existing applyCarouselGenAdapter
-        // path (Step 5.5) runs unchanged — /carousel-gen generates slides from
-        // --blog-source, so an absent brief is fine. Supersedes the format-mix
-        // governor (unreliable: plugin ignores format_preference). The pure
-        // rewrite is guarded so a real plugin failure (status='failed') and an
-        // already-carousel route are never masked; /carousel-gen failure →
-        // markFailed → manual review (no silent text downgrade), per Decision 1.
+        // Default-carousel skip (June 10, 2026): when linkedin_force_carousel
+        // is ON, the /linkedin-gen orchestrator output is ~90% discarded — the
+        // backend rebuilds the LinkedIn caption (buildCarouselCaption) and
+        // ALWAYS routes carousel, so only a thin brief survives. Skip the
+        // ~10-13 min SSH orchestrator entirely and synthesize the
+        // route_to_carousel_gen envelope directly; /carousel-gen authors the
+        // slide storyline from the blog content embedded inline (Step 5.5).
+        // Set linkedin_force_carousel='false' to restore the plugin-decided
+        // path (Steps 3 → 4.5 below). Per
+        // docs/plans/2026-06-09-skip-linkedin-gen-force-carousel.md.
         $forceEnabled = filter_var(
             Setting::get('linkedin_force_carousel', 'true'),
             FILTER_VALIDATE_BOOLEAN
         );
-        $beforeStatus = $parsed['status'] ?? null;
-        $parsed = $this->forceCarouselEnvelope($parsed, $forceEnabled);
-        $detectedFormat = $parsed['format'] ?? 'unknown';
-        $isCarouselRoute = ($parsed['status'] ?? null) === 'route_to_carousel_gen';
-        if ($isCarouselRoute && $beforeStatus !== 'route_to_carousel_gen') {
-            Log::info('[LinkedInGen] linkedin_force_carousel ON — overriding plugin format to carousel', [
+        if ($forceEnabled) {
+            // Eager-load so buildForcedCarouselEnvelope reads the real pillar
+            // without triggering a lazy query mid-build.
+            $draft->loadMissing('post.contentIdea');
+            $parsed = $this->buildForcedCarouselEnvelope($draft);
+            $detectedFormat = 'carousel';
+            $isCarouselRoute = true;
+            Log::info('[LinkedInGen] linkedin_force_carousel ON — skipping /linkedin-gen, dispatching /carousel-gen directly', [
                 'draft_id' => $draft->id,
-                'before_status' => $beforeStatus,
             ]);
-            $this->appendNonTransitionLogEntry($draft, 'force_carousel_override', [
-                'before_status' => $beforeStatus,
+            $this->appendNonTransitionLogEntry($draft, 'force_carousel_skip_plugin', [
                 'target' => 'carousel',
             ]);
-        }
-
-        $parsedPct = $detectedFormat === 'carousel' || $isCarouselRoute ? 25 : 50;
-        LinkedInProgressEmitter::emit(
-            $draft,
-            'orchestrator_parsed',
-            $parsedPct,
-            $isCarouselRoute
-                ? 'Plugin output parsed — routing to /carousel-gen engine'
-                : "Plugin output parsed — format={$detectedFormat}"
-        );
-
-        // Step 4.5 (May 12, 2026): format-mix governor decides whether to
-        // re-dispatch the plugin with format_preference=carousel when the
-        // recent draft ratio drifts below the configured target (default 80%
-        // carousel / 20% text). Cap at 1 re-dispatch per draft to prevent
-        // infinite loop if plugin refuses override (plugin v0.6.0 ignores
-        // the field entirely → returns text again → we accept).
-        if ($detectedFormat === 'text' && ! $isCarouselRoute
-            && $this->governor()->shouldOverrideToCarousel($draft, $detectedFormat)) {
-            \Illuminate\Support\Facades\Log::info(
-                '[LinkedInGen] Format-mix governor over-rides plugin text→carousel',
-                [
-                    'draft_id' => $draft->id,
-                    'plugin_emitted' => $detectedFormat,
-                    'carousel_ratio_pre_override' => $this->governor()->computeRatio($draft),
-                ]
+            LinkedInProgressEmitter::emit(
+                $draft,
+                'force_carousel_direct',
+                25,
+                'Force-carousel ON — skipping /linkedin-gen, dispatching /carousel-gen directly'
             );
-            $this->appendNonTransitionLogEntry($draft, 'format_overridden_by_governor', [
-                'plugin_emitted' => $detectedFormat,
-                'target' => 'carousel',
-            ]);
+        } else {
+            // Step 3: Invoke plugin
+            // Wrap in try/catch — Laravel's Process::timeout()->run() throws
+            // ProcessTimedOutException when SSH dispatch hangs past the budget
+            // (Sonnet output cap exhaustion, MCP leak, network), and Symfony's
+            // process layer can throw RuntimeException on exec(); without this
+            // catch the exception propagates up and `markFailed` never runs,
+            // leaving the FSM stuck in `generating` until the 20-min reaper
+            // surfaces it as a misleading "Reaper: stuck" message — operators
+            // saw this loop on drafts #59/#63/#65 with regenerate not breaking
+            // out. Catching here turns the SSH timeout into an actionable
+            // Failed transition with a clean error message.
+            try {
+                $result = $this->invokePlugin($blog, $draft->id);
+            } catch (\Throwable $e) {
+                $errMsg = 'SSH dispatch threw: ' . $e->getMessage();
+                $this->markFailed($draft, $errMsg);
+                return [
+                    'success' => false,
+                    'draft_id' => $draft->id,
+                    'status' => 'failed',
+                    'error' => $errMsg,
+                ];
+            }
+            if (!$result['success']) {
+                $this->markFailed($draft, $result['error'] ?? 'Plugin invocation failed');
+                return [
+                    'success' => false,
+                    'draft_id' => $draft->id,
+                    'status' => 'failed',
+                    'error' => $result['error'],
+                ];
+            }
 
-            // Re-build payload WITH format_preference, re-invoke plugin
-            $reblog = $this->buildBlogPayload($draft, 'carousel');
-            if ($reblog !== null) {
-                LinkedInProgressEmitter::emit(
-                    $draft,
-                    'governor_redispatch',
-                    35,
-                    'Format-mix governor re-dispatching plugin with format_preference=carousel'
+            // Step 4: Parse JSON stdout
+            $parsed = $this->parseOrchestratorOutput($result['stdout']);
+            if ($parsed === null) {
+                $this->markFailed($draft, 'Could not parse orchestrator JSON from stdout');
+                return [
+                    'success' => false,
+                    'draft_id' => $draft->id,
+                    'status' => 'failed',
+                    'error' => 'Invalid JSON from plugin',
+                ];
+            }
+
+            $detectedFormat = $parsed['format'] ?? 'unknown';
+            $isCarouselRoute = ($parsed['status'] ?? null) === 'route_to_carousel_gen';
+
+            // Default-carousel (June 9, 2026): even on the plugin path, when
+            // linkedin_force_carousel is on, override the plugin's text decision
+            // and route through /carousel-gen. forceCarouselEnvelope() rewrites
+            // the envelope to a route_to_carousel_gen shape so the existing
+            // applyCarouselGenAdapter path (Step 5.5) runs unchanged. Guarded so
+            // a real plugin failure (status='failed') and an already-carousel
+            // route are never masked. NOTE: with the skip branch above, this
+            // only fires when force is OFF (no-op) — kept for defense-in-depth
+            // and so the governor below can still upgrade text→carousel.
+            $beforeStatus = $parsed['status'] ?? null;
+            $parsed = $this->forceCarouselEnvelope($parsed, $forceEnabled);
+            $detectedFormat = $parsed['format'] ?? 'unknown';
+            $isCarouselRoute = ($parsed['status'] ?? null) === 'route_to_carousel_gen';
+            if ($isCarouselRoute && $beforeStatus !== 'route_to_carousel_gen') {
+                Log::info('[LinkedInGen] linkedin_force_carousel ON — overriding plugin format to carousel', [
+                    'draft_id' => $draft->id,
+                    'before_status' => $beforeStatus,
+                ]);
+                $this->appendNonTransitionLogEntry($draft, 'force_carousel_override', [
+                    'before_status' => $beforeStatus,
+                    'target' => 'carousel',
+                ]);
+            }
+
+            $parsedPct = $detectedFormat === 'carousel' || $isCarouselRoute ? 25 : 50;
+            LinkedInProgressEmitter::emit(
+                $draft,
+                'orchestrator_parsed',
+                $parsedPct,
+                $isCarouselRoute
+                    ? 'Plugin output parsed — routing to /carousel-gen engine'
+                    : "Plugin output parsed — format={$detectedFormat}"
+            );
+
+            // Step 4.5 (May 12, 2026): format-mix governor decides whether to
+            // re-dispatch the plugin with format_preference=carousel when the
+            // recent draft ratio drifts below the configured target (default 80%
+            // carousel / 20% text). Cap at 1 re-dispatch per draft to prevent
+            // infinite loop if plugin refuses override (plugin v0.6.0 ignores
+            // the field entirely → returns text again → we accept).
+            if ($detectedFormat === 'text' && ! $isCarouselRoute
+                && $this->governor()->shouldOverrideToCarousel($draft, $detectedFormat)) {
+                \Illuminate\Support\Facades\Log::info(
+                    '[LinkedInGen] Format-mix governor over-rides plugin text→carousel',
+                    [
+                        'draft_id' => $draft->id,
+                        'plugin_emitted' => $detectedFormat,
+                        'carousel_ratio_pre_override' => $this->governor()->computeRatio($draft),
+                    ]
                 );
-                try {
-                    $reresult = $this->invokePlugin($reblog, $draft->id);
-                    if ($reresult['success']) {
-                        $reparsed = $this->parseOrchestratorOutput($reresult['stdout']);
-                        if ($reparsed !== null) {
-                            // Plugin honored override OR refused (still text).
-                            // Either way, this is the canonical response now.
-                            $reFormat = $reparsed['format'] ?? 'unknown';
-                            if ($reFormat === 'text') {
-                                \Illuminate\Support\Facades\Log::info(
-                                    '[LinkedInGen] Plugin refused format override — accepting text',
-                                    ['draft_id' => $draft->id]
-                                );
-                                $this->appendNonTransitionLogEntry(
-                                    $draft,
-                                    'plugin_refused_format_override',
-                                    ['override_reason' => $reparsed['format_override_reason'] ?? null]
-                                );
-                            }
-                            $parsed = $reparsed;
-                            $detectedFormat = $reFormat;
-                            $isCarouselRoute = ($reparsed['status'] ?? null) === 'route_to_carousel_gen';
-                        }
-                    }
-                } catch (\Throwable $e) {
-                    // Governor re-dispatch failure is NON-FATAL — keep
-                    // original $parsed (text) and let normal flow continue.
-                    \Illuminate\Support\Facades\Log::warning(
-                        '[LinkedInGen] Governor re-dispatch threw — falling back to original plugin output',
-                        ['draft_id' => $draft->id, 'error' => $e->getMessage()]
+                $this->appendNonTransitionLogEntry($draft, 'format_overridden_by_governor', [
+                    'plugin_emitted' => $detectedFormat,
+                    'target' => 'carousel',
+                ]);
+
+                // Re-build payload WITH format_preference, re-invoke plugin
+                $reblog = $this->buildBlogPayload($draft, 'carousel');
+                if ($reblog !== null) {
+                    LinkedInProgressEmitter::emit(
+                        $draft,
+                        'governor_redispatch',
+                        35,
+                        'Format-mix governor re-dispatching plugin with format_preference=carousel'
                     );
+                    try {
+                        $reresult = $this->invokePlugin($reblog, $draft->id);
+                        if ($reresult['success']) {
+                            $reparsed = $this->parseOrchestratorOutput($reresult['stdout']);
+                            if ($reparsed !== null) {
+                                // Plugin honored override OR refused (still text).
+                                // Either way, this is the canonical response now.
+                                $reFormat = $reparsed['format'] ?? 'unknown';
+                                if ($reFormat === 'text') {
+                                    \Illuminate\Support\Facades\Log::info(
+                                        '[LinkedInGen] Plugin refused format override — accepting text',
+                                        ['draft_id' => $draft->id]
+                                    );
+                                    $this->appendNonTransitionLogEntry(
+                                        $draft,
+                                        'plugin_refused_format_override',
+                                        ['override_reason' => $reparsed['format_override_reason'] ?? null]
+                                    );
+                                }
+                                $parsed = $reparsed;
+                                $detectedFormat = $reFormat;
+                                $isCarouselRoute = ($reparsed['status'] ?? null) === 'route_to_carousel_gen';
+                            }
+                        }
+                    } catch (\Throwable $e) {
+                        // Governor re-dispatch failure is NON-FATAL — keep
+                        // original $parsed (text) and let normal flow continue.
+                        \Illuminate\Support\Facades\Log::warning(
+                            '[LinkedInGen] Governor re-dispatch threw — falling back to original plugin output',
+                            ['draft_id' => $draft->id, 'error' => $e->getMessage()]
+                        );
+                    }
                 }
             }
         }
@@ -289,7 +319,7 @@ class LinkedInGenerationService
             LinkedInProgressEmitter::emit($draft, 'carousel_gen_dispatch', 30, 'Dispatching /carousel-gen engine');
         }
         try {
-            $parsed = $this->applyCarouselGenAdapter($parsed, $blog['url'], $draft->id);
+            $parsed = $this->applyCarouselGenAdapter($parsed, $blog['url'], $draft->id, $blog['content'] ?? null);
         } catch (CarouselGenAdapterException $e) {
             $this->markFailed($draft, "carousel-gen adapter failed: {$e->getMessage()}");
             return [
@@ -409,7 +439,7 @@ class LinkedInGenerationService
      *
      * @return array{success: bool, stdout: string, error: string|null}
      */
-    private function invokePlugin(array $blog, int $draftId): array
+    protected function invokePlugin(array $blog, int $draftId): array
     {
         $driver = (string) config('linkedin.generation.driver', 'ssh');
         $model = (string) config('linkedin.generation.model', 'sonnet');
@@ -654,7 +684,7 @@ class LinkedInGenerationService
      *
      * @return array{success: bool, draft_id: int, status: string, depth_score?: int|null}
      */
-    private function persistAndRoute(LinkedInPost $draft, array $parsed): array
+    protected function persistAndRoute(LinkedInPost $draft, array $parsed): array
     {
         $format = $parsed['format'] ?? $draft->format;
         $validation = $parsed['validation'] ?? [];
@@ -863,6 +893,42 @@ class LinkedInGenerationService
     }
 
     /**
+     * Build the synthetic route_to_carousel_gen envelope used when
+     * linkedin_force_carousel is ON and we skip the /linkedin-gen orchestrator
+     * entirely (June 9, 2026). Under force-carousel the plugin's text/convert/
+     * validate output is discarded anyway (forceCarouselEnvelope rewrites it,
+     * the LinkedIn caption is rebuilt backend-side from the carousel slides,
+     * and only a thin brief survives) — so the ~10-13min /linkedin-gen run is
+     * pure waste. This produces, with zero API/SSH cost, the exact envelope
+     * shape that forceCarouselEnvelope yields, so generate()'s existing Step
+     * 5.5 (applyCarouselGenAdapter) + persistAndRoute path runs unchanged.
+     *
+     * brief.pillar is cosmetic (dispatch log + a non-binding signal); resolved
+     * from the linked ContentIdea when its relation is already loaded, else the
+     * 'ai_generalist' default. Guarded with relationLoaded so it NEVER triggers
+     * a lazy DB query — keeps the unit test DB-free and adds no query in prod
+     * beyond what the caller already loaded.
+     */
+    public function buildForcedCarouselEnvelope(LinkedInPost $draft): array
+    {
+        $pillar = 'ai_generalist';
+        if ($draft->relationLoaded('post') && $draft->post
+            && $draft->post->relationLoaded('contentIdea') && $draft->post->contentIdea
+            && ! empty($draft->post->contentIdea->pillar)) {
+            $pillar = (string) $draft->post->contentIdea->pillar;
+        }
+
+        return [
+            'format' => 'carousel',
+            'status' => 'route_to_carousel_gen',
+            'brief' => ['pillar' => $pillar],
+            'carousel' => null,
+            'post' => null,
+            'validation' => null,
+        ];
+    }
+
+    /**
      * Carousel router — STRICT /carousel-gen enforcement (no legacy fallback).
      *
      * Behavior matrix:
@@ -892,7 +958,7 @@ class LinkedInGenerationService
      *                                      for carousel format. Caller
      *                                      catches and routes to FSM Failed.
      */
-    public function applyCarouselGenAdapter(array $parsed, string $blogUrl, int $draftId): array
+    public function applyCarouselGenAdapter(array $parsed, string $blogUrl, int $draftId, ?string $blogContent = null): array
     {
         $format = $parsed['format'] ?? null;
         if ($format !== 'carousel') {
@@ -922,7 +988,7 @@ class LinkedInGenerationService
             'brief_pillar' => $brief['pillar'] ?? null,
         ]);
 
-        $carouselGenJson = $this->dispatchCarouselGenEngine($brief, $blogUrl, $draftId);
+        $carouselGenJson = $this->dispatchCarouselGenEngine($brief, $blogUrl, $draftId, $blogContent);
 
         if ($carouselGenJson === null) {
             throw new CarouselGenAdapterException(
@@ -972,34 +1038,18 @@ class LinkedInGenerationService
      * Public so it can be Mockery-mocked in unit tests without booting the
      * full SSH stack.
      */
-    public function dispatchCarouselGenEngine(array $brief, string $blogUrl, int $draftId): ?array
+    public function dispatchCarouselGenEngine(array $brief, string $blogUrl, int $draftId, ?string $blogContent = null): ?array
     {
         $driver = (string) config('carousel-gen.driver', 'ssh');
         $model = (string) config('carousel-gen.model', 'sonnet');
         $timeout = (int) config('carousel-gen.timeout_seconds', 600);
         $refsPath = (string) config('carousel-gen.refs_pipeline', '');
 
-        // Decide bilingual + target_slides from brief if available.
-        // /linkedin-gen carousel briefs default to bilingual ID/EN (LinkedIn
-        // pillar) so we mirror that.
-        $bilingual = 'id,en';
-        $narrative = '5act';
-        $targetSlides = $this->inferTargetSlides($brief);
-
-        $flags = [
-            '--pipeline',
-            '--blog-source=' . escapeshellarg($blogUrl),
-            '--bilingual=' . $bilingual,
-            '--narrative=' . $narrative,
-            '--target-slides=' . $targetSlides,
-        ];
-        $flagString = implode(' ', $flags);
+        $prompt = $this->buildCarouselGenPrompt($brief, $blogUrl, $blogContent);
 
         $refsFlag = $refsPath !== ''
             ? '--append-system-prompt-file ' . escapeshellarg($refsPath)
             : '';
-
-        $prompt = "/carousel-gen {$flagString}";
 
         if ($driver === 'local') {
             $result = $this->executeCarouselGenLocal($prompt, $model, $refsFlag, $timeout);
@@ -1040,6 +1090,41 @@ class LinkedInGenerationService
         }
 
         return $parsed;
+    }
+
+    /**
+     * Build the `/carousel-gen` prompt string (pure — no SSH, no config side
+     * effects beyond reading nothing). Extracted as a testable seam so the
+     * inline-content behavior can be unit-asserted without booting the SSH
+     * stack. The --blog-source URL flag is always present (supplementary OG
+     * fetch); when $blogContent is non-empty the full article body is appended
+     * as the labeled PRIMARY source so the engine builds the 5-act storyline
+     * from the real article instead of a thin OG blurb (June 9, 2026).
+     */
+    public function buildCarouselGenPrompt(array $brief, string $blogUrl, ?string $blogContent = null): string
+    {
+        // /linkedin-gen carousel briefs default to bilingual ID/EN (LinkedIn
+        // pillar) so we mirror that.
+        $bilingual = 'id,en';
+        $narrative = '5act';
+        $targetSlides = $this->inferTargetSlides($brief);
+
+        $flags = [
+            '--pipeline',
+            '--blog-source=' . escapeshellarg($blogUrl),
+            '--bilingual=' . $bilingual,
+            '--narrative=' . $narrative,
+            '--target-slides=' . $targetSlides,
+        ];
+
+        $prompt = '/carousel-gen ' . implode(' ', $flags);
+
+        if (is_string($blogContent) && trim($blogContent) !== '') {
+            $prompt .= "\n\nSOURCE ARTICLE CONTENT (primary source — use this to build the slide narrative; the --blog-source URL is supplementary OG metadata only):\n"
+                . trim($blogContent);
+        }
+
+        return $prompt;
     }
 
     /**
