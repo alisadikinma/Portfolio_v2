@@ -30,6 +30,8 @@ class Post extends Model
         'is_premium',
         'published',
         'published_at',
+        'content_reviewed_at',
+        'stale_notified_at',
         'views',
         'reading_time',
         // SEO fields (global only)
@@ -51,6 +53,8 @@ class Post extends Model
         'is_premium' => 'boolean',
         'published' => 'boolean',
         'published_at' => 'datetime',
+        'content_reviewed_at' => 'datetime',
+        'stale_notified_at' => 'datetime',
         'schema_markup' => 'array',
         'faq_schema' => 'array',
         'index_follow' => 'boolean',
@@ -93,6 +97,19 @@ class Post extends Model
         return $query->where('published', true)
                     ->whereNotNull('published_at')
                     ->where('published_at', '<=', now());
+    }
+
+    /**
+     * Scope a query to published posts whose freshness anchor is older than
+     * $days. The anchor is COALESCE(content_reviewed_at, published_at) — a post
+     * the operator re-reviewed counts as fresh from the review date, not the
+     * original publish date. Drives the weekly stale-content digest (GEO
+     * freshness loop). Drafts/unpublished are excluded via published().
+     */
+    public function scopeStale($query, int $days = 90)
+    {
+        return $query->published()
+            ->whereRaw('COALESCE(content_reviewed_at, published_at) < ?', [now()->subDays($days)]);
     }
 
     /**

@@ -1180,7 +1180,7 @@ class ContentIdeaController extends Controller
             && (($lastFailure['safety_detected'] ?? false) || $imgSvc->isSafetyError($lastFailure['reason'] ?? null));
         $alreadyRewritten = !empty($segment['visual_direction_pre_safety']);
 
-        if ($retryCount >= \App\Services\ImageGenerationService::MAX_SEGMENT_ATTEMPTS) {
+        if ($retryCount >= $imgSvc->maxSegmentAttempts()) {
             if (!$lastWasSafety) {
                 return response()->json([
                     'success' => false,
@@ -1319,6 +1319,22 @@ class ContentIdeaController extends Controller
         $idea = ContentIdea::find($id);
         if (!$idea) {
             return response()->json(['success' => false, 'message' => 'Content idea not found.'], 404);
+        }
+
+        // Defense-in-depth (GEO image-completion gate): never compile/publish
+        // while any image segment is unresolved (failed / needs_operator). The
+        // FSM gates already block auto-advance to images_ready, but a force-set
+        // status, a race, or a legacy row could still reach here.
+        $prompts = $idea->generated_article['image_prompts'] ?? [];
+        if (!empty($prompts) && !\App\Services\ImageGenerationService::segmentsResolvedForAdvance($prompts)) {
+            $unresolved = collect($prompts)
+                ->filter(fn ($p) => !in_array($p['status'] ?? '', ['done', 'skipped'], true))
+                ->count();
+
+            return response()->json([
+                'success' => false,
+                'message' => "Cannot publish: {$unresolved} image segment(s) have not finished generating. Retry or skip them first.",
+            ], 422);
         }
 
         try {

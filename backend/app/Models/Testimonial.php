@@ -44,4 +44,20 @@ class Testimonial extends Model
     {
         return $query->orderBy('sort_order');
     }
+
+    /**
+     * Bust the homepage SSR HTML cache whenever a testimonial changes, since the
+     * homepage Organization JSON-LD node embeds aggregateRating + review[] derived
+     * from active testimonials. See SpaPrerenderController::organizationRatingNode().
+     */
+    public static function boot()
+    {
+        parent::boot();
+
+        $purge = function () {
+            \App\Http\Controllers\SpaPrerenderController::purgeHome();
+        };
+        static::saved($purge);
+        static::deleted($purge);
+    }
 }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Category;
 use App\Models\Post;
+use App\Models\Testimonial;
 use App\Services\Seo\SchemaGraphBuilder;
 use App\Services\Seo\SeoHtmlComposer;
 use Illuminate\Http\Request;
@@ -57,12 +58,51 @@ class SpaPrerenderController extends Controller
             ])->render();
 
             return $this->composer->compose($shell, [
-                'jsonLd' => [$this->schema->webSite()],
+                'jsonLd' => [
+                    $this->schema->webSite(),
+                    // Organization node carrying aggregateRating + review[] built
+                    // from real, same-page-displayed testimonials (TestimonialsCarousel)
+                    // — GEO review signal. Person + FAQ stay static in index.html.
+                    $this->organizationRatingNode(),
+                ],
                 'bodyHtml' => $body,
             ]);
         });
 
         return $this->respond($html);
+    }
+
+    /**
+     * Build the homepage Organization JSON-LD node with aggregateRating + top-5
+     * review[] computed from active testimonials. Zero active testimonials → a
+     * plain Organization node (no fabricated rating). One query; the home HTML is
+     * cached 1h and busted on any Testimonial save/delete (Testimonial::boot()).
+     */
+    private function organizationRatingNode(): array
+    {
+        $testimonials = Testimonial::where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderByDesc('id')
+            ->get();
+
+        $count = $testimonials->count();
+        if ($count < 1) {
+            return $this->schema->organizationWithRating(['reviewCount' => 0], []);
+        }
+
+        $reviews = $testimonials->take(5)->map(fn (Testimonial $t) => [
+            'author' => $t->client_name,
+            'body' => $t->testimonial_text,
+            'rating' => $t->star_rating,
+        ])->all();
+
+        return $this->schema->organizationWithRating(
+            [
+                'ratingValue' => round((float) $testimonials->avg('star_rating'), 1),
+                'reviewCount' => $count,
+            ],
+            $reviews,
+        );
     }
 
     // ---- Blog index ---------------------------------------------------------
@@ -282,6 +322,16 @@ class SpaPrerenderController extends Controller
      * its category variants. Cheap explicit forgets — the database cache driver
      * has no tag support.
      */
+    /**
+     * Forget just the homepage SSR HTML cache. Wired from Testimonial::boot()
+     * saved/deleted so a rating/review change refreshes the Organization graph
+     * before the 1h TTL lapses. The home cache is a single key (not per-lang).
+     */
+    public static function purgeHome(): void
+    {
+        Cache::forget('seo_html:home');
+    }
+
     public static function purgeForPost(Post $post): void
     {
         Cache::forget('seo_html:home');

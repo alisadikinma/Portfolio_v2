@@ -66,6 +66,28 @@
       </div>
     </BaseCard>
 
+    <!-- Freshness filter chip (GEO publish-and-forget fix) — only when stale posts exist -->
+    <div v-if="staleCount > 0" class="mb-6 flex items-center gap-3">
+      <button
+        type="button"
+        @click="showStaleOnly = !showStaleOnly"
+        :class="[
+          'inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors',
+          showStaleOnly
+            ? 'bg-amber-500 text-white border-amber-500'
+            : 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/50'
+        ]"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        Needs refresh ({{ staleCount }})
+      </button>
+      <span v-if="showStaleOnly" class="text-xs text-neutral-500 dark:text-neutral-400">
+        Showing stale posts on this page only
+      </span>
+    </div>
+
     <!-- Posts Table -->
     <BaseCard>
       <!-- Loading State -->
@@ -83,7 +105,7 @@
       </div>
 
       <!-- Empty State -->
-      <div v-else-if="posts.length === 0" class="text-center py-12">
+      <div v-else-if="displayedPosts.length === 0" class="text-center py-12">
         <svg class="w-12 h-12 text-neutral-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
@@ -124,7 +146,7 @@
             </tr>
           </thead>
           <tbody class="bg-white dark:bg-neutral-900 divide-y divide-neutral-200 dark:divide-neutral-700">
-            <tr v-for="post in posts" :key="post.id" class="hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors">
+            <tr v-for="post in displayedPosts" :key="post.id" class="hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors">
               <!-- Post Info -->
               <td class="px-6 py-4">
                 <div class="flex items-center">
@@ -158,6 +180,13 @@
                 <span v-else class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
                   Draft
                 </span>
+                <span
+                  v-if="isStale(post.id)"
+                  class="ml-2 px-2 py-1 text-xs rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
+                  :title="`Freshness anchor is ${staleDays(post.id)} days old — review or refresh`"
+                >
+                  Stale · {{ staleDays(post.id) }}d
+                </span>
               </td>
 
               <!-- Date -->
@@ -177,6 +206,23 @@
               <!-- Actions -->
               <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                 <div class="flex items-center justify-end gap-2">
+                  <!-- Mark reviewed (only when stale) -->
+                  <button
+                    v-if="isStale(post.id)"
+                    @click="handleMarkReviewed(post)"
+                    :disabled="reviewingId === post.id"
+                    class="text-amber-600 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Mark reviewed (resets freshness anchor)"
+                  >
+                    <svg v-if="reviewingId === post.id" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </button>
+
                   <!-- Preview -->
                   <a
                     v-if="post.slug"
@@ -305,15 +351,17 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { usePostsStore } from '@/stores/posts'
 import { useCategoriesStore } from '@/stores/categories'
 import { useUiStore } from '@/stores/ui'
+import { useStalePosts, useMarkReviewed } from '@/composables/useStalePosts'
 import BaseCard from '@/components/base/BaseCard.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
 
 const router = useRouter()
+const route = useRoute()
 const postsStore = usePostsStore()
 const categoriesStore = useCategoriesStore()
 const uiStore = useUiStore()
@@ -324,11 +372,56 @@ const statusFilter = ref('')
 const postToDelete = ref(null)
 const isDeleting = ref(false)
 
+// Freshness loop (GEO publish-and-forget fix) — real stale set from the backend.
+const { data: stalePostsData } = useStalePosts(90)
+const markReviewedMutation = useMarkReviewed()
+// Deep-link support: the Telegram stale digest links to ?filter=stale.
+const showStaleOnly = ref(route.query.filter === 'stale')
+const reviewingId = ref(null)
+
 const posts = computed(() => postsStore.posts)
 const pagination = computed(() => postsStore.pagination)
 const loading = computed(() => postsStore.loading)
 const error = computed(() => postsStore.error)
 const categories = computed(() => categoriesStore.categories)
+
+const staleList = computed(() => stalePostsData.value || [])
+const staleCount = computed(() => staleList.value.length)
+const staleMap = computed(() => {
+  const m = new Map()
+  for (const p of staleList.value) m.set(p.id, p.days_stale)
+  return m
+})
+function isStale(id) {
+  return staleMap.value.has(id)
+}
+function staleDays(id) {
+  return staleMap.value.get(id) ?? ''
+}
+
+// When the "Needs refresh" chip is active, narrow the current page to stale rows.
+const displayedPosts = computed(() =>
+  showStaleOnly.value ? posts.value.filter((p) => isStale(p.id)) : posts.value
+)
+
+function handleMarkReviewed(post) {
+  reviewingId.value = post.id
+  markReviewedMutation.mutate(post.id, {
+    onSuccess: () => {
+      uiStore.showSuccess(`"${post.title}" marked as reviewed.`, 'Freshness reset')
+    },
+    onError: (err) => {
+      uiStore.showError(
+        err.response?.data?.message || 'Failed to mark as reviewed. Please try again.',
+        'Action failed',
+        0
+      )
+    },
+    onSettled: () => {
+      reviewingId.value = null
+    },
+  })
+}
 
 // Visible page numbers for pagination
 const visiblePages = computed(() => {

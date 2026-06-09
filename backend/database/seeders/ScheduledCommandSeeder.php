@@ -85,6 +85,16 @@ class ScheduledCommandSeeder extends Seeder
                 'arguments' => null,
                 'sort_order' => 50,
             ],
+            [
+                'signature' => 'content:flag-stale-posts',
+                'display_name' => 'Content Engine — Flag Stale Posts (Freshness)',
+                'description' => 'Tiap Senin jam 6 pagi: tandai blog post yang anchor freshness-nya (published_at / content_reviewed_at) > 90 hari, kirim SATU digest Telegram. Operator yang putuskan refresh atau mark reviewed — tidak ada auto-regenerate.',
+                'category' => 'content_engine',
+                'cron_expression' => '0 6 * * 1',
+                'without_overlapping_minutes' => 30,
+                'arguments' => ['--days=90'],
+                'sort_order' => 60,
+            ],
 
             // ─────────────── LinkedIn (7) ───────────────
             [

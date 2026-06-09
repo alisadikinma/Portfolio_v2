@@ -246,24 +246,21 @@ class ProcessPendingImages extends Command
                 $article['image_prompts'] = $prompts;
                 $idea->generated_article = $article;
 
-                // Advance rule: every segment must be 'done', 'skipped', or terminally-'failed'.
-                $allResolved = collect($prompts)->every(function ($p) {
-                    $status = $p['status'] ?? '';
-                    if ($status === 'done' || $status === 'skipped') {
-                        return true;
-                    }
-                    return $status === 'failed' && !empty($p['terminal_at']);
-                });
-                $anyDone = collect($prompts)->contains(fn ($p) => ($p['status'] ?? '') === 'done');
+                // Hard image-completion gate (GEO publish-and-forget fix): a
+                // 'failed' segment — even a terminally-failed one — HOLDS the
+                // idea at generating_images. We never compile/publish a blog with
+                // a broken image; the operator retries/skips first. Only
+                // all-done-or-skipped + ≥1 done advances. Shared predicate so the
+                // poller and the webhook handler can never diverge.
+                $canAdvance = \App\Services\ImageGenerationService::segmentsResolvedForAdvance($prompts);
 
-                // Cover-critical block: if segment 0 (cover) is terminal failure or skipped,
-                // do NOT advance — operator must intervene.
+                // Cover-critical block: a skipped cover (no cover image) must
+                // also HOLD, even though 'skipped' is otherwise advance-eligible.
                 $cover = $prompts[0] ?? null;
                 $coverCritical = $cover !== null
-                    && in_array($cover['status'] ?? '', ['failed', 'skipped'], true)
-                    && !empty($cover['terminal_at']);
+                    && ($cover['status'] ?? '') === 'skipped';
 
-                if ($allResolved && $anyDone && !$coverCritical && $idea->status === 'generating_images') {
+                if ($canAdvance && !$coverCritical && $idea->status === 'generating_images') {
                     // Persist generated_article first (so the transitionTo
                     // update doesn't lose the in-memory mutation), then
                     // transition status via FSM.

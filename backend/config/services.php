@@ -99,6 +99,10 @@ return [
         'use_translate_phase' => env('ARTICLE_GEN_USE_TRANSLATE_PHASE', false),
         'use_score_phase' => env('ARTICLE_GEN_USE_SCORE_PHASE', false),
         'use_safety_rewrite' => env('ARTICLE_GEN_USE_SAFETY_REWRITE', true),
+        // Max GeminiGen attempts per image segment before the idea is HELD at
+        // generating_images and escalated to the operator (never auto-advanced
+        // with a broken image). GEO image-completion gate.
+        'image_segment_max_attempts' => env('IMAGE_SEGMENT_MAX_ATTEMPTS', 6),
         // Empty MCP config — passed via `--mcp-config <path> --strict-mcp-config`
         // so pipeline runs of `claude` skip MCP server boot entirely. Without
         // this, every `claude -p` invocation spawns the user's full MCP stack

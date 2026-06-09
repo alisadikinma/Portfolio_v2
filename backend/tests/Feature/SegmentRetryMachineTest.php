@@ -153,8 +153,10 @@ class SegmentRetryMachineTest extends TestCase
     }
 
     /** @test */
-    public function max_segment_attempts_constant_equals_three(): void
+    public function max_segment_attempts_constant_equals_default_six(): void
     {
-        $this->assertSame(3, ImageGenerationService::MAX_SEGMENT_ATTEMPTS);
+        // Bumped 3 → 6 (env-tunable via image_segment_max_attempts) so the
+        // GEO image-completion gate retries persistently before HOLD+escalate.
+        $this->assertSame(6, ImageGenerationService::MAX_SEGMENT_ATTEMPTS);
     }
 }

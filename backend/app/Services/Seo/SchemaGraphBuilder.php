@@ -63,6 +63,80 @@ class SchemaGraphBuilder
     }
 
     /**
+     * Standalone Organization entity carrying aggregateRating + review[] for the
+     * homepage graph (GEO review signal — reviews lift both classic search and
+     * LLM citation). Values are computed by the caller from real testimonials and
+     * passed in; this builder NEVER fabricates a rating.
+     *
+     * @param array $rating  ['ratingValue' => float, 'reviewCount' => int]
+     * @param array $reviews list of ['author' => string, 'body' => string(HTML), 'rating' => int]
+     *
+     * When reviewCount < 1 the aggregateRating + review[] keys are omitted
+     * entirely — a real Organization node is still returned (with @id) but with
+     * no zero/fake rating that crawlers could mistrust.
+     */
+    public function organizationWithRating(array $rating, array $reviews = []): array
+    {
+        $node = [
+            '@context' => 'https://schema.org',
+            '@type' => 'Organization',
+            '@id' => self::SITE_URL . '/#organization',
+            'name' => self::ORG_NAME,
+            'url' => self::ORG_URL,
+            'sameAs' => self::SAME_AS,
+        ];
+
+        $reviewCount = (int) ($rating['reviewCount'] ?? 0);
+        if ($reviewCount < 1) {
+            return $node;
+        }
+
+        $node['aggregateRating'] = [
+            '@type' => 'AggregateRating',
+            'ratingValue' => (string) round((float) ($rating['ratingValue'] ?? 0), 1),
+            'reviewCount' => $reviewCount,
+            'bestRating' => '5',
+            'worstRating' => '1',
+        ];
+
+        $items = [];
+        foreach ($reviews as $review) {
+            $author = trim((string) ($review['author'] ?? ''));
+            $body = $this->plainText((string) ($review['body'] ?? ''), 280);
+            if ($author === '' || $body === '') {
+                continue;
+            }
+            $items[] = [
+                '@type' => 'Review',
+                'author' => ['@type' => 'Person', 'name' => $author],
+                'reviewBody' => $body,
+                'reviewRating' => [
+                    '@type' => 'Rating',
+                    'ratingValue' => (string) ((int) ($review['rating'] ?? 5)),
+                    'bestRating' => '5',
+                    'worstRating' => '1',
+                ],
+            ];
+        }
+        if (!empty($items)) {
+            $node['review'] = $items;
+        }
+
+        return $node;
+    }
+
+    /** Strip HTML, collapse whitespace, and cap at $limit chars (testimonial_text is HTML). */
+    private function plainText(string $html, int $limit): string
+    {
+        $text = trim(preg_replace('/\s+/', ' ', strip_tags($html)) ?? '');
+        if (mb_strlen($text) <= $limit) {
+            return $text;
+        }
+
+        return rtrim(mb_substr($text, 0, $limit)) . '…';
+    }
+
+    /**
      * WebSite entity with the Person as publisher. Carries a SearchAction so
      * search engines can surface a sitelinks searchbox.
      */

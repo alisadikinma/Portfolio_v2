@@ -14,7 +14,12 @@ use Illuminate\Support\Str;
 
 class ImageGenerationService
 {
-    public const MAX_SEGMENT_ATTEMPTS = 3;
+    /**
+     * Legacy default cap. The live cap is env-tunable via
+     * services.article_generation.image_segment_max_attempts (default 6) —
+     * read through maxSegmentAttempts(). Kept for backward-compatible references.
+     */
+    public const MAX_SEGMENT_ATTEMPTS = 6;
 
     private string $apiKey;
     private string $baseUrl = 'https://api.geminigen.ai/uapi/v1';
@@ -26,6 +31,49 @@ class ImageGenerationService
         // Constructor-optional injection so the legacy `new ImageGenerationService()`
         // callers (if any) still work; production code goes through the container.
         $this->breaker = $breaker ?? app(GeminiGenCircuitBreaker::class);
+    }
+
+    /**
+     * Hard image-completion gate (GEO publish-and-forget fix). The idea may
+     * advance out of generating_images ONLY when EVERY segment is 'done' or
+     * operator-'skipped' AND at least one rendered. A 'failed' segment — even a
+     * terminal one — HOLDS the idea; we never compile/publish a blog with a
+     * broken image. Single source of truth for both gate sites (webhook handler
+     * here + the ProcessPendingImages poller) and the publish defense-in-depth.
+     *
+     * @param array<int,array<string,mixed>> $prompts image_prompts[] entries
+     */
+    public static function segmentsResolvedForAdvance(array $prompts): bool
+    {
+        if (empty($prompts)) {
+            return false;
+        }
+        $allResolved = collect($prompts)
+            ->every(fn ($p) => in_array($p['status'] ?? '', ['done', 'skipped'], true));
+        $anyDone = collect($prompts)
+            ->contains(fn ($p) => ($p['status'] ?? '') === 'done');
+
+        return $allResolved && $anyDone;
+    }
+
+    /**
+     * Max GeminiGen attempts per segment before HOLD + operator escalation.
+     * Env-tunable; never below 1.
+     */
+    public function maxSegmentAttempts(): int
+    {
+        return max(1, (int) config('services.article_generation.image_segment_max_attempts', 6));
+    }
+
+    /**
+     * Exponential auto-retry backoff in seconds (1-based attempt), capped at
+     * 15 min so persistent retry doesn't hammer GeminiGen during slow recovery.
+     */
+    public static function retryBackoffSeconds(int $attempt): int
+    {
+        $base = 60 * (2 ** max(0, $attempt - 1));
+
+        return (int) min($base, 900);
     }
 
     /**
@@ -475,11 +523,12 @@ class ImageGenerationService
             $article['image_prompts'] = $prompts;
             $idea->update(['generated_article' => $article]);
 
-            $allDone = collect($prompts)->every(fn ($p) => in_array($p['status'] ?? '', ['done', 'failed']));
-            $anyDone = collect($prompts)->contains(fn ($p) => ($p['status'] ?? '') === 'done');
-            if ($allDone && $anyDone && $idea->status === 'generating_images') {
+            // Hard image-completion gate: a 'failed' segment HOLDS the idea at
+            // generating_images (no compile/publish with a broken image). Only
+            // all-done-or-skipped + ≥1 done advances. See segmentsResolvedForAdvance().
+            if (self::segmentsResolvedForAdvance($prompts) && $idea->status === 'generating_images') {
                 $idea->transitionTo(ContentIdeaStatus::ImagesReady, 'webhook_all_done');
-                Log::info("[ImageGen] Content idea {$idea->id} → images_ready (all segments done)");
+                Log::info("[ImageGen] Content idea {$idea->id} → images_ready (all segments done/skipped)");
             }
 
             Log::info("[ImageGen] Webhook: updated segment for idea {$idea->id} uuid={$uuid} status={$status}");
@@ -689,7 +738,7 @@ class ImageGenerationService
         $segment = $prompts[$i];
         $currentCount = (int) ($segment['retry_count'] ?? 0);
 
-        if ($currentCount >= self::MAX_SEGMENT_ATTEMPTS) {
+        if ($currentCount >= $this->maxSegmentAttempts()) {
             Log::warning("[ImageGen] retrySegment: idea #{$idea->id} segment {$i} at cap ({$currentCount})");
             return null;
         }
@@ -751,6 +800,9 @@ class ImageGenerationService
 
         $prompts[$i] = $segment;
         $article['image_prompts'] = $prompts;
+        // Re-arm the stall escalation: this segment is generating again, so a
+        // future exhaustion is a NEW stall episode that should re-alert.
+        unset($article['images_stalled_notified']);
         $idea->generated_article = $article;
         $idea->save();
 
@@ -865,8 +917,12 @@ class ImageGenerationService
             }
             $segment['status'] = 'failed';
 
-            if ($newCount >= self::MAX_SEGMENT_ATTEMPTS) {
+            if ($newCount >= $this->maxSegmentAttempts()) {
                 $segment['terminal_at'] = now()->toIso8601String();
+                // HOLD signal: the idea must NOT advance to images_ready/publish
+                // while this is set (the gate already blocks on 'failed', this
+                // flag also gates the manual publish defense-in-depth + admin UI).
+                $segment['needs_operator'] = true;
 
                 // Phase I — Suppress per-segment Telegram dispatches while the
                 // GeminiGen circuit is non-closed. During an outage the operator
@@ -888,6 +944,31 @@ class ImageGenerationService
                         }
                         \App\Jobs\DispatchTelegramNotification::dispatch($idea->id, 'cover_critical');
                     }
+
+                    // Idea-level HOLD escalation — fired ONCE per stall (guarded
+                    // by an in-JSON flag, no migration) so the operator gets a
+                    // clear "image generation stalled, idea HELD" message in
+                    // addition to the per-segment alert. Persisted with the
+                    // article mutation below.
+                    if (empty($article['images_stalled_notified'])) {
+                        // Build the unresolved list from the OTHER segments (the
+                        // current one isn't re-merged into $prompts yet), then add
+                        // the current segment once — avoids double-counting it.
+                        $failed = collect($prompts)
+                            ->map(fn ($p, $idx) => ['index' => $idx, 'type' => $p['type'] ?? null, 'status' => $p['status'] ?? null])
+                            ->reject(fn ($p) => $p['index'] === $matchIndex)
+                            ->filter(fn ($p) => !in_array($p['status'], ['done', 'skipped'], true))
+                            ->values()
+                            ->all();
+                        $failed[] = ['index' => $matchIndex, 'type' => $segment['type'] ?? null, 'status' => 'failed'];
+                        try {
+                            app(\App\Services\TelegramNotificationService::class)
+                                ->sendImageGenerationStalled($idea, $failed);
+                        } catch (\Throwable $e) {
+                            Log::warning('[ImageGen] sendImageGenerationStalled failed', ['idea_id' => $idea->id, 'error' => $e->getMessage()]);
+                        }
+                        $article['images_stalled_notified'] = true;
+                    }
                 } else {
                     Log::info('[ImageGen] segment_retry_exhausted Telegram suppressed during outage', [
                         'idea_id' => $idea->id,
@@ -896,12 +977,13 @@ class ImageGenerationService
                     ]);
                 }
 
-                Log::warning("[ImageGen] Segment {$matchIndex} on idea #{$idea->id} reached terminal failure after {$newCount} attempts");
+                Log::warning("[ImageGen] Segment {$matchIndex} on idea #{$idea->id} reached terminal failure after {$newCount} attempts — idea HELD at generating_images");
             } elseif ($idea->auto_mode) {
+                $backoff = self::retryBackoffSeconds($newCount);
                 \App\Jobs\RetryImageSegmentJob::dispatch($idea->id, $matchIndex)
-                    ->delay(now()->addSeconds(60));
+                    ->delay(now()->addSeconds($backoff));
 
-                Log::info("[ImageGen] Scheduled auto-retry for idea #{$idea->id} segment {$matchIndex} (attempt {$newCount}/" . self::MAX_SEGMENT_ATTEMPTS . ')' . ($rewriteApplied ? ' [safety-rewritten]' : ''));
+                Log::info("[ImageGen] Scheduled auto-retry for idea #{$idea->id} segment {$matchIndex} (attempt {$newCount}/{$this->maxSegmentAttempts()}, backoff {$backoff}s)" . ($rewriteApplied ? ' [safety-rewritten]' : ''));
             }
 
             $prompts[$matchIndex] = $segment;

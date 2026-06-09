@@ -208,6 +208,86 @@ class TelegramNotificationService
     }
 
     /**
+     * Weekly freshness digest (GEO publish-and-forget fix — Neil Patel #1).
+     * SYSTEM-LEVEL — not keyed to a ContentIdea. Sends ONE message listing the
+     * stale posts so the operator reviews or refreshes them (never auto-regen).
+     * Gated by telegram_notify_stale_content. No-op when disabled or empty.
+     *
+     * @param array<int,array{id:int,title:string,days:int,slug?:string}> $posts
+     */
+    public function sendStaleContentDigest(array $posts): bool
+    {
+        if (!$this->isEnabledFor('stale_content')) {
+            return false;
+        }
+        if (empty($posts)) {
+            return false;
+        }
+
+        $count = count($posts);
+        $shown = array_slice($posts, 0, 15);
+
+        $lines = [];
+        $lines[] = '🕸️ *Stale content — time to refresh*';
+        $lines[] = '';
+        $lines[] = $count === 1
+            ? '1 published post is past the freshness window:'
+            : "{$count} published posts are past the freshness window:";
+        $lines[] = '';
+        foreach ($shown as $p) {
+            $title = $this->escapeMarkdown($this->truncate((string) ($p['title'] ?? 'Untitled'), 80));
+            $days = (int) ($p['days'] ?? 0);
+            $lines[] = "• _{$title}_ — {$days}d old";
+        }
+        if ($count > count($shown)) {
+            $lines[] = '…and ' . ($count - count($shown)) . ' more.';
+        }
+        $lines[] = '';
+        $lines[] = 'Review or refresh in [admin]('
+            . rtrim((string) config('app.url'), '/') . '/admin/posts?filter=stale).';
+
+        return $this->send(implode("\n", $lines));
+    }
+
+    /**
+     * Idea-level HOLD escalation when image generation stalls (GEO
+     * image-completion gate). SYSTEM-LEVEL — fired once per stall from
+     * ImageGenerationService::handleSegmentFailure when a segment exhausts its
+     * retry budget, so the operator knows the idea is HELD at generating_images
+     * and won't auto-publish with a broken image. Gated by
+     * telegram_notify_image_stalled. No-op when disabled.
+     *
+     * @param \App\Models\ContentIdea $idea
+     * @param array<int,array{index:int,type:?string,status:?string}> $failedSegments
+     */
+    public function sendImageGenerationStalled(\App\Models\ContentIdea $idea, array $failedSegments): bool
+    {
+        if (!$this->isEnabledFor('image_stalled')) {
+            return false;
+        }
+
+        $count = count($failedSegments);
+        $adminUrl = rtrim((string) config('app.url'), '/') . '/admin/content-engine?idea=' . $idea->id;
+
+        $lines = [];
+        $lines[] = '🛑 *Image generation stalled — idea HELD*';
+        $lines[] = '';
+        $lines[] = 'Article: _' . $this->escapeMarkdown((string) ($idea->title ?? 'Untitled')) . '_';
+        $lines[] = $count === 1
+            ? '1 image segment exhausted its retries — the idea will NOT publish until it is resolved.'
+            : "{$count} image segments exhausted their retries — the idea will NOT publish until they are resolved.";
+        foreach (array_slice($failedSegments, 0, 8) as $seg) {
+            $idx = $seg['index'] ?? '?';
+            $type = $seg['type'] ?? 'segment';
+            $lines[] = "• #{$idx} ({$type})";
+        }
+        $lines[] = '';
+        $lines[] = 'Retry, skip, or upload manually in [admin](' . $adminUrl . ').';
+
+        return $this->send(implode("\n", $lines));
+    }
+
+    /**
      * Celebratory alert when a LinkedIn draft has been successfully posted to
      * the LinkedIn feed. Includes the live LinkedIn URL so the operator can
      * jump straight to the post (or to the comment thread to reply early).

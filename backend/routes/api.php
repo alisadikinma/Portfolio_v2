@@ -979,6 +979,12 @@ Route::middleware(['auth:sanctum'])->prefix('admin/content-engine')->group(funct
     Route::get('/workflows', [ContentIdeaController::class, 'listWorkflows']);
     Route::get('/workflows/{id}', [ContentIdeaController::class, 'getWorkflowStatus']);
 
+    // Freshness loop (GEO publish-and-forget fix) — read-only stale list +
+    // mark-reviewed. Owned by PostController (the admin/posts read owner) but
+    // surfaced here next to the content lifecycle the operator manages.
+    Route::get('/stale-posts', [PostController::class, 'staleList']);
+    Route::post('/posts/{id}/mark-reviewed', [PostController::class, 'markReviewed']);
+
     // Content Ideas CRUD
     Route::get('/ideas', [ContentIdeaController::class, 'index']);
     Route::post('/ideas', [ContentIdeaController::class, 'store']);

@@ -116,7 +116,12 @@ class SeoHtmlComposer
             if (empty($block)) {
                 continue;
             }
-            $json = json_encode($block, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            // JSON_HEX_TAG|JSON_HEX_AMP escape <, >, & to \u00XX so DB-sourced
+            // strings (post titles, testimonial author/body, FAQ) can never break
+            // out of the <script type="application/ld+json"> context with a literal
+            // </script>. Crawlers decode the escapes transparently — JSON-LD stays
+            // valid (this is the recommended encoding for JSON-LD in a script tag).
+            $json = json_encode($block, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
             if ($json === false) {
                 continue;
             }

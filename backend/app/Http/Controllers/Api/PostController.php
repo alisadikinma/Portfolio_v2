@@ -232,6 +232,73 @@ class PostController extends Controller
     }
 
     /**
+     * Stale posts for the admin freshness surface (GEO publish-and-forget fix).
+     * Returns published posts whose freshness anchor (COALESCE(content_reviewed_at,
+     * published_at)) is older than ?days (default 90), oldest-first, each with a
+     * computed days_stale. Read-only — drives the "Needs refresh" badge/filter.
+     */
+    public function staleList(Request $request): JsonResponse
+    {
+        $days = max(1, (int) $request->query('days', 90));
+
+        $posts = Post::stale($days)
+            ->with('translations')
+            ->orderBy('published_at')
+            ->get()
+            ->map(function (Post $post) {
+                $t = $post->translations->firstWhere('language', 'en')
+                    ?? $post->translations->firstWhere('language', 'id')
+                    ?? $post->translations->first();
+                $anchor = $post->content_reviewed_at ?? $post->published_at;
+
+                return [
+                    'id' => $post->id,
+                    'slug' => $post->slug,
+                    'title' => $t?->title ?? "(post #{$post->id})",
+                    'published_at' => optional($post->published_at)->toIso8601String(),
+                    'content_reviewed_at' => optional($post->content_reviewed_at)->toIso8601String(),
+                    'days_stale' => $anchor ? (int) abs($anchor->diffInDays(now())) : null,
+                ];
+            })
+            ->values();
+
+        return response()->json([
+            'success' => true,
+            'data' => $posts,
+            'meta' => ['days' => $days, 'total' => $posts->count()],
+        ]);
+    }
+
+    /**
+     * Mark a post content-reviewed. Stamps content_reviewed_at=now(), which
+     * resets the freshness anchor so the post drops out of the stale list.
+     * Does NOT regenerate content (operator-initiated refresh stays separate).
+     */
+    public function markReviewed(int $id): JsonResponse
+    {
+        $post = Post::find($id);
+
+        if (!$post) {
+            return response()->json([
+                'message' => 'Post not found',
+                'error' => 'The requested post does not exist.',
+            ], 404);
+        }
+
+        $post->content_reviewed_at = now();
+        $post->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Post marked as reviewed',
+            'data' => [
+                'id' => $post->id,
+                'content_reviewed_at' => $post->content_reviewed_at->toIso8601String(),
+            ],
+        ]);
+    }
+
+    /**
      * Store a newly created post.
      */
     public function store(StorePostRequest $request): JsonResponse

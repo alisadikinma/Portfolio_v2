@@ -43,6 +43,16 @@ class TelegramSettingsSeeder extends Seeder
             ['key' => 'telegram_notify_geminigen_circuit_open',         'value' => 'true', 'type' => 'text'],
             ['key' => 'telegram_notify_geminigen_circuit_close',        'value' => 'true', 'type' => 'text'],
 
+            // Weekly stale-content freshness digest (GEO publish-and-forget fix).
+            // System-level, NOT keyed to a ContentIdea. Default 'true' — flip via
+            // UI to silence. Fires from content:flag-stale-posts (Mon 06:00 WIB).
+            ['key' => 'telegram_notify_stale_content',                  'value' => 'true', 'type' => 'text'],
+
+            // Image-generation HOLD escalation (GEO image-completion gate) — fires
+            // once per stall when a segment exhausts its retry budget and the idea
+            // is held at generating_images (never auto-published with a broken image).
+            ['key' => 'telegram_notify_image_stalled',                  'value' => 'true', 'type' => 'text'],
+
             ['key' => 'telegram_webhook_secret',                        'value' => bin2hex(random_bytes(16)), 'type' => 'text'],
         ];
 
