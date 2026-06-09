@@ -6,6 +6,7 @@ use App\Enums\LinkedInPostStatus;
 use App\Exceptions\CarouselGenAdapterException;
 use App\Models\LinkedInPost;
 use App\Models\PostTranslation;
+use App\Models\Setting;
 use App\Support\LinkedInProgressEmitter;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
@@ -161,6 +162,36 @@ class LinkedInGenerationService
 
         $detectedFormat = $parsed['format'] ?? 'unknown';
         $isCarouselRoute = ($parsed['status'] ?? null) === 'route_to_carousel_gen';
+
+        // Default-carousel (June 9, 2026): when linkedin_force_carousel is on,
+        // override the plugin's text decision and route EVERY draft through
+        // /carousel-gen. forceCarouselEnvelope() rewrites the envelope to a
+        // route_to_carousel_gen shape so the existing applyCarouselGenAdapter
+        // path (Step 5.5) runs unchanged — /carousel-gen generates slides from
+        // --blog-source, so an absent brief is fine. Supersedes the format-mix
+        // governor (unreliable: plugin ignores format_preference). The pure
+        // rewrite is guarded so a real plugin failure (status='failed') and an
+        // already-carousel route are never masked; /carousel-gen failure →
+        // markFailed → manual review (no silent text downgrade), per Decision 1.
+        $forceEnabled = filter_var(
+            Setting::get('linkedin_force_carousel', 'true'),
+            FILTER_VALIDATE_BOOLEAN
+        );
+        $beforeStatus = $parsed['status'] ?? null;
+        $parsed = $this->forceCarouselEnvelope($parsed, $forceEnabled);
+        $detectedFormat = $parsed['format'] ?? 'unknown';
+        $isCarouselRoute = ($parsed['status'] ?? null) === 'route_to_carousel_gen';
+        if ($isCarouselRoute && $beforeStatus !== 'route_to_carousel_gen') {
+            Log::info('[LinkedInGen] linkedin_force_carousel ON — overriding plugin format to carousel', [
+                'draft_id' => $draft->id,
+                'before_status' => $beforeStatus,
+            ]);
+            $this->appendNonTransitionLogEntry($draft, 'force_carousel_override', [
+                'before_status' => $beforeStatus,
+                'target' => 'carousel',
+            ]);
+        }
+
         $parsedPct = $detectedFormat === 'carousel' || $isCarouselRoute ? 25 : 50;
         LinkedInProgressEmitter::emit(
             $draft,
@@ -797,6 +828,38 @@ class LinkedInGenerationService
             'status' => $draft->fresh()->status,
             'depth_score' => $depthScore,
         ];
+    }
+
+    /**
+     * Pure envelope rewrite for the default-carousel policy (Phase B,
+     * 2026-06-09). When $forceEnabled is true and the plugin emitted a
+     * non-failed, non-carousel envelope, rewrite it to the
+     * route_to_carousel_gen shape so generate()'s existing Step 5.5 adapter
+     * call dispatches /carousel-gen. No side effects (no DB, no logging) — so
+     * it is unit-testable without booting Laravel; generate() owns the audit
+     * log + progress emit. Guards:
+     *   - $forceEnabled false        → unchanged (operator opt-out)
+     *   - status route_to_carousel_gen → unchanged (plugin already routed)
+     *   - format already 'carousel'  → unchanged (legacy handled/rejected downstream)
+     *   - status 'failed'            → unchanged (never mask a plugin failure)
+     */
+    public function forceCarouselEnvelope(array $parsed, bool $forceEnabled): array
+    {
+        if (! $forceEnabled) {
+            return $parsed;
+        }
+
+        $status = $parsed['status'] ?? null;
+        $format = $parsed['format'] ?? null;
+
+        if ($status === 'route_to_carousel_gen' || $format === 'carousel' || $status === 'failed') {
+            return $parsed;
+        }
+
+        $parsed['format'] = 'carousel';
+        $parsed['status'] = 'route_to_carousel_gen';
+
+        return $parsed;
     }
 
     /**
