@@ -2,7 +2,6 @@
 
 namespace Tests\Unit;
 
-use App\Models\Category;
 use App\Models\FacebookPost;
 use App\Models\InstagramPost;
 use App\Models\LinkedInPost;
@@ -14,16 +13,16 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * TDD — PublerPayloadBuilder payload construction (P4, 2026-05-13).
+ * PublerPayloadBuilder normalized-spec construction.
  *
- * Verifies that each platform's payload builder emits the correct shape for
- * the Publer POST /posts/schedule endpoint, covering:
- *   - accounts[] with the right platform account_id from settings
- *   - caption body construction (caption + hashtags for IG/TH/FB, URL-in-body for TikTok)
- *   - media[] pulled from linkedinPost->carousel_slides[].image_url
- *   - comments[] (IG + Threads only, NOT TikTok, NOT Facebook per May 10 cleanup)
- *   - scheduled_at ISO 8601
- *   - RuntimeException when account_id not configured in settings
+ * REWRITTEN June 10, 2026 — the builder no longer emits the final flat Publer
+ * payload. It emits a normalized "spec" the PublishViaPubler job turns into the
+ * live bulk envelope after pre-uploading media:
+ *   [ platform, network, account_id, network_fields{type,text,...}, media_urls[], comments[] ]
+ *
+ * Verifies: account_id from settings, caption+hashtags in network_fields.text,
+ * media_urls from carousel_slides, comments only for IG+Threads (delay 1 min),
+ * TikTok title passthrough, per-platform enabled gate, missing-account throw.
  */
 class PublerPayloadBuilderTest extends TestCase
 {
@@ -31,7 +30,6 @@ class PublerPayloadBuilderTest extends TestCase
 
     private function makePost(): Post
     {
-        // category_id is NOT NULL in posts table
         $category = \App\Models\Category::create(['name' => 'AI', 'slug' => 'ai-' . uniqid()]);
         return Post::create([
             'category_id' => $category->id,
@@ -73,7 +71,7 @@ class PublerPayloadBuilderTest extends TestCase
 
     // ─── Instagram ────────────────────────────────────────────────────────────
 
-    public function test_instagram_payload_carries_caption_hashtags_link_comment_and_slides(): void
+    public function test_instagram_spec_carries_caption_hashtags_link_comment_and_media_urls(): void
     {
         $this->setSetting('publer_instagram_account_id', 'ig_acc_123');
 
@@ -90,40 +88,33 @@ class PublerPayloadBuilderTest extends TestCase
         ]);
         $sibling->load('linkedinPost');
 
-        $builder = new PublerPayloadBuilder();
-        $payload = $builder->buildInstagram($sibling);
+        $spec = (new PublerPayloadBuilder())->buildInstagram($sibling);
 
-        // accounts[]
-        $this->assertArrayHasKey('accounts', $payload);
-        $this->assertCount(1, $payload['accounts']);
-        $this->assertSame('ig_acc_123', $payload['accounts'][0]['id']);
+        $this->assertSame('instagram', $spec['platform']);
+        $this->assertSame('instagram', $spec['network']);
+        $this->assertSame('ig_acc_123', $spec['account_id']);
 
-        // caption includes both body and hashtags
-        $this->assertStringContainsString('Ini caption Instagram.', $payload['caption']);
-        $this->assertStringContainsString('#AI', $payload['caption']);
-        $this->assertStringContainsString('#VibeCoding', $payload['caption']);
+        // Multi-image → type photo; caption carries body + hashtags
+        $this->assertSame('photo', $spec['network_fields']['type']);
+        $this->assertStringContainsString('Ini caption Instagram.', $spec['network_fields']['text']);
+        $this->assertStringContainsString('#AI', $spec['network_fields']['text']);
+        $this->assertStringContainsString('#VibeCoding', $spec['network_fields']['text']);
 
-        // media[] sourced from linkedinPost->carousel_slides[].image_url
-        $this->assertArrayHasKey('media', $payload);
-        $this->assertCount(3, $payload['media']);
-        $this->assertSame('https://cdn.test/slide-01.png', $payload['media'][0]['url']);
-        $this->assertSame('https://cdn.test/slide-03.png', $payload['media'][2]['url']);
+        // media_urls from carousel_slides (ordered, raw URLs — uploaded later)
+        $this->assertCount(3, $spec['media_urls']);
+        $this->assertSame('https://cdn.test/slide-01.png', $spec['media_urls'][0]);
+        $this->assertSame('https://cdn.test/slide-03.png', $spec['media_urls'][2]);
 
-        // comments[] with link_comment + 30s delay
-        $this->assertArrayHasKey('comments', $payload);
-        $this->assertCount(1, $payload['comments']);
-        $this->assertStringContainsString('https://alisadikinma.com/blog/test-post', $payload['comments'][0]['text']);
-        $this->assertSame(30, $payload['comments'][0]['delay']['duration']);
-        $this->assertSame('seconds', $payload['comments'][0]['delay']['unit']);
-
-        // scheduled_at ISO 8601
-        $this->assertArrayHasKey('scheduled_at', $payload);
-        $this->assertStringContainsString('2026-05-15', $payload['scheduled_at']);
+        // comments[] with link_comment + 1-minute delay
+        $this->assertCount(1, $spec['comments']);
+        $this->assertStringContainsString('https://alisadikinma.com/blog/test-post', $spec['comments'][0]['text']);
+        $this->assertSame(1, $spec['comments'][0]['delay']['duration']);
+        $this->assertSame('minute', $spec['comments'][0]['delay']['unit']);
     }
 
     // ─── TikTok ────────────────────────────────────────────────────────────────
 
-    public function test_tiktok_payload_has_url_in_caption_body_and_no_comments(): void
+    public function test_tiktok_spec_has_url_in_caption_title_and_no_comments(): void
     {
         $this->setSetting('publer_tiktok_account_id', 'tt_acc_456');
 
@@ -141,30 +132,20 @@ class PublerPayloadBuilderTest extends TestCase
         ]);
         $sibling->load('linkedinPost');
 
-        $builder = new PublerPayloadBuilder();
-        $payload = $builder->buildTiktok($sibling);
+        $spec = (new PublerPayloadBuilder())->buildTiktok($sibling);
 
-        // accounts[]
-        $this->assertSame('tt_acc_456', $payload['accounts'][0]['id']);
+        $this->assertSame('tt_acc_456', $spec['account_id']);
+        $this->assertStringContainsString('https://ali.me/r/abc1234', $spec['network_fields']['text']);
+        $this->assertSame('TikTok title here', $spec['network_fields']['title']);
+        $this->assertCount(3, $spec['media_urls']);
 
-        // caption carries URL (TikTok has no first-comment API)
-        $this->assertStringContainsString('https://ali.me/r/abc1234', $payload['caption']);
-
-        // NO comments[] for TikTok
-        $this->assertArrayNotHasKey('comments', $payload);
-
-        // title field included
-        $this->assertArrayHasKey('title', $payload);
-        $this->assertSame('TikTok title here', $payload['title']);
-
-        // media[] from carousel_slides
-        $this->assertArrayHasKey('media', $payload);
-        $this->assertCount(3, $payload['media']);
+        // NO comments[] for TikTok (no first-comment API)
+        $this->assertEmpty($spec['comments']);
     }
 
     // ─── Threads ───────────────────────────────────────────────────────────────
 
-    public function test_threads_payload_carries_caption_hashtags_link_comment_and_slides(): void
+    public function test_threads_spec_carries_caption_hashtags_link_comment_and_media(): void
     {
         $this->setSetting('publer_threads_account_id', 'th_acc_789');
 
@@ -181,28 +162,21 @@ class PublerPayloadBuilderTest extends TestCase
         ]);
         $sibling->load('linkedinPost');
 
-        $builder = new PublerPayloadBuilder();
-        $payload = $builder->buildThreads($sibling);
+        $spec = (new PublerPayloadBuilder())->buildThreads($sibling);
 
-        // accounts[]
-        $this->assertSame('th_acc_789', $payload['accounts'][0]['id']);
+        $this->assertSame('th_acc_789', $spec['account_id']);
+        $this->assertStringContainsString('Ini caption Threads singkat.', $spec['network_fields']['text']);
+        $this->assertStringContainsString('#Automation', $spec['network_fields']['text']);
+        $this->assertCount(3, $spec['media_urls']);
 
-        // caption + hashtags
-        $this->assertStringContainsString('Ini caption Threads singkat.', $payload['caption']);
-        $this->assertStringContainsString('#Automation', $payload['caption']);
-
-        // media[] from carousel_slides
-        $this->assertCount(3, $payload['media']);
-
-        // comments[] with link_comment + 30s delay
-        $this->assertArrayHasKey('comments', $payload);
-        $this->assertStringContainsString('alisadikinma.com', $payload['comments'][0]['text']);
-        $this->assertSame(30, $payload['comments'][0]['delay']['duration']);
+        $this->assertCount(1, $spec['comments']);
+        $this->assertStringContainsString('alisadikinma.com', $spec['comments'][0]['text']);
+        $this->assertSame(1, $spec['comments'][0]['delay']['duration']);
     }
 
     // ─── Facebook ──────────────────────────────────────────────────────────────
 
-    public function test_facebook_carousel_payload_has_slides_and_no_comments(): void
+    public function test_facebook_carousel_spec_has_media_and_no_comments(): void
     {
         $this->setSetting('publer_facebook_account_id', 'fb_acc_101');
 
@@ -219,28 +193,32 @@ class PublerPayloadBuilderTest extends TestCase
         ]);
         $sibling->load('linkedinPost');
 
-        $builder = new PublerPayloadBuilder();
-        $payload = $builder->buildFacebook($sibling);
+        $spec = (new PublerPayloadBuilder())->buildFacebook($sibling);
 
-        // accounts[]
-        $this->assertSame('fb_acc_101', $payload['accounts'][0]['id']);
+        $this->assertSame('fb_acc_101', $spec['account_id']);
+        $this->assertStringContainsString('Caption Facebook carousel.', $spec['network_fields']['text']);
+        $this->assertCount(3, $spec['media_urls']);
+        $this->assertEmpty($spec['comments']);
+    }
 
-        // caption
-        $this->assertStringContainsString('Caption Facebook carousel.', $payload['caption']);
+    // ─── Per-platform enabled gate ──────────────────────────────────────────────
 
-        // media[] from carousel_slides (carousel format)
-        $this->assertArrayHasKey('media', $payload);
-        $this->assertCount(3, $payload['media']);
+    public function test_is_platform_enabled_reflects_account_setting(): void
+    {
+        $this->assertFalse(PublerPayloadBuilder::isPlatformEnabled('threads'));
 
-        // NO comments[] for Facebook (May 10 cleanup decision)
-        $this->assertArrayNotHasKey('comments', $payload);
+        $this->setSetting('publer_threads_account_id', 'th_acc_789');
+        $this->assertTrue(PublerPayloadBuilder::isPlatformEnabled('threads'));
+
+        // Whitespace-only setting still counts as disabled
+        $this->setSetting('publer_instagram_account_id', '   ');
+        $this->assertFalse(PublerPayloadBuilder::isPlatformEnabled('instagram'));
     }
 
     // ─── Missing account ID ────────────────────────────────────────────────────
 
     public function test_throws_runtime_exception_when_account_id_not_configured(): void
     {
-        // No setting seeded for instagram
         $linkedinPost = $this->makeLinkedInPost();
         $sibling = InstagramPost::create([
             'linkedin_post_id' => $linkedinPost->id,
@@ -253,7 +231,6 @@ class PublerPayloadBuilderTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessageMatches('/instagram/i');
 
-        $builder = new PublerPayloadBuilder();
-        $builder->buildInstagram($sibling);
+        (new PublerPayloadBuilder())->buildInstagram($sibling);
     }
 }

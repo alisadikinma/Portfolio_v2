@@ -900,7 +900,10 @@ class LinkedInDraftController extends Controller
         $draft->load(['instagramPost', 'tiktokPost', 'threadsPost', 'facebookPost']);
         foreach (['instagram', 'tiktok', 'threads', 'facebook'] as $platform) {
             $sibling = $draft->{$platform . 'Post'};
+            // Per-platform gate: only publish to platforms the operator has
+            // selected a Publer account for (disabled platform = skipped).
             if ($sibling !== null
+                && \App\Services\PublerPayloadBuilder::isPlatformEnabled($platform)
                 && in_array($sibling->status, ['awaiting_review', 'publishing'], true)
                 && $sibling->publer_post_id === null) {
                 try {

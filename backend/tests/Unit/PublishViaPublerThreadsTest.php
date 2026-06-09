@@ -80,10 +80,10 @@ class PublishViaPublerThreadsTest extends TestCase
         $this->setPublerApiKey();
 
         Http::fake([
-            '*/posts/schedule' => Http::response([
-                'success' => true,
-                'data' => ['job_id' => 'job_threads_789'],
-            ], 200),
+            '*/media/from-url' => Http::response(['job_id' => 'mjob'], 200),
+            '*/job_status/mjob' => Http::response(['status' => 'complete', 'payload' => [['id' => 'media_1']]], 200),
+            '*/posts/schedule/publish' => Http::response(['job_id' => 'pjob'], 200),
+            '*/job_status/pjob' => Http::response(['status' => 'complete', 'payload' => ['failures' => []]], 200),
         ]);
 
         $sibling = $this->makeSibling();
@@ -92,7 +92,7 @@ class PublishViaPublerThreadsTest extends TestCase
         $job->handle(app(PublerClient::class), app(PublerPayloadBuilder::class));
 
         $fresh = $sibling->fresh();
-        $this->assertSame('job_threads_789', $fresh->publer_post_id);
+        $this->assertSame('pjob', $fresh->publer_post_id);
         $this->assertSame('published', $fresh->status);
         $this->assertNotNull($fresh->published_at);
     }
@@ -105,7 +105,9 @@ class PublishViaPublerThreadsTest extends TestCase
         $this->setPublerApiKey();
 
         Http::fake([
-            '*/posts/schedule' => Http::response([
+            '*/media/from-url' => Http::response(['job_id' => 'mjob'], 200),
+            '*/job_status/mjob' => Http::response(['status' => 'complete', 'payload' => [['id' => 'media_1']]], 200),
+            '*/posts/schedule/publish' => Http::response([
                 'success' => false,
                 'error' => 'Threads account disconnected',
             ], 403),

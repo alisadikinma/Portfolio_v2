@@ -151,14 +151,24 @@ class PublishViaPublerEndToEndTest extends TestCase
      */
     public function test_dispatching_4_platforms_at_slot_publishes_all_via_publer_mock(): void
     {
-        // Mock Publer HTTP — each call returns a distinct job_id.
-        $callCount = 0;
-        Http::fake(function () use (&$callCount) {
-            $callCount++;
-            return Http::response([
-                'success' => true,
-                'data' => ['job_id' => "job_e2e_{$callCount}"],
-            ], 200);
+        // Mock the full Publer flow: media upload → poll → publish → poll.
+        // Each platform's publish returns a distinct job_id (pjob_1..4).
+        $publishCount = 0;
+        Http::fake(function ($request) use (&$publishCount) {
+            $url = $request->url();
+            if (str_contains($url, '/media/from-url')) {
+                return Http::response(['job_id' => 'mjob'], 200);
+            }
+            if (str_contains($url, '/posts/schedule/publish')) {
+                $publishCount++;
+                return Http::response(['job_id' => "pjob_{$publishCount}"], 200);
+            }
+            if (str_contains($url, '/job_status/')) {
+                return str_contains($url, 'mjob')
+                    ? Http::response(['status' => 'complete', 'payload' => [['id' => 'media_x']]], 200)
+                    : Http::response(['status' => 'complete', 'payload' => ['failures' => []]], 200);
+            }
+            return Http::response([], 200);
         });
 
         $instagram = $this->makeInstagram();
@@ -180,8 +190,8 @@ class PublishViaPublerEndToEndTest extends TestCase
             $job->handle($client, $builder);
         }
 
-        // All 4 Publer API calls were made.
-        $this->assertSame(4, $callCount, 'Expected exactly 4 Publer API calls');
+        // All 4 platforms ran their publish job.
+        $this->assertSame(4, $publishCount, 'Expected exactly 4 Publer publish calls');
 
         // All siblings now have publer_post_id set and status='published'.
         foreach ([$instagram, $tiktok, $threads, $facebook] as $sibling) {
@@ -208,14 +218,25 @@ class PublishViaPublerEndToEndTest extends TestCase
      */
     public function test_publer_requests_carry_correct_per_platform_payload(): void
     {
-        $capturedRequests = [];
+        // Capture ONLY the publish request bodies (the assembled bulk envelope);
+        // media uploads + polls are mocked through.
+        $publishBodies = [];
 
-        Http::fake(function ($request) use (&$capturedRequests) {
-            $capturedRequests[] = $request->data();
-            return Http::response([
-                'success' => true,
-                'data' => ['job_id' => 'job_payload_check_' . count($capturedRequests)],
-            ], 200);
+        Http::fake(function ($request) use (&$publishBodies) {
+            $url = $request->url();
+            if (str_contains($url, '/media/from-url')) {
+                return Http::response(['job_id' => 'mjob'], 200);
+            }
+            if (str_contains($url, '/posts/schedule/publish')) {
+                $publishBodies[] = $request->data();
+                return Http::response(['job_id' => 'pjob_' . count($publishBodies)], 200);
+            }
+            if (str_contains($url, '/job_status/')) {
+                return str_contains($url, 'mjob')
+                    ? Http::response(['status' => 'complete', 'payload' => [['id' => 'media_x']]], 200)
+                    : Http::response(['status' => 'complete', 'payload' => ['failures' => []]], 200);
+            }
+            return Http::response([], 200);
         });
 
         $instagram = $this->makeInstagram();
@@ -235,27 +256,28 @@ class PublishViaPublerEndToEndTest extends TestCase
             (new PublishViaPubler($platform, $sibling->id))->handle($client, $builder);
         }
 
-        $this->assertCount(4, $capturedRequests);
+        $this->assertCount(4, $publishBodies);
 
-        [$igPayload, $ttPayload, $thPayload, $fbPayload] = $capturedRequests;
+        // Each body is { bulk: { state, posts: [ <post> ] } } — assert on the post.
+        [$ig, $tt, $th, $fb] = array_map(fn ($b) => $b['bulk']['posts'][0], $publishBodies);
 
-        // Instagram: must have comments[].
-        $this->assertArrayHasKey('comments', $igPayload, 'Instagram payload must include comments[]');
-        $this->assertNotEmpty($igPayload['comments']);
-        $this->assertStringContainsString('https://', $igPayload['comments'][0]['text'] ?? '');
+        // Instagram: comments[] at post level, with the blog link.
+        $this->assertArrayHasKey('comments', $ig, 'Instagram post must include comments[]');
+        $this->assertNotEmpty($ig['comments']);
+        $this->assertStringContainsString('https://', $ig['comments'][0]['text'] ?? '');
 
-        // TikTok: must have title, must NOT have comments[].
-        $this->assertArrayHasKey('title', $ttPayload, 'TikTok payload must include title');
-        $this->assertArrayNotHasKey('comments', $ttPayload, 'TikTok payload must NOT include comments[]');
+        // TikTok: title under networks.tiktok, NO comments[].
+        $this->assertArrayHasKey('title', $tt['networks']['tiktok'], 'TikTok network must include title');
+        $this->assertArrayNotHasKey('comments', $tt, 'TikTok post must NOT include comments[]');
 
-        // Threads: must have comments[].
-        $this->assertArrayHasKey('comments', $thPayload, 'Threads payload must include comments[]');
-        $this->assertNotEmpty($thPayload['comments']);
+        // Threads: comments[] at post level.
+        $this->assertArrayHasKey('comments', $th, 'Threads post must include comments[]');
+        $this->assertNotEmpty($th['comments']);
 
-        // Facebook: must NOT have comments[], must have media[] (carousel).
-        $this->assertArrayNotHasKey('comments', $fbPayload, 'Facebook payload must NOT include comments[]');
-        $this->assertArrayHasKey('media', $fbPayload, 'Facebook carousel payload must include media[]');
-        $this->assertNotEmpty($fbPayload['media']);
+        // Facebook: NO comments[], media[] under networks.facebook (carousel).
+        $this->assertArrayNotHasKey('comments', $fb, 'Facebook post must NOT include comments[]');
+        $this->assertArrayHasKey('media', $fb['networks']['facebook'], 'Facebook carousel must include media[]');
+        $this->assertNotEmpty($fb['networks']['facebook']['media']);
     }
 
     /**

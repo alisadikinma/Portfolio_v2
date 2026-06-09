@@ -49,7 +49,8 @@ class PublishViaPubler implements ShouldQueue
 
     public int $tries = 3;
     public array $backoff = [60, 300, 900];
-    public int $timeout = 60;
+    /** Generous: N media uploads (each upload+poll) + publish-job poll. */
+    public int $timeout = 240;
 
     /**
      * @param  string  $platform       'instagram'|'tiktok'|'threads'|'facebook'
@@ -83,23 +84,67 @@ class PublishViaPubler implements ShouldQueue
             return;
         }
 
+        // Defense-in-depth gate: never publish to a platform the operator hasn't
+        // selected a Publer account for (dispatch sites also gate, but a stale
+        // queued job could outlive a settings change). Skip silently — leave the
+        // sibling untouched so re-selecting the account + re-dispatching works.
+        if (!PublerPayloadBuilder::isPlatformEnabled($this->platform)) {
+            Log::info('[PublishViaPubler] Platform not configured in Publer settings — skipping', [
+                'platform' => $this->platform,
+                'sibling_id' => $this->siblingPostId,
+            ]);
+            return;
+        }
+
         $method = 'build' . ucfirst($this->platform);
-        $payload = $builder->$method($sibling);
+        $spec = $builder->$method($sibling);
 
         Log::info('[PublishViaPubler] Dispatching to Publer', [
             'platform' => $this->platform,
             'sibling_id' => $this->siblingPostId,
+            'media_count' => count($spec['media_urls'] ?? []),
         ]);
 
         try {
-            // createPost() returns a Publer job_id string on success,
-            // throws RuntimeException on 4xx/5xx (already mapped by PublerClient).
-            $jobId = $client->createPost($payload);
+            // 1. Pre-upload every media URL → media_ids (Publer rejects raw URLs).
+            $mediaIds = [];
+            foreach ($spec['media_urls'] as $i => $url) {
+                $name = sprintf('%s-%d-slide-%02d.png', $this->platform, $sibling->id, $i + 1);
+                $mediaIds[] = $client->uploadAndAwaitMedia($url, $name);
+            }
+
+            // 2. Assemble the single post object (networks + accounts + comments).
+            $post = $this->assemblePost($spec, $mediaIds);
+
+            // 3. Publish immediately, then CONFIRM via the async job result
+            //    (a 200 + job_id alone does not mean it published).
+            $jobId = $client->publishNow($post);
+            $result = $client->awaitPublishResult($jobId);
+
+            if (!($result['ok'] ?? false)) {
+                // Permanent — bad params / incompatible media. Mark failed with
+                // the operator-actionable message Publer returned.
+                $msg = $result['error'] ?? 'Publer publish job reported failure';
+                DB::table($sibling->getTable())
+                    ->where('id', $sibling->id)
+                    ->update([
+                        'status' => 'failed',
+                        'last_error' => mb_substr($msg, 0, 1000),
+                        'updated_at' => now(),
+                    ]);
+                Log::error('[PublishViaPubler] Publish job reported failure — marked failed', [
+                    'platform' => $this->platform,
+                    'sibling_id' => $this->siblingPostId,
+                    'job_id' => $jobId,
+                    'error' => $msg,
+                ]);
+                return;
+            }
 
             DB::table($sibling->getTable())
                 ->where('id', $sibling->id)
                 ->update([
-                    'publer_post_id' => $jobId,
+                    'publer_post_id' => $result['post_id'] ?? $jobId,
                     'status' => 'published',
                     'published_at' => now(),
                     'updated_at' => now(),
@@ -108,7 +153,7 @@ class PublishViaPubler implements ShouldQueue
             Log::info('[PublishViaPubler] Published successfully', [
                 'platform' => $this->platform,
                 'sibling_id' => $this->siblingPostId,
-                'publer_post_id' => $jobId,
+                'publer_post_id' => $result['post_id'] ?? $jobId,
             ]);
         } catch (\RuntimeException $e) {
             // PublerClient maps 4xx to RuntimeException with message describing
@@ -142,6 +187,34 @@ class PublishViaPubler implements ShouldQueue
                 'error' => $errorMessage,
             ]);
         }
+    }
+
+    /**
+     * Assemble the single Publer post object from the builder spec + the
+     * media_ids resolved from the pre-upload step:
+     *   { networks: { <net>: {type,text,media:[{id,type:image}]} },
+     *     accounts: [{id, scheduled_at:""}], comments?: [...] }
+     */
+    private function assemblePost(array $spec, array $mediaIds): array
+    {
+        $networkFields = $spec['network_fields'];
+        if (!empty($mediaIds)) {
+            $networkFields['media'] = array_map(
+                fn ($id) => ['id' => $id, 'type' => 'image'],
+                $mediaIds
+            );
+        }
+
+        $post = [
+            'networks' => [$spec['network'] => $networkFields],
+            'accounts' => [['id' => $spec['account_id'], 'scheduled_at' => '']],
+        ];
+
+        if (!empty($spec['comments'])) {
+            $post['comments'] = $spec['comments'];
+        }
+
+        return $post;
     }
 
     public function failed(\Throwable $e): void

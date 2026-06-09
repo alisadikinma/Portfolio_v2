@@ -88,12 +88,13 @@ class PublishViaPublerInstagramTest extends TestCase
         $this->setSetting('publer_instagram_account_id', 'ig_acc_test');
         $this->setPublerApiKey();
 
-        // Publer /posts/schedule returns {success: true, data: {job_id: 'job_abc'}}
+        // New flow: pre-upload each media URL → poll media job → publish → poll
+        // publish job. Distinct job ids let us fake distinct /job_status URLs.
         Http::fake([
-            '*/posts/schedule' => Http::response([
-                'success' => true,
-                'data' => ['job_id' => 'job_abc123'],
-            ], 200),
+            '*/media/from-url' => Http::response(['job_id' => 'mjob'], 200),
+            '*/job_status/mjob' => Http::response(['status' => 'complete', 'payload' => [['id' => 'media_1']]], 200),
+            '*/posts/schedule/publish' => Http::response(['job_id' => 'pjob'], 200),
+            '*/job_status/pjob' => Http::response(['status' => 'complete', 'payload' => ['failures' => []]], 200),
         ]);
 
         $sibling = $this->makeSibling();
@@ -102,7 +103,8 @@ class PublishViaPublerInstagramTest extends TestCase
         $job->handle(app(PublerClient::class), app(PublerPayloadBuilder::class));
 
         $fresh = $sibling->fresh();
-        $this->assertSame('job_abc123', $fresh->publer_post_id);
+        // No post id in the success payload → publer_post_id falls back to job id
+        $this->assertSame('pjob', $fresh->publer_post_id);
         $this->assertSame('published', $fresh->status);
         $this->assertNotNull($fresh->published_at);
     }
@@ -114,8 +116,11 @@ class PublishViaPublerInstagramTest extends TestCase
         $this->setSetting('publer_instagram_account_id', 'ig_acc_test');
         $this->setPublerApiKey();
 
+        // Media uploads succeed; the publish endpoint 4xx's → permanent failure.
         Http::fake([
-            '*/posts/schedule' => Http::response([
+            '*/media/from-url' => Http::response(['job_id' => 'mjob'], 200),
+            '*/job_status/mjob' => Http::response(['status' => 'complete', 'payload' => [['id' => 'media_1']]], 200),
+            '*/posts/schedule/publish' => Http::response([
                 'success' => false,
                 'error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Invalid caption length'],
             ], 422),

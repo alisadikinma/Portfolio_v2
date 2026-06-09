@@ -144,11 +144,17 @@ class PublishSlotOrchestrator extends Command
             return;
         }
 
-        // Parallel sibling dispatch — all enqueue same tick, queue workers pick up
+        // Parallel sibling dispatch — all enqueue same tick, queue workers pick up.
+        // Per-platform gate: skip platforms with no Publer account selected
+        // (operator directive — "cek dulu settingan ke sosmed mana saja").
         foreach (['instagram', 'tiktok', 'threads', 'facebook'] as $platform) {
             $rel = $platform . 'Post';
             $sibling = $draft->$rel;
             if ($sibling === null) {
+                continue;
+            }
+            if (!\App\Services\PublerPayloadBuilder::isPlatformEnabled($platform)) {
+                $this->line("  ⊘ {$platform} not configured in Publer settings — skipped");
                 continue;
             }
             PublishViaPubler::dispatch($platform, $sibling->id);

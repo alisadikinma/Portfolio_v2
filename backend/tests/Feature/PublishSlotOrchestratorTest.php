@@ -47,6 +47,15 @@ class PublishSlotOrchestratorTest extends TestCase
         Setting::firstOrCreate(['group' => 'linkedin', 'key' => 'linkedin_publish_slots'], ['value' => '[5,6,7,12,17,18,19,20]', 'type' => 'json']);
         Setting::firstOrCreate(['group' => 'linkedin', 'key' => 'linkedin_slot_lead_time_minutes'], ['value' => '5']);
 
+        // Per-platform publish gate (June 10) — seed a Publer account for each
+        // platform so the carousel fan-out actually dispatches the siblings.
+        foreach (['instagram', 'tiktok', 'threads', 'facebook'] as $p) {
+            Setting::firstOrCreate(
+                ['group' => 'publer', 'key' => "publer_{$p}_account_id"],
+                ['value' => "{$p}_test_acc"]
+            );
+        }
+
         // Mock LinkedInPublishService — orchestrator should call ::publish
         $this->mock(LinkedInPublishService::class, function ($mock) {
             $mock->shouldReceive('publish')

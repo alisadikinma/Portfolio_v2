@@ -254,6 +254,30 @@ trait HandlesCrossPostDraftActions
             ], 422);
         }
 
+        // Map the FQN model class to the short platform name the job's
+        // loadSibling method expects.
+        $platform = match ($modelClass) {
+            \App\Models\FacebookPost::class => 'facebook',
+            \App\Models\InstagramPost::class => 'instagram',
+            \App\Models\TiktokPost::class => 'tiktok',
+            \App\Models\ThreadsPost::class => 'threads',
+            default => throw new \InvalidArgumentException("Unknown cross-post model: {$modelClass}"),
+        };
+
+        // Per-platform gate: refuse to approve-publish a platform with no Publer
+        // account selected (operator directive — don't blindly publish). Clear
+        // 422 so the operator selects the account in Publer settings first.
+        if (!\App\Services\PublerPayloadBuilder::isPlatformEnabled($platform)) {
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'platform_not_configured',
+                    'message' => "No Publer account selected for {$platform}. "
+                        . "Select one in admin → Publer Integration before publishing.",
+                ],
+            ], 422);
+        }
+
         try {
             app(PipelineGuard::class)->advance(
                 $draft,
@@ -268,16 +292,6 @@ trait HandlesCrossPostDraftActions
         }
 
         // Publer dispatch (real impl shipped May 12 — see PublishViaPubler P4).
-        // New signature is (string $platform, int $siblingPostId) — map the
-        // FQN model class to the short platform name the job's loadSibling
-        // method expects.
-        $platform = match ($modelClass) {
-            \App\Models\FacebookPost::class => 'facebook',
-            \App\Models\InstagramPost::class => 'instagram',
-            \App\Models\TiktokPost::class => 'tiktok',
-            \App\Models\ThreadsPost::class => 'threads',
-            default => throw new \InvalidArgumentException("Unknown cross-post model: {$modelClass}"),
-        };
         PublishViaPubler::dispatch($platform, $draft->id);
 
         return response()->json([

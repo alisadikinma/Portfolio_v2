@@ -80,10 +80,10 @@ class PublishViaPublerFacebookTest extends TestCase
         $this->setPublerApiKey();
 
         Http::fake([
-            '*/posts/schedule' => Http::response([
-                'success' => true,
-                'data' => ['job_id' => 'job_facebook_101'],
-            ], 200),
+            '*/media/from-url' => Http::response(['job_id' => 'mjob'], 200),
+            '*/job_status/mjob' => Http::response(['status' => 'complete', 'payload' => [['id' => 'media_1']]], 200),
+            '*/posts/schedule/publish' => Http::response(['job_id' => 'pjob'], 200),
+            '*/job_status/pjob' => Http::response(['status' => 'complete', 'payload' => ['failures' => []]], 200),
         ]);
 
         $sibling = $this->makeSibling();
@@ -92,7 +92,7 @@ class PublishViaPublerFacebookTest extends TestCase
         $job->handle(app(PublerClient::class), app(PublerPayloadBuilder::class));
 
         $fresh = $sibling->fresh();
-        $this->assertSame('job_facebook_101', $fresh->publer_post_id);
+        $this->assertSame('pjob', $fresh->publer_post_id);
         $this->assertSame('published', $fresh->status);
         $this->assertNotNull($fresh->published_at);
     }
@@ -105,7 +105,9 @@ class PublishViaPublerFacebookTest extends TestCase
         $this->setPublerApiKey();
 
         Http::fake([
-            '*/posts/schedule' => Http::response([
+            '*/media/from-url' => Http::response(['job_id' => 'mjob'], 200),
+            '*/job_status/mjob' => Http::response(['status' => 'complete', 'payload' => [['id' => 'media_1']]], 200),
+            '*/posts/schedule/publish' => Http::response([
                 'success' => false,
                 'error' => 'Facebook page disconnected',
             ], 400),

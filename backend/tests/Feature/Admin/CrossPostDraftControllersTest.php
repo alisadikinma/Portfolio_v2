@@ -34,7 +34,32 @@ class CrossPostDraftControllersTest extends TestCase
         // ships the real Publer transport. Tests that exercise the FSM
         // approve→publishing path must enable the flag explicitly.
         config(['social-cross-post.publer.enabled' => true]);
+        // Per-platform publish gate (June 10) requires a selected Publer account
+        // per platform — seed all four so approve→publishing succeeds.
+        foreach (['instagram', 'tiktok', 'threads', 'facebook'] as $p) {
+            \App\Models\Setting::create([
+                'group' => 'publer',
+                'key' => "publer_{$p}_account_id",
+                'value' => "{$p}_test_acc",
+            ]);
+        }
         $this->admin = User::factory()->create();
+    }
+
+    public function test_approve_returns_422_when_platform_account_not_configured(): void
+    {
+        // Operator left this platform's Publer account unselected → gate blocks.
+        \App\Models\Setting::where('group', 'publer')
+            ->where('key', 'publer_instagram_account_id')->delete();
+
+        $id = $this->seedDraft('instagram_posts', InstagramPostStatus::AwaitingReview->value);
+
+        $resp = $this->actingAs($this->admin, 'sanctum')
+            ->postJson("/api/admin/instagram-drafts/{$id}/approve");
+
+        $resp->assertStatus(422);
+        $this->assertSame('platform_not_configured', $resp->json('error.code'));
+        Queue::assertNotPushed(PublishViaPubler::class);
     }
 
     public function test_approve_returns_503_when_publer_disabled(): void

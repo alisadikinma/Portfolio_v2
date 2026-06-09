@@ -294,11 +294,18 @@ class PublerClient
      * @param  string  $url  Publicly-accessible image URL (Publer downloads it)
      * @return string Publer job_id (use with pollMediaJob)
      */
-    public function uploadMediaFromUrl(string $url): string
+    public function uploadMediaFromUrl(string $url, string $name = 'media.png'): string
     {
+        // Body shape per LIVE-validated contract (probed June 10, 2026):
+        //   { "media": [{ "url": "...", "name": "..." }], "type": "single" }
+        // The old { "url": $url } body returned 200 with NO job_id (silently
+        // ignored) — that was the bug behind cross-post media never uploading.
         $response = $this->client(['Publer-Workspace-Id' => $this->workspaceId()])->post(
             $this->url('/media/from-url'),
-            ['url' => $url]
+            [
+                'media' => [['url' => $url, 'name' => $name]],
+                'type' => 'single',
+            ]
         );
 
         $data = $this->extractData($response, 'uploadMediaFromUrl');
@@ -311,6 +318,44 @@ class PublerClient
         }
 
         return $jobId;
+    }
+
+    /**
+     * Upload a public media URL and block until Publer finishes ingesting it,
+     * returning the resulting media_id (used in createPost/publishNow media[]).
+     *
+     * Polls /job_status every ~1.5s up to $maxTries. Throws on timeout or a
+     * 'failed' job so the caller routes the sibling to a failed state with an
+     * actionable error rather than publishing a post with a broken media ref.
+     */
+    public function uploadAndAwaitMedia(string $url, string $name = 'media.png', int $maxTries = 12): string
+    {
+        $jobId = $this->uploadMediaFromUrl($url, $name);
+
+        for ($i = 0; $i < $maxTries; $i++) {
+            $job = $this->pollMediaJob($jobId);
+
+            if (($job['status'] ?? null) === 'complete') {
+                if (is_string($job['media_id'] ?? null) && $job['media_id'] !== '') {
+                    return $job['media_id'];
+                }
+                throw new RuntimeException(
+                    "Publer media job {$jobId} completed but exposed no media_id. URL: {$url}"
+                );
+            }
+
+            if (($job['status'] ?? null) === 'failed') {
+                throw new RuntimeException(
+                    "Publer media job {$jobId} failed for URL {$url}: " . ($job['error'] ?? 'unknown')
+                );
+            }
+
+            usleep(1_500_000);
+        }
+
+        throw new RuntimeException(
+            "Publer media job {$jobId} did not complete within {$maxTries} polls. URL: {$url}"
+        );
     }
 
     /**
@@ -332,32 +377,50 @@ class PublerClient
             ->get($this->url("/job_status/{$jobId}"));
         $data = $this->extractData($response, 'pollJob');
 
+        // LIVE shape (validated June 10, 2026): top-level { status, payload }.
+        // The older docs example nested it under data.result.payload; extractData
+        // already unwraps `data`, so accept BOTH shapes defensively.
+        $payload = $data['payload'] ?? ($data['result']['payload'] ?? null);
+
         return [
             'status' => $data['status'] ?? 'unknown',
+            'payload' => $payload,
             'result' => $data['result'] ?? null,
             'error' => $data['error'] ?? null,
+            'raw' => $data,
         ];
     }
 
     /**
      * Convenience alias for pollJob() when the caller knows it's a media job.
      * Returns array with shape {status, media_id?, error?}.
+     *
+     * Media job result (validated live): { status:"complete",
+     *   payload:[{ id:"<media_id>", path, thumbnail, validity, ... }] }
+     * — i.e. payload is an ARRAY of media objects; we uploaded one URL per
+     * call so the media_id is payload[0].id.
      */
     public function pollMediaJob(string $jobId): array
     {
         $job = $this->pollJob($jobId);
 
-        // On complete, Publer's job result.payload contains media metadata.
-        // Shape may evolve — defensive extraction.
         $mediaId = null;
-        if (($job['status'] ?? null) === 'complete' && is_array($job['result'] ?? null)) {
-            $payload = $job['result']['payload'] ?? $job['result'];
-            $mediaId = $payload['id'] ?? $payload['media_id'] ?? null;
+        if (($job['status'] ?? null) === 'complete') {
+            $payload = $job['payload'];
+            if (is_array($payload)) {
+                // payload[] (array of media objects) OR a single media object
+                $first = array_is_list($payload) ? ($payload[0] ?? null) : $payload;
+                if (is_array($first)) {
+                    $mediaId = $first['id'] ?? $first['media_id'] ?? null;
+                } elseif (is_string($first)) {
+                    $mediaId = $first; // bare-id array variant
+                }
+            }
         }
 
         return [
             'status' => $job['status'],
-            'media_id' => $mediaId,
+            'media_id' => is_string($mediaId) ? $mediaId : null,
             'error' => $job['error'],
         ];
     }
@@ -400,18 +463,133 @@ class PublerClient
     }
 
     /**
-     * DELETE /posts/{post_id} — remove a scheduled or draft post from
-     * Publer's queue. Idempotent: 404 (already deleted or never existed)
-     * is treated as success — same as our cancel-cascade semantics.
+     * POST /posts/schedule/publish — publish ONE assembled post immediately.
+     * Wraps the post object in the bulk envelope ({bulk:{state, posts:[...]}})
+     * and returns the async job_id. Confirm actual success via
+     * awaitPublishResult() — a 200 + job_id does NOT mean the post published
+     * (Publer reports per-account failures inside the job result, not the HTTP
+     * response).
      *
-     * Cannot delete already-published posts (Publer returns 422 or 4xx);
-     * caller should check FSM state before invoking (FSM rule:
-     * publishing → cancelled allowed, published → cancelled forbidden).
+     * @param  array  $post  One post object: {networks:{<net>:{...}}, accounts:[...], comments?:[...]}
+     * @return string Publer job_id
+     */
+    public function publishNow(array $post): string
+    {
+        $payload = ['bulk' => ['state' => 'scheduled', 'posts' => [$post]]];
+
+        $response = $this->client(['Publer-Workspace-Id' => $this->workspaceId()])
+            ->post($this->url('/posts/schedule/publish'), $payload);
+        $data = $this->extractData($response, 'publishNow');
+
+        $jobId = $data['job_id'] ?? null;
+        if (!is_string($jobId) || $jobId === '') {
+            throw new RuntimeException(
+                'Publer /posts/schedule/publish returned no job_id. Response: ' . json_encode($data)
+            );
+        }
+
+        return $jobId;
+    }
+
+    /**
+     * Poll a publish job until it completes, then classify the outcome.
+     *
+     * Publish jobs report per-account problems in payload.failures — an EMPTY
+     * failures collection means every account published; a non-empty one means
+     * at least one account failed (with an operator-actionable message like
+     * "missing the social network params" or "media incompatible"). Returns:
+     *   ['ok' => bool, 'post_id' => ?string, 'error' => ?string]
+     */
+    public function awaitPublishResult(string $jobId, int $maxTries = 15): array
+    {
+        for ($i = 0; $i < $maxTries; $i++) {
+            $job = $this->pollJob($jobId);
+            $status = $job['status'] ?? 'unknown';
+
+            if ($status === 'failed') {
+                return ['ok' => false, 'post_id' => null, 'error' => $job['error'] ?? 'Publer job failed'];
+            }
+
+            if ($status === 'complete') {
+                $payload = $job['payload'];
+                $failures = is_array($payload) ? ($payload['failures'] ?? null) : null;
+
+                if (!empty($failures)) {
+                    return ['ok' => false, 'post_id' => null, 'error' => $this->firstFailureMessage($failures)];
+                }
+
+                return ['ok' => true, 'post_id' => $this->extractPostId($payload), 'error' => null];
+            }
+
+            usleep(1_500_000);
+        }
+
+        return ['ok' => false, 'post_id' => null, 'error' => "Publer publish job {$jobId} did not complete in time"];
+    }
+
+    /** Pull the first human-readable failure message out of payload.failures. */
+    private function firstFailureMessage(mixed $failures): string
+    {
+        if (is_array($failures)) {
+            foreach ($failures as $entry) {
+                if (is_array($entry)) {
+                    foreach ($entry as $f) {
+                        if (is_array($f) && isset($f['message'])) {
+                            return (string) $f['message'];
+                        }
+                    }
+                    if (isset($entry['message'])) {
+                        return (string) $entry['message'];
+                    }
+                } elseif (is_string($entry)) {
+                    return $entry;
+                }
+            }
+        }
+
+        return 'Publer reported a publish failure: ' . json_encode($failures);
+    }
+
+    /** Best-effort extraction of a created post id from a successful payload. */
+    private function extractPostId(mixed $payload): ?string
+    {
+        if (!is_array($payload)) {
+            return null;
+        }
+
+        foreach (['post_ids', 'ids', 'posts'] as $key) {
+            $v = $payload[$key] ?? null;
+            if (is_array($v) && !empty($v)) {
+                $first = $v[0];
+                if (is_string($first)) {
+                    return $first;
+                }
+                if (is_array($first) && isset($first['id']) && is_string($first['id'])) {
+                    return $first['id'];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * DELETE /api/v1/posts?post_ids[]={id} — remove scheduled/draft posts.
+     * Publer's delete endpoint is a COLLECTION route taking a post_ids[] query
+     * array (NOT DELETE /posts/{id}, which 404s). Idempotent: a 404 (already
+     * gone) is treated as success.
+     *
+     * Cannot delete queued/published posts (Publer restricts by state); caller
+     * should check FSM state before invoking.
      */
     public function deletePost(string $postId): bool
     {
+        // post_ids MUST ride as a query-string array (the client forces a JSON
+        // content-type, so a body array wouldn't reach Publer's query parser).
+        $url = $this->url('/posts') . '?' . http_build_query(['post_ids' => [$postId]]);
+
         $response = $this->client(['Publer-Workspace-Id' => $this->workspaceId()])
-            ->delete($this->url("/posts/{$postId}"));
+            ->delete($url);
 
         // 404 = already gone — idempotent success
         if ($response->status() === 404) {

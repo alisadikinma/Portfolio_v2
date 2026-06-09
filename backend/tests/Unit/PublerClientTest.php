@@ -128,8 +128,10 @@ class PublerClientTest extends TestCase
 
         $this->assertSame('job_media_xyz', $jobId);
 
+        // Body shape: { media: [{ url, name }], type: "single" }
         Http::assertSent(function ($request) {
-            return $request['url'] === 'https://alisadikinma.com/storage/linkedin-carousel/01-cover.png';
+            return ($request['media'][0]['url'] ?? null) === 'https://alisadikinma.com/storage/linkedin-carousel/01-cover.png'
+                && ($request['type'] ?? null) === 'single';
         });
     }
 
@@ -228,7 +230,7 @@ class PublerClientTest extends TestCase
     public function test_delete_post_treats_404_as_idempotent_success(): void
     {
         Http::fake([
-            'app.publer.com/api/v1/posts/post_already_gone' => Http::response(null, 404),
+            '*/posts*' => Http::response(null, 404),
         ]);
 
         $client = new PublerClient(apiKey: 'TEST_KEY');
@@ -240,7 +242,7 @@ class PublerClientTest extends TestCase
     public function test_delete_post_succeeds_on_200(): void
     {
         Http::fake([
-            'app.publer.com/api/v1/posts/post_xyz' => Http::response([
+            '*/posts*' => Http::response([
                 'success' => true,
                 'data' => [],
             ], 200),

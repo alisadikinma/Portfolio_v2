@@ -297,6 +297,23 @@ abstract class BaseSocialGenerationService
                 return;
             }
 
+            // PublishViaPubler expects the SHORT platform key (instagram/tiktok/
+            // threads/facebook) — its loadSibling() matches those, NOT the FQCN.
+            // Passing $modelClass made the job throw InvalidArgumentException at
+            // runtime (caught below as "non-fatal"), so the cascade never reached
+            // Publer. Derive the short name: InstagramPost → instagram.
+            $platform = strtolower(str_replace('Post', '', class_basename($modelClass)));
+
+            // Per-platform gate: don't promote/dispatch a platform the operator
+            // hasn't selected a Publer account for — leave it at AwaitingReview.
+            if (!\App\Services\PublerPayloadBuilder::isPlatformEnabled($platform)) {
+                \Illuminate\Support\Facades\Log::info('[BaseSocialGen] Cascade skipped — platform not configured in Publer', [
+                    'platform' => $platform,
+                    'draft_id' => $draft->id,
+                ]);
+                return;
+            }
+
             $guard->advance(
                 $draft,
                 $publishingStatus,
@@ -304,10 +321,10 @@ abstract class BaseSocialGenerationService
                 ['source' => 'linkedin_publish_all_flag']
             );
 
-            \App\Jobs\PublishViaPubler::dispatch($modelClass, $draft->id);
+            \App\Jobs\PublishViaPubler::dispatch($platform, $draft->id);
 
             \Illuminate\Support\Facades\Log::info('[BaseSocialGen] Cascade promoted draft to Publishing', [
-                'platform' => class_basename($modelClass),
+                'platform' => $platform,
                 'draft_id' => $draft->id,
             ]);
         } catch (\Throwable $e) {
