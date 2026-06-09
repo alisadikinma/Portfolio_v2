@@ -123,9 +123,25 @@
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900">
+                <template v-for="row in displayRows(category, rows)" :key="row.__toggle ? `toggle-${row.category}` : row.id">
+                <!-- Collapsible toggle: reveals self-healing internals + placeholders -->
+                <tr v-if="row.__toggle" class="bg-gray-50/60 dark:bg-gray-800/40">
+                  <td colspan="6" class="px-4 py-2.5">
+                    <button
+                      type="button"
+                      @click="toggleCategory(row.category)"
+                      :aria-expanded="isCategoryExpanded(row.category)"
+                      class="inline-flex items-center gap-2 text-xs font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
+                    >
+                      <span aria-hidden="true">{{ isCategoryExpanded(row.category) ? '▾' : '▸' }}</span>
+                      {{ isCategoryExpanded(row.category) ? 'Hide' : 'Show' }}
+                      {{ row.count }} system &amp; upcoming {{ row.count === 1 ? 'job' : 'jobs' }}
+                      <span class="text-gray-400 dark:text-gray-500 font-normal">(auto-managed)</span>
+                    </button>
+                  </td>
+                </tr>
                 <tr
-                  v-for="row in rows"
-                  :key="row.id"
+                  v-else
                   :class="row.is_placeholder ? 'bg-amber-50/40 dark:bg-amber-900/10' : ''"
                 >
                   <!-- Name -->
@@ -249,6 +265,7 @@
                     </button>
                   </td>
                 </tr>
+                </template>
               </tbody>
             </table>
           </div>
@@ -279,6 +296,7 @@ import {
   useUpdateScheduledCommand,
   useRunScheduledCommand,
 } from '@/composables/useScheduler'
+import { classifyTier } from './schedulerTiers.js'
 
 // ---------------------------------------------------------------------------
 // Data + mutations
@@ -343,6 +361,49 @@ const visibleGroups = computed(() => {
     .map(cat => [cat, groups.value[cat]])
     .filter(([, rows]) => rows && rows.length > 0)
 })
+
+// ---------------------------------------------------------------------------
+// Tiering — operator-tunable rows show by default; self-healing internals +
+// locked placeholders collapse behind a per-category toggle so the default
+// view isn't 22 rows of plumbing the operator never touches. Pure tier rule
+// lives in ./schedulerTiers.js (unit-tested).
+// ---------------------------------------------------------------------------
+const expandedCategories = ref(new Set())
+
+function isCategoryExpanded(category) {
+  return expandedCategories.value.has(category)
+}
+
+function toggleCategory(category) {
+  const next = new Set(expandedCategories.value)
+  next.has(category) ? next.delete(category) : next.add(category)
+  expandedCategories.value = next
+}
+
+// Build the render list for a category: operator-tier rows first (always
+// visible), then a sentinel { __toggle } row, then the collapsed remainder
+// (system internals + placeholders) only when expanded. Single flat list so
+// the table body reuses ONE <tr> template instead of triplicating markup.
+function displayRows(category, rows) {
+  const operatorRows = []
+  const collapsibleRows = []
+  for (const row of rows) {
+    if (classifyTier(row.signature, row.is_placeholder) === 'operator') {
+      operatorRows.push(row)
+    } else {
+      collapsibleRows.push(row)
+    }
+  }
+  if (collapsibleRows.length === 0) return operatorRows
+
+  const list = [...operatorRows, {
+    __toggle: true,
+    category,
+    count: collapsibleRows.length,
+  }]
+  if (isCategoryExpanded(category)) list.push(...collapsibleRows)
+  return list
+}
 
 // Per-row pending markers — multiple rows may be in-flight concurrently
 const updatingIds = ref(new Set())
