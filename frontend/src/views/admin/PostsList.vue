@@ -265,19 +265,19 @@
         </table>
 
         <!-- Pagination -->
-        <div v-if="pagination.last_page > 1" class="px-6 py-4 border-t border-neutral-200 dark:border-neutral-700">
+        <div v-if="pagination.lastPage > 1" class="px-6 py-4 border-t border-neutral-200 dark:border-neutral-700">
           <div class="flex items-center justify-between">
             <div class="text-sm text-neutral-600 dark:text-neutral-400">
-              Showing {{ ((pagination.current_page - 1) * pagination.per_page) + 1 }} to
-              {{ Math.min(pagination.current_page * pagination.per_page, pagination.total) }} of
+              Showing {{ ((pagination.currentPage - 1) * pagination.perPage) + 1 }} to
+              {{ Math.min(pagination.currentPage * pagination.perPage, pagination.total) }} of
               {{ pagination.total }} results
             </div>
 
             <div class="flex items-center gap-2">
               <!-- Previous -->
               <button
-                @click="changePage(pagination.current_page - 1)"
-                :disabled="pagination.current_page === 1"
+                @click="changePage(pagination.currentPage - 1)"
+                :disabled="pagination.currentPage === 1"
                 class="px-3 py-1 border border-neutral-300 dark:border-neutral-600 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-neutral-50 dark:hover:bg-neutral-800"
               >
                 Previous
@@ -290,7 +290,7 @@
                 @click="changePage(page)"
                 :class="[
                   'px-3 py-1 border rounded-md text-sm',
-                  page === pagination.current_page
+                  page === pagination.currentPage
                     ? 'bg-primary-600 text-white border-primary-600'
                     : 'border-neutral-300 dark:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-800'
                 ]"
@@ -300,8 +300,8 @@
 
               <!-- Next -->
               <button
-                @click="changePage(pagination.current_page + 1)"
-                :disabled="pagination.current_page === pagination.last_page"
+                @click="changePage(pagination.currentPage + 1)"
+                :disabled="pagination.currentPage === pagination.lastPage"
                 class="px-3 py-1 border border-neutral-300 dark:border-neutral-600 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-neutral-50 dark:hover:bg-neutral-800"
               >
                 Next
