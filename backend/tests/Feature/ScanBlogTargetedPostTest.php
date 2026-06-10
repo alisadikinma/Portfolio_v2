@@ -124,6 +124,17 @@ class ScanBlogTargetedPostTest extends TestCase
         Queue::assertNotPushed(GenerateLinkedInPost::class);
     }
 
+    public function test_post_id_for_nonexistent_post_is_a_clean_noop(): void
+    {
+        // A --post-id that matches no row must exit cleanly with nothing
+        // created — the where('id', ...) simply returns zero candidates.
+        $this->artisan('linkedin:scan-blog', ['--post-id' => 999999])
+            ->assertExitCode(0);
+
+        $this->assertDatabaseCount('linkedin_posts', 0);
+        Queue::assertNotPushed(GenerateLinkedInPost::class);
+    }
+
     /* -------------------- Test helpers -------------------- */
 
     /**

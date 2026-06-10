@@ -78,7 +78,9 @@ class ScanBlogForLinkedInConversion extends Command
             ->get();
 
         if ($candidates->isEmpty()) {
-            $this->info("No un-converted posts in the last {$hours}h passing the virality gate.");
+            $this->info($postId !== null
+                ? "Post #{$postId} skipped (not found, unpublished, already has a live draft, or below the virality gate)."
+                : "No un-converted posts in the last {$hours}h passing the virality gate.");
             return 0;
         }
 

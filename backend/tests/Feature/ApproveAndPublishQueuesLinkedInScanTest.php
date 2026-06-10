@@ -100,11 +100,19 @@ class ApproveAndPublishQueuesLinkedInScanTest extends TestCase
 
         $response->assertStatus(200)->assertJson(['success' => true]);
 
+        // Guard: exactly one QueuedCommand pushed. If the payload-shape closure
+        // below ever stops matching (e.g. a Laravel internals change), this
+        // count assertion still fails loudly rather than passing vacuously.
+        Queue::assertPushed(QueuedCommand::class, 1);
+
         Queue::assertPushed(QueuedCommand::class, function (QueuedCommand $job) use ($post) {
+            // Kernel::queue($command, $parameters) does QueuedCommand::dispatch(func_get_args()),
+            // so $data is a POSITIONAL array: [0 => command string, 1 => parameters array]
+            // (NOT associative 'command'/'parameters' keys).
             $data = $this->extractQueuedCommandData($job);
 
-            return ($data['command'] ?? null) === 'linkedin:scan-blog'
-                && (string) (($data['parameters'] ?? [])['--post-id'] ?? null) === (string) $post->id;
+            return ($data[0] ?? null) === 'linkedin:scan-blog'
+                && (string) (($data[1] ?? [])['--post-id'] ?? null) === (string) $post->id;
         });
     }
 
@@ -133,8 +141,9 @@ class ApproveAndPublishQueuesLinkedInScanTest extends TestCase
 
     /**
      * QueuedCommand stores the Artisan::queue($command, $parameters) payload in a
-     * protected $data array shaped ['command' => ..., 'parameters' => ...]. Read it
-     * via reflection so the assertion targets the real command + --post-id value.
+     * protected $data array. Kernel::queue() builds it via func_get_args(), so it is
+     * POSITIONAL: [0 => command string, 1 => parameters array]. Read it via reflection
+     * so the assertion targets the real command + --post-id value.
      */
     private function extractQueuedCommandData(QueuedCommand $job): array
     {
