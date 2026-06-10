@@ -14,6 +14,7 @@ use App\Services\ContentPublishService;
 use App\Services\TrendingTopicService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -1345,6 +1346,19 @@ class ContentIdeaController extends Controller
         }
 
         $post = $result['post'];
+
+        // Event-driven LinkedIn draft ingest (June 10, 2026): replaces the daily
+        // linkedin:scan-blog cron + the manual "Scan blog now" button. The targeted
+        // scan reuses the virality gate + one-live-draft idempotency in the command.
+        try {
+            Artisan::queue('linkedin:scan-blog', ['--post-id' => $post->id]);
+        } catch (\Throwable $e) {
+            Log::warning('[ContentEngine] linkedin:scan-blog dispatch failed (non-fatal)', [
+                'post_id' => $post->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
         $translationPending = $result['translation_pending'];
 
         return response()->json([
