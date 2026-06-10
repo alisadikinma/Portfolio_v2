@@ -113,16 +113,6 @@ class ScheduledCommandSeeder extends Seeder
                 'sort_order' => 10,
             ],
             [
-                'signature' => 'linkedin:scan-blog',
-                'display_name' => 'LinkedIn — Scan Blog for Conversion',
-                'description' => 'Tiap pagi jam 3: scan blog post baru 24 jam terakhir. Yang virality ≥ 60 dan belum punya draft LinkedIn → buat draft pending generation.',
-                'category' => 'linkedin',
-                'cron_expression' => '0 3 * * *',
-                'without_overlapping_minutes' => 30,
-                'arguments' => ['--hours=24'],
-                'sort_order' => 20,
-            ],
-            [
                 'signature' => 'linkedin:reap-stuck',
                 'display_name' => 'LinkedIn — Reap Stuck Generation',
                 'description' => 'Tiap 5 menit: cek draft yang stuck di pending_generation > 30 menit → re-dispatch atau mark failed.',
@@ -255,6 +245,12 @@ class ScheduledCommandSeeder extends Seeder
         // caller that hardcoded the old signature. But the cron-driven row
         // must be removed so we don't double-publish every minute.
         ScheduledCommand::where('signature', 'linkedin:process-scheduled')->delete();
+
+        // Phase C (2026-06-10) — retire the daily linkedin:scan-blog cron row.
+        // Publishing now auto-creates cross-post drafts (event-driven), so the
+        // scheduled scan is redundant. The Artisan command itself remains as
+        // the engine / SSH catch-up — only the cron-driven row is dropped.
+        ScheduledCommand::where('signature', 'linkedin:scan-blog')->delete();
 
         // ─────────────── Placeholders (4 — disabled, reserved for roadmap) ───────────────
         $placeholders = [

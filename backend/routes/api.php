@@ -1291,10 +1291,6 @@ Route::middleware(['auth:sanctum'])->get('/admin/linkedin-posts/calendar', [Link
 // Admin draft CRUD (7 endpoints per plugin design §4.5 + 2 carousel image endpoints)
 Route::middleware(['auth:sanctum'])->prefix('admin/linkedin-drafts')->group(function () {
     Route::get('/', [LinkedInDraftController::class, 'index']);
-    // Static path BEFORE /{id} so Laravel doesn't try to bind the literal
-    // `scan-blog-now` to the int $id parameter.
-    Route::post('/scan-blog-now', [LinkedInDraftController::class, 'scanBlogNow'])
-        ->name('admin.linkedin-drafts.scan-blog-now');
     Route::get('/{id}', [LinkedInDraftController::class, 'show']);
     Route::get('/{id}/progress', [LinkedInDraftController::class, 'progress']);
     Route::put('/{id}', [LinkedInDraftController::class, 'update']);

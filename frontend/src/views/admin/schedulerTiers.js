@@ -22,7 +22,6 @@ export const OPERATOR_SIGNATURES = new Set([
   'content:pull-trending-daily',
   'content:flag-stale-posts',
   'social:publish-slot',
-  'linkedin:scan-blog',
   'linkedin:auto-schedule',
   'social-cross-post:scan',
   'newsletter:send-weekly',

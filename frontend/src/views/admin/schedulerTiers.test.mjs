@@ -32,10 +32,12 @@ check('unknown signature defaults to system (safe — hidden, not lost)', () => 
   assert.strictEqual(classifyTier('some:future-command', false), 'system')
 })
 
-check('OPERATOR_SIGNATURES is the documented ~8-row allowlist', () => {
+check('OPERATOR_SIGNATURES is the documented ~7-row allowlist', () => {
   assert.ok(OPERATOR_SIGNATURES instanceof Set)
-  assert.strictEqual(OPERATOR_SIGNATURES.size, 8)
-  assert.ok(OPERATOR_SIGNATURES.has('linkedin:scan-blog'))
+  assert.strictEqual(OPERATOR_SIGNATURES.size, 7)
+  // Phase C (2026-06-10): linkedin:scan-blog cron retired — publishing now
+  // auto-creates drafts (event-driven), so it's no longer operator-tunable.
+  assert.ok(!OPERATOR_SIGNATURES.has('linkedin:scan-blog'))
   assert.ok(OPERATOR_SIGNATURES.has('linkedin:auto-schedule'))
 })
 

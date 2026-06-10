@@ -1,8 +1,6 @@
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
-import { useQueryClient } from '@tanstack/vue-query'
-import api from '@/services/api'
 import {
   useLinkedInDraftsList,
   useCancelLinkedInDraft,
@@ -220,54 +218,6 @@ const cancelMutation = useCancelLinkedInDraft()
 const approveMutation = useApproveLinkedInDraft()
 const regenerateMutation = useRegenerateLinkedInDraft()
 
-// --- Manual blog scan (bypass daily cron) ---------------------------------
-// Queues `linkedin:scan-blog` via the admin scheduler endpoint so the
-// operator doesn't have to wait for the 03:00 WIB run after a new article
-// ships from Content Engine.
-const queryClient = useQueryClient()
-const scanRunning = ref(false)
-const scanFlash = ref(null) // { type: 'success'|'error', message: '...' }
-
-async function scanBlogNow() {
-  if (scanRunning.value) return
-  scanRunning.value = true
-  scanFlash.value = null
-  try {
-    const res = await api.post('/admin/linkedin-drafts/scan-blog-now')
-    const data = res?.data ?? {}
-    const created = data?.created ?? 0
-    scanFlash.value = {
-      type: created > 0 ? 'success' : 'info',
-      message: data?.message || (created > 0
-        ? `Created ${created} draft(s).`
-        : 'No new posts to convert.'),
-    }
-    if (created > 0) {
-      // Auto-jump to In Progress so the operator sees the freshly-created
-      // pending_generation rows rather than staring at an unchanged
-      // Manual Review tab.
-      activeTab.value = 'in_progress'
-      // Refresh the list a couple times — drafts go pending → generating
-      // within ~5s, then validating, then manual_review/awaiting_publish
-      // over the next 30-90s.
-      queryClient.invalidateQueries({ queryKey: ['linkedin-drafts'] })
-      setTimeout(() => queryClient.invalidateQueries({ queryKey: ['linkedin-drafts'] }), 5000)
-      setTimeout(() => queryClient.invalidateQueries({ queryKey: ['linkedin-drafts'] }), 30000)
-    }
-  } catch (err) {
-    scanFlash.value = {
-      type: 'error',
-      message: err?.response?.data?.error?.message || err?.message || 'Scan failed.',
-    }
-  } finally {
-    scanRunning.value = false
-    // Info / success messages auto-dismiss after 12s (operator needs longer
-    // to read the explanatory copy when zero drafts were created); errors
-    // also dismiss but you can read longer.
-    setTimeout(() => { scanFlash.value = null }, 12000)
-  }
-}
-
 const tabs = [
   { key: 'need_reviews', label: 'Need Reviews', accent: 'text-amber-400' },
   { key: 'in_progress', label: 'In progress', accent: 'text-cyan-400' },
@@ -338,7 +288,7 @@ async function doRegenerate(id) {
 const emptyMessage = computed(() => {
   const map = {
     need_reviews: { title: 'Inbox zero', body: 'No drafts waiting for your review. New ones land here once /linkedin-gen finishes generating + validating.' },
-    in_progress: { title: 'Quiet on the wire', body: 'No drafts in the pipeline. Click "Scan blog now" to pull recent published posts.' },
+    in_progress: { title: 'Quiet on the wire', body: 'Drafts are created automatically when you publish from Content Engine.' },
     failed: { title: 'Nothing broken', body: 'No failed runs in the queue.' },
     all: { title: 'Queue is clear', body: 'No drafts in the pipeline.' },
   }
@@ -370,20 +320,6 @@ const emptyMessage = computed(() => {
           <span class="h-1.5 w-1.5 rounded-full" :class="circuitDotClass"></span>
           {{ circuitLabel }}
         </span>
-        <!-- Manual scan: pulls completed blog posts now instead of waiting
-             for the daily 03:00 WIB cron. Useful right after publishing a
-             new article from Content Engine. -->
-        <button
-          @click="scanBlogNow"
-          :disabled="scanRunning"
-          title="Scan completed blog posts and create LinkedIn drafts now (instead of waiting for the daily 03:00 cron)"
-          class="inline-flex items-center gap-2 px-3.5 py-2 text-sm text-neutral-100 border border-amber-500/40 bg-amber-500/10 rounded-lg hover:bg-amber-500/20 hover:border-amber-400/60 transition disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5" :class="scanRunning ? 'animate-spin' : ''">
-            <path :d="ICON.refresh" />
-          </svg>
-          {{ scanRunning ? 'Scanning…' : 'Scan blog now' }}
-        </button>
         <router-link
           to="/admin/sosmed-posts"
           class="inline-flex items-center gap-2 px-3.5 py-2 text-sm text-neutral-300 border border-neutral-800 rounded-lg hover:border-amber-500/40 hover:bg-amber-500/5 hover:text-amber-300 transition"
@@ -395,21 +331,6 @@ const emptyMessage = computed(() => {
         </router-link>
       </div>
     </header>
-
-    <!-- Scan flash message — auto-dismisses after 12s.
-         3 tones: success (drafts created), info (zero candidates),
-         error (request failed). -->
-    <div
-      v-if="scanFlash"
-      class="rounded-lg px-3.5 py-2 text-sm border"
-      :class="{
-        'border-emerald-500/30 bg-emerald-500/5 text-emerald-300': scanFlash.type === 'success',
-        'border-amber-500/30 bg-amber-500/5 text-amber-200': scanFlash.type === 'info',
-        'border-red-500/30 bg-red-500/5 text-red-300': scanFlash.type === 'error',
-      }"
-    >
-      {{ scanFlash.message }}
-    </div>
 
     <!-- Tab rail (segmented control style, not generic pills) -->
     <nav class="flex flex-wrap gap-1 p-1 rounded-xl bg-neutral-900/50 border border-neutral-800/80 w-max max-w-full">
