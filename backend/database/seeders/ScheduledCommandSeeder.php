@@ -215,6 +215,19 @@ class ScheduledCommandSeeder extends Seeder
                 'arguments' => null,
                 'sort_order' => 20,
             ],
+            [
+                // IG repurpose (2026-06-11) — retention reaper. Purges
+                // storage/app/repurpose/{job}/ dirs older than N days regardless
+                // of status (catches failed/abandoned jobs; success purges inline).
+                'signature' => 'repurpose:reap',
+                'display_name' => 'IG Repurpose — Retention Reaper',
+                'description' => 'Tiap hari jam 4 pagi: hapus folder artefak IG repurpose (slide + caption) yang umurnya > 7 hari, apapun statusnya. Job sukses sudah purge inline; ini nyapu yang failed/terbengkalai.',
+                'category' => 'system',
+                'cron_expression' => '0 4 * * *',
+                'without_overlapping_minutes' => 30,
+                'arguments' => ['--days=7'],
+                'sort_order' => 30,
+            ],
         ];
 
         foreach ($rows as $row) {
