@@ -172,6 +172,8 @@ $RECYCLE.BIN/
 *.exe
 *.o
 *.so
+*.webp
+*.jpg
 
 # Archives
 *.7z
