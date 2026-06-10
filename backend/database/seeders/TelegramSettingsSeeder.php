@@ -54,6 +54,11 @@ class TelegramSettingsSeeder extends Seeder
             ['key' => 'telegram_notify_image_stalled',                  'value' => 'true', 'type' => 'text'],
 
             ['key' => 'telegram_webhook_secret',                        'value' => bin2hex(random_bytes(16)), 'type' => 'text'],
+
+            // IG repurpose feature toggle (docs/plans/2026-06-10-telegram-ig-repurpose-carousel.md).
+            // When 'true', an Instagram URL sent to the bot from telegram_chat_id
+            // triggers the capture → research → carousel pipeline. Default OFF.
+            ['key' => 'telegram_repurpose_enabled',                     'value' => 'false', 'type' => 'text'],
         ];
 
         // firstOrCreate — NOT updateOrCreate — so running this seeder on every

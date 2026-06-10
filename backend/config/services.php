@@ -69,6 +69,45 @@ return [
         'enabled' => env('TELEGRAM_ENABLED', true),
     ],
 
+    'instagram_capture' => [
+        // IG repurpose Phase B — Playwright headless capture of a source post's
+        // slides + caption. 'ssh' runs the Node script on the VPS (queue-worker
+        // context = claudesn, mirroring CAROUSEL_GEN_* key path); 'local' runs
+        // it on the dev box. See docs/runbooks/repurpose-ig-carousel-deploy.md.
+        'driver' => env('IG_CAPTURE_DRIVER', 'ssh'),
+        'ssh_host' => env('IG_CAPTURE_SSH_HOST', 'localhost'),
+        'ssh_user' => env('IG_CAPTURE_SSH_USER', 'claudesn'),
+        'ssh_key' => env('IG_CAPTURE_SSH_KEY', '/home/claudesn/.ssh/id_ed25519'),
+        'node_path' => env('IG_CAPTURE_NODE_PATH', 'node'),
+        // Repo-root scripts/ (one level above the Laravel base_path = backend/).
+        // Override on the VPS with an absolute path if the layout differs.
+        'script_path' => env('IG_CAPTURE_SCRIPT_PATH', dirname(base_path()) . '/scripts/playwright/ig-capture.cjs'),
+        // Optional authenticated Playwright storageState JSON (cookies) to get
+        // past the IG login wall on full carousels. Empty = anonymous capture
+        // (public posts mostly work; private/wall → job fails with clear reason).
+        'storage_state_path' => env('IG_CAPTURE_STORAGE_STATE', ''),
+        'timeout' => (int) env('IG_CAPTURE_TIMEOUT', 120),
+    ],
+
+    'repurpose' => [
+        // IG repurpose Claude-CLI exec (vision extract / fact-check research /
+        // rewrite). Defaults mirror article_generation so one VPS auth + key
+        // path serves both. All claude calls MUST carry the empty-mcp flags
+        // (anti MCP-leak — see ArticleGenerationService::buildMcpFlags).
+        'driver' => env('REPURPOSE_DRIVER', env('ARTICLE_GEN_DRIVER', 'ssh')),
+        'ssh_host' => env('REPURPOSE_SSH_HOST', env('ARTICLE_GEN_SSH_HOST', 'localhost')),
+        'ssh_user' => env('REPURPOSE_SSH_USER', env('ARTICLE_GEN_SSH_USER', 'claudesn')),
+        'ssh_key' => env('REPURPOSE_SSH_KEY', env('ARTICLE_GEN_SSH_KEY', '')),
+        'claude_path' => env('REPURPOSE_CLAUDE_PATH', env('ARTICLE_GEN_CLAUDE_PATH', 'claude')),
+        'empty_mcp_config' => env('REPURPOSE_EMPTY_MCP_CONFIG', env('ARTICLE_GEN_EMPTY_MCP_CONFIG', '/home/claudesn/empty-mcp.json')),
+        'model_vision' => env('REPURPOSE_MODEL_VISION', 'sonnet'),
+        'model_research' => env('REPURPOSE_MODEL_RESEARCH', 'sonnet'),
+        'model_rewrite' => env('REPURPOSE_MODEL_REWRITE', 'sonnet'),
+        // Style guide refs appended to the rewrite prompt (reuse article refs).
+        'refs_rewrite' => env('REPURPOSE_REFS_REWRITE', env('ARTICLE_GEN_REFS_WRITE', '')),
+        'timeout' => (int) env('REPURPOSE_TIMEOUT', 300),
+    ],
+
     'article_generation' => [
         'driver' => env('ARTICLE_GEN_DRIVER', 'ssh'),
         'ssh_host' => env('ARTICLE_GEN_SSH_HOST', ''),
