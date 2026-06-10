@@ -26,7 +26,8 @@ class ScanBlogForLinkedInConversion extends Command
         {--hours=24 : Lookback window in hours}
         {--dry-run : Log candidates without creating drafts}
         {--limit=20 : Max drafts to create per run (safety cap)}
-        {--min-virality= : Override linkedin_virality_min_score setting (0 disables the gate)}';
+        {--min-virality= : Override linkedin_virality_min_score setting (0 disables the gate)}
+        {--post-id= : Target a single post by id — bypasses the lookback window, keeps the virality + one-live-draft idempotency gates}';
 
     protected $description = 'Scan recent blog posts and dispatch LinkedIn conversion jobs for those without a live draft';
 
@@ -35,6 +36,7 @@ class ScanBlogForLinkedInConversion extends Command
         $hours = max(1, (int) $this->option('hours'));
         $dryRun = (bool) $this->option('dry-run');
         $limit = max(1, (int) $this->option('limit'));
+        $postId = $this->option('post-id');
 
         // Virality gate (April 29, 2026): only ingest blog posts whose
         // backing ContentIdea has a virality_score >= threshold. Posts
@@ -48,8 +50,17 @@ class ScanBlogForLinkedInConversion extends Command
         $query = Post::query()
             ->where('published', true)
             ->whereNotNull('published_at')
-            ->where('published_at', '>=', now()->subHours($hours))
             ->whereDoesntHave('linkedinPosts');
+
+        // Targeted mode (--post-id): bypass the lookback window and aim at a
+        // single post. All other gates (published, published_at present,
+        // one-live-draft, virality) still apply.
+        if ($postId !== null) {
+            $query->where('id', (int) $postId);
+            $this->info("[LinkedInScan] targeted post #{$postId}");
+        } else {
+            $query->where('published_at', '>=', now()->subHours($hours));
+        }
 
         if ($minVirality > 0) {
             $query->whereHas('contentIdea', function ($q) use ($minVirality) {
