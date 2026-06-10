@@ -585,6 +585,31 @@ class TelegramNotificationService
         return $this->send($text, $replyMarkup);
     }
 
+    /**
+     * IG repurpose: notify the operator that a job failed at some pipeline step
+     * (capture/extract/research/rewrite/finalize). Plain status reply — gated
+     * only on the master toggle + token/chat (no per-type telegram_notify_* key,
+     * since a failure the operator triggered should always surface). Used by the
+     * pipeline jobs' failJob() paths so a stuck job is never silent.
+     */
+    public function sendRepurposeFailed(\App\Models\RepurposeJob $job, string $reason): bool
+    {
+        if ($this->getSetting('telegram_enabled') !== 'true') {
+            return false;
+        }
+        if (empty($this->getBotToken()) || empty($this->getChatId())) {
+            return false;
+        }
+
+        $url = $this->truncate((string) $job->source_url, 80);
+        $reasonLine = $this->truncate($reason, 200);
+
+        $text = "⚠️ *IG repurpose gagal* (job #{$job->id})\n{$url}\n\nAlasan: `{$reasonLine}`\n\n"
+            . 'Cek post-nya public/bisa diakses, atau paste ulang URL untuk retry.';
+
+        return $this->send($text);
+    }
+
     private function isEnabledFor(string $notificationType): bool
     {
         if ($this->getSetting('telegram_enabled') !== 'true') {

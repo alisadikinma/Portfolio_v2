@@ -69,6 +69,26 @@ return [
         'enabled' => env('TELEGRAM_ENABLED', true),
     ],
 
+    'instagram_capture' => [
+        // IG repurpose Phase B — Playwright headless capture of a source post's
+        // slides + caption. 'ssh' runs the Node script on the VPS (queue-worker
+        // context = claudesn, mirroring CAROUSEL_GEN_* key path); 'local' runs
+        // it on the dev box. See docs/runbooks/repurpose-ig-carousel-deploy.md.
+        'driver' => env('IG_CAPTURE_DRIVER', 'ssh'),
+        'ssh_host' => env('IG_CAPTURE_SSH_HOST', 'localhost'),
+        'ssh_user' => env('IG_CAPTURE_SSH_USER', 'claudesn'),
+        'ssh_key' => env('IG_CAPTURE_SSH_KEY', '/home/claudesn/.ssh/id_ed25519'),
+        'node_path' => env('IG_CAPTURE_NODE_PATH', 'node'),
+        // Repo-root scripts/ (one level above the Laravel base_path = backend/).
+        // Override on the VPS with an absolute path if the layout differs.
+        'script_path' => env('IG_CAPTURE_SCRIPT_PATH', dirname(base_path()) . '/scripts/playwright/ig-capture.cjs'),
+        // Optional authenticated Playwright storageState JSON (cookies) to get
+        // past the IG login wall on full carousels. Empty = anonymous capture
+        // (public posts mostly work; private/wall → job fails with clear reason).
+        'storage_state_path' => env('IG_CAPTURE_STORAGE_STATE', ''),
+        'timeout' => (int) env('IG_CAPTURE_TIMEOUT', 120),
+    ],
+
     'article_generation' => [
         'driver' => env('ARTICLE_GEN_DRIVER', 'ssh'),
         'ssh_host' => env('ARTICLE_GEN_SSH_HOST', ''),
