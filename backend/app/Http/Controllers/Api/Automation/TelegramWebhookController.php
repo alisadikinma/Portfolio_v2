@@ -3,9 +3,12 @@
 namespace App\Http\Controllers\Api\Automation;
 
 use App\Enums\LinkedInPostStatus;
+use App\Enums\RepurposeJobStatus;
 use App\Http\Controllers\Controller;
+use App\Jobs\CaptureInstagramPost;
 use App\Jobs\GenerateLinkedInPost;
 use App\Models\LinkedInPost;
+use App\Models\RepurposeJob;
 use App\Models\Setting;
 use App\Services\PipelineGuard;
 use App\Services\TelegramNotificationService;
@@ -56,11 +59,15 @@ class TelegramWebhookController extends Controller
             return response()->json(['ok' => false, 'error' => 'forbidden'], 403);
         }
 
-        // Telegram payload shape varies; we only act on callback_query.
+        // Telegram payload shape varies. Button taps arrive as callback_query;
+        // plain text (e.g. an IG repurpose URL) arrives as message.
         $callbackQuery = $request->input('callback_query');
         if (!is_array($callbackQuery)) {
-            // Could be a /start text message, channel post, etc. Acknowledge
-            // and move on so Telegram doesn't retry.
+            $message = $request->input('message');
+            if (is_array($message)) {
+                $this->handleMessage($message);
+            }
+            // Acknowledge so Telegram doesn't retry (channel posts, /start, etc.).
             return response()->json(['ok' => true]);
         }
 
@@ -77,7 +84,7 @@ class TelegramWebhookController extends Controller
         }
 
         try {
-            $message = $this->dispatchAction($verified, $guard);
+            $actionResponse = $this->dispatchAction($verified, $guard);
         } catch (\Throwable $e) {
             Log::error('[TelegramWebhook] action dispatch threw', [
                 'verified' => $verified,
@@ -87,7 +94,7 @@ class TelegramWebhookController extends Controller
             return response()->json(['ok' => true]);
         }
 
-        $this->answerCallbackQuery($callbackId, $message);
+        $this->answerCallbackQuery($callbackId, $actionResponse);
         return response()->json(['ok' => true]);
     }
 
@@ -119,6 +126,14 @@ class TelegramWebhookController extends Controller
                 return 'Idea not found.';
             }
             return $this->resolveIdeaAction($idea, $action);
+        }
+
+        if ($kind === 'repurpose') {
+            $job = RepurposeJob::find($id);
+            if (!$job) {
+                return 'Repurpose job not found.';
+            }
+            return $this->resolveRepurposeAction($job, $action);
         }
 
         return 'Unknown target.';
@@ -180,6 +195,99 @@ class TelegramWebhookController extends Controller
         }
 
         return 'Unknown action.';
+    }
+
+    /**
+     * Inbound text message handler — IG repurpose entrypoint. When the operator
+     * sends an Instagram post/reel URL from the allowed chat (and the feature is
+     * enabled), create a RepurposeJob and reply with mode-choice buttons (D9).
+     * The capture pipeline starts only after a button is tapped
+     * (resolveRepurposeAction). Silently ignores non-IG text / wrong chat.
+     */
+    private function handleMessage(array $message): void
+    {
+        $text = trim((string) ($message['text'] ?? ''));
+        if ($text === '') {
+            return;
+        }
+
+        // Feature toggle.
+        $enabled = (string) Setting::where('group', 'telegram')
+            ->where('key', 'telegram_repurpose_enabled')
+            ->value('value');
+        if ($enabled !== 'true') {
+            return;
+        }
+
+        // Allowlist: only the configured operator chat may trigger repurpose.
+        $allowedChatId = (string) Setting::where('group', 'telegram')
+            ->where('key', 'telegram_chat_id')
+            ->value('value');
+        $incomingChatId = (string) ($message['chat']['id'] ?? '');
+        if ($allowedChatId === '' || !hash_equals($allowedChatId, $incomingChatId)) {
+            Log::info('[TelegramRepurpose] message from non-allowed chat ignored', [
+                'chat_present' => $incomingChatId !== '',
+            ]);
+            return;
+        }
+
+        // SSRF guard: only accept instagram.com post/reel/tv URLs.
+        $url = $this->extractInstagramUrl($text);
+        if ($url === null) {
+            return; // non-IG text — ignore quietly, no spam reply
+        }
+
+        // Remaining text after stripping the URL = optional angle/instruction.
+        $angle = trim(str_replace($url, '', $text));
+        $angle = $angle !== '' ? $angle : null;
+
+        $job = RepurposeJob::create([
+            'source_url' => $url,
+            'angle' => $angle,
+            'mode' => null,
+            'status' => RepurposeJobStatus::Received->value,
+            'chat_id' => $incomingChatId,
+        ]);
+
+        app(TelegramNotificationService::class)->sendRepurposeModePrompt($job);
+    }
+
+    /**
+     * Extract the first instagram.com post/reel/tv URL from text. Host-restricted
+     * (no arbitrary host) so the downstream Playwright capture can never be
+     * pointed at a non-Instagram target.
+     */
+    private function extractInstagramUrl(string $text): ?string
+    {
+        $pattern = '~https?://(?:www\.)?instagram\.com/(?:p|reel|reels|tv)/[A-Za-z0-9_-]+/?~i';
+        if (!preg_match($pattern, $text, $m)) {
+            return null;
+        }
+        return $m[0];
+    }
+
+    /**
+     * Apply the operator's mode choice (blog | carousel). Sets RepurposeJob.mode,
+     * advances FSM received → capturing, and dispatches the capture job.
+     * Idempotent — a late second tap after the pipeline has started is a no-op.
+     */
+    private function resolveRepurposeAction(RepurposeJob $job, string $action): string
+    {
+        if (!in_array($action, ['blog', 'carousel'], true)) {
+            return 'Unknown action.';
+        }
+
+        // Only the first tap (while still awaiting a choice) takes effect.
+        if ($job->mode !== null || $job->status !== RepurposeJobStatus::Received->value) {
+            return 'Already started.';
+        }
+
+        $job->update(['mode' => $action]);
+        $job->transitionTo(RepurposeJobStatus::Capturing, "telegram_mode_{$action}");
+        CaptureInstagramPost::dispatch($job->id);
+
+        $label = $action === 'blog' ? '📝 Blog + Carousel' : '🎠 Carousel saja';
+        return "⏳ {$label} repurpose started.";
     }
 
     /**

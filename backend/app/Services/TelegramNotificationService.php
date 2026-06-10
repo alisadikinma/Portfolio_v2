@@ -551,6 +551,40 @@ class TelegramNotificationService
         }
     }
 
+    /**
+     * IG repurpose (D9): prompt the operator to choose output mode via two
+     * inline buttons. callback_data is HMAC-signed (kind='repurpose') so
+     * TelegramWebhookController can verify the tap. This is an interactive
+     * reply, not a per-type notification — gated only on the master toggle +
+     * token/chat (no telegram_notify_* key).
+     */
+    public function sendRepurposeModePrompt(\App\Models\RepurposeJob $job): bool
+    {
+        if ($this->getSetting('telegram_enabled') !== 'true') {
+            return false;
+        }
+        if (empty($this->getBotToken()) || empty($this->getChatId())) {
+            return false;
+        }
+
+        $secret = (string) $this->getSetting('telegram_webhook_secret');
+        $url = $this->truncate((string) $job->source_url, 80);
+        $angleLine = $job->angle ? "\nAngle: _" . $this->truncate((string) $job->angle, 120) . '_' : '';
+
+        $text = "🔗 *IG repurpose* — pilih output:\n{$url}{$angleLine}";
+
+        $replyMarkup = [
+            'inline_keyboard' => [
+                [
+                    ['text' => '📝 Blog + Carousel', 'callback_data' => self::signCallback('blog', 'repurpose', $job->id, $secret)],
+                    ['text' => '🎠 Carousel saja', 'callback_data' => self::signCallback('carousel', 'repurpose', $job->id, $secret)],
+                ],
+            ],
+        ];
+
+        return $this->send($text, $replyMarkup);
+    }
+
     private function isEnabledFor(string $notificationType): bool
     {
         if ($this->getSetting('telegram_enabled') !== 'true') {
