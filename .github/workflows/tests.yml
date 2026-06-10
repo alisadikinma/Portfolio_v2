@@ -48,7 +48,8 @@ jobs:
           php artisan key:generate
 
       # Tests force DB_CONNECTION=sqlite + DB_DATABASE=:memory: via phpunit.xml.
-      # Matches the IG-repurpose suite (RepurposeJob*/TelegramRepurpose*) plus
-      # the capture job test (CaptureInstagramPostJobTest).
+      # Matches the whole IG-repurpose pipeline suite — Repurpose* + the per-step
+      # job tests whose class names don't carry "Repurpose"
+      # (CaptureInstagramPost / ExtractSlideContent).
       - name: Run IG-repurpose feature tests
-        run: php artisan test --filter='Repurpose|CaptureInstagramPost'
+        run: php artisan test --filter='Repurpose|CaptureInstagramPost|ExtractSlideContent'

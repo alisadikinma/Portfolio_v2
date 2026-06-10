@@ -610,6 +610,35 @@ class TelegramNotificationService
         return $this->send($text);
     }
 
+    /**
+     * IG repurpose: notify the operator that a draft is ready (finalize done).
+     * blog mode → Content Engine link; carousel mode → /admin/draft-posts link.
+     * Plain status reply (master-toggle gated).
+     */
+    public function sendRepurposeDrafted(\App\Models\RepurposeJob $job, ?int $linkedinDraftId, int $correctedClaims): bool
+    {
+        if ($this->getSetting('telegram_enabled') !== 'true') {
+            return false;
+        }
+        if (empty($this->getBotToken()) || empty($this->getChatId())) {
+            return false;
+        }
+
+        $claimLine = $correctedClaims > 0
+            ? "{$correctedClaims} klaim dikoreksi + sumber dilampirkan."
+            : 'Klaim diverifikasi, sumber dilampirkan.';
+
+        if ($job->mode === 'blog') {
+            $text = "📝 *Artikel repurpose siap* (job #{$job->id})\n{$claimLine}\n\n"
+                . 'Approve di Content Engine → images → publish → carousel + cross-post otomatis: /admin/content-engine';
+        } else {
+            $link = $linkedinDraftId ? "/admin/draft-posts/{$linkedinDraftId}" : '/admin/draft-posts';
+            $text = "🎠 *Carousel draft siap* (job #{$job->id})\n{$claimLine}\n\nReview → {$link}";
+        }
+
+        return $this->send($text);
+    }
+
     private function isEnabledFor(string $notificationType): bool
     {
         if ($this->getSetting('telegram_enabled') !== 'true') {
