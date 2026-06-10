@@ -59,6 +59,29 @@ class LinkedInFixedSlotSchedulerTest extends TestCase
         $this->assertSame('2026-05-13 05:00:00', $slot->copy()->setTimezone('Asia/Jakarta')->format('Y-m-d H:i:s'));
     }
 
+    public function test_weekdays_only_skips_weekend_to_monday(): void
+    {
+        // Friday 2026-05-15 21:00 WIB — all of Friday's slots have passed.
+        Carbon::setTestNow(Carbon::parse('2026-05-15 21:00:00', 'Asia/Jakarta'));
+
+        $scheduler = new LinkedInFixedSlotScheduler([5, 12, 18], null, true);
+        $slot = $scheduler->nextAvailableSlot();
+
+        // Sat 16 + Sun 17 skipped → first slot Monday 18 at 05:00.
+        $this->assertSame('2026-05-18 05:00:00', $slot->copy()->setTimezone('Asia/Jakarta')->format('Y-m-d H:i:s'));
+    }
+
+    public function test_weekdays_only_off_allows_saturday(): void
+    {
+        // Same Friday 21:00, but weekdays-only disabled → Saturday is eligible.
+        Carbon::setTestNow(Carbon::parse('2026-05-15 21:00:00', 'Asia/Jakarta'));
+
+        $scheduler = new LinkedInFixedSlotScheduler([5, 12, 18], null, false);
+        $slot = $scheduler->nextAvailableSlot();
+
+        $this->assertSame('2026-05-16 05:00:00', $slot->copy()->setTimezone('Asia/Jakarta')->format('Y-m-d H:i:s'));
+    }
+
     public function test_skips_past_slots_to_next_hour(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-05-13 13:00:00', 'Asia/Jakarta'));

@@ -50,8 +50,11 @@ class LinkedInSettingsSeeder extends Seeder
             // - linkedin_slot_lead_time_minutes: minimum minutes between now()
             //   and a slot for it to be eligible. Guards against approving at
             //   04:59 and trying to publish at 05:00 (cancel window collapses).
+            // - linkedin_publish_weekdays_only: when 'true', the scheduler skips
+            //   Saturday + Sunday entirely (WIB) so posts only land Mon-Fri.
             ['key' => 'linkedin_publish_slots',                'value' => '[5,6,7,12,17,18,19,20]', 'type' => 'json'],
             ['key' => 'linkedin_slot_lead_time_minutes',       'value' => '5',     'type' => 'text'],
+            ['key' => 'linkedin_publish_weekdays_only',        'value' => 'false', 'type' => 'text'],
             // Format-mix governor (May 12, 2026):
             // - linkedin_format_carousel_target_ratio: fraction 0.0-1.0,
             //   default 0.8 (80% carousel). LinkedInFormatMixGovernor

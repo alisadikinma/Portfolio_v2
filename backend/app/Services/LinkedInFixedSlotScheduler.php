@@ -31,6 +31,7 @@ class LinkedInFixedSlotScheduler
 {
     private const DEFAULT_SLOTS = [5, 6, 7, 12, 17, 18, 19, 20];
     private const DEFAULT_LEAD_TIME_MINUTES = 5;
+    private const DEFAULT_WEEKDAYS_ONLY = false;
     private const LOOKAHEAD_DAYS = 14;
 
     /**
@@ -52,23 +53,29 @@ class LinkedInFixedSlotScheduler
 
     private ?int $leadTimeMinutes = null;
 
+    /** @var bool|null when true, Saturday/Sunday slots are skipped */
+    private ?bool $weekdaysOnly = null;
+
     /** @var int[]|null operator override of configured slots */
     private readonly ?array $slotsOverride;
 
     private readonly ?int $leadTimeOverride;
+
+    private readonly ?bool $weekdaysOnlyOverride;
 
     /**
      * @param int[]|null $slots Override the configured slot hours (0-23).
      *                         If null, reads from `linkedin_publish_slots` setting on first use.
      * @param int|null $leadTimeMinutes Override lead time. Null reads from setting on first use.
      */
-    public function __construct(?array $slots = null, ?int $leadTimeMinutes = null)
+    public function __construct(?array $slots = null, ?int $leadTimeMinutes = null, ?bool $weekdaysOnly = null)
     {
         // Defer DB-backed setting lookups to first use so service can be
         // constructed by Laravel container without an active DB connection
         // (e.g., during test bootstrap before RefreshDatabase migrates).
         $this->slotsOverride = $slots;
         $this->leadTimeOverride = $leadTimeMinutes;
+        $this->weekdaysOnlyOverride = $weekdaysOnly;
     }
 
     private function ensureResolved(): void
@@ -78,6 +85,9 @@ class LinkedInFixedSlotScheduler
         }
         if ($this->leadTimeMinutes === null) {
             $this->leadTimeMinutes = $this->leadTimeOverride ?? $this->resolveLeadTime();
+        }
+        if ($this->weekdaysOnly === null) {
+            $this->weekdaysOnly = $this->weekdaysOnlyOverride ?? $this->resolveWeekdaysOnly();
         }
     }
 
@@ -96,6 +106,11 @@ class LinkedInFixedSlotScheduler
 
         for ($day = 0; $day < self::LOOKAHEAD_DAYS; $day++) {
             $dayDate = $cursor->copy()->addDays($day);
+
+            // Weekday-only cadence: skip Saturday + Sunday entirely (WIB).
+            if ($this->weekdaysOnly && $dayDate->isWeekend()) {
+                continue;
+            }
 
             foreach ($this->slots as $hour) {
                 $candidate = $dayDate->copy()->setHour($hour)->setMinute(0)->setSecond(0);
@@ -198,5 +213,17 @@ class LinkedInFixedSlotScheduler
         }
         $value = (int) $row->value;
         return $value >= 0 ? $value : self::DEFAULT_LEAD_TIME_MINUTES;
+    }
+
+    private function resolveWeekdaysOnly(): bool
+    {
+        $row = Setting::where('group', 'linkedin')
+            ->where('key', 'linkedin_publish_weekdays_only')
+            ->first();
+        if ($row === null || $row->value === null) {
+            return self::DEFAULT_WEEKDAYS_ONLY;
+        }
+
+        return in_array(strtolower(trim((string) $row->value)), ['1', 'true', 'yes', 'on'], true);
     }
 }
