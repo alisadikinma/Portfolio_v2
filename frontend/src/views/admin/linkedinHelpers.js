@@ -73,11 +73,17 @@ export const STATUS_META = {
   // misleading "MANUAL REVIEW" while images haven't even started rendering.
   // Resolved via effectiveStatusMeta() below.
   // ---------------------------------------------------------------------------
+  carousel_reauthoring: {
+    label: 'Re-authoring slides',
+    short: 'Re-authoring',
+    mood: 'progress',
+    sentence: 'Re-writing the slide storyline with /carousel-gen — it pulls fresh teaching content from your blog and rebuilds all slides. This takes ~3-7 minutes. Image rendering starts automatically right after; nothing has been sent to GeminiGen yet.',
+  },
   carousel_render_pending: {
     label: 'Awaiting render',
     short: 'Awaiting render',
     mood: 'decision',
-    sentence: 'Slide JSON is ready. GeminiGen rendering should be in flight — refresh in ~30s. Approve unlocks once every slide finishes rendering.',
+    sentence: 'Slides are authored — GeminiGen image rendering is being dispatched now. The page polls every 5s; Approve unlocks once every slide finishes rendering.',
   },
   carousel_render_active: {
     label: 'Rendering slides',
@@ -95,7 +101,7 @@ export const STATUS_META = {
     label: 'Render partial',
     short: 'Partial render',
     mood: 'decision',
-    sentence: 'Some slides rendered, others failed. Retry failed slides individually before approving.',
+    sentence: 'Some slides rendered, others failed (often a transient GeminiGen fetch error). Failed slides auto-retry every ~5 min via the reaper, or hit "Re-render image" on the failed slide.',
   },
 }
 
@@ -110,6 +116,9 @@ export function statusMeta(status) {
 
 /**
  * Inspect a carousel draft's slide image lifecycle. Returns one of:
+ *   'reauthoring' — the /carousel-gen engine is rewriting the slide storyline
+ *                   (image_status='reauthoring' on any slide, set at queue time
+ *                   by regenerateAllImages). No render has been dispatched yet.
  *   'ready'      — every slide has image_status='done' + image_url
  *   'pending'    — no slide has even started rendering (image_status='pending'
  *                   or null on every slide)
@@ -127,14 +136,20 @@ export function inspectCarouselRenderState(draft) {
   let done = 0
   let inFlight = 0
   let failed = 0
+  let reauthoring = 0
   for (const slide of slides) {
     const s = slide?.image_status
-    if (s === 'done' && slide?.image_url) done++
+    if (s === 'reauthoring') reauthoring++
+    else if (s === 'done' && slide?.image_url) done++
     else if (s === 'generating') inFlight++
     else if (s === 'failed') failed++
     // 'pending' or null falls through — counted as not-yet-started below
   }
 
+  // Re-authoring takes precedence — the storyline is still being rewritten,
+  // no GeminiGen render has started. Surfacing 'pending' here would falsely
+  // claim "rendering in flight" while /carousel-gen is the actual background job.
+  if (reauthoring > 0) return 'reauthoring'
   if (done === slides.length) return 'ready'
   if (inFlight > 0) return 'generating'
   if (failed === slides.length) return 'failed'
@@ -159,6 +174,7 @@ export function effectiveStatusMeta(draft) {
   if (draft.format === 'carousel' && draft.status === 'manual_review') {
     const renderState = inspectCarouselRenderState(draft)
     switch (renderState) {
+      case 'reauthoring': return STATUS_META.carousel_reauthoring
       case 'pending':    return STATUS_META.carousel_render_pending
       case 'generating': return STATUS_META.carousel_render_active
       case 'failed':     return STATUS_META.carousel_render_failed

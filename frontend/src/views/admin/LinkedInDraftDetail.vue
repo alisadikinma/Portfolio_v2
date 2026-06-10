@@ -887,10 +887,18 @@ const slidesPendingMessage = computed(() => {
   if (slidesReadyForPublish.value) return ''
   const slides = carouselSlides.value
   if (slides.length === 0) return 'No slides on this draft yet'
+  // Re-authoring: /carousel-gen is rewriting the storyline — no render started.
+  const reauthoring = slides.filter(s => s?.image_status === 'reauthoring').length
+  if (reauthoring > 0) {
+    return `Re-authoring storyline with /carousel-gen (~3-7 min) — slides not generated yet, nothing rendering`
+  }
   const done = slides.filter(s => s?.image_status === 'done' && s?.image_url).length
+  const generating = slides.filter(s => s?.image_status === 'generating').length
   const failed = slides.filter(s => s?.image_status === 'failed').length
-  if (failed > 0) return `${failed} slide(s) failed to render — retry them before approving`
-  return `Wait for all slides to finish rendering (${done} of ${slides.length} done)`
+  if (failed > 0) {
+    return `Rendering ${done} of ${slides.length} done · ${failed} failed (auto-retries every ~5 min, or hit "Re-render image")`
+  }
+  return `Rendering slide images — ${done} of ${slides.length} done${generating > 0 ? ` · ${generating} in flight` : ''}`
 })
 
 function slideCopyId(slide) {

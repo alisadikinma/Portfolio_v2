@@ -1010,8 +1010,16 @@ class LinkedInDraftController extends Controller
         //
         // Caption + hashtags + link_comment + draft ID + FSM state are all
         // preserved across the re-author, so operator's caption work survives.
+        //
+        // Mark slides 'reauthoring' (NOT 'pending') for the window while
+        // /carousel-gen rewrites the storyline. The frontend uses this to show
+        // an accurate "Re-authoring slides" status instead of falsely claiming
+        // "GeminiGen rendering in flight" — no render has been dispatched yet.
+        // RegenerateLinkedInCarouselContent replaces carousel_slides with fresh
+        // slides (clearing this marker) once /carousel-gen returns, and resets
+        // any leftover 'reauthoring' slides to 'failed' if it errors/times out.
         foreach ($slides as $i => $slide) {
-            $slides[$i]['image_status'] = 'pending';
+            $slides[$i]['image_status'] = 'reauthoring';
             $slides[$i]['image_url'] = '';
             $slides[$i]['image_error'] = null;
             $slides[$i]['image_job_uuid'] = null;

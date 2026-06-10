@@ -293,24 +293,30 @@ class ScanLinkedInForCrossPost extends Command
         return null;
     }
 
+    // Idempotency guard is keyed on linkedin_post_id (the specific draft being
+    // fanned out), NOT post_id. Keying on post_id meant a regenerated draft
+    // (e.g. text→carousel, which soft-deletes the old draft and creates a new
+    // linkedin_posts row) inherited the OLD draft's siblings as a "live row"
+    // and got disqualified — so IG/TikTok/Threads captions never generated for
+    // the new draft. Per-draft keying scopes the guard to the current draft.
     private function hasLiveFacebookRow(LinkedInPost $li): bool
     {
-        return FacebookPost::where('post_id', $li->post_id)->exists();
+        return FacebookPost::where('linkedin_post_id', $li->id)->exists();
     }
 
     private function hasLiveInstagramRow(LinkedInPost $li): bool
     {
-        return InstagramPost::where('post_id', $li->post_id)->exists();
+        return InstagramPost::where('linkedin_post_id', $li->id)->exists();
     }
 
     private function hasLiveTiktokRow(LinkedInPost $li): bool
     {
-        return TiktokPost::where('post_id', $li->post_id)->exists();
+        return TiktokPost::where('linkedin_post_id', $li->id)->exists();
     }
 
     private function hasLiveThreadsRow(LinkedInPost $li): bool
     {
-        return ThreadsPost::where('post_id', $li->post_id)->exists();
+        return ThreadsPost::where('linkedin_post_id', $li->id)->exists();
     }
 
     private function createFacebook(LinkedInPost $li, string $format): void
