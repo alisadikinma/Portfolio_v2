@@ -2,6 +2,10 @@
 
 namespace App\Jobs;
 
+use App\Enums\RepurposeJobStatus;
+use App\Models\RepurposeJob;
+use App\Services\RepurposeRewriteService;
+use App\Services\TelegramNotificationService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -9,15 +13,13 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * Phase E dispatch target for the IG repurpose pipeline. Dispatched by
- * ResearchRepurposeClaims once claims are verified (status researched).
+ * IG repurpose Phase E — rewrite step. Dispatched by ResearchRepurposeClaims
+ * once claims are verified (status researched).
  *
- * NOTE (intentional, plan-tracked): the real rewrite body —
- * RepurposeRewriteService producing a powerful, accurate, style-Ali article
- * body (corrected claims + sources appendix) — lands in Phase E
- * (docs/plans/2026-06-10-telegram-ig-repurpose-carousel.md). Until then this is
- * a no-op so the research → rewrite dispatch wiring is testable in isolation.
- * Phase E fills handle() and chains FinalizeRepurpose.
+ *   - success → persist `rewritten` + status rewritten + dispatch FinalizeRepurpose
+ *   - failure → status failed + Telegram reply
+ *
+ * @see docs/plans/2026-06-10-telegram-ig-repurpose-carousel.md
  */
 class RewriteRepurposeContent implements ShouldQueue
 {
@@ -26,14 +28,44 @@ class RewriteRepurposeContent implements ShouldQueue
     use Queueable;
     use SerializesModels;
 
+    public int $timeout = 600;
+
     public function __construct(public readonly int $repurposeJobId)
     {
     }
 
     public function handle(): void
     {
-        // Phase E: app(RepurposeRewriteService::class)->rewrite(
-        //     RepurposeJob::findOrFail($this->repurposeJobId)
-        // );
+        $job = RepurposeJob::find($this->repurposeJobId);
+        if (!$job || $job->status !== RepurposeJobStatus::Researched->value) {
+            return;
+        }
+
+        $job->transitionTo(RepurposeJobStatus::Rewriting, 'rewrite_start');
+
+        try {
+            $result = app(RepurposeRewriteService::class)->rewrite($job);
+        } catch (\Throwable $e) {
+            $this->failJob($job, 'rewrite_exception: ' . $e->getMessage());
+            return;
+        }
+
+        if (!($result['success'] ?? false) || empty($result['rewritten'])) {
+            $this->failJob($job, 'rewrite_failed: ' . ($result['error'] ?? 'no rewrite'));
+            return;
+        }
+
+        $job->transitionTo(
+            RepurposeJobStatus::Rewritten,
+            'rewrite_ok',
+            ['rewritten' => $result['rewritten'], 'last_error' => null]
+        );
+        FinalizeRepurpose::dispatch($job->id);
+    }
+
+    private function failJob(RepurposeJob $job, string $reason): void
+    {
+        $job->transitionTo(RepurposeJobStatus::Failed, $reason, ['last_error' => $reason]);
+        app(TelegramNotificationService::class)->sendRepurposeFailed($job, $reason);
     }
 }
