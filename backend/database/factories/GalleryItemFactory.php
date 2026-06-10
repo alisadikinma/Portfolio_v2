@@ -61,14 +61,4 @@ class GalleryItemFactory extends Factory
             'gallery_id' => $gallery->id,
         ]);
     }
-
-    /**
-     * Set a specific sequence.
-     */
-    public function sequence(int $sequence): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'sequence' => $sequence,
-        ]);
-    }
 }
