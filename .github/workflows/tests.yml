@@ -1,0 +1,52 @@
+name: tests
+
+# First real test CI for this repo. Previously the only workflow was
+# deploy.yml (main-only deploy script — it never ran `php artisan test`), so
+# the suite had never executed in CI.
+#
+# NOTE: the FULL `php artisan test` suite currently has ~186 pre-existing
+# failures that predate any CI — legacy Mockery `alias:` mock collisions
+# (tests that pass in isolation but collide under a full run), APP_URL
+# subpath feature tests, and stale assertions. Triaging those is separate
+# work. Until then this gate runs the IG-repurpose feature suite (green).
+# Broaden the `--filter` (or drop it for the full suite) once the legacy
+# failures are cleaned up.
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  phpunit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: intl, pdo_sqlite, sqlite3, mbstring, bcmath, gd, zip, fileinfo, curl
+          coverage: none
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: backend/vendor
+          key: composer-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: composer-
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      # Tests force DB_CONNECTION=sqlite + DB_DATABASE=:memory: via phpunit.xml.
+      - name: Run IG-repurpose feature tests
+        run: php artisan test --filter=Repurpose
