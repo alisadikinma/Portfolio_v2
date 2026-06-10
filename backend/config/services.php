@@ -89,6 +89,25 @@ return [
         'timeout' => (int) env('IG_CAPTURE_TIMEOUT', 120),
     ],
 
+    'repurpose' => [
+        // IG repurpose Claude-CLI exec (vision extract / fact-check research /
+        // rewrite). Defaults mirror article_generation so one VPS auth + key
+        // path serves both. All claude calls MUST carry the empty-mcp flags
+        // (anti MCP-leak — see ArticleGenerationService::buildMcpFlags).
+        'driver' => env('REPURPOSE_DRIVER', env('ARTICLE_GEN_DRIVER', 'ssh')),
+        'ssh_host' => env('REPURPOSE_SSH_HOST', env('ARTICLE_GEN_SSH_HOST', 'localhost')),
+        'ssh_user' => env('REPURPOSE_SSH_USER', env('ARTICLE_GEN_SSH_USER', 'claudesn')),
+        'ssh_key' => env('REPURPOSE_SSH_KEY', env('ARTICLE_GEN_SSH_KEY', '')),
+        'claude_path' => env('REPURPOSE_CLAUDE_PATH', env('ARTICLE_GEN_CLAUDE_PATH', 'claude')),
+        'empty_mcp_config' => env('REPURPOSE_EMPTY_MCP_CONFIG', env('ARTICLE_GEN_EMPTY_MCP_CONFIG', '/home/claudesn/empty-mcp.json')),
+        'model_vision' => env('REPURPOSE_MODEL_VISION', 'sonnet'),
+        'model_research' => env('REPURPOSE_MODEL_RESEARCH', 'sonnet'),
+        'model_rewrite' => env('REPURPOSE_MODEL_REWRITE', 'sonnet'),
+        // Style guide refs appended to the rewrite prompt (reuse article refs).
+        'refs_rewrite' => env('REPURPOSE_REFS_REWRITE', env('ARTICLE_GEN_REFS_WRITE', '')),
+        'timeout' => (int) env('REPURPOSE_TIMEOUT', 300),
+    ],
+
     'article_generation' => [
         'driver' => env('ARTICLE_GEN_DRIVER', 'ssh'),
         'ssh_host' => env('ARTICLE_GEN_SSH_HOST', ''),
