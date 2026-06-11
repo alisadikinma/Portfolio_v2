@@ -479,30 +479,37 @@ const routes = [
     name: 'admin-sosmed-posts',
     component: () => import('@/views/admin/LinkedInPostsCalendar.vue'),
     meta: {
-      title: 'SOSMED Posts - Admin',
+      title: 'Content Calendar - Admin',
       requiresAuth: true,
       layout: 'admin'
     }
   },
+  // Social Studio — merged work surface (blog drafts + IG repurpose jobs).
+  // Targets of the collapsed menu item; old list paths redirect here.
+  {
+    path: '/admin/social-studio',
+    name: 'admin-social-studio',
+    component: () => import('@/views/admin/SocialStudio.vue'),
+    meta: {
+      title: 'Social Studio - Admin',
+      requiresAuth: true,
+      layout: 'admin'
+    }
+  },
+  // The old "Draft Posts" list now redirects into Social Studio (bookmarks survive).
   {
     path: '/admin/draft-posts',
-    name: 'admin-draft-posts',
-    component: () => import('@/views/admin/LinkedInQueueList.vue'),
-    meta: {
-      title: 'Draft Posts - Admin',
-      requiresAuth: true,
-      layout: 'admin'
-    }
+    redirect: { name: 'admin-social-studio' },
   },
   // Legacy aliases — redirect to the renamed routes so bookmarks +
-  // the back-navigation origin sentinel ('queue' / 'posts') keep working.
+  // the back-navigation origin sentinel ('feed' / 'studio') keep working.
   {
     path: '/admin/linkedin-posts',
     redirect: { name: 'admin-sosmed-posts' },
   },
   {
     path: '/admin/linkedin-queue',
-    redirect: { name: 'admin-draft-posts' },
+    redirect: { name: 'admin-social-studio' },
   },
   {
     path: '/admin/sosmed-drafts/:id',
@@ -521,12 +528,11 @@ const routes = [
     redirect: (to) => ({ name: 'admin-sosmed-draft-detail', params: { id: to.params.id } }),
   },
 
-  // IG repurpose monitoring panel (Telegram → IG repurpose pipeline).
+  // IG repurpose — the list is merged into Social Studio; the path redirects
+  // there (bookmarks survive). The per-job detail route is kept (2-pane view).
   {
     path: '/admin/repurpose',
-    name: 'admin-repurpose',
-    component: () => import('@/views/admin/RepurposeJobsList.vue'),
-    meta: { title: 'IG Repurpose - Admin', requiresAuth: true, layout: 'admin' }
+    redirect: { name: 'admin-social-studio' },
   },
   {
     path: '/admin/repurpose/:id',

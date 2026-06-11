@@ -213,16 +213,17 @@ const rerenderImagesOnlyMutation = useRerenderImagesOnly()
 const regenerateCaptionMutation = useRegenerateCaption()
 const regenerateSlideMutation = useRegenerateSlideImage()
 
-// --- Smart back navigation: read the referring origin (queue vs feed) from
-// sessionStorage so "Back" returns to the right list view, with the tab
-// the operator was on. Falls back to /admin/draft-posts.
-const backTarget = ref({ name: 'admin-draft-posts', label: 'Draft Posts' })
+// --- Smart back navigation: read the referring origin from sessionStorage so
+// "Back" returns to the right list view. 'feed' came from the calendar →
+// Content Calendar; 'studio' (and any default) came from the merged menu →
+// Social Studio.
+const backTarget = ref({ name: 'admin-social-studio', label: 'Social Studio' })
 onMounted(() => {
   const origin = sessionStorage.getItem('linkedin:detail:origin')
   if (origin === 'feed') {
-    backTarget.value = { name: 'admin-sosmed-posts', label: 'SOSMED Posts' }
+    backTarget.value = { name: 'admin-sosmed-posts', label: 'Content Calendar' }
   } else {
-    backTarget.value = { name: 'admin-draft-posts', label: 'Draft Posts' }
+    backTarget.value = { name: 'admin-social-studio', label: 'Social Studio' }
   }
 })
 
