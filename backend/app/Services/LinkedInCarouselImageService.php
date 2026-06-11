@@ -286,9 +286,27 @@ class LinkedInCarouselImageService
         // If GeminiGen returned the image inline (status=2 means ready), shortcut.
         if ($status === 2 && isset($data['generate_result'])) {
             $localUrl = $this->downloadAndStore($data['generate_result'], $plannedFilename);
+            $jobAttrs['remote_url'] = $data['generate_result'];
+
+            if (! $this->isLocalStorageUrl($localUrl)) {
+                // downloadAndStore fell back to the remote URL — never mark the
+                // slide 'done' carrying it (see isLocalStorageUrl). Hold for the
+                // reaper to re-dispatch.
+                $jobAttrs['status'] = 'failed';
+                $jobAttrs['error_message'] = 'Image download/store failed — remote URL not usable';
+                ImageGenerationJob::create($jobAttrs);
+                $this->mirrorSlideStatus($draft->id, $uuid, 'failed', null, 'Image download failed — will retry');
+                Log::warning('[LinkedInCarouselImage] instant render download did not yield a local URL — slide held for retry', [
+                    'draft_id' => $draft->id,
+                    'slide_index' => $slideIndex,
+                    'uuid' => $uuid,
+                    'remote_url' => $data['generate_result'],
+                ]);
+                return $uuid;
+            }
+
             $jobAttrs['status'] = 'completed';
             $jobAttrs['image_url'] = $localUrl;
-            $jobAttrs['remote_url'] = $data['generate_result'];
 
             ImageGenerationJob::create($jobAttrs);
 
@@ -372,6 +390,28 @@ class LinkedInCarouselImageService
             }
 
             $localUrl = $this->downloadAndStore($remoteUrl, $job->planned_filename);
+
+            if (! $this->isLocalStorageUrl($localUrl)) {
+                // downloadAndStore fell back to the remote URL (non-2xx, empty
+                // body, or storage failure). Marking the slide 'done' with it
+                // would leak a short-lived octet-stream GeminiGen URL into
+                // carousel_slides[].image_url — which LinkedIn tolerates (it
+                // fetches bytes) but Publer cannot ingest (the draft-149
+                // cross-post failure). Mark failed so the reaper re-dispatches.
+                $job->update([
+                    'status' => 'failed',
+                    'remote_url' => $remoteUrl,
+                    'error_message' => 'Image download/store failed — remote URL not usable',
+                ]);
+                $this->mirrorSlideStatus($job->linkedin_post_id, $uuid, 'failed', null, 'Image download failed — will retry');
+                $this->emitSlideProgress($job->linkedin_post_id, $job->slide_index, 'failed');
+                Log::warning('[LinkedInCarouselImage] webhook download did not yield a local URL — slide held for retry', [
+                    'draft_id' => $job->linkedin_post_id,
+                    'slide_index' => $job->slide_index,
+                    'remote_url' => $remoteUrl,
+                ]);
+                return false;
+            }
 
             $job->update([
                 'status' => 'completed',
@@ -922,6 +962,30 @@ class LinkedInCarouselImageService
      * Reuses the same path convention as ImageGenerationService — keeps
      * carousel slide PNGs alongside article images.
      */
+    /**
+     * True when the URL is an app-hosted /storage/ asset (i.e. downloadAndStore
+     * succeeded and mirrored the PNG locally), as opposed to a remote URL it
+     * fell back to on failure. Used to gate slide completion: a slide must never
+     * reach 'done' carrying a remote URL (octet-stream / expiring) that Publer
+     * cannot ingest.
+     */
+    private function isLocalStorageUrl(?string $url): bool
+    {
+        if (! is_string($url) || $url === '') {
+            return false;
+        }
+
+        $appHost = parse_url((string) config('app.url'), PHP_URL_HOST);
+        $urlHost = parse_url($url, PHP_URL_HOST);
+
+        if (is_string($appHost) && $appHost !== '' && is_string($urlHost) && $urlHost !== '') {
+            return strcasecmp($appHost, $urlHost) === 0 && str_contains($url, '/storage/');
+        }
+
+        // Host-less relative path is local by definition.
+        return $urlHost === null && str_contains($url, '/storage/');
+    }
+
     public function downloadAndStore(string $imageUrl, ?string $customFilename = null): ?string
     {
         try {

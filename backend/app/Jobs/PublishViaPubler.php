@@ -96,16 +96,19 @@ class PublishViaPubler implements ShouldQueue
             return;
         }
 
-        $method = 'build' . ucfirst($this->platform);
-        $spec = $builder->$method($sibling);
-
-        Log::info('[PublishViaPubler] Dispatching to Publer', [
-            'platform' => $this->platform,
-            'sibling_id' => $this->siblingPostId,
-            'media_count' => count($spec['media_urls'] ?? []),
-        ]);
-
         try {
+            // 0. Build the normalized spec. The builder throws a RuntimeException
+            //    if any slide lacks an app-hosted (Publer-ingestible) media URL —
+            //    classified below as a permanent failure (no wasted retries).
+            $method = 'build' . ucfirst($this->platform);
+            $spec = $builder->$method($sibling);
+
+            Log::info('[PublishViaPubler] Dispatching to Publer', [
+                'platform' => $this->platform,
+                'sibling_id' => $this->siblingPostId,
+                'media_count' => count($spec['media_urls'] ?? []),
+            ]);
+
             // 1. Pre-upload every media URL → media_ids (Publer rejects raw URLs).
             $mediaIds = [];
             foreach ($spec['media_urls'] as $i => $url) {

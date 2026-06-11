@@ -3,10 +3,12 @@
 namespace App\Services;
 
 use App\Models\FacebookPost;
+use App\Models\ImageGenerationJob;
 use App\Models\InstagramPost;
 use App\Models\Setting;
 use App\Models\ThreadsPost;
 use App\Models\TiktokPost;
+use RuntimeException;
 
 /**
  * Builds normalized Publer "post specs" for cross-post siblings.
@@ -251,13 +253,98 @@ class PublerPayloadBuilder
 
         $urls = [];
         foreach ($slides as $slide) {
-            $url = $slide['image_url'] ?? null;
-            if (is_string($url) && $url !== '') {
-                $urls[] = $url;
-            }
+            $urls[] = $this->resolveServableSlideUrl($linkedinPost, $slide);
         }
 
         return $urls;
+    }
+
+    /**
+     * Resolve a single slide to a URL Publer can actually ingest.
+     *
+     * Publer's /media/from-url downloads the URL server-side and validates it
+     * as an image. A raw GeminiGen edge URL (host edge-files.geminigen.ai) is
+     * served with `Content-Type: application/octet-stream` AND is a short-lived
+     * signed URL — Publer's media job "completes" with an EMPTY payload (no
+     * media_id), which is the exact draft-149 failure. LinkedIn tolerated it
+     * because publishCarousel fetches the bytes itself; Publer does not.
+     *
+     * Production slide image_urls are ALWAYS app-hosted
+     * (https://alisadikinma.com/storage/linkedin-carousel/...) because they are
+     * generated via url('/storage/...') after downloadAndStore mirrors the
+     * remote PNG locally. So we hard-require the app host and, for legacy slides
+     * that leaked a remote URL (download fell back to returning the remote URL),
+     * recover the locally-mirrored URL from the slide's ImageGenerationJob row.
+     * If neither yields an app-hosted URL we throw — a clear, actionable failure
+     * beats silently feeding Publer a URL it can never fetch.
+     */
+    private function resolveServableSlideUrl(object $linkedinPost, array $slide): string
+    {
+        $url = $slide['image_url'] ?? null;
+        if ($this->isAppHostedUrl($url)) {
+            return $url;
+        }
+
+        $local = $this->localMirrorForSlide($linkedinPost, $slide);
+        if ($local !== null) {
+            return $local;
+        }
+
+        $n = $slide['slide_number'] ?? '?';
+        throw new RuntimeException(
+            "Cross-post blocked: carousel slide {$n} has no app-hosted image — only an "
+            . 'external/expiring URL Publer cannot ingest. Re-render the slide, then retry.'
+        );
+    }
+
+    /**
+     * Recover the locally-mirrored (app-hosted) URL for a slide whose JSON
+     * image_url leaked a remote URL. The slide's own image_job_uuid may point
+     * at the failed-download job, so we key on slide_index (slide_number - 1)
+     * and take the newest carousel_slide job that actually mirrored locally.
+     */
+    private function localMirrorForSlide(object $linkedinPost, array $slide): ?string
+    {
+        if (! isset($slide['slide_number'])) {
+            return null;
+        }
+
+        $candidates = ImageGenerationJob::query()
+            ->where('linkedin_post_id', $linkedinPost->id)
+            ->where('type', 'carousel_slide')
+            ->where('slide_index', (int) $slide['slide_number'] - 1)
+            ->whereNotNull('image_url')
+            ->orderByDesc('id')
+            ->pluck('image_url');
+
+        foreach ($candidates as $candidate) {
+            if ($this->isAppHostedUrl($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * True when the URL is served from this app's own host (config app.url) —
+     * i.e. a locally-mirrored /storage/ asset Publer can fetch as a real image.
+     */
+    private function isAppHostedUrl(?string $url): bool
+    {
+        if (! is_string($url) || $url === '') {
+            return false;
+        }
+
+        $appHost = parse_url((string) config('app.url'), PHP_URL_HOST);
+        $urlHost = parse_url($url, PHP_URL_HOST);
+
+        if (is_string($appHost) && $appHost !== '' && is_string($urlHost) && $urlHost !== '') {
+            return strcasecmp($appHost, $urlHost) === 0;
+        }
+
+        // Host-less relative path (e.g. /storage/...) is local by definition.
+        return $urlHost === null && str_contains($url, '/storage/');
     }
 
     /**

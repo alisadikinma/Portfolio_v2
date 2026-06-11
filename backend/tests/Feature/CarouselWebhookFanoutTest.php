@@ -43,7 +43,9 @@ class CarouselWebhookFanoutTest extends TestCase
             LinkedInCarouselImageService::class . '[downloadAndStore,dispatchCrossPostScan]',
             [Mockery::mock(CarouselSlideEnhancer::class), $breaker]
         )->makePartial();
-        $svc->shouldReceive('downloadAndStore')->andReturn('https://cdn.example.com/slide.png');
+        // Must be an app-hosted /storage/ URL — the completion path now holds a
+        // slide for retry if downloadAndStore yields a non-local (remote) URL.
+        $svc->shouldReceive('downloadAndStore')->andReturn('http://localhost/storage/linkedin-carousel/slide.png');
 
         return $svc;
     }

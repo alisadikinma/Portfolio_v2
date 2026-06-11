@@ -28,6 +28,14 @@ class PublerPayloadBuilderTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // Production app host — slide image_urls are app-hosted by construction
+        // (url('/storage/...')); the builder only emits app-hosted media URLs.
+        config(['app.url' => 'https://alisadikinma.com']);
+    }
+
     private function makePost(): Post
     {
         $category = \App\Models\Category::create(['name' => 'AI', 'slug' => 'ai-' . uniqid()]);
@@ -44,9 +52,9 @@ class PublerPayloadBuilderTest extends TestCase
         $post = $this->makePost();
 
         $slides = [
-            ['slide_number' => 1, 'image_url' => 'https://cdn.test/slide-01.png', 'is_cover' => true, 'is_cta' => false],
-            ['slide_number' => 2, 'image_url' => 'https://cdn.test/slide-02.png', 'is_cover' => false, 'is_cta' => false],
-            ['slide_number' => 3, 'image_url' => 'https://cdn.test/slide-03.png', 'is_cover' => false, 'is_cta' => true],
+            ['slide_number' => 1, 'image_url' => 'https://alisadikinma.com/storage/linkedin-carousel/slide-01.png', 'is_cover' => true, 'is_cta' => false],
+            ['slide_number' => 2, 'image_url' => 'https://alisadikinma.com/storage/linkedin-carousel/slide-02.png', 'is_cover' => false, 'is_cta' => false],
+            ['slide_number' => 3, 'image_url' => 'https://alisadikinma.com/storage/linkedin-carousel/slide-03.png', 'is_cover' => false, 'is_cta' => true],
         ];
 
         return LinkedInPost::create(array_merge([
@@ -102,8 +110,8 @@ class PublerPayloadBuilderTest extends TestCase
 
         // media_urls from carousel_slides (ordered, raw URLs — uploaded later)
         $this->assertCount(3, $spec['media_urls']);
-        $this->assertSame('https://cdn.test/slide-01.png', $spec['media_urls'][0]);
-        $this->assertSame('https://cdn.test/slide-03.png', $spec['media_urls'][2]);
+        $this->assertSame('https://alisadikinma.com/storage/linkedin-carousel/slide-01.png', $spec['media_urls'][0]);
+        $this->assertSame('https://alisadikinma.com/storage/linkedin-carousel/slide-03.png', $spec['media_urls'][2]);
 
         // comments[] with link_comment + 1-minute delay
         $this->assertCount(1, $spec['comments']);
@@ -230,6 +238,85 @@ class PublerPayloadBuilderTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessageMatches('/instagram/i');
+
+        (new PublerPayloadBuilder())->buildInstagram($sibling);
+    }
+
+    // ─── Servable-media guard (draft-149 regression) ────────────────────────────
+
+    /**
+     * A slide whose JSON image_url leaked a remote GeminiGen edge URL (download
+     * fell back to the remote URL) must be resolved to its locally-mirrored,
+     * app-hosted URL from the carousel_slide ImageGenerationJob row — Publer
+     * cannot ingest the octet-stream/expiring geminigen URL.
+     */
+    public function test_recovers_local_mirror_when_slide_url_is_remote_geminigen(): void
+    {
+        $this->setSetting('publer_instagram_account_id', 'ig_acc_123');
+
+        // Slide 2 leaked a geminigen edge URL; slides 1 & 3 are app-hosted.
+        $linkedinPost = $this->makeLinkedInPost([
+            'carousel_slides' => [
+                ['slide_number' => 1, 'image_url' => 'https://alisadikinma.com/storage/linkedin-carousel/slide-01.png'],
+                ['slide_number' => 2, 'image_url' => 'https://edge-files.geminigen.ai/bucket/gen/slide-02.png?Signature=abc&Expires=123'],
+                ['slide_number' => 3, 'image_url' => 'https://alisadikinma.com/storage/linkedin-carousel/slide-03.png'],
+            ],
+        ]);
+
+        // A later regen mirrored slide 2 locally (slide_index 1 = slide_number 2).
+        \App\Models\ImageGenerationJob::create([
+            'linkedin_post_id' => $linkedinPost->id,
+            'type' => 'carousel_slide',
+            'slide_index' => 1,
+            'uuid' => 'regen-uuid-2',
+            'status' => 'completed',
+            'prompt' => 'slide 2 prompt',
+            'image_url' => 'https://alisadikinma.com/storage/linkedin-carousel/creator-brand-li-x-slide-02-body-v2.png',
+        ]);
+
+        $sibling = InstagramPost::create([
+            'linkedin_post_id' => $linkedinPost->id,
+            'post_id' => $linkedinPost->post_id,
+            'status' => 'awaiting_review',
+            'caption' => 'caption',
+        ]);
+        $sibling->load('linkedinPost');
+
+        $spec = (new PublerPayloadBuilder())->buildInstagram($sibling);
+
+        $this->assertCount(3, $spec['media_urls']);
+        $this->assertSame('https://alisadikinma.com/storage/linkedin-carousel/creator-brand-li-x-slide-02-body-v2.png', $spec['media_urls'][1]);
+        foreach ($spec['media_urls'] as $url) {
+            $this->assertStringNotContainsString('geminigen.ai', $url);
+        }
+    }
+
+    /**
+     * If a slide has only a remote URL and NO locally-mirrored job exists, the
+     * builder throws a clear, actionable error instead of feeding Publer a URL
+     * it can never fetch (which is the silent draft-149 failure).
+     */
+    public function test_throws_when_slide_has_only_remote_url_and_no_local_mirror(): void
+    {
+        $this->setSetting('publer_instagram_account_id', 'ig_acc_123');
+
+        $linkedinPost = $this->makeLinkedInPost([
+            'carousel_slides' => [
+                ['slide_number' => 1, 'image_url' => 'https://alisadikinma.com/storage/linkedin-carousel/slide-01.png'],
+                ['slide_number' => 2, 'image_url' => 'https://edge-files.geminigen.ai/bucket/gen/slide-02.png?Signature=abc&Expires=123'],
+            ],
+        ]);
+
+        $sibling = InstagramPost::create([
+            'linkedin_post_id' => $linkedinPost->id,
+            'post_id' => $linkedinPost->post_id,
+            'status' => 'awaiting_review',
+            'caption' => 'caption',
+        ]);
+        $sibling->load('linkedinPost');
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/slide 2/i');
 
         (new PublerPayloadBuilder())->buildInstagram($sibling);
     }
