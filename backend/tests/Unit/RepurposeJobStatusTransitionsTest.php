@@ -42,13 +42,18 @@ class RepurposeJobStatusTransitionsTest extends TestCase
         }
     }
 
-    public function test_failed_can_retry_from_step_entrypoints(): void
+    public function test_failed_can_retry_from_step_guard_states(): void
     {
+        // Retry resumes a step by re-entering the guard state that step's job
+        // accepts (capture@capturing, extract@captured, research@extracted,
+        // rewrite@researched, finalize@rewritten).
         $this->assertTrue(RepurposeJobStatus::Failed->canTransitionTo(RepurposeJobStatus::Capturing));
-        $this->assertTrue(RepurposeJobStatus::Failed->canTransitionTo(RepurposeJobStatus::Researching));
-        $this->assertTrue(RepurposeJobStatus::Failed->canTransitionTo(RepurposeJobStatus::Finalizing));
-        // Cannot retry into a non-entrypoint state.
-        $this->assertFalse(RepurposeJobStatus::Failed->canTransitionTo(RepurposeJobStatus::Captured));
+        $this->assertTrue(RepurposeJobStatus::Failed->canTransitionTo(RepurposeJobStatus::Captured));
+        $this->assertTrue(RepurposeJobStatus::Failed->canTransitionTo(RepurposeJobStatus::Extracted));
+        $this->assertTrue(RepurposeJobStatus::Failed->canTransitionTo(RepurposeJobStatus::Researched));
+        $this->assertTrue(RepurposeJobStatus::Failed->canTransitionTo(RepurposeJobStatus::Rewritten));
+        // Cannot retry into a non-guard / terminal state.
+        $this->assertFalse(RepurposeJobStatus::Failed->canTransitionTo(RepurposeJobStatus::Researching));
         $this->assertFalse(RepurposeJobStatus::Failed->canTransitionTo(RepurposeJobStatus::Drafted));
     }
 }
