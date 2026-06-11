@@ -32,6 +32,9 @@ import {
   relativeTime,
   countdownTo,
   formatDateTime,
+  shouldShowLastError,
+  resolveCarouselActivity,
+  formatElapsed,
   ICON,
 } from './linkedinHelpers'
 
@@ -539,27 +542,22 @@ const isTerminalGood = computed(() => draft.value?.status === 'published')
 const isTerminalBad = computed(() => draft.value?.status === 'failed')
 
 const STALE_ERROR_HOURS = 24
-const showLastError = computed(() => {
-  if (!draft.value?.last_error) return false
-  // Status gate — only failed / manual_review surface errors at all.
-  if (!['failed', 'manual_review'].includes(draft.value.status)) return false
-
-  // Staleness gate — if the most recent state transition is older than
-  // STALE_ERROR_HOURS, the error has been sitting around without further
-  // activity and is almost certainly from a resolved issue. Hides errors
-  // like "Could not parse orchestrator JSON from stdout" written days ago
-  // before subsequent fixes (May 2 parser fix, etc.) shipped. The error
-  // stays in the DB for debugging — only the UI suppresses.
-  const log = Array.isArray(draft.value?.pipeline_state_log)
-    ? draft.value.pipeline_state_log
-    : []
-  if (log.length === 0) return true
-  const latest = log[log.length - 1]
-  const latestTs = latest?.timestamp ? Date.parse(latest.timestamp) : NaN
-  if (Number.isNaN(latestTs)) return true
-  const ageHours = (Date.now() - latestTs) / 36e5
-  return ageHours < STALE_ERROR_HOURS
-})
+// Delegated to the pure shouldShowLastError() helper (unit-tested). Adds an
+// in-flight guard on top of the existing status + staleness gates: while a
+// /carousel-gen re-author OR slide render is in progress, the stale last_error
+// is suppressed so the operator never sees the "red error + nothing happening"
+// contradiction (the draft-149 incident). Error stays in the DB for debugging.
+const showLastError = computed(() =>
+  shouldShowLastError({
+    lastError: draft.value?.last_error,
+    status: draft.value?.status,
+    pipelineLog: draft.value?.pipeline_state_log,
+    slides: carouselSlides.value,
+    regenerateActive: draft.value?.regenerate_activity?.active,
+    nowMs: Date.now(),
+    staleHours: STALE_ERROR_HOURS,
+  })
+)
 
 // --- Live countdown ticker for awaiting_publish so the seconds tick visibly
 const tick = ref(0)
@@ -868,6 +866,19 @@ const carouselSlides = computed(() =>
   Array.isArray(draft.value?.carousel_slides) ? draft.value.carousel_slides : []
 )
 
+// Live carousel work phase for the status hero / approval-gated banner.
+// `void tick.value` makes the elapsed timer re-evaluate every second; the
+// regenerate_activity block (active + started_at) comes from show().
+const liveActivity = computed(() => {
+  void tick.value
+  return resolveCarouselActivity({
+    slides: carouselSlides.value,
+    regenerateActive: draft.value?.regenerate_activity?.active,
+    regenerateStartedAt: draft.value?.regenerate_activity?.started_at,
+    nowMs: Date.now(),
+  })
+})
+
 // Carousels can only be approved / scheduled / published when EVERY slide has
 // finished rendering. Approving with pending slides starts the cancel_window
 // timer immediately while GeminiGen is still generating images — the
@@ -888,9 +899,12 @@ const slidesPendingMessage = computed(() => {
   const slides = carouselSlides.value
   if (slides.length === 0) return 'No slides on this draft yet'
   // Re-authoring: /carousel-gen is rewriting the storyline — no render started.
+  // liveActivity.elapsedMs ticks every second (tick-driven) so the operator
+  // sees it's actually working, not stalled.
   const reauthoring = slides.filter(s => s?.image_status === 'reauthoring').length
-  if (reauthoring > 0) {
-    return `Re-authoring storyline with /carousel-gen (~3-7 min) — slides not generated yet, nothing rendering`
+  if (reauthoring > 0 || liveActivity.value.phase === 're_authoring') {
+    const el = formatElapsed(liveActivity.value.elapsedMs)
+    return `Re-authoring storyline with /carousel-gen${el ? ` · ${el} elapsed` : ''} · ~3-7 min — building slides now`
   }
   const done = slides.filter(s => s?.image_status === 'done' && s?.image_url).length
   const generating = slides.filter(s => s?.image_status === 'generating').length
@@ -1380,9 +1394,19 @@ const showThumbnailUploadCaption = computed(() =>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-cyan-400 shrink-0 mt-0.5">
                 <path :d="ICON.clock" />
               </svg>
-              <div class="min-w-0">
+              <div class="min-w-0 flex-1">
                 <p class="text-[11px] uppercase tracking-[0.14em] text-cyan-400 font-medium mb-0.5">Approval gated</p>
                 <p class="text-sm text-cyan-100/90">{{ slidesPendingMessage }}</p>
+                <!-- Live progress bar: indeterminate while re-authoring, determinate while rendering. -->
+                <div v-if="liveActivity.phase === 're_authoring'" class="mt-2 h-1 w-full overflow-hidden rounded-full bg-cyan-500/15">
+                  <div class="h-full w-1/3 rounded-full bg-cyan-400/70 animate-pulse motion-reduce:animate-none"></div>
+                </div>
+                <div v-else-if="liveActivity.phase === 'rendering' && liveActivity.renderTotal > 0" class="mt-2 h-1 w-full overflow-hidden rounded-full bg-cyan-500/15">
+                  <div
+                    class="h-full rounded-full bg-cyan-400 transition-[width] duration-500"
+                    :style="{ width: Math.round((liveActivity.renderDone / liveActivity.renderTotal) * 100) + '%' }"
+                  ></div>
+                </div>
               </div>
             </div>
 
