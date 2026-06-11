@@ -104,6 +104,11 @@ You are analyzing an Instagram carousel post to repurpose it. Read EACH slide im
 For each slide note the on-image text and its narrative role (hook | context | point | data | cta | other).
 Then list every factual/claimed statement made across the post — each as a short standalone sentence.
 
+STRICT JSON OUTPUT — your output is parsed by a machine, not a human:
+- Output ONE compact JSON object only. No markdown fences, no preamble, no trailing prose.
+- Escape EVERY double-quote inside a string value as \" (a raw " inside a value breaks parsing).
+- Do not truncate. If content runs long, be more concise but ALWAYS close the JSON object.
+
 Return ONE JSON object, no preamble, no markdown fence, starting with `{` ending with `}`, with exactly these keys:
 {
   "slides": [{"n": 1, "text": "...", "role": "hook"}],

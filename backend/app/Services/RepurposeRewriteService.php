@@ -98,6 +98,11 @@ REQUIREMENTS:
 - End the body with a "Sumber" section listing the cited source URLs as an HTML <ul> of <a> links.
 - meta_keywords: 5-7 short entity tokens (comma-separated), no long phrases.
 
+STRICT JSON OUTPUT — your output is parsed by a machine, not a human:
+- Output ONE compact JSON object only. No markdown fences, no preamble, no trailing prose.
+- Escape EVERY double-quote inside a string value as \" (a raw " inside the HTML body breaks parsing).
+- Do not truncate. If content runs long, be more concise but ALWAYS close the JSON object.
+
 Return ONE JSON object, no preamble, no markdown fence, starting with `{` ending with `}`:
 {
   "title": "...",
