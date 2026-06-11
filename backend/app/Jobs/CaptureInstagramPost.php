@@ -70,6 +70,14 @@ class CaptureInstagramPost implements ShouldQueue
             return;
         }
 
+        $count = (int) ($result['count'] ?? 0);
+        try {
+            app(TelegramNotificationService::class)
+                ->sendRepurposeProgress($job, "📸 {$count} slide ke-capture");
+        } catch (\Throwable $e) {
+            Log::warning('[CaptureInstagramPost] progress notify failed', ['job' => $job->id, 'error' => $e->getMessage()]);
+        }
+
         $job->transitionTo(
             RepurposeJobStatus::Captured,
             'capture_ok',
