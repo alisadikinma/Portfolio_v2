@@ -61,6 +61,21 @@ export function inferFailedStep(log) {
   return null
 }
 
+/**
+ * Which view the right ("Generated") pane of the 2-pane detail should render:
+ *   'generated'   — carousel job with a linked LinkedInPost draft → show the
+ *                   rendered slides + caption + publish actions.
+ *   'in_progress' — carousel job still processing (no draft yet) → show the
+ *                   pipeline timeline / current step.
+ *   'blog'        — blog-mode job → produces a ContentIdea (not a draft); show
+ *                   the rewrite preview + a Content Engine handoff link.
+ */
+export function rightPaneMode(job) {
+  if (job?.mode === 'blog') return 'blog'
+  if (job?.mode === 'carousel' && job?.linkedin_post_id) return 'generated'
+  return 'in_progress'
+}
+
 export function modeLabel(mode) {
   if (mode === 'blog') return '📝 Blog + Carousel'
   if (mode === 'carousel') return '🎠 Carousel'
