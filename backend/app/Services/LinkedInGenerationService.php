@@ -328,6 +328,12 @@ class LinkedInGenerationService
         if ($detectedFormat === 'carousel' || $isCarouselRoute) {
             $isRepurpose = $this->isRepurposeDraft($draft);
             $carouselStyle = (string) Setting::get('linkedin_carousel_style', 'sketchnote');
+            // Whitelist — the value is operator-set in settings, so clamp to a
+            // known preset before it becomes a shell flag (defense-in-depth +
+            // guarantees /carousel-gen receives a valid --style).
+            if (!in_array($carouselStyle, ['sketchnote', 'cinematic'], true)) {
+                $carouselStyle = 'sketchnote';
+            }
         }
         try {
             $parsed = $this->applyCarouselGenAdapter($parsed, $blog['url'], $draft->id, $blog['content'] ?? null, $isRepurpose, $carouselStyle);
@@ -940,6 +946,33 @@ class LinkedInGenerationService
     }
 
     /**
+     * Detect whether a draft originated from the IG-repurpose pipeline. Used by
+     * the carousel-gen router to drop the foreshadow beat (--narrative=free) for
+     * repurpose drafts while normal blog carousels keep --narrative=5act.
+     *
+     * Covers both repurpose modes:
+     *  - carousel: a RepurposeJob references this draft (linkedin_post_id) or its
+     *    anchor blog post (anchor_post_id);
+     *  - blog: the draft's post links a ContentIdea with source='instagram'.
+     */
+    public function isRepurposeDraft(LinkedInPost $draft): bool
+    {
+        $query = RepurposeJob::query()->where('linkedin_post_id', $draft->id);
+        if ($draft->post_id) {
+            $query->orWhere('anchor_post_id', $draft->post_id);
+        }
+        if ($query->exists()) {
+            return true;
+        }
+
+        return (bool) ($draft->post_id
+            && ContentIdea::query()
+                ->where('result_post_id', $draft->post_id)
+                ->where('source', 'instagram')
+                ->exists());
+    }
+
+    /**
      * Carousel router — STRICT /carousel-gen enforcement (no legacy fallback).
      *
      * Behavior matrix:
@@ -969,33 +1002,6 @@ class LinkedInGenerationService
      *                                      for carousel format. Caller
      *                                      catches and routes to FSM Failed.
      */
-    /**
-     * Detect whether a draft originated from the IG-repurpose pipeline. Used by
-     * the carousel-gen router to drop the foreshadow beat (--narrative=free) for
-     * repurpose drafts while normal blog carousels keep --narrative=5act.
-     *
-     * Covers both repurpose modes:
-     *  - carousel: a RepurposeJob references this draft (linkedin_post_id) or its
-     *    anchor blog post (anchor_post_id);
-     *  - blog: the draft's post links a ContentIdea with source='instagram'.
-     */
-    public function isRepurposeDraft(LinkedInPost $draft): bool
-    {
-        $query = RepurposeJob::query()->where('linkedin_post_id', $draft->id);
-        if ($draft->post_id) {
-            $query->orWhere('anchor_post_id', $draft->post_id);
-        }
-        if ($query->exists()) {
-            return true;
-        }
-
-        return (bool) ($draft->post_id
-            && ContentIdea::query()
-                ->where('result_post_id', $draft->post_id)
-                ->where('source', 'instagram')
-                ->exists());
-    }
-
     public function applyCarouselGenAdapter(array $parsed, string $blogUrl, int $draftId, ?string $blogContent = null, bool $isRepurpose = false, string $style = 'sketchnote'): array
     {
         $format = $parsed['format'] ?? null;

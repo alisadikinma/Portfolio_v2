@@ -57,6 +57,22 @@ class LinkedInIsRepurposeDraftTest extends TestCase
         $this->assertTrue($this->service()->isRepurposeDraft($draft));
     }
 
+    public function test_true_when_only_anchor_post_id_matches(): void
+    {
+        [$post, $draft] = $this->makeDraft();
+
+        // RepurposeJob NOT linked to this draft's id — only its anchor post.
+        // Pins the anchor_post_id OR-branch independently of linkedin_post_id.
+        RepurposeJob::factory()->create([
+            'mode' => 'carousel',
+            'status' => 'drafted',
+            'linkedin_post_id' => null,
+            'anchor_post_id' => $post->id,
+        ]);
+
+        $this->assertTrue($this->service()->isRepurposeDraft($draft));
+    }
+
     public function test_true_when_draft_post_links_instagram_content_idea(): void
     {
         [$post, $draft] = $this->makeDraft();
