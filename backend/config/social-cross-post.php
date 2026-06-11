@@ -93,6 +93,12 @@ return [
         // PublerClient applies these via Laravel HTTP retry().
         'max_retries' => (int) env('PUBLER_MAX_RETRIES', 3),
         'retry_backoff_ms' => (int) env('PUBLER_RETRY_BACKOFF_MS', 500),
+        // Media ingest (POST /media/from-url) is async on Publer's side: we poll
+        // /job_status until 'complete'. A multi-slide carousel can take >18s to
+        // ingest the tail slides, so the old hardcoded 12-poll (~18s) window
+        // failed IG on jobs that actually completed moments later. Tunable.
+        'media_poll_tries' => (int) env('PUBLER_MEDIA_POLL_TRIES', 40),
+        'media_poll_interval_ms' => (int) env('PUBLER_MEDIA_POLL_INTERVAL_MS', 1500),
         // Max time the synchronous PublerClient methods wait before bailing.
         // Most calls resolve in <2s; createPost can take longer (Publer
         // queues the job internally). Increase only after observing P99 latency.

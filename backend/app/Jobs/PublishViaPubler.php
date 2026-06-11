@@ -310,7 +310,15 @@ class PublishViaPubler implements ShouldQueue
         if (stripos($message, 'connection') !== false || stripos($message, 'timeout') !== false) {
             return true;
         }
-        // 401/403/429 and other 4xx are permanent failures
+        // Publer media-from-url concurrency throttle (403 "another download-media
+        // job is still running") + rate limit (429) — back off and retry, not a
+        // permanent content/plan failure.
+        if (stripos($message, 'media busy') !== false
+            || stripos($message, 'download media') !== false
+            || stripos($message, 'rate limit') !== false) {
+            return true;
+        }
+        // Other 401/403 and 4xx are permanent failures.
         return false;
     }
 }

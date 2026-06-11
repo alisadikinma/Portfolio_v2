@@ -328,8 +328,11 @@ class PublerClient
      * 'failed' job so the caller routes the sibling to a failed state with an
      * actionable error rather than publishing a post with a broken media ref.
      */
-    public function uploadAndAwaitMedia(string $url, string $name = 'media.png', int $maxTries = 12): string
+    public function uploadAndAwaitMedia(string $url, string $name = 'media.png', ?int $maxTries = null): string
     {
+        $maxTries = $maxTries ?? (int) config('social-cross-post.publer.media_poll_tries', 40);
+        $intervalUs = ((int) config('social-cross-post.publer.media_poll_interval_ms', 1500)) * 1000;
+
         $jobId = $this->uploadMediaFromUrl($url, $name);
 
         for ($i = 0; $i < $maxTries; $i++) {
@@ -350,7 +353,7 @@ class PublerClient
                 );
             }
 
-            usleep(1_500_000);
+            usleep($intervalUs);
         }
 
         throw new RuntimeException(
@@ -698,6 +701,29 @@ class PublerClient
      * Throws RuntimeException with context on auth/validation/server errors.
      * Logs failures (api_key redacted) before throwing.
      */
+    /**
+     * Flatten Publer's error payload to a single string. Publer is inconsistent:
+     * media endpoints return {errors: ["..."]} (plural array) while others use
+     * {error: "..."} (singular) — read both.
+     *
+     * @param  mixed  $body  decoded JSON body
+     */
+    private function errorsText($body): string
+    {
+        if (!is_array($body)) {
+            return '';
+        }
+        if (isset($body['errors']) && is_array($body['errors'])) {
+            return implode('; ', array_map('strval', $body['errors']));
+        }
+        if (isset($body['error'])) {
+            return is_array($body['error'])
+                ? (string) ($body['error']['message'] ?? json_encode($body['error']))
+                : (string) $body['error'];
+        }
+        return '';
+    }
+
     private function extractData(Response $response, string $methodName): array
     {
         $status = $response->status();
@@ -712,8 +738,19 @@ class PublerClient
 
         if ($status === 403) {
             $this->logFailure($methodName, $status, $body);
+            $detail = $this->errorsText($body);
+            // Publer serializes media-from-url ingest per account. A 403 saying
+            // another download-media job is still running is a TRANSIENT
+            // concurrency throttle (e.g. IG's batch still ingesting when TikTok
+            // fires), NOT a plan/scope denial — surface a message the caller's
+            // isTransientError() recognizes so the job retries with backoff.
+            if (stripos($detail, 'download media') !== false || stripos($detail, 'jobs have finished') !== false) {
+                throw new RuntimeException(
+                    "Publer media busy (403): another download-media job is still running — retry shortly." . ($detail !== '' ? " ({$detail})" : '')
+                );
+            }
             throw new RuntimeException(
-                'Publer access denied (403). Plan/scope may be insufficient — verify Publer subscription tier.'
+                'Publer access denied (403). Plan/scope may be insufficient — verify Publer subscription tier.' . ($detail !== '' ? " ({$detail})" : '')
             );
         }
 

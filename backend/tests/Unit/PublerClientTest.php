@@ -280,6 +280,24 @@ class PublerClientTest extends TestCase
         $client->createPost(['bulk' => ['state' => 'scheduled', 'posts' => []]]);
     }
 
+    public function test_403_concurrency_throttle_is_classified_transient(): void
+    {
+        // Publer serializes media-from-url ingest per account; this 403 body
+        // (errors[] plural) is a transient concurrency throttle, NOT plan/scope.
+        Http::fake([
+            'app.publer.com/api/v1/media/from-url' => Http::response(
+                ['errors' => ['Please wait until your other download media from URL jobs have finished']],
+                403
+            ),
+        ]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessageMatches('/media busy|retry shortly|download-media/i');
+
+        $client = new PublerClient(apiKey: 'TEST_KEY');
+        $client->uploadMediaFromUrl('https://alisadikinma.com/storage/linkedin-carousel/01.png');
+    }
+
     public function test_throws_on_429_with_rate_limit_hint(): void
     {
         Http::fake([

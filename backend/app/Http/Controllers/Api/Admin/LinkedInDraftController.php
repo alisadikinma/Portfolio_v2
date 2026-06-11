@@ -1579,6 +1579,66 @@ class LinkedInDraftController extends Controller
         ], 202);
     }
 
+    /**
+     * Manually (re)publish ONE cross-post platform sibling to Publer — the
+     * operator-triggered version of the auto fan-out. Unlike publishAll (which
+     * only re-fires siblings in awaiting_review/publishing), this RESETS a
+     * `failed`/stale sibling and re-dispatches, so an operator can recover a
+     * platform that failed without regenerating the caption. Publishing per
+     * platform also naturally serializes Publer's media-from-url jobs, avoiding
+     * the concurrency 403 a simultaneous all-platforms publish can hit.
+     */
+    public function publishCrossPost(int $id, string $platform): JsonResponse
+    {
+        $allowed = ['instagram', 'tiktok', 'threads', 'facebook'];
+        if (!in_array($platform, $allowed, true)) {
+            return response()->json([
+                'success' => false,
+                'error' => ['code' => 'bad_platform', 'message' => 'Unknown platform.'],
+            ], 422);
+        }
+
+        $draft = LinkedInPost::with($platform . 'Post')->find($id);
+        if (!$draft) {
+            return $this->notFound();
+        }
+
+        $sibling = $draft->{$platform . 'Post'};
+        if ($sibling === null) {
+            return response()->json([
+                'success' => false,
+                'error' => ['code' => 'no_sibling', 'message' => ucfirst($platform) . ' draft not found for this post.'],
+            ], 404);
+        }
+
+        if (!\App\Services\PublerPayloadBuilder::isPlatformEnabled($platform)) {
+            return response()->json([
+                'success' => false,
+                'error' => ['code' => 'platform_not_configured', 'message' => 'Select a ' . ucfirst($platform) . ' account in admin → Publer Integration before publishing.'],
+            ], 422);
+        }
+
+        if ($sibling->publer_post_id !== null && $sibling->status === 'published') {
+            return response()->json([
+                'success' => true,
+                'message' => ucfirst($platform) . ' is already published.',
+            ], 200);
+        }
+
+        // Reset a failed/stale sibling so PublishViaPubler's idempotency guard
+        // (skip when publer_post_id set) doesn't short-circuit the re-publish.
+        \Illuminate\Support\Facades\DB::table($sibling->getTable())
+            ->where('id', $sibling->id)
+            ->update(['status' => 'publishing', 'publer_post_id' => null, 'last_error' => null, 'updated_at' => now()]);
+
+        \App\Jobs\PublishViaPubler::dispatch($platform, $sibling->id);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Publishing ' . ucfirst($platform) . ' to Publer…',
+        ], 202);
+    }
+
     private function notFound(): JsonResponse
     {
         return response()->json([

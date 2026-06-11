@@ -257,6 +257,23 @@ export function useRegenerateCaption() {
   })
 }
 
+/**
+ * POST /admin/linkedin-drafts/{id}/publish-crosspost/{platform} — manually
+ * (re)publish ONE cross-post platform sibling to Publer. Recovers a failed
+ * sibling without regenerating its caption.
+ */
+export function usePublishCrossPost() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, platform }) =>
+      api.post(`/admin/linkedin-drafts/${id}/publish-crosspost/${platform}`).then(r => r.data),
+    onSuccess: (_, { id }) => {
+      qc.invalidateQueries({ queryKey: [LIST_KEY] })
+      qc.invalidateQueries({ queryKey: [LIST_KEY, id] })
+    },
+  })
+}
+
 /** POST /admin/linkedin-drafts/{id}/slides/{slideIndex}/regenerate-image — single slide retry */
 export function useRegenerateSlideImage() {
   const qc = useQueryClient()
