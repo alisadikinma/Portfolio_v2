@@ -19,6 +19,7 @@ function listDrafts(filters = {}) {
   if (filters.status) params.status = filters.status
   if (filters.format) params.format = filters.format
   if (filters.scope) params.scope = filters.scope
+  if (filters.exclude_repurpose) params.exclude_repurpose = 1
   if (filters.per_page) params.per_page = filters.per_page
   if (filters.page) params.page = filters.page
   return api.get('/admin/linkedin-drafts', { params }).then(r => r.data)
