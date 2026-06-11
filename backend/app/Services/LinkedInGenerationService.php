@@ -4,8 +4,10 @@ namespace App\Services;
 
 use App\Enums\LinkedInPostStatus;
 use App\Exceptions\CarouselGenAdapterException;
+use App\Models\ContentIdea;
 use App\Models\LinkedInPost;
 use App\Models\PostTranslation;
+use App\Models\RepurposeJob;
 use App\Models\Setting;
 use App\Support\LinkedInProgressEmitter;
 use Illuminate\Support\Facades\Log;
@@ -318,8 +320,10 @@ class LinkedInGenerationService
         if ($detectedFormat === 'carousel' || $isCarouselRoute) {
             LinkedInProgressEmitter::emit($draft, 'carousel_gen_dispatch', 30, 'Dispatching /carousel-gen engine');
         }
+        $isRepurpose = $this->isRepurposeDraft($draft);
+        $carouselStyle = (string) Setting::get('linkedin_carousel_style', 'sketchnote');
         try {
-            $parsed = $this->applyCarouselGenAdapter($parsed, $blog['url'], $draft->id, $blog['content'] ?? null);
+            $parsed = $this->applyCarouselGenAdapter($parsed, $blog['url'], $draft->id, $blog['content'] ?? null, $isRepurpose, $carouselStyle);
         } catch (CarouselGenAdapterException $e) {
             $this->markFailed($draft, "carousel-gen adapter failed: {$e->getMessage()}");
             return [
@@ -958,7 +962,34 @@ class LinkedInGenerationService
      *                                      for carousel format. Caller
      *                                      catches and routes to FSM Failed.
      */
-    public function applyCarouselGenAdapter(array $parsed, string $blogUrl, int $draftId, ?string $blogContent = null): array
+    /**
+     * Detect whether a draft originated from the IG-repurpose pipeline. Used by
+     * the carousel-gen router to drop the foreshadow beat (--narrative=free) for
+     * repurpose drafts while normal blog carousels keep --narrative=5act.
+     *
+     * Covers both repurpose modes:
+     *  - carousel: a RepurposeJob references this draft (linkedin_post_id) or its
+     *    anchor blog post (anchor_post_id);
+     *  - blog: the draft's post links a ContentIdea with source='instagram'.
+     */
+    public function isRepurposeDraft(LinkedInPost $draft): bool
+    {
+        $query = RepurposeJob::query()->where('linkedin_post_id', $draft->id);
+        if ($draft->post_id) {
+            $query->orWhere('anchor_post_id', $draft->post_id);
+        }
+        if ($query->exists()) {
+            return true;
+        }
+
+        return (bool) ($draft->post_id
+            && ContentIdea::query()
+                ->where('result_post_id', $draft->post_id)
+                ->where('source', 'instagram')
+                ->exists());
+    }
+
+    public function applyCarouselGenAdapter(array $parsed, string $blogUrl, int $draftId, ?string $blogContent = null, bool $isRepurpose = false, string $style = 'sketchnote'): array
     {
         $format = $parsed['format'] ?? null;
         if ($format !== 'carousel') {
@@ -988,7 +1019,7 @@ class LinkedInGenerationService
             'brief_pillar' => $brief['pillar'] ?? null,
         ]);
 
-        $carouselGenJson = $this->dispatchCarouselGenEngine($brief, $blogUrl, $draftId, $blogContent);
+        $carouselGenJson = $this->dispatchCarouselGenEngine($brief, $blogUrl, $draftId, $blogContent, $isRepurpose, $style);
 
         if ($carouselGenJson === null) {
             throw new CarouselGenAdapterException(
@@ -1038,14 +1069,14 @@ class LinkedInGenerationService
      * Public so it can be Mockery-mocked in unit tests without booting the
      * full SSH stack.
      */
-    public function dispatchCarouselGenEngine(array $brief, string $blogUrl, int $draftId, ?string $blogContent = null): ?array
+    public function dispatchCarouselGenEngine(array $brief, string $blogUrl, int $draftId, ?string $blogContent = null, bool $isRepurpose = false, string $style = 'sketchnote'): ?array
     {
         $driver = (string) config('carousel-gen.driver', 'ssh');
         $model = (string) config('carousel-gen.model', 'sonnet');
         $timeout = (int) config('carousel-gen.timeout_seconds', 600);
         $refsPath = (string) config('carousel-gen.refs_pipeline', '');
 
-        $prompt = $this->buildCarouselGenPrompt($brief, $blogUrl, $blogContent);
+        $prompt = $this->buildCarouselGenPrompt($brief, $blogUrl, $blogContent, $isRepurpose, $style);
 
         $refsFlag = $refsPath !== ''
             ? '--append-system-prompt-file ' . escapeshellarg($refsPath)
@@ -1101,7 +1132,7 @@ class LinkedInGenerationService
      * as the labeled PRIMARY source so the engine builds the 5-act storyline
      * from the real article instead of a thin OG blurb (June 9, 2026).
      */
-    public function buildCarouselGenPrompt(array $brief, string $blogUrl, ?string $blogContent = null): string
+    public function buildCarouselGenPrompt(array $brief, string $blogUrl, ?string $blogContent = null, bool $isRepurpose = false, string $style = 'sketchnote'): string
     {
         // /linkedin-gen carousel briefs default to bilingual ID/EN (LinkedIn
         // pillar) so we mirror that.
