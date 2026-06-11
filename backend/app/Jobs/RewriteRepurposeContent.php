@@ -11,6 +11,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 
 /**
  * IG repurpose Phase E — rewrite step. Dispatched by ResearchRepurposeClaims
@@ -53,6 +54,13 @@ class RewriteRepurposeContent implements ShouldQueue
         if (!($result['success'] ?? false) || empty($result['rewritten'])) {
             $this->failJob($job, 'rewrite_failed: ' . ($result['error'] ?? 'no rewrite'));
             return;
+        }
+
+        try {
+            app(TelegramNotificationService::class)
+                ->sendRepurposeProgress($job, '✍️ Artikel ditulis ulang — finalisasi…');
+        } catch (\Throwable $e) {
+            Log::warning('[RewriteRepurposeContent] progress notify failed', ['job' => $job->id, 'error' => $e->getMessage()]);
         }
 
         $job->transitionTo(

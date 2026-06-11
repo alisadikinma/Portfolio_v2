@@ -28,6 +28,7 @@ use App\Http\Controllers\Api\BlogPromoSlotController;
 use App\Http\Controllers\Api\CarouselDraftController;
 use App\Http\Controllers\Api\Admin\ContentIdeaController;
 use App\Http\Controllers\Api\Admin\LinkedInDraftController;
+use App\Http\Controllers\Api\Admin\RepurposeJobController;
 use App\Http\Controllers\Api\Admin\NewsletterAdminController;
 use App\Http\Controllers\Api\Admin\PostingRuleController;
 use App\Http\Controllers\Api\LinkedInOAuthController;
@@ -1321,6 +1322,15 @@ Route::middleware(['auth:sanctum'])->prefix('admin/linkedin-drafts')->group(func
     // (300ms) on every datetime input change. Operator can still proceed.
     Route::post('/{id}/check-conflict', [LinkedInDraftController::class, 'checkConflict'])
         ->name('admin.linkedin-drafts.check-conflict');
+});
+
+// IG repurpose monitoring panel — list/detail/retry + private slide thumbnails.
+Route::middleware(['auth:sanctum'])->prefix('admin/repurpose')->group(function () {
+    Route::get('/', [RepurposeJobController::class, 'index']);
+    Route::get('/{id}', [RepurposeJobController::class, 'show'])->whereNumber('id');
+    Route::post('/{id}/retry', [RepurposeJobController::class, 'retry'])->whereNumber('id');
+    Route::get('/{id}/slide/{n}', [RepurposeJobController::class, 'slide'])
+        ->whereNumber('id')->whereNumber('n');
 });
 
 // ============================================================================

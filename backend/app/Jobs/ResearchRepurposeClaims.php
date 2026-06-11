@@ -11,6 +11,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 
 /**
  * IG repurpose Phase D — fact-check step. Dispatched by ExtractSlideContent
@@ -54,6 +55,14 @@ class ResearchRepurposeClaims implements ShouldQueue
         if (!($result['success'] ?? false) || empty($result['research'])) {
             $this->failJob($job, 'research_failed: ' . ($result['error'] ?? 'no research'));
             return;
+        }
+
+        $corrected = (int) ($result['research']['corrected_count'] ?? 0);
+        try {
+            app(TelegramNotificationService::class)
+                ->sendRepurposeProgress($job, "✅ Fact-check: {$corrected} klaim dikoreksi");
+        } catch (\Throwable $e) {
+            Log::warning('[ResearchRepurposeClaims] progress notify failed', ['job' => $job->id, 'error' => $e->getMessage()]);
         }
 
         $job->transitionTo(

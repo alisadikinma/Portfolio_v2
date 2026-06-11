@@ -37,8 +37,12 @@ enum RepurposeJobStatus: string
         'rewritten'   => ['finalizing', 'failed'],
         'finalizing'  => ['drafted', 'failed'],
         'drafted'     => [],
-        // Per-step retry entrypoints after a failure.
-        'failed'      => ['capturing', 'extracting', 'researching', 'rewriting', 'finalizing'],
+        // Per-step retry entrypoints after a failure. These are the guard states
+        // each step job accepts (CaptureInstagramPost@capturing,
+        // ExtractSlideContent@captured, ResearchRepurposeClaims@extracted,
+        // RewriteRepurposeContent@researched, FinalizeRepurpose@rewritten) so the
+        // admin retry can resume the exact failed step rather than restart.
+        'failed'      => ['capturing', 'captured', 'extracted', 'researched', 'rewritten'],
     ];
 
     public function canTransitionTo(self $next): bool

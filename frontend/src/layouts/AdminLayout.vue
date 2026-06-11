@@ -132,6 +132,17 @@
                 SOSMED Posts
               </router-link>
 
+              <router-link
+                to="/admin/repurpose"
+                class="flex items-center px-4 py-3 rounded-lg text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
+                active-class="bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 font-semibold"
+              >
+                <svg class="h-5 w-5 mr-3" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12a4.5 4.5 0 0 1-9 0m9 0a4.5 4.5 0 0 0-9 0m9 0H21m-13.5 0H3m9-9v3m0 12v3m6.364-15.364-2.121 2.121M7.757 16.243l-2.121 2.121m12.728 0-2.121-2.121M7.757 7.757 5.636 5.636" />
+                </svg>
+                IG Repurpose
+              </router-link>
+
               <!-- End Social Media section -->
               <div class="my-4 border-t border-neutral-200 dark:border-neutral-700"></div>
 

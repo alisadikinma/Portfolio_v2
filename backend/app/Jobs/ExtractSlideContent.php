@@ -11,6 +11,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 
 /**
  * IG repurpose Phase C — vision-extract step. Dispatched by CaptureInstagramPost
@@ -54,6 +55,14 @@ class ExtractSlideContent implements ShouldQueue
         if (!($result['success'] ?? false) || empty($result['extracted'])) {
             $this->failJob($job, 'extract_failed: ' . ($result['error'] ?? 'no extraction'));
             return;
+        }
+
+        $claimCount = count((array) ($result['extracted']['claims'] ?? []));
+        try {
+            app(TelegramNotificationService::class)
+                ->sendRepurposeProgress($job, "🔎 Ekstrak: {$claimCount} klaim ditemukan");
+        } catch (\Throwable $e) {
+            Log::warning('[ExtractSlideContent] progress notify failed', ['job' => $job->id, 'error' => $e->getMessage()]);
         }
 
         $job->transitionTo(
