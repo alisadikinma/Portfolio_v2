@@ -5,7 +5,13 @@
 // Scope: generatingProgress(draft) — synthetic % indicator derived from
 // pipeline_state_log[] timestamps + format-aware baselines.
 
-import { generatingProgress, generatingProgressMeta } from './linkedinHelpers.js'
+import {
+  generatingProgress,
+  generatingProgressMeta,
+  shouldShowLastError,
+  resolveCarouselActivity,
+  formatElapsed,
+} from './linkedinHelpers.js'
 
 let failed = 0
 let passed = 0
@@ -163,6 +169,76 @@ assertEqual(
   generatingProgressMeta({ status: 'published', format: 'text' }),
   null,
 )
+
+// ---------------------------------------------------------------------------
+// formatElapsed(ms) — "Nm SSs" or '' for null/invalid/negative.
+// ---------------------------------------------------------------------------
+assertEqual('formatElapsed 192000ms', formatElapsed(192_000), '3m12s')
+assertEqual('formatElapsed 5000ms zero-pads seconds', formatElapsed(5_000), '0m05s')
+assertEqual('formatElapsed null', formatElapsed(null), '')
+assertEqual('formatElapsed negative guard', formatElapsed(-100), '')
+
+// ---------------------------------------------------------------------------
+// shouldShowLastError({ lastError, status, pipelineLog, slides,
+//   regenerateActive, nowMs, staleHours }) — suppress while in flight,
+//   else existing status + staleness gates.
+// ---------------------------------------------------------------------------
+const NOW = Date.now()
+const recentLog = [{ to: 'manual_review', timestamp: new Date(NOW - 60_000).toISOString() }]
+const staleLog = [{ to: 'manual_review', timestamp: new Date(NOW - 48 * 36e5).toISOString() }]
+
+assertEqual('error suppressed when regenerateActive',
+  shouldShowLastError({ lastError: 'boom', status: 'manual_review', pipelineLog: recentLog, slides: [], regenerateActive: true, nowMs: NOW }), false)
+assertEqual('error suppressed when a slide is generating',
+  shouldShowLastError({ lastError: 'boom', status: 'manual_review', pipelineLog: recentLog, slides: [{ image_status: 'generating' }], nowMs: NOW }), false)
+assertEqual('error suppressed when a slide is reauthoring',
+  shouldShowLastError({ lastError: 'boom', status: 'manual_review', pipelineLog: recentLog, slides: [{ image_status: 'reauthoring' }], nowMs: NOW }), false)
+assertEqual('no error → false',
+  shouldShowLastError({ lastError: null, status: 'failed', pipelineLog: recentLog, slides: [], nowMs: NOW }), false)
+assertEqual('status not failed/manual_review → false',
+  shouldShowLastError({ lastError: 'boom', status: 'awaiting_publish', pipelineLog: recentLog, slides: [], nowMs: NOW }), false)
+assertEqual('failed + no log → true',
+  shouldShowLastError({ lastError: 'boom', status: 'failed', pipelineLog: [], slides: [], nowMs: NOW }), true)
+assertEqual('manual_review + recent log → true (regression)',
+  shouldShowLastError({ lastError: 'boom', status: 'manual_review', pipelineLog: recentLog, slides: [{ image_status: 'done', image_url: 'x' }], nowMs: NOW, staleHours: 24 }), true)
+assertEqual('stale error (>staleHours) → false',
+  shouldShowLastError({ lastError: 'boom', status: 'failed', pipelineLog: staleLog, slides: [], nowMs: NOW, staleHours: 24 }), false)
+
+// ---------------------------------------------------------------------------
+// resolveCarouselActivity({ slides, regenerateActive, regenerateStartedAt, nowMs })
+//   → { phase, renderDone, renderTotal, elapsedMs }
+// ---------------------------------------------------------------------------
+{
+  const a = resolveCarouselActivity({ slides: [{ image_status: 'done', image_url: 'x' }, { image_status: 'done', image_url: 'y' }], regenerateActive: true, nowMs: NOW })
+  assertEqual('regenerateActive → re_authoring phase', a.phase, 're_authoring')
+}
+{
+  const a = resolveCarouselActivity({ slides: [{ image_status: 'reauthoring' }, { image_status: 'reauthoring' }], nowMs: NOW })
+  assertEqual('reauthoring slide → re_authoring phase', a.phase, 're_authoring')
+}
+{
+  const a = resolveCarouselActivity({ slides: [{ image_status: 'done', image_url: 'x' }, { image_status: 'generating' }, { image_status: 'pending' }], nowMs: NOW })
+  assertEqual('in-flight slide → rendering phase', a.phase, 'rendering')
+  assertEqual('renderDone counts done-with-url', a.renderDone, 1)
+  assertEqual('renderTotal counts all slides', a.renderTotal, 3)
+}
+{
+  const a = resolveCarouselActivity({ slides: [{ image_status: 'done', image_url: 'x' }, { image_status: 'done', image_url: 'y' }], nowMs: NOW })
+  assertEqual('all done → ready phase', a.phase, 'ready')
+  assertEqual('ready renderDone === renderTotal', a.renderDone, a.renderTotal)
+}
+{
+  const a = resolveCarouselActivity({ slides: [{ image_status: 'reauthoring' }], regenerateActive: true, regenerateStartedAt: new Date(NOW - 120_000).toISOString(), nowMs: NOW })
+  assertEqual('elapsedMs computed from started_at', a.elapsedMs, 120_000)
+}
+{
+  const a = resolveCarouselActivity({ slides: [{ image_status: 'reauthoring' }], regenerateActive: true, regenerateStartedAt: null, nowMs: NOW })
+  assertEqual('elapsedMs null when no started_at', a.elapsedMs, null)
+}
+{
+  const a = resolveCarouselActivity({ slides: [], regenerateActive: false, nowMs: NOW })
+  assertEqual('empty + inactive → idle phase', a.phase, 'idle')
+}
 
 console.log(`---\nTotal: ${passed} passed, ${failed} failed`)
 process.exit(failed > 0 ? 1 : 0)
