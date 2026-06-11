@@ -521,6 +521,20 @@ const routes = [
     redirect: (to) => ({ name: 'admin-sosmed-draft-detail', params: { id: to.params.id } }),
   },
 
+  // IG repurpose monitoring panel (Telegram → IG repurpose pipeline).
+  {
+    path: '/admin/repurpose',
+    name: 'admin-repurpose',
+    component: () => import('@/views/admin/RepurposeJobsList.vue'),
+    meta: { title: 'IG Repurpose - Admin', requiresAuth: true, layout: 'admin' }
+  },
+  {
+    path: '/admin/repurpose/:id',
+    name: 'admin-repurpose-detail',
+    component: () => import('@/views/admin/RepurposeJobDetail.vue'),
+    meta: { title: 'Repurpose Job - Admin', requiresAuth: true, layout: 'admin' }
+  },
+
   // Cross-post admin (Facebook + Instagram + TikTok).
   //
   // Phase 3+4 unification: /admin/{platform}-posts → calendar (same
