@@ -142,10 +142,47 @@ class LinkedInDraftController extends Controller
             return $this->notFound();
         }
 
+        $data = $draft->toArray();
+        $data['regenerate_activity'] = $this->resolveRegenerateActivity($draft);
+
         return response()->json([
             'success' => true,
-            'data' => $draft,
+            'data' => $data,
         ]);
+    }
+
+    /**
+     * Derive the carousel re-author activity signal for the detail page
+     * (2026-06-11 live backend-activity pass). Cheap, no-migration:
+     *   - started_at = value of the dispatch lock `linkedin_regenerate_lock:{id}`
+     *     (regenerateAllImages stores now()->toIso8601String() there, held for
+     *     the ~3-7 min /carousel-gen SSH call).
+     *   - active = lock present OR any slide image_status === 'reauthoring'
+     *     (the latter covers tinker/auto dispatch where no lock was acquired).
+     * The frontend renders a live "Re-authoring slides" phase + elapsed timer
+     * from this and suppresses the stale last_error while work is in flight.
+     */
+    private function resolveRegenerateActivity(LinkedInPost $draft): array
+    {
+        $startedAt = Cache::get("linkedin_regenerate_lock:{$draft->id}");
+
+        $reauthoring = false;
+        if (is_array($draft->carousel_slides)) {
+            foreach ($draft->carousel_slides as $slide) {
+                if (($slide['image_status'] ?? null) === 'reauthoring') {
+                    $reauthoring = true;
+                    break;
+                }
+            }
+        }
+
+        $active = ! empty($startedAt) || $reauthoring;
+
+        return [
+            'active' => $active,
+            'phase' => $active ? 're_authoring' : null,
+            'started_at' => $startedAt ?: null,
+        ];
     }
 
     /**
