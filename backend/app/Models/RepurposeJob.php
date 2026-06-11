@@ -65,4 +65,41 @@ class RepurposeJob extends Model
     {
         return $this->belongsTo(Post::class, 'anchor_post_id');
     }
+
+    /**
+     * Single source of truth: does this Post / LinkedIn draft originate from an
+     * IG-repurpose job? Repurpose carousels anchor an UNPUBLISHED Post purely to
+     * generate slides — that post's /blog/{slug} URL 404s, so NO platform should
+     * emit a "Full article" first-comment for it (LinkedInPost::isRepurpose,
+     * blogUrl(), and the IG/TikTok/Threads link_comment builders all gate on this).
+     *
+     * Matches the repurpose by either FK linkage (RepurposeJob.linkedin_post_id /
+     * anchor_post_id) or a ContentIdea(source='instagram') anchoring the post.
+     */
+    public static function isRepurposePost(?int $postId, ?int $linkedinPostId = null): bool
+    {
+        if (!$postId && !$linkedinPostId) {
+            return false;
+        }
+
+        $linked = static::query()
+            ->where(function ($q) use ($postId, $linkedinPostId) {
+                if ($linkedinPostId) {
+                    $q->orWhere('linkedin_post_id', $linkedinPostId);
+                }
+                if ($postId) {
+                    $q->orWhere('anchor_post_id', $postId);
+                }
+            })
+            ->exists();
+
+        if ($linked) {
+            return true;
+        }
+
+        return (bool) ($postId && ContentIdea::query()
+            ->where('result_post_id', $postId)
+            ->where('source', 'instagram')
+            ->exists());
+    }
 }

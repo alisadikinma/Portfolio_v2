@@ -4,10 +4,8 @@ namespace App\Services;
 
 use App\Enums\LinkedInPostStatus;
 use App\Exceptions\CarouselGenAdapterException;
-use App\Models\ContentIdea;
 use App\Models\LinkedInPost;
 use App\Models\PostTranslation;
-use App\Models\RepurposeJob;
 use App\Models\Setting;
 use App\Support\LinkedInProgressEmitter;
 use Illuminate\Support\Facades\Log;
@@ -957,19 +955,8 @@ class LinkedInGenerationService
      */
     public function isRepurposeDraft(LinkedInPost $draft): bool
     {
-        $query = RepurposeJob::query()->where('linkedin_post_id', $draft->id);
-        if ($draft->post_id) {
-            $query->orWhere('anchor_post_id', $draft->post_id);
-        }
-        if ($query->exists()) {
-            return true;
-        }
-
-        return (bool) ($draft->post_id
-            && ContentIdea::query()
-                ->where('result_post_id', $draft->post_id)
-                ->where('source', 'instagram')
-                ->exists());
+        // Single source of truth lives on the model (RepurposeJob::isRepurposePost).
+        return $draft->isRepurpose();
     }
 
     /**
@@ -1312,6 +1299,12 @@ class LinkedInGenerationService
      */
     private function blogUrl(LinkedInPost $draft): string
     {
+        // IG-repurpose carousels anchor an UNPUBLISHED Post — its /blog/{slug}
+        // 404s, so there is no article to link. Empty URL → resolveLinkComment
+        // yields an empty link_comment → no first comment.
+        if ($draft->isRepurpose()) {
+            return '';
+        }
         $post = $draft->post;
         if ($post === null || empty($post->slug)) {
             return '';
@@ -1469,7 +1462,12 @@ class LinkedInGenerationService
             $parts[] = "What you can't see from the surface:\n{$bullets}";
         }
         $parts[] = "{$question}\n\nSwipe → for the full breakdown.";
-        $parts[] = 'Full article: link in comments ↓';
+        // Only promise a "link in comments" when there's a real published article.
+        // IG-repurpose carousels have no blog post — the first comment is empty,
+        // so the CTA would point at nothing.
+        if (!$draft->isRepurpose()) {
+            $parts[] = 'Full article: link in comments ↓';
+        }
 
         $caption = implode("\n\n", $parts);
 

@@ -148,8 +148,29 @@ class LinkedInPost extends Model
      * Idempotent. No-op when link_comment already contains http(s)://.
      * Returns true when the field was rewritten.
      */
+    /**
+     * Is this draft an IG-repurpose carousel (no public blog article)?
+     * Delegates to the single source of truth on RepurposeJob.
+     */
+    public function isRepurpose(): bool
+    {
+        return RepurposeJob::isRepurposePost($this->post_id, $this->id);
+    }
+
     public function ensureLinkCommentHasUrl(): bool
     {
+        // IG-repurpose carousels anchor an UNPUBLISHED Post (slide-gen only) —
+        // its /blog/{slug} URL 404s, so there is no article to link. Suppress
+        // the first-comment link entirely; clear any stale dead URL so a legacy
+        // repurpose draft doesn't post a 404 link on (re)publish.
+        if ($this->isRepurpose()) {
+            if (trim((string) $this->link_comment) !== '') {
+                $this->update(['link_comment' => '']);
+                return true;
+            }
+            return false;
+        }
+
         $current = trim((string) $this->link_comment);
         if ($current !== '' && preg_match('#https?://#i', $current) === 1) {
             return false;

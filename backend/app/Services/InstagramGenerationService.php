@@ -324,8 +324,12 @@ class InstagramGenerationService extends BaseSocialGenerationService
 
         // Persist branded short URL for first-comment publishing (Publer comments[]
         // field, Phase H+ real impl). Format mirrors LinkedInPost.link_comment.
+        // Skip the blog first-comment link for IG-repurpose drafts: their anchor
+        // Post is unpublished (slide-gen only), so /blog/{slug} 404s. Empty
+        // link_comment → Publer comments[] is empty → no dead-link first comment.
         $linkComment = null;
-        if ($draft->post && !empty($draft->post->slug)) {
+        if ($draft->post && !empty($draft->post->slug)
+            && !\App\Models\RepurposeJob::isRepurposePost($draft->post_id, $draft->linkedin_post_id)) {
             try {
                 $shortUrl = app(\App\Services\ShortLinkService::class)
                     ->forBlogPost($draft->post, 'instagram');

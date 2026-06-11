@@ -263,8 +263,10 @@ class TiktokGenerationService extends BaseSocialGenerationService
         // Persist branded short URL for parity with other platforms (TikTok
         // doesn't support Publer first-comment; URL lives in caption body via
         // plugin input. Column populated for visibility / admin UI parity).
+        // No blog link for IG-repurpose drafts (unpublished anchor → /blog 404s).
         $linkComment = null;
-        if ($draft->post && !empty($draft->post->slug)) {
+        if ($draft->post && !empty($draft->post->slug)
+            && !\App\Models\RepurposeJob::isRepurposePost($draft->post_id, $draft->linkedin_post_id)) {
             try {
                 $shortUrl = app(\App\Services\ShortLinkService::class)
                     ->forBlogPost($draft->post, 'tiktok');
