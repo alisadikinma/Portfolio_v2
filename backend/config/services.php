@@ -105,7 +105,11 @@ return [
         'model_rewrite' => env('REPURPOSE_MODEL_REWRITE', 'sonnet'),
         // Style guide refs appended to the rewrite prompt (reuse article refs).
         'refs_rewrite' => env('REPURPOSE_REFS_REWRITE', env('ARTICLE_GEN_REFS_WRITE', '')),
-        'timeout' => (int) env('REPURPOSE_TIMEOUT', 300),
+        // CLI budget per attempt — matches carousel-gen (900s). Big IG carousels
+        // (16-slide vision / full-article rewrite) overran the old 300s budget.
+        // The repair-retry (RunsRepurposeClaudeCli::runRepurposeParsed) can fire a
+        // 2nd attempt, so step-job $timeouts are sized at 1920s to cover both.
+        'timeout' => (int) env('REPURPOSE_TIMEOUT', 900),
     ],
 
     'article_generation' => [

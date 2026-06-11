@@ -29,7 +29,8 @@ class RewriteRepurposeContent implements ShouldQueue
     use Queueable;
     use SerializesModels;
 
-    public int $timeout = 600;
+    // Covers one CLI attempt + one repair retry (2x services.repurpose.timeout).
+    public int $timeout = 1920;
 
     public function __construct(public readonly int $repurposeJobId)
     {

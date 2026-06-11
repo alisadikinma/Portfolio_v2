@@ -30,7 +30,8 @@ class ExtractSlideContent implements ShouldQueue
     use Queueable;
     use SerializesModels;
 
-    public int $timeout = 360;
+    // Covers one CLI attempt + one repair retry (2x services.repurpose.timeout).
+    public int $timeout = 1920;
 
     public function __construct(public readonly int $repurposeJobId)
     {
