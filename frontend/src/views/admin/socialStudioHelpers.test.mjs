@@ -69,6 +69,13 @@ test('toCard(igJob) → ig card with backend title + repurpose-detail route', ()
   assert.deepEqual(c.platforms, ['li', 'ig', 'tt', 'th'])
 })
 
+test('toCard(igJob) maps backend cover_url → coverUrl (generated-carousel thumbnail fallback)', () => {
+  const url = 'https://alisadikinma.com/storage/linkedin-carousel/creator-brand-li-149-slide-01-cover.png'
+  const c = toCard({ ...igCarouselJob, has_cover: false, slide_count: 0, cover_url: url })
+  assert.equal(c.coverUrl, url)
+  assert.equal(c.hasCover, false) // source purged → no private blob fetch, public fallback used
+})
+
 test('toCard(igJob) title falls back to first caption line when backend title null', () => {
   const c = toCard(igBlogJob)
   assert.equal(c.title, 'Topik dari caption asli')

@@ -76,7 +76,10 @@ function igCard(job) {
     updatedAt: job.updated_at ?? null,
     route: { name: 'admin-repurpose-detail', params: { id: job.id } },
     platforms,
-    coverUrl: null, // IG covers are private → lazy blob-fetched in the view
+    // Source slide-0 is private → lazy blob-fetched in the view when has_cover.
+    // `cover_url` is the public generated-carousel 1st slide, the thumbnail
+    // fallback once the private source slides have been purged.
+    coverUrl: job.cover_url || null,
     coverJobId: job.id,
     hasCover: !!job.has_cover,
   }

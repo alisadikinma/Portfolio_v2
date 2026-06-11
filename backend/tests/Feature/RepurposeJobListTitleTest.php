@@ -95,6 +95,41 @@ class RepurposeJobListTitleTest extends TestCase
         $this->assertFalse($row['has_cover']);
     }
 
+    public function test_compact_cover_url_falls_back_to_generated_carousel_when_source_purged(): void
+    {
+        Storage::fake('local');
+        // Post requires category_id (NOT NULL on sqlite) → make one + a carousel draft.
+        $cat = \App\Models\Category::create(['name' => 'AI & Tech']);
+        $post = \App\Models\Post::factory()->create(['category_id' => $cat->id, 'title' => 'Anchor', 'content' => '<p>b</p>']);
+        $li = \App\Models\LinkedInPost::factory()->create([
+            'post_id' => $post->id,
+            'format' => 'carousel',
+            'carousel_slides' => [
+                ['slide_number' => 1, 'image_url' => 'https://alisadikinma.com/storage/linkedin-carousel/x-slide-01.png', 'image_status' => 'done'],
+                ['slide_number' => 2, 'image_url' => 'https://alisadikinma.com/storage/linkedin-carousel/x-slide-02.png', 'image_status' => 'done'],
+            ],
+        ]);
+        // Drafted carousel job whose private source slides have been purged.
+        $job = RepurposeJob::factory()->create([
+            'status' => 'drafted',
+            'mode' => 'carousel',
+            'slides_path' => 'repurpose/99',
+            'linkedin_post_id' => $li->id,
+        ]);
+
+        $row = $this->listRow($job->id);
+        $this->assertFalse($row['has_cover']);
+        $this->assertSame('https://alisadikinma.com/storage/linkedin-carousel/x-slide-01.png', $row['cover_url']);
+    }
+
+    public function test_compact_cover_url_null_when_no_linked_carousel(): void
+    {
+        Storage::fake('local');
+        $job = RepurposeJob::factory()->create(['status' => 'received', 'linkedin_post_id' => null]);
+
+        $this->assertNull($this->listRow($job->id)['cover_url']);
+    }
+
     public function test_show_includes_title(): void
     {
         $job = RepurposeJob::factory()->create([

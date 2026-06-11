@@ -39,7 +39,7 @@ class RepurposeJobController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $query = RepurposeJob::query()->orderByDesc('id');
+        $query = RepurposeJob::query()->with('linkedinPost')->orderByDesc('id');
 
         $status = (string) $request->query('status', '');
         if ($status !== '') {
@@ -218,6 +218,7 @@ class RepurposeJobController extends Controller
             'angle' => $job->angle,
             'slide_count' => $slideCount,
             'has_cover' => $slideCount > 0,
+            'cover_url' => $this->generatedCoverUrl($job),
             'content_idea_id' => $job->content_idea_id,
             'linkedin_post_id' => $job->linkedin_post_id,
             'anchor_post_id' => $job->anchor_post_id,
@@ -225,6 +226,29 @@ class RepurposeJobController extends Controller
             'created_at' => $job->created_at,
             'updated_at' => $job->updated_at,
         ];
+    }
+
+    /**
+     * Public thumbnail fallback for a Social Studio IG card: the first generated
+     * carousel slide image (a `done` public URL). Used when the PRIVATE source
+     * slides have been purged (the reaper clears them a week after publish), so
+     * the operator still sees a "1st image" on the list. Null when the job has
+     * no linked carousel draft yet. Reads the eager-loaded `linkedinPost`.
+     */
+    private function generatedCoverUrl(RepurposeJob $job): ?string
+    {
+        $li = $job->relationLoaded('linkedinPost')
+            ? $job->getRelation('linkedinPost')
+            : ($job->linkedin_post_id ? $job->linkedinPost()->first() : null);
+
+        foreach ((array) ($li->carousel_slides ?? []) as $slide) {
+            $url = trim((string) ($slide['image_url'] ?? ''));
+            if ($url !== '') {
+                return $url;
+            }
+        }
+
+        return null;
     }
 
     /**

@@ -81,7 +81,9 @@ watch(
 
 function cardCover(card) {
   if (card.kind === 'blog') return card.coverUrl
-  return igCoverUrls.value[card.coverJobId] || null
+  // Private source slide-0 blob (if fetched) wins; else the public generated
+  // carousel cover (card.coverUrl) so a thumbnail still shows after purge.
+  return igCoverUrls.value[card.coverJobId] || card.coverUrl || null
 }
 
 onBeforeUnmount(() => {
