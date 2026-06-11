@@ -69,4 +69,42 @@ class CarouselGenInlineContentPromptTest extends TestCase
 
         $this->assertStringNotContainsString('SOURCE ARTICLE CONTENT', $prompt);
     }
+
+    public function test_prompt_always_emits_sketchnote_style(): void
+    {
+        $svc = $this->makeService();
+
+        $prompt = $svc->buildCarouselGenPrompt([], 'https://alisadikinma.com/blog/x', null);
+
+        $this->assertStringContainsString('--style=sketchnote', $prompt);
+    }
+
+    public function test_repurpose_draft_drops_foreshadow_with_free_narrative(): void
+    {
+        $svc = $this->makeService();
+
+        $prompt = $svc->buildCarouselGenPrompt([], 'https://alisadikinma.com/blog/x', null, true);
+
+        $this->assertStringContainsString('--narrative=free', $prompt);
+        $this->assertStringNotContainsString('--narrative=5act', $prompt);
+    }
+
+    public function test_non_repurpose_draft_keeps_5act_narrative(): void
+    {
+        $svc = $this->makeService();
+
+        $prompt = $svc->buildCarouselGenPrompt([], 'https://alisadikinma.com/blog/x', null, false);
+
+        $this->assertStringContainsString('--narrative=5act', $prompt);
+        $this->assertStringNotContainsString('--narrative=free', $prompt);
+    }
+
+    public function test_sketchnote_appends_knowledge_first_infographic_directive(): void
+    {
+        $svc = $this->makeService();
+
+        $prompt = $svc->buildCarouselGenPrompt([], 'https://alisadikinma.com/blog/x', null);
+
+        $this->assertStringContainsString('KNOWLEDGE-FIRST INFOGRAPHIC', $prompt);
+    }
 }

@@ -1137,18 +1137,37 @@ class LinkedInGenerationService
         // /linkedin-gen carousel briefs default to bilingual ID/EN (LinkedIn
         // pillar) so we mirror that.
         $bilingual = 'id,en';
-        $narrative = '5act';
+        // Foreshadow is a cinematic narrative device that doesn't fit an
+        // educational infographic. Drop it for IG-repurpose drafts (free
+        // narrative); keep the 5-act spine for normal blog carousels.
+        $narrative = $isRepurpose ? 'free' : '5act';
         $targetSlides = $this->inferTargetSlides($brief);
 
         $flags = [
             '--pipeline',
             '--blog-source=' . escapeshellarg($blogUrl),
+            '--style=' . $style,
             '--bilingual=' . $bilingual,
             '--narrative=' . $narrative,
             '--target-slides=' . $targetSlides,
         ];
 
         $prompt = '/carousel-gen ' . implode(' ', $flags);
+
+        // Knowledge-first directive — only meaningful for the flat sketchnote
+        // infographic preset (cinematic photo carousels keep their own WOW
+        // gate). Steers every slide toward a self-contained mini-infographic so
+        // a reader grasps the topic deeply from the slides alone.
+        if ($style === 'sketchnote') {
+            $prompt .= "\n\nKNOWLEDGE-FIRST INFOGRAPHIC (sketchnote style): render every slide as a flat"
+                . " hand-drawn educational infographic on warm cream paper per the bundled style-presets"
+                . " sketchnote preset + DOODLE gate — NOT a cinematic photo, no creator-face photo. Build a"
+                . " knowledge spine: the cover states the core promise/definition; each body slide is a"
+                . " SELF-CONTAINED mini-infographic that teaches ONE idea in depth (numbered icon-rows with a"
+                . " short label + one-line explanation, OR a labeled comparison, OR an annotated mechanism"
+                . " diagram); the peak slide delivers the key insight; the CTA closes. Maximize knowledge"
+                . " density per slide while keeping text legible.";
+        }
 
         if (is_string($blogContent) && trim($blogContent) !== '') {
             $prompt .= "\n\nSOURCE ARTICLE CONTENT (primary source — use this to build the slide narrative; the --blog-source URL is supplementary OG metadata only):\n"

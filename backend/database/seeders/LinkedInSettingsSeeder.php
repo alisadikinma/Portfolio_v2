@@ -81,6 +81,13 @@ class LinkedInSettingsSeeder extends Seeder
             // the cross-post fan-out only creates IG/TikTok/Threads-carousel
             // siblings when LinkedIn format=carousel. Operator-tunable.
             ['key' => 'linkedin_force_carousel',                'value' => 'true',  'type' => 'text'],
+
+            // - linkedin_carousel_style: visual execution preset for /carousel-gen.
+            //   'sketchnote' (default) = flat hand-drawn educational infographic on
+            //   cream paper (Granola/Obsidian look, knowledge-first). 'cinematic'
+            //   restores the photorealistic creator-face carousel. No-redeploy
+            //   revert lever read by LinkedInGenerationService::buildCarouselGenPrompt.
+            ['key' => 'linkedin_carousel_style',               'value' => 'sketchnote', 'type' => 'text'],
         ];
 
         foreach ($settings as $setting) {
