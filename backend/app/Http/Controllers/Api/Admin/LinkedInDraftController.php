@@ -6,7 +6,9 @@ use App\Enums\LinkedInPostStatus;
 use App\Exceptions\InvalidStateTransitionException;
 use App\Http\Controllers\Controller;
 use App\Jobs\GenerateLinkedInPost;
+use App\Models\ContentIdea;
 use App\Models\LinkedInPost;
+use App\Models\RepurposeJob;
 use App\Services\LinkedInCarouselImageService;
 use App\Services\LinkedInGenerationService;
 use App\Services\LinkedInPublishService;
@@ -55,6 +57,7 @@ class LinkedInDraftController extends Controller
             'status' => ['nullable', 'string'],
             'format' => ['nullable', Rule::in(['text', 'carousel'])],
             'scope' => ['nullable', Rule::in(['feed', 'queue', 'all'])],
+            'exclude_repurpose' => ['nullable', 'boolean'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:200'],
         ]);
 
@@ -85,6 +88,38 @@ class LinkedInDraftController extends Controller
             $query->whereIn('status', LinkedInPostStatus::feedStatuses());
         } elseif (($validated['scope'] ?? null) === 'queue') {
             $query->whereIn('status', LinkedInPostStatus::queueStatuses());
+        }
+
+        // Social Studio union list: when the blog-draft source is paired with
+        // the IG-repurpose source, exclude repurpose-origin drafts so a
+        // finalized repurpose carousel (which IS a LinkedInPost) doesn't appear
+        // in BOTH sources. This mirrors LinkedInGenerationService::isRepurposeDraft
+        // at QUERY level — no per-row predicate call (would be N+1). The three
+        // exclusion arms match the predicate exactly:
+        //   1. draft.id referenced by RepurposeJob.linkedin_post_id
+        //   2. draft.post_id = some RepurposeJob.anchor_post_id
+        //   3. draft.post_id links a ContentIdea{source:'instagram'}
+        // The whereNull('post_id') guard short-circuits arms 2+3 for null
+        // post_id (defends the NULL-NOT-IN trap; harmless given the NOT NULL
+        // schema, future-proofs it). whereNotNull on each subquery keeps NULLs
+        // out of the IN-lists so NOT IN can't silently drop valid rows.
+        if ($request->boolean('exclude_repurpose')) {
+            $query
+                ->whereNotIn('id', RepurposeJob::query()
+                    ->whereNotNull('linkedin_post_id')
+                    ->select('linkedin_post_id'))
+                ->where(function ($q) {
+                    $q->whereNull('post_id')
+                        ->orWhere(function ($q2) {
+                            $q2->whereNotIn('post_id', RepurposeJob::query()
+                                ->whereNotNull('anchor_post_id')
+                                ->select('anchor_post_id'))
+                                ->whereNotIn('post_id', ContentIdea::query()
+                                    ->where('source', 'instagram')
+                                    ->whereNotNull('result_post_id')
+                                    ->select('result_post_id'));
+                        });
+                });
         }
 
         $perPage = $validated['per_page'] ?? 15;
