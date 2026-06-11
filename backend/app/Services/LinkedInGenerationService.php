@@ -320,8 +320,15 @@ class LinkedInGenerationService
         if ($detectedFormat === 'carousel' || $isCarouselRoute) {
             LinkedInProgressEmitter::emit($draft, 'carousel_gen_dispatch', 30, 'Dispatching /carousel-gen engine');
         }
-        $isRepurpose = $this->isRepurposeDraft($draft);
-        $carouselStyle = (string) Setting::get('linkedin_carousel_style', 'sketchnote');
+        // Resolve carousel style + repurpose narrative only when actually
+        // routing to /carousel-gen (applyCarouselGenAdapter no-ops for text) —
+        // avoids two wasted EXISTS queries on text-format drafts.
+        $isRepurpose = false;
+        $carouselStyle = 'sketchnote';
+        if ($detectedFormat === 'carousel' || $isCarouselRoute) {
+            $isRepurpose = $this->isRepurposeDraft($draft);
+            $carouselStyle = (string) Setting::get('linkedin_carousel_style', 'sketchnote');
+        }
         try {
             $parsed = $this->applyCarouselGenAdapter($parsed, $blog['url'], $draft->id, $blog['content'] ?? null, $isRepurpose, $carouselStyle);
         } catch (CarouselGenAdapterException $e) {

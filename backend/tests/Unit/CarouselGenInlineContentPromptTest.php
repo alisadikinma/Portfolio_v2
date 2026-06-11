@@ -107,4 +107,14 @@ class CarouselGenInlineContentPromptTest extends TestCase
 
         $this->assertStringContainsString('KNOWLEDGE-FIRST INFOGRAPHIC', $prompt);
     }
+
+    public function test_cinematic_style_omits_knowledge_directive_and_emits_its_flag(): void
+    {
+        $svc = $this->makeService();
+
+        $prompt = $svc->buildCarouselGenPrompt([], 'https://alisadikinma.com/blog/x', null, false, 'cinematic');
+
+        $this->assertStringContainsString('--style=cinematic', $prompt);
+        $this->assertStringNotContainsString('KNOWLEDGE-FIRST INFOGRAPHIC', $prompt);
+    }
 }
