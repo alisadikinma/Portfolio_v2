@@ -1,7 +1,7 @@
 # Social Studio — merge Draft Posts + IG Repurpose into one menu
 
 **Date:** 2026-06-11
-**Status:** SHIPPED 2026-06-11 (Phases A–G via gaspol-execute) — 29 tests green, NOT pushed (operator authorizes pushes)
+**Status:** SHIPPED 2026-06-11 (Phases A–G via gaspol-execute) — 25 new tests green (37 backend + 18 frontend suites pass), NOT pushed (operator authorizes pushes)
 **Type:** Frontend-heavy UI/UX refactor + small backend additions. No migrations, no FSM changes, no publish-engine changes.
 
 ---
