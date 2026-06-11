@@ -187,6 +187,105 @@ export function effectiveStatusMeta(draft) {
   return statusMeta(draft.status)
 }
 
+// --- Live backend-activity (detail page, 2026-06-11) -------------------------
+// Powers the live status hero (phase + elapsed/ETA) and the stale-error
+// suppression on LinkedInDraftDetail.vue. `regenerateActive` + `started_at`
+// come from the `regenerate_activity` block the show() endpoint now returns
+// (cache-lock-derived); the render counts come from carousel_slides[].
+
+/**
+ * Resolve the current carousel work phase for the live status hero.
+ *   phase: 're_authoring' | 'rendering' | 'ready' | 'idle'
+ *   renderDone / renderTotal: slide render progress (N / M)
+ *   elapsedMs: ms since /carousel-gen started (from regenerate_activity.started_at), or null
+ *
+ * Reuses inspectCarouselRenderState() for the base classification so the
+ * phase mapping stays consistent with the badge logic.
+ */
+export function resolveCarouselActivity({
+  slides,
+  regenerateActive = false,
+  regenerateStartedAt = null,
+  nowMs = Date.now(),
+} = {}) {
+  const list = Array.isArray(slides) ? slides : []
+  const renderTotal = list.length
+  let renderDone = 0
+  for (const s of list) {
+    if (s?.image_status === 'done' && s?.image_url) renderDone++
+  }
+
+  let phase
+  if (regenerateActive || renderTotal > 0) {
+    const base = inspectCarouselRenderState({ format: 'carousel', carousel_slides: list })
+    if (regenerateActive || base === 'reauthoring') phase = 're_authoring'
+    else if (base === 'generating' || base === 'pending') phase = 'rendering'
+    else if (base === 'ready') phase = 'ready'
+    else phase = 'idle' // partial | failed → normal status hero / error path handles it
+  } else {
+    phase = 'idle'
+  }
+
+  let elapsedMs = null
+  if (regenerateStartedAt) {
+    const t = Date.parse(regenerateStartedAt)
+    if (Number.isFinite(t)) elapsedMs = Math.max(0, nowMs - t)
+  }
+
+  return { phase, renderDone, renderTotal, elapsedMs }
+}
+
+/**
+ * Whether to surface draft.last_error on the detail page. Suppresses the
+ * stale "red error + nothing happening" contradiction while work is in
+ * flight (the draft-149 incident), then applies the existing status gate
+ * (failed | manual_review) + staleness gate. nowMs + staleHours are
+ * injectable for testing; callers pass Date.now() + STALE_ERROR_HOURS.
+ */
+export function shouldShowLastError({
+  lastError,
+  status,
+  pipelineLog,
+  slides,
+  regenerateActive = false,
+  nowMs = Date.now(),
+  staleHours = 24,
+} = {}) {
+  if (!lastError) return false
+
+  // In-flight guard — never alarm while re-authoring or rendering.
+  if (regenerateActive) return false
+  const list = Array.isArray(slides) ? slides : []
+  for (const s of list) {
+    const st = s?.image_status
+    if (st === 'reauthoring' || st === 'pending' || st === 'generating') return false
+  }
+
+  // Status gate — only failed / manual_review surface errors at all.
+  if (!['failed', 'manual_review'].includes(status)) return false
+
+  // Staleness gate — hide errors whose last transition is older than staleHours.
+  const log = Array.isArray(pipelineLog) ? pipelineLog : []
+  if (log.length === 0) return true
+  const latest = log[log.length - 1]
+  const latestTs = latest?.timestamp ? Date.parse(latest.timestamp) : NaN
+  if (Number.isNaN(latestTs)) return true
+  const ageHours = (nowMs - latestTs) / 36e5
+  return ageHours < staleHours
+}
+
+/**
+ * Format a ms duration as "Nm SSs" (seconds zero-padded). '' for
+ * null / non-finite / negative input.
+ */
+export function formatElapsed(ms) {
+  if (ms == null || !Number.isFinite(ms) || ms < 0) return ''
+  const totalSec = Math.floor(ms / 1000)
+  const m = Math.floor(totalSec / 60)
+  const s = totalSec % 60
+  return `${m}m${String(s).padStart(2, '0')}s`
+}
+
 // Tailwind class fragments per mood — kept short, applied via :class binding.
 export const MOOD_CLASSES = {
   progress: {

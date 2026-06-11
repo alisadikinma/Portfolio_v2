@@ -287,6 +287,20 @@ class TelegramWebhookController extends Controller
         CaptureInstagramPost::dispatch($job->id);
 
         $label = $action === 'blog' ? '📝 Blog + Carousel' : '🎠 Carousel saja';
+
+        // Persistent chat bubble so the operator sees the pipeline actually
+        // started — the answerCallbackQuery toast is transient and easy to miss.
+        // Best-effort: a notify failure must never undo the dispatch above.
+        try {
+            app(TelegramNotificationService::class)
+                ->sendRepurposeProgress($job, "✅ {$label} dipilih — mulai memproses…");
+        } catch (\Throwable $e) {
+            Log::warning('[TelegramRepurpose] progress ack failed', [
+                'job' => $job->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
         return "⏳ {$label} repurpose started.";
     }
 

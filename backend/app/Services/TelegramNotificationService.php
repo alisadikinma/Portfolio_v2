@@ -639,6 +639,24 @@ class TelegramNotificationService
         return $this->send($text);
     }
 
+    /**
+     * IG repurpose: best-effort live progress bubble — one NEW chat message per
+     * pipeline step (vs the transient answerCallbackQuery toast). Master-toggle
+     * gated like the sibling repurpose notifications. Callers wrap this in
+     * try/catch so a notify failure never blocks/reverses the pipeline FSM.
+     */
+    public function sendRepurposeProgress(\App\Models\RepurposeJob $job, string $text): bool
+    {
+        if ($this->getSetting('telegram_enabled') !== 'true') {
+            return false;
+        }
+        if (empty($this->getBotToken()) || empty($this->getChatId())) {
+            return false;
+        }
+
+        return $this->send($text);
+    }
+
     private function isEnabledFor(string $notificationType): bool
     {
         if ($this->getSetting('telegram_enabled') !== 'true') {
