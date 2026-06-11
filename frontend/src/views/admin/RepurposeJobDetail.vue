@@ -6,13 +6,7 @@ import {
   useRetryRepurposeJob,
   fetchSlideObjectUrl,
 } from '@/composables/useRepurposeJobs'
-import {
-  useLinkedInDraft,
-  useApproveLinkedInDraft,
-  useCancelLinkedInDraft,
-  useRegenerateAllCarouselImages,
-  usePublishLinkedInDraftNow,
-} from '@/composables/useLinkedInDrafts'
+import { useLinkedInDraft } from '@/composables/useLinkedInDrafts'
 import {
   statusTone,
   statusLabel,
@@ -23,15 +17,16 @@ import {
 } from './repurposeHelpers.js'
 
 /**
- * Source ↔ Generated comparison workspace for an IG-repurpose job.
+ * Source ↔ Generated comparison + review surface for an IG-repurpose job.
  *
- * The hero is an aligned slide-by-slide grid: captured IG slide N (PRIVATE →
- * blob-fetched) on the left, the generated slide N (PUBLIC carousel image) on
- * the right, so the operator sees the transformation per slide. Below it: the
- * extracted intelligence (caption, claims, fact-check) beside the generated
- * caption + the SAME approve/cancel/regenerate/publish mutations the draft
- * detail uses (no duplicated publish logic). Light/dark themed to match the
- * Content Engine admin surface.
+ * This page is review-only — it shows what the pipeline produced and how it
+ * compares to the original. All publish/edit actions live in the draft editor
+ * (LinkedInDraftDetail) for carousel jobs, or Content Engine for blog jobs, so
+ * the IG flow stays consistent with the blog flow (review here → act there).
+ *
+ * Hero: aligned slide-by-slide grid (captured IG slide N → generated slide N).
+ * Captured slides are PRIVATE → blob-fetched; they're retained until the 7-day
+ * repurpose:reap reaper, so an older drafted job may have its source cleared.
  */
 
 const route = useRoute()
@@ -41,31 +36,18 @@ const id = computed(() => Number(route.params.id))
 const { job, isLoading, refetch } = useRepurposeJob(id)
 const retry = useRetryRepurposeJob()
 
-// --- right pane: linked LinkedIn draft (generated side) --------------------
+// --- linked LinkedIn draft (generated side, read-only here) ----------------
 const linkedinPostId = computed(() => job.value?.linkedin_post_id || null)
 const { draft } = useLinkedInDraft(linkedinPostId) // enabled only when id present
 
-const approve = useApproveLinkedInDraft()
-const cancel = useCancelLinkedInDraft()
-const regenImages = useRegenerateAllCarouselImages()
-const publishNow = usePublishLinkedInDraftNow()
-
 const paneMode = computed(() => rightPaneMode(job.value))
+const isBlog = computed(() => paneMode.value === 'blog')
 const draftStatus = computed(() => draft.value?.status || null)
 const generatedSlides = computed(() =>
   Array.isArray(draft.value?.carousel_slides) ? draft.value.carousel_slides : [],
 )
 
-async function doApprove() { await approve.mutateAsync(linkedinPostId.value); refetch() }
-async function doCancel() { await cancel.mutateAsync(linkedinPostId.value); refetch() }
-async function doRegenImages() { await regenImages.mutateAsync(linkedinPostId.value); refetch() }
-async function doPublishNow() { await publishNow.mutateAsync(linkedinPostId.value); refetch() }
-const anyDraftActionPending = computed(() =>
-  approve.isPending.value || cancel.isPending.value ||
-  regenImages.isPending.value || publishNow.isPending.value,
-)
-
-// --- left pane: private captured slides ------------------------------------
+// --- private captured slides ------------------------------------------------
 const slideUrls = ref([])
 let loadedForCount = -1
 
@@ -88,7 +70,7 @@ function revokeSlides() {
 }
 onBeforeUnmount(revokeSlides)
 
-// --- comparison pairing ----------------------------------------------------
+// --- comparison ------------------------------------------------------------
 const hasSourceSlides = computed(() => slideUrls.value.some(Boolean))
 const comparisonPairs = computed(() => {
   const n = Math.max(slideUrls.value.length, generatedSlides.value.length)
@@ -98,12 +80,11 @@ const comparisonPairs = computed(() => {
     gen: generatedSlides.value[i] || null,
   }))
 })
-const showComparison = computed(() => paneMode.value !== 'blog' && comparisonPairs.value.length > 0)
-// Source slides are cleared by the 7-day reaper; an old drafted job may have a
-// generated carousel but no captured source left to compare against.
-const sourceCleared = computed(() =>
-  paneMode.value === 'generated' && !hasSourceSlides.value && generatedSlides.value.length > 0,
-)
+// Paired rows only when we actually have source slides to compare against;
+// otherwise show the generated carousel on its own (source cleared by reaper).
+const showPaired = computed(() => !isBlog.value && hasSourceSlides.value && comparisonPairs.value.length > 0)
+const showGeneratedOnly = computed(() => !isBlog.value && !hasSourceSlides.value && generatedSlides.value.length > 0)
+const showComparison = computed(() => showPaired.value || showGeneratedOnly.value)
 
 const verdicts = computed(() => job.value?.research?.verdicts || [])
 const claims = computed(() => job.value?.extracted?.claims || [])
@@ -113,6 +94,12 @@ const headerTitle = computed(() =>
   job.value?.title || job.value?.rewritten?.title || `Repurpose #${job.value?.id ?? ''}`,
 )
 
+function genState(s) {
+  if (s && s.image_status === 'done' && s.image_url) return null
+  if (s && s.image_status === 'failed') return 'failed'
+  if (s) return 'rendering…'
+  return paneMode.value === 'in_progress' ? 'generating…' : 'not generated'
+}
 function claimText(c) { return typeof c === 'string' ? c : (c?.claim || JSON.stringify(c)) }
 function verdictTone(status) {
   if (status === 'wrong' || status === 'outdated') return 'text-amber-600 dark:text-amber-400'
@@ -150,8 +137,19 @@ function goBack() { router.push({ name: 'admin-social-studio' }) }
               <span>#{{ job.id }} · {{ relativeTime(job.updated_at) }}</span>
             </div>
           </div>
+          <!-- Single handoff to where the work actually happens -->
+          <router-link
+            v-if="!isBlog && linkedinPostId"
+            :to="{ name: 'admin-sosmed-draft-detail', params: { id: linkedinPostId } }"
+            class="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-600 active:scale-[0.98] motion-reduce:transition-none"
+          >Open in draft editor →</router-link>
+          <router-link
+            v-else-if="isBlog && job.content_idea_id"
+            :to="{ name: 'admin-content-engine' }"
+            class="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-600 active:scale-[0.98] motion-reduce:transition-none"
+          >Open in Content Engine →</router-link>
           <button
-            v-if="isFailed"
+            v-else-if="isFailed"
             class="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-600 active:scale-[0.98] disabled:opacity-60 motion-reduce:transition-none"
             :disabled="retry.isPending.value"
             @click="doRetry"
@@ -167,107 +165,56 @@ function goBack() { router.push({ name: 'admin-social-studio' }) }
 
       <!-- Comparison: Source -> Generated -->
       <div v-if="showComparison" class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
-        <div class="mb-4 flex items-center gap-2">
-          <h2 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Slide comparison</h2>
-          <span class="text-xs text-neutral-400 dark:text-neutral-500">{{ comparisonPairs.length }} slides</span>
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <h2 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Slide comparison</h2>
+            <span class="text-xs text-neutral-400 dark:text-neutral-500">{{ comparisonPairs.length }} slides</span>
+          </div>
+          <span v-if="draftStatus" class="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium" :class="statusTone(draftStatus)">
+            {{ statusLabel(draftStatus) }}
+          </span>
         </div>
 
-        <!-- column legend -->
-        <div class="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_1fr]">
-          <span class="text-[11px] font-bold uppercase tracking-widest text-fuchsia-600 dark:text-fuchsia-400">Source · Original IG</span>
-          <span class="hidden w-6 sm:block"></span>
-          <span class="text-[11px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">Generated · Your version</span>
-        </div>
-
-        <p v-if="sourceCleared" class="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 ring-1 ring-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:ring-amber-500/20">
-          The original Instagram slides were cleared after drafting — showing the generated version only.
-        </p>
-
-        <!-- paired rows -->
-        <div class="space-y-3">
-          <div
-            v-for="pair in comparisonPairs"
-            :key="pair.i"
-            class="grid grid-cols-1 items-center gap-3 sm:grid-cols-[1fr_auto_1fr]"
-          >
-            <!-- source slide -->
-            <div class="overflow-hidden rounded-lg bg-neutral-100 ring-1 ring-neutral-200 dark:bg-neutral-900 dark:ring-neutral-700">
-              <img v-if="pair.src" :src="pair.src" :alt="`source slide ${pair.i + 1}`" class="block w-full object-contain" />
-              <div v-else class="flex aspect-[4/5] items-center justify-center text-xs text-neutral-400 dark:text-neutral-600">
-                {{ sourceCleared ? 'cleared' : 'slide ' + (pair.i + 1) }}
+        <!-- paired rows (source available) -->
+        <template v-if="showPaired">
+          <div class="mb-2 grid grid-cols-[1fr_auto_1fr] gap-3">
+            <span class="text-[11px] font-bold uppercase tracking-widest text-fuchsia-600 dark:text-fuchsia-400">Source · Original IG</span>
+            <span class="w-5"></span>
+            <span class="text-[11px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">Generated · Your version</span>
+          </div>
+          <div class="space-y-3">
+            <div v-for="pair in comparisonPairs" :key="pair.i" class="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+              <div class="flex items-center justify-center rounded-lg bg-neutral-100 p-1 ring-1 ring-neutral-200 dark:bg-neutral-900 dark:ring-neutral-700">
+                <img v-if="pair.src" :src="pair.src" :alt="`source slide ${pair.i + 1}`" class="max-h-44 w-auto rounded object-contain" />
+                <span v-else class="flex h-44 items-center justify-center text-xs text-neutral-400 dark:text-neutral-600">slide {{ pair.i + 1 }}</span>
               </div>
-            </div>
-
-            <!-- arrow -->
-            <div class="flex items-center justify-center">
-              <svg class="h-5 w-5 rotate-90 text-neutral-300 dark:text-neutral-600 sm:rotate-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M13 6l6 6-6 6" /></svg>
-            </div>
-
-            <!-- generated slide -->
-            <div class="overflow-hidden rounded-lg bg-neutral-100 ring-1 ring-neutral-200 dark:bg-neutral-900 dark:ring-neutral-700">
-              <img
-                v-if="pair.gen && pair.gen.image_status === 'done' && pair.gen.image_url"
-                :src="pair.gen.image_url"
-                :alt="`generated slide ${pair.i + 1}`"
-                class="block w-full object-contain"
-              />
-              <div v-else class="flex aspect-[4/5] items-center justify-center px-2 text-center text-xs"
-                   :class="pair.gen && pair.gen.image_status === 'failed' ? 'text-red-500 dark:text-red-400' : 'text-neutral-400 dark:text-neutral-600'">
-                {{ pair.gen ? (pair.gen.image_status === 'failed' ? 'failed' : 'rendering…') : (paneMode === 'in_progress' ? 'generating…' : 'not generated') }}
+              <svg class="h-4 w-4 text-neutral-300 dark:text-neutral-600" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M13 6l6 6-6 6" /></svg>
+              <div class="flex items-center justify-center rounded-lg bg-neutral-100 p-1 ring-1 ring-neutral-200 dark:bg-neutral-900 dark:ring-neutral-700">
+                <img v-if="!genState(pair.gen)" :src="pair.gen.image_url" :alt="`generated slide ${pair.i + 1}`" class="max-h-44 w-auto rounded object-contain" />
+                <span v-else class="flex h-44 items-center justify-center px-2 text-center text-xs"
+                      :class="genState(pair.gen) === 'failed' ? 'text-red-500 dark:text-red-400' : 'text-neutral-400 dark:text-neutral-600'">{{ genState(pair.gen) }}</span>
               </div>
             </div>
           </div>
-        </div>
+        </template>
 
-        <!-- generated caption + actions -->
-        <template v-if="paneMode === 'generated' && draft">
-          <div class="mt-5 flex items-center gap-2 border-t border-neutral-200 pt-4 dark:border-neutral-700">
-            <span class="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium" :class="statusTone(draftStatus)">
-              {{ statusLabel(draftStatus) }}
-            </span>
-            <span class="text-xs text-neutral-500 dark:text-neutral-400">LinkedIn draft #{{ linkedinPostId }}</span>
-          </div>
-
-          <p v-if="draft.content" class="mt-3 whitespace-pre-line rounded-lg bg-neutral-50 p-3 text-sm text-neutral-700 dark:bg-neutral-900/40 dark:text-neutral-300">
-            {{ draft.content }}
+        <!-- generated-only (source cleared) -->
+        <template v-else-if="showGeneratedOnly">
+          <p class="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 ring-1 ring-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:ring-amber-500/20">
+            The original Instagram slides were cleared after drafting — showing the generated version only.
           </p>
-
-          <div class="mt-4 flex flex-wrap gap-2">
-            <button
-              v-if="draftStatus === 'manual_review'"
-              class="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-emerald-500 active:scale-[0.98] disabled:opacity-60 motion-reduce:transition-none"
-              :disabled="anyDraftActionPending" @click="doApprove"
-            >{{ approve.isPending.value ? 'Approving…' : 'Approve & schedule' }}</button>
-            <button
-              v-if="draftStatus === 'awaiting_publish'"
-              class="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-emerald-500 active:scale-[0.98] disabled:opacity-60 motion-reduce:transition-none"
-              :disabled="anyDraftActionPending" @click="doPublishNow"
-            >{{ publishNow.isPending.value ? 'Publishing…' : 'Publish now' }}</button>
-            <a
-              v-if="draftStatus === 'published' && draft.linkedin_post_url"
-              :href="draft.linkedin_post_url" target="_blank" rel="noopener"
-              class="rounded-lg bg-[#0077B5] px-3 py-1.5 text-sm font-medium text-white transition hover:brightness-110 motion-reduce:transition-none"
-            >Open on LinkedIn ↗</a>
-            <button
-              class="rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-sm text-neutral-700 transition-colors hover:bg-neutral-50 active:scale-[0.98] disabled:opacity-60 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700 motion-reduce:transition-none"
-              :disabled="anyDraftActionPending" @click="doRegenImages"
-            >{{ regenImages.isPending.value ? 'Regenerating…' : 'Regenerate images' }}</button>
-            <button
-              v-if="draftStatus && !['published', 'cancelled'].includes(draftStatus)"
-              class="rounded-lg border border-red-300 bg-white px-3 py-1.5 text-sm text-red-600 transition-colors hover:bg-red-50 active:scale-[0.98] disabled:opacity-60 dark:border-red-500/30 dark:bg-neutral-800 dark:text-red-300 dark:hover:bg-red-900/20 motion-reduce:transition-none"
-              :disabled="anyDraftActionPending" @click="doCancel"
-            >{{ cancel.isPending.value ? 'Cancelling…' : 'Cancel' }}</button>
-            <router-link
-              :to="{ name: 'admin-sosmed-draft-detail', params: { id: linkedinPostId } }"
-              class="rounded-lg px-3 py-1.5 text-sm font-medium text-amber-600 transition-colors hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300 motion-reduce:transition-none"
-            >Open full editor →</router-link>
+          <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            <div v-for="(s, i) in generatedSlides" :key="i" class="flex items-center justify-center rounded-lg bg-neutral-100 p-1 ring-1 ring-neutral-200 dark:bg-neutral-900 dark:ring-neutral-700">
+              <img v-if="!genState(s)" :src="s.image_url" :alt="`generated slide ${i + 1}`" class="max-h-52 w-full rounded object-contain" />
+              <span v-else class="flex aspect-[4/5] w-full items-center justify-center px-1 text-center text-xs"
+                    :class="genState(s) === 'failed' ? 'text-red-500 dark:text-red-400' : 'text-neutral-400 dark:text-neutral-600'">{{ genState(s) }}</span>
+            </div>
           </div>
         </template>
       </div>
 
-      <!-- Intelligence: source extraction + (blog rewrite | pipeline) -->
-      <div class="grid gap-5 lg:grid-cols-2">
-        <!-- Source intelligence -->
+      <!-- Source intelligence (summary + collapsible detail) + blog rewrite -->
+      <div class="grid gap-5" :class="isBlog ? 'lg:grid-cols-2' : ''">
         <section class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
           <h2 class="mb-3 text-sm font-semibold text-neutral-900 dark:text-neutral-100">Source intelligence</h2>
           <a :href="job.source_url" target="_blank" rel="noopener" class="block truncate text-sm text-amber-600 hover:underline dark:text-amber-400">
@@ -275,22 +222,29 @@ function goBack() { router.push({ name: 'admin-social-studio' }) }
           </a>
           <p v-if="job.angle" class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">Angle: {{ job.angle }}</p>
 
-          <p v-if="job.extracted?.caption" class="mt-4 text-sm text-neutral-600 dark:text-neutral-300">
-            <span class="font-medium text-neutral-500 dark:text-neutral-400">Original caption:</span> {{ job.extracted.caption }}
+          <p v-if="job.extracted?.caption" class="mt-3 line-clamp-3 text-sm text-neutral-600 dark:text-neutral-300">
+            <span class="font-medium text-neutral-500 dark:text-neutral-400">Caption:</span> {{ job.extracted.caption }}
           </p>
 
-          <div v-if="claims.length" class="mt-4">
-            <p class="mb-2 text-xs font-medium text-neutral-500 dark:text-neutral-400">Extracted claims ({{ claims.length }})</p>
-            <ul class="space-y-1.5 text-sm text-neutral-700 dark:text-neutral-300">
+          <!-- one-line summary; full claims + fact-check fold away -->
+          <p v-if="claims.length || verdicts.length" class="mt-3 text-sm text-neutral-700 dark:text-neutral-200">
+            <span class="font-medium">{{ claims.length }}</span> claims extracted
+            <template v-if="verdicts.length"> · <span class="font-medium text-amber-600 dark:text-amber-400">{{ correctedCount }}</span> corrected by fact-check</template>
+          </p>
+
+          <details v-if="claims.length || verdicts.length" class="group mt-2">
+            <summary class="cursor-pointer select-none text-xs font-medium text-amber-600 hover:underline dark:text-amber-400">
+              <span class="group-open:hidden">Show claims &amp; fact-check ↓</span>
+              <span class="hidden group-open:inline">Hide claims &amp; fact-check ↑</span>
+            </summary>
+
+            <ul v-if="claims.length" class="mt-3 space-y-1.5 text-sm text-neutral-700 dark:text-neutral-300">
               <li v-for="(c, i) in claims" :key="i" class="flex gap-2">
                 <span class="text-neutral-400 dark:text-neutral-600">{{ i + 1 }}.</span><span>{{ claimText(c) }}</span>
               </li>
             </ul>
-          </div>
 
-          <div v-if="verdicts.length" class="mt-4">
-            <p class="mb-2 text-xs font-medium text-neutral-500 dark:text-neutral-400">Fact-check · {{ correctedCount }} corrected</p>
-            <ul class="space-y-3 text-sm">
+            <ul v-if="verdicts.length" class="mt-4 space-y-3 text-sm">
               <li v-for="(v, i) in verdicts" :key="i" class="border-l-2 border-neutral-200 pl-3 dark:border-neutral-700">
                 <p class="text-neutral-700 dark:text-neutral-300">{{ v.claim }}</p>
                 <p :class="verdictTone(v.status)" class="text-xs font-medium uppercase tracking-wide">{{ v.status }}</p>
@@ -302,48 +256,30 @@ function goBack() { router.push({ name: 'admin-social-studio' }) }
                 </div>
               </li>
             </ul>
-          </div>
+          </details>
         </section>
 
-        <!-- Right: blog rewrite preview OR pipeline (generated handled above) -->
-        <section class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
-          <template v-if="paneMode === 'blog'">
-            <h2 class="mb-3 text-sm font-semibold text-neutral-900 dark:text-neutral-100">Generated · Blog draft</h2>
-            <h3 v-if="job.rewritten?.title" class="text-lg font-semibold text-neutral-900 dark:text-neutral-100">{{ job.rewritten.title }}</h3>
-            <p v-if="job.rewritten?.excerpt" class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">{{ job.rewritten.excerpt }}</p>
-            <div
-              v-if="job.rewritten?.body"
-              class="prose prose-sm mt-3 max-h-80 max-w-none overflow-y-auto rounded-lg bg-neutral-50 p-3 text-neutral-700 dark:prose-invert dark:bg-neutral-900/40 dark:text-neutral-300"
-              v-html="job.rewritten.body"
-            ></div>
-            <router-link
-              v-if="job.content_idea_id"
-              :to="{ name: 'admin-content-engine' }"
-              class="mt-4 inline-block text-sm font-medium text-amber-600 hover:underline dark:text-amber-400"
-            >Open in Content Engine (idea #{{ job.content_idea_id }}) →</router-link>
-          </template>
-          <template v-else>
-            <h2 class="mb-3 text-sm font-semibold text-neutral-900 dark:text-neutral-100">Pipeline status</h2>
-            <p class="text-sm text-neutral-500 dark:text-neutral-400">
-              Current step:
-              <span class="font-medium text-blue-600 dark:text-blue-400">{{ statusLabel(job.status) }}</span>
-            </p>
-            <ol class="mt-4 space-y-2 text-xs">
-              <li v-for="(e, i) in (job.pipeline_state_log || [])" :key="i" class="flex flex-wrap items-center gap-1.5">
-                <span class="text-neutral-400 dark:text-neutral-500">{{ relativeTime(e.timestamp) }}</span>
-                <span class="text-neutral-400 dark:text-neutral-500">{{ e.from }} →</span>
-                <span :class="e.to === 'failed' ? 'text-red-600 dark:text-red-400' : 'text-neutral-700 dark:text-neutral-200'">{{ e.to }}</span>
-                <span class="text-neutral-400 dark:text-neutral-600">· {{ e.reason }}</span>
-              </li>
-            </ol>
-          </template>
+        <!-- Blog rewrite preview (blog mode only) -->
+        <section v-if="isBlog" class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
+          <h2 class="mb-3 text-sm font-semibold text-neutral-900 dark:text-neutral-100">Generated · Blog draft</h2>
+          <h3 v-if="job.rewritten?.title" class="text-lg font-semibold text-neutral-900 dark:text-neutral-100">{{ job.rewritten.title }}</h3>
+          <p v-if="job.rewritten?.excerpt" class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">{{ job.rewritten.excerpt }}</p>
+          <div
+            v-if="job.rewritten?.body"
+            class="prose prose-sm mt-3 max-h-80 max-w-none overflow-y-auto rounded-lg bg-neutral-50 p-3 text-neutral-700 dark:prose-invert dark:bg-neutral-900/40 dark:text-neutral-300"
+            v-html="job.rewritten.body"
+          ></div>
         </section>
       </div>
 
-      <!-- Pipeline timeline (full) -->
-      <div class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
-        <h2 class="mb-3 text-sm font-semibold text-neutral-900 dark:text-neutral-100">Pipeline timeline</h2>
-        <ol class="space-y-2 text-xs">
+      <!-- Pipeline timeline (collapsed by default) -->
+      <details class="group rounded-xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
+        <summary class="flex cursor-pointer select-none items-center justify-between text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+          Pipeline timeline
+          <span class="text-xs font-normal text-neutral-400 dark:text-neutral-500 group-open:hidden">show</span>
+          <span class="hidden text-xs font-normal text-neutral-400 dark:text-neutral-500 group-open:inline">hide</span>
+        </summary>
+        <ol class="mt-3 space-y-2 text-xs">
           <li v-for="(e, i) in (job.pipeline_state_log || [])" :key="i" class="flex flex-wrap items-center gap-1.5">
             <span class="text-neutral-400 dark:text-neutral-500">{{ relativeTime(e.timestamp) }}</span>
             <span class="text-neutral-400 dark:text-neutral-500">{{ e.from }} →</span>
@@ -351,7 +287,7 @@ function goBack() { router.push({ name: 'admin-social-studio' }) }
             <span class="text-neutral-400 dark:text-neutral-600">· {{ e.reason }}</span>
           </li>
         </ol>
-      </div>
+      </details>
     </div>
   </div>
 </template>
