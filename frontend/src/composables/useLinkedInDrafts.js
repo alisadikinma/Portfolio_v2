@@ -81,9 +81,11 @@ export function useLinkedInDraft(id) {
       }
       // Carousel slide image polling — 5s while any slide is mid-flight.
       // Webhooks land server-side; this poll picks them up on the client.
+      // 'reauthoring' = /carousel-gen is rewriting the storyline (3-7 min) —
+      // keep polling so the hero flips to "Rendering" the moment slides land.
       const slides = Array.isArray(data?.carousel_slides) ? data.carousel_slides : []
       const anyMidFlight = slides.some(s =>
-        s?.image_status === 'generating' || s?.image_status === 'pending'
+        s?.image_status === 'generating' || s?.image_status === 'pending' || s?.image_status === 'reauthoring'
       )
       return anyMidFlight ? 5_000 : false
     },
@@ -149,20 +151,25 @@ export function useLinkedInDraftProgress(id, options = {}) {
 }
 
 /**
- * Optimistic helper: flip every slide to pending + clear errors locally so
- * the UI reflects the click instantly, before the network round-trip and
- * the queue worker pickup latency. Returns rollback context for onError.
+ * Optimistic helper: flip every slide to the given lifecycle status + clear
+ * errors locally so the UI reflects the click instantly, before the network
+ * round-trip and the queue worker pickup latency. Returns rollback context.
+ *
+ * `status` is 'reauthoring' for the full re-author path (regenerate-images →
+ * /carousel-gen rewrites the storyline first, no render yet) so the hero shows
+ * "Re-authoring slides" instead of a misleading "rendering in flight"; it is
+ * 'pending' for the render-only path (rerender-images → straight to GeminiGen).
  *
  * Used by the bulk re-render mutations. Single-slide retry uses a narrower
  * variant inline (only flips the one slide).
  */
-async function optimisticResetAllSlides(qc, id) {
+async function optimisticResetAllSlides(qc, id, status = 'pending') {
   await qc.cancelQueries({ queryKey: [LIST_KEY, id] })
   const previous = qc.getQueryData([LIST_KEY, id])
   if (previous?.data?.carousel_slides && Array.isArray(previous.data.carousel_slides)) {
     const nextSlides = previous.data.carousel_slides.map(s => ({
       ...s,
-      image_status: 'pending',
+      image_status: status,
       image_url: '',
       image_error: null,
       image_job_uuid: null,
@@ -185,7 +192,7 @@ export function useRegenerateAllCarouselImages() {
   return useMutation({
     mutationFn: (id) =>
       api.post(`/admin/linkedin-drafts/${id}/regenerate-images`).then(r => r.data),
-    onMutate: (id) => optimisticResetAllSlides(qc, id),
+    onMutate: (id) => optimisticResetAllSlides(qc, id, 'reauthoring'),
     onError: (_err, id, context) => {
       if (context?.previous) qc.setQueryData([LIST_KEY, id], context.previous)
     },
