@@ -251,7 +251,32 @@ class PublishSlotOrchestrator extends Command
         try {
             $result = $publisher->publish($draft);
             if ($result['success'] ?? false) {
-                $this->info("  ✓ LinkedIn #{$draft->id} published — URN {$result['urn']}");
+                $urn = $result['post_urn'] ?? $result['urn'] ?? '';
+                $this->info("  ✓ LinkedIn #{$draft->id} published — URN {$urn}");
+                // CRITICAL: advance awaiting_publish → published here. Without
+                // this the draft stays awaiting_publish with cancel_window in
+                // the past, so the every-minute cron re-publishes it next tick
+                // → LinkedIn 422 "duplicate" → draft marked Failed even though
+                // the post is live (production incident: draft 148, 2026-06-11).
+                // Mirrors LinkedInDraftController::publishNow's success path.
+                try {
+                    $guard->advance($draft, LinkedInPostStatus::Published, 'published_in_orchestrator', [
+                        'post_urn' => $urn ?: null,
+                    ]);
+                    $draft->update([
+                        'published_at' => now(),
+                        'linkedin_post_urn' => $urn ?: null,
+                        'linkedin_post_url' => $result['post_url'] ?? null,
+                    ]);
+                } catch (\Throwable $e) {
+                    // Publish already succeeded on LinkedIn — never undo that.
+                    // Log so the operator can reconcile the FSM state manually.
+                    Log::warning('[social:publish-slot] FSM advance to published threw (post is live)', [
+                        'draft_id' => $draft->id,
+                        'post_urn' => $urn,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
                 return true;
             }
             $this->error("  ✗ LinkedIn #{$draft->id} publish failed: " . ($result['error'] ?? 'unknown'));

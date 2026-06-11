@@ -150,6 +150,33 @@ class PublishSlotOrchestratorTest extends TestCase
         Queue::assertPushed(PublishViaPubler::class, 3); // IG + TT + TH
     }
 
+    public function test_text_success_advances_draft_to_published(): void
+    {
+        // Regression for the draft-148 incident (2026-06-11): the orchestrator
+        // success path must transition awaiting_publish → published. If it
+        // doesn't, the draft stays awaiting_publish with cancel_window in the
+        // past and the every-minute cron re-publishes it → LinkedIn 422
+        // duplicate → Failed despite the post being live.
+        $draft = $this->makeDueTextDraft();
+
+        $this->artisan('social:publish-slot')->assertExitCode(0);
+
+        $draft->refresh();
+        $this->assertSame(LinkedInPostStatus::Published->value, $draft->status);
+        $this->assertNotNull($draft->published_at);
+    }
+
+    public function test_carousel_success_advances_draft_to_published(): void
+    {
+        $draft = $this->makeDueCarouselDraft();
+
+        $this->artisan('social:publish-slot')->assertExitCode(0);
+
+        $draft->refresh();
+        $this->assertSame(LinkedInPostStatus::Published->value, $draft->status);
+        $this->assertNotNull($draft->published_at);
+    }
+
     public function test_carousel_not_ready_postpones_to_next_slot(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-05-13 04:55:00', 'Asia/Jakarta'));

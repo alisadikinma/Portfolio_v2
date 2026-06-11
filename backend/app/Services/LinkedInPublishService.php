@@ -206,6 +206,14 @@ class LinkedInPublishService
         }
 
         if (!$response->successful()) {
+            // Idempotent duplicate — the content is already live on LinkedIn.
+            if ($dupUrn = $this->detectDuplicateShareUrn($response)) {
+                Log::info('[LinkedInPublish] publishText duplicate — already live, treating as success', [
+                    'draft_id' => $draft->id,
+                    'existing_urn' => $dupUrn,
+                ]);
+                return $this->duplicateSuccess($draft, $account, $dupUrn);
+            }
             Log::warning('[LinkedInPublish] publishText API error', [
                 'draft_id' => $draft->id,
                 'status' => $response->status(),
@@ -387,6 +395,23 @@ class LinkedInPublishService
         }
 
         if (!$response->successful()) {
+            // Idempotent duplicate — the carousel is already live on LinkedIn.
+            // Happens when a prior create-post POST reached LinkedIn (slides
+            // already uploaded, share created) but its response was lost, so
+            // our code marked the attempt failed and a later tick / re-approve
+            // re-POSTed the identical payload. LinkedIn names the existing
+            // share in the 422; treat the retry as success so the draft is
+            // marked Published and the IG/TT/Threads/FB cross-posts still fan
+            // out (the bug behind "live on LinkedIn but FAILED + nothing in
+            // Publer").
+            if ($dupUrn = $this->detectDuplicateShareUrn($response)) {
+                Log::info('[LinkedInPublish] publishCarousel duplicate — already live, treating as success', [
+                    'draft_id' => $draft->id,
+                    'existing_urn' => $dupUrn,
+                    'slide_count' => $slideCount,
+                ]);
+                return $this->duplicateSuccess($draft, $account, $dupUrn);
+            }
             Log::warning('[LinkedInPublish] publishCarousel API error', [
                 'draft_id' => $draft->id,
                 'status' => $response->status(),
@@ -443,6 +468,58 @@ class LinkedInPublishService
             'post_urn' => null,
             'post_url' => null,
             'error' => $message,
+        ];
+    }
+
+    /**
+     * Detect LinkedIn's "duplicate content" rejection and extract the URN of
+     * the share that already exists. LinkedIn returns HTTP 422 with a
+     * BadRequestResponseException whose message names the live share, e.g.:
+     *
+     *   "Content is a duplicate of urn:li:share:7470701611313471488"
+     *
+     * That share IS the post we were trying to create — so from our side the
+     * publish is, in effect, already done. Returning the URN lets the caller
+     * treat the retry as an idempotent success instead of a hard failure.
+     *
+     * @return string|null the existing share/ugcPost URN, or null when the
+     *                      response is not a recognizable duplicate rejection.
+     */
+    private function detectDuplicateShareUrn(Response $response): ?string
+    {
+        if ($response->status() !== 422) {
+            return null;
+        }
+        $message = $this->extractApiError($response);
+        if (stripos($message, 'duplicate') === false) {
+            return null;
+        }
+        if (preg_match('/urn:li:(?:share|ugcPost):[A-Za-z0-9_-]+/i', $message, $m)) {
+            return $m[0];
+        }
+        return null;
+    }
+
+    /**
+     * Build the success return for an idempotent duplicate publish. Mirrors a
+     * fresh-publish success (schedules the first comment when configured) since
+     * the dominant cause is a prior attempt whose response was lost BEFORE the
+     * first-comment job was ever scheduled — so the blog-link comment was never
+     * posted and scheduling it now completes the publish.
+     */
+    private function duplicateSuccess(LinkedInPost $draft, LinkedInAccount $account, string $urn): array
+    {
+        if ($this->firstCommentEnabled($draft) && $urn !== '') {
+            $delay = (int) config('linkedin.first_comment_delay_seconds', 30);
+            PostLinkedInFirstComment::dispatch($draft->id, $urn, $account->id)
+                ->delay(now()->addSeconds(max(5, $delay)));
+        }
+
+        return [
+            'success' => true,
+            'post_urn' => $urn,
+            'post_url' => $this->urnToPublicUrl($urn),
+            'error' => null,
         ];
     }
 
