@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import {
   useRepurposeJob,
   useRetryRepurposeJob,
+  useRefetchRepurposeSource,
   fetchSlideObjectUrl,
 } from '@/composables/useRepurposeJobs'
 import { useLinkedInDraft } from '@/composables/useLinkedInDrafts'
@@ -35,6 +36,7 @@ const id = computed(() => Number(route.params.id))
 
 const { job, isLoading, refetch } = useRepurposeJob(id)
 const retry = useRetryRepurposeJob()
+const refetchSource = useRefetchRepurposeSource()
 
 // --- linked LinkedIn draft (generated side, read-only here) ----------------
 const linkedinPostId = computed(() => job.value?.linkedin_post_id || null)
@@ -68,7 +70,27 @@ function revokeSlides() {
   slideUrls.value.forEach(u => u && URL.revokeObjectURL(u))
   slideUrls.value = []
 }
-onBeforeUnmount(revokeSlides)
+
+// --- re-fetch source on demand (reaper clears it ~7d after publish) --------
+const refetching = ref(false)
+let pollTimer = null
+function clearPoll() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null } }
+async function doRefetchSource() {
+  if (refetching.value) return
+  refetching.value = true
+  try { await refetchSource.mutateAsync(id.value) } catch { /* surfaced as no-image */ }
+  clearPoll()
+  let tries = 0
+  pollTimer = setInterval(async () => {
+    tries += 1
+    await refetch()
+    if ((job.value?.slide_count || 0) > 0 || tries >= 20) {
+      clearPoll()
+      refetching.value = false
+    }
+  }, 6000)
+}
+onBeforeUnmount(() => { revokeSlides(); clearPoll() })
 
 // --- comparison ------------------------------------------------------------
 const hasSourceSlides = computed(() => slideUrls.value.some(Boolean))
@@ -200,9 +222,21 @@ function goBack() { router.push({ name: 'admin-social-studio' }) }
 
         <!-- generated-only (source cleared) -->
         <template v-else-if="showGeneratedOnly">
-          <p class="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 ring-1 ring-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:ring-amber-500/20">
-            The original Instagram slides were cleared after drafting — showing the generated version only.
-          </p>
+          <div class="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-amber-50 px-3 py-2 ring-1 ring-amber-200 dark:bg-amber-900/20 dark:ring-amber-500/20">
+            <p class="text-xs text-amber-700 dark:text-amber-300">
+              {{ refetching
+                ? 'Re-fetching the original slides from Instagram… (~1 min)'
+                : 'The original Instagram slides were cleared — showing the generated version only.' }}
+            </p>
+            <button
+              class="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-2.5 py-1 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-50 active:scale-[0.98] disabled:opacity-60 dark:border-amber-500/40 dark:bg-neutral-800 dark:text-amber-300 dark:hover:bg-amber-900/20 motion-reduce:transition-none"
+              :disabled="refetching"
+              @click="doRefetchSource"
+            >
+              <svg class="h-3.5 w-3.5" :class="{ 'animate-spin': refetching }" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5M5.5 14a7 7 0 0 0 12.4 2M18.5 10A7 7 0 0 0 6.1 8" /></svg>
+              {{ refetching ? 'Re-fetching…' : 'Re-fetch source' }}
+            </button>
+          </div>
           <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             <div v-for="(s, i) in generatedSlides" :key="i" class="flex items-center justify-center rounded-lg bg-neutral-100 p-1 ring-1 ring-neutral-200 dark:bg-neutral-900 dark:ring-neutral-700">
               <img v-if="!genState(s)" :src="s.image_url" :alt="`generated slide ${i + 1}`" class="max-h-52 w-full rounded object-contain" />

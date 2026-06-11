@@ -56,6 +56,42 @@ class RepurposeJobAdminControllerTest extends TestCase
         $this->assertSame([$failed->id], $ids);
     }
 
+    // ---- refetch-source ----
+
+    public function test_refetch_source_dispatches_job(): void
+    {
+        Queue::fake();
+        $job = RepurposeJob::factory()->create([
+            'status' => 'drafted',
+            'source_url' => 'https://www.instagram.com/p/ABC123/',
+        ]);
+
+        $this->actingAs($this->admin(), 'sanctum')
+            ->postJson("/api/admin/repurpose/{$job->id}/refetch-source")
+            ->assertStatus(202)
+            ->assertJson(['success' => true]);
+
+        Queue::assertPushed(\App\Jobs\RefetchSourceSlides::class,
+            fn ($j) => $j->repurposeJobId === $job->id);
+    }
+
+    public function test_refetch_source_422_when_no_url(): void
+    {
+        Queue::fake();
+        $job = RepurposeJob::factory()->create(['status' => 'drafted', 'source_url' => '']);
+
+        $this->actingAs($this->admin(), 'sanctum')
+            ->postJson("/api/admin/repurpose/{$job->id}/refetch-source")
+            ->assertStatus(422);
+
+        Queue::assertNothingPushed();
+    }
+
+    public function test_refetch_source_requires_auth(): void
+    {
+        $this->postJson('/api/admin/repurpose/1/refetch-source')->assertUnauthorized();
+    }
+
     // ---- show ----
 
     public function test_show_returns_full_detail(): void

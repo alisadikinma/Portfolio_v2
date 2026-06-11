@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Jobs\CaptureInstagramPost;
 use App\Jobs\ExtractSlideContent;
 use App\Jobs\FinalizeRepurpose;
+use App\Jobs\RefetchSourceSlides;
 use App\Jobs\ResearchRepurposeClaims;
 use App\Jobs\RewriteRepurposeContent;
 use App\Models\RepurposeJob;
@@ -128,6 +129,32 @@ class RepurposeJobController extends Controller
             'message' => 'Retry dispatched.',
             'data' => ['status' => $job->status],
         ]);
+    }
+
+    /**
+     * Re-download the source IG slides on demand (the reaper clears them a week
+     * after publish). Dispatches the capture asynchronously; the detail view
+     * polls slide_count until the images reappear. Review-only — no FSM change.
+     */
+    public function refetchSource(int $id): JsonResponse
+    {
+        $job = RepurposeJob::find($id);
+        if (!$job) {
+            return $this->notFound();
+        }
+        if ((string) $job->source_url === '') {
+            return response()->json([
+                'success' => false,
+                'error' => ['code' => 'NO_SOURCE', 'message' => 'Job has no source URL to re-fetch.'],
+            ], 422);
+        }
+
+        RefetchSourceSlides::dispatch($job->id);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Source re-fetch dispatched.',
+        ], 202);
     }
 
     /**

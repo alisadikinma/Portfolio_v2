@@ -171,8 +171,10 @@ class FinalizeRepurpose implements ShouldQueue
         GenerateLinkedInPost::dispatch($linkedinId);
 
         // NOTE: captured IG slides are intentionally RETAINED here (no purge) so the
-        // Social Studio detail can render the source↔generated image comparison for a
-        // freshly drafted carousel. The 7-day `repurpose:reap` reaper handles cleanup.
+        // Social Studio detail can render the source↔generated image comparison.
+        // `repurpose:reap` clears them ~7 days AFTER the carousel is published
+        // (publish-anchored retention), or re-fetches them on demand via the
+        // detail's "Re-fetch source" action (RefetchSourceSlides).
         app(TelegramNotificationService::class)->sendRepurposeDrafted($job, $linkedinId, $this->correctedClaims($job));
     }
 

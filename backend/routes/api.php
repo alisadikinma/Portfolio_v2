@@ -1329,6 +1329,7 @@ Route::middleware(['auth:sanctum'])->prefix('admin/repurpose')->group(function (
     Route::get('/', [RepurposeJobController::class, 'index']);
     Route::get('/{id}', [RepurposeJobController::class, 'show'])->whereNumber('id');
     Route::post('/{id}/retry', [RepurposeJobController::class, 'retry'])->whereNumber('id');
+    Route::post('/{id}/refetch-source', [RepurposeJobController::class, 'refetchSource'])->whereNumber('id');
     Route::get('/{id}/slide/{n}', [RepurposeJobController::class, 'slide'])
         ->whereNumber('id')->whereNumber('n');
 });

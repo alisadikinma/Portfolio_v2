@@ -84,6 +84,21 @@ export function useRetryRepurposeJob() {
 }
 
 /**
+ * Re-download a job's source IG slides (the reaper clears them ~7 days after
+ * publish). Backend dispatches the capture asynchronously; the detail view
+ * polls slide_count until the images reappear.
+ */
+export function useRefetchRepurposeSource() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) => api.post(`/admin/repurpose/${id}/refetch-source`).then(r => r.data),
+    onSuccess: (_data, id) => {
+      qc.invalidateQueries({ queryKey: [LIST_KEY, id] })
+    },
+  })
+}
+
+/**
  * Slide thumbnails are auth:sanctum, so a native <img src> can't carry the
  * bearer — fetch as a blob through the axios instance (interceptor adds the
  * token) and hand back an object URL. Caller must URL.revokeObjectURL on unmount.
