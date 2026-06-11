@@ -80,6 +80,7 @@ class RepurposeJobController extends Controller
                 'id' => $job->id,
                 'status' => $job->status,
                 'mode' => $job->mode,
+                'title' => $this->derivedTitle($job),
                 'source_url' => $job->source_url,
                 'angle' => $job->angle,
                 'slides_path' => $job->slides_path,
@@ -179,12 +180,17 @@ class RepurposeJobController extends Controller
     /** @return array<string,mixed> compact list-row shape. */
     private function compact(RepurposeJob $job): array
     {
+        $slideCount = $this->slideFiles($job)->count();
+
         return [
             'id' => $job->id,
             'status' => $job->status,
             'mode' => $job->mode,
+            'title' => $this->derivedTitle($job),
             'source_url' => $job->source_url,
             'angle' => $job->angle,
+            'slide_count' => $slideCount,
+            'has_cover' => $slideCount > 0,
             'content_idea_id' => $job->content_idea_id,
             'linkedin_post_id' => $job->linkedin_post_id,
             'anchor_post_id' => $job->anchor_post_id,
@@ -192,6 +198,30 @@ class RepurposeJobController extends Controller
             'created_at' => $job->created_at,
             'updated_at' => $job->updated_at,
         ];
+    }
+
+    /**
+     * Human topic title for a Social Studio card (operator "gak tau topiknya").
+     * Priority: the rewritten title → first non-empty line of the source
+     * caption (≤120 chars) → null. Both `rewritten` and `extracted` are array
+     * casts, so we read them as arrays.
+     */
+    private function derivedTitle(RepurposeJob $job): ?string
+    {
+        $rewrittenTitle = trim((string) ($job->rewritten['title'] ?? ''));
+        if ($rewrittenTitle !== '') {
+            return $rewrittenTitle;
+        }
+
+        $caption = (string) ($job->extracted['caption'] ?? '');
+        foreach (preg_split('/\r\n|\r|\n/', $caption) as $line) {
+            $line = trim($line);
+            if ($line !== '') {
+                return mb_substr($line, 0, 120);
+            }
+        }
+
+        return null;
     }
 
     private function notFound(): JsonResponse
