@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\LinkedInPost;
+use App\Models\Setting;
 use App\Services\CarouselGenOutputAdapter;
 use App\Services\LinkedInGenerationService;
 use Illuminate\Bus\Queueable;
@@ -105,12 +106,31 @@ class RegenerateLinkedInCarouselContent implements ShouldQueue
         // via --blog-source so it doesn't need our brief metadata.
         $brief = [];
 
+        // Mirror the generate path so the "Regenerate all images" button
+        // produces the SAME carousel as the auto pipeline: resolve the visual
+        // style from the operator setting (sketchnote default; flips to
+        // cinematic without redeploy) and detect IG-repurpose drafts so they
+        // get --narrative=free (foreshadow dropped) instead of 5act. Without
+        // this the button silently re-authored every draft as a 5act carousel
+        // and ignored a cinematic revert.
+        $style = (string) Setting::get('linkedin_carousel_style', 'sketchnote');
+        $isRepurpose = $generation->isRepurposeDraft($draft);
+
         Log::info('[RegenerateCarouselContent] dispatching /carousel-gen', [
             'draft_id' => $this->draftId,
             'blog_url' => $blogUrl,
+            'style' => $style,
+            'is_repurpose' => $isRepurpose,
         ]);
 
-        $envelope = $generation->dispatchCarouselGenEngine($brief, $blogUrl, $this->draftId);
+        $envelope = $generation->dispatchCarouselGenEngine(
+            $brief,
+            $blogUrl,
+            $this->draftId,
+            null,
+            $isRepurpose,
+            $style
+        );
         if ($envelope === null) {
             Log::error('[RegenerateCarouselContent] /carousel-gen returned null', ['draft_id' => $this->draftId]);
             $draft->update(['last_error' => 'Re-author failed: /carousel-gen returned no usable output. See logs.']);
