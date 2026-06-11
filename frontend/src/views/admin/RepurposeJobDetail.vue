@@ -23,16 +23,15 @@ import {
 } from './repurposeHelpers.js'
 
 /**
- * 2-pane Source ↔ Generated workspace for an IG-repurpose job.
- *   LEFT  (Source · Original IG): captured slides are PRIVATE → blob-fetched via
- *         fetchSlideObjectUrl; original caption + extracted claims + fact-check.
- *   RIGHT (Generated · Your version): per rightPaneMode —
- *         'generated' → reuse the linked LinkedInPost draft (PUBLIC
- *                       carousel_slides[].image_url + caption) + the SAME
- *                       approve/cancel/regenerate/publish mutations the draft
- *                       detail uses (no duplicated publish logic).
- *         'in_progress' → pipeline timeline + current step.
- *         'blog' → rewrite preview + Content Engine handoff.
+ * Source ↔ Generated comparison workspace for an IG-repurpose job.
+ *
+ * The hero is an aligned slide-by-slide grid: captured IG slide N (PRIVATE →
+ * blob-fetched) on the left, the generated slide N (PUBLIC carousel image) on
+ * the right, so the operator sees the transformation per slide. Below it: the
+ * extracted intelligence (caption, claims, fact-check) beside the generated
+ * caption + the SAME approve/cancel/regenerate/publish mutations the draft
+ * detail uses (no duplicated publish logic). Light/dark themed to match the
+ * Content Engine admin surface.
  */
 
 const route = useRoute()
@@ -89,6 +88,23 @@ function revokeSlides() {
 }
 onBeforeUnmount(revokeSlides)
 
+// --- comparison pairing ----------------------------------------------------
+const hasSourceSlides = computed(() => slideUrls.value.some(Boolean))
+const comparisonPairs = computed(() => {
+  const n = Math.max(slideUrls.value.length, generatedSlides.value.length)
+  return Array.from({ length: n }, (_, i) => ({
+    i,
+    src: slideUrls.value[i] || null,
+    gen: generatedSlides.value[i] || null,
+  }))
+})
+const showComparison = computed(() => paneMode.value !== 'blog' && comparisonPairs.value.length > 0)
+// Source slides are cleared by the 7-day reaper; an old drafted job may have a
+// generated carousel but no captured source left to compare against.
+const sourceCleared = computed(() =>
+  paneMode.value === 'generated' && !hasSourceSlides.value && generatedSlides.value.length > 0,
+)
+
 const verdicts = computed(() => job.value?.research?.verdicts || [])
 const claims = computed(() => job.value?.extracted?.claims || [])
 const correctedCount = computed(() => job.value?.research?.corrected_count ?? 0)
@@ -99,9 +115,9 @@ const headerTitle = computed(() =>
 
 function claimText(c) { return typeof c === 'string' ? c : (c?.claim || JSON.stringify(c)) }
 function verdictTone(status) {
-  if (status === 'wrong' || status === 'outdated') return 'text-amber-300'
-  if (status === 'correct') return 'text-emerald-300'
-  return 'text-neutral-400'
+  if (status === 'wrong' || status === 'outdated') return 'text-amber-600 dark:text-amber-400'
+  if (status === 'correct') return 'text-emerald-600 dark:text-emerald-400'
+  return 'text-neutral-500 dark:text-neutral-400'
 }
 async function doRetry() { await retry.mutateAsync(id.value); refetch() }
 function goBack() { router.push({ name: 'admin-social-studio' }) }
@@ -109,86 +125,178 @@ function goBack() { router.push({ name: 'admin-social-studio' }) }
 
 <template>
   <div class="px-4 py-6 sm:px-6 lg:px-8">
-    <button class="mb-4 text-sm text-neutral-400 transition hover:text-neutral-200 motion-reduce:transition-none" @click="goBack">
-      ← Back to Social Studio
+    <button
+      class="mb-4 inline-flex items-center gap-1 text-sm text-neutral-500 transition-colors hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 motion-reduce:transition-none"
+      @click="goBack"
+    >
+      <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m15 18-6-6 6-6" /></svg>
+      Back to Social Studio
     </button>
 
-    <div v-if="isLoading" class="py-12 text-center text-neutral-500">Loading…</div>
-    <div v-else-if="!job" class="py-12 text-center text-neutral-500">Job not found.</div>
+    <div v-if="isLoading" class="py-12 text-center text-neutral-500 dark:text-neutral-400">Loading…</div>
+    <div v-else-if="!job" class="py-12 text-center text-neutral-500 dark:text-neutral-400">Job not found.</div>
 
-    <div v-else class="space-y-6">
+    <div v-else class="space-y-5">
       <!-- Header -->
-      <div class="rounded-xl bg-neutral-900/50 p-5 ring-1 ring-neutral-800">
+      <div class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
         <div class="flex flex-wrap items-start justify-between gap-3">
           <div class="min-w-0">
-            <h1 class="truncate text-xl font-semibold text-neutral-100">{{ headerTitle }}</h1>
-            <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-neutral-500">
-              <span class="inline-flex items-center rounded-full px-2 py-0.5 font-medium ring-1" :class="statusTone(job.status)">
+            <h1 class="truncate text-xl font-bold text-neutral-900 dark:text-neutral-100">{{ headerTitle }}</h1>
+            <div class="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400">
+              <span class="inline-flex items-center rounded px-2 py-0.5 font-medium" :class="statusTone(job.status)">
                 {{ statusLabel(job.status) }}
               </span>
-              <span class="text-neutral-400">{{ modeLabel(job.mode) }}</span>
+              <span class="rounded bg-neutral-100 px-2 py-0.5 font-medium text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300">{{ modeLabel(job.mode) }}</span>
               <span>#{{ job.id }} · {{ relativeTime(job.updated_at) }}</span>
             </div>
           </div>
           <button
             v-if="isFailed"
-            class="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-cyan-500 active:scale-[0.98] disabled:opacity-60 motion-reduce:transition-none"
+            class="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-600 active:scale-[0.98] disabled:opacity-60 motion-reduce:transition-none"
             :disabled="retry.isPending.value"
             @click="doRetry"
           >
-            {{ retry.isPending.value ? 'Retrying…' : `↻ Retry ${inferFailedStep(job.pipeline_state_log) || 'capture'} step` }}
+            <svg class="h-4 w-4" :class="{ 'animate-spin': retry.isPending.value }" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5M5.5 14a7 7 0 0 0 12.4 2M18.5 10A7 7 0 0 0 6.1 8" /></svg>
+            {{ retry.isPending.value ? 'Retrying…' : `Retry ${inferFailedStep(job.pipeline_state_log) || 'capture'} step` }}
           </button>
         </div>
-        <p v-if="job.last_error" class="mt-3 rounded-lg bg-red-500/10 p-3 text-sm text-red-300 ring-1 ring-red-500/20">
+        <p v-if="job.last_error" class="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700 ring-1 ring-red-200 dark:bg-red-900/20 dark:text-red-300 dark:ring-red-500/20">
           {{ job.last_error }}
         </p>
       </div>
 
-      <!-- 2-pane workspace -->
-      <div class="grid gap-5 lg:grid-cols-2">
-        <!-- LEFT · Source -->
-        <section class="rounded-xl bg-neutral-900/50 p-5 ring-1 ring-neutral-800">
-          <h2 class="mb-3 text-xs font-bold uppercase tracking-widest text-neutral-500">Source · Original IG</h2>
-          <a :href="job.source_url" target="_blank" rel="noopener" class="block truncate text-sm text-cyan-400 hover:underline">
-            {{ job.source_url }}
-          </a>
-          <p v-if="job.angle" class="mt-1 text-sm text-neutral-400">Angle: {{ job.angle }}</p>
+      <!-- Comparison: Source -> Generated -->
+      <div v-if="showComparison" class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
+        <div class="mb-4 flex items-center gap-2">
+          <h2 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Slide comparison</h2>
+          <span class="text-xs text-neutral-400 dark:text-neutral-500">{{ comparisonPairs.length }} slides</span>
+        </div>
 
-          <!-- captured slides (private blobs) -->
-          <div v-if="job.slide_count" class="mt-4">
-            <p class="mb-2 text-xs text-neutral-500">Captured slides ({{ job.slide_count }})</p>
-            <div class="flex gap-3 overflow-x-auto pb-2">
-              <div v-for="(url, i) in slideUrls" :key="i" class="h-40 w-32 flex-shrink-0 overflow-hidden rounded-lg bg-neutral-800 ring-1 ring-neutral-700">
-                <img v-if="url" :src="url" :alt="`slide ${i + 1}`" class="h-full w-full object-cover" />
-                <div v-else class="flex h-full items-center justify-center text-xs text-neutral-500">slide {{ i + 1 }}</div>
+        <!-- column legend -->
+        <div class="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_1fr]">
+          <span class="text-[11px] font-bold uppercase tracking-widest text-fuchsia-600 dark:text-fuchsia-400">Source · Original IG</span>
+          <span class="hidden w-6 sm:block"></span>
+          <span class="text-[11px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">Generated · Your version</span>
+        </div>
+
+        <p v-if="sourceCleared" class="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 ring-1 ring-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:ring-amber-500/20">
+          The original Instagram slides were cleared after drafting — showing the generated version only.
+        </p>
+
+        <!-- paired rows -->
+        <div class="space-y-3">
+          <div
+            v-for="pair in comparisonPairs"
+            :key="pair.i"
+            class="grid grid-cols-1 items-center gap-3 sm:grid-cols-[1fr_auto_1fr]"
+          >
+            <!-- source slide -->
+            <div class="overflow-hidden rounded-lg bg-neutral-100 ring-1 ring-neutral-200 dark:bg-neutral-900 dark:ring-neutral-700">
+              <img v-if="pair.src" :src="pair.src" :alt="`source slide ${pair.i + 1}`" class="block w-full object-contain" />
+              <div v-else class="flex aspect-[4/5] items-center justify-center text-xs text-neutral-400 dark:text-neutral-600">
+                {{ sourceCleared ? 'cleared' : 'slide ' + (pair.i + 1) }}
+              </div>
+            </div>
+
+            <!-- arrow -->
+            <div class="flex items-center justify-center">
+              <svg class="h-5 w-5 rotate-90 text-neutral-300 dark:text-neutral-600 sm:rotate-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M13 6l6 6-6 6" /></svg>
+            </div>
+
+            <!-- generated slide -->
+            <div class="overflow-hidden rounded-lg bg-neutral-100 ring-1 ring-neutral-200 dark:bg-neutral-900 dark:ring-neutral-700">
+              <img
+                v-if="pair.gen && pair.gen.image_status === 'done' && pair.gen.image_url"
+                :src="pair.gen.image_url"
+                :alt="`generated slide ${pair.i + 1}`"
+                class="block w-full object-contain"
+              />
+              <div v-else class="flex aspect-[4/5] items-center justify-center px-2 text-center text-xs"
+                   :class="pair.gen && pair.gen.image_status === 'failed' ? 'text-red-500 dark:text-red-400' : 'text-neutral-400 dark:text-neutral-600'">
+                {{ pair.gen ? (pair.gen.image_status === 'failed' ? 'failed' : 'rendering…') : (paneMode === 'in_progress' ? 'generating…' : 'not generated') }}
               </div>
             </div>
           </div>
+        </div>
 
-          <p v-if="job.extracted?.caption" class="mt-4 text-xs text-neutral-400">
-            <span class="font-medium text-neutral-500">Original caption:</span> {{ job.extracted.caption }}
+        <!-- generated caption + actions -->
+        <template v-if="paneMode === 'generated' && draft">
+          <div class="mt-5 flex items-center gap-2 border-t border-neutral-200 pt-4 dark:border-neutral-700">
+            <span class="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium" :class="statusTone(draftStatus)">
+              {{ statusLabel(draftStatus) }}
+            </span>
+            <span class="text-xs text-neutral-500 dark:text-neutral-400">LinkedIn draft #{{ linkedinPostId }}</span>
+          </div>
+
+          <p v-if="draft.content" class="mt-3 whitespace-pre-line rounded-lg bg-neutral-50 p-3 text-sm text-neutral-700 dark:bg-neutral-900/40 dark:text-neutral-300">
+            {{ draft.content }}
           </p>
 
-          <!-- claims -->
+          <div class="mt-4 flex flex-wrap gap-2">
+            <button
+              v-if="draftStatus === 'manual_review'"
+              class="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-emerald-500 active:scale-[0.98] disabled:opacity-60 motion-reduce:transition-none"
+              :disabled="anyDraftActionPending" @click="doApprove"
+            >{{ approve.isPending.value ? 'Approving…' : 'Approve & schedule' }}</button>
+            <button
+              v-if="draftStatus === 'awaiting_publish'"
+              class="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-emerald-500 active:scale-[0.98] disabled:opacity-60 motion-reduce:transition-none"
+              :disabled="anyDraftActionPending" @click="doPublishNow"
+            >{{ publishNow.isPending.value ? 'Publishing…' : 'Publish now' }}</button>
+            <a
+              v-if="draftStatus === 'published' && draft.linkedin_post_url"
+              :href="draft.linkedin_post_url" target="_blank" rel="noopener"
+              class="rounded-lg bg-[#0077B5] px-3 py-1.5 text-sm font-medium text-white transition hover:brightness-110 motion-reduce:transition-none"
+            >Open on LinkedIn ↗</a>
+            <button
+              class="rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-sm text-neutral-700 transition-colors hover:bg-neutral-50 active:scale-[0.98] disabled:opacity-60 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700 motion-reduce:transition-none"
+              :disabled="anyDraftActionPending" @click="doRegenImages"
+            >{{ regenImages.isPending.value ? 'Regenerating…' : 'Regenerate images' }}</button>
+            <button
+              v-if="draftStatus && !['published', 'cancelled'].includes(draftStatus)"
+              class="rounded-lg border border-red-300 bg-white px-3 py-1.5 text-sm text-red-600 transition-colors hover:bg-red-50 active:scale-[0.98] disabled:opacity-60 dark:border-red-500/30 dark:bg-neutral-800 dark:text-red-300 dark:hover:bg-red-900/20 motion-reduce:transition-none"
+              :disabled="anyDraftActionPending" @click="doCancel"
+            >{{ cancel.isPending.value ? 'Cancelling…' : 'Cancel' }}</button>
+            <router-link
+              :to="{ name: 'admin-sosmed-draft-detail', params: { id: linkedinPostId } }"
+              class="rounded-lg px-3 py-1.5 text-sm font-medium text-amber-600 transition-colors hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300 motion-reduce:transition-none"
+            >Open full editor →</router-link>
+          </div>
+        </template>
+      </div>
+
+      <!-- Intelligence: source extraction + (blog rewrite | pipeline) -->
+      <div class="grid gap-5 lg:grid-cols-2">
+        <!-- Source intelligence -->
+        <section class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
+          <h2 class="mb-3 text-sm font-semibold text-neutral-900 dark:text-neutral-100">Source intelligence</h2>
+          <a :href="job.source_url" target="_blank" rel="noopener" class="block truncate text-sm text-amber-600 hover:underline dark:text-amber-400">
+            {{ job.source_url }}
+          </a>
+          <p v-if="job.angle" class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">Angle: {{ job.angle }}</p>
+
+          <p v-if="job.extracted?.caption" class="mt-4 text-sm text-neutral-600 dark:text-neutral-300">
+            <span class="font-medium text-neutral-500 dark:text-neutral-400">Original caption:</span> {{ job.extracted.caption }}
+          </p>
+
           <div v-if="claims.length" class="mt-4">
-            <p class="mb-2 text-xs text-neutral-500">Extracted claims ({{ claims.length }})</p>
-            <ul class="space-y-1.5 text-sm text-neutral-300">
+            <p class="mb-2 text-xs font-medium text-neutral-500 dark:text-neutral-400">Extracted claims ({{ claims.length }})</p>
+            <ul class="space-y-1.5 text-sm text-neutral-700 dark:text-neutral-300">
               <li v-for="(c, i) in claims" :key="i" class="flex gap-2">
-                <span class="text-neutral-600">{{ i + 1 }}.</span><span>{{ claimText(c) }}</span>
+                <span class="text-neutral-400 dark:text-neutral-600">{{ i + 1 }}.</span><span>{{ claimText(c) }}</span>
               </li>
             </ul>
           </div>
 
-          <!-- fact-check -->
           <div v-if="verdicts.length" class="mt-4">
-            <p class="mb-2 text-xs text-neutral-500">Fact-check · {{ correctedCount }} corrected</p>
+            <p class="mb-2 text-xs font-medium text-neutral-500 dark:text-neutral-400">Fact-check · {{ correctedCount }} corrected</p>
             <ul class="space-y-3 text-sm">
-              <li v-for="(v, i) in verdicts" :key="i" class="border-l-2 border-neutral-700 pl-3">
-                <p class="text-neutral-300">{{ v.claim }}</p>
-                <p :class="verdictTone(v.status)" class="text-xs uppercase tracking-wide">{{ v.status }}</p>
-                <p v-if="v.corrected && v.corrected !== v.claim" class="mt-0.5 text-neutral-400">→ {{ v.corrected }}</p>
+              <li v-for="(v, i) in verdicts" :key="i" class="border-l-2 border-neutral-200 pl-3 dark:border-neutral-700">
+                <p class="text-neutral-700 dark:text-neutral-300">{{ v.claim }}</p>
+                <p :class="verdictTone(v.status)" class="text-xs font-medium uppercase tracking-wide">{{ v.status }}</p>
+                <p v-if="v.corrected && v.corrected !== v.claim" class="mt-0.5 text-neutral-500 dark:text-neutral-400">→ {{ v.corrected }}</p>
                 <div v-if="Array.isArray(v.sources) && v.sources.length" class="mt-1 flex flex-wrap gap-2">
-                  <a v-for="(s, si) in v.sources" :key="si" :href="s" target="_blank" rel="noopener" class="text-xs text-cyan-400 hover:underline">
+                  <a v-for="(s, si) in v.sources" :key="si" :href="s" target="_blank" rel="noopener" class="text-xs text-amber-600 hover:underline dark:text-amber-400">
                     source {{ si + 1 }}
                   </a>
                 </div>
@@ -197,110 +305,50 @@ function goBack() { router.push({ name: 'admin-social-studio' }) }
           </div>
         </section>
 
-        <!-- RIGHT · Generated -->
-        <section class="rounded-xl bg-neutral-900/50 p-5 ring-1 ring-neutral-800">
-          <h2 class="mb-3 text-xs font-bold uppercase tracking-widest text-neutral-500">Generated · Your version</h2>
-
-          <!-- generated: linked draft slides + caption + actions -->
-          <template v-if="paneMode === 'generated' && draft">
-            <div class="mb-3 flex items-center gap-2">
-              <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1" :class="statusTone(draftStatus)">
-                {{ statusLabel(draftStatus) }}
-              </span>
-              <span class="text-xs text-neutral-500">LinkedIn draft #{{ linkedinPostId }}</span>
-            </div>
-
-            <div v-if="generatedSlides.length" class="flex gap-3 overflow-x-auto pb-2">
-              <div v-for="(s, i) in generatedSlides" :key="i" class="h-40 w-32 flex-shrink-0 overflow-hidden rounded-lg bg-neutral-800 ring-1 ring-neutral-700">
-                <img v-if="s.image_status === 'done' && s.image_url" :src="s.image_url" :alt="`generated slide ${i + 1}`" class="h-full w-full object-cover" />
-                <div v-else class="flex h-full items-center justify-center px-1 text-center text-[10px] text-neutral-500">
-                  {{ s.image_status === 'failed' ? 'failed' : 'rendering…' }}
-                </div>
-              </div>
-            </div>
-            <p v-else class="text-sm text-neutral-500">Slides not rendered yet.</p>
-
-            <p v-if="draft.content" class="mt-3 whitespace-pre-line rounded-lg bg-neutral-950/40 p-3 text-sm text-neutral-300">
-              {{ draft.content }}
-            </p>
-
-            <!-- actions — reuse the draft mutations on linkedin_post_id -->
-            <div class="mt-4 flex flex-wrap gap-2">
-              <button
-                v-if="draftStatus === 'manual_review'"
-                class="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-emerald-500 active:scale-[0.98] disabled:opacity-60 motion-reduce:transition-none"
-                :disabled="anyDraftActionPending" @click="doApprove"
-              >{{ approve.isPending.value ? 'Approving…' : 'Approve & schedule' }}</button>
-              <button
-                v-if="draftStatus === 'awaiting_publish'"
-                class="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-emerald-500 active:scale-[0.98] disabled:opacity-60 motion-reduce:transition-none"
-                :disabled="anyDraftActionPending" @click="doPublishNow"
-              >{{ publishNow.isPending.value ? 'Publishing…' : 'Publish now' }}</button>
-              <a
-                v-if="draftStatus === 'published' && draft.linkedin_post_url"
-                :href="draft.linkedin_post_url" target="_blank" rel="noopener"
-                class="rounded-lg bg-[#0077B5] px-3 py-1.5 text-sm font-medium text-white transition hover:brightness-110 motion-reduce:transition-none"
-              >Open on LinkedIn ↗</a>
-              <button
-                class="rounded-lg bg-neutral-800 px-3 py-1.5 text-sm text-neutral-200 ring-1 ring-neutral-700 transition hover:bg-neutral-700 active:scale-[0.98] disabled:opacity-60 motion-reduce:transition-none"
-                :disabled="anyDraftActionPending" @click="doRegenImages"
-              >{{ regenImages.isPending.value ? 'Regenerating…' : 'Regenerate images' }}</button>
-              <button
-                v-if="draftStatus && !['published', 'cancelled'].includes(draftStatus)"
-                class="rounded-lg bg-neutral-800 px-3 py-1.5 text-sm text-red-300 ring-1 ring-red-500/30 transition hover:bg-red-500/10 active:scale-[0.98] disabled:opacity-60 motion-reduce:transition-none"
-                :disabled="anyDraftActionPending" @click="doCancel"
-              >{{ cancel.isPending.value ? 'Cancelling…' : 'Cancel' }}</button>
-              <router-link
-                :to="{ name: 'admin-sosmed-draft-detail', params: { id: linkedinPostId } }"
-                class="rounded-lg px-3 py-1.5 text-sm text-cyan-400 ring-1 ring-neutral-800 transition hover:text-cyan-300 motion-reduce:transition-none"
-              >Open full editor →</router-link>
-            </div>
-          </template>
-
-          <!-- in_progress: pipeline still running, no draft yet -->
-          <template v-else-if="paneMode === 'in_progress'">
-            <p class="text-sm text-neutral-400">
-              Pipeline running — current step:
-              <span class="font-medium text-cyan-300">{{ statusLabel(job.status) }}</span>
-            </p>
-            <ol class="mt-4 space-y-2 text-xs">
-              <li v-for="(e, i) in (job.pipeline_state_log || [])" :key="i" class="flex items-center gap-2">
-                <span class="text-neutral-500">{{ relativeTime(e.timestamp) }}</span>
-                <span class="text-neutral-400">{{ e.from }} →</span>
-                <span :class="e.to === 'failed' ? 'text-red-300' : 'text-neutral-200'">{{ e.to }}</span>
-                <span class="text-neutral-600">· {{ e.reason }}</span>
-              </li>
-            </ol>
-          </template>
-
-          <!-- blog: produces a ContentIdea, not a draft -->
-          <template v-else>
-            <h3 v-if="job.rewritten?.title" class="text-lg font-semibold text-neutral-100">{{ job.rewritten.title }}</h3>
-            <p v-if="job.rewritten?.excerpt" class="mt-1 text-sm text-neutral-400">{{ job.rewritten.excerpt }}</p>
-            <!-- Admin-only preview of our own pipeline output. -->
+        <!-- Right: blog rewrite preview OR pipeline (generated handled above) -->
+        <section class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
+          <template v-if="paneMode === 'blog'">
+            <h2 class="mb-3 text-sm font-semibold text-neutral-900 dark:text-neutral-100">Generated · Blog draft</h2>
+            <h3 v-if="job.rewritten?.title" class="text-lg font-semibold text-neutral-900 dark:text-neutral-100">{{ job.rewritten.title }}</h3>
+            <p v-if="job.rewritten?.excerpt" class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">{{ job.rewritten.excerpt }}</p>
             <div
               v-if="job.rewritten?.body"
-              class="prose prose-invert mt-3 max-h-72 overflow-y-auto rounded-lg bg-neutral-950/40 p-3 text-sm text-neutral-300"
+              class="prose prose-sm mt-3 max-h-80 max-w-none overflow-y-auto rounded-lg bg-neutral-50 p-3 text-neutral-700 dark:prose-invert dark:bg-neutral-900/40 dark:text-neutral-300"
               v-html="job.rewritten.body"
             ></div>
             <router-link
               v-if="job.content_idea_id"
               :to="{ name: 'admin-content-engine' }"
-              class="mt-4 inline-block text-sm text-cyan-400 hover:underline"
+              class="mt-4 inline-block text-sm font-medium text-amber-600 hover:underline dark:text-amber-400"
             >Open in Content Engine (idea #{{ job.content_idea_id }}) →</router-link>
+          </template>
+          <template v-else>
+            <h2 class="mb-3 text-sm font-semibold text-neutral-900 dark:text-neutral-100">Pipeline status</h2>
+            <p class="text-sm text-neutral-500 dark:text-neutral-400">
+              Current step:
+              <span class="font-medium text-blue-600 dark:text-blue-400">{{ statusLabel(job.status) }}</span>
+            </p>
+            <ol class="mt-4 space-y-2 text-xs">
+              <li v-for="(e, i) in (job.pipeline_state_log || [])" :key="i" class="flex flex-wrap items-center gap-1.5">
+                <span class="text-neutral-400 dark:text-neutral-500">{{ relativeTime(e.timestamp) }}</span>
+                <span class="text-neutral-400 dark:text-neutral-500">{{ e.from }} →</span>
+                <span :class="e.to === 'failed' ? 'text-red-600 dark:text-red-400' : 'text-neutral-700 dark:text-neutral-200'">{{ e.to }}</span>
+                <span class="text-neutral-400 dark:text-neutral-600">· {{ e.reason }}</span>
+              </li>
+            </ol>
           </template>
         </section>
       </div>
 
       <!-- Pipeline timeline (full) -->
-      <div class="rounded-xl bg-neutral-900/50 p-5 ring-1 ring-neutral-800">
-        <h2 class="mb-3 text-sm font-semibold text-neutral-200">Pipeline timeline</h2>
+      <div class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
+        <h2 class="mb-3 text-sm font-semibold text-neutral-900 dark:text-neutral-100">Pipeline timeline</h2>
         <ol class="space-y-2 text-xs">
-          <li v-for="(e, i) in (job.pipeline_state_log || [])" :key="i" class="flex items-center gap-2">
-            <span class="text-neutral-500">{{ relativeTime(e.timestamp) }}</span>
-            <span class="text-neutral-400">{{ e.from }} →</span>
-            <span :class="e.to === 'failed' ? 'text-red-300' : 'text-neutral-200'">{{ e.to }}</span>
-            <span class="text-neutral-600">· {{ e.reason }}</span>
+          <li v-for="(e, i) in (job.pipeline_state_log || [])" :key="i" class="flex flex-wrap items-center gap-1.5">
+            <span class="text-neutral-400 dark:text-neutral-500">{{ relativeTime(e.timestamp) }}</span>
+            <span class="text-neutral-400 dark:text-neutral-500">{{ e.from }} →</span>
+            <span :class="e.to === 'failed' ? 'text-red-600 dark:text-red-400' : 'text-neutral-700 dark:text-neutral-200'">{{ e.to }}</span>
+            <span class="text-neutral-400 dark:text-neutral-600">· {{ e.reason }}</span>
           </li>
         </ol>
       </div>

@@ -14,12 +14,14 @@ import { relativeTime } from './repurposeHelpers.js'
 
 /**
  * Social Studio — merged work surface for blog-origin LinkedIn drafts +
- * IG-repurpose jobs. Two DISJOINT sources unioned into one card list:
+ * IG-repurpose jobs. Two DISJOINT sources unioned into one list:
  *   - IG  = all RepurposeJob rows (useRepurposeJobsList)
  *   - Blog = LinkedInPost queue drafts, repurpose-origin EXCLUDED
  *            (useLinkedInDraftsList, exclude_repurpose=1)
- * Cockpit dark aesthetic (neutral-950, amber/cyan, mono labels, inline SVG —
- * no emoji), matching LinkedInQueueList.
+ *
+ * Display matches the Content Engine spreadsheet (light/dark table, amber
+ * accent, status pills, tab strip, per-row open action) so the two admin
+ * surfaces read as one product.
  */
 
 const router = useRouter()
@@ -86,37 +88,38 @@ onBeforeUnmount(() => {
   Object.values(igCoverUrls.value).forEach((url) => URL.revokeObjectURL(url))
 })
 
-// --- status presentation (source-aware, presentational) -------------------
+// --- status presentation (source-aware, light/dark) -----------------------
 const BLOG_STATUS = {
-  pending_generation: ['Queued', 'cyan'],
-  generating: ['Generating', 'cyan'],
-  validating: ['Validating', 'cyan'],
+  pending_generation: ['Queued', 'blue'],
+  generating: ['Generating', 'blue'],
+  validating: ['Validating', 'blue'],
   manual_review: ['Review', 'amber'],
   awaiting_publish: ['Scheduled', 'emerald'],
-  published: ['Published', 'emerald'],
+  published: ['Published', 'green'],
   cancelled: ['Cancelled', 'neutral'],
   failed: ['Failed', 'red'],
 }
 const IG_STATUS = {
   received: ['Awaiting mode', 'neutral'],
-  capturing: ['Capturing', 'cyan'],
-  captured: ['Captured', 'cyan'],
-  extracting: ['Reading', 'cyan'],
-  extracted: ['Extracted', 'cyan'],
-  researching: ['Fact-checking', 'cyan'],
-  researched: ['Verified', 'cyan'],
-  rewriting: ['Rewriting', 'cyan'],
-  rewritten: ['Rewritten', 'cyan'],
-  finalizing: ['Finalizing', 'cyan'],
+  capturing: ['Capturing', 'blue'],
+  captured: ['Captured', 'blue'],
+  extracting: ['Reading', 'blue'],
+  extracted: ['Extracted', 'blue'],
+  researching: ['Fact-checking', 'blue'],
+  researched: ['Verified', 'blue'],
+  rewriting: ['Rewriting', 'blue'],
+  rewritten: ['Rewritten', 'blue'],
+  finalizing: ['Finalizing', 'blue'],
   drafted: ['Draft ready', 'emerald'],
   failed: ['Failed', 'red'],
 }
 const TONE = {
-  emerald: 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/30',
-  amber: 'bg-amber-500/15 text-amber-300 ring-amber-500/30',
-  cyan: 'bg-cyan-500/15 text-cyan-300 ring-cyan-500/30',
-  red: 'bg-red-500/15 text-red-300 ring-red-500/30',
-  neutral: 'bg-neutral-500/15 text-neutral-300 ring-neutral-500/30',
+  emerald: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
+  green: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+  amber: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+  blue: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+  red: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+  neutral: 'bg-neutral-100 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300',
 }
 function statusMeta(card) {
   const map = card.kind === 'ig' ? IG_STATUS : BLOG_STATUS
@@ -137,102 +140,162 @@ function openCard(card) {
 <template>
   <div class="px-4 py-6 sm:px-6 lg:px-8">
     <!-- header -->
-    <div class="mb-6 flex items-center justify-between gap-4">
+    <div class="mb-5 flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h1 class="text-2xl font-semibold text-neutral-100">Social Studio</h1>
-        <p class="mt-1 text-sm text-neutral-400">
-          Draft queue + IG repurpose in one place — original → generated → publish.
+        <h1 class="text-2xl font-bold text-neutral-900 dark:text-neutral-100">Social Studio</h1>
+        <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
+          Draft queue + Instagram repurpose in one place — original → generated → publish.
         </p>
       </div>
       <button
-        class="rounded-lg bg-neutral-800 px-3 py-2 text-sm text-neutral-200 ring-1 ring-neutral-700 transition hover:bg-neutral-700 active:scale-[0.98]"
+        class="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50 active:scale-[0.98] disabled:opacity-60 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
         :disabled="isFetching"
         @click="refetchAll()"
       >
+        <svg class="h-4 w-4" :class="{ 'animate-spin': isFetching }" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5M5.5 14a7 7 0 0 0 12.4 2M18.5 10A7 7 0 0 0 6.1 8" />
+        </svg>
         {{ isFetching ? 'Refreshing…' : 'Refresh' }}
       </button>
     </div>
 
-    <!-- filter chips -->
-    <div class="mb-5 flex flex-wrap gap-2">
-      <button
-        v-for="f in FILTERS"
-        :key="f.key"
-        class="rounded-full px-4 py-1.5 text-xs font-medium uppercase tracking-wide ring-1 transition"
-        :class="activeFilter === f.key
-          ? 'bg-amber-500/20 text-amber-200 ring-amber-500/40'
-          : 'bg-neutral-900/60 text-neutral-300 ring-neutral-800 hover:bg-neutral-800'"
-        @click="activeFilter = f.key"
-      >
-        {{ f.label }}
-        <span class="ml-1.5 text-neutral-500">{{ counts[f.key] }}</span>
-      </button>
+    <!-- card -->
+    <div class="rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
+      <!-- filter tabs (Content Engine strip style) -->
+      <div class="flex flex-wrap gap-1 border-b border-neutral-200 px-3 pt-2 dark:border-neutral-700">
+        <button
+          v-for="f in FILTERS"
+          :key="f.key"
+          type="button"
+          @click="activeFilter = f.key"
+          :class="[
+            'px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors',
+            activeFilter === f.key
+              ? 'border-amber-500 text-amber-600 dark:text-amber-400'
+              : 'border-transparent text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200',
+          ]"
+        >
+          {{ f.label }}
+          <span
+            :class="[
+              'ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-semibold rounded-full',
+              activeFilter === f.key
+                ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400'
+                : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-400',
+            ]"
+          >{{ counts[f.key] }}</span>
+        </button>
+      </div>
+
+      <!-- table -->
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="bg-neutral-50 text-left dark:bg-neutral-700/50">
+              <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400 w-14"></th>
+              <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400 w-20">Source</th>
+              <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400">Topic</th>
+              <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400 w-40">Platforms</th>
+              <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400 w-32">Status</th>
+              <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400 w-24">Updated</th>
+              <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400 text-right w-16">Open</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-neutral-100 dark:divide-neutral-700">
+            <!-- loading -->
+            <tr v-if="isLoading && allCards.length === 0">
+              <td colspan="7" class="px-4 py-12 text-center text-neutral-500 dark:text-neutral-400">
+                <svg class="animate-spin h-6 w-6 mx-auto mb-2 text-amber-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                Loading…
+              </td>
+            </tr>
+
+            <!-- empty -->
+            <tr v-else-if="visibleCards.length === 0">
+              <td colspan="7" class="px-4 py-14 text-center">
+                <p class="text-sm text-neutral-500 dark:text-neutral-400">Nothing here yet.</p>
+                <p class="mt-1 text-xs text-neutral-400 dark:text-neutral-600">
+                  Publish from Content Engine to create a draft, or send an Instagram URL to the Telegram bot to repurpose.
+                </p>
+              </td>
+            </tr>
+
+            <!-- rows -->
+            <tr
+              v-else
+              v-for="card in visibleCards"
+              :key="`${card.kind}-${card.id}`"
+              class="cursor-pointer transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-700/30"
+              @click="openCard(card)"
+            >
+              <!-- cover -->
+              <td class="px-4 py-3">
+                <div class="relative h-12 w-12 overflow-hidden rounded-lg bg-neutral-100 ring-1 ring-neutral-200 dark:bg-neutral-700 dark:ring-neutral-600">
+                  <img v-if="cardCover(card)" :src="cardCover(card)" alt="" class="h-full w-full object-cover" loading="lazy" />
+                  <div v-else class="flex h-full w-full items-center justify-center">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" class="h-5 w-5 text-neutral-400 dark:text-neutral-500">
+                      <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-5-5L5 21" />
+                    </svg>
+                  </div>
+                </div>
+              </td>
+
+              <!-- source badge -->
+              <td class="px-4 py-3 align-middle">
+                <span
+                  class="inline-flex rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+                  :class="card.sourceBadge === 'ig'
+                    ? 'bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-900/30 dark:text-fuchsia-300'
+                    : 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300'"
+                >{{ card.sourceBadge === 'ig' ? 'IG' : 'Blog' }}</span>
+              </td>
+
+              <!-- topic -->
+              <td class="px-4 py-3 font-medium text-neutral-900 dark:text-neutral-100">
+                <span class="line-clamp-2">{{ card.title }}</span>
+              </td>
+
+              <!-- platforms -->
+              <td class="px-4 py-3">
+                <div class="flex flex-wrap gap-1">
+                  <span
+                    v-for="p in card.platforms"
+                    :key="p"
+                    class="rounded bg-neutral-100 px-1 py-0.5 text-[10px] font-medium uppercase tracking-wider text-neutral-500 dark:bg-neutral-700 dark:text-neutral-400"
+                  >{{ PLATFORM_LABEL[p] }}</span>
+                  <span v-if="!card.platforms.length" class="text-xs text-neutral-300 dark:text-neutral-600">—</span>
+                </div>
+              </td>
+
+              <!-- status -->
+              <td class="px-4 py-3">
+                <span class="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium" :class="statusToneFor(card)">
+                  {{ statusLabelFor(card) }}
+                </span>
+              </td>
+
+              <!-- updated -->
+              <td class="px-4 py-3 text-xs text-neutral-500 dark:text-neutral-400">{{ relativeTime(card.updatedAt) }}</td>
+
+              <!-- open -->
+              <td class="px-4 py-3 text-right">
+                <span class="inline-flex p-1.5 text-neutral-400 transition-colors group-hover:text-amber-600 dark:text-neutral-500">
+                  <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m9 18 6-6-6-6" />
+                  </svg>
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- footer count -->
+      <div class="flex items-center justify-end border-t border-neutral-200 px-4 py-3 dark:border-neutral-700">
+        <span class="text-xs text-neutral-500 dark:text-neutral-400">
+          {{ visibleCards.length }} shown / {{ allCards.length }} total
+        </span>
+      </div>
     </div>
-
-    <!-- loading -->
-    <div v-if="isLoading && allCards.length === 0" class="space-y-3">
-      <div v-for="n in 4" :key="n" class="h-20 animate-pulse rounded-xl bg-neutral-900/60 ring-1 ring-neutral-800" />
-    </div>
-
-    <!-- empty -->
-    <div
-      v-else-if="visibleCards.length === 0"
-      class="rounded-xl border border-dashed border-neutral-800 bg-neutral-900/30 px-6 py-16 text-center"
-    >
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-3 h-12 w-12 text-neutral-700">
-        <rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 21V9" />
-      </svg>
-      <p class="text-sm text-neutral-400">Nothing here yet.</p>
-      <p class="mt-1 text-xs text-neutral-600">
-        Publish from Content Engine to create a draft, or send an Instagram URL to the Telegram bot to repurpose.
-      </p>
-    </div>
-
-    <!-- cards -->
-    <ul v-else class="space-y-3">
-      <li
-        v-for="card in visibleCards"
-        :key="`${card.kind}-${card.id}`"
-        class="group flex cursor-pointer items-center gap-4 rounded-xl bg-neutral-900/50 p-3 ring-1 ring-neutral-800 transition hover:-translate-y-px hover:bg-neutral-900 hover:ring-neutral-700"
-        @click="openCard(card)"
-      >
-        <!-- cover -->
-        <div class="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-neutral-800 ring-1 ring-neutral-700">
-          <img v-if="cardCover(card)" :src="cardCover(card)" alt="" class="h-full w-full object-cover" loading="lazy" />
-          <div v-else class="flex h-full w-full items-center justify-center">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" class="h-6 w-6 text-neutral-600">
-              <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-5-5L5 21" />
-            </svg>
-          </div>
-        </div>
-
-        <!-- title + badges -->
-        <div class="min-w-0 flex-1">
-          <div class="flex items-center gap-2">
-            <!-- source badge (text chip, no emoji) -->
-            <span
-              class="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ring-1"
-              :class="card.sourceBadge === 'ig'
-                ? 'bg-fuchsia-500/15 text-fuchsia-300 ring-fuchsia-500/30'
-                : 'bg-sky-500/15 text-sky-300 ring-sky-500/30'"
-            >{{ card.sourceBadge === 'ig' ? 'IG' : 'Blog' }}</span>
-            <span
-              v-for="p in card.platforms"
-              :key="p"
-              class="rounded bg-neutral-800 px-1 py-0.5 text-[10px] font-medium uppercase tracking-wider text-neutral-400 ring-1 ring-neutral-700"
-            >{{ PLATFORM_LABEL[p] }}</span>
-          </div>
-          <p class="mt-1 truncate text-sm font-medium text-neutral-100">{{ card.title }}</p>
-        </div>
-
-        <!-- status + updated -->
-        <div class="flex shrink-0 flex-col items-end gap-1">
-          <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1" :class="statusToneFor(card)">
-            {{ statusLabelFor(card) }}
-          </span>
-          <span class="text-xs text-neutral-500">{{ relativeTime(card.updatedAt) }}</span>
-        </div>
-      </li>
-    </ul>
   </div>
 </template>

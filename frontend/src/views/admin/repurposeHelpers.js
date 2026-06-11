@@ -23,13 +23,14 @@ export const STATUS_LABEL = {
   failed: 'Failed',
 }
 
-// Tailwind chip tone per status group. Unknown → neutral slate (never empty).
+// Light/dark chip tone per status group, matching the Content Engine status
+// pills (bg-{c}-100 text-{c}-800 dark:…). Unknown → neutral (never empty).
 const TONE = {
-  drafted: 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/30',
-  failed: 'bg-red-500/15 text-red-300 ring-red-500/30',
-  received: 'bg-slate-500/15 text-slate-300 ring-slate-500/30',
+  drafted: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
+  failed: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+  received: 'bg-neutral-100 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300',
 }
-const INPROGRESS_TONE = 'bg-cyan-500/15 text-cyan-300 ring-cyan-500/30'
+const INPROGRESS_TONE = 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
 
 export function isTerminal(status) {
   return TERMINAL_STATUSES.includes(status)
@@ -77,8 +78,8 @@ export function rightPaneMode(job) {
 }
 
 export function modeLabel(mode) {
-  if (mode === 'blog') return '📝 Blog + Carousel'
-  if (mode === 'carousel') return '🎠 Carousel'
+  if (mode === 'blog') return 'Blog + Carousel'
+  if (mode === 'carousel') return 'Carousel'
   return '—'
 }
 

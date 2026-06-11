@@ -170,7 +170,9 @@ class FinalizeRepurpose implements ShouldQueue
         // transaction commits so the worker sees a persisted draft.
         GenerateLinkedInPost::dispatch($linkedinId);
 
-        $this->purge($job);
+        // NOTE: captured IG slides are intentionally RETAINED here (no purge) so the
+        // Social Studio detail can render the source↔generated image comparison for a
+        // freshly drafted carousel. The 7-day `repurpose:reap` reaper handles cleanup.
         app(TelegramNotificationService::class)->sendRepurposeDrafted($job, $linkedinId, $this->correctedClaims($job));
     }
 

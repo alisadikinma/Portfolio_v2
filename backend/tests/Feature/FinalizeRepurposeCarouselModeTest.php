@@ -19,7 +19,8 @@ use Tests\TestCase;
  * Phase F (carousel mode) — finalize creates an anchor blog Post(draft) +
  * primary PostTranslation + LinkedInPost(carousel, pending_generation) and
  * dispatches GenerateLinkedInPost (existing force-carousel path). NO ContentIdea.
- * Success purges the artifact dir + sends a Telegram drafted notice.
+ * Success RETAINS the artifact dir (source↔generated comparison in Social Studio;
+ * the 7-day repurpose:reap reaper cleans up) + sends a Telegram drafted notice.
  */
 class FinalizeRepurposeCarouselModeTest extends TestCase
 {
