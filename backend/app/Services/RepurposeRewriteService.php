@@ -37,24 +37,23 @@ class RepurposeRewriteService
         $refs = (string) config('services.repurpose.refs_rewrite', '');
 
         try {
-            $result = $this->runRepurposeSync($prompt, 'rewrite', (string) config('services.repurpose.model_rewrite', 'sonnet'), $refs);
+            $res = $this->runRepurposeParsed($prompt, 'rewrite', ['title', 'body'], (string) config('services.repurpose.model_rewrite', 'sonnet'), $refs);
         } catch (\Throwable $e) {
             Log::error('[RepurposeRewrite] exec threw', ['job' => $job->id, 'error' => $e->getMessage()]);
             return ['success' => false, 'rewritten' => null, 'error' => 'exec_error: ' . $e->getMessage()];
         }
 
-        if (!$result['success']) {
-            return ['success' => false, 'rewritten' => null, 'error' => $result['error'] ?? 'rewrite_exec_failed'];
-        }
-
-        $parsed = $this->parseJsonObject($result['output']);
-        if ($parsed === null || empty($parsed['title']) || empty($parsed['body'])) {
+        if (!$res['success']) {
+            $error = $res['error'] === 'unparseable_after_repair' ? 'rewrite_unparseable' : ($res['error'] ?? 'rewrite_exec_failed');
             Log::error('[RepurposeRewrite] unparseable / missing title|body', [
                 'job' => $job->id,
-                'output_head' => mb_substr($result['output'], 0, 500),
+                'output_head' => mb_substr((string) $res['output'], 0, 500),
+                'repaired' => $res['repaired'],
             ]);
-            return ['success' => false, 'rewritten' => null, 'error' => 'rewrite_unparseable'];
+            return ['success' => false, 'rewritten' => null, 'error' => $error];
         }
+
+        $parsed = $res['parsed'];
 
         Log::info('[RepurposeRewrite] done', [
             'job' => $job->id,

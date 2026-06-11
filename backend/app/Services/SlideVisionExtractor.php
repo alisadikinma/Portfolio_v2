@@ -41,24 +41,23 @@ class SlideVisionExtractor
         $prompt = $this->buildPrompt($slidePaths, $caption);
 
         try {
-            $result = $this->runRepurposeSync($prompt, 'vision', (string) config('services.repurpose.model_vision', 'sonnet'));
+            $res = $this->runRepurposeParsed($prompt, 'vision', ['claims'], (string) config('services.repurpose.model_vision', 'sonnet'));
         } catch (\Throwable $e) {
             Log::error('[SlideVisionExtractor] exec threw', ['job' => $job->id, 'error' => $e->getMessage()]);
             return ['success' => false, 'extracted' => null, 'error' => 'exec_error: ' . $e->getMessage()];
         }
 
-        if (!$result['success']) {
-            return ['success' => false, 'extracted' => null, 'error' => $result['error'] ?? 'vision_exec_failed'];
-        }
-
-        $parsed = $this->parseJsonObject($result['output']);
-        if ($parsed === null || empty($parsed['claims'])) {
+        if (!$res['success']) {
+            $error = $res['error'] === 'unparseable_after_repair' ? 'vision_unparseable' : ($res['error'] ?? 'vision_exec_failed');
             Log::error('[SlideVisionExtractor] unparseable / empty claims', [
                 'job' => $job->id,
-                'output_head' => mb_substr($result['output'], 0, 500),
+                'output_head' => mb_substr((string) $res['output'], 0, 500),
+                'repaired' => $res['repaired'],
             ]);
-            return ['success' => false, 'extracted' => null, 'error' => 'vision_unparseable'];
+            return ['success' => false, 'extracted' => null, 'error' => $error];
         }
+
+        $parsed = $res['parsed'];
 
         Log::info('[SlideVisionExtractor] extracted', [
             'job' => $job->id,

@@ -38,24 +38,23 @@ class RepurposeResearchService
         $prompt = $this->buildPrompt($claims, (string) ($extracted['narrative'] ?? ''), (string) $job->source_url);
 
         try {
-            $result = $this->runRepurposeSync($prompt, 'research', (string) config('services.repurpose.model_research', 'sonnet'));
+            $res = $this->runRepurposeParsed($prompt, 'research', ['verdicts'], (string) config('services.repurpose.model_research', 'sonnet'));
         } catch (\Throwable $e) {
             Log::error('[RepurposeResearch] exec threw', ['job' => $job->id, 'error' => $e->getMessage()]);
             return ['success' => false, 'research' => null, 'error' => 'exec_error: ' . $e->getMessage()];
         }
 
-        if (!$result['success']) {
-            return ['success' => false, 'research' => null, 'error' => $result['error'] ?? 'research_exec_failed'];
-        }
-
-        $parsed = $this->parseJsonObject($result['output']);
-        if ($parsed === null || empty($parsed['verdicts'])) {
+        if (!$res['success']) {
+            $error = $res['error'] === 'unparseable_after_repair' ? 'research_unparseable' : ($res['error'] ?? 'research_exec_failed');
             Log::error('[RepurposeResearch] unparseable / empty verdicts', [
                 'job' => $job->id,
-                'output_head' => mb_substr($result['output'], 0, 500),
+                'output_head' => mb_substr((string) $res['output'], 0, 500),
+                'repaired' => $res['repaired'],
             ]);
-            return ['success' => false, 'research' => null, 'error' => 'research_unparseable'];
+            return ['success' => false, 'research' => null, 'error' => $error];
         }
+
+        $parsed = $res['parsed'];
 
         $verdicts = array_values((array) $parsed['verdicts']);
         $corrected = count(array_filter($verdicts, fn ($v) => in_array(($v['status'] ?? ''), ['wrong', 'outdated'], true)));
