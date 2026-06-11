@@ -4,40 +4,30 @@ namespace Tests\Feature;
 
 use App\Models\Category;
 use App\Models\ContentIdea;
-use App\Models\Post;
-use App\Models\User;
 use App\Services\ContentPublishService;
 use Illuminate\Foundation\Console\QueuedCommand;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Queue;
-use Laravel\Sanctum\Sanctum;
 use Mockery;
 use Tests\TestCase;
 
 /**
- * Phase B (June 10, 2026): publishing a Content Engine idea must auto-queue a
- * targeted `linkedin:scan-blog --post-id={id}` so the LinkedIn draft surfaces
- * without the daily cron / manual "Scan blog now" button. The dispatch is
- * non-fatal — a failure to enqueue must NOT break the publish response.
+ * Event-driven LinkedIn draft ingest (June 10, 2026). Publishing a Content
+ * Engine idea must auto-queue a targeted `linkedin:scan-blog --post-id={id}`
+ * so the LinkedIn draft surfaces without the daily cron / manual button.
  *
- * @see \App\Http\Controllers\Api\Admin\ContentIdeaController::approveAndPublish
+ * The dispatch lives in ContentPublishService::publish — the SHARED chokepoint
+ * for BOTH the manual operator path (ContentIdeaController::approveAndPublish)
+ * AND the autonomous factory (AutoPipelineOrchestrator::publishReady). Testing
+ * the service directly proves both callers get the behavior. The dispatch is
+ * non-fatal — a failure to enqueue must NOT break the publish.
+ *
+ * @see \App\Services\ContentPublishService::publish
  */
 class ApproveAndPublishQueuesLinkedInScanTest extends TestCase
 {
     use RefreshDatabase;
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        // Local dev `.env` has APP_URL=http://localhost/Portfolio_v2/backend/public,
-        // which makes Laravel's test client prepend that subpath to every URL so
-        // `/api/admin/content-engine/ideas/{id}/publish` no longer matches the
-        // registered route. Reset the URL generator (mirrors GeminiGenRelayWebhookTest).
-        config(['app.url' => 'http://localhost']);
-        \URL::forceRootUrl('http://localhost');
-    }
 
     protected function tearDown(): void
     {
@@ -45,105 +35,63 @@ class ApproveAndPublishQueuesLinkedInScanTest extends TestCase
         parent::tearDown();
     }
 
-    /**
-     * Build a publishable ContentIdea (status reaches publish, no unresolved
-     * image segments) and a real saved Post the mocked publish() returns.
-     */
-    private function makePublishableIdeaAndPost(): array
+    /** Build a publishable ContentIdea (real article content, no image segments). */
+    private function makePublishableIdea(): ContentIdea
     {
-        $category = Category::create([
-            'name' => 'Tech',
-            'slug' => 'tech-' . uniqid(),
-        ]);
+        Category::create(['name' => 'Tech', 'slug' => 'tech-' . uniqid()]);
 
-        // Created BEFORE Queue::fake() so any HasImageVariants saved() side-effect
-        // never lands in the faked queue we assert against. featured_image is null
-        // so the variant job isn't dispatched at all.
-        $post = Post::create([
-            'category_id' => $category->id,
-            'title' => 'Published Article',
-            'slug' => 'published-article-' . uniqid(),
-            'content' => '<p>Body.</p>',
-            'published' => true,
-            'published_at' => now(),
-        ]);
-
-        // No image_prompts → the image-completion guard in approveAndPublish is
-        // skipped, so the request reaches publishService->publish().
-        $idea = ContentIdea::create([
+        return ContentIdea::create([
             'title' => 'Scan after publish',
             'pillar' => 'ai_generalist',
             'status' => 'images_ready',
-            'generated_article' => ['language' => 'en', 'en' => ['title' => 'X', 'content' => 'Y']],
+            'generated_article' => [
+                'language' => 'en',
+                'en' => ['title' => 'Published Article', 'content' => '<p>Body.</p>'],
+            ],
         ]);
-
-        return [$idea, $post];
     }
 
     public function test_publish_queues_targeted_linkedin_scan(): void
     {
-        [$idea, $post] = $this->makePublishableIdeaAndPost();
-
-        // Bind a mock ContentPublishService so we don't exercise the full publish
-        // path — return the real saved Post + translation flag the controller reads.
-        $mock = Mockery::mock(ContentPublishService::class);
-        $mock->shouldReceive('publish')
-            ->once()
-            ->andReturn(['post' => $post, 'translation_pending' => false]);
-        $this->instance(ContentPublishService::class, $mock);
+        $idea = $this->makePublishableIdea();
 
         Queue::fake();
 
-        Sanctum::actingAs(User::factory()->create());
+        $result = app(ContentPublishService::class)->publish($idea);
+        $postId = $result['post']->id;
 
-        $response = $this->postJson("/api/admin/content-engine/ideas/{$idea->id}/publish");
-
-        $response->assertStatus(200)->assertJson(['success' => true]);
-
-        // Guard: exactly one QueuedCommand pushed. If the payload-shape closure
-        // below ever stops matching (e.g. a Laravel internals change), this
-        // count assertion still fails loudly rather than passing vacuously.
+        // Exactly one QueuedCommand — the scan. featured_image is null so the
+        // HasImageVariants job never dispatches and can't pollute the count.
         Queue::assertPushed(QueuedCommand::class, 1);
 
-        Queue::assertPushed(QueuedCommand::class, function (QueuedCommand $job) use ($post) {
-            // Kernel::queue($command, $parameters) does QueuedCommand::dispatch(func_get_args()),
-            // so $data is a POSITIONAL array: [0 => command string, 1 => parameters array]
-            // (NOT associative 'command'/'parameters' keys).
+        Queue::assertPushed(QueuedCommand::class, function (QueuedCommand $job) use ($postId) {
+            // Kernel::queue($command, $parameters) → QueuedCommand::dispatch(func_get_args()),
+            // so $data is POSITIONAL: [0 => command string, 1 => parameters array].
             $data = $this->extractQueuedCommandData($job);
 
             return ($data[0] ?? null) === 'linkedin:scan-blog'
-                && (string) (($data[1] ?? [])['--post-id'] ?? null) === (string) $post->id;
+                && (string) (($data[1] ?? [])['--post-id'] ?? null) === (string) $postId;
         });
     }
 
     public function test_publish_succeeds_when_scan_dispatch_throws(): void
     {
-        [$idea, $post] = $this->makePublishableIdeaAndPost();
+        $idea = $this->makePublishableIdea();
 
-        $mock = Mockery::mock(ContentPublishService::class);
-        $mock->shouldReceive('publish')
-            ->once()
-            ->andReturn(['post' => $post, 'translation_pending' => false]);
-        $this->instance(ContentPublishService::class, $mock);
+        // Make the queue dispatch blow up; publish() must swallow it and still
+        // return the created post.
+        Artisan::shouldReceive('queue')->andThrow(new \RuntimeException('queue down'));
 
-        // Partial-mock the Artisan facade so the queue dispatch blows up; the
-        // controller's try/catch must swallow it and still return 200 success.
-        Artisan::shouldReceive('queue')
-            ->andThrow(new \RuntimeException('queue down'));
+        $result = app(ContentPublishService::class)->publish($idea);
 
-        Sanctum::actingAs(User::factory()->create());
-
-        $response = $this->postJson("/api/admin/content-engine/ideas/{$idea->id}/publish");
-
-        $response->assertStatus(200);
-        $this->assertTrue($response->json('success') === true);
+        $this->assertNotNull($result['post']->id);
+        $this->assertTrue($result['post']->published);
     }
 
     /**
      * QueuedCommand stores the Artisan::queue($command, $parameters) payload in a
-     * protected $data array. Kernel::queue() builds it via func_get_args(), so it is
-     * POSITIONAL: [0 => command string, 1 => parameters array]. Read it via reflection
-     * so the assertion targets the real command + --post-id value.
+     * protected $data array (POSITIONAL: [0 => command, 1 => parameters]). Read it
+     * via reflection so the assertion targets the real command + --post-id value.
      */
     private function extractQueuedCommandData(QueuedCommand $job): array
     {

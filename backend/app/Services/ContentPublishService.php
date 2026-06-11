@@ -9,6 +9,7 @@ use App\Models\Post;
 use App\Models\PostTranslation;
 use App\Services\TelegramNotifier;
 use App\Support\HtmlSlashSanitizer;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -164,6 +165,22 @@ class ContentPublishService
         // (article_ready / images_ready). Completed transition + Telegram
         // happen in markTranslationComplete or AutoPipelineOrchestrator,
         // whichever fires first.
+
+        // Event-driven LinkedIn draft ingest (June 10, 2026). Lives HERE — the
+        // single publish chokepoint shared by BOTH the manual operator path
+        // (ContentIdeaController::approveAndPublish) AND the autonomous factory
+        // (AutoPipelineOrchestrator::publishReady). Previously the dispatch sat
+        // only in approveAndPublish, so auto-published posts never spawned a
+        // LinkedIn draft. The targeted scan reuses the command's virality gate +
+        // one-live-draft idempotency, so a re-publish or double-call is safe.
+        try {
+            Artisan::queue('linkedin:scan-blog', ['--post-id' => $post->id]);
+        } catch (\Throwable $e) {
+            Log::warning('[ContentPublish] linkedin:scan-blog dispatch failed (non-fatal)', [
+                'post_id' => $post->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         return [
             'post' => $post,

@@ -120,11 +120,18 @@ function classifyForQueue(draft) {
   //     flip artisan; kept here as fallback so any future drafts that
   //     land back in awaiting_publish still surface for review).
   if (draft.status === 'manual_review' || draft.status === 'awaiting_publish') {
-    // Carousel-specific failure: every slide rejected → bucket as failed
-    // so operator's action is "retry slides", not "review caption".
+    // Carousel drafts can sit in manual_review while GeminiGen is still
+    // rendering slides (persistAndRoute dispatches the image job AFTER the FSM
+    // advance). Until rendering settles there is nothing for the operator to
+    // review yet — bucket by render state so the tab matches the RENDERING
+    // badge that effectiveStatusMeta() already shows.
     if (draft.format === 'carousel') {
       const imgState = inspectCarouselRenderState(draft)
+      // Worker still active (slides in flight / not started / re-authoring) → wait.
+      if (['generating', 'pending', 'reauthoring'].includes(imgState)) return 'in_progress'
+      // Every slide rejected → operator's action is "retry slides", not "review caption".
       if (imgState === 'failed') return 'failed'
+      // 'ready' (all done) or 'partial' (some done/some failed) → genuinely reviewable.
     }
     return 'need_reviews'
   }

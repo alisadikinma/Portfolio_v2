@@ -1347,17 +1347,11 @@ class ContentIdeaController extends Controller
 
         $post = $result['post'];
 
-        // Event-driven LinkedIn draft ingest (June 10, 2026): replaces the daily
-        // linkedin:scan-blog cron + the manual "Scan blog now" button. The targeted
-        // scan reuses the virality gate + one-live-draft idempotency in the command.
-        try {
-            Artisan::queue('linkedin:scan-blog', ['--post-id' => $post->id]);
-        } catch (\Throwable $e) {
-            Log::warning('[ContentEngine] linkedin:scan-blog dispatch failed (non-fatal)', [
-                'post_id' => $post->id,
-                'error' => $e->getMessage(),
-            ]);
-        }
+        // Event-driven LinkedIn draft ingest (June 10, 2026) now lives in
+        // ContentPublishService::publish — the shared chokepoint for both this
+        // manual path and the autonomous AutoPipelineOrchestrator path. No
+        // dispatch here (would be a redundant second queue; the command is
+        // idempotent anyway).
 
         $translationPending = $result['translation_pending'];
 
