@@ -568,8 +568,10 @@ class TelegramNotificationService
         }
 
         $secret = (string) $this->getSetting('telegram_webhook_secret');
-        $url = $this->truncate((string) $job->source_url, 80);
-        $angleLine = $job->angle ? "\nAngle: _" . $this->truncate((string) $job->angle, 120) . '_' : '';
+        $url = $this->escapeMarkdown($this->truncate((string) $job->source_url, 80));
+        $angleLine = $job->angle
+            ? "\nAngle: _" . $this->escapeMarkdown($this->truncate((string) $job->angle, 120)) . '_'
+            : '';
 
         $text = "🔗 *IG repurpose* — pilih output:\n{$url}{$angleLine}";
 
@@ -601,10 +603,10 @@ class TelegramNotificationService
             return false;
         }
 
-        $url = $this->truncate((string) $job->source_url, 80);
-        $reasonLine = $this->truncate($reason, 200);
+        $url = $this->escapeMarkdown($this->truncate((string) $job->source_url, 80));
+        $reasonLine = $this->escapeMarkdown($this->truncate($reason, 200));
 
-        $text = "⚠️ *IG repurpose gagal* (job #{$job->id})\n{$url}\n\nAlasan: `{$reasonLine}`\n\n"
+        $text = "⚠️ *IG repurpose gagal* (job #{$job->id})\n{$url}\n\nAlasan: {$reasonLine}\n\n"
             . 'Cek post-nya public/bisa diakses, atau paste ulang URL untuk retry.';
 
         return $this->send($text);

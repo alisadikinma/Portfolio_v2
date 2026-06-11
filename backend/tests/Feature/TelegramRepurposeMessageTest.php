@@ -66,6 +66,35 @@ class TelegramRepurposeMessageTest extends TestCase
         });
     }
 
+    public function test_ig_url_query_string_is_not_treated_as_angle(): void
+    {
+        // The IG share URL carries ?img_index/?igsh params. Those must be
+        // stripped with the URL token, NOT misread as the operator's angle
+        // (regression: ?img_index=2&igsh=... became angle, and the `_` in
+        // img_index broke the Markdown mode-prompt → Telegram 400).
+        $this->postWebhook([
+            'message' => ['chat' => ['id' => 99], 'text' => 'https://www.instagram.com/p/DZXsw3okgv1/?img_index=2&igsh=MTg1a3FtaXdiZWht'],
+        ])->assertOk();
+
+        $this->assertDatabaseHas('repurpose_jobs', [
+            'source_url' => 'https://www.instagram.com/p/DZXsw3okgv1/',
+            'status' => 'received',
+            'angle' => null,
+        ]);
+    }
+
+    public function test_real_angle_after_url_with_query_is_preserved(): void
+    {
+        $this->postWebhook([
+            'message' => ['chat' => ['id' => 99], 'text' => 'https://www.instagram.com/p/ABC123/?igsh=xyz fokus sisi teknis'],
+        ])->assertOk();
+
+        $this->assertDatabaseHas('repurpose_jobs', [
+            'source_url' => 'https://www.instagram.com/p/ABC123/',
+            'angle' => 'fokus sisi teknis',
+        ]);
+    }
+
     public function test_reel_url_also_accepted(): void
     {
         $this->postWebhook([

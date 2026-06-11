@@ -59,6 +59,44 @@ class RepurposeProgressNotificationTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_mode_prompt_escapes_markdown_in_dynamic_content(): void
+    {
+        // angle / shortcode with _ or * must be escaped so the Markdown
+        // entities stay balanced — otherwise Telegram rejects the send with
+        // 400 "can't parse entities" and the mode buttons never arrive
+        // (regression: job #6 angle "?img_index=2&igsh=..." → unbalanced `_`).
+        $job = RepurposeJob::factory()->create([
+            'source_url' => 'https://www.instagram.com/p/A_b1/',
+            'angle' => 'fokus after_effects & *hook*',
+        ]);
+
+        $ok = app(TelegramNotificationService::class)->sendRepurposeModePrompt($job);
+
+        $this->assertTrue($ok);
+        Http::assertSent(function ($req) {
+            $text = (string) $req['text'];
+            return str_contains($req->url(), '/sendMessage')
+                && str_contains($text, 'after\\_effects')
+                && str_contains($text, '\\*hook\\*')
+                && str_contains($text, 'A\\_b1');
+        });
+    }
+
+    public function test_failed_notice_escapes_markdown_in_reason(): void
+    {
+        $job = RepurposeJob::factory()->create(['source_url' => 'https://www.instagram.com/p/ABC/']);
+
+        $ok = app(TelegramNotificationService::class)
+            ->sendRepurposeFailed($job, 'exec threw _exceeded_ the `timeout`');
+
+        $this->assertTrue($ok);
+        Http::assertSent(function ($req) {
+            $text = (string) $req['text'];
+            return str_contains($text, '\\_exceeded\\_')
+                && str_contains($text, '\\`timeout\\`');
+        });
+    }
+
     public function test_mode_tap_sends_a_progress_ack_bubble(): void
     {
         Bus::fake();

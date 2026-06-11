@@ -237,8 +237,12 @@ class TelegramWebhookController extends Controller
             return; // non-IG text — ignore quietly, no spam reply
         }
 
-        // Remaining text after stripping the URL = optional angle/instruction.
-        $angle = trim(str_replace($url, '', $text));
+        // Remaining text after stripping the FULL URL token (incl. the
+        // ?img_index/?igsh query string IG appends to share links) = optional
+        // angle/instruction. Stripping only the matched clean URL would leave
+        // the query string behind and misread it as an angle — and the `_` in
+        // `img_index` then broke the Markdown mode-prompt (Telegram 400).
+        $angle = trim(preg_replace('~https?://\S+~i', '', $text));
         $angle = $angle !== '' ? $angle : null;
 
         $job = RepurposeJob::create([

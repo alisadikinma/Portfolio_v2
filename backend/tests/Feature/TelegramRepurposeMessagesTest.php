@@ -52,8 +52,11 @@ class TelegramRepurposeMessagesTest extends TestCase
 
         app(TelegramNotificationService::class)->sendRepurposeFailed($job, 'capture_failed: login_wall');
 
+        // Reason is Markdown-escaped so underscores can't unbalance the entity
+        // parser (Telegram 400). The escaped substring confirms the reason text
+        // is present AND safely encoded.
         Http::assertSent(fn ($req) => str_contains($req->url(), '/sendMessage')
-            && str_contains($req['text'], 'login_wall'));
+            && str_contains($req['text'], 'login\\_wall'));
     }
 
     public function test_drafted_message_carousel_links_draft_posts(): void
