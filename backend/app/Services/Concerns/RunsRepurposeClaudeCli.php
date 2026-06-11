@@ -2,6 +2,7 @@
 
 namespace App\Services\Concerns;
 
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 
 /**
@@ -58,6 +59,80 @@ trait RunsRepurposeClaudeCli
         }
 
         return ['success' => true, 'output' => $result->output(), 'error' => null];
+    }
+
+    /**
+     * Run the CLI, parse the JSON object, validate required keys. On a parse/keys
+     * failure WHERE EXEC SUCCEEDED, fire ONE repair attempt with a strict
+     * re-prompt. Exec failures (timeout/ssh) are returned immediately — a re-run
+     * would just fail the same way (the bigger CLI budget is what rescues those).
+     *
+     * @param string[] $requiredKeys keys that must be present & non-empty in parsed
+     * @return array{success: bool, parsed: array<string,mixed>|null, output: string, error: string|null, repaired: bool}
+     */
+    protected function runRepurposeParsed(
+        string $prompt,
+        string $phase,
+        array $requiredKeys,
+        string $model = 'sonnet',
+        string $refsFile = ''
+    ): array {
+        $result = $this->runRepurposeSync($prompt, $phase, $model, $refsFile);
+
+        if (!$result['success']) {
+            // Exec failure (timeout / ssh) — no repair.
+            return ['success' => false, 'parsed' => null, 'output' => '', 'error' => $result['error'], 'repaired' => false];
+        }
+
+        $parsed = $this->parseJsonObject($result['output']);
+        if ($this->hasRequiredKeys($parsed, $requiredKeys)) {
+            return ['success' => true, 'parsed' => $parsed, 'output' => $result['output'], 'error' => null, 'repaired' => false];
+        }
+
+        // Exec OK but output unparseable / missing keys → ONE repair attempt.
+        Log::warning('[Repurpose] repair retry', ['phase' => $phase, 'required' => $requiredKeys]);
+        $repair = $this->runRepurposeSync($this->buildRepairPrompt($prompt, $requiredKeys), $phase . '-repair', $model, $refsFile);
+
+        if ($repair['success']) {
+            $parsed = $this->parseJsonObject($repair['output']);
+            if ($this->hasRequiredKeys($parsed, $requiredKeys)) {
+                return ['success' => true, 'parsed' => $parsed, 'output' => $repair['output'], 'error' => null, 'repaired' => true];
+            }
+        }
+
+        return [
+            'success' => false,
+            'parsed' => null,
+            'output' => $repair['output'] !== '' ? $repair['output'] : $result['output'],
+            'error' => 'unparseable_after_repair',
+            'repaired' => true,
+        ];
+    }
+
+    /** @param string[] $requiredKeys */
+    private function buildRepairPrompt(string $prompt, array $requiredKeys): string
+    {
+        $keys = implode(', ', $requiredKeys);
+
+        return $prompt . "\n\n---\nYOUR PREVIOUS OUTPUT WAS INVALID OR INCOMPLETE JSON. Return ONLY one complete, valid JSON object now. It MUST contain these non-empty keys: {$keys}. Escape every double-quote inside string values as \\\". Output compact JSON — no markdown fences, no preamble, no trailing prose. Do NOT truncate; close every bracket.";
+    }
+
+    /**
+     * @param array<string,mixed>|null $parsed
+     * @param string[] $keys
+     */
+    private function hasRequiredKeys(?array $parsed, array $keys): bool
+    {
+        if ($parsed === null) {
+            return false;
+        }
+        foreach ($keys as $key) {
+            if (empty($parsed[$key])) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function repurposeMcpFlags(): string
