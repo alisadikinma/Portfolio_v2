@@ -81,6 +81,16 @@ class LinkedInSlotReadinessService
             if (in_array($status, self::SIBLING_BLOCKING_STATUSES, true)) {
                 $blockers[] = "{$platformKey}_status_{$status}";
             }
+
+            // IG mixed carousel: wait for the GROK hook video to settle so we
+            // don't publish the all-image fallback while it's still rendering.
+            // done/failed/null all clear (failed → fallback, null → not requested).
+            if ($platformKey === 'instagram') {
+                $hookStatus = (string) ($sibling->hook_video_status ?? '');
+                if (in_array($hookStatus, ['generating', 'pending'], true)) {
+                    $blockers[] = "instagram_hook_video_{$hookStatus}";
+                }
+            }
         }
 
         return [
