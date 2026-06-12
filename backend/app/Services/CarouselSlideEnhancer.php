@@ -279,9 +279,9 @@ class CarouselSlideEnhancer
 
         $chrome = "\n\nBrand chrome (rendered as in-image typography):\n";
         $chrome .= "Top-left corner of the canvas, render the page indicator \"{$pageIndicator}\" in small white text positioned roughly seventy-five pixels from the top edge and seventy-five pixels from the left edge.\n";
-        $chrome .= "Centered horizontally and vertically as a small circular badge, render the brand icon from the provided brand logo reference image at {$opacityWord} — use the exact icon from the file, do not generate a new logo.\n";
-        $chrome .= "Centered horizontally directly below the brand icon, render the watermark text \"{$handle}\" in white at {$opacityWord}, subtle background mark only, never competing with the headline.\n";
-        $chrome .= "CRITICAL: the opacity/transparency is a RENDERING instruction only — NEVER draw the words \"opacity\", \"transparent\", \"thirty percent\", \"30%\", or any percentage or number label anywhere in the image. The centered brand block is ONLY the icon plus the \"{$handle}\" text — no opacity caption, no percentage figure, nothing else beside it.\n";
+        $chrome .= "Bottom-left corner of the canvas, render the watermark text \"{$handle}\" in small white typography at {$opacityWord} — a single subtle attribution mark, never competing with the headline.\n";
+        $chrome .= "The brand mark (bald-with-glasses icon) appears ONCE, in the top bar only. Do NOT render a second brand-icon watermark in the center of the canvas — no duplicated face/logo in the middle of the image.\n";
+        $chrome .= "CRITICAL: the opacity/transparency is a RENDERING instruction only — NEVER draw the words \"opacity\", \"transparent\", \"thirty percent\", \"30%\", or any percentage or number label anywhere in the image. The watermark is ONLY the \"{$handle}\" text — no opacity caption, no percentage figure, nothing beside it.\n";
 
         if (! $isCta && $swipeText !== '') {
             $chrome .= "Bottom center of the composition, beneath the headline text with minimal gap and never crammed against the very bottom of the canvas, render the literal text \"{$swipeText}\" in small white typography.\n";
