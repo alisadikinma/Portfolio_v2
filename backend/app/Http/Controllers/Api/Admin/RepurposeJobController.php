@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Admin;
 
+use App\Enums\LinkedInPostStatus;
 use App\Enums\RepurposeJobStatus;
 use App\Http\Controllers\Controller;
 use App\Jobs\CaptureInstagramPost;
@@ -51,6 +52,26 @@ class RepurposeJobController extends Controller
                 ], 422);
             }
             $query->where('status', $status);
+        }
+
+        // Mirror the blog source's `scope=queue` gate EXACTLY: the blog list shows only
+        // LinkedInPostStatus::queueStatuses() drafts, so a draft leaves Social Studio the
+        // moment it SETTLES — scheduled into the Content Calendar (awaiting_publish) OR
+        // published (also cancelled). Apply the same to IG: hide a job once its downstream
+        // output has settled:
+        //   carousel mode → linked LinkedInPost left queueStatuses (calendar/published/cancelled)
+        //   blog mode     → linked ContentIdea completed with a result Post
+        // Jobs with no downstream yet (in-flight repurpose / drafted-not-routed) and jobs
+        // whose draft is still in the queue (incl. failed → Failed tab) all stay. Opt-in
+        // via ?exclude_settled=1 so any other consumer keeps the full set.
+        if ($request->boolean('exclude_settled')) {
+            $queue = LinkedInPostStatus::queueStatuses();
+            $query
+                ->where(function ($q) use ($queue) {
+                    $q->whereDoesntHave('linkedinPost')
+                        ->orWhereHas('linkedinPost', fn ($p) => $p->whereIn('status', $queue));
+                })
+                ->whereDoesntHave('contentIdea', fn ($q) => $q->where('status', 'completed')->whereNotNull('result_post_id'));
         }
 
         $perPage = min((int) $request->query('per_page', 25), 100);

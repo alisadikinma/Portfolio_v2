@@ -27,7 +27,10 @@ import { relativeTime } from './repurposeHelpers.js'
 const router = useRouter()
 
 // --- sources ---------------------------------------------------------------
-const igFilters = computed(() => ({ per_page: 100 }))
+// exclude_settled: once an IG job's carousel/blog is scheduled into the Content
+// Calendar OR published, it leaves Social Studio — exactly as a blog draft does
+// (the blog scope=queue gate already drops awaiting_publish + published drafts).
+const igFilters = computed(() => ({ per_page: 100, exclude_settled: 1 }))
 const { jobs: igJobs, isLoading: igLoading, isFetching: igFetching, refetch: refetchIg } =
   useRepurposeJobsList(igFilters)
 

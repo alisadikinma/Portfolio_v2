@@ -20,6 +20,10 @@ function listJobs(filters = {}) {
   if (filters.status) params.status = filters.status
   if (filters.per_page) params.per_page = filters.per_page
   if (filters.page) params.page = filters.page
+  // Social Studio opts in: hide IG jobs whose downstream carousel/blog has SETTLED —
+  // scheduled into the Content Calendar OR published (mirrors the blog source's
+  // scope=queue gate, which already drops awaiting_publish + published drafts).
+  if (filters.exclude_settled) params.exclude_settled = 1
   return api.get('/admin/repurpose', { params }).then(r => r.data)
 }
 
