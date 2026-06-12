@@ -50,6 +50,15 @@ class PublishViaPublerTransientTest extends TestCase
         ));
     }
 
+    public function test_media_poll_timeout_is_transient(): void
+    {
+        // Publer media-from-url ingest slow/congested — the job is still running
+        // on Publer's side; a backed-off retry succeeds once the queue drains.
+        $this->assertTrue($this->classify(
+            'Publer media job 6a2be941c1f50598dfee1130 did not complete within 40 polls. URL: https://alisadikinma.com/storage/linkedin-carousel/creator-brand-li-154-slide-07-cta-v2.png'
+        ));
+    }
+
     /**
      * Routes to the dedicated cross-post worker pool, not the shared `default`
      * queue (where it would starve behind multi-minute /carousel-gen SSH jobs —

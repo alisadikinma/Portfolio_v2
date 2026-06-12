@@ -49,8 +49,12 @@ class PublishViaPubler implements ShouldQueue
 
     public int $tries = 3;
     public array $backoff = [60, 300, 900];
-    /** Generous: N media uploads (each upload+poll) + publish-job poll. */
-    public int $timeout = 240;
+    /**
+     * Generous: N media uploads (each upload+poll) + publish-job poll. Raised
+     * 240→600 so a slow-but-progressing publish under Publer media-ingest
+     * congestion isn't killed mid-flight (stays under the worker's 900s cap).
+     */
+    public int $timeout = 600;
 
     /**
      * @param  string  $platform       'instagram'|'tiktok'|'threads'|'facebook'
@@ -332,6 +336,17 @@ class PublishViaPubler implements ShouldQueue
         if (stripos($message, 'media busy') !== false
             || stripos($message, 'download media') !== false
             || stripos($message, 'rate limit') !== false) {
+            return true;
+        }
+        // Publer media-from-url ingest is slow/congested for this account and our
+        // poll window elapsed ("...did not complete within N polls"). This is
+        // transient — the media job is still ingesting on Publer's side and a
+        // backed-off retry succeeds once the per-account queue drains (proven by
+        // the serial-recovery pattern). The upload happens BEFORE publishNow, so
+        // publer_post_id is still null → no duplicate risk on retry. Previously
+        // this fell through to "permanent" and hard-failed the cross-post on a
+        // recoverable timeout (production incidents: drafts 154/157, 2026-06-12).
+        if (stripos($message, 'did not complete within') !== false) {
             return true;
         }
         // Other 401/403 and 4xx are permanent failures.
