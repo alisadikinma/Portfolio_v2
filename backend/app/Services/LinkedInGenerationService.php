@@ -1157,24 +1157,32 @@ class LinkedInGenerationService
         // Knowledge-first directive — only meaningful for the blue-brand
         // sketchnote hybrid preset (cinematic photo carousels keep their own
         // WOW gate). Hybrid per style-presets §0 slide-role routing: every
-        // slide sits on the solid blue #0F59B6 base; the hook (cover) + CTA
-        // use the photographic Spotlight Portrait (real creator face/body +
-        // floating topic UI), while the body/peak slides are flat hand-drawn
+        // slide sits on a blue brand GRADIENT base (navy #0A3D82 edges →
+        // brighter #1E6FD0 center, not flat); the hook (cover) + CTA use the
+        // photographic Spotlight Portrait (real bald creator face/body, caught
+        // mid-action + floating topic UI), while the body/peak slides are flat hand-drawn
         // doodle mini-infographics. Steers each doodle slide toward a
         // self-contained teaching unit so a reader grasps the topic alone.
         if ($style === 'sketchnote') {
             $prompt .= "\n\nBLUE-BRAND HYBRID (sketchnote style — per the bundled style-presets sketchnote"
-                . " preset §0 slide-role routing): EVERY slide sits on the solid blue #0F59B6 brand base."
-                . " COVER (hook) + CTA: render the PHOTOGRAPHIC Spotlight Portrait — a real creator face and"
-                . " upper body from the provided face reference, signature outfit, with at least 3 floating"
-                . " topic UI elements (real tool cards/logos/screenshots) and a bold bilingual headline with"
-                . " gold accent words. BODY + PEAK + all middle slides: flat hand-drawn DOODLE infographic on"
-                . " the blue base (light off-white marker ink, gold + mint accents — never dark ink) per the"
-                . " DOODLE gate, each a SELF-CONTAINED mini-infographic that teaches ONE idea in depth"
+                . " preset §0 slide-role routing): EVERY slide sits on a BLUE BRAND GRADIENT base — deep navy"
+                . " #0A3D82 in the corners radiating to a brighter #1E6FD0 toward the center (a soft gradient"
+                . " for artistry, NEVER a flat solid fill). COVER (hook) + CTA: render the PHOTOGRAPHIC"
+                . " Spotlight Portrait — a real creator face and upper body from the provided face reference"
+                . " (bald head with rectangular glasses), signature outfit, caught MID-ACTION in a relaxed"
+                . " slightly-quirky beat (sipping a coffee mug, holding a game controller, mid-gesture — NOT a"
+                . " stiff frontal stand), with at least 3 floating topic UI elements (real tool cards/logos/"
+                . "screenshots) and a bold bilingual headline with gold accent words. Top-bar pill shows the"
+                . " clearly visible handle @alisadikinma + a bald-with-glasses brand avatar — do NOT print the"
+                . " word 'Bilingual'. BODY + PEAK + all middle slides: flat hand-drawn DOODLE infographic on"
+                . " the blue gradient base (light off-white marker ink, gold + mint accents — never dark ink)"
+                . " per the DOODLE gate, each a SELF-CONTAINED mini-infographic that teaches ONE idea in depth"
                 . " (numbered icon-rows with a short label + one-line explanation, OR a labeled comparison, OR"
-                . " an annotated mechanism diagram). Build a knowledge spine: cover states the core"
-                . " promise/definition; body slides teach; the peak delivers the key insight; the CTA closes."
-                . " Maximize knowledge density per doodle slide while keeping text legible on blue.";
+                . " an annotated mechanism diagram). The brand icon on every slide is a BALD head with"
+                . " rectangular glasses and NO hair — match the real brand mark, never doodle a face with hair."
+                . " Build a knowledge spine: cover states the core promise/definition; body slides teach; the"
+                . " peak delivers the key insight; the CTA closes. Maximize knowledge density per doodle slide"
+                . " while keeping text legible on the blue gradient.";
         }
 
         if (is_string($blogContent) && trim($blogContent) !== '') {
