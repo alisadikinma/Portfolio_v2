@@ -89,6 +89,33 @@ class PollHookVideosCommandTest extends TestCase
         $this->assertNotNull($ig->hook_video_error);
     }
 
+    public function test_in_progress_poll_with_empty_error_keys_stays_generating(): void
+    {
+        // GeminiGen ALWAYS returns error_code/error_message keys, set to "" while
+        // a render is still in progress. The old isset()-based detection treated
+        // the present-but-empty key as a failure and marked every hook video
+        // 'failed' within ~1 min of dispatch, before GROK finished. Regression:
+        // an in-progress poll (status=1, percentage<100, empty error strings, no
+        // video_url) must stay 'generating'.
+        $ig = $this->makeIg(['hook_video_status' => 'generating', 'hook_video_job_uuid' => 'u-prog']);
+
+        Http::fake([
+            '*/history/u-prog' => Http::response([
+                'status' => 1,
+                'status_percentage' => 50,
+                'error_code' => '',
+                'error_message' => '',
+                'generated_video' => [],
+            ], 200),
+        ]);
+
+        $this->artisan('crosspost:poll-hook-videos')->assertExitCode(0);
+
+        $ig->refresh();
+        $this->assertSame('generating', $ig->hook_video_status);
+        $this->assertNull($ig->hook_video_url);
+    }
+
     public function test_recovery_redispatches_failed_under_cap(): void
     {
         Bus::fake();

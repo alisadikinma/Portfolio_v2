@@ -89,9 +89,15 @@ class PollHookVideos extends Command
                 ?? $data['media_url']
                 ?? null;
             $status = (int) ($data['status'] ?? 0);
-            $hasError = $status === 3
-                || isset($data['error'])
-                || isset($data['error_message']);
+
+            // GeminiGen ALWAYS returns error_code/error_message keys, set to ""
+            // on a healthy render — so isset() is always true and CANNOT signal
+            // failure (it false-positived every in-progress poll into 'failed'
+            // within ~1 min of dispatch, before GROK even finished rendering).
+            // A real failure is status===3 OR a NON-EMPTY error string.
+            $errCode = is_string($data['error_code'] ?? null) ? trim($data['error_code']) : '';
+            $errMsg = is_string($data['error_message'] ?? null) ? trim($data['error_message']) : '';
+            $hasError = $status === 3 || $errCode !== '' || $errMsg !== '';
 
             if ($videoUrl) {
                 if ($dry) {
@@ -112,7 +118,7 @@ class PollHookVideos extends Command
             }
 
             if ($hasError) {
-                $reason = is_string($data['error_message'] ?? null) ? $data['error_message'] : 'GROK reported a render failure.';
+                $reason = $errMsg !== '' ? $errMsg : ($errCode !== '' ? $errCode : 'GROK reported a render failure.');
                 if (! $dry) {
                     $ig->update(['hook_video_status' => 'failed', 'hook_video_error' => $reason]);
                 }
