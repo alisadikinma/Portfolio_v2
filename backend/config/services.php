@@ -37,6 +37,12 @@ return [
 
     'geminigen' => [
         'api_key' => env('GEMINIGEN_API_KEY', ''),
+        // GROK hook-video (IG mixed carousel). Same key + base URL as the
+        // image endpoint; grok-3 maps server-side to model_name=grok-video.
+        'video_model' => env('GEMINIGEN_VIDEO_MODEL', 'grok-3'),
+        // ffmpeg binary on the queue-worker host (flatten PNG→JPG + pad 4:5→2:3
+        // before dispatch, crop 2:3→4:5 + strip audio on download).
+        'ffmpeg_path' => env('FFMPEG_PATH', 'ffmpeg'),
     ],
 
     'geoip' => [
