@@ -40,7 +40,13 @@ export function useRepurposeJobsList(filters) {
     gcTime: 5 * 60 * 1000,
     refetchInterval: (q) => {
       const rows = q.state.data?.data || []
-      return rows.some(r => !isTerminal(r.status)) ? 5_000 : false
+      // Poll while a job is mid-pipeline OR a `drafted` job's downstream
+      // carousel is still re-authoring / rendering (so the list progress climbs).
+      const active = rows.some(r =>
+        !isTerminal(r.status) ||
+        (r.status === 'drafted' && ['reauthoring', 'generating', 'pending', 'partial'].includes(r.render_state)),
+      )
+      return active ? 5_000 : false
     },
   })
 

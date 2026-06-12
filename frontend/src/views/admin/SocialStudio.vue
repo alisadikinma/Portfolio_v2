@@ -9,6 +9,7 @@ import {
   matchesFilter,
   mergeAndSort,
   countsBySource,
+  progressLabel,
 } from './socialStudioHelpers.js'
 import { relativeTime } from './repurposeHelpers.js'
 
@@ -43,6 +44,13 @@ const allCards = computed(() =>
   mergeAndSort(igJobs.value.map(toCard), blogDrafts.value.map(toCard)),
 )
 const counts = computed(() => countsBySource(allCards.value))
+
+// Live 1s tick so the re-authoring elapsed counts up between the 5s data polls
+// (cheap for a small admin table). Render N/M comes from the polled data itself.
+const now = ref(Date.now())
+const tickTimer = setInterval(() => { now.value = Date.now() }, 1000)
+onBeforeUnmount(() => clearInterval(tickTimer))
+function progressFor(card) { return progressLabel(card, now.value) }
 
 const FILTERS = [
   { key: 'all', label: 'All' },
@@ -290,9 +298,14 @@ function openCard(card) {
 
               <!-- status -->
               <td class="px-4 py-3">
-                <span class="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium" :class="statusToneFor(card)">
-                  {{ statusLabelFor(card) }}
-                </span>
+                <div class="flex items-center gap-2">
+                  <span class="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium" :class="statusToneFor(card)">
+                    {{ statusLabelFor(card) }}
+                  </span>
+                  <span v-if="progressFor(card)" class="font-mono text-xs tabular-nums text-neutral-500 dark:text-neutral-400">
+                    {{ progressFor(card) }}
+                  </span>
+                </div>
               </td>
 
               <!-- updated -->

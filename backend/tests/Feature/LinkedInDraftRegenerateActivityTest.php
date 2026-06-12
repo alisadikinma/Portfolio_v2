@@ -6,8 +6,10 @@ use App\Models\Category;
 use App\Models\LinkedInPost;
 use App\Models\Post;
 use App\Models\PostTranslation;
+use App\Models\RepurposeJob;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
@@ -134,5 +136,47 @@ class LinkedInDraftRegenerateActivityTest extends TestCase
             ->assertJsonPath('data.regenerate_activity.active', false)
             ->assertJsonPath('data.regenerate_activity.phase', null)
             ->assertJsonPath('data.regenerate_activity.started_at', null);
+    }
+
+    /** @test */
+    public function regenerate_repoints_linked_repurpose_job_to_the_new_draft(): void
+    {
+        Bus::fake(); // GenerateLinkedInPost is dispatched by regenerate
+
+        $draft = LinkedInPost::factory()->create([
+            'post_id' => $this->makePost()->id,
+            'format' => 'carousel',
+            'status' => 'failed',
+            'carousel_slides' => [],
+        ]);
+        $job = RepurposeJob::factory()->create([
+            'mode' => 'carousel',
+            'status' => 'drafted',
+            'linkedin_post_id' => $draft->id,
+            'anchor_post_id' => $draft->post_id,
+        ]);
+
+        $res = $this->postJson("/api/admin/linkedin-drafts/{$draft->id}/regenerate");
+        $res->assertStatus(201);
+        $newId = $res->json('data.id');
+
+        $this->assertNotSame($draft->id, $newId);
+        $this->assertSoftDeleted('linkedin_posts', ['id' => $draft->id]);
+        // The repurpose linkage now points at the live draft, not the dead one.
+        $this->assertSame($newId, $job->fresh()->linkedin_post_id);
+    }
+
+    /** @test */
+    public function list_exposes_render_progress_for_carousel_drafts(): void
+    {
+        $draft = $this->carouselDraft(['done', 'generating', 'pending']);
+
+        $res = $this->getJson('/api/admin/linkedin-drafts?per_page=100');
+        $res->assertStatus(200);
+
+        $row = collect($res->json('data'))->firstWhere('id', $draft->id);
+        $this->assertNotNull($row);
+        $this->assertSame(1, $row['render_done']);
+        $this->assertSame(3, $row['render_total']);
     }
 }

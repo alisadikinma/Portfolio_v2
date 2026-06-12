@@ -116,6 +116,48 @@ export function igDisplayStatus(job) {
   return job?.status
 }
 
+/** ms elapsed since an ISO timestamp; null when missing/invalid/future. */
+function elapsedMs(iso, nowMs) {
+  if (!iso) return null
+  const t = new Date(iso).getTime()
+  if (Number.isNaN(t)) return null
+  return Math.max(0, (nowMs ?? Date.now()) - t)
+}
+
+/** Compact elapsed: "45s" / "3m" / "1h 4m". */
+function fmtElapsed(ms) {
+  const s = Math.floor(ms / 1000)
+  if (s < 60) return `${s}s`
+  const m = Math.floor(s / 60)
+  if (m < 60) return `${m}m`
+  return `${Math.floor(m / 60)}h ${m % 60}m`
+}
+
+/**
+ * Short progress text shown next to the synthetic carousel status:
+ *   rendering / partial → "N/M · P%" (real slide render progress)
+ *   re-authoring        → "~3m" elapsed (single /carousel-gen call, no sub-%)
+ *   awaiting render     → "0/M"
+ *   else                → '' (no progress chip)
+ * `nowMs` is injected so the view's tick makes the elapsed count up live.
+ */
+export function progressLabel(card, nowMs = Date.now()) {
+  const total = card?.renderTotal || 0
+  switch (card?.displayStatus) {
+    case 'carousel_render_active':
+    case 'carousel_render_partial':
+      return total > 0 ? `${card.renderDone || 0}/${total} · ${Math.round(((card.renderDone || 0) / total) * 100)}%` : ''
+    case 'carousel_render_pending':
+      return total > 0 ? `0/${total}` : ''
+    case 'carousel_reauthoring': {
+      const ms = elapsedMs(card?.reauthorStartedAt, nowMs)
+      return ms == null ? '' : `~${fmtElapsed(ms)}`
+    }
+    default:
+      return ''
+  }
+}
+
 /**
  * Adapt one source row (IG `RepurposeJob` compact OR blog `LinkedInPost` list
  * row) into the unified Social Studio card. Both kinds yield IDENTICAL keys so
@@ -150,6 +192,9 @@ function igCard(job) {
     coverUrl: job.cover_url || null,
     coverJobId: job.id,
     hasCover: !!job.has_cover,
+    renderDone: job.render_done ?? 0,
+    renderTotal: job.render_total ?? 0,
+    reauthorStartedAt: job.reauthor_started_at ?? null,
   }
 }
 
@@ -171,6 +216,9 @@ function blogCard(draft) {
     coverUrl,
     coverJobId: null,
     hasCover: !!coverUrl,
+    renderDone: draft.render_done ?? 0,
+    renderTotal: draft.render_total ?? 0,
+    reauthorStartedAt: draft.reauthor_started_at ?? null,
   }
 }
 

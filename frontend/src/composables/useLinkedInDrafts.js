@@ -45,6 +45,22 @@ export function useLinkedInDraftsList(filters) {
     staleTime: 30_000,
     refetchOnMount: 'always',
     gcTime: 5 * 60 * 1000,
+    // Poll every 5s while any draft is mid-generation OR a carousel in
+    // manual_review is still re-authoring / rendering — so the Social Studio
+    // list status + render progress (N/M) update without a manual refresh.
+    refetchInterval: (q) => {
+      const rows = q.state.data?.data || []
+      const active = rows.some(r => {
+        if (['pending_generation', 'generating', 'validating'].includes(r.status)) return true
+        if (r.format === 'carousel' && r.status === 'manual_review') {
+          if (r.reauthor_started_at) return true
+          const total = r.render_total || 0
+          if (total > 0 && (r.render_done || 0) < total) return true
+        }
+        return false
+      })
+      return active ? 5_000 : false
+    },
   })
 
   const drafts = computed(() => query.data.value?.data || [])

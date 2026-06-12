@@ -149,7 +149,10 @@ class RepurposeJobListTitleTest extends TestCase
             'linkedin_post_id' => $li->id,
         ]);
 
-        $this->assertSame('generating', $this->listRow($job->id)['render_state']);
+        $row = $this->listRow($job->id);
+        $this->assertSame('generating', $row['render_state']);
+        $this->assertSame(0, $row['render_done']);
+        $this->assertSame(2, $row['render_total']);
     }
 
     public function test_compact_render_state_ready_when_all_slides_done(): void
@@ -171,7 +174,10 @@ class RepurposeJobListTitleTest extends TestCase
             'linkedin_post_id' => $li->id,
         ]);
 
-        $this->assertSame('ready', $this->listRow($job->id)['render_state']);
+        $row = $this->listRow($job->id);
+        $this->assertSame('ready', $row['render_state']);
+        $this->assertSame(2, $row['render_done']);
+        $this->assertSame(2, $row['render_total']);
     }
 
     public function test_compact_render_state_null_for_blog_mode(): void

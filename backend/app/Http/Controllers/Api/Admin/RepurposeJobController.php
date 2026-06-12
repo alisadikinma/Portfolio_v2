@@ -229,6 +229,7 @@ class RepurposeJobController extends Controller
     private function compact(RepurposeJob $job): array
     {
         $slideCount = $this->slideFiles($job)->count();
+        $render = $this->carouselRenderProgress($job);
 
         return [
             'id' => $job->id,
@@ -240,7 +241,10 @@ class RepurposeJobController extends Controller
             'slide_count' => $slideCount,
             'has_cover' => $slideCount > 0,
             'cover_url' => $this->generatedCoverUrl($job),
-            'render_state' => $this->carouselRenderState($job),
+            'render_state' => $render['state'],
+            'render_done' => $render['done'],
+            'render_total' => $render['total'],
+            'reauthor_started_at' => $render['reauthor_started_at'],
             'content_idea_id' => $job->content_idea_id,
             'linkedin_post_id' => $job->linkedin_post_id,
             'anchor_post_id' => $job->anchor_post_id,
@@ -274,18 +278,22 @@ class RepurposeJobController extends Controller
     }
 
     /**
-     * Render state of the linked carousel draft so a Social Studio IG card can
-     * reflect "Rendering images" / "Re-authoring" instead of a flat "Draft
-     * ready" while the downstream LinkedInPost slides are still in flight. PHP
-     * mirror of socialStudioHelpers.js::carouselRenderState. Reads the
+     * Render state + slide progress of the linked carousel draft so a Social
+     * Studio IG card can reflect "Rendering images N/M" / "Re-authoring"
+     * instead of a flat "Draft ready" while the downstream LinkedInPost slides
+     * are still in flight. PHP mirror of socialStudioHelpers.js. Reads the
      * eager-loaded `linkedinPost` (index() does `->with('linkedinPost')`, so no
-     * N+1). Returns null for non-carousel jobs / no linked draft — the FE then
-     * keeps the plain FSM status.
+     * N+1). state=null for non-carousel jobs / no linked draft → the FE keeps
+     * the plain FSM status.
+     *
+     * @return array{state: ?string, done: int, total: int, reauthor_started_at: ?string}
      */
-    private function carouselRenderState(RepurposeJob $job): ?string
+    private function carouselRenderProgress(RepurposeJob $job): array
     {
+        $empty = ['state' => null, 'done' => 0, 'total' => 0, 'reauthor_started_at' => null];
+
         if ($job->mode !== 'carousel') {
-            return null;
+            return $empty;
         }
 
         $li = $job->relationLoaded('linkedinPost')
@@ -293,12 +301,14 @@ class RepurposeJobController extends Controller
             : ($job->linkedin_post_id ? $job->linkedinPost()->first() : null);
 
         if ($li === null || $li->format !== 'carousel') {
-            return null;
+            return $empty;
         }
 
+        $startedAt = \Illuminate\Support\Facades\Cache::get("linkedin_regenerate_lock:{$li->id}") ?: null;
         $slides = (array) ($li->carousel_slides ?? []);
-        if (count($slides) === 0) {
-            return 'pending';
+        $total = count($slides);
+        if ($total === 0) {
+            return ['state' => 'pending', 'done' => 0, 'total' => 0, 'reauthor_started_at' => $startedAt];
         }
 
         $done = $inFlight = $failed = $reauthoring = 0;
@@ -315,23 +325,20 @@ class RepurposeJobController extends Controller
             }
         }
 
+        $state = 'pending';
         if ($reauthoring > 0) {
-            return 'reauthoring';
-        }
-        if ($done === count($slides)) {
-            return 'ready';
-        }
-        if ($inFlight > 0) {
-            return 'generating';
-        }
-        if ($failed === count($slides)) {
-            return 'failed';
-        }
-        if ($done > 0 || $failed > 0) {
-            return 'partial';
+            $state = 'reauthoring';
+        } elseif ($done === $total) {
+            $state = 'ready';
+        } elseif ($inFlight > 0) {
+            $state = 'generating';
+        } elseif ($failed === $total) {
+            $state = 'failed';
+        } elseif ($done > 0 || $failed > 0) {
+            $state = 'partial';
         }
 
-        return 'pending';
+        return ['state' => $state, 'done' => $done, 'total' => $total, 'reauthor_started_at' => $startedAt];
     }
 
     /**

@@ -131,11 +131,26 @@ class LinkedInDraftController extends Controller
         // which keeps the full slide payload.
         $items = array_map(function ($draft) {
             if ($draft->format === 'carousel' && is_array($draft->carousel_slides)) {
+                // Slide render progress (the list shows "N/M · P%" while a
+                // carousel renders) — computed BEFORE stripping image_prompt.
+                $slides = $draft->carousel_slides;
+                $done = 0;
+                foreach ($slides as $slide) {
+                    if (is_array($slide) && ($slide['image_status'] ?? null) === 'done' && !empty($slide['image_url'])) {
+                        $done++;
+                    }
+                }
+                $draft->render_done = $done;
+                $draft->render_total = count($slides);
+                // Re-authoring elapsed: the /carousel-gen dispatch lock holds the
+                // ISO start time (same source as show()'s regenerate_activity).
+                $draft->reauthor_started_at = Cache::get("linkedin_regenerate_lock:{$draft->id}") ?: null;
+
                 $draft->carousel_slides = array_map(
                     fn ($slide) => is_array($slide)
                         ? array_diff_key($slide, array_flip(['image_prompt', 'image_prompt_pre_safety']))
                         : $slide,
-                    $draft->carousel_slides
+                    $slides
                 );
             }
             return $draft;
@@ -354,7 +369,7 @@ class LinkedInDraftController extends Controller
 
                 $draft->delete(); // soft-delete
 
-                return LinkedInPost::create([
+                $created = LinkedInPost::create([
                     'post_id' => $draft->post_id,
                     'format' => $draft->format,
                     'content' => '',
@@ -367,6 +382,17 @@ class LinkedInDraftController extends Controller
                         'timestamp' => now()->toIso8601String(),
                     ]],
                 ]);
+
+                // Keep any IG-repurpose linkage fresh. A regenerate soft-deletes
+                // the old draft + creates a new row; the `linkedinPost` relation
+                // excludes soft-deletes, so a RepurposeJob still pointing at the
+                // old id resolves to null → Social Studio list/detail show a
+                // stale status ("Draft ready" / "failed"). Re-point to the live
+                // draft inside the same transaction so the link can't dangle.
+                RepurposeJob::where('linkedin_post_id', $draft->id)
+                    ->update(['linkedin_post_id' => $created->id]);
+
+                return $created;
             });
         } catch (\App\Exceptions\DuplicateLinkedInDraftException $e) {
             return response()->json([

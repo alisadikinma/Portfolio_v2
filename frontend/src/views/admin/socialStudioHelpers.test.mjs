@@ -9,6 +9,7 @@ import {
   countsBySource,
   blogDisplayStatus,
   igDisplayStatus,
+  progressLabel,
 } from './socialStudioHelpers.js'
 
 // ---- fixtures -------------------------------------------------------------
@@ -188,6 +189,42 @@ test('igDisplayStatus reflects downstream render_state only while drafted', () =
   assert.equal(igDisplayStatus({ status: 'drafted', render_state: 'ready' }), 'drafted')
   assert.equal(igDisplayStatus({ status: 'drafted' }), 'drafted')
   assert.equal(igDisplayStatus({ status: 'rewriting', render_state: 'generating' }), 'rewriting')
+})
+
+// ---- progressLabel: % / N-of-M / elapsed ---------------------------------
+
+test('progressLabel shows N/M · P% while rendering or partial', () => {
+  assert.equal(progressLabel({ displayStatus: 'carousel_render_active', renderDone: 3, renderTotal: 7 }), '3/7 · 43%')
+  assert.equal(progressLabel({ displayStatus: 'carousel_render_partial', renderDone: 5, renderTotal: 7 }), '5/7 · 71%')
+})
+
+test('progressLabel shows 0/M while awaiting render', () => {
+  assert.equal(progressLabel({ displayStatus: 'carousel_render_pending', renderTotal: 7 }), '0/7')
+  assert.equal(progressLabel({ displayStatus: 'carousel_render_pending', renderTotal: 0 }), '')
+})
+
+test('progressLabel shows ~elapsed while re-authoring (counts up via nowMs)', () => {
+  const started = '2026-06-12T10:00:00.000Z'
+  const now = Date.parse(started) + 90_000 // +90s
+  assert.equal(progressLabel({ displayStatus: 'carousel_reauthoring', reauthorStartedAt: started }, now), '~1m')
+  assert.equal(progressLabel({ displayStatus: 'carousel_reauthoring', reauthorStartedAt: started }, Date.parse(started) + 5_000), '~5s')
+  assert.equal(progressLabel({ displayStatus: 'carousel_reauthoring', reauthorStartedAt: null }), '')
+})
+
+test('progressLabel is empty for ready / non-carousel states', () => {
+  assert.equal(progressLabel({ displayStatus: 'manual_review', renderDone: 7, renderTotal: 7 }), '')
+  assert.equal(progressLabel({ displayStatus: 'drafted' }), '')
+  assert.equal(progressLabel({}), '')
+})
+
+test('toCard carries render progress fields for both kinds (keys still identical)', () => {
+  const ig = toCard({ ...igCarouselJob, render_done: 2, render_total: 7, reauthor_started_at: '2026-06-12T10:00:00Z' })
+  assert.equal(ig.renderDone, 2)
+  assert.equal(ig.renderTotal, 7)
+  assert.equal(ig.reauthorStartedAt, '2026-06-12T10:00:00Z')
+  const blog = toCard({ ...blogDraft, render_done: 4, render_total: 7 })
+  assert.equal(blog.renderDone, 4)
+  assert.equal(blog.renderTotal, 7)
 })
 
 // ---- countsBySource (Phase D glue, asserted here) ------------------------
