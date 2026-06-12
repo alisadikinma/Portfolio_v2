@@ -53,6 +53,20 @@ class AutoScheduleManualReviewLinkedInPosts extends Command
 
     public function handle(): int
     {
+        // Telegram human-in-the-loop scheduling (June 12, 2026) supersedes the
+        // auto-schedule cron: when the operator owns slot selection via Telegram,
+        // defer so the two never race over the same manual_review drafts.
+        $telegramSchedule = Setting::query()
+            ->where('group', 'linkedin')
+            ->where('key', 'linkedin_telegram_schedule_enabled')
+            ->value('value');
+
+        if ($telegramSchedule === 'true') {
+            $this->info('[linkedin:auto-schedule] deferred — linkedin_telegram_schedule_enabled is on (Telegram owns scheduling).');
+            Log::info('[linkedin:auto-schedule] deferred: telegram scheduling enabled');
+            return self::SUCCESS;
+        }
+
         $enabled = Setting::query()
             ->where('group', 'linkedin')
             ->where('key', 'linkedin_auto_approve_enabled')

@@ -659,6 +659,63 @@ class TelegramNotificationService
         return $this->send($text);
     }
 
+    /**
+     * Ask the operator when to publish a ready draft (Phase E/F of the Telegram
+     * scheduling conversation). Renders up to 3 weekday/holiday/occupancy-filtered
+     * slot buttons (callback_data = "slot{i}:schedule:{id}:{hmac}", index-encoded
+     * to fit Telegram's 64-byte callback limit) + a free-text-override hint.
+     *
+     * Gated by the master telegram_enabled toggle (token + chat_id required). The
+     * caller (linkedin:prompt-schedule) only consumes the one-shot on a true return.
+     *
+     * @param \Carbon\Carbon[] $candidateSlots ascending free slots (WIB)
+     */
+    public function sendSchedulePrompt(\App\Models\LinkedInPost $draft, array $candidateSlots): bool
+    {
+        if ($this->getSetting('telegram_enabled') !== 'true') {
+            return false;
+        }
+        if (empty($this->getBotToken()) || empty($this->getChatId())) {
+            return false;
+        }
+
+        $secret = (string) $this->getSetting('telegram_webhook_secret');
+        $title = $this->resolveDraftTitle($draft);
+
+        $lines = [
+            '🗓️ *Siap dijadwalkan* — ' . $this->escapeMarkdown($this->truncate($title, 90)),
+            'Kapan mau posting? Pilih slot di bawah, atau ketik sendiri (mis. `17 Jun 18:00`).',
+        ];
+
+        $rows = [];
+        foreach (array_values($candidateSlots) as $i => $slot) {
+            $label = $slot->locale('id')->isoFormat('ddd, D MMM HH:mm') . ' WIB';
+            $rows[] = [[
+                'text' => $label,
+                'callback_data' => self::signCallback("slot{$i}", 'schedule', $draft->id, $secret),
+            ]];
+        }
+
+        return $this->send(implode("\n", $lines), ['inline_keyboard' => $rows]);
+    }
+
+    /**
+     * Best-effort display title for a LinkedIn draft's source post (EN
+     * translation → first translation → slug → "Draft #id").
+     */
+    private function resolveDraftTitle(\App\Models\LinkedInPost $draft): string
+    {
+        $post = $draft->post;
+        if ($post === null) {
+            return 'Draft #' . $draft->id;
+        }
+
+        $translations = $post->translations ?? collect();
+        $t = $translations->firstWhere('language', 'en') ?? $translations->first();
+
+        return (string) ($t->title ?? $post->slug ?? ('Draft #' . $draft->id));
+    }
+
     private function isEnabledFor(string $notificationType): bool
     {
         if ($this->getSetting('telegram_enabled') !== 'true') {

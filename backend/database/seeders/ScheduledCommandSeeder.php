@@ -155,12 +155,22 @@ class ScheduledCommandSeeder extends Seeder
             [
                 'signature' => 'linkedin:auto-schedule',
                 'display_name' => 'LinkedIn — Auto-Schedule Manual Review',
-                'description' => 'Tiap pagi jam 4:30: promote draft manual_review → awaiting_publish di slot waktu kosong (urut virality DESC). Gated by master kill switch (default OFF).',
+                'description' => 'Tiap pagi jam 4:30: promote draft manual_review → awaiting_publish di slot waktu kosong (urut virality DESC). Gated by master kill switch (default OFF). Auto-defer kalau linkedin_telegram_schedule_enabled ON.',
                 'category' => 'linkedin',
                 'cron_expression' => '30 4 * * *',
                 'without_overlapping_minutes' => 15,
                 'arguments' => null,
                 'sort_order' => 70,
+            ],
+            [
+                'signature' => 'linkedin:prompt-schedule',
+                'display_name' => 'LinkedIn — Telegram Schedule Prompt',
+                'description' => 'Tiap menit: kalau ada draft yang benar-benar ready (carousel ter-render + caption ready / text validated) dan belum terjadwal, kirim SATU prompt Telegram "kapan posting?" dengan tombol slot (weekday + non-libur). Gated by linkedin_telegram_schedule_enabled (default OFF).',
+                'category' => 'linkedin',
+                'cron_expression' => '* * * * *',
+                'without_overlapping_minutes' => 5,
+                'arguments' => null,
+                'sort_order' => 75,
             ],
             [
                 // Default-carousel fan-out reaper (June 9, 2026). Promoted from
