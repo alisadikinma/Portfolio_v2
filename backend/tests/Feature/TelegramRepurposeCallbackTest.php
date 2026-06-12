@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Jobs\CaptureInstagramPost;
+use App\Jobs\CaptureVideoCarousel;
 use App\Models\RepurposeJob;
 use App\Models\Setting;
 use App\Services\TelegramNotificationService;
@@ -65,6 +66,21 @@ class TelegramRepurposeCallbackTest extends TestCase
         $this->tap($data)->assertOk();
 
         $this->assertSame('carousel', $job->refresh()->mode);
+    }
+
+    public function test_video_rebrand_button_dispatches_video_capture_not_image_capture(): void
+    {
+        Bus::fake();
+        $job = RepurposeJob::factory()->create(['status' => 'received', 'mode' => null]);
+        $data = TelegramNotificationService::signCallback('video_rebrand', 'repurpose', $job->id, $this->secret);
+
+        $this->tap($data)->assertOk();
+
+        $job->refresh();
+        $this->assertSame('video_rebrand', $job->mode);
+        $this->assertSame('capturing', $job->status);
+        Bus::assertDispatched(CaptureVideoCarousel::class, fn ($j) => $j->repurposeJobId === $job->id);
+        Bus::assertNotDispatched(CaptureInstagramPost::class);
     }
 
     public function test_double_tap_is_idempotent(): void

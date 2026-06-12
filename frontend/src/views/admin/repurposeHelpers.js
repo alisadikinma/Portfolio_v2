@@ -73,6 +73,9 @@ export function inferFailedStep(log) {
  */
 export function rightPaneMode(job) {
   if (job?.mode === 'blog') return 'blog'
+  // video_rebrand renders its own download section (handled in the detail view),
+  // not the image source↔generated comparison — keep it out of 'generated'.
+  if (job?.mode === 'video_rebrand') return 'video'
   if (job?.mode === 'carousel' && job?.linkedin_post_id) return 'generated'
   return 'in_progress'
 }
@@ -80,6 +83,7 @@ export function rightPaneMode(job) {
 export function modeLabel(mode) {
   if (mode === 'blog') return 'Blog + Carousel'
   if (mode === 'carousel') return 'Carousel'
+  if (mode === 'video_rebrand') return 'Video rebrand'
   return '—'
 }
 

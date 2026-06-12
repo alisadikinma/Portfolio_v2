@@ -134,6 +134,42 @@ const headerTitle = computed(() =>
   job.value?.title || job.value?.rewritten?.title || `Repurpose #${job.value?.id ?? ''}`,
 )
 
+// --- video_rebrand: composited 4:5 MP4s for manual download ------------------
+const isVideoRebrand = computed(() => job.value?.mode === 'video_rebrand')
+const videoSlides = computed(() => (Array.isArray(job.value?.video_slides) ? job.value.video_slides : []))
+const readyVideoSlides = computed(() => videoSlides.value.filter(s => s.composited_status === 'done' && s.composited_url))
+// Still working through face-gen → Veo → composite — the composable auto-polls.
+const videoGenerating = computed(() =>
+  isVideoRebrand.value &&
+  ['generating_assets', 'assets_ready', 'compositing', 'composed'].includes(job.value?.status),
+)
+function roleLabel(role) {
+  return role === 'hook' ? 'Hook' : role === 'cta' ? 'CTA' : 'Tool'
+}
+function videoSlideState(s) {
+  if (s.composited_status === 'done' && s.composited_url) return null
+  if (s.composited_status === 'failed' || s.keyframe_status === 'failed' || s.veo_status === 'failed') return 'failed'
+  return 'rendering…'
+}
+function slideFilename(s) {
+  const idx = String(s.slide_index).padStart(2, '0')
+  return `alisadikinma-rebrand-${job.value?.id ?? 'x'}-slide-${idx}-${s.role}.mp4`
+}
+function downloadSlide(s) {
+  if (!s.composited_url) return
+  const a = document.createElement('a')
+  a.href = s.composited_url
+  a.download = slideFilename(s)
+  a.rel = 'noopener'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+}
+function downloadAll() {
+  // Stagger the synthetic clicks — browsers drop simultaneous download bursts.
+  readyVideoSlides.value.forEach((s, i) => setTimeout(() => downloadSlide(s), i * 350))
+}
+
 function genState(s) {
   if (s && s.image_status === 'done' && s.image_url) return null
   if (s && s.image_status === 'failed') return 'failed'
@@ -265,6 +301,73 @@ function goBack() { router.push({ name: 'admin-social-studio' }) }
           </div>
         </template>
       </div>
+
+      <!-- video_rebrand: branded 4:5 MP4 carousel for manual download -->
+      <section
+        v-if="isVideoRebrand"
+        class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-700 dark:bg-neutral-800"
+      >
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <h2 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+            Branded video carousel
+            <span class="ml-1 font-normal text-neutral-400 dark:text-neutral-500">· {{ readyVideoSlides.length }}/{{ videoSlides.length }} ready</span>
+          </h2>
+          <button
+            v-if="readyVideoSlides.length"
+            @click="downloadAll"
+            class="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-amber-700"
+          >
+            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" /></svg>
+            Download all ({{ readyVideoSlides.length }})
+          </button>
+        </div>
+
+        <p v-if="videoGenerating" class="mb-4 flex items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400">
+          <svg class="h-3.5 w-3.5 animate-spin text-amber-500" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5M5.5 14a7 7 0 0 0 12.4 2M18.5 10A7 7 0 0 0 6.1 8" /></svg>
+          Generating hook + CTA clips and compositing slides… this view refreshes automatically.
+        </p>
+
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          <div
+            v-for="s in videoSlides"
+            :key="s.id"
+            class="overflow-hidden rounded-lg ring-1 ring-neutral-200 dark:ring-neutral-700"
+          >
+            <div class="relative flex aspect-[4/5] items-center justify-center bg-neutral-100 dark:bg-neutral-900">
+              <video
+                v-if="!videoSlideState(s)"
+                :src="s.composited_url"
+                class="h-full w-full object-contain"
+                controls
+                playsinline
+                muted
+                loop
+                preload="metadata"
+              ></video>
+              <span
+                v-else
+                class="px-2 text-center text-xs"
+                :class="videoSlideState(s) === 'failed' ? 'text-red-500 dark:text-red-400' : 'text-neutral-400 dark:text-neutral-600'"
+              >{{ videoSlideState(s) }}</span>
+              <span class="absolute left-1.5 top-1.5 rounded bg-black/55 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white">
+                {{ s.slide_index }} · {{ roleLabel(s.role) }}
+              </span>
+            </div>
+            <button
+              v-if="!videoSlideState(s)"
+              @click="downloadSlide(s)"
+              class="flex w-full items-center justify-center gap-1 bg-neutral-50 py-1.5 text-xs font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900 dark:bg-neutral-900/60 dark:text-neutral-300 dark:hover:bg-neutral-900 dark:hover:text-neutral-100"
+            >
+              <svg class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" /></svg>
+              Download
+            </button>
+          </div>
+        </div>
+
+        <p class="mt-4 text-xs text-neutral-400 dark:text-neutral-500">
+          Download all slides, then post them as a video carousel in the Instagram app (manual publish — v1).
+        </p>
+      </section>
 
       <!-- Source intelligence (summary + collapsible detail) + blog rewrite -->
       <div class="grid gap-5" :class="isBlog ? 'lg:grid-cols-2' : ''">

@@ -40,6 +40,10 @@ return [
         // GROK hook-video (IG mixed carousel). Same key + base URL as the
         // image endpoint; grok-3 maps server-side to model_name=grok-video.
         'video_model' => env('GEMINIGEN_VIDEO_MODEL', 'grok-3'),
+        // Veo image-to-video for video_rebrand hook/CTA clips (9:16, face-gen
+        // keyframe via mode_image=frame). veo-3.1-fast = speed tier. Endpoint
+        // /video-gen/veo verified live 2026-06-12.
+        'veo_model' => env('GEMINIGEN_VEO_MODEL', 'veo-3.1-fast'),
         // ffmpeg binary on the queue-worker host (flatten PNG→JPG + pad 4:5→2:3
         // before dispatch, crop 2:3→4:5 + strip audio on download).
         'ffmpeg_path' => env('FFMPEG_PATH', 'ffmpeg'),
@@ -93,6 +97,19 @@ return [
         // (public posts mostly work; private/wall → job fails with clear reason).
         'storage_state_path' => env('IG_CAPTURE_STORAGE_STATE', ''),
         'timeout' => (int) env('IG_CAPTURE_TIMEOUT', 120),
+
+        // video_rebrand Phase B — yt-dlp video carousel capture (separate node
+        // wrapper, NOT the Playwright images path). yt-dlp downloads each video
+        // slide headless (no login); ffmpeg extracts a poster; ffprobe probes
+        // dimensions/audio. See docs/plans/2026-06-12-ig-video-carousel-rebrand.md.
+        'video_script_path' => env('REPURPOSE_VIDEO_CAPTURE_SCRIPT', dirname(base_path()) . '/scripts/repurpose/ig-video-capture.cjs'),
+        // Phase D — Playwright HTML→PNG brand chrome (header/footer) for tool slides.
+        'chrome_script_path' => env('REPURPOSE_VIDEO_CHROME_SCRIPT', dirname(base_path()) . '/scripts/repurpose/video-chrome.cjs'),
+        'ytdlp_path' => env('REPURPOSE_YTDLP_PATH', 'yt-dlp'),
+        'ffmpeg_path' => env('REPURPOSE_FFMPEG_PATH', 'ffmpeg'),
+        'ffprobe_path' => env('REPURPOSE_FFPROBE_PATH', 'ffprobe'),
+        // Video downloads + poster extraction run longer than image scraping.
+        'video_timeout' => (int) env('REPURPOSE_VIDEO_CAPTURE_TIMEOUT', 300),
     ],
 
     'repurpose' => [

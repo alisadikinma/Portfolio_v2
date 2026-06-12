@@ -581,6 +581,11 @@ class TelegramNotificationService
                     ['text' => '📝 Blog + Carousel', 'callback_data' => self::signCallback('blog', 'repurpose', $job->id, $secret)],
                     ['text' => '🎠 Carousel saja', 'callback_data' => self::signCallback('carousel', 'repurpose', $job->id, $secret)],
                 ],
+                [
+                    // video_rebrand (June 13): re-skins a VIDEO carousel into Ali's
+                    // brand chrome — ships composited 4:5 MP4s for manual download.
+                    ['text' => '🎬 Video rebrand', 'callback_data' => self::signCallback('video_rebrand', 'repurpose', $job->id, $secret)],
+                ],
             ],
         ];
 

@@ -223,6 +223,23 @@ class ScheduledCommandSeeder extends Seeder
                 'sort_order' => 100,
             ],
 
+            [
+                // video_rebrand keyframe→Veo poll (June 13, 2026). Like the GROK
+                // poll, GeminiGen never webhooks — this per-minute command is the
+                // SOLE completion driver for the face-gen keyframe → Veo clip
+                // handoff: 2-poll (keyframe image ready → dispatch Veo; Veo ready →
+                // finalize 4:5 clip), promotes the job to assets_ready when both
+                // hook/CTA bookends are composited, and bounded-retries failures.
+                'signature' => 'repurpose:poll-rebrand-assets',
+                'display_name' => 'IG Repurpose — Poll Video Rebrand Assets (Veo)',
+                'description' => 'Tiap menit: cek status face-gen keyframe + Veo hook/CTA clip untuk video_rebrand (keyframe selesai → dispatch Veo; Veo selesai → finalize 4:5). Begitu kedua bookend jadi → assets_ready → compose. Satu-satunya jalur completion (GeminiGen nggak kirim webhook).',
+                'category' => 'linkedin',
+                'cron_expression' => '* * * * *',
+                'without_overlapping_minutes' => 2,
+                'arguments' => null,
+                'sort_order' => 110,
+            ],
+
             // ─────────────── Newsletter (1) ───────────────
             [
                 'signature' => 'newsletter:send-weekly',

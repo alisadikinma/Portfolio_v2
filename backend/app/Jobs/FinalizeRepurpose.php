@@ -58,7 +58,28 @@ class FinalizeRepurpose implements ShouldQueue
     public function handle(): void
     {
         $job = RepurposeJob::find($this->repurposeJobId);
-        if (!$job || $job->status !== RepurposeJobStatus::Rewritten->value) {
+        if (!$job) {
+            return;
+        }
+
+        // video_rebrand enters at `composed` (after ComposeVideoCarousel) and has
+        // no claims to rewrite — it ships composited 4:5 MP4s the operator
+        // downloads + posts manually (v1, no auto-publish). Branch off early.
+        if ($job->mode === 'video_rebrand') {
+            if ($job->status !== RepurposeJobStatus::Composed->value) {
+                return;
+            }
+            $job->transitionTo(RepurposeJobStatus::Finalizing, 'finalize_video_start');
+            try {
+                $this->finalizeVideoRebrand($job);
+            } catch (\Throwable $e) {
+                // Composited files retained (no purge) so the operator can retry/download.
+                $this->failJob($job, 'finalize_video_exception: ' . $e->getMessage());
+            }
+            return;
+        }
+
+        if ($job->status !== RepurposeJobStatus::Rewritten->value) {
             return;
         }
 
@@ -176,6 +197,24 @@ class FinalizeRepurpose implements ShouldQueue
         // (publish-anchored retention), or re-fetches them on demand via the
         // detail's "Re-fetch source" action (RefetchSourceSlides).
         app(TelegramNotificationService::class)->sendRepurposeDrafted($job, $linkedinId, $this->correctedClaims($job));
+    }
+
+    /**
+     * video_rebrand v1 — ship the composited 4:5 MP4 carousel for MANUAL download.
+     * No ContentIdea / anchor Post / LinkedIn draft (auto-publish deferred). Slides
+     * are RETAINED (the manual-download UI streams composited_path); `repurpose:reap`
+     * clears them on the same publish-anchored retention as the image carousels.
+     */
+    private function finalizeVideoRebrand(RepurposeJob $job): void
+    {
+        $done = $job->videoSlides()->where('composited_status', 'done')->whereNotNull('composited_path')->count();
+        if ($done === 0) {
+            $this->failJob($job, 'finalize_video_failed: no composited slides to ship');
+            return;
+        }
+
+        $job->transitionTo(RepurposeJobStatus::Drafted, 'finalize_video', ['last_error' => null]);
+        app(TelegramNotificationService::class)->sendRepurposeDrafted($job, null, $this->correctedClaims($job));
     }
 
     private function resolvePillar(RepurposeJob $job): string

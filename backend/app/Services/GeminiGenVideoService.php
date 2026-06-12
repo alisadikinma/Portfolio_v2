@@ -133,6 +133,207 @@ class GeminiGenVideoService
     }
 
     /**
+     * Dispatch a face-gen keyframe for a video_rebrand hook/CTA clip — a 9:16
+     * photoreal portrait built from the creator face ref via GeminiGen
+     * /generate_image. Poll-based (NO webhook — geminigen never fires one); the
+     * finished image URL feeds dispatchVeoClip() as the Veo start frame. Returns
+     * the job uuid (poll key at /history/{uuid}) or null on
+     * circuit-open / missing key / HTTP failure.
+     */
+    public function dispatchKeyframe(string $faceRefUrl, string $prompt, ?int $contextId = null): ?string
+    {
+        if (empty($this->apiKey)) {
+            Log::error('[GeminiGenVideo] GEMINIGEN_API_KEY missing — cannot dispatch keyframe', ['ctx' => $contextId]);
+
+            return null;
+        }
+
+        if ($this->breaker->state() === 'open') {
+            Log::warning('[GeminiGenVideo] dispatchKeyframe skipped — circuit OPEN', ['ctx' => $contextId]);
+
+            return null;
+        }
+
+        $finalPrompt = $prompt
+            .'. Maintain exact facial identity, appearance, and features from the provided face reference image(s).';
+
+        $multipart = [
+            ['name' => 'prompt', 'contents' => $finalPrompt],
+            ['name' => 'model', 'contents' => (string) (config('content.default_image_model') ?: 'nano-banana-pro')],
+            // 9:16 is Imagen-native (1:1/16:9/9:16/4:3/3:4 only) so it survives
+            // without falling back to the 16:9 default — feeds Veo cleanly.
+            ['name' => 'aspect_ratio', 'contents' => '9:16'],
+            ['name' => 'style', 'contents' => 'Photorealistic'],
+            // GeminiGen expects each ref URL as its own multipart entry.
+            ['name' => 'file_urls', 'contents' => $faceRefUrl],
+        ];
+
+        try {
+            $response = Http::timeout(30)
+                ->withHeaders(['x-api-key' => $this->apiKey])
+                ->asMultipart()
+                ->post("{$this->baseUrl}/generate_image", $multipart);
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            $this->breaker->recordFailure(null, null, $e);
+            Log::error('[GeminiGenVideo] keyframe HTTP connection exception', ['ctx' => $contextId, 'error' => $e->getMessage()]);
+
+            return null;
+        } catch (\Throwable $e) {
+            Log::error('[GeminiGenVideo] keyframe HTTP unexpected exception', ['ctx' => $contextId, 'error' => $e->getMessage()]);
+
+            return null;
+        }
+
+        if (! $response->successful()) {
+            $errorCode = $response->json('error_code') ?? $response->json('code');
+            $this->breaker->recordFailure($response->status(), is_string($errorCode) ? $errorCode : null);
+            Log::error('[GeminiGenVideo] keyframe dispatch non-2xx', [
+                'ctx' => $contextId,
+                'status' => $response->status(),
+                'body' => mb_substr($response->body(), 0, 500),
+            ]);
+
+            return null;
+        }
+
+        $this->breaker->recordSuccess();
+
+        $uuid = $response->json('uuid');
+        if (! is_string($uuid) || $uuid === '') {
+            Log::error('[GeminiGenVideo] keyframe 2xx but no uuid', ['ctx' => $contextId, 'body' => mb_substr($response->body(), 0, 300)]);
+
+            return null;
+        }
+
+        return $uuid;
+    }
+
+    /**
+     * Dispatch a Veo image-to-video job for a video_rebrand hook/CTA clip. The
+     * keyframe (face-gen 9:16) drives the start frame (mode_image=frame, ref sent
+     * as ref_images — verified live 2026-06-12). Returns the Veo job uuid (poll
+     * key at /history/{uuid}) or null on circuit-open / missing key / HTTP failure.
+     */
+    public function dispatchVeoClip(string $keyframeUrl, string $prompt, string $aspect = '9:16', ?int $contextId = null): ?string
+    {
+        if (empty($this->apiKey)) {
+            Log::error('[GeminiGenVideo] GEMINIGEN_API_KEY missing — cannot dispatch Veo', ['ctx' => $contextId]);
+
+            return null;
+        }
+
+        if ($this->breaker->state() === 'open') {
+            Log::warning('[GeminiGenVideo] dispatchVeoClip skipped — circuit OPEN', ['ctx' => $contextId]);
+
+            return null;
+        }
+
+        $multipart = [
+            ['name' => 'prompt', 'contents' => $prompt],
+            ['name' => 'model', 'contents' => (string) config('services.geminigen.veo_model', 'veo-3.1-fast')],
+            ['name' => 'aspect_ratio', 'contents' => $aspect],
+            ['name' => 'duration', 'contents' => '6'],
+            ['name' => 'resolution', 'contents' => '720p'],
+            ['name' => 'mode_image', 'contents' => 'frame'],
+            ['name' => 'ref_images', 'contents' => $keyframeUrl],
+        ];
+
+        try {
+            $response = Http::timeout(90)
+                ->withHeaders(['x-api-key' => $this->apiKey])
+                ->asMultipart()
+                ->post("{$this->baseUrl}/video-gen/veo", $multipart);
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            $this->breaker->recordFailure(null, null, $e);
+            Log::error('[GeminiGenVideo] Veo HTTP connection exception', ['ctx' => $contextId, 'error' => $e->getMessage()]);
+
+            return null;
+        } catch (\Throwable $e) {
+            Log::error('[GeminiGenVideo] Veo HTTP unexpected exception', ['ctx' => $contextId, 'error' => $e->getMessage()]);
+
+            return null;
+        }
+
+        if (! $response->successful()) {
+            $errorCode = $response->json('error_code') ?? $response->json('code');
+            $this->breaker->recordFailure($response->status(), is_string($errorCode) ? $errorCode : null);
+            Log::error('[GeminiGenVideo] Veo dispatch non-2xx', [
+                'ctx' => $contextId,
+                'status' => $response->status(),
+                'body' => mb_substr($response->body(), 0, 500),
+            ]);
+
+            return null;
+        }
+
+        $this->breaker->recordSuccess();
+
+        $uuid = $response->json('uuid');
+        if (! is_string($uuid) || $uuid === '') {
+            Log::error('[GeminiGenVideo] Veo 2xx but no uuid', ['ctx' => $contextId, 'body' => mb_substr($response->body(), 0, 300)]);
+
+            return null;
+        }
+
+        return $uuid;
+    }
+
+    /**
+     * Download a finished Veo 9:16 MP4, center-crop to 4:5 + scale to 1080×1350
+     * (match the carousel slides). Audio kept (Veo clips may carry it). $relOut is
+     * the public-disk relative path. Returns the public MP4 URL or null on failure.
+     */
+    public function finalizeVeoClip(string $remoteVideoUrl, string $relOut): ?string
+    {
+        try {
+            $resp = Http::timeout(120)->get($remoteVideoUrl);
+        } catch (\Throwable $e) {
+            Log::error('[GeminiGenVideo] Veo video download failed', ['out' => $relOut, 'error' => $e->getMessage()]);
+
+            return null;
+        }
+        if (! $resp->successful()) {
+            Log::error('[GeminiGenVideo] Veo video download non-2xx', ['out' => $relOut, 'status' => $resp->status()]);
+
+            return null;
+        }
+
+        $rawRel = 'tmp/veo-raw-'.uniqid().'.mp4';
+        Storage::disk('local')->put($rawRel, $resp->body());
+        $rawPath = Storage::disk('local')->path($rawRel);
+
+        $outPath = Storage::disk('public')->path($relOut);
+        @mkdir(dirname($outPath), 0775, true);
+
+        // 9:16 → 4:5: keep full width, center-crop height to iw*5/4, then normalize
+        // to exactly 1080×1350.
+        try {
+            $result = Process::timeout(150)->run([
+                $this->ffmpeg, '-y', '-i', $rawPath,
+                '-vf', 'crop=iw:floor(iw*5/4/2)*2:0:(ih-iw*5/4)/2,scale=1080:1350',
+                '-c:v', 'libx264', '-crf', '20', '-c:a', 'aac', '-movflags', '+faststart',
+                $outPath,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('[GeminiGenVideo] Veo ffmpeg crop threw', ['out' => $relOut, 'error' => $e->getMessage()]);
+            @unlink($outPath);
+
+            return null;
+        } finally {
+            Storage::disk('local')->delete($rawRel);
+        }
+
+        if (! $result->successful() || ! is_file($outPath)) {
+            Log::error('[GeminiGenVideo] Veo ffmpeg crop failed', ['out' => $relOut, 'error' => $result->errorOutput()]);
+            @unlink($outPath);
+
+            return null;
+        }
+
+        return url('/storage/'.$relOut);
+    }
+
+    /**
      * Download the hook slide PNG, flatten alpha (GROK rejects PNG transparency)
      * and pre-pad 4:5/3:4 → 2:3 with brand-blue (#0F59B6) fill so GROK has no
      * empty margin to outpaint. Returns the public JPG URL to pass as file_urls,

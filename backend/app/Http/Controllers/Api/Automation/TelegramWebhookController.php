@@ -6,6 +6,7 @@ use App\Enums\LinkedInPostStatus;
 use App\Enums\RepurposeJobStatus;
 use App\Http\Controllers\Controller;
 use App\Jobs\CaptureInstagramPost;
+use App\Jobs\CaptureVideoCarousel;
 use App\Jobs\GenerateLinkedInPost;
 use App\Jobs\ParseAndScheduleReply;
 use App\Models\LinkedInPost;
@@ -385,7 +386,7 @@ class TelegramWebhookController extends Controller
      */
     private function resolveRepurposeAction(RepurposeJob $job, string $action): string
     {
-        if (!in_array($action, ['blog', 'carousel'], true)) {
+        if (!in_array($action, ['blog', 'carousel', 'video_rebrand'], true)) {
             return 'Unknown action.';
         }
 
@@ -396,9 +397,20 @@ class TelegramWebhookController extends Controller
 
         $job->update(['mode' => $action]);
         $job->transitionTo(RepurposeJobStatus::Capturing, "telegram_mode_{$action}");
-        CaptureInstagramPost::dispatch($job->id);
 
-        $label = $action === 'blog' ? '📝 Blog + Carousel' : '🎠 Carousel saja';
+        // video_rebrand re-skins a VIDEO carousel (yt-dlp download path), the other
+        // two modes scrape image slides (Playwright). Different capture job per mode.
+        if ($action === 'video_rebrand') {
+            CaptureVideoCarousel::dispatch($job->id);
+        } else {
+            CaptureInstagramPost::dispatch($job->id);
+        }
+
+        $label = match ($action) {
+            'blog' => '📝 Blog + Carousel',
+            'video_rebrand' => '🎬 Video rebrand',
+            default => '🎠 Carousel saja',
+        };
 
         // Persistent chat bubble so the operator sees the pipeline actually
         // started — the answerCallbackQuery toast is transient and easy to miss.

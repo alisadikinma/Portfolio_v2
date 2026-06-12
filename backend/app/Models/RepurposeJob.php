@@ -7,11 +7,13 @@ use App\Traits\HasStatusTransitions;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 // Same App\Models namespace, but imported explicitly for PSR-12 + static analysis.
 use App\Models\ContentIdea;
 use App\Models\LinkedInPost;
 use App\Models\Post;
+use App\Models\RepurposeVideoSlide;
 
 /**
  * IG repurpose pipeline job — see
@@ -35,6 +37,7 @@ class RepurposeJob extends Model
         'linkedin_post_id',
         'anchor_post_id',
         'last_error',
+        'asset_retry_count',
         'pipeline_state_log',
         'chat_id',
     ];
@@ -44,6 +47,7 @@ class RepurposeJob extends Model
         'research' => 'array',
         'rewritten' => 'array',
         'pipeline_state_log' => 'array',
+        'asset_retry_count' => 'integer',
     ];
 
     protected function statusEnumClass(): string
@@ -64,6 +68,14 @@ class RepurposeJob extends Model
     public function anchorPost(): BelongsTo
     {
         return $this->belongsTo(Post::class, 'anchor_post_id');
+    }
+
+    /**
+     * Per-slide rows for the video_rebrand mode (ordered by carousel position).
+     */
+    public function videoSlides(): HasMany
+    {
+        return $this->hasMany(RepurposeVideoSlide::class)->orderBy('slide_index');
     }
 
     /**

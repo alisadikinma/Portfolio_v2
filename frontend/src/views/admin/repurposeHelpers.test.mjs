@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { isTerminal, inferFailedStep, statusTone, STATUS_LABEL, rightPaneMode } from './repurposeHelpers.js'
+import { isTerminal, inferFailedStep, statusTone, STATUS_LABEL, rightPaneMode, modeLabel } from './repurposeHelpers.js'
 
 test('isTerminal flags only drafted/failed', () => {
   assert.equal(isTerminal('drafted'), true)
@@ -39,6 +39,14 @@ test('rightPaneMode routes carousel(with draft)/carousel(processing)/blog', () =
   assert.equal(rightPaneMode({ mode: 'blog', linkedin_post_id: null }), 'blog')
   // null/unknown job → safe default
   assert.equal(rightPaneMode(null), 'in_progress')
+  // video_rebrand → its own download section (not the image comparison panes)
+  assert.equal(rightPaneMode({ mode: 'video_rebrand' }), 'video')
+})
+
+test('modeLabel covers all three repurpose modes', () => {
+  assert.equal(modeLabel('blog'), 'Blog + Carousel')
+  assert.equal(modeLabel('carousel'), 'Carousel')
+  assert.equal(modeLabel('video_rebrand'), 'Video rebrand')
 })
 
 test('STATUS_LABEL covers every FSM state', () => {

@@ -107,6 +107,7 @@ class RepurposeJobController extends Controller
                 'angle' => $job->angle,
                 'slides_path' => $job->slides_path,
                 'slide_count' => $this->slideFiles($job)->count(),
+                'video_slides' => $this->videoSlides($job),
                 'extracted' => $job->extracted,
                 'research' => $job->research,
                 'rewritten' => $job->rewritten,
@@ -197,6 +198,32 @@ class RepurposeJobController extends Controller
         }
 
         return Storage::disk('local')->response($files->values()[$n]);
+    }
+
+    /**
+     * video_rebrand per-slide rows for the manual-download UI. Empty for the
+     * blog/carousel modes. composited_path is a full public MP4 URL the frontend
+     * links with `<a download>` — no streaming endpoint needed (the file lives on
+     * the public disk). Ordered by carousel position (hook 0 → tools → cta N+1).
+     *
+     * @return array<int,array<string,mixed>>
+     */
+    private function videoSlides(RepurposeJob $job): array
+    {
+        if ($job->mode !== 'video_rebrand') {
+            return [];
+        }
+
+        return $job->videoSlides()->get()->map(fn ($s) => [
+            'id' => $s->id,
+            'slide_index' => $s->slide_index,
+            'role' => $s->role,
+            'header_title' => $s->header_title,
+            'keyframe_status' => $s->keyframe_status,
+            'veo_status' => $s->veo_status,
+            'composited_status' => $s->composited_status,
+            'composited_url' => $s->composited_path, // full public MP4 URL (or null)
+        ])->all();
     }
 
     /** Sorted list of slide-*.jpg paths (relative to the local disk) for a job. */
