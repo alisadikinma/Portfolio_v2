@@ -90,7 +90,10 @@ class CarouselSlideEnhancer
         $portfolioUrl = $this->resolvePortfolioUrl();
         $pageIndicator = ($slideIndex + 1) . '/' . $totalSlides;
         $swipeText = $isCta ? '' : 'SWIPE (GESER) >';
-        $opacityWord = 'thirty percent opacity';
+        // Phrase the opacity as a non-numeric rendering cue. Earlier "thirty
+        // percent opacity" wording leaked into renders as a literal "30%" label
+        // beside the brand icon — the model treated the value as caption text.
+        $opacityWord = 'a faint, barely-visible strength (subtle semi-transparent background watermark, never fully opaque)';
 
         // 1. Resolve reference URLs
         $creatorFaceUrl = $this->getCreatorFaceUrl();
@@ -278,6 +281,7 @@ class CarouselSlideEnhancer
         $chrome .= "Top-left corner of the canvas, render the page indicator \"{$pageIndicator}\" in small white text positioned roughly seventy-five pixels from the top edge and seventy-five pixels from the left edge.\n";
         $chrome .= "Centered horizontally and vertically as a small circular badge, render the brand icon from the provided brand logo reference image at {$opacityWord} — use the exact icon from the file, do not generate a new logo.\n";
         $chrome .= "Centered horizontally directly below the brand icon, render the watermark text \"{$handle}\" in white at {$opacityWord}, subtle background mark only, never competing with the headline.\n";
+        $chrome .= "CRITICAL: the opacity/transparency is a RENDERING instruction only — NEVER draw the words \"opacity\", \"transparent\", \"thirty percent\", \"30%\", or any percentage or number label anywhere in the image. The centered brand block is ONLY the icon plus the \"{$handle}\" text — no opacity caption, no percentage figure, nothing else beside it.\n";
 
         if (! $isCta && $swipeText !== '') {
             $chrome .= "Bottom center of the composition, beneath the headline text with minimal gap and never crammed against the very bottom of the canvas, render the literal text \"{$swipeText}\" in small white typography.\n";
