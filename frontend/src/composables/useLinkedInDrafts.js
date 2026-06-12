@@ -88,7 +88,11 @@ export function useLinkedInDraft(id) {
       const anyMidFlight = slides.some(s =>
         s?.image_status === 'generating' || s?.image_status === 'pending' || s?.image_status === 'reauthoring'
       )
-      return anyMidFlight ? 5_000 : false
+      // IG hook video still rendering (GROK is poll-driven, no webhook) — keep
+      // polling so the Video tab flips to the player the moment it completes.
+      const hookStatus = data?.instagram_post?.hook_video_status
+      const hookMidFlight = hookStatus === 'generating' || hookStatus === 'pending'
+      return (anyMidFlight || hookMidFlight) ? 5_000 : false
     },
   })
 
@@ -268,6 +272,22 @@ export function usePublishCrossPost() {
     mutationFn: ({ id, platform }) =>
       api.post(`/admin/linkedin-drafts/${id}/publish-crosspost/${platform}`).then(r => r.data),
     onSuccess: (_, { id }) => {
+      qc.invalidateQueries({ queryKey: [LIST_KEY] })
+      qc.invalidateQueries({ queryKey: [LIST_KEY, id] })
+    },
+  })
+}
+
+/**
+ * POST /admin/linkedin-drafts/{id}/regenerate-hook-video — reset + re-dispatch
+ * the IG sibling's GROK hook video (the Image|Video tab's "Regenerate" action).
+ */
+export function useRegenerateHookVideo() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) =>
+      api.post(`/admin/linkedin-drafts/${id}/regenerate-hook-video`).then(r => r.data),
+    onSuccess: (_, id) => {
       qc.invalidateQueries({ queryKey: [LIST_KEY] })
       qc.invalidateQueries({ queryKey: [LIST_KEY, id] })
     },

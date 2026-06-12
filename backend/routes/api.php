@@ -1321,6 +1321,10 @@ Route::middleware(['auth:sanctum'])->prefix('admin/linkedin-drafts')->group(func
     // Webhook completes asynchronously; frontend polls draft.show for status.
     Route::post('/{id}/regenerate-images', [LinkedInDraftController::class, 'regenerateAllImages']);
     Route::post('/{id}/rerender-images', [LinkedInDraftController::class, 'rerenderImagesOnly']);
+    // GROK hook video (IG mixed carousel) — reset + re-dispatch the IG sibling's
+    // hook animation. Frontend polls draft.show for hook_video_status.
+    Route::post('/{id}/regenerate-hook-video', [LinkedInDraftController::class, 'regenerateHookVideo'])
+        ->name('admin.linkedin-drafts.regenerate-hook-video');
     Route::post('/{id}/regenerate-caption', [LinkedInDraftController::class, 'regenerateCaption']);
     Route::post('/{id}/slides/{slideIndex}/regenerate-image', [LinkedInDraftController::class, 'regenerateSlideImage']);
     // Soft-warning conflict check for the reschedule modal — fires debounced

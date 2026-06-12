@@ -166,7 +166,8 @@ class LinkedInDraftController extends Controller
             // hidden from UI per May 10 cleanup; revive when direct FB
             // Graph API integration ships — add migration + re-add field).
             'facebookPost:id,linkedin_post_id,status,caption,hashtags,scheduled_at,published_at,external_url',
-            'instagramPost:id,linkedin_post_id,status,title,caption,hashtags,link_comment,scheduled_at,published_at,external_url',
+            // hook_video_* powers the IG hook Image|Video tabs + regenerate UI.
+            'instagramPost:id,linkedin_post_id,status,title,caption,hashtags,link_comment,scheduled_at,published_at,external_url,hook_video_url,hook_video_status,hook_video_job_uuid,hook_video_error',
             // tiktok title is REQUIRED by Publer for photo carousel posts
             // (max 90 chars per Publer API spec). Plugin emits it; surface
             // to UI so operator sees what'll ship to TikTok.
@@ -1679,6 +1680,50 @@ class LinkedInDraftController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Publishing ' . ucfirst($platform) . ' to Publer…',
+        ], 202);
+    }
+
+    /**
+     * POST /admin/linkedin-drafts/{id}/regenerate-hook-video
+     *
+     * Reset + re-dispatch the IG sibling's GROK hook video (operator action
+     * from the hook Image|Video tab). Carousel + IG-sibling only.
+     */
+    public function regenerateHookVideo(int $id): JsonResponse
+    {
+        $draft = LinkedInPost::with('instagramPost')->find($id);
+        if (!$draft) {
+            return $this->notFound();
+        }
+
+        if ($draft->format !== 'carousel') {
+            return response()->json([
+                'success' => false,
+                'error' => ['code' => 'not_carousel', 'message' => 'Hook video applies to carousel drafts only.'],
+            ], 422);
+        }
+
+        $ig = $draft->instagramPost;
+        if ($ig === null) {
+            return response()->json([
+                'success' => false,
+                'error' => ['code' => 'no_sibling', 'message' => 'No Instagram draft for this post.'],
+            ], 404);
+        }
+
+        $ig->update([
+            'hook_video_status' => 'pending',
+            'hook_video_url' => null,
+            'hook_video_error' => null,
+            'hook_video_job_uuid' => null,
+            'hook_video_retry_count' => 0,
+        ]);
+
+        \App\Jobs\GenerateHookVideo::dispatch($ig->id)->onQueue('social-crosspost');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Regenerating Instagram hook video…',
         ], 202);
     }
 
