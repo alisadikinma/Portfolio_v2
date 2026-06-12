@@ -814,36 +814,13 @@ class LinkedInDraftController extends Controller
                     ->nextAvailableSlot();
             }
 
-            // For drafts already in awaiting_publish, this endpoint becomes
-            // a "reschedule" — only update timestamps without an FSM
-            // transition. PipelineGuard would reject same-state transitions.
-            if ($draft->status !== LinkedInPostStatus::AwaitingPublish->value) {
-                $this->guard->advance(
-                    $draft,
-                    LinkedInPostStatus::AwaitingPublish,
-                    'admin_approve',
-                    ['draft_id' => $draft->id, 'publish_at' => $publishAt->toIso8601String()]
-                );
-            }
-
-            // Post-May-12: scheduled_at AND cancel_window_ends_at both =
-            // the slot time. Operator can cancel anytime between approve
-            // click and slot fire (could be hours). LinkedIn process-
-            // scheduled cron fires when cancel_window_ends_at <= now()
-            // — same trigger logic, just at predictable slot times.
-            $draft->update([
-                'scheduled_at' => $publishAt,
-                'cancel_window_ends_at' => $publishAt,
-            ]);
-
-            // P5 (May 12): propagate slot to cross-post siblings so the
-            // social:publish-slot atomic orchestrator finds them at the same
-            // minute tick. Scanner's 2-min cron handles drafts whose siblings
-            // don't exist yet at approve time.
-            $draft->load(['facebookPost', 'instagramPost', 'tiktokPost', 'threadsPost']);
-            foreach (['facebookPost', 'instagramPost', 'tiktokPost', 'threadsPost'] as $rel) {
-                $draft->$rel?->update(['scheduled_at' => $publishAt]);
-            }
+            // The schedule write (FSM advance manual_review→awaiting_publish,
+            // scheduled_at + cancel_window_ends_at = slot, sibling propagation,
+            // clear schedule_prompt flag) is shared with the Telegram scheduling
+            // flow — one code path. Reschedule of an already-awaiting_publish
+            // draft is handled inside (same-state FSM advance is skipped).
+            app(\App\Services\LinkedInSchedulingService::class)
+                ->scheduleAt($draft, $publishAt, 'admin_approve');
 
             // Self-heal: a carousel draft can land in manual_review with non-done
             // slides if the original Scenario-C dispatch in persistAndRoute
