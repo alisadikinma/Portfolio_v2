@@ -7,13 +7,18 @@ use App\Enums\RepurposeJobStatus;
 use App\Http\Controllers\Controller;
 use App\Jobs\CaptureInstagramPost;
 use App\Jobs\GenerateLinkedInPost;
+use App\Jobs\ParseAndScheduleReply;
 use App\Models\LinkedInPost;
 use App\Models\RepurposeJob;
 use App\Models\Setting;
+use App\Services\LinkedInFixedSlotScheduler;
+use App\Services\LinkedInSchedulingService;
 use App\Services\PipelineGuard;
 use App\Services\TelegramNotificationService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -136,7 +141,86 @@ class TelegramWebhookController extends Controller
             return $this->resolveRepurposeAction($job, $action);
         }
 
+        if ($kind === 'schedule') {
+            return $this->resolveScheduleAction($id, $action);
+        }
+
         return 'Unknown target.';
+    }
+
+    /**
+     * Apply a scheduling-conversation button tap (Phase F). Actions:
+     *   - slot0|slot1|slot2 → schedule at candidate_slots[i] from the cache state
+     *     (already weekend/holiday/occupancy-filtered → no conflict re-check)
+     *   - confirm → schedule the proposed_slot despite a ±30-min collision
+     *   - reject → re-offer 3 fresh suggestions
+     * Conversation state lives in cache `telegram_schedule_state:{chat}`.
+     */
+    private function resolveScheduleAction(int $draftId, string $action): string
+    {
+        $chatId = (string) Setting::where('group', 'telegram')
+            ->where('key', 'telegram_chat_id')
+            ->value('value');
+        $stateKey = "telegram_schedule_state:{$chatId}";
+        $state = Cache::get($stateKey);
+
+        $draft = LinkedInPost::find($draftId);
+        if (!$draft) {
+            return 'Draft not found.';
+        }
+
+        $scheduling = app(LinkedInSchedulingService::class);
+        $telegram = app(TelegramNotificationService::class);
+
+        if (str_starts_with($action, 'slot')) {
+            if (!is_array($state) || (int) ($state['draft_id'] ?? 0) !== $draftId) {
+                return 'Prompt kedaluwarsa — tunggu prompt berikutnya.';
+            }
+            $i = (int) substr($action, 4);
+            $iso = $state['candidate_slots'][$i] ?? null;
+            if (!is_string($iso)) {
+                return 'Slot tidak valid.';
+            }
+            $slot = Carbon::parse($iso);
+            $scheduling->scheduleAt($draft, $slot, 'telegram_slot_button');
+            Cache::forget($stateKey);
+            $telegram->sendScheduleConfirmed($draft, $slot);
+
+            return '✅ Dijadwalkan ' . $slot->locale('id')->isoFormat('ddd, D MMM HH:mm') . ' WIB.';
+        }
+
+        if ($action === 'confirm') {
+            if (!is_array($state)
+                || ($state['step'] ?? null) !== 'awaiting_conflict_confirm'
+                || (int) ($state['draft_id'] ?? 0) !== $draftId
+                || !is_string($state['proposed_slot'] ?? null)) {
+                return 'Tidak ada konfirmasi tertunda.';
+            }
+            $slot = Carbon::parse($state['proposed_slot']);
+            $scheduling->scheduleAt($draft, $slot, 'telegram_conflict_override');
+            Cache::forget($stateKey);
+            $telegram->sendScheduleConfirmed($draft, $slot);
+
+            return '✅ Dijadwalkan (override).';
+        }
+
+        if ($action === 'reject') {
+            try {
+                $slots = app(LinkedInFixedSlotScheduler::class)->nextAvailableSlots(3);
+            } catch (\Throwable $e) {
+                return 'Tidak ada slot kosong dalam jendela.';
+            }
+            Cache::put($stateKey, [
+                'draft_id' => $draftId,
+                'step' => 'awaiting_datetime',
+                'candidate_slots' => array_map(fn ($s) => $s->toIso8601String(), $slots),
+            ], now()->addMinutes(60));
+            $telegram->sendSchedulePrompt($draft, $slots);
+
+            return 'Oke — pilih slot lain atau ketik sendiri.';
+        }
+
+        return 'Unknown action.';
     }
 
     private function resolveLinkedInAction(LinkedInPost $draft, string $action, PipelineGuard $guard): string
@@ -209,6 +293,27 @@ class TelegramWebhookController extends Controller
         $text = trim((string) ($message['text'] ?? ''));
         if ($text === '') {
             return;
+        }
+
+        $incomingChatId = (string) ($message['chat']['id'] ?? '');
+        $allowedChatId = (string) Setting::where('group', 'telegram')
+            ->where('key', 'telegram_chat_id')
+            ->value('value');
+        $chatAllowed = $allowedChatId !== '' && hash_equals($allowedChatId, $incomingChatId);
+
+        // Scheduling-conversation free-text reply (Phase F) — handled BEFORE the
+        // repurpose gate so it works regardless of telegram_repurpose_enabled.
+        // When a "kapan posting?" prompt is awaiting a datetime for THIS chat and
+        // the message isn't an IG URL, hand it to the queued Claude-CLI parser
+        // (webhook stays fast). The parse job validates weekday/holiday/conflict.
+        if ($chatAllowed) {
+            $state = Cache::get("telegram_schedule_state:{$incomingChatId}");
+            if (is_array($state)
+                && ($state['step'] ?? null) === 'awaiting_datetime'
+                && $this->extractInstagramUrl($text) === null) {
+                ParseAndScheduleReply::dispatch($incomingChatId, (int) ($state['draft_id'] ?? 0), $text);
+                return;
+            }
         }
 
         // Feature toggle.

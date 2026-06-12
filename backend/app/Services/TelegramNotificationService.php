@@ -716,6 +716,72 @@ class TelegramNotificationService
         return (string) ($t->title ?? $post->slug ?? ('Draft #' . $draft->id));
     }
 
+    /**
+     * The operator's typed slot collides (±30 min) with an existing scheduled
+     * draft — ask for a Ya-tetap / Pilih-lain confirmation (Phase F).
+     *
+     * @param array{id:int,post_title:string,scheduled_at:string,minutes_apart:int} $conflict
+     */
+    public function sendScheduleConflict(\App\Models\LinkedInPost $draft, \Carbon\Carbon $proposed, array $conflict): bool
+    {
+        if ($this->getSetting('telegram_enabled') !== 'true') {
+            return false;
+        }
+        if (empty($this->getBotToken()) || empty($this->getChatId())) {
+            return false;
+        }
+
+        $secret = (string) $this->getSetting('telegram_webhook_secret');
+        $when = $proposed->locale('id')->isoFormat('ddd, D MMM HH:mm') . ' WIB';
+        $other = $this->escapeMarkdown($this->truncate((string) ($conflict['post_title'] ?? 'draft lain'), 60));
+
+        $lines = [
+            '⚠️ Slot *' . $when . '* sudah ada draft #' . (int) ($conflict['id'] ?? 0) . " (\"{$other}\").",
+            'Tetap jadwalkan di situ?',
+        ];
+
+        $replyMarkup = [
+            'inline_keyboard' => [[
+                ['text' => '✅ Ya, tetap', 'callback_data' => self::signCallback('confirm', 'schedule', $draft->id, $secret)],
+                ['text' => '↩️ Pilih lain', 'callback_data' => self::signCallback('reject', 'schedule', $draft->id, $secret)],
+            ]],
+        ];
+
+        return $this->send(implode("\n", $lines), $replyMarkup);
+    }
+
+    /** Confirm a draft has been scheduled (Phase F). */
+    public function sendScheduleConfirmed(\App\Models\LinkedInPost $draft, \Carbon\Carbon $slot): bool
+    {
+        if ($this->getSetting('telegram_enabled') !== 'true') {
+            return false;
+        }
+        if (empty($this->getBotToken()) || empty($this->getChatId())) {
+            return false;
+        }
+
+        $when = $slot->locale('id')->isoFormat('ddd, D MMM HH:mm') . ' WIB';
+        $title = $this->escapeMarkdown($this->truncate($this->resolveDraftTitle($draft), 70));
+
+        return $this->send("✅ *Dijadwalkan* {$when}\n{$title}");
+    }
+
+    /**
+     * Generic gated send for the scheduling conversation (parse-help, invalid
+     * datetime re-prompts). Goes to the configured operator chat (Phase F).
+     */
+    public function sendScheduleNotice(string $text): bool
+    {
+        if ($this->getSetting('telegram_enabled') !== 'true') {
+            return false;
+        }
+        if (empty($this->getBotToken()) || empty($this->getChatId())) {
+            return false;
+        }
+
+        return $this->send($text);
+    }
+
     private function isEnabledFor(string $notificationType): bool
     {
         if ($this->getSetting('telegram_enabled') !== 'true') {
