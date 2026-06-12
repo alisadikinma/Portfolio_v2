@@ -8,6 +8,7 @@ use App\Enums\LinkedInPostStatus;
 use App\Enums\TiktokPostStatus;
 use App\Enums\ThreadsPostStatus;
 use App\Jobs\GenerateFacebookPost;
+use App\Jobs\GenerateHookVideo;
 use App\Jobs\GenerateInstagramPost;
 use App\Jobs\GenerateThreadsPost;
 use App\Jobs\GenerateTiktokPost;
@@ -357,7 +358,14 @@ class ScanLinkedInForCrossPost extends Command
         ]);
 
         GenerateInstagramPost::dispatch($draft->id)->onQueue('social-crosspost');
-        Log::info('[CrossPostScan] IG draft created + dispatched', [
+
+        // GROK hook video (IG mixed carousel). Fan-out only fires once the
+        // carousel slides are 'done', so the hook slide is rendered — dispatch
+        // the hook-video job here (it re-checks + is idempotent). IG-only: the
+        // hook ships as carousel item 1 video; LinkedIn/TikTok stay all-image.
+        GenerateHookVideo::dispatch($draft->id)->onQueue('social-crosspost');
+
+        Log::info('[CrossPostScan] IG draft created + dispatched (caption + hook video)', [
             'linkedin_post_id' => $li->id,
             'instagram_post_id' => $draft->id,
         ]);
