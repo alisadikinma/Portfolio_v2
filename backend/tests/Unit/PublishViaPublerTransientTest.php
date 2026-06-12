@@ -49,4 +49,14 @@ class PublishViaPublerTransientTest extends TestCase
             'Publer access denied (403). Plan/scope may be insufficient — verify Publer subscription tier.'
         ));
     }
+
+    /**
+     * Routes to the dedicated cross-post worker pool, not the shared `default`
+     * queue (where it would starve behind multi-minute /carousel-gen SSH jobs —
+     * production incident draft 157, 2026-06-12).
+     */
+    public function test_runs_on_social_crosspost_queue(): void
+    {
+        $this->assertSame('social-crosspost', (new PublishViaPubler('instagram', 1))->queue);
+    }
 }

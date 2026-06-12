@@ -60,6 +60,16 @@ class PublishViaPubler implements ShouldQueue
         public string $platform,
         public int $siblingPostId
     ) {
+        // Run on the dedicated cross-post worker pool, NOT the shared `default`
+        // queue. Without this the publish job competes with multi-minute
+        // /carousel-gen + article-gen SSH jobs on `default` and starves behind
+        // them, so an approved cross-post can sit unpublished for 10-20 min
+        // while the idle `social-crosspost` workers do nothing (production
+        // incident: draft 157, 2026-06-12 — IG/TikTok siblings queued at default
+        // position 6-7 behind 3 RegenerateLinkedInCarouselContent jobs).
+        // Set via onQueue() rather than a redeclared $queue property (which
+        // collides with the Queueable trait's own $queue declaration).
+        $this->onQueue('social-crosspost');
     }
 
     public function handle(PublerClient $client, PublerPayloadBuilder $builder): void

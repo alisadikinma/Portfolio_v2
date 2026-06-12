@@ -515,13 +515,35 @@ class PublerClient
 
             if ($status === 'complete') {
                 $payload = $job['payload'];
-                $failures = is_array($payload) ? ($payload['failures'] ?? null) : null;
 
+                // Failure shape A (documented): a top-level `failures` collection.
+                $failures = is_array($payload) ? ($payload['failures'] ?? null) : null;
                 if (!empty($failures)) {
                     return ['ok' => false, 'timed_out' => false, 'post_id' => null, 'error' => $this->firstFailureMessage($failures)];
                 }
 
-                return ['ok' => true, 'timed_out' => false, 'post_id' => $this->extractPostId($payload), 'error' => null];
+                // Failure shape B (validated live 2026-06-12): the immediate-publish
+                // payload is a LIST whose entries can be per-account errors, e.g.
+                // [{type:"error", status:"failed", failure:{message}}] — with NO
+                // top-level `failures` key. Checking `failures` alone read these as
+                // success and silently mislabeled the sibling `published` (IG mixed
+                // video+image carousel, which Publer rejects with an internal error).
+                $listFailure = $this->firstListItemFailure($payload);
+                if ($listFailure !== null) {
+                    return ['ok' => false, 'timed_out' => false, 'post_id' => null, 'error' => $listFailure];
+                }
+
+                // Complete with no failures still REQUIRES a real post id. A
+                // completed job that produced no post is not a publish — treat it
+                // as a failure so it surfaces for retry instead of being recorded
+                // as a phantom success (the jobId was previously stored as the
+                // publer_post_id, masking that nothing was created).
+                $postId = $this->extractPostId($payload);
+                if ($postId === null) {
+                    return ['ok' => false, 'timed_out' => false, 'post_id' => null, 'error' => 'Publer job completed but returned no post id (post was not created)'];
+                }
+
+                return ['ok' => true, 'timed_out' => false, 'post_id' => $postId, 'error' => null];
             }
 
             usleep(1_500_000);
@@ -553,6 +575,42 @@ class PublerClient
         }
 
         return 'Publer reported a publish failure: ' . json_encode($failures);
+    }
+
+    /**
+     * Detect a per-item failure in the LIST-shaped immediate-publish payload.
+     * A failed account appears as {type:"error", status:"failed", failure:{message}}
+     * with NO top-level `failures` key (validated live 2026-06-12 on the IG mixed
+     * video+image carousel, which Publer cannot publish). Returns the human-
+     * readable message, or null when no list item reports failure.
+     */
+    private function firstListItemFailure(mixed $payload): ?string
+    {
+        if (!is_array($payload) || !array_is_list($payload)) {
+            return null;
+        }
+
+        foreach ($payload as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+
+            $isError = ($entry['type'] ?? null) === 'error'
+                || ($entry['status'] ?? null) === 'failed';
+            if (!$isError) {
+                continue;
+            }
+
+            $msg = $entry['failure']['message']
+                ?? (is_string($entry['error'] ?? null) ? $entry['error'] : null)
+                ?? (is_string($entry['message'] ?? null) ? $entry['message'] : null);
+
+            return is_string($msg) && $msg !== ''
+                ? $msg
+                : 'Publer reported a per-account publish failure';
+        }
+
+        return null;
     }
 
     /** Best-effort extraction of a created post id from a successful payload. */

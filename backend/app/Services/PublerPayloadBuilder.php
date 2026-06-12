@@ -136,7 +136,17 @@ class PublerPayloadBuilder
             : null;
     }
 
-    /** Kill-switch (group=publer) — default ON; flip off if Publer rejects mixed. */
+    /**
+     * Kill-switch (group=publer) — default OFF.
+     *
+     * Publer support confirmed (2026-06-12) and a live probe verified that the
+     * Publer publish API cannot create an Instagram carousel mixing video +
+     * images — it only does full-image OR full-video posts. `type:"photo"` with
+     * a video item silently creates no post; `type:"carousel"` crashes Publer
+     * internally ("undefined method 'first' for nil"). So IG defaults to the
+     * all-image carousel. Set publer_ig_mixed_video_enabled='true' only if
+     * Publer adds mixed-carousel support.
+     */
     private function isMixedVideoEnabled(): bool
     {
         $value = Setting::where('group', 'publer')
@@ -144,7 +154,7 @@ class PublerPayloadBuilder
             ->value('value');
 
         if ($value === null) {
-            return true; // default enabled
+            return false; // default disabled — Publer cannot publish mixed IG carousels
         }
 
         return filter_var($value, FILTER_VALIDATE_BOOLEAN);

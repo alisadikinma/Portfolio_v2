@@ -206,6 +206,77 @@ class PublerClientTest extends TestCase
         $this->assertNull($job['media_id']);
     }
 
+    /**
+     * Regression (2026-06-12): Publer's immediate-publish payload is a LIST
+     * whose entries can be per-account errors — [{type:"error", status:"failed",
+     * failure:{message}}] — with NO top-level `failures` key. The old code only
+     * checked `payload['failures']`, so it read these as success and silently
+     * marked the sibling `published` (the IG mixed video+image carousel case).
+     */
+    public function test_await_publish_result_detects_list_shaped_per_account_failure(): void
+    {
+        Http::fake([
+            'app.publer.com/api/v1/users/me' => Http::response(['success' => true, 'data' => ['workspaces' => [['id' => 'ws_test']]]], 200),
+            'app.publer.com/api/v1/job_status/job_fail' => Http::response([
+                'success' => true,
+                'data' => [
+                    'status' => 'complete',
+                    'payload' => [[
+                        'jid' => null,
+                        'type' => 'error',
+                        'status' => 'failed',
+                        'failure' => ['provider' => 'instagram', 'message' => "undefined method 'first' for nil"],
+                    ]],
+                ],
+            ], 200),
+        ]);
+
+        $client = new PublerClient(apiKey: 'TEST_KEY');
+        $result = $client->awaitPublishResult('job_fail', maxTries: 1);
+
+        $this->assertFalse($result['ok']);
+        $this->assertFalse($result['timed_out']);
+        $this->assertNull($result['post_id']);
+        $this->assertStringContainsString("undefined method 'first' for nil", $result['error']);
+    }
+
+    public function test_await_publish_result_treats_complete_without_post_id_as_failure(): void
+    {
+        Http::fake([
+            'app.publer.com/api/v1/users/me' => Http::response(['success' => true, 'data' => ['workspaces' => [['id' => 'ws_test']]]], 200),
+            'app.publer.com/api/v1/job_status/job_empty' => Http::response([
+                'success' => true,
+                'data' => ['status' => 'complete', 'payload' => [['type' => 'job', 'post' => null]]],
+            ], 200),
+        ]);
+
+        $client = new PublerClient(apiKey: 'TEST_KEY');
+        $result = $client->awaitPublishResult('job_empty', maxTries: 1);
+
+        $this->assertFalse($result['ok']);
+        $this->assertFalse($result['timed_out']);
+        $this->assertNull($result['post_id']);
+        $this->assertStringContainsString('no post id', $result['error']);
+    }
+
+    public function test_await_publish_result_returns_post_id_on_real_success(): void
+    {
+        Http::fake([
+            'app.publer.com/api/v1/users/me' => Http::response(['success' => true, 'data' => ['workspaces' => [['id' => 'ws_test']]]], 200),
+            'app.publer.com/api/v1/job_status/job_ok' => Http::response([
+                'success' => true,
+                'data' => ['status' => 'complete', 'payload' => [['type' => 'job', 'post' => ['id' => 'post_777']]]],
+            ], 200),
+        ]);
+
+        $client = new PublerClient(apiKey: 'TEST_KEY');
+        $result = $client->awaitPublishResult('job_ok', maxTries: 1);
+
+        $this->assertTrue($result['ok']);
+        $this->assertSame('post_777', $result['post_id']);
+        $this->assertNull($result['error']);
+    }
+
     public function test_create_post_returns_job_id(): void
     {
         Http::fake([

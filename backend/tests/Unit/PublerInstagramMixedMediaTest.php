@@ -14,10 +14,12 @@ use Tests\TestCase;
 /**
  * Phase G — IG mixed video+image carousel.
  *
- * When the IG sibling's GROK hook video is done (and app-hosted), buildInstagram
- * prepends it as media item 0 (type=video) ahead of the image slides, so Publer
- * publishes a mixed carousel. Falls back to all-image when the video isn't ready,
- * isn't app-hosted, or the publer_ig_mixed_video_enabled kill-switch is off.
+ * The buildInstagram prepend path (GROK hook video as media item 0, type=video)
+ * still exists but is gated behind the publer_ig_mixed_video_enabled kill-switch,
+ * which now defaults OFF: Publer support confirmed (2026-06-12) + a live probe
+ * verified that Publer cannot publish a mixed video+image IG carousel (it only
+ * does full-image OR full-video). So the default behaviour is the all-image
+ * carousel; the prepend path only fires when the kill-switch is explicitly ON.
  */
 class PublerInstagramMixedMediaTest extends TestCase
 {
@@ -61,8 +63,11 @@ class PublerInstagramMixedMediaTest extends TestCase
         return $ig;
     }
 
-    public function test_prepends_hook_video_when_done_and_app_hosted(): void
+    public function test_prepends_hook_video_when_enabled_done_and_app_hosted(): void
     {
+        // Kill-switch must be EXPLICITLY on — the prepend path is dormant by default.
+        Setting::create(['group' => 'publer', 'key' => 'publer_ig_mixed_video_enabled', 'value' => 'true']);
+
         $ig = $this->makeSibling([
             'hook_video_status' => 'done',
             'hook_video_url' => 'https://alisadikinma.com/storage/linkedin-carousel/grok-hook-1.mp4',
@@ -73,7 +78,22 @@ class PublerInstagramMixedMediaTest extends TestCase
         $this->assertCount(4, $spec['media_urls']);
         $this->assertSame('https://alisadikinma.com/storage/linkedin-carousel/grok-hook-1.mp4', $spec['media_urls'][0]);
         $this->assertSame(['video', 'image', 'image', 'image'], $spec['media_types']);
-        $this->assertSame('photo', $spec['network_fields']['type']);
+    }
+
+    public function test_default_is_all_image_when_setting_absent(): void
+    {
+        // No publer_ig_mixed_video_enabled row → default OFF → all-image even
+        // though the hook video is done + app-hosted (Publer can't do mixed).
+        $ig = $this->makeSibling([
+            'hook_video_status' => 'done',
+            'hook_video_url' => 'https://alisadikinma.com/storage/linkedin-carousel/grok-hook-1.mp4',
+        ]);
+
+        $spec = (new PublerPayloadBuilder())->buildInstagram($ig);
+
+        $this->assertCount(3, $spec['media_urls']);
+        $this->assertSame(['image', 'image', 'image'], $spec['media_types']);
+        $this->assertStringNotContainsString('.mp4', json_encode($spec['media_urls']));
     }
 
     public function test_all_image_when_hook_not_done(): void
