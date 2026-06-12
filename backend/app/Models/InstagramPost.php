@@ -44,6 +44,7 @@ class InstagramPost extends Model
         'hook_video_status',
         'hook_video_job_uuid',
         'hook_video_error',
+        'hook_video_retry_count',
         'publer_post_id',
         'last_error',
         'auto_retry_count',

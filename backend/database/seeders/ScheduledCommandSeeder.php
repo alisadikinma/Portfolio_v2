@@ -196,6 +196,23 @@ class ScheduledCommandSeeder extends Seeder
                 'sort_order' => 90,
             ],
 
+            [
+                // GROK hook-video poll + recovery (June 12, 2026). GeminiGen
+                // never fires webhooks, so this per-minute command is the SOLE
+                // completion driver for IG hook videos: polls /history, finalizes
+                // done clips (crop 2:3→4:5 + strip audio), and bounded-retries
+                // failed/stuck ones. Pairs with social-cross-post:scan (fan-out)
+                // + crosspost:reap (caption recovery).
+                'signature' => 'crosspost:poll-hook-videos',
+                'display_name' => 'Social — Poll GROK Hook Videos (IG)',
+                'description' => 'Tiap menit: cek status GROK hook-video IG (selesai → download+crop+strip audio), dan retry terbatas yang gagal/stuck. Satu-satunya jalur completion (GeminiGen nggak kirim webhook).',
+                'category' => 'linkedin',
+                'cron_expression' => '* * * * *',
+                'without_overlapping_minutes' => 2,
+                'arguments' => null,
+                'sort_order' => 100,
+            ],
+
             // ─────────────── Newsletter (1) ───────────────
             [
                 'signature' => 'newsletter:send-weekly',
