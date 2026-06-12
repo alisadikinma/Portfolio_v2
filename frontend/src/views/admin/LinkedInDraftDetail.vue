@@ -210,10 +210,15 @@ const hookVideo = computed(() => {
     error: ig?.hook_video_error || null,
   }
 })
-const hookSlideImage = computed(() => draft.value?.carousel_slides?.[0]?.image_url || null)
-const showHookPanel = computed(
-  () => activePlatform.value === 'instagram' && draft.value?.format === 'carousel'
+// Slide 1 of an IG-capable carousel ships a GROK image-to-video animation
+// alongside the static slide image. The Image|Video toggle lives ON the slide
+// viewer (only on slide 1), decoupled from the caption-platform tab below —
+// the clip is IG-specific but the shared viewer is where the operator sees it.
+const hasHookVideo = computed(
+  () => draft.value?.format === 'carousel' && !!draft.value?.instagram_post
 )
+const isHookSlide = computed(() => activeSlideIndex.value === 0 && hasHookVideo.value)
+const showHookVideoFrame = computed(() => isHookSlide.value && hookTab.value === 'video')
 async function doRegenerateHookVideo() {
   if (!confirm('Regenerate the Instagram hook video? GROK renders a fresh ~6s clip (takes a few minutes).')) return
   try {
@@ -1831,10 +1836,54 @@ const showThumbnailUploadCaption = computed(() =>
                 <!-- Slide counter + per-slide retry. Prev/next arrows moved
                      onto the image frame itself (overlay, gallery pattern). -->
                 <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
-                  <p class="text-xs font-mono uppercase tracking-[0.14em] text-neutral-400">
-                    Slide <span class="text-neutral-100 font-bold">{{ activeSlideIndex + 1 }}</span> / {{ carouselSlides.length }}
-                  </p>
+                  <div class="flex items-center gap-3 flex-wrap">
+                    <p class="text-xs font-mono uppercase tracking-[0.14em] text-neutral-400">
+                      Slide <span class="text-neutral-100 font-bold">{{ activeSlideIndex + 1 }}</span> / {{ carouselSlides.length }}
+                    </p>
+                    <!-- Hook slide (IG carousel): Image|Video preview toggle, inline
+                         on the viewer so it sits in the SAME section as the slide. -->
+                    <div v-if="isHookSlide" class="inline-flex items-center gap-2">
+                      <div class="inline-flex rounded-lg border border-neutral-700 overflow-hidden text-[10px] font-mono uppercase tracking-[0.1em]">
+                        <button
+                          type="button"
+                          @click="hookTab = 'image'"
+                          :class="hookTab === 'image' ? 'bg-fuchsia-500/20 text-fuchsia-200' : 'text-neutral-400 hover:text-neutral-200'"
+                          class="px-2.5 py-1 transition"
+                        >Image</button>
+                        <button
+                          type="button"
+                          @click="hookTab = 'video'"
+                          :class="hookTab === 'video' ? 'bg-fuchsia-500/20 text-fuchsia-200' : 'text-neutral-400 hover:text-neutral-200'"
+                          class="px-2.5 py-1 transition border-l border-neutral-700"
+                        >Video</button>
+                      </div>
+                      <span
+                        v-if="hookTab === 'video' && hookVideo.status"
+                        class="text-[9px] font-mono uppercase tracking-[0.1em] px-2 py-0.5 rounded-full border"
+                        :class="{
+                          'border-emerald-500/40 bg-emerald-500/10 text-emerald-300': hookVideo.status === 'done',
+                          'border-cyan-500/40 bg-cyan-500/10 text-cyan-300 animate-pulse': hookVideo.status === 'generating' || hookVideo.status === 'pending',
+                          'border-rose-500/40 bg-rose-500/10 text-rose-300': hookVideo.status === 'failed',
+                        }"
+                      >{{ hookVideo.status }}</span>
+                    </div>
+                  </div>
+                  <!-- Context action: regenerate the GROK clip while previewing the
+                       hook video; otherwise re-render the static slide image. -->
                   <button
+                    v-if="showHookVideoFrame"
+                    @click="doRegenerateHookVideo"
+                    :disabled="regenerateHookVideoMutation.isPending.value || hookVideo.status === 'generating' || hookVideo.status === 'pending'"
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] rounded-md bg-fuchsia-500/10 ring-1 ring-fuchsia-500/30 text-fuchsia-300 hover:bg-fuchsia-500/20 disabled:opacity-40 transition"
+                    title="Re-render the IG hook animation via GROK (~few minutes)"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3">
+                      <path :d="ICON.refresh" />
+                    </svg>
+                    {{ regenerateHookVideoMutation.isPending.value ? 'Starting…' : 'Regenerate video' }}
+                  </button>
+                  <button
+                    v-else
                     @click="regenerateSingleSlide(activeSlideIndex)"
                     :disabled="regenerateSlideMutation.isPending.value"
                     class="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] rounded-md bg-amber-500/10 ring-1 ring-amber-500/30 text-amber-300 hover:bg-amber-500/20 disabled:opacity-30 transition"
@@ -1855,7 +1904,7 @@ const showThumbnailUploadCaption = computed(() =>
                 >
                   <!-- Status pill -->
                   <span
-                    v-if="carouselSlides[activeSlideIndex]?.image_status"
+                    v-if="!showHookVideoFrame && carouselSlides[activeSlideIndex]?.image_status"
                     class="absolute top-3 right-3 z-10 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono uppercase tracking-[0.14em]"
                     :class="{
                       'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30': carouselSlides[activeSlideIndex].image_status === 'done',
@@ -1876,6 +1925,26 @@ const showThumbnailUploadCaption = computed(() =>
                     }[carouselSlides[activeSlideIndex].image_status] || 'Pending' }}
                   </span>
 
+                  <!-- Hook-video status pill (replaces the image pill while
+                       previewing the GROK clip on slide 1). -->
+                  <span
+                    v-if="showHookVideoFrame && hookVideo.status"
+                    class="absolute top-3 right-3 z-10 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono uppercase tracking-[0.14em]"
+                    :class="{
+                      'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30': hookVideo.status === 'done',
+                      'bg-cyan-500/15 text-cyan-300 ring-1 ring-cyan-500/30': hookVideo.status === 'generating' || hookVideo.status === 'pending',
+                      'bg-rose-500/15 text-rose-300 ring-1 ring-rose-500/30': hookVideo.status === 'failed',
+                    }"
+                  >
+                    <span
+                      v-if="hookVideo.status === 'generating' || hookVideo.status === 'pending'"
+                      class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"
+                    />
+                    {{ hookVideo.status }}
+                  </span>
+
+                  <!-- Static slide image (every slide) vs GROK hook video (slide 1, Video tab). -->
+                  <template v-if="!showHookVideoFrame">
                   <img
                     v-if="carouselSlides[activeSlideIndex]?.image_url"
                     :src="carouselSlides[activeSlideIndex].image_url"
@@ -1935,6 +2004,67 @@ const showThumbnailUploadCaption = computed(() =>
                     <p class="text-white text-2xl font-bold uppercase tracking-tight max-w-md mb-2 leading-tight">{{ slideCopyId(carouselSlides[activeSlideIndex]) }}</p>
                     <p class="text-white/80 text-xs max-w-md">{{ slideCopyEn(carouselSlides[activeSlideIndex]) }}</p>
                   </div>
+                  </template>
+
+                  <!-- GROK hook video states (slide 1, Video tab). -->
+                  <template v-else>
+                    <video
+                      v-if="hookVideo.status === 'done' && hookVideo.url"
+                      :src="hookVideo.url"
+                      controls
+                      loop
+                      muted
+                      playsinline
+                      class="absolute inset-0 w-full h-full object-contain bg-black"
+                    ></video>
+                    <div
+                      v-else-if="hookVideo.status === 'generating' || hookVideo.status === 'pending'"
+                      class="absolute inset-0 flex flex-col items-center justify-center text-center p-6"
+                    >
+                      <span class="inline-block h-10 w-10 rounded-full border-2 border-cyan-400/30 border-t-cyan-400 animate-spin mb-3"></span>
+                      <p class="text-cyan-300 text-[10px] uppercase tracking-[0.18em] font-mono">Rendering with GROK…</p>
+                      <p class="text-neutral-400 text-xs mt-1">~a few minutes · poll-driven</p>
+                    </div>
+                    <div
+                      v-else-if="hookVideo.status === 'failed'"
+                      class="absolute inset-0 flex flex-col items-center justify-center text-center p-6"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-9 h-9 text-rose-400 mb-2">
+                        <path :d="ICON.alertTriangle" />
+                      </svg>
+                      <p class="text-rose-300 text-[10px] uppercase tracking-[0.18em] font-mono mb-2">Hook video failed</p>
+                      <p v-if="hookVideo.error" class="text-rose-200 text-xs mb-4 max-w-md font-mono break-words">{{ hookVideo.error }}</p>
+                      <button
+                        @click="doRegenerateHookVideo"
+                        :disabled="regenerateHookVideoMutation.isPending.value"
+                        class="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-fuchsia-500 text-fuchsia-950 hover:bg-fuchsia-400 active:scale-[0.98] text-sm font-semibold transition disabled:opacity-50"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5">
+                          <path :d="ICON.refresh" />
+                        </svg>
+                        Retry hook video
+                      </button>
+                    </div>
+                    <div
+                      v-else
+                      class="absolute inset-0 flex flex-col items-center justify-center text-center p-6"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-9 h-9 text-fuchsia-400/70 mb-3">
+                        <path :d="ICON.image" />
+                      </svg>
+                      <p class="text-neutral-300 text-sm mb-4 max-w-xs">No hook video yet — render a GROK animation of this slide for the Instagram carousel.</p>
+                      <button
+                        @click="doRegenerateHookVideo"
+                        :disabled="regenerateHookVideoMutation.isPending.value"
+                        class="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-fuchsia-500 text-fuchsia-950 hover:bg-fuchsia-400 active:scale-[0.98] text-sm font-semibold transition disabled:opacity-50"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5">
+                          <path :d="ICON.refresh" />
+                        </svg>
+                        Generate hook video
+                      </button>
+                    </div>
+                  </template>
                 </div>
                   <!-- Gallery-style prev/next arrows overlaid on the frame.
                        Placed in the relative wrapper above the frame so they
@@ -2199,97 +2329,6 @@ const showThumbnailUploadCaption = computed(() =>
 
                 <div v-if="activePlatformPost.hashtags.length > 0" class="flex flex-wrap gap-x-2 gap-y-1">
                   <span v-for="tag in activePlatformPost.hashtags" :key="tag" class="text-cyan-400 text-sm">{{ tag }}</span>
-                </div>
-
-                <!-- IG hook (slide 1) ships as a GROK image-to-video animation
-                     in the mixed carousel. LinkedIn/TikTok stay all-image, so
-                     this panel is IG-carousel only. Toggle previews the static
-                     slide vs the rendered clip; GROK is poll-driven so the
-                     parent query keeps polling while status is generating. -->
-                <div v-if="showHookPanel" class="rounded-xl border border-fuchsia-500/20 bg-fuchsia-500/[0.04] p-3 space-y-3">
-                  <div class="flex items-center justify-between gap-2">
-                    <div class="flex items-center gap-2">
-                      <span class="text-xs font-mono uppercase tracking-[0.14em] text-fuchsia-300/80">Hook slide</span>
-                      <span
-                        v-if="hookVideo.status"
-                        class="text-[10px] font-mono uppercase tracking-[0.1em] px-2 py-0.5 rounded-full border"
-                        :class="{
-                          'border-emerald-500/40 bg-emerald-500/10 text-emerald-300': hookVideo.status === 'done',
-                          'border-cyan-500/40 bg-cyan-500/10 text-cyan-300 animate-pulse': hookVideo.status === 'generating' || hookVideo.status === 'pending',
-                          'border-rose-500/40 bg-rose-500/10 text-rose-300': hookVideo.status === 'failed',
-                        }"
-                      >{{ hookVideo.status }}</span>
-                    </div>
-                    <!-- Image|Video segmented toggle -->
-                    <div class="inline-flex rounded-lg border border-neutral-700 overflow-hidden text-xs font-mono uppercase tracking-[0.1em]">
-                      <button
-                        type="button"
-                        @click="hookTab = 'image'"
-                        :class="hookTab === 'image' ? 'bg-fuchsia-500/20 text-fuchsia-200' : 'text-neutral-400 hover:text-neutral-200'"
-                        class="px-3 py-1 transition"
-                      >Image</button>
-                      <button
-                        type="button"
-                        @click="hookTab = 'video'"
-                        :class="hookTab === 'video' ? 'bg-fuchsia-500/20 text-fuchsia-200' : 'text-neutral-400 hover:text-neutral-200'"
-                        class="px-3 py-1 transition border-l border-neutral-700"
-                      >Video</button>
-                    </div>
-                  </div>
-
-                  <!-- Image tab: static rendered slide 1 -->
-                  <div v-if="hookTab === 'image'">
-                    <img
-                      v-if="hookSlideImage"
-                      :src="hookSlideImage"
-                      alt="Hook slide"
-                      class="w-full max-w-[280px] mx-auto rounded-lg border border-neutral-800"
-                    />
-                    <p v-else class="text-sm text-neutral-500 text-center py-6">Hook slide not rendered yet.</p>
-                  </div>
-
-                  <!-- Video tab: GROK clip / spinner / error -->
-                  <div v-else>
-                    <video
-                      v-if="hookVideo.status === 'done' && hookVideo.url"
-                      :src="hookVideo.url"
-                      controls
-                      loop
-                      muted
-                      playsinline
-                      class="w-full max-w-[280px] mx-auto rounded-lg border border-neutral-800 bg-black"
-                    ></video>
-                    <div
-                      v-else-if="hookVideo.status === 'generating' || hookVideo.status === 'pending'"
-                      class="flex flex-col items-center gap-2 py-8 text-cyan-300"
-                    >
-                      <span class="inline-block h-6 w-6 rounded-full border-2 border-cyan-400/30 border-t-cyan-400 animate-spin"></span>
-                      <span class="text-xs font-mono">Rendering with GROK…</span>
-                    </div>
-                    <div
-                      v-else-if="hookVideo.status === 'failed'"
-                      class="rounded-lg border border-rose-500/30 bg-rose-500/5 px-4 py-3 text-sm text-rose-200"
-                    >
-                      <strong class="text-rose-300">Hook video failed.</strong>
-                      <span v-if="hookVideo.error" class="block mt-1 text-rose-300/70 text-xs break-words">{{ hookVideo.error }}</span>
-                    </div>
-                    <p v-else class="text-sm text-neutral-500 text-center py-6">
-                      No hook video yet. Click “Regenerate hook video” to render one.
-                    </p>
-                  </div>
-
-                  <div class="flex justify-end pt-1 border-t border-fuchsia-500/10">
-                    <button
-                      type="button"
-                      @click="doRegenerateHookVideo"
-                      :disabled="regenerateHookVideoMutation.isPending.value || hookVideo.status === 'generating' || hookVideo.status === 'pending'"
-                      class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono uppercase tracking-[0.12em] rounded-md border border-fuchsia-500/40 bg-fuchsia-500/10 text-fuchsia-300 hover:bg-fuchsia-500/20 hover:text-fuchsia-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                      title="Re-render the IG hook animation via GROK (~few minutes)"
-                    >
-                      <span v-if="regenerateHookVideoMutation.isPending.value">⟳ Starting…</span>
-                      <span v-else>↻ Regenerate hook video</span>
-                    </button>
-                  </div>
                 </div>
 
                 <!-- Per-platform caption regen buttons. LinkedIn carousel uses
