@@ -32,6 +32,7 @@ class LinkedInPost extends Model
         'validation_log',
         'scheduled_at',
         'cancel_window_ends_at',
+        'schedule_prompt_sent_at',
         'published_at',
         'linkedin_post_urn',
         'linkedin_asset_urn',
@@ -61,6 +62,7 @@ class LinkedInPost extends Model
         'auto_retry_count' => 'integer',
         'scheduled_at' => 'datetime',
         'cancel_window_ends_at' => 'datetime',
+        'schedule_prompt_sent_at' => 'datetime',
         'published_at' => 'datetime',
         'auto_approve_cross_posts' => 'boolean',
     ];

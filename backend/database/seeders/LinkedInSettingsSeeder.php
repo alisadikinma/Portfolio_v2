@@ -88,6 +88,16 @@ class LinkedInSettingsSeeder extends Seeder
             //   restores the photorealistic creator-face carousel. No-redeploy
             //   revert lever read by LinkedInGenerationService::buildCarouselGenPrompt.
             ['key' => 'linkedin_carousel_style',               'value' => 'sketchnote', 'type' => 'text'],
+
+            // Telegram scheduling conversation (June 12, 2026):
+            // When 'true', a draft that becomes genuinely ready (carousel:
+            // slides rendered + captions ready; text: validation passed) fires
+            // ONE Telegram "kapan posting?" prompt with weekday/holiday-aware
+            // slot buttons + free-text override. Enabling this SUPERSEDES
+            // linkedin_auto_approve_enabled: linkedin:auto-schedule defers
+            // (no-ops) so the human-in-the-loop Telegram flow owns scheduling.
+            // Default OFF — zero behavior change until the operator opts in.
+            ['key' => 'linkedin_telegram_schedule_enabled',    'value' => 'false', 'type' => 'text'],
         ];
 
         foreach ($settings as $setting) {
