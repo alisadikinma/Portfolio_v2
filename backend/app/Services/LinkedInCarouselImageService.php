@@ -33,6 +33,13 @@ use Illuminate\Support\Str;
  */
 class LinkedInCarouselImageService
 {
+    /**
+     * Max bounded auto-retries for a TRANSIENT/UNKNOWN slide render failure
+     * before the slide is marked failed_permanent. Per-slide counter lives in
+     * carousel_slides[i].image_retry_count.
+     */
+    private const MAX_TRANSIENT_RETRIES = 3;
+
     private string $apiKey;
     private string $baseUrl = 'https://api.geminigen.ai/uapi/v1';
 
@@ -77,8 +84,15 @@ class LinkedInCarouselImageService
         $dispatched = 0;
 
         foreach ($slides as $i => $slide) {
+            $st = $slide['image_status'] ?? null;
             // Idempotency: skip slides already done
-            if (($slide['image_status'] ?? null) === 'done' && ! empty($slide['image_url'])) {
+            if ($st === 'done' && ! empty($slide['image_url'])) {
+                continue;
+            }
+            // Terminal: never re-render a slide whose tiered safety rewrite OR
+            // bounded transient retries are exhausted (failed_permanent). The
+            // operator skips + republishes manually.
+            if ($st === 'failed_permanent') {
                 continue;
             }
 
@@ -457,6 +471,13 @@ class LinkedInCarouselImageService
             // so a sanitized-prompt-still-failing scenario doesn't loop.
             $this->maybeAutoRetryOnSafety($job, $reason);
 
+            // Bounded transient retry. The safety path above only acts on
+            // POLICY_* refusals; a plain network blip / 5xx / timeout used to
+            // stick in terminal 'failed' with no retry. This re-renders the
+            // slide up to MAX_TRANSIENT_RETRIES times (no-op for policy classes,
+            // which the safety path owns).
+            $this->maybeTransientRetry($job, $reason);
+
             return false;
         }
 
@@ -500,6 +521,89 @@ class LinkedInCarouselImageService
             Log::info('[LinkedInCarouselImage] safety auto-retry dispatched', [
                 'draft_id' => $draftId,
                 'slide_index' => $slideIndex,
+                'new_uuid' => $newUuid,
+            ]);
+        }
+    }
+
+    /**
+     * Bounded auto-retry for TRANSIENT / DETERMINISTIC_LLM / UNKNOWN GeminiGen
+     * failures (June 12, 2026). The safety path (maybeAutoRetryOnSafety) only
+     * handles POLICY_* refusals; a plain network blip / 5xx / timeout used to
+     * land the slide in terminal 'failed' with zero retry — stuck until the
+     * operator manually hit "Re-render image".
+     *
+     * Resets the slide to 'pending' (so dispatchSingleSlide re-renders it) up to
+     * MAX_TRANSIENT_RETRIES times, tracked per-slide via image_retry_count. On
+     * exhaustion the slide is marked failed_permanent + a Telegram notify fires.
+     * POLICY_* (safety path owns) and PERMANENT (won't succeed on retry) classes
+     * are skipped.
+     *
+     * Idempotent against the safety path: for a POLICY_* class the early class
+     * check returns before any mutation, so the slide isn't double-dispatched.
+     */
+    private function maybeTransientRetry(ImageGenerationJob $job, string $reason): void
+    {
+        $draftId = $job->linkedin_post_id;
+        $slideIndex = $job->slide_index;
+        if ($draftId === null || $slideIndex === null) {
+            return;
+        }
+
+        $errorClass = app(\App\Services\ImageGenerationService::class)->classifyError($reason);
+
+        $retryable = in_array($errorClass, [
+            \App\Enums\PipelineErrorClass::Transient,
+            \App\Enums\PipelineErrorClass::DeterministicLlm,
+            \App\Enums\PipelineErrorClass::Unknown,
+        ], true);
+        if (! $retryable) {
+            return;
+        }
+
+        $draft = LinkedInPost::find($draftId);
+        if (! $draft) {
+            return;
+        }
+        $slides = $draft->carousel_slides ?? [];
+        if (! isset($slides[$slideIndex])) {
+            return;
+        }
+
+        $count = (int) ($slides[$slideIndex]['image_retry_count'] ?? 0);
+
+        // Exhausted — mark permanent so dispatchAllSlides + the reaper stop
+        // re-rendering it, and alert the operator to skip + republish.
+        if ($count >= self::MAX_TRANSIENT_RETRIES) {
+            $this->markSlideFailedPermanent($draftId, $slideIndex, $reason);
+            return;
+        }
+
+        // Reset to pending + bump the counter, then re-dispatch the single slide.
+        DB::transaction(function () use ($draftId, $slideIndex, $count) {
+            $locked = LinkedInPost::lockForUpdate()->find($draftId);
+            if (! $locked) {
+                return;
+            }
+            $s = $locked->carousel_slides ?? [];
+            if (! isset($s[$slideIndex])) {
+                return;
+            }
+            $s[$slideIndex]['image_status'] = 'pending';
+            $s[$slideIndex]['image_error'] = null;
+            $s[$slideIndex]['image_job_uuid'] = null;
+            $s[$slideIndex]['image_retry_count'] = $count + 1;
+            $locked->update(['carousel_slides' => $s]);
+        });
+
+        $fresh = LinkedInPost::find($draftId);
+        if ($fresh) {
+            $newUuid = $this->dispatchSingleSlide($fresh, $slideIndex);
+            Log::info('[LinkedInCarouselImage] transient auto-retry dispatched', [
+                'draft_id' => $draftId,
+                'slide_index' => $slideIndex,
+                'attempt' => $count + 1,
+                'error_class' => $errorClass->value,
                 'new_uuid' => $newUuid,
             ]);
         }

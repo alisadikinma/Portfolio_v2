@@ -944,6 +944,46 @@ const slidesPendingMessage = computed(() => {
   return `Rendering slide images — ${done} of ${slides.length} done${generating > 0 ? ` · ${generating} in flight` : ''}`
 })
 
+// Cross-post caption readiness (June 12, 2026). Authoritative flag computed
+// server-side in show() (caption_readiness) — it knows which Publer platforms
+// are configured (the FE can't). Blocks Approve / Schedule / Publish when any
+// expected IG/TikTok/Threads caption is missing, empty, or still generating,
+// so the operator can't push a carousel whose sibling captions haven't landed.
+const captionsReady = computed(() => draft.value?.caption_readiness?.ready ?? true)
+
+const CAPTION_BLOCKER_LABELS = {
+  instagram_caption_missing: 'Instagram caption not generated yet',
+  tiktok_caption_missing: 'TikTok caption not generated yet',
+  threads_caption_missing: 'Threads caption not generated yet',
+  instagram_caption_empty: 'Instagram caption is empty',
+  tiktok_caption_empty: 'TikTok caption is empty',
+  threads_caption_empty: 'Threads caption is empty',
+  instagram_pending_generation: 'Instagram caption queued (generating soon)',
+  tiktok_pending_generation: 'TikTok caption queued (generating soon)',
+  threads_pending_generation: 'Threads caption queued (generating soon)',
+  instagram_generating: 'Instagram caption still authoring',
+  tiktok_generating: 'TikTok caption still authoring',
+  threads_generating: 'Threads caption still authoring',
+  instagram_failed: 'Instagram caption failed — auto-retries every ~10 min',
+  tiktok_failed: 'TikTok caption failed — auto-retries every ~10 min',
+  threads_failed: 'Threads caption failed — auto-retries every ~10 min',
+}
+const captionsPendingMessage = computed(() => {
+  if (captionsReady.value) return ''
+  const blockers = draft.value?.caption_readiness?.blockers ?? []
+  if (blockers.length === 0) return 'Cross-post captions not ready yet'
+  return blockers.map(b => CAPTION_BLOCKER_LABELS[b] || b).join(' · ')
+})
+
+// Single gate for the 3 publish actions: slides rendered AND captions ready.
+const readyForApproval = computed(() => slidesReadyForPublish.value && captionsReady.value)
+const approvalPendingMessage = computed(() => {
+  if (readyForApproval.value) return ''
+  // Slides first (rendering is the longer pole), then captions.
+  if (!slidesReadyForPublish.value) return slidesPendingMessage.value
+  return captionsPendingMessage.value
+})
+
 function slideCopyId(slide) {
   if (!slide) return ''
   return slide.copy_id || slide.copy || ''
@@ -1442,7 +1482,7 @@ const showThumbnailUploadCaption = computed(() =>
                  are disabled so operator understands WHY the green button is
                  dim. Sits above the chip warnings so it's the first thing read. -->
             <div
-              v-if="['manual_review', 'awaiting_publish'].includes(draft.status) && draft.format === 'carousel' && !slidesReadyForPublish"
+              v-if="['manual_review', 'awaiting_publish'].includes(draft.status) && draft.format === 'carousel' && !readyForApproval"
               class="mt-1 flex items-start gap-3 rounded-lg border border-cyan-500/25 bg-cyan-500/[0.04] px-4 py-3"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-cyan-400 shrink-0 mt-0.5">
@@ -1450,7 +1490,7 @@ const showThumbnailUploadCaption = computed(() =>
               </svg>
               <div class="min-w-0 flex-1">
                 <p class="text-[11px] uppercase tracking-[0.14em] text-cyan-400 font-medium mb-0.5">Approval gated</p>
-                <p class="text-sm text-cyan-100/90">{{ slidesPendingMessage }}</p>
+                <p class="text-sm text-cyan-100/90">{{ approvalPendingMessage }}</p>
                 <!-- Live progress bar: indeterminate while re-authoring, determinate while rendering. -->
                 <div v-if="liveActivity.phase === 're_authoring'" class="mt-2 h-1 w-full overflow-hidden rounded-full bg-cyan-500/15">
                   <div class="h-full w-1/3 rounded-full bg-cyan-400/70 animate-pulse motion-reduce:animate-none"></div>
@@ -1485,8 +1525,8 @@ const showThumbnailUploadCaption = computed(() =>
             <button
               v-if="draft.status === 'manual_review'"
               @click="doApprove"
-              :disabled="approveMutation.isPending.value || !slidesReadyForPublish"
-              :title="slidesReadyForPublish ? '' : slidesPendingMessage"
+              :disabled="approveMutation.isPending.value || !readyForApproval"
+              :title="readyForApproval ? '' : approvalPendingMessage"
               class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-500 text-emerald-950 hover:bg-emerald-400 active:scale-[0.98] text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-emerald-500 shadow-[0_8px_24px_-12px_rgba(16,185,129,0.5)]"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
@@ -1501,8 +1541,8 @@ const showThumbnailUploadCaption = computed(() =>
             <button
               v-if="['manual_review', 'awaiting_publish'].includes(draft.status)"
               @click="openScheduler"
-              :disabled="!slidesReadyForPublish"
-              :title="slidesReadyForPublish ? '' : slidesPendingMessage"
+              :disabled="!readyForApproval"
+              :title="readyForApproval ? '' : approvalPendingMessage"
               class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-amber-500/40 text-amber-300 hover:bg-amber-500/10 active:scale-[0.98] text-sm font-medium transition disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
@@ -1519,10 +1559,10 @@ const showThumbnailUploadCaption = computed(() =>
             <button
               v-if="draft.status === 'awaiting_publish'"
               @click="doPublishNow"
-              :disabled="publishNowMutation.isPending.value || !slidesReadyForPublish"
-              :title="slidesReadyForPublish
+              :disabled="publishNowMutation.isPending.value || !readyForApproval"
+              :title="readyForApproval
                 ? 'Publish LinkedIn + cross-post to Instagram/TikTok/Threads via Publer'
-                : slidesPendingMessage"
+                : approvalPendingMessage"
               class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-amber-500 text-amber-950 hover:bg-amber-400 active:scale-[0.98] text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-amber-500 shadow-[0_8px_24px_-12px_rgba(212,168,67,0.5)]"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
@@ -1598,10 +1638,10 @@ const showThumbnailUploadCaption = computed(() =>
             <div class="flex gap-2">
               <button
                 @click="submitSchedule"
-                :disabled="approveMutation.isPending.value || !slidesReadyForPublish"
-                :title="slidesReadyForPublish
+                :disabled="approveMutation.isPending.value || !readyForApproval"
+                :title="readyForApproval
                   ? (conflictData?.has_conflict ? 'Soft warning — proceed if intentional.' : '')
-                  : slidesPendingMessage"
+                  : approvalPendingMessage"
                 class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-amber-500 text-amber-950 hover:bg-amber-400 active:scale-[0.98] text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-amber-500"
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">

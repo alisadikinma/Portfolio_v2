@@ -179,6 +179,22 @@ class ScheduledCommandSeeder extends Seeder
                 'arguments' => null,
                 'sort_order' => 80,
             ],
+            [
+                // Cross-post caption reaper (June 12, 2026). Caption parity with
+                // linkedin:reap-stuck + linkedin:retry-failed — recovers IG/
+                // TikTok/Threads captions stuck in pending_generation (worker
+                // missed) / generating (stale) / failed (bounded transient
+                // retry). Without this, a stuck sibling never recovered (the
+                // fan-out scan's exists() idempotency also can't re-create it).
+                'signature' => 'crosspost:reap',
+                'display_name' => 'Social — Reap Stuck Cross-Post Captions',
+                'description' => 'Tiap 10 menit: re-dispatch caption IG/TikTok/Threads yang stuck pending/generating atau gagal (retry transient terbatas). Catches worker-down + caption-gen failures.',
+                'category' => 'linkedin',
+                'cron_expression' => '*/10 * * * *',
+                'without_overlapping_minutes' => 10,
+                'arguments' => null,
+                'sort_order' => 90,
+            ],
 
             // ─────────────── Newsletter (1) ───────────────
             [

@@ -54,14 +54,19 @@ class ReapStuckLinkedInCarouselImages extends Command
     protected $signature = 'linkedin:reap-stuck-carousel-images
         {--pending-threshold=30 : Minutes before pending slides are re-dispatched}
         {--generating-threshold=15 : Minutes before generating slides are re-dispatched}
+        {--failed-threshold=15 : Minutes before transient-failed slides are re-dispatched}
         {--dry-run : Log candidates without re-dispatching}';
 
-    protected $description = 'Re-dispatch GenerateLinkedInCarouselImages for drafts whose slides are stuck in pending/generating';
+    protected $description = 'Re-dispatch GenerateLinkedInCarouselImages for drafts whose slides are stuck in pending/generating/failed';
+
+    /** Mirror of LinkedInCarouselImageService::MAX_TRANSIENT_RETRIES — past this a slide is failed_permanent, never reaped. */
+    private const MAX_TRANSIENT_RETRIES = 3;
 
     public function handle(): int
     {
         $pendingThreshold = max(5, (int) $this->option('pending-threshold'));
         $generatingThreshold = max(5, (int) $this->option('generating-threshold'));
+        $failedThreshold = max(5, (int) $this->option('failed-threshold'));
         $dryRun = (bool) $this->option('dry-run');
 
         // Look at carousel drafts in a state where image rendering can still
@@ -89,6 +94,7 @@ class ReapStuckLinkedInCarouselImages extends Command
 
             $stuckPending = 0;
             $stuckGenerating = 0;
+            $stuckFailed = 0;
 
             // Use updated_at as the per-slide age proxy. We don't track per-slide
             // dispatched_at on the row (would require schema change) — relying on
@@ -106,10 +112,18 @@ class ReapStuckLinkedInCarouselImages extends Command
                     $stuckPending++;
                 } elseif ($st === 'generating' && $ageMinutes >= $generatingThreshold) {
                     $stuckGenerating++;
+                } elseif ($st === 'failed'
+                    && (int) ($slide['image_retry_count'] ?? 0) < self::MAX_TRANSIENT_RETRIES
+                    && $ageMinutes >= $failedThreshold) {
+                    // Transient-failed (not yet failed_permanent). Re-dispatch
+                    // re-renders it via dispatchAllSlides (which skips done +
+                    // failed_permanent). Webhook-drop safety net for the inline
+                    // transient retry in handleWebhook.
+                    $stuckFailed++;
                 }
             }
 
-            if ($stuckPending === 0 && $stuckGenerating === 0) {
+            if ($stuckPending === 0 && $stuckGenerating === 0 && $stuckFailed === 0) {
                 continue;
             }
 
@@ -117,6 +131,7 @@ class ReapStuckLinkedInCarouselImages extends Command
                 'draft' => $draft,
                 'pending' => $stuckPending,
                 'generating' => $stuckGenerating,
+                'failed' => $stuckFailed,
                 'age' => $ageMinutes,
             ];
         }
@@ -132,11 +147,12 @@ class ReapStuckLinkedInCarouselImages extends Command
             /** @var LinkedInPost $draft */
             $draft = $row['draft'];
             $this->line(sprintf(
-                '  #%d  age=%dm  stuck-pending=%d  stuck-generating=%d',
+                '  #%d  age=%dm  stuck-pending=%d  stuck-generating=%d  stuck-failed=%d',
                 $draft->id,
                 $row['age'],
                 $row['pending'],
-                $row['generating']
+                $row['generating'],
+                $row['failed']
             ));
 
             if ($dryRun) {
@@ -152,6 +168,7 @@ class ReapStuckLinkedInCarouselImages extends Command
                     'age_minutes' => $row['age'],
                     'stuck_pending' => $row['pending'],
                     'stuck_generating' => $row['generating'],
+                    'stuck_failed' => $row['failed'],
                 ]);
             } catch (\Throwable $e) {
                 $this->error("    failed to re-dispatch #{$draft->id}: {$e->getMessage()}");

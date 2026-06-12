@@ -41,6 +41,8 @@ class TiktokPost extends Model
         'external_url',
         'publer_post_id',
         'last_error',
+        'auto_retry_count',
+        'last_classified_error_class',
         'pipeline_state_log',
         'created_by_user_id',
     ];

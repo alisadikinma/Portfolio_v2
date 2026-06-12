@@ -180,6 +180,13 @@ class LinkedInDraftController extends Controller
         $data = $draft->toArray();
         $data['regenerate_activity'] = $this->resolveRegenerateActivity($draft);
 
+        // Caption-readiness signal for the Approve / Schedule-for-later gate
+        // (June 12, 2026). Authoritative server-side check — the frontend can't
+        // see which Publer platforms are configured, so it reads this rather
+        // than re-deriving. Carousel-only; text drafts come back ready.
+        $data['caption_readiness'] = app(\App\Services\LinkedInSlotReadinessService::class)
+            ->captionReadinessForApproval($draft);
+
         return response()->json([
             'success' => true,
             'data' => $data,
@@ -750,6 +757,42 @@ class LinkedInDraftController extends Controller
                             $done,
                             count($slides)
                         ),
+                    ],
+                ], 409);
+            }
+        }
+
+        // Caption-readiness gate (June 12, 2026). UI disables Approve /
+        // Schedule-for-later when any cross-post caption (IG/TikTok/Threads)
+        // isn't ready (caption_readiness on show()); a curl/script bypass hits
+        // the same wall here. Only enforced on the manual_review →
+        // awaiting_publish transition (a reschedule of an already-approved
+        // draft skips this — captions were settled at first approval).
+        if ($draft->format === 'carousel'
+            && $draft->status !== LinkedInPostStatus::AwaitingPublish->value) {
+            $draft->load(['instagramPost', 'tiktokPost', 'threadsPost']);
+            $captionReadiness = app(\App\Services\LinkedInSlotReadinessService::class)
+                ->captionReadinessForApproval($draft);
+            if (! $captionReadiness['ready']) {
+                // Self-heal: ensure missing siblings get created. The targeted
+                // scan creates any not-yet-fanned-out platform; crosspost:reap
+                // (every 10 min) re-dispatches stuck/failed captions. Non-fatal.
+                try {
+                    Artisan::queue('social-cross-post:scan', ['--draft-id' => $draft->id]);
+                } catch (\Throwable $e) {
+                    Log::warning('[LinkedInDraft] approve caption-gate scan dispatch failed (non-fatal)', [
+                        'draft_id' => $draft->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+                return response()->json([
+                    'success' => false,
+                    'error' => [
+                        'code' => 'captions_not_ready',
+                        'message' => 'Cannot approve: one or more cross-post captions aren\'t ready yet ('
+                            . implode(', ', $captionReadiness['blockers'])
+                            . '). Caption generation has been re-checked — try again once every platform shows a caption.',
+                        'blockers' => $captionReadiness['blockers'],
                     ],
                 ], 409);
             }

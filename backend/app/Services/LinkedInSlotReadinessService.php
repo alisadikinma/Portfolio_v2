@@ -88,4 +88,78 @@ class LinkedInSlotReadinessService
             'blockers' => $blockers,
         ];
     }
+
+    /**
+     * Caption-readiness gate for the Approve / Schedule-for-later buttons
+     * (June 12, 2026). Stricter than isReady(): it ALSO blocks when an
+     * expected carousel platform's sibling row is entirely MISSING (fan-out
+     * never created it) or is still mid-authoring — so the operator can't
+     * approve a carousel whose IG/TikTok/Threads caption hasn't generated yet.
+     *
+     * Rules (carousel only — text-format threads publishes independently and
+     * never gates LinkedIn):
+     *   - Only platforms whose Publer account is configured
+     *     (PublerPayloadBuilder::isPlatformEnabled) are considered. An
+     *     unconfigured platform is exempt (never blocks).
+     *   - `cancelled` sibling = operator deliberately opted that platform out
+     *     → exempt (never blocks).
+     *   - sibling missing            → blocker '{platform}_caption_missing'
+     *   - sibling caption empty      → blocker '{platform}_caption_empty'
+     *   - sibling status in-progress / failed → blocker '{platform}_{status}'
+     *     (pending_generation / generating / failed — caption not settled)
+     *   - sibling awaiting_review / publishing / published → ready
+     *
+     * Slide rendering is gated separately (slidesReadyForPublish on the FE +
+     * the carousel_not_ready guard in approve()), so this method intentionally
+     * returns ONLY caption blockers.
+     *
+     * @return array{ready: bool, blockers: string[]}
+     */
+    public function captionReadinessForApproval(LinkedInPost $draft): array
+    {
+        // Captions only gate carousels — that's the only format that fans out
+        // to IG/TikTok/Threads. Text drafts are trivially caption-ready.
+        if ($draft->format !== 'carousel') {
+            return ['ready' => true, 'blockers' => []];
+        }
+
+        $blockers = [];
+        $notSettled = ['pending_generation', 'generating', 'failed'];
+
+        foreach (self::SIBLING_RELATIONS as $platformKey => $relation) {
+            // Platform not configured in Publer → never published, never gates.
+            if (! \App\Services\PublerPayloadBuilder::isPlatformEnabled($platformKey)) {
+                continue;
+            }
+
+            $sibling = $draft->$relation;
+
+            if ($sibling === null) {
+                $blockers[] = "{$platformKey}_caption_missing";
+                continue;
+            }
+
+            $status = (string) ($sibling->status ?? '');
+
+            // Operator intentionally dropped this platform — don't block.
+            if ($status === 'cancelled') {
+                continue;
+            }
+
+            $caption = trim((string) ($sibling->caption ?? ''));
+            if ($caption === '') {
+                $blockers[] = "{$platformKey}_caption_empty";
+                continue;
+            }
+
+            if (in_array($status, $notSettled, true)) {
+                $blockers[] = "{$platformKey}_{$status}";
+            }
+        }
+
+        return [
+            'ready' => empty($blockers),
+            'blockers' => $blockers,
+        ];
+    }
 }
