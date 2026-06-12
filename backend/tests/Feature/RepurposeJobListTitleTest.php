@@ -130,6 +130,57 @@ class RepurposeJobListTitleTest extends TestCase
         $this->assertNull($this->listRow($job->id)['cover_url']);
     }
 
+    public function test_compact_render_state_reflects_in_flight_carousel(): void
+    {
+        Storage::fake('local');
+        $cat = \App\Models\Category::create(['name' => 'AI & Tech']);
+        $post = \App\Models\Post::factory()->create(['category_id' => $cat->id, 'title' => 'Anchor', 'content' => '<p>b</p>']);
+        $li = \App\Models\LinkedInPost::factory()->create([
+            'post_id' => $post->id,
+            'format' => 'carousel',
+            'carousel_slides' => [
+                ['slide_number' => 1, 'image_status' => 'generating', 'image_url' => null],
+                ['slide_number' => 2, 'image_status' => 'pending', 'image_url' => null],
+            ],
+        ]);
+        $job = RepurposeJob::factory()->create([
+            'status' => 'drafted',
+            'mode' => 'carousel',
+            'linkedin_post_id' => $li->id,
+        ]);
+
+        $this->assertSame('generating', $this->listRow($job->id)['render_state']);
+    }
+
+    public function test_compact_render_state_ready_when_all_slides_done(): void
+    {
+        Storage::fake('local');
+        $cat = \App\Models\Category::create(['name' => 'AI & Tech']);
+        $post = \App\Models\Post::factory()->create(['category_id' => $cat->id, 'title' => 'Anchor', 'content' => '<p>b</p>']);
+        $li = \App\Models\LinkedInPost::factory()->create([
+            'post_id' => $post->id,
+            'format' => 'carousel',
+            'carousel_slides' => [
+                ['slide_number' => 1, 'image_status' => 'done', 'image_url' => 'https://x/1.png'],
+                ['slide_number' => 2, 'image_status' => 'done', 'image_url' => 'https://x/2.png'],
+            ],
+        ]);
+        $job = RepurposeJob::factory()->create([
+            'status' => 'drafted',
+            'mode' => 'carousel',
+            'linkedin_post_id' => $li->id,
+        ]);
+
+        $this->assertSame('ready', $this->listRow($job->id)['render_state']);
+    }
+
+    public function test_compact_render_state_null_for_blog_mode(): void
+    {
+        $job = RepurposeJob::factory()->create(['status' => 'drafted', 'mode' => 'blog', 'linkedin_post_id' => null]);
+
+        $this->assertNull($this->listRow($job->id)['render_state']);
+    }
+
     public function test_show_includes_title(): void
     {
         $job = RepurposeJob::factory()->create([

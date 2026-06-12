@@ -50,6 +50,73 @@ function igTitle(job) {
 }
 
 /**
+ * Inspect a carousel draft's slide image lifecycle from `carousel_slides[]`.
+ * Pure mirror of linkedinHelpers.js::inspectCarouselRenderState — re-derived
+ * here (not imported) to keep this module import-free for the `.mjs` node test.
+ * Returns: 'reauthoring' | 'ready' | 'generating' | 'partial' | 'failed' | 'pending'.
+ */
+function carouselRenderState(slides) {
+  const list = Array.isArray(slides) ? slides : []
+  if (list.length === 0) return 'pending'
+  let done = 0
+  let inFlight = 0
+  let failed = 0
+  let reauthoring = 0
+  for (const slide of list) {
+    const s = slide?.image_status
+    if (s === 'reauthoring') reauthoring++
+    else if (s === 'done' && slide?.image_url) done++
+    else if (s === 'generating') inFlight++
+    else if (s === 'failed') failed++
+  }
+  if (reauthoring > 0) return 'reauthoring'
+  if (done === list.length) return 'ready'
+  if (inFlight > 0) return 'generating'
+  if (failed === list.length) return 'failed'
+  if (done > 0 || failed > 0) return 'partial'
+  return 'pending'
+}
+
+/** Map a carousel render state → synthetic status key (or null when ready). */
+function renderStatusKey(state) {
+  switch (state) {
+    case 'reauthoring': return 'carousel_reauthoring'
+    case 'pending':     return 'carousel_render_pending'
+    case 'generating':  return 'carousel_render_active'
+    case 'failed':      return 'carousel_render_failed'
+    case 'partial':     return 'carousel_render_partial'
+    default:            return null // 'ready' → caller falls back to FSM status
+  }
+}
+
+/**
+ * Badge key for a blog draft: a carousel in `manual_review` whose slides are
+ * still re-authoring / rendering shows the REAL in-flight state instead of a
+ * misleading "Review". Mirrors linkedinHelpers.js::effectiveStatusMeta.
+ */
+export function blogDisplayStatus(draft) {
+  if (draft?.format === 'carousel' && draft?.status === 'manual_review') {
+    const key = renderStatusKey(carouselRenderState(draft.carousel_slides))
+    if (key) return key
+  }
+  return draft?.status
+}
+
+/**
+ * Badge key for an IG-repurpose card. Once the repurpose pipeline is `drafted`,
+ * its linked carousel (a downstream LinkedInPost) may still be rendering — the
+ * backend `compact` exposes `render_state` so the list reflects it instead of a
+ * flat "Draft ready". Absent / 'ready' → plain FSM status.
+ */
+export function igDisplayStatus(job) {
+  if (job?.status === 'drafted') {
+    const key = renderStatusKey(job?.render_state)
+    if (key) return key
+  }
+  return job?.status
+}
+
+/**
  * Adapt one source row (IG `RepurposeJob` compact OR blog `LinkedInPost` list
  * row) into the unified Social Studio card. Both kinds yield IDENTICAL keys so
  * the view template is source-agnostic.
@@ -73,6 +140,7 @@ function igCard(job) {
     title: igTitle(job),
     sourceBadge: 'ig',
     status: job.status,
+    displayStatus: igDisplayStatus(job),
     updatedAt: job.updated_at ?? null,
     route: { name: 'admin-repurpose-detail', params: { id: job.id } },
     platforms,
@@ -96,6 +164,7 @@ function blogCard(draft) {
     title: resolveBlogTitle(draft),
     sourceBadge: 'blog',
     status: draft.status,
+    displayStatus: blogDisplayStatus(draft),
     updatedAt: draft.updated_at ?? null,
     route: { name: 'admin-sosmed-draft-detail', params: { id: draft.id } },
     platforms,

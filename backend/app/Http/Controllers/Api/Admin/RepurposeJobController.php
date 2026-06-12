@@ -240,6 +240,7 @@ class RepurposeJobController extends Controller
             'slide_count' => $slideCount,
             'has_cover' => $slideCount > 0,
             'cover_url' => $this->generatedCoverUrl($job),
+            'render_state' => $this->carouselRenderState($job),
             'content_idea_id' => $job->content_idea_id,
             'linkedin_post_id' => $job->linkedin_post_id,
             'anchor_post_id' => $job->anchor_post_id,
@@ -270,6 +271,67 @@ class RepurposeJobController extends Controller
         }
 
         return null;
+    }
+
+    /**
+     * Render state of the linked carousel draft so a Social Studio IG card can
+     * reflect "Rendering images" / "Re-authoring" instead of a flat "Draft
+     * ready" while the downstream LinkedInPost slides are still in flight. PHP
+     * mirror of socialStudioHelpers.js::carouselRenderState. Reads the
+     * eager-loaded `linkedinPost` (index() does `->with('linkedinPost')`, so no
+     * N+1). Returns null for non-carousel jobs / no linked draft — the FE then
+     * keeps the plain FSM status.
+     */
+    private function carouselRenderState(RepurposeJob $job): ?string
+    {
+        if ($job->mode !== 'carousel') {
+            return null;
+        }
+
+        $li = $job->relationLoaded('linkedinPost')
+            ? $job->getRelation('linkedinPost')
+            : ($job->linkedin_post_id ? $job->linkedinPost()->first() : null);
+
+        if ($li === null || $li->format !== 'carousel') {
+            return null;
+        }
+
+        $slides = (array) ($li->carousel_slides ?? []);
+        if (count($slides) === 0) {
+            return 'pending';
+        }
+
+        $done = $inFlight = $failed = $reauthoring = 0;
+        foreach ($slides as $slide) {
+            $s = $slide['image_status'] ?? null;
+            if ($s === 'reauthoring') {
+                $reauthoring++;
+            } elseif ($s === 'done' && !empty($slide['image_url'])) {
+                $done++;
+            } elseif ($s === 'generating') {
+                $inFlight++;
+            } elseif ($s === 'failed') {
+                $failed++;
+            }
+        }
+
+        if ($reauthoring > 0) {
+            return 'reauthoring';
+        }
+        if ($done === count($slides)) {
+            return 'ready';
+        }
+        if ($inFlight > 0) {
+            return 'generating';
+        }
+        if ($failed === count($slides)) {
+            return 'failed';
+        }
+        if ($done > 0 || $failed > 0) {
+            return 'partial';
+        }
+
+        return 'pending';
     }
 
     /**

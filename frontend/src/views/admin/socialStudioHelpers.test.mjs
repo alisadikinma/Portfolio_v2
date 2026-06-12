@@ -7,6 +7,8 @@ import {
   matchesFilter,
   mergeAndSort,
   countsBySource,
+  blogDisplayStatus,
+  igDisplayStatus,
 } from './socialStudioHelpers.js'
 
 // ---- fixtures -------------------------------------------------------------
@@ -149,6 +151,43 @@ test('mergeAndSort pushes invalid/missing dates to the end', () => {
     [toCard(blogDraft)],
   )
   assert.deepEqual(merged.map(c => c.id), [88, 1])
+})
+
+// ---- displayStatus: carousel render reflection ---------------------------
+
+const slidesWith = (statuses) =>
+  statuses.map((s, i) => ({
+    slide_number: i + 1,
+    image_status: s,
+    image_url: s === 'done' ? `https://x/${i}.png` : null,
+  }))
+
+test('blogDisplayStatus reflects reauthoring slides over manual_review', () => {
+  const d = { format: 'carousel', status: 'manual_review', carousel_slides: slidesWith(['reauthoring', 'reauthoring']) }
+  assert.equal(blogDisplayStatus(d), 'carousel_reauthoring')
+  assert.equal(toCard(d).status, 'manual_review') // raw status preserved for filters
+  assert.equal(toCard(d).displayStatus, 'carousel_reauthoring')
+})
+
+test('blogDisplayStatus reflects active/pending/partial/failed render', () => {
+  assert.equal(blogDisplayStatus({ format: 'carousel', status: 'manual_review', carousel_slides: slidesWith(['generating', 'pending']) }), 'carousel_render_active')
+  assert.equal(blogDisplayStatus({ format: 'carousel', status: 'manual_review', carousel_slides: slidesWith(['pending', 'pending']) }), 'carousel_render_pending')
+  assert.equal(blogDisplayStatus({ format: 'carousel', status: 'manual_review', carousel_slides: slidesWith(['done', 'failed']) }), 'carousel_render_partial')
+  assert.equal(blogDisplayStatus({ format: 'carousel', status: 'manual_review', carousel_slides: slidesWith(['failed', 'failed']) }), 'carousel_render_failed')
+})
+
+test('blogDisplayStatus falls back to FSM status when slides ready or non-carousel', () => {
+  assert.equal(blogDisplayStatus({ format: 'carousel', status: 'manual_review', carousel_slides: slidesWith(['done', 'done']) }), 'manual_review')
+  assert.equal(blogDisplayStatus({ format: 'text', status: 'manual_review' }), 'manual_review')
+  assert.equal(blogDisplayStatus({ format: 'carousel', status: 'published', carousel_slides: slidesWith(['generating']) }), 'published')
+})
+
+test('igDisplayStatus reflects downstream render_state only while drafted', () => {
+  assert.equal(igDisplayStatus({ status: 'drafted', render_state: 'generating' }), 'carousel_render_active')
+  assert.equal(igDisplayStatus({ status: 'drafted', render_state: 'reauthoring' }), 'carousel_reauthoring')
+  assert.equal(igDisplayStatus({ status: 'drafted', render_state: 'ready' }), 'drafted')
+  assert.equal(igDisplayStatus({ status: 'drafted' }), 'drafted')
+  assert.equal(igDisplayStatus({ status: 'rewriting', render_state: 'generating' }), 'rewriting')
 })
 
 // ---- countsBySource (Phase D glue, asserted here) ------------------------

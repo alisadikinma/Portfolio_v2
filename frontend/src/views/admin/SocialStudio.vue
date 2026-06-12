@@ -94,7 +94,19 @@ onBeforeUnmount(() => {
 })
 
 // --- status presentation (source-aware, light/dark) -----------------------
+// Synthetic carousel-render keys (set by socialStudioHelpers.js::displayStatus)
+// so the list reflects in-flight slide state — a carousel still
+// re-authoring / rendering shows that instead of a misleading "Review" /
+// "Draft ready". Shared by both source maps. Mirrors linkedinHelpers STATUS_META.
+const CAROUSEL_RENDER_STATUS = {
+  carousel_reauthoring:    ['Re-authoring', 'blue'],
+  carousel_render_pending: ['Awaiting render', 'amber'],
+  carousel_render_active:  ['Rendering images', 'blue'],
+  carousel_render_partial: ['Render partial', 'amber'],
+  carousel_render_failed:  ['Render failed', 'red'],
+}
 const BLOG_STATUS = {
+  ...CAROUSEL_RENDER_STATUS,
   pending_generation: ['Queued', 'blue'],
   generating: ['Generating', 'blue'],
   validating: ['Validating', 'blue'],
@@ -105,6 +117,7 @@ const BLOG_STATUS = {
   failed: ['Failed', 'red'],
 }
 const IG_STATUS = {
+  ...CAROUSEL_RENDER_STATUS,
   received: ['Awaiting mode', 'neutral'],
   capturing: ['Capturing', 'blue'],
   captured: ['Captured', 'blue'],
@@ -128,7 +141,10 @@ const TONE = {
 }
 function statusMeta(card) {
   const map = card.kind === 'ig' ? IG_STATUS : BLOG_STATUS
-  return map[card.status] || [card.status, 'neutral']
+  // displayStatus reflects carousel render state (reauthoring/rendering); falls
+  // back to the raw FSM status. Filtering/counts still key on card.status.
+  const key = card.displayStatus || card.status
+  return map[key] || [key, 'neutral']
 }
 function statusLabelFor(card) { return statusMeta(card)[0] }
 function statusToneFor(card) { return TONE[statusMeta(card)[1]] }
