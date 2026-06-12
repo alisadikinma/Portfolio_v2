@@ -93,13 +93,61 @@ class PublerPayloadBuilder
     /** @throws \RuntimeException when publer_instagram_account_id is not set */
     public function buildInstagram(InstagramPost $sibling): array
     {
+        $images = $this->buildMediaUrls($sibling);
+        $hookVideo = $this->resolveHookVideoUrl($sibling);
+
+        if ($hookVideo !== null) {
+            // Mixed carousel: GROK hook video item 0 + image slides (IG-only;
+            // LinkedIn can't mix, TikTok stays all-image). Falls back to all-
+            // image when the video isn't ready/app-hosted or the switch is off.
+            $mediaUrls = array_merge([$hookVideo], $images);
+            $mediaTypes = array_merge(['video'], array_fill(0, count($images), 'image'));
+        } else {
+            $mediaUrls = $images;
+            $mediaTypes = array_fill(0, count($images), 'image');
+        }
+
         return $this->spec(
             platform: 'instagram',
             accountId: $this->resolveAccountId('instagram'),
             text: $this->buildCaption($sibling->caption, $sibling->hashtags),
-            mediaUrls: $this->buildMediaUrls($sibling),
+            mediaUrls: $mediaUrls,
             comments: $this->buildComments($sibling->link_comment),
+            mediaTypes: $mediaTypes,
         );
+    }
+
+    /**
+     * The IG hook video to prepend as carousel item 0, or null to fall back to
+     * all-image. Gated by: the publer_ig_mixed_video_enabled kill-switch, the
+     * video being done, and an app-hosted (Publer-ingestible) URL.
+     */
+    private function resolveHookVideoUrl(InstagramPost $sibling): ?string
+    {
+        if (! $this->isMixedVideoEnabled()) {
+            return null;
+        }
+        if ($sibling->hook_video_status !== 'done') {
+            return null;
+        }
+
+        return $this->isAppHostedUrl($sibling->hook_video_url)
+            ? $sibling->hook_video_url
+            : null;
+    }
+
+    /** Kill-switch (group=publer) — default ON; flip off if Publer rejects mixed. */
+    private function isMixedVideoEnabled(): bool
+    {
+        $value = Setting::where('group', 'publer')
+            ->where('key', 'publer_ig_mixed_video_enabled')
+            ->value('value');
+
+        if ($value === null) {
+            return true; // default enabled
+        }
+
+        return filter_var($value, FILTER_VALIDATE_BOOLEAN);
     }
 
     /**
@@ -175,6 +223,7 @@ class PublerPayloadBuilder
         array $mediaUrls,
         array $comments,
         array $networkExtra = [],
+        array $mediaTypes = [],
     ): array {
         $type = !empty($mediaUrls) ? 'photo' : 'status';
 
@@ -183,12 +232,19 @@ class PublerPayloadBuilder
             'text' => $text,
         ], $networkExtra);
 
+        // Per-item media types parallel to media_urls (default all 'image').
+        // PublishViaPubler reads these to tag each pre-uploaded media item.
+        if ($mediaTypes === []) {
+            $mediaTypes = array_fill(0, count($mediaUrls), 'image');
+        }
+
         return [
             'platform' => $platform,
             'network' => $platform,
             'account_id' => $accountId,
             'network_fields' => $networkFields,
             'media_urls' => $mediaUrls,
+            'media_types' => $mediaTypes,
             'comments' => $comments,
         ];
     }

@@ -110,9 +110,13 @@ class PublishViaPubler implements ShouldQueue
             ]);
 
             // 1. Pre-upload every media URL → media_ids (Publer rejects raw URLs).
+            //    media_types[i] tags each item (image|video) so the IG mixed
+            //    carousel uploads the hook video with the right extension.
             $mediaIds = [];
+            $mediaTypes = $spec['media_types'] ?? [];
             foreach ($spec['media_urls'] as $i => $url) {
-                $name = sprintf('%s-%d-slide-%02d.png', $this->platform, $sibling->id, $i + 1);
+                $ext = ($mediaTypes[$i] ?? 'image') === 'video' ? 'mp4' : 'png';
+                $name = sprintf('%s-%d-slide-%02d.%s', $this->platform, $sibling->id, $i + 1, $ext);
                 $mediaIds[] = $client->uploadAndAwaitMedia($url, $name);
             }
 
@@ -227,9 +231,11 @@ class PublishViaPubler implements ShouldQueue
     {
         $networkFields = $spec['network_fields'];
         if (!empty($mediaIds)) {
+            $mediaTypes = $spec['media_types'] ?? [];
             $networkFields['media'] = array_map(
-                fn ($id) => ['id' => $id, 'type' => 'image'],
-                $mediaIds
+                fn ($id, $i) => ['id' => $id, 'type' => $mediaTypes[$i] ?? 'image'],
+                $mediaIds,
+                array_keys($mediaIds)
             );
         }
 
