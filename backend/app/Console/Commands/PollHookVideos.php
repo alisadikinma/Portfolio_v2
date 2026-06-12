@@ -172,6 +172,10 @@ class PollHookVideos extends Command
                 continue;
             }
             GenerateHookVideo::dispatch($ig->id);
+            // Reset the stale clock so a row whose job keeps bailing (e.g. parent
+            // slides reset to 'generating' by a regenerate-all) is re-dispatched
+            // at most once per PENDING_REDISPATCH_MINUTES instead of every tick.
+            $ig->touch();
             $this->info("  ig {$ig->id} stale pending re-dispatched");
         }
     }
