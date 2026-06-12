@@ -63,19 +63,31 @@ class LinkedInFixedSlotScheduler
 
     private readonly ?bool $weekdaysOnlyOverride;
 
+    /** @var IndonesianHolidayService|null injected for tests; else resolved from the container on first use */
+    private readonly ?IndonesianHolidayService $holidaysOverride;
+
+    private ?IndonesianHolidayService $holidays = null;
+
     /**
      * @param int[]|null $slots Override the configured slot hours (0-23).
      *                         If null, reads from `linkedin_publish_slots` setting on first use.
      * @param int|null $leadTimeMinutes Override lead time. Null reads from setting on first use.
+     * @param bool|null $weekdaysOnly Override weekday-only cadence. Null reads from setting.
+     * @param IndonesianHolidayService|null $holidays Override the holiday source (tests). Null resolves from container.
      */
-    public function __construct(?array $slots = null, ?int $leadTimeMinutes = null, ?bool $weekdaysOnly = null)
-    {
+    public function __construct(
+        ?array $slots = null,
+        ?int $leadTimeMinutes = null,
+        ?bool $weekdaysOnly = null,
+        ?IndonesianHolidayService $holidays = null,
+    ) {
         // Defer DB-backed setting lookups to first use so service can be
         // constructed by Laravel container without an active DB connection
         // (e.g., during test bootstrap before RefreshDatabase migrates).
         $this->slotsOverride = $slots;
         $this->leadTimeOverride = $leadTimeMinutes;
         $this->weekdaysOnlyOverride = $weekdaysOnly;
+        $this->holidaysOverride = $holidays;
     }
 
     private function ensureResolved(): void
@@ -89,6 +101,30 @@ class LinkedInFixedSlotScheduler
         if ($this->weekdaysOnly === null) {
             $this->weekdaysOnly = $this->weekdaysOnlyOverride ?? $this->resolveWeekdaysOnly();
         }
+        if ($this->holidays === null) {
+            $this->holidays = $this->holidaysOverride ?? app(IndonesianHolidayService::class);
+        }
+    }
+
+    /**
+     * The next $count distinct available slots (ascending) — used to offer the
+     * operator a few tappable choices in the Telegram schedule prompt. Each is
+     * weekend-, holiday-, and occupancy-filtered (delegates to nextAvailableSlot).
+     *
+     * @return Carbon[]
+     * @throws NoAvailableSlotException when the lookahead window can't yield $count slots
+     */
+    public function nextAvailableSlots(int $count = 3): array
+    {
+        $slots = [];
+        $from = null;
+        for ($i = 0; $i < $count; $i++) {
+            $slot = $this->nextAvailableSlot($from);
+            $slots[] = $slot;
+            // Advance just past this slot so the next iteration finds a later one.
+            $from = $slot->copy()->addMinute();
+        }
+        return $slots;
     }
 
     /**
@@ -109,6 +145,12 @@ class LinkedInFixedSlotScheduler
 
             // Weekday-only cadence: skip Saturday + Sunday entirely (WIB).
             if ($this->weekdaysOnly && $dayDate->isWeekend()) {
+                continue;
+            }
+
+            // National holidays + cuti bersama are never valid posting days —
+            // skip the whole day regardless of the weekdays_only setting.
+            if ($this->holidays->isHoliday($dayDate)) {
                 continue;
             }
 

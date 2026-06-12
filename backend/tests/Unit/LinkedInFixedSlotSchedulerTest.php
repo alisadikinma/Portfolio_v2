@@ -9,6 +9,7 @@ use App\Models\Category;
 use App\Models\LinkedInPost;
 use App\Models\Post;
 use App\Models\Setting;
+use App\Services\IndonesianHolidayService;
 use App\Services\LinkedInFixedSlotScheduler;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -47,7 +48,20 @@ class LinkedInFixedSlotSchedulerTest extends TestCase
 
     private function makeScheduler(?array $slots = null, ?int $leadTime = null): LinkedInFixedSlotScheduler
     {
-        return new LinkedInFixedSlotScheduler($slots, $leadTime);
+        // Inject a no-op holiday service so these pure slot-logic tests stay
+        // decoupled from the real Indonesian holiday calendar (holiday skipping
+        // is covered separately in LinkedInFixedSlotSchedulerHolidayTest).
+        return new LinkedInFixedSlotScheduler($slots, $leadTime, null, $this->noHolidays());
+    }
+
+    private function noHolidays(): IndonesianHolidayService
+    {
+        return new class extends IndonesianHolidayService {
+            public function isHoliday(Carbon $date): bool
+            {
+                return false;
+            }
+        };
     }
 
     public function test_returns_next_hour_in_slot_list(): void
@@ -64,7 +78,7 @@ class LinkedInFixedSlotSchedulerTest extends TestCase
         // Friday 2026-05-15 21:00 WIB — all of Friday's slots have passed.
         Carbon::setTestNow(Carbon::parse('2026-05-15 21:00:00', 'Asia/Jakarta'));
 
-        $scheduler = new LinkedInFixedSlotScheduler([5, 12, 18], null, true);
+        $scheduler = new LinkedInFixedSlotScheduler([5, 12, 18], null, true, $this->noHolidays());
         $slot = $scheduler->nextAvailableSlot();
 
         // Sat 16 + Sun 17 skipped → first slot Monday 18 at 05:00.
@@ -76,7 +90,7 @@ class LinkedInFixedSlotSchedulerTest extends TestCase
         // Same Friday 21:00, but weekdays-only disabled → Saturday is eligible.
         Carbon::setTestNow(Carbon::parse('2026-05-15 21:00:00', 'Asia/Jakarta'));
 
-        $scheduler = new LinkedInFixedSlotScheduler([5, 12, 18], null, false);
+        $scheduler = new LinkedInFixedSlotScheduler([5, 12, 18], null, false, $this->noHolidays());
         $slot = $scheduler->nextAvailableSlot();
 
         $this->assertSame('2026-05-16 05:00:00', $slot->copy()->setTimezone('Asia/Jakarta')->format('Y-m-d H:i:s'));
