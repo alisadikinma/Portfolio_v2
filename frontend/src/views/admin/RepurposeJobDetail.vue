@@ -44,6 +44,24 @@ const { draft } = useLinkedInDraft(linkedinPostId) // enabled only when id prese
 
 const paneMode = computed(() => rightPaneMode(job.value))
 const isBlog = computed(() => paneMode.value === 'blog')
+
+// Once a carousel job is a finished draft, the work happens in the draft
+// editor — skip this review page and jump straight there. replace() so the
+// repurpose page doesn't linger in history (Back returns to Social Studio).
+const willRedirectToDraft = computed(() =>
+  job.value?.status === 'drafted' &&
+  paneMode.value === 'generated' &&
+  !!job.value?.linkedin_post_id,
+)
+watch(
+  willRedirectToDraft,
+  (redirect) => {
+    if (redirect) {
+      router.replace({ name: 'admin-sosmed-draft-detail', params: { id: job.value.linkedin_post_id } })
+    }
+  },
+  { immediate: true },
+)
 const draftStatus = computed(() => draft.value?.status || null)
 const generatedSlides = computed(() =>
   Array.isArray(draft.value?.carousel_slides) ? draft.value.carousel_slides : [],
@@ -144,6 +162,7 @@ function goBack() { router.push({ name: 'admin-social-studio' }) }
 
     <div v-if="isLoading" class="py-12 text-center text-neutral-500 dark:text-neutral-400">Loading…</div>
     <div v-else-if="!job" class="py-12 text-center text-neutral-500 dark:text-neutral-400">Job not found.</div>
+    <div v-else-if="willRedirectToDraft" class="py-12 text-center text-neutral-500 dark:text-neutral-400">Opening draft editor…</div>
 
     <div v-else class="space-y-5">
       <!-- Header -->
