@@ -1154,19 +1154,27 @@ class LinkedInGenerationService
 
         $prompt = '/carousel-gen ' . implode(' ', $flags);
 
-        // Knowledge-first directive — only meaningful for the flat sketchnote
-        // infographic preset (cinematic photo carousels keep their own WOW
-        // gate). Steers every slide toward a self-contained mini-infographic so
-        // a reader grasps the topic deeply from the slides alone.
+        // Knowledge-first directive — only meaningful for the blue-brand
+        // sketchnote hybrid preset (cinematic photo carousels keep their own
+        // WOW gate). Hybrid per style-presets §0 slide-role routing: every
+        // slide sits on the solid blue #0F59B6 base; the hook (cover) + CTA
+        // use the photographic Spotlight Portrait (real creator face/body +
+        // floating topic UI), while the body/peak slides are flat hand-drawn
+        // doodle mini-infographics. Steers each doodle slide toward a
+        // self-contained teaching unit so a reader grasps the topic alone.
         if ($style === 'sketchnote') {
-            $prompt .= "\n\nKNOWLEDGE-FIRST INFOGRAPHIC (sketchnote style): render every slide as a flat"
-                . " hand-drawn educational infographic on warm cream paper per the bundled style-presets"
-                . " sketchnote preset + DOODLE gate — NOT a cinematic photo, no creator-face photo. Build a"
-                . " knowledge spine: the cover states the core promise/definition; each body slide is a"
-                . " SELF-CONTAINED mini-infographic that teaches ONE idea in depth (numbered icon-rows with a"
-                . " short label + one-line explanation, OR a labeled comparison, OR an annotated mechanism"
-                . " diagram); the peak slide delivers the key insight; the CTA closes. Maximize knowledge"
-                . " density per slide while keeping text legible.";
+            $prompt .= "\n\nBLUE-BRAND HYBRID (sketchnote style — per the bundled style-presets sketchnote"
+                . " preset §0 slide-role routing): EVERY slide sits on the solid blue #0F59B6 brand base."
+                . " COVER (hook) + CTA: render the PHOTOGRAPHIC Spotlight Portrait — a real creator face and"
+                . " upper body from the provided face reference, signature outfit, with at least 3 floating"
+                . " topic UI elements (real tool cards/logos/screenshots) and a bold bilingual headline with"
+                . " gold accent words. BODY + PEAK + all middle slides: flat hand-drawn DOODLE infographic on"
+                . " the blue base (light off-white marker ink, gold + mint accents — never dark ink) per the"
+                . " DOODLE gate, each a SELF-CONTAINED mini-infographic that teaches ONE idea in depth"
+                . " (numbered icon-rows with a short label + one-line explanation, OR a labeled comparison, OR"
+                . " an annotated mechanism diagram). Build a knowledge spine: cover states the core"
+                . " promise/definition; body slides teach; the peak delivers the key insight; the CTA closes."
+                . " Maximize knowledge density per doodle slide while keeping text legible on blue.";
         }
 
         if (is_string($blogContent) && trim($blogContent) !== '') {
