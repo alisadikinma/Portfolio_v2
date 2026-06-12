@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\LinkedInPostStatus;
 use App\Models\LinkedInPost;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 /**
  * The single scheduling write for a LinkedIn draft — sets the publish slot,
@@ -38,24 +39,33 @@ class LinkedInSchedulingService
      */
     public function scheduleAt(LinkedInPost $draft, Carbon $slot, string $reason): void
     {
-        if ($draft->status !== LinkedInPostStatus::AwaitingPublish->value) {
-            $this->guard->advance(
-                $draft,
-                LinkedInPostStatus::AwaitingPublish,
-                $reason,
-                ['draft_id' => $draft->id, 'publish_at' => $slot->toIso8601String()]
-            );
-        }
+        // Atomic: the FSM advance (status + pipeline_state_log), the timestamp
+        // write, and the sibling propagation must all land together. Without
+        // this, a crash between the advance and the scheduled_at write would
+        // strand the draft in awaiting_publish with scheduled_at=NULL — out of
+        // manual_review (so prompt-schedule won't re-prompt it) yet never fired
+        // by the publish cron. Matters now that scheduleAt also runs from the
+        // queued Telegram job + webhook, not just the HTTP approve request.
+        DB::transaction(function () use ($draft, $slot, $reason) {
+            if ($draft->status !== LinkedInPostStatus::AwaitingPublish->value) {
+                $this->guard->advance(
+                    $draft,
+                    LinkedInPostStatus::AwaitingPublish,
+                    $reason,
+                    ['draft_id' => $draft->id, 'publish_at' => $slot->toIso8601String()]
+                );
+            }
 
-        $draft->update([
-            'scheduled_at' => $slot,
-            'cancel_window_ends_at' => $slot,
-            'schedule_prompt_sent_at' => null,
-        ]);
+            $draft->update([
+                'scheduled_at' => $slot,
+                'cancel_window_ends_at' => $slot,
+                'schedule_prompt_sent_at' => null,
+            ]);
 
-        $draft->load(['facebookPost', 'instagramPost', 'tiktokPost', 'threadsPost']);
-        foreach (['facebookPost', 'instagramPost', 'tiktokPost', 'threadsPost'] as $rel) {
-            $draft->$rel?->update(['scheduled_at' => $slot]);
-        }
+            $draft->load(['facebookPost', 'instagramPost', 'tiktokPost', 'threadsPost']);
+            foreach (['facebookPost', 'instagramPost', 'tiktokPost', 'threadsPost'] as $rel) {
+                $draft->$rel?->update(['scheduled_at' => $slot]);
+            }
+        });
     }
 }

@@ -86,20 +86,30 @@ class PromptScheduleReadyDrafts extends Command
                 return self::SUCCESS;
             }
 
+            // Acquire the per-chat conversation lock atomically (put-if-absent)
+            // BEFORE sending, so a process racing past the Cache::has fast-path
+            // above (e.g. a manual artisan run alongside the cron) can't open a
+            // second conversation. Cache::add returns false if one already exists.
+            $acquired = Cache::add("telegram_schedule_state:{$chatId}", [
+                'draft_id' => $draft->id,
+                'step' => 'awaiting_datetime',
+                'candidate_slots' => array_map(fn ($s) => $s->toIso8601String(), $slots),
+            ], now()->addMinutes(60));
+            if (! $acquired) {
+                $this->info('[linkedin:prompt-schedule] skipped: conversation opened concurrently');
+                return self::SUCCESS;
+            }
+
             // Only consume the one-shot on a successful send — a failed Telegram
             // delivery must not suppress the (only) prompt this draft ever gets.
+            // Release the lock on failure so the next tick retries.
             if (! $telegram->sendSchedulePrompt($draft, $slots)) {
+                Cache::forget("telegram_schedule_state:{$chatId}");
                 Log::warning('[linkedin:prompt-schedule] Telegram send failed; not consuming one-shot', [
                     'draft_id' => $draft->id,
                 ]);
                 return self::SUCCESS;
             }
-
-            Cache::put("telegram_schedule_state:{$chatId}", [
-                'draft_id' => $draft->id,
-                'step' => 'awaiting_datetime',
-                'candidate_slots' => array_map(fn ($s) => $s->toIso8601String(), $slots),
-            ], now()->addMinutes(60));
 
             $draft->update(['schedule_prompt_sent_at' => now()]);
             $this->info("[linkedin:prompt-schedule] prompted draft {$draft->id}");

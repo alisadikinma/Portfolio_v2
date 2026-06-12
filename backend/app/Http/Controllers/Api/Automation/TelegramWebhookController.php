@@ -166,6 +166,9 @@ class TelegramWebhookController extends Controller
 
         $draft = LinkedInPost::find($draftId);
         if (!$draft) {
+            // Draft deleted mid-conversation — clear the stale lock so the next
+            // ready draft can be prompted (mirrors ParseAndScheduleReply).
+            Cache::forget($stateKey);
             return 'Draft not found.';
         }
 
