@@ -117,44 +117,59 @@ class VideoHookSceneAuthor
             'video-hook-author',
             ['scene_prompt'],
             (string) config('services.repurpose.model_hook_author', 'sonnet'),
-            (string) config('services.repurpose.refs_hook', '')
+            $this->refsBundle()
         );
+    }
+
+    /**
+     * The hook/CTA author shares the SAME compiled knowledge bundle as
+     * /carousel-gen (hook-visual-library + hook-science + creator-bible + the v3
+     * visual standard) so both stay one source of truth — the author applies the
+     * plugin's dynamic hook rules per topic instead of any hardcoded rule here.
+     *
+     * Defaults to the carousel-gen bundle (`carousel-gen.refs_pipeline`, already
+     * required + deployed for the carousel pipeline) so it can NEVER be silently
+     * empty. `REPURPOSE_REFS_HOOK` is now only an optional override — a missing
+     * env used to leave this knowledge-less (the "rules seem gone" bug).
+     */
+    protected function refsBundle(): string
+    {
+        $refs = (string) config('services.repurpose.refs_hook', '');
+
+        return $refs !== '' ? $refs : (string) config('carousel-gen.refs_pipeline', '');
     }
 
     private function buildPrompt(string $topic, bool $allowFigure): string
     {
+        // The full hook/cover + creator + visual standard lives in the SYSTEM
+        // PROMPT (the /carousel-gen knowledge bundle via refsBundle) — the single
+        // source of truth. Do NOT restate visual rules here (no hardcoded base
+        // colour / outfit / floating-UI / grade — that would duplicate + drift).
+        // This prompt only frames the task + the video-specific deltas and defers
+        // every creative/visual decision to the bundle. Reuse, don't recreate.
         $figureBlock = $allowFigure
             ? <<<'FIG'
-2. Decide whether ONE iconic public figure strongly fits this topic (e.g. a Google product → Google's CEO; an OpenAI product → OpenAI's CEO; a specific company's tool → that company's well-known leader). If yes, set "figure_name" to that person's full real name. If no single figure clearly fits, set "figure_name" to null.
-3. Author "scene_prompt" on the Spotlight Portrait standard below. If a figure was chosen, place the CREATOR on the LEFT and "the person matching reference image 2" on the RIGHT, both on the signature-blue base, with the floating topic UI elements between/around them. NEVER write the figure's name in scene_prompt — refer to them ONLY as "the person matching reference image 2". If no figure, author a creator-only Spotlight Portrait.
+2. Decide whether ONE iconic public figure strongly fits this topic (e.g. a Google product → Google's CEO; an OpenAI product → OpenAI's CEO; a company's tool → that company's well-known leader). If yes, set "figure_name" to that person's full real name AND make the hook an INTERACTION with them (creator on the LEFT, "the person matching reference image 2" on the RIGHT, spatially separated so faces don't blend). If no single figure clearly fits, set "figure_name" to null. NEVER write the figure's real name in scene_prompt — refer to them ONLY as "the person matching reference image 2".
 FIG
             : <<<'NOFIG'
-2. Set "figure_name" to null (no second person).
-3. Author "scene_prompt" on the Spotlight Portrait standard below, featuring ONLY the creator. Do NOT include any other person.
+2. Set "figure_name" to null — creator only, no second person.
 NOFIG;
 
         return <<<PROMPT
-You are authoring the cover/HOOK keyframe image prompt for a short branded vertical video that opens an Instagram carousel about: "{$topic}". The image is animated by a video model, so describe ONE held moment, not motion.
+You are authoring the cover/HOOK keyframe image prompt for a short branded vertical video that OPENS an Instagram carousel about: "{$topic}". The image is animated by a video model, so describe ONE held moment, not motion.
 
-This hook MUST stop the scroll — it is the single most important frame. The drama comes from a bold, striking composition + topic-evocative floating UI, NOT from a costume change.
+Apply the hook + cover + creator + visual standards from your system prompt (the /carousel-gen knowledge) and choose the STRONGEST hook approach for THIS specific topic. Think creatively per topic — do not fall back on one fixed formula.
 
-Follow the v3 "Spotlight Portrait" standard EXACTLY (the /carousel-gen cover look, at 9:16 vertical):
-- Solid signature-blue (#0F59B6) studio background — one clean solid base, no busy environment.
-- The creator is a calm, confident, credible subject, slightly off-center (rule of thirds), a scroll-stopping composition.
-- Signature outfit on EVERY topic: a dark tee or henley under an unstructured blazer, neutral slate/charcoal/muted-navy tone. NEVER change the outfit to suit the topic.
-- THREE OR MORE floating topic UI elements (sleek app cards, real tool logos, product screenshots, holographic dashboards relevant to "{$topic}") hover around the subject with soft glow and gentle depth blur. The TOPIC is conveyed by these floating elements, never by costume or a literal location.
-- Lighting/grade: cool-neutral ~5200K key + soft blue ambient bounce + a warm gold rim light. No warm-amber wash.
-- Hyperrealistic, anti-AI-look: visible skin pores, a few stray hairs catching light, natural fabric creases, subtle lens vignetting, slight asymmetry.
+Hard constraints for THIS medium (these override nothing in the standard, they just scope it):
+- 9:16 vertical, photorealistic, 4K, sharp focus. No on-image text, no captions, no watermark.
+- CURIOSITY GAP — this carousel reveals a LIST of items across the later slides. The hook MUST NOT reveal, enumerate, or display those specific items (no row of tool cards / logos spelling out the list). Showing everything up front kills the reason to keep swiping — tease and withhold instead.
+- Scroll-stopping and a little eccentric — a genuine pattern interrupt.
+- ~70-130 words, one descriptive paragraph.
 
 Steps:
 1. Read the topic.
 {$figureBlock}
-
-Rules for scene_prompt:
-- 9:16 vertical, photorealistic, sharp focus, 4K. No on-image text, no logos baked as captions, no watermark.
-- Keep it ~70-130 words, one descriptive paragraph.
-- Name 2-4 CONCRETE floating UI elements that evoke "{$topic}" specifically (e.g. for an AI design tool: a floating layout canvas, a component library card, a generated-mockup screenshot).
-- Spatially separate the two people when a figure is used ("creator on the left ... the person matching reference image 2 on the right") so their faces do not blend.
+3. Author "scene_prompt" per the standard + the constraints above.
 
 STRICT JSON OUTPUT — parsed by a machine, not a human:
 - Output ONE compact JSON object only. No markdown fences, no preamble, no trailing prose.

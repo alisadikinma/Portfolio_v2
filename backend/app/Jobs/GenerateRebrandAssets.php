@@ -47,18 +47,17 @@ class GenerateRebrandAssets implements ShouldQueue
     public int $tries = 1;
 
     /**
-     * Face-gen keyframe (image) prompts — the v3 "Spotlight Portrait" carousel
-     * standard at 9:16 (mirrors the /carousel-gen cover/CTA look, see vault
-     * 10-Identity/visual-identity.md). Used as the static fallback when
-     * VideoHookSceneAuthor declines (empty topic / author failure / figure dropped);
-     * the authored hook is topic-evocative on the SAME standard. The hook must be
-     * scroll-stopping — the drama comes from the bold composition + floating topic
-     * UI, NOT a costume change (signature outfit is fixed across every topic).
+     * STATIC FALLBACK ONLY — used when VideoHookSceneAuthor (which carries the full
+     * /carousel-gen hook knowledge as its system prompt) can't run (empty topic /
+     * CLI failure / figure dropped). The authored hook is the real path; this is a
+     * safe, self-contained default on the v3 Spotlight Portrait visual base. It
+     * deliberately holds a CURIOSITY GAP — NO floating tool/list cards (revealing
+     * the carousel's items in the hook kills the scroll-through).
      */
     public const KEYFRAME_PROMPT_HOOK = 'Cinematic vertical 9:16 Spotlight Portrait of the creator on a solid signature-blue (#0F59B6) studio background. '
-        .'Calm, confident, credible expression looking straight down the lens; a striking scroll-stopping composition, subject slightly off-center (rule of thirds). '
+        .'An intriguing, scroll-stopping expression — a knowing half-smile, eyebrow slightly raised as if about to reveal a secret, subject slightly off-center (rule of thirds). '
         .'Signature outfit: dark tee or henley under an unstructured blazer in a neutral slate-charcoal tone. '
-        .'Around him THREE OR MORE floating topic UI elements — sleek app cards, tool logos and product screenshots — hover with soft glow and gentle depth blur, conveying the subject matter (NOT his clothing). '
+        .'A single soft glowing element (an abstract orb / undefined holographic glow) hints that something is coming WITHOUT showing what — no readable UI, no tool logos, no list. Curiosity gap. '
         .'Lighting: cool-neutral ~5200K key + soft blue ambient bounce + a warm gold rim light separating him from the background (no warm-amber wash). '
         .'Hyperrealistic, anti-AI-look: visible skin pores, a few stray hairs catching light, natural fabric creases, subtle lens vignetting, slight asymmetry. '
         .'Sharp focus, 4K, no on-image text, no watermark.';
