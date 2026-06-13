@@ -39,8 +39,14 @@ class PollRebrandAssets extends Command
     /** Face-gen images land in ~30-60s, Veo clips in ~60-120s; past this a row is wedged. */
     private const STUCK_MINUTES = 15;
 
-    /** Bounded re-dispatch of a failed bookend (keyframe ≈1 credit, Veo ≈5). */
-    private const MAX_RETRIES = 2;
+    /**
+     * Bounded re-dispatch of a failed bookend (keyframe ≈1 credit, Veo ≈5). Set to
+     * 3 (was 2) to ride out the transient Veo 3.1 audio-filter trips that the
+     * positive-ambient prompt fix can't fully eliminate (the filter is partly
+     * nondeterministic — see GenerateRebrandAssets::VEO_PROMPT_* + Reddit r/Bard
+     * reports of recent Veo 3.1 audio regressions).
+     */
+    private const MAX_RETRIES = 3;
 
     private const FAILED_RETRY_COOLDOWN_MINUTES = 5;
 

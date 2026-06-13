@@ -61,17 +61,26 @@ class GenerateRebrandAssets implements ShouldQueue
      * Veo I2V motion prompts — follow the VEO 3.1 standard format (see
      * ai-video-promo-engine reference/image-video-gen/02-veo-production-guide.md
      * "I2V Prompt Template" + "Audio (NOT OPTIONAL)"). The explicit `Audio:` line
-     * is MANDATORY: Veo 3.x always generates audio, and an UNspecified audio layer
-     * makes the model guess → the guess trips `PUBLIC_ERROR_AUDIO_FILTERED` and the
-     * whole render fails (verified live June 13, 2026 — 4/4 fails without it, pass
-     * with it). We direct silent ambient (audio is stripped on download anyway).
+     * is MANDATORY: Veo 3.x ALWAYS generates audio and there is NO API param to
+     * disable it (confirmed in the GeminiGen video-gen/veo docs + Google dev forum).
+     *
+     * The directive must give a CONCRETE, POSITIVE ambient bed — NOT a stack of
+     * negations. An over-negated near-silence command ("quiet room tone ONLY, no
+     * music, no dialogue, no subtitles, no audience sounds") leaves Veo's mandatory
+     * audio model with no valid target → it emits a degenerate track → the whole
+     * render fails with `PUBLIC_ERROR_AUDIO_FILTERED` (observed live June 13, 2026 —
+     * hook + CTA both failed identically with that phrasing). The fix (per the
+     * snubroot Veo-3 Prompting Guide v4.0 "Audio Hallucination Fixes": match audio
+     * complexity to visual complexity, give one positive ambiance + at most one
+     * negation) is a soft room-tone bed. Audio is stripped on download anyway — we
+     * only need it to PASS, not to be heard.
      */
     public const VEO_PROMPT_HOOK = '6s, 720p, 9:16 vertical. Camera: locked-off static shot, no zoom or pan. '
         .'Subject: the creator holds the relaxed pose from the reference frame, subtle eye blinks every 2-3 seconds, '
         .'gentle micro-expressions, faint natural smile, mouth stays closed and not speaking. '
         .'Maintain visual continuity with reference frame character appearance throughout clip. '
         .'Ambient: floating side UI icons drift and bob gently with subtle parallax. '
-        .'Audio: quiet ambient room tone only, no music, no dialogue, no subtitles, no audience sounds. '
+        .'Audio: soft neutral room tone, gentle ambient hum, calm and quiet atmosphere, no music, no spoken words. '
         .'Maintain exact lighting, environment, appearance from reference frame. '
         .'Photorealistic, smooth natural motion, no morphing. 9:16 output.';
 
@@ -80,7 +89,7 @@ class GenerateRebrandAssets implements ShouldQueue
         .'subtle eye blinks, faint smile, mouth stays closed and not speaking. '
         .'Maintain visual continuity with reference frame character appearance throughout clip. '
         .'Ambient: soft gold glow, gentle light shift. '
-        .'Audio: quiet ambient room tone only, no music, no dialogue, no subtitles, no audience sounds. '
+        .'Audio: warm soft room tone, gentle ambient hum, calm inviting atmosphere, no music, no spoken words. '
         .'Maintain exact lighting, environment, appearance from reference frame. '
         .'Photorealistic, smooth natural motion, no morphing. 9:16 output.';
 
