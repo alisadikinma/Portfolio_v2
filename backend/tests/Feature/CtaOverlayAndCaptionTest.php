@@ -46,11 +46,18 @@ class CtaOverlayAndCaptionTest extends TestCase
         // The finalized CTA clip must exist on the public disk (overlayCta reads it).
         $inRel = "repurpose/{$job->id}/composited/slide_3.mp4";
         Storage::disk('public')->put($inRel, 'fake-mp4-bytes');
+        // Process::fake won't run ffmpeg, so simulate the overlaid output ffmpeg
+        // would write — the non-empty-output guard requires it before it deletes
+        // the plain clip.
+        $outRel = "repurpose/{$job->id}/composited/slide_3_cta.mp4";
+        Storage::disk('public')->put($outRel, 'overlaid-mp4-bytes');
 
         $url = app(VideoRebrandComposer::class)->overlayCta($cta, '/tmp/cta_overlay.png');
 
         $this->assertNotNull($url);
         $this->assertStringContainsString("repurpose/{$job->id}/composited/slide_3_cta.mp4", $url);
+        // Plain clip dropped once the overlay succeeded (no disk orphan).
+        $this->assertFalse(Storage::disk('public')->exists($inRel));
 
         Process::assertRan(function ($process) {
             $cmd = is_array($process->command) ? implode(' ', $process->command) : $process->command;

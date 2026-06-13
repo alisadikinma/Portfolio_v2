@@ -162,6 +162,17 @@ class VideoRebrandComposer
             return null;
         }
 
+        // Verify the overlaid output is real + non-empty BEFORE dropping the plain
+        // clip — ffmpeg can exit 0 yet write a 0-byte file on a disk-full race. If
+        // so, keep the plain clip and degrade (caller falls back to it; the ask
+        // still ships in the caption). This guard gates a destructive delete, so
+        // unlike composeSlide it is mandatory here.
+        if (!is_file($outAbs) || filesize($outAbs) === 0) {
+            Log::error('[VideoRebrandComposer] CTA overlay produced empty/missing output — keeping plain clip', ['slide' => $slide->id, 'out' => $outRel]);
+            @unlink($outAbs);
+            return null;
+        }
+
         // The plain clip is now superseded by the overlaid _cta.mp4 and is no
         // longer referenced by composited_path — drop it so it doesn't orphan on
         // disk (the reaper only knows composited_path).

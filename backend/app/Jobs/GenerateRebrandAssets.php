@@ -181,6 +181,13 @@ class GenerateRebrandAssets implements ShouldQueue
             $figureUrl = is_array($entity) ? ($entity['url'] ?? null) : null;
             if (is_string($figureUrl) && $figureUrl !== '') {
                 $refs[] = $figureUrl; // license-checked + downloaded to our storage
+            } else {
+                // Distinguish a Wikidata/notability/license miss (silent creator-only
+                // here) from a GeminiGen safety refusal (figure_dropped, logged later).
+                Log::info('[GenerateRebrandAssets] hook figure unresolved — creator-only scene', [
+                    'job' => $job->id,
+                    'figure' => $figureName,
+                ]);
             }
         }
 
