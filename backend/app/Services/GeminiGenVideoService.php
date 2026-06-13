@@ -60,6 +60,21 @@ class GeminiGenVideoService
     }
 
     /**
+     * Write a transient download to the OS temp dir (world-writable /tmp), NOT
+     * storage/app/private/tmp — that dir is 0700 www-data and unreadable by the
+     * claudesn queue worker that runs the rebrand poller. Durable replacement for
+     * the fragile `chmod 2775 private/tmp` ops-fix. Returns the absolute path;
+     * callers @unlink it in a finally block.
+     */
+    private function writeTempFile(string $name, string $bytes): string
+    {
+        $path = rtrim(sys_get_temp_dir(), '/').'/'.$name;
+        file_put_contents($path, $bytes);
+
+        return $path;
+    }
+
+    /**
      * Dispatch a GROK image-to-video job for the IG hook. Returns the GROK job
      * uuid (poll key) or null on circuit-open / missing key / HTTP failure.
      */
@@ -317,9 +332,7 @@ class GeminiGenVideoService
             return null;
         }
 
-        $rawRel = 'tmp/veo-raw-'.uniqid().'.mp4';
-        Storage::disk('local')->put($rawRel, $resp->body());
-        $rawPath = Storage::disk('local')->path($rawRel);
+        $rawPath = $this->writeTempFile('veo-raw-'.uniqid().'.mp4', $resp->body());
 
         $outPath = Storage::disk('public')->path($relOut);
         @mkdir(dirname($outPath), 0775, true);
@@ -339,7 +352,7 @@ class GeminiGenVideoService
 
             return null;
         } finally {
-            Storage::disk('local')->delete($rawRel);
+            @unlink($rawPath);
         }
 
         if (! $result->successful() || ! is_file($outPath)) {
@@ -375,9 +388,7 @@ class GeminiGenVideoService
 
         // uniqid suffix so a manual retry racing the reaper for the same IG id
         // can't overwrite the other's source PNG mid-ffmpeg.
-        $srcRel = "tmp/grok-src-{$igId}-".uniqid().'.png';
-        Storage::disk('local')->put($srcRel, $resp->body());
-        $srcPath = Storage::disk('local')->path($srcRel);
+        $srcPath = $this->writeTempFile("grok-src-{$igId}-".uniqid().'.png', $resp->body());
 
         $outRel = "linkedin-carousel/grok-frame-{$igId}.jpg";
         $outPath = Storage::disk('public')->path($outRel);
@@ -398,7 +409,7 @@ class GeminiGenVideoService
 
             return null;
         } finally {
-            Storage::disk('local')->delete($srcRel);
+            @unlink($srcPath);
         }
 
         if (! $result->successful() || ! is_file($outPath)) {
@@ -430,9 +441,7 @@ class GeminiGenVideoService
             return null;
         }
 
-        $rawRel = "tmp/grok-raw-{$igId}-".uniqid().'.mp4';
-        Storage::disk('local')->put($rawRel, $resp->body());
-        $rawPath = Storage::disk('local')->path($rawRel);
+        $rawPath = $this->writeTempFile("grok-raw-{$igId}-".uniqid().'.mp4', $resp->body());
 
         $outRel = "linkedin-carousel/grok-hook-{$igId}.mp4";
         $outPath = Storage::disk('public')->path($outRel);
@@ -452,7 +461,7 @@ class GeminiGenVideoService
 
             return null;
         } finally {
-            Storage::disk('local')->delete($rawRel);
+            @unlink($rawPath);
         }
 
         if (! $result->successful() || ! is_file($outPath)) {
