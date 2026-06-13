@@ -55,16 +55,32 @@ class GenerateRebrandAssets implements ShouldQueue
         .'clean solid navy-blue studio background with a subtle gold glow, soft key light with gold rim light, '
         .'friendly closing energy, sharp focus, photorealistic, no text, no logos, no UI elements';
 
-    /** Veo motion prompts — gentle, frame-respecting, no new objects (GROK-style). */
-    public const VEO_PROMPT_HOOK = 'The creator holds the relaxed pose already shown in the source image, '
-        .'animate only what already exists and introduce no new object, subtle natural micro-motion in the eyes and a faint smile, '
-        .'the camera stays completely static with no zoom or pan, the mouth stays mostly closed, '
-        .'photorealistic with smooth natural motion and no morphing';
+    /**
+     * Veo I2V motion prompts — follow the VEO 3.1 standard format (see
+     * ai-video-promo-engine reference/image-video-gen/02-veo-production-guide.md
+     * "I2V Prompt Template" + "Audio (NOT OPTIONAL)"). The explicit `Audio:` line
+     * is MANDATORY: Veo 3.x always generates audio, and an UNspecified audio layer
+     * makes the model guess → the guess trips `PUBLIC_ERROR_AUDIO_FILTERED` and the
+     * whole render fails (verified live June 13, 2026 — 4/4 fails without it, pass
+     * with it). We direct silent ambient (audio is stripped on download anyway).
+     */
+    public const VEO_PROMPT_HOOK = '6s, 720p, 9:16 vertical. Camera: locked-off static shot, no zoom or pan. '
+        .'Subject: the creator holds the relaxed pose from the reference frame, subtle eye blinks every 2-3 seconds, '
+        .'gentle micro-expressions, faint natural smile, mouth stays closed and not speaking. '
+        .'Maintain visual continuity with reference frame character appearance throughout clip. '
+        .'Ambient: floating side UI icons drift and bob gently with subtle parallax. '
+        .'Audio: quiet ambient room tone only, no music, no dialogue, no subtitles, no audience sounds. '
+        .'Maintain exact lighting, environment, appearance from reference frame. '
+        .'Photorealistic, smooth natural motion, no morphing. 9:16 output.';
 
-    public const VEO_PROMPT_CTA = 'The creator holds the warm inviting pose already shown in the source image, '
-        .'animate only what already exists and introduce no new object, a gentle welcoming hand gesture and soft nod, '
-        .'the camera stays completely static with no zoom or pan, '
-        .'photorealistic with smooth natural motion and no morphing';
+    public const VEO_PROMPT_CTA = '6s, 720p, 9:16 vertical. Camera: locked-off static shot, no zoom or pan. '
+        .'Subject: the creator holds the warm inviting pose from the reference frame, a gentle welcoming hand gesture and soft nod, '
+        .'subtle eye blinks, faint smile, mouth stays closed and not speaking. '
+        .'Maintain visual continuity with reference frame character appearance throughout clip. '
+        .'Ambient: soft gold glow, gentle light shift. '
+        .'Audio: quiet ambient room tone only, no music, no dialogue, no subtitles, no audience sounds. '
+        .'Maintain exact lighting, environment, appearance from reference frame. '
+        .'Photorealistic, smooth natural motion, no morphing. 9:16 output.';
 
     public function __construct(public readonly int $repurposeJobId)
     {
