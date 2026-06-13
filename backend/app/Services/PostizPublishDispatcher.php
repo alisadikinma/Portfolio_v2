@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Jobs\PublishViaPubler;
 use App\Models\FacebookPost;
 use App\Models\InstagramPost;
+use App\Models\Post;
 use App\Models\PostizChannel;
 use App\Models\PostizPublishJob;
 use App\Models\Setting;
@@ -75,11 +76,56 @@ class PostizPublishDispatcher
         );
     }
 
+    /**
+     * Blog→Medium cross-post (canonical backlink) — Phase K. Called from
+     * ContentIdeaController::approveAndPublish after a blog Post publishes
+     * (non-fatal try/catch at the call site). Gated by postiz_enabled AND
+     * postiz_medium_enabled AND a mapped `medium` channel. No Publer fallback
+     * exists for Medium (Publer can't post Medium articles) — the watchdog
+     * treats medium like IG-video (wait + alert, never fallback).
+     *
+     * Idempotent firstOrCreate on (medium, post_id). slot_due_at=now (publish-now,
+     * not slot-scheduled). The canonical URL + attribution footer are built at
+     * `pending` time on the VPS so the URL is always authoritative.
+     */
+    public function dispatchBlogToMedium(Post $post): void
+    {
+        if (! $this->postizEnabled() || ! $this->mediumEnabled()) {
+            return;
+        }
+
+        $integrationId = PostizChannel::integrationIdFor('medium');
+        if ($integrationId === null) {
+            Log::warning('[PostizPublishDispatcher] postiz_medium_enabled but no mapped medium channel — skipping blog→Medium', [
+                'post_id' => $post->id,
+            ]);
+            return;
+        }
+
+        PostizPublishJob::firstOrCreate(
+            ['platform' => 'medium', 'sibling_post_id' => $post->id],
+            [
+                'sibling_type' => Post::class,
+                'status' => PostizPublishJob::STATUS_READY,
+                'slot_due_at' => now(),
+                'postiz_integration_id' => $integrationId,
+            ]
+        );
+    }
+
     private function postizEnabled(): bool
     {
-        $value = Setting::where('group', 'postiz')
-            ->where('key', 'postiz_enabled')
-            ->value('value');
+        return $this->boolSetting('postiz_enabled');
+    }
+
+    private function mediumEnabled(): bool
+    {
+        return $this->boolSetting('postiz_medium_enabled');
+    }
+
+    private function boolSetting(string $key): bool
+    {
+        $value = Setting::where('group', 'postiz')->where('key', $key)->value('value');
 
         return filter_var($value, FILTER_VALIDATE_BOOLEAN);
     }

@@ -1353,6 +1353,18 @@ class ContentIdeaController extends Controller
         // dispatch here (would be a redundant second queue; the command is
         // idempotent anyway).
 
+        // Blog→Medium cross-post (2026-06-13, Phase K). Non-fatal: a Medium
+        // hand-off must never break the publish response. No-ops unless
+        // postiz_enabled + postiz_medium_enabled + a mapped medium channel.
+        try {
+            app(\App\Services\PostizPublishDispatcher::class)->dispatchBlogToMedium($post);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('[approveAndPublish] blog→Medium dispatch failed (non-fatal)', [
+                'post_id' => $post->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
         $translationPending = $result['translation_pending'];
 
         return response()->json([

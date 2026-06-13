@@ -214,6 +214,12 @@ class PostizPublishController extends Controller
             return null;
         }
 
+        // Medium = blog article (Post), not a carousel — distinct payload shape
+        // (title + HTML body + canonical + reader-visible backlink footer).
+        if ($job->platform === 'medium' && $sibling instanceof \App\Models\Post) {
+            return $this->buildMediumPayload($job, $sibling);
+        }
+
         try {
             $content = $this->builder->resolveSiblingContent($sibling);
         } catch (\Throwable $e) {
@@ -231,6 +237,44 @@ class PostizPublishController extends Controller
             'hashtags' => $content['hashtags'],
             'link_comment' => $content['link_comment'],
             'post_type' => $job->platform === 'instagram' ? 'post' : null,
+        ];
+    }
+
+    /**
+     * Build the Medium publish payload from a blog Post — dual SEO:
+     *  - canonical = the blog permalink (rel=canonical signal, consolidates rank)
+     *  - content = primary-translation HTML + a server-built attribution footer
+     *    with a real clickable backlink (reader-visible referral driver)
+     * The URL is authoritative (built here, never hardcoded in the poller).
+     *
+     * @return array<string,mixed>
+     */
+    private function buildMediumPayload(PostizPublishJob $job, \App\Models\Post $post): array
+    {
+        $slug = $post->slug;
+        $frontendUrl = rtrim((string) config('app.frontend_url', 'https://alisadikinma.com'), '/');
+        $canonical = $frontendUrl . '/blog/' . $slug;
+
+        $translation = $post->relationLoaded('translations')
+            ? $post->translations->first()
+            : $post->translations()->first();
+
+        $title = $translation->title ?? $slug;
+        $body = (string) ($translation->content ?? '');
+
+        $footer = '<hr><p><em>Originally published at '
+            . '<a href="' . $canonical . '">alisadikinma.com</a></em></p>';
+
+        return [
+            'job_id' => $job->id,
+            'platform' => 'medium',
+            'postiz_integration_id' => $job->postiz_integration_id,
+            'title' => $title,
+            'content' => $body . "\n" . $footer,
+            'canonical' => $canonical,
+            'media_urls' => [],
+            'media_types' => [],
+            'post_type' => null,
         ];
     }
 

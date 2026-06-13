@@ -25,7 +25,8 @@ class PostizSettingsSeederTest extends TestCase
         $this->assertSame('20', Setting::where('group', 'postiz')->where('key', 'postiz_worker_alert_minutes')->value('value'));
         $this->assertTrue(Setting::where('group', 'postiz')->where('key', 'postiz_api_base_url')->exists());
 
-        $this->assertSame(5, Setting::where('group', 'postiz')->count());
+        $this->assertSame('false', Setting::where('group', 'postiz')->where('key', 'postiz_medium_enabled')->value('value'));
+        $this->assertSame(6, Setting::where('group', 'postiz')->count());
     }
 
     public function test_idempotent_does_not_clobber_edited_values(): void
@@ -36,6 +37,7 @@ class PostizSettingsSeederTest extends TestCase
         (new PostizSettingsSeeder())->run();
 
         $this->assertSame('true', Setting::where('group', 'postiz')->where('key', 'postiz_enabled')->value('value'));
-        $this->assertSame(5, Setting::where('group', 'postiz')->count());
+        $this->assertSame('false', Setting::where('group', 'postiz')->where('key', 'postiz_medium_enabled')->value('value'));
+        $this->assertSame(6, Setting::where('group', 'postiz')->count());
     }
 }

@@ -32,6 +32,8 @@ class PostizSettingsSeeder extends Seeder
             ['key' => 'postiz_api_base_url', 'value' => null, 'type' => 'text'],
             // Stuck-job alert threshold (minutes) for Postiz-only jobs (IG video / Medium).
             ['key' => 'postiz_worker_alert_minutes', 'value' => '20', 'type' => 'text'],
+            // Blog→Medium cross-post (canonical backlink). Default OFF.
+            ['key' => 'postiz_medium_enabled', 'value' => 'false', 'type' => 'text'],
         ];
 
         foreach ($settings as $row) {
