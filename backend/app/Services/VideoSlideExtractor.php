@@ -21,14 +21,17 @@ class VideoSlideExtractor
 {
     use RunsRepurposeClaudeCli;
 
+    /** Non-content slide kinds — the SOURCE creator's own bookends, dropped (#2). */
+    private const NON_CONTENT_KINDS = ['source_hook', 'source_cta'];
+
     /**
-     * @return array{success: bool, error: string|null}
+     * @return array{success: bool, error: string|null, dropped: array<int,int>}
      */
     public function extract(RepurposeJob $job): array
     {
         $toolSlides = $job->videoSlides()->where('role', RepurposeVideoSlide::ROLE_TOOL)->get();
         if ($toolSlides->isEmpty()) {
-            return ['success' => false, 'error' => 'no_tool_slides'];
+            return ['success' => false, 'error' => 'no_tool_slides', 'dropped' => []];
         }
 
         // Map slide_index → absolute poster path for the vision prompt.
@@ -53,7 +56,7 @@ class VideoSlideExtractor
                 'job' => $job->id,
                 'output_head' => mb_substr((string) ($res['output'] ?? ''), 0, 500),
             ]);
-            return ['success' => false, 'error' => $error];
+            return ['success' => false, 'error' => $error, 'dropped' => []];
         }
 
         // Map the parsed per-slide title/desc back onto rows by slide number.
@@ -65,6 +68,11 @@ class VideoSlideExtractor
             }
         }
 
+        // slide_index values of the SOURCE creator's own hook/cta bookends — the
+        // caller (ExtractVideoSlides) drops + renumbers these. A slide with no
+        // vision entry (or an unknown kind) is treated as content (conservative —
+        // never drop what we couldn't classify).
+        $dropped = [];
         foreach ($toolSlides as $slide) {
             $entry = $bySlideNumber[$slide->slide_index] ?? null;
             if ($entry === null) {
@@ -74,11 +82,20 @@ class VideoSlideExtractor
                 'header_title' => trim((string) ($entry['title'] ?? '')) ?: null,
                 'header_desc' => trim((string) ($entry['desc'] ?? '')) ?: null,
             ]);
+
+            $kind = strtolower(trim((string) ($entry['kind'] ?? 'content')));
+            if (in_array($kind, self::NON_CONTENT_KINDS, true)) {
+                $dropped[] = (int) $slide->slide_index;
+            }
         }
 
-        Log::info('[VideoSlideExtractor] extracted', ['job' => $job->id, 'slides' => $toolSlides->count()]);
+        Log::info('[VideoSlideExtractor] extracted', [
+            'job' => $job->id,
+            'slides' => $toolSlides->count(),
+            'dropped' => $dropped,
+        ]);
 
-        return ['success' => true, 'error' => null];
+        return ['success' => true, 'error' => null, 'dropped' => $dropped];
     }
 
     /**
@@ -108,19 +125,26 @@ class VideoSlideExtractor
         }
 
         return <<<PROMPT
-You are analyzing slides from an Instagram VIDEO carousel that recommends tools/tips. Each slide has a header band with a TOOL NAME (a short title) and a one-line DESCRIPTION, around a central demo video. Read EACH slide's header text.
+You are analyzing slides from an Instagram VIDEO carousel that recommends tools/tips. Each slide has a header band with a TOOL NAME (a short title) and a one-line DESCRIPTION, around a central demo video. Read EACH slide's header text AND classify what KIND of slide it is.
 
 {$imageLines}
-For each slide, extract the header TITLE (the tool/topic name, 1-4 words) and the one-line DESCRIPTION beneath it. Keep the description faithful to the source (you may lightly clean it), max ~14 words.
+For each slide:
+1. Extract the header TITLE (the tool/topic name, 1-4 words) and the one-line DESCRIPTION beneath it. Keep the description faithful to the source (you may lightly clean it), max ~14 words.
+2. Classify the slide KIND as exactly one of:
+   - "content"     → a real tool/tip slide (names a tool/topic and shows a demo). This is the default.
+   - "source_hook" → the ORIGINAL creator's own intro/cover/title slide: a talking-head face, a "swipe for more" / "save this" / "follow for part 2" prompt, NO actual tool being demonstrated.
+   - "source_cta"  → the ORIGINAL creator's own outro: a follow / like / subscribe / share / comment ask, NOT a tool.
+   Only classify a slide as source_hook/source_cta when you are confident it is the creator's own bookend, not a real tool. When unsure, use "content".
 
 STRICT JSON OUTPUT — parsed by a machine, not a human:
 - Output ONE compact JSON object only. No markdown fences, no preamble, no trailing prose.
+- "n" MUST be the EXACT integer slide label given above (the number after "Slide"), NOT a re-counted ordinal. Echo it back verbatim for every slide.
 - Escape EVERY double-quote inside a string value as \".
 - Do not truncate; always close the JSON object.
 
 Return ONE JSON object with exactly this shape:
 {
-  "slides": [{"n": 1, "title": "Stitch", "desc": "AI design studio that builds layouts from text"}]
+  "slides": [{"n": 1, "kind": "content", "title": "Stitch", "desc": "AI design studio that builds layouts from text"}]
 }
 PROMPT;
     }
