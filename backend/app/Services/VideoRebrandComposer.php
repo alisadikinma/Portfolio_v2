@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\RepurposeVideoSlide;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * video_rebrand Phase D — ffmpeg composite of ONE slide: keep the center 16:9
@@ -71,8 +72,13 @@ class VideoRebrandComposer
         }
 
         $sourceAbs = storage_path('app/' . $sourceRel);
+        // Write to the PUBLIC disk + store a full public URL — same convention as
+        // the Veo bookends (GeminiGenVideoService::finalizeVeoClip). The source
+        // capture stays on the private disk; only the final downloadable slide is
+        // published so the Social Studio `<a download>` link resolves for ALL
+        // slides (tool + hook + cta), not just the bookends.
         $outRel = "repurpose/{$jobId}/composited/slide_{$slide->slide_index}.mp4";
-        $outAbs = storage_path('app/' . $outRel);
+        $outAbs = Storage::disk('public')->path($outRel);
         @mkdir(dirname($outAbs), 0775, true);
 
         $slide->update(['composited_status' => 'compositing']);
@@ -105,9 +111,10 @@ class VideoRebrandComposer
             return null;
         }
 
-        $slide->update(['composited_status' => 'done', 'composited_path' => $outRel, 'last_error' => null]);
+        $publicUrl = url('/storage/' . $outRel);
+        $slide->update(['composited_status' => 'done', 'composited_path' => $publicUrl, 'last_error' => null]);
 
-        return $outRel;
+        return $publicUrl;
     }
 
     /**
