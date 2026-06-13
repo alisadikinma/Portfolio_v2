@@ -1,0 +1,20 @@
+# Cloudflare NAMED tunnel for Postiz OAuth callbacks (outbound-only, zero inbound).
+# See docs/runbooks/postiz-local-node-deploy.md.
+#
+# Setup (one-time):
+#   cloudflared tunnel login
+#   cloudflared tunnel create postiz-local        # prints the <TUNNEL_UUID>
+#   cloudflared tunnel route dns postiz-local postiz.alisadikinma.com
+#   cp cloudflared-config.example.yml ~/.cloudflared/config.yml   # edit UUID + paths
+#   cloudflared tunnel run postiz-local            # (or install as a service)
+#
+# A NAMED tunnel keeps a STABLE hostname — required because each platform's
+# OAuth redirect URI is registered against postiz.alisadikinma.com exactly.
+
+tunnel: <TUNNEL_UUID>
+credentials-file: /home/youruser/.cloudflared/<TUNNEL_UUID>.json
+
+ingress:
+  - hostname: postiz.alisadikinma.com
+    service: http://localhost:4007
+  - service: http_status:404

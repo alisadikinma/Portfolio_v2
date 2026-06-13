@@ -1,0 +1,6 @@
+# Secrets + runtime — never commit.
+.env
+poller/node_modules/
+poller/package-lock.json
+# Copied from the postiz-app repo at deploy time.
+dynamicconfig/

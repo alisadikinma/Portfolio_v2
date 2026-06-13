@@ -1,0 +1,192 @@
+# Postiz local-node cross-post hub — see docs/runbooks/postiz-local-node-deploy.md
+# Based on the official gitroomhq/postiz-app self-host compose with three
+# project-specific changes:
+#   1. `spotlight` (Sentry) DROPPED — nothing depends on it (optional in upstream).
+#   2. API_LIMIT raised 30 → 300 (a 10-item video carousel ≈ 11 Postiz API calls).
+#   3. `poller` service added — our dumb executor (Phase I) that claims VPS jobs.
+#
+# Secrets come from .env (see .env.example). All social OAuth dev-app keys live
+# there too. Temporal needs ./dynamicconfig — copy it from the postiz-app repo:
+#   cp -r /path/to/postiz-app/dynamicconfig ./dynamicconfig
+#
+# Slim option (saves ~0.5GB): set ENABLE_ES=false on `temporal`, remove the
+# temporal-elasticsearch service + its depends_on. Default keeps ES for parity.
+
+services:
+  postiz:
+    image: ghcr.io/gitroomhq/postiz-app:latest
+    container_name: postiz
+    restart: always
+    env_file: .env
+    environment:
+      # Tunnel-aware URLs — MUST match the Cloudflare named tunnel hostname so
+      # OAuth redirect URIs resolve. A quick-tunnel random URL would break them.
+      MAIN_URL: '${POSTIZ_PUBLIC_URL:-https://postiz.alisadikinma.com}'
+      FRONTEND_URL: '${POSTIZ_PUBLIC_URL:-https://postiz.alisadikinma.com}'
+      NEXT_PUBLIC_BACKEND_URL: '${POSTIZ_PUBLIC_URL:-https://postiz.alisadikinma.com}/api'
+      JWT_SECRET: '${POSTIZ_JWT_SECRET}'
+      DATABASE_URL: 'postgresql://postiz-user:postiz-password@postiz-postgres:5432/postiz-db-local'
+      REDIS_URL: 'redis://postiz-redis:6379'
+      BACKEND_INTERNAL_URL: 'http://localhost:3000'
+      TEMPORAL_ADDRESS: 'temporal:7233'
+      IS_GENERAL: 'true'
+      DISABLE_REGISTRATION: 'true'   # single-operator — lock signups after first account
+      STORAGE_PROVIDER: 'local'
+      UPLOAD_DIRECTORY: '/uploads'
+      NEXT_PUBLIC_UPLOAD_DIRECTORY: '/uploads'
+      # Raise the throttle for self-host (docker default 30/hr is too low — a
+      # 10-video carousel ≈ 11 calls + confirm polls).
+      API_LIMIT: '${POSTIZ_API_LIMIT:-300}'
+      # Social OAuth dev-app keys (only fill the platforms you connect).
+      LINKEDIN_CLIENT_ID: '${LINKEDIN_CLIENT_ID:-}'
+      LINKEDIN_CLIENT_SECRET: '${LINKEDIN_CLIENT_SECRET:-}'
+      FACEBOOK_APP_ID: '${FACEBOOK_APP_ID:-}'
+      FACEBOOK_APP_SECRET: '${FACEBOOK_APP_SECRET:-}'
+      THREADS_APP_ID: '${THREADS_APP_ID:-}'
+      THREADS_APP_SECRET: '${THREADS_APP_SECRET:-}'
+      TIKTOK_CLIENT_ID: '${TIKTOK_CLIENT_ID:-}'
+      TIKTOK_CLIENT_SECRET: '${TIKTOK_CLIENT_SECRET:-}'
+    volumes:
+      - postiz-config:/config/
+      - postiz-uploads:/uploads/
+    ports:
+      - '4007:5000'
+    networks:
+      - postiz-network
+      - temporal-network
+    depends_on:
+      postiz-postgres:
+        condition: service_healthy
+      postiz-redis:
+        condition: service_healthy
+
+  postiz-postgres:
+    image: postgres:17-alpine
+    container_name: postiz-postgres
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: postiz-password
+      POSTGRES_USER: postiz-user
+      POSTGRES_DB: postiz-db-local
+    volumes:
+      - postgres-volume:/var/lib/postgresql/data
+    networks:
+      - postiz-network
+    healthcheck:
+      test: pg_isready -U postiz-user -d postiz-db-local
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  postiz-redis:
+    image: redis:7.2
+    container_name: postiz-redis
+    restart: always
+    healthcheck:
+      test: redis-cli ping
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    volumes:
+      - postiz-redis-data:/data
+    networks:
+      - postiz-network
+
+  # ── Our dumb executor (Phase I) ───────────────────────────────────────────
+  poller:
+    image: node:20-alpine
+    container_name: postiz-poller
+    restart: always
+    working_dir: /app
+    command: sh -c "npm install --omit=dev --no-audit --no-fund && node index.mjs"
+    env_file: .env
+    environment:
+      POSTIZ_API_BASE_URL: 'http://postiz:5000'   # internal — no tunnel needed
+    volumes:
+      - ./poller:/app
+    networks:
+      - postiz-network
+    depends_on:
+      - postiz
+
+  # ── Temporal stack ────────────────────────────────────────────────────────
+  temporal-elasticsearch:
+    container_name: temporal-elasticsearch
+    image: elasticsearch:7.17.27
+    environment:
+      - cluster.routing.allocation.disk.threshold_enabled=true
+      - cluster.routing.allocation.disk.watermark.low=512mb
+      - cluster.routing.allocation.disk.watermark.high=256mb
+      - cluster.routing.allocation.disk.watermark.flood_stage=128mb
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms256m -Xmx256m
+      - xpack.security.enabled=false
+    networks:
+      - temporal-network
+    expose:
+      - 9200
+    volumes:
+      - elasticsearch-data:/var/lib/elasticsearch/data
+
+  temporal-postgresql:
+    container_name: temporal-postgresql
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: temporal
+      POSTGRES_USER: temporal
+    networks:
+      - temporal-network
+    expose:
+      - 5432
+    volumes:
+      - temporal-postgres-data:/var/lib/postgresql/data
+
+  temporal:
+    container_name: temporal
+    ports:
+      - '7233:7233'
+    image: temporalio/auto-setup:1.28.1
+    depends_on:
+      - temporal-postgresql
+      - temporal-elasticsearch
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=temporal
+      - POSTGRES_PWD=temporal
+      - POSTGRES_SEEDS=temporal-postgresql
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
+      - ENABLE_ES=true
+      - ES_SEEDS=temporal-elasticsearch
+      - ES_VERSION=v7
+      - TEMPORAL_NAMESPACE=default
+    networks:
+      - temporal-network
+    volumes:
+      - ./dynamicconfig:/etc/temporal/config/dynamicconfig
+
+  temporal-ui:
+    container_name: temporal-ui
+    image: temporalio/ui:2.34.0
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CORS_ORIGINS=http://127.0.0.1:3000
+    networks:
+      - temporal-network
+    ports:
+      - '8080:8080'
+
+volumes:
+  postgres-volume:
+  postiz-redis-data:
+  postiz-config:
+  postiz-uploads:
+  elasticsearch-data:
+  temporal-postgres-data:
+
+networks:
+  postiz-network:
+    external: false
+  temporal-network:
+    driver: bridge
+    name: temporal-network
