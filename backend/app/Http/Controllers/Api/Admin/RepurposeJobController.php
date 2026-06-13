@@ -188,6 +188,37 @@ class RepurposeJobController extends Controller
     }
 
     /**
+     * Hard-delete a repurpose job + its captured-slide artifacts. Backs the
+     * Social Studio "Delete" action for manual cleanup of stale/test jobs. Any
+     * linked ContentIdea / LinkedInPost is left intact — those have their own
+     * delete surfaces; this only removes the IG monitoring row + its private
+     * slide dir (RepurposeJob has no SoftDeletes — the row is gone for good).
+     */
+    public function destroy(int $id): JsonResponse
+    {
+        $job = RepurposeJob::find($id);
+        if (!$job) {
+            return $this->notFound();
+        }
+
+        // Purge captured-slide artifacts (private local disk) so deleting a job
+        // doesn't leak an orphaned dir the reaper would otherwise have to find.
+        $rel = (string) $job->slides_path;
+        if ($rel !== '') {
+            Storage::disk('local')->deleteDirectory($rel);
+        }
+
+        // Remove child video-slide rows first (FK), then the job itself.
+        $job->videoSlides()->delete();
+        $job->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Repurpose job deleted.',
+        ]);
+    }
+
+    /**
      * Serve the Nth captured slide image from the PRIVATE per-job storage dir.
      * The client passes only an integer index (route-constrained to digits) —
      * never a filename — so there is no path-traversal surface; the index maps

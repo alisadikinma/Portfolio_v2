@@ -109,6 +109,21 @@ export function useRefetchRepurposeSource() {
 }
 
 /**
+ * Hard-delete a repurpose job (Social Studio "Delete" action). Removes the row
+ * + its captured-slide artifacts on the backend; invalidate the list so the
+ * card disappears.
+ */
+export function useDeleteRepurposeJob() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) => api.delete(`/admin/repurpose/${id}`).then(r => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [LIST_KEY] })
+    },
+  })
+}
+
+/**
  * Slide thumbnails are auth:sanctum, so a native <img src> can't carry the
  * bearer — fetch as a blob through the axios instance (interceptor adds the
  * token) and hand back an object URL. Caller must URL.revokeObjectURL on unmount.

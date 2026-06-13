@@ -1,8 +1,8 @@
 <script setup>
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
-import { useRepurposeJobsList } from '@/composables/useRepurposeJobs'
-import { useLinkedInDraftsList } from '@/composables/useLinkedInDrafts'
+import { useRepurposeJobsList, useDeleteRepurposeJob } from '@/composables/useRepurposeJobs'
+import { useLinkedInDraftsList, useDeleteLinkedInDraft } from '@/composables/useLinkedInDrafts'
 import { fetchSlideObjectUrl } from '@/composables/useRepurposeJobs'
 import {
   toCard,
@@ -164,6 +164,34 @@ function openCard(card) {
   sessionStorage.setItem('linkedin:detail:origin', 'studio')
   router.push(card.route)
 }
+
+// --- delete (manual cleanup) ----------------------------------------------
+// IG card → DELETE the RepurposeJob (hard delete + artifact purge); blog card
+// → DELETE the LinkedInPost draft (soft delete). One mutation each; track the
+// in-flight card key so only its button shows the spinner.
+const deleteIg = useDeleteRepurposeJob()
+const deleteBlog = useDeleteLinkedInDraft()
+const deletingKey = ref(null)
+
+function cardKey(card) { return `${card.kind}-${card.id}` }
+
+async function deleteCard(card) {
+  const what = card.kind === 'ig' ? 'IG repurpose job' : 'blog draft'
+  const ok = window.confirm(
+    `Hapus ${what} ini?\n\n"${card.title || 'Untitled'}"\n\nTindakan ini tidak bisa dibatalkan.`,
+  )
+  if (!ok) return
+
+  deletingKey.value = cardKey(card)
+  try {
+    if (card.kind === 'ig') await deleteIg.mutateAsync(card.id)
+    else await deleteBlog.mutateAsync(card.id)
+  } catch (e) {
+    window.alert('Gagal menghapus. Coba lagi.')
+  } finally {
+    deletingKey.value = null
+  }
+}
 </script>
 
 <template>
@@ -227,7 +255,7 @@ function openCard(card) {
               <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400 w-40">Platforms</th>
               <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400 w-32">Status</th>
               <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400 w-24">Updated</th>
-              <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400 text-right w-16">Open</th>
+              <th class="px-4 py-3 font-medium text-neutral-500 dark:text-neutral-400 text-right w-28">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-neutral-100 dark:divide-neutral-700">
@@ -311,13 +339,29 @@ function openCard(card) {
               <!-- updated -->
               <td class="px-4 py-3 text-xs text-neutral-500 dark:text-neutral-400">{{ relativeTime(card.updatedAt) }}</td>
 
-              <!-- open -->
-              <td class="px-4 py-3 text-right">
-                <span class="inline-flex p-1.5 text-neutral-400 transition-colors group-hover:text-amber-600 dark:text-neutral-500">
-                  <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="m9 18 6-6-6-6" />
-                  </svg>
-                </span>
+              <!-- actions: delete + open -->
+              <td class="px-4 py-3">
+                <div class="flex items-center justify-end gap-1">
+                  <button
+                    type="button"
+                    title="Delete"
+                    :disabled="deletingKey === cardKey(card)"
+                    @click.stop="deleteCard(card)"
+                    class="inline-flex rounded p-1.5 text-neutral-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:text-neutral-500 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                  >
+                    <svg v-if="deletingKey === cardKey(card)" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    <svg v-else class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                  <span class="inline-flex p-1.5 text-neutral-400 transition-colors group-hover:text-amber-600 dark:text-neutral-500">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="m9 18 6-6-6-6" />
+                    </svg>
+                  </span>
+                </div>
               </td>
             </tr>
           </tbody>

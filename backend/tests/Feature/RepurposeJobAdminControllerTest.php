@@ -176,6 +176,31 @@ class RepurposeJobAdminControllerTest extends TestCase
         Queue::assertNothingPushed();
     }
 
+    // ---- delete ----
+
+    public function test_destroy_removes_the_job(): void
+    {
+        $job = RepurposeJob::factory()->create(['status' => 'drafted']);
+
+        $this->actingAs($this->admin(), 'sanctum')
+            ->deleteJson("/api/admin/repurpose/{$job->id}")
+            ->assertOk()->assertJson(['success' => true]);
+
+        $this->assertDatabaseMissing('repurpose_jobs', ['id' => $job->id]);
+    }
+
+    public function test_destroy_404_on_missing(): void
+    {
+        $this->actingAs($this->admin(), 'sanctum')
+            ->deleteJson('/api/admin/repurpose/999999')
+            ->assertStatus(404);
+    }
+
+    public function test_destroy_requires_auth(): void
+    {
+        $this->deleteJson('/api/admin/repurpose/1')->assertUnauthorized();
+    }
+
     // ---- thumbnail ----
 
     public function test_slide_thumbnail_serves_private_file(): void

@@ -278,6 +278,20 @@ export function useRegenerateCaption() {
 }
 
 /**
+ * DELETE /admin/linkedin-drafts/{id} — soft-delete a draft (Social Studio
+ * "Delete" action). Invalidate the list so the card disappears.
+ */
+export function useDeleteLinkedInDraft() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) => api.delete(`/admin/linkedin-drafts/${id}`).then(r => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [LIST_KEY] })
+    },
+  })
+}
+
+/**
  * POST /admin/linkedin-drafts/{id}/publish-crosspost/{platform} — manually
  * (re)publish ONE cross-post platform sibling to Publer. Recovers a failed
  * sibling without regenerating its caption.

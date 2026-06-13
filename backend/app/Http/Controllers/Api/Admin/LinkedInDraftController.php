@@ -334,6 +334,27 @@ class LinkedInDraftController extends Controller
         ]);
     }
 
+    /**
+     * Soft-delete a draft. Backs the Social Studio "Delete" action for manual
+     * cleanup of stale/test blog-origin drafts. SoftDeletes keeps the row for
+     * audit and lets a future blog scan re-create a fresh draft for the post
+     * (the "one live row per post_id" invariant only counts non-deleted rows).
+     */
+    public function destroy(int $id): JsonResponse
+    {
+        $draft = LinkedInPost::find($id);
+        if ($draft === null) {
+            return $this->notFound();
+        }
+
+        $draft->delete(); // soft delete
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Draft deleted.',
+        ]);
+    }
+
     public function regenerate(int $id): JsonResponse
     {
         $draft = LinkedInPost::find($id);

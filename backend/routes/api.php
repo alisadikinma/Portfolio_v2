@@ -1295,6 +1295,7 @@ Route::middleware(['auth:sanctum'])->prefix('admin/linkedin-drafts')->group(func
     Route::get('/{id}', [LinkedInDraftController::class, 'show']);
     Route::get('/{id}/progress', [LinkedInDraftController::class, 'progress']);
     Route::put('/{id}', [LinkedInDraftController::class, 'update']);
+    Route::delete('/{id}', [LinkedInDraftController::class, 'destroy'])->whereNumber('id');
     Route::post('/{id}/regenerate', [LinkedInDraftController::class, 'regenerate']);
     Route::post('/{id}/generate-threads', [LinkedInDraftController::class, 'generateThreads'])
         ->name('admin.linkedin-drafts.generate-threads');
@@ -1341,6 +1342,7 @@ Route::middleware(['auth:sanctum'])->prefix('admin/repurpose')->group(function (
     Route::post('/{id}/refetch-source', [RepurposeJobController::class, 'refetchSource'])->whereNumber('id');
     Route::get('/{id}/slide/{n}', [RepurposeJobController::class, 'slide'])
         ->whereNumber('id')->whereNumber('n');
+    Route::delete('/{id}', [RepurposeJobController::class, 'destroy'])->whereNumber('id');
 });
 
 // ============================================================================
