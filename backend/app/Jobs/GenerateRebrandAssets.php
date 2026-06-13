@@ -46,16 +46,30 @@ class GenerateRebrandAssets implements ShouldQueue
 
     public int $tries = 1;
 
-    /** Face-gen keyframe (image) prompts — a calm branded vertical portrait. */
-    public const KEYFRAME_PROMPT_HOOK = 'Cinematic vertical 9:16 portrait of the creator, confident and approachable, '
-        .'smart-casual outfit (tee with unstructured blazer), looking directly at camera with a subtle welcoming expression, '
-        .'clean solid brand-blue (#0F59B6) studio background, soft key light with gentle gold rim light, '
-        .'modern tech-founder energy, sharp focus, photorealistic, no text, no logos, no UI elements';
+    /**
+     * Face-gen keyframe (image) prompts — the v3 "Spotlight Portrait" carousel
+     * standard at 9:16 (mirrors the /carousel-gen cover/CTA look, see vault
+     * 10-Identity/visual-identity.md). Used as the static fallback when
+     * VideoHookSceneAuthor declines (empty topic / author failure / figure dropped);
+     * the authored hook is topic-evocative on the SAME standard. The hook must be
+     * scroll-stopping — the drama comes from the bold composition + floating topic
+     * UI, NOT a costume change (signature outfit is fixed across every topic).
+     */
+    public const KEYFRAME_PROMPT_HOOK = 'Cinematic vertical 9:16 Spotlight Portrait of the creator on a solid signature-blue (#0F59B6) studio background. '
+        .'Calm, confident, credible expression looking straight down the lens; a striking scroll-stopping composition, subject slightly off-center (rule of thirds). '
+        .'Signature outfit: dark tee or henley under an unstructured blazer in a neutral slate-charcoal tone. '
+        .'Around him THREE OR MORE floating topic UI elements — sleek app cards, tool logos and product screenshots — hover with soft glow and gentle depth blur, conveying the subject matter (NOT his clothing). '
+        .'Lighting: cool-neutral ~5200K key + soft blue ambient bounce + a warm gold rim light separating him from the background (no warm-amber wash). '
+        .'Hyperrealistic, anti-AI-look: visible skin pores, a few stray hairs catching light, natural fabric creases, subtle lens vignetting, slight asymmetry. '
+        .'Sharp focus, 4K, no on-image text, no watermark.';
 
-    public const KEYFRAME_PROMPT_CTA = 'Cinematic vertical 9:16 portrait of the creator, warm and inviting, '
-        .'smart-casual outfit (tee with unstructured blazer), gesturing softly toward the viewer as if inviting them to follow, '
-        .'clean solid navy-blue studio background with a subtle gold glow, soft key light with gold rim light, '
-        .'friendly closing energy, sharp focus, photorealistic, no text, no logos, no UI elements';
+    public const KEYFRAME_PROMPT_CTA = 'Cinematic vertical 9:16 Spotlight Portrait of the creator on a deepened-navy variant of signature blue (#0F59B6) with a warm gold glow. '
+        .'Warm, inviting, confident expression with an open-hand "join me" gesture toward the viewer. '
+        .'Signature outfit: dark tee or henley under an unstructured blazer in a neutral slate-charcoal tone. '
+        .'A few floating topic UI cards hover softly behind him as a mini value-recap, with gentle glow and depth blur. '
+        .'Lighting: cool-neutral key + warm gold rim and a soft gold ambient glow for a friendly closing energy. '
+        .'Hyperrealistic, anti-AI-look: visible skin pores, stray hairs, natural fabric creases, subtle lens vignetting, slight asymmetry. '
+        .'Sharp focus, 4K, no on-image text, no watermark.';
 
     /**
      * Veo I2V motion prompts — follow the VEO 3.1 standard format (see

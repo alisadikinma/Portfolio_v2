@@ -126,25 +126,34 @@ class VideoHookSceneAuthor
         $figureBlock = $allowFigure
             ? <<<'FIG'
 2. Decide whether ONE iconic public figure strongly fits this topic (e.g. a Google product → Google's CEO; an OpenAI product → OpenAI's CEO; a specific company's tool → that company's well-known leader). If yes, set "figure_name" to that person's full real name. If no single figure clearly fits, set "figure_name" to null.
-3. Author "scene_prompt": a cinematic 9:16 vertical PHOTOREALISTIC hook scene. If a figure was chosen, place the CREATOR on the LEFT and "the person matching reference image 2" on the RIGHT, together in a setting evocative of the topic (e.g. a modern tech campus garden, a product launch stage). NEVER write the figure's name in scene_prompt — refer to them ONLY as "the person matching reference image 2". If no figure, author a striking creator-only scene in a topic-evocative setting.
+3. Author "scene_prompt" on the Spotlight Portrait standard below. If a figure was chosen, place the CREATOR on the LEFT and "the person matching reference image 2" on the RIGHT, both on the signature-blue base, with the floating topic UI elements between/around them. NEVER write the figure's name in scene_prompt — refer to them ONLY as "the person matching reference image 2". If no figure, author a creator-only Spotlight Portrait.
 FIG
             : <<<'NOFIG'
 2. Set "figure_name" to null (no second person).
-3. Author "scene_prompt": a cinematic 9:16 vertical PHOTOREALISTIC hook scene featuring ONLY the creator in a setting evocative of the topic (e.g. a modern tech campus, a product launch stage). Do NOT include any other person.
+3. Author "scene_prompt" on the Spotlight Portrait standard below, featuring ONLY the creator. Do NOT include any other person.
 NOFIG;
 
         return <<<PROMPT
-You are authoring the cover/HOOK keyframe image prompt for a short branded vertical video that opens an Instagram carousel about: "{$topic}".
+You are authoring the cover/HOOK keyframe image prompt for a short branded vertical video that opens an Instagram carousel about: "{$topic}". The image is animated by a video model, so describe ONE held moment, not motion.
 
-Follow the Spotlight Portrait hook standard (the creator is the confident subject; the scene is topic-evocative; smart-casual outfit; clean modern lighting; photorealistic, anti-AI-look). The image will be animated by a video model, so describe a single held moment, not motion.
+This hook MUST stop the scroll — it is the single most important frame. The drama comes from a bold, striking composition + topic-evocative floating UI, NOT from a costume change.
+
+Follow the v3 "Spotlight Portrait" standard EXACTLY (the /carousel-gen cover look, at 9:16 vertical):
+- Solid signature-blue (#0F59B6) studio background — one clean solid base, no busy environment.
+- The creator is a calm, confident, credible subject, slightly off-center (rule of thirds), a scroll-stopping composition.
+- Signature outfit on EVERY topic: a dark tee or henley under an unstructured blazer, neutral slate/charcoal/muted-navy tone. NEVER change the outfit to suit the topic.
+- THREE OR MORE floating topic UI elements (sleek app cards, real tool logos, product screenshots, holographic dashboards relevant to "{$topic}") hover around the subject with soft glow and gentle depth blur. The TOPIC is conveyed by these floating elements, never by costume or a literal location.
+- Lighting/grade: cool-neutral ~5200K key + soft blue ambient bounce + a warm gold rim light. No warm-amber wash.
+- Hyperrealistic, anti-AI-look: visible skin pores, a few stray hairs catching light, natural fabric creases, subtle lens vignetting, slight asymmetry.
 
 Steps:
 1. Read the topic.
 {$figureBlock}
 
 Rules for scene_prompt:
-- 9:16 vertical, photorealistic, sharp focus, natural lighting. No on-image text, no logos, no UI watermark.
-- Keep it ~60-110 words, one descriptive paragraph.
+- 9:16 vertical, photorealistic, sharp focus, 4K. No on-image text, no logos baked as captions, no watermark.
+- Keep it ~70-130 words, one descriptive paragraph.
+- Name 2-4 CONCRETE floating UI elements that evoke "{$topic}" specifically (e.g. for an AI design tool: a floating layout canvas, a component library card, a generated-mockup screenshot).
 - Spatially separate the two people when a figure is used ("creator on the left ... the person matching reference image 2 on the right") so their faces do not blend.
 
 STRICT JSON OUTPUT — parsed by a machine, not a human:
