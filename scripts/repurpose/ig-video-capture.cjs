@@ -8,15 +8,17 @@
  * CAPTURE METHOD: Playwright (headless browser), NOT yt-dlp (June 13, 2026).
  * yt-dlp hits IG's internal API which IG rate-limits hard and flags the session
  * even WITH cookies — a known dead-end (it succeeds once on a fresh account then
- * throttles for hours). The headless browser renders the real page like a human,
- * intercepts the video CDN responses, and downloads them THROUGH the browser
- * context (cookies preserved) — the same resilient pattern the image-carousel
- * path (scripts/playwright/ig-capture.cjs) uses and which is NOT API-throttled.
+ * throttles for hours). The headless browser renders the real page like a human
+ * and reads the progressive video URLs straight out of the page's embedded JSON
+ * — the same resilient pattern the image-carousel path uses, NOT API-throttled.
  *
- * Flow: load post (+ Netscape cookies) → listen for cdninstagram video responses
- * → swipe through every carousel slide so each video hydrates → download each
- * unique video via context.request → ffmpeg poster + center 16:9 luminance
- * band-detect (unchanged from the old yt-dlp version).
+ * Flow: load post (+ Netscape cookies) → read `video_versions[].url` (highest-
+ * bitrate progressive MP4 per slide) from the rendered data-sjs JSON → download
+ * each via context.request → ffmpeg poster + center 16:9 luminance band-detect.
+ *
+ * Do NOT intercept the playing <video>: IG streams carousel videos as MPEG-DASH
+ * media segments (tiny unplayable chunks); only the embedded progressive_url
+ * gives a complete file with audio. (Diagnosed + verified live on VPS Jun 13.)
  *
  *   node ig-video-capture.cjs --url <ig-url> --out <dir> \
  *        [--timeout 300] [--ffmpeg ffmpeg] [--ffprobe ffprobe] [--cookies <netscape.txt>]
@@ -146,17 +148,34 @@ function probe(file) {
   }
 }
 
-/** Stable key for a signed IG video URL: the long media-id segments in the path
- *  (query params + CDN host vary per request, the /o1/v/.../<id> path is stable). */
-function videoKey(u) {
-  const noQ = u.split('?')[0];
-  const segs = (noQ.match(/\/[A-Za-z0-9_-]{16,}/g) || []).join('');
-  return segs || noQ;
+/** Unescape the backslash-escaped URLs embedded in IG's data-sjs JSON blocks. */
+function unescapeUrl(s) {
+  return s.replace(/\\\//g, '/').replace(/\\u0026/g, '&').replace(/\\u003D/gi, '=');
 }
 
-function isVideoResponse(u, ct) {
-  if (ct && ct.toLowerCase().includes('video/')) return true;
-  return /cdninstagram\.com\/(o1\/)?v\//i.test(u) || /\.mp4(\?|$)/i.test(u);
+/**
+ * Extract one FULL-PROGRESSIVE video URL per carousel slide from the rendered
+ * page HTML. IG embeds a `"video_versions":[{type,width,height,url}, ...]` array
+ * per video item in its server-rendered data-sjs JSON; the FIRST entry is the
+ * highest-quality progressive MP4. This is deterministic (N arrays = N video
+ * slides) and yields complete files WITH audio.
+ *
+ * Why not intercept the playing <video>? IG streams carousel videos as MPEG-DASH
+ * media segments (many tiny `video/mp4` 200 responses); re-downloading a single
+ * intercepted segment gives an unplayable ~20-130KB chunk (duration 0, no audio).
+ * Only a fully-buffered slide ever surfaces as one progressive file. The embedded
+ * progressive_url is the reliable source. (Verified live on VPS, June 13 2026.)
+ */
+function extractProgressiveUrls(html) {
+  const urls = [];
+  let i = 0;
+  while ((i = html.indexOf('"video_versions":[', i)) >= 0) {
+    const seg = html.slice(i, i + 4000);
+    const m = seg.match(/"url":"(https:[^"]+?\.mp4[^"]*?)"/);
+    if (m) urls.push(unescapeUrl(m[1]));
+    i += 18;
+  }
+  return [...new Set(urls)];
 }
 
 async function capturePlaywright() {
@@ -172,47 +191,40 @@ async function capturePlaywright() {
     if (cks.length) await ctx.addCookies(cks);
     const page = await ctx.newPage();
 
-    // Collect cdninstagram video response URLs in first-seen (≈ carousel) order.
-    const seen = new Map(); // key -> url
-    page.on('response', (resp) => {
-      try {
-        const u = resp.url();
-        const ct = resp.headers()['content-type'] || '';
-        if (isVideoResponse(u, ct)) {
-          const k = videoKey(u);
-          if (!seen.has(k)) seen.set(k, u);
-        }
-      } catch (e) { /* ignore */ }
-    });
-
     await page.goto(url, { waitUntil: 'load', timeout: Math.min(60000, timeoutMs) });
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(6000);
 
-    const title = (await page.title()) || '';
-    const hasLogin = (await page.$('input[name="username"]')) !== null;
-    if (seen.size === 0 && (hasLogin || /log\s?in/i.test(title))) {
+    // Primary source: progressive video_versions URLs in the rendered data-sjs JSON.
+    let urls = extractProgressiveUrls(await page.content());
+
+    // Defensive: a lazy-hydrated carousel may surface extra items only after a
+    // swipe. If the first read looks short, swipe through and union the results.
+    if (urls.length < 2) {
+      for (let i = 0; i < 15; i++) {
+        const next = await page.$('button[aria-label="Next"], [aria-label="Next"]');
+        if (!next) break;
+        try { await next.click({ timeout: 3000 }); } catch (e) { break; }
+        await page.waitForTimeout(1800);
+      }
+      urls = [...new Set([...urls, ...extractProgressiveUrls(await page.content())])];
+    }
+
+    if (urls.length === 0) {
+      const title = (await page.title()) || '';
+      const hasLogin = (await page.$('input[name="username"]')) !== null;
       await browser.close();
-      return { error: 'login_wall' };
+      return { error: (hasLogin || /log\s?in/i.test(title)) ? 'login_wall' : 'no_video_items' };
     }
 
-    // Swipe through the carousel so every slide's video hydrates → response fires.
-    for (let i = 0; i < 20; i++) {
-      const next = await page.$('button[aria-label="Next"], [aria-label="Next"]');
-      if (!next) break;
-      try { await next.click({ timeout: 3000 }); } catch (e) { break; }
-      await page.waitForTimeout(2500);
-    }
-    await page.waitForTimeout(1500);
-
-    // Download each unique video via the browser context (cookies/session kept).
+    // Download each full progressive video via the browser context (cookies kept).
+    // URLs are in document order = carousel slide order → slide_1..slide_N.
     const files = [];
-    const urls = [...seen.values()];
     for (let i = 0; i < urls.length; i++) {
       try {
-        const resp = await ctx.request.get(urls[i], { timeout: 60000, headers: { Referer: 'https://www.instagram.com/' } });
+        const resp = await ctx.request.get(urls[i], { timeout: 90000, headers: { Referer: 'https://www.instagram.com/' } });
         if (!resp.ok()) continue;
         const buf = await resp.body();
-        if (!buf || buf.length < 10000) continue; // skip tiny/non-video payloads
+        if (!buf || buf.length < 50000) continue; // full slide videos are >0.5MB; skip stragglers
         const name = 'slide_' + (files.length + 1) + '.mp4';
         fs.writeFileSync(path.join(outDir, name), buf);
         files.push(name);
