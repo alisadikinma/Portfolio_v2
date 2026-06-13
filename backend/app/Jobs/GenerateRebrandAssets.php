@@ -6,8 +6,10 @@ use App\Enums\RepurposeJobStatus;
 use App\Models\RepurposeJob;
 use App\Models\RepurposeVideoSlide;
 use App\Services\CarouselSlideEnhancer;
+use App\Services\EntityReferenceService;
 use App\Services\GeminiGenVideoService;
 use App\Services\TelegramNotificationService;
+use App\Services\VideoHookSceneAuthor;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -110,9 +112,14 @@ class GenerateRebrandAssets implements ShouldQueue
         $hook = $this->ensureBookend($job, RepurposeVideoSlide::ROLE_HOOK, 0);
         $cta = $this->ensureBookend($job, RepurposeVideoSlide::ROLE_CTA, $maxToolIndex + 1);
 
+        // Hook keyframe is topic-aware (#1): authored from the surviving tool
+        // titles, optionally with a public figure as a face reference. CTA stays
+        // the static branded portrait this phase.
+        [$hookRefs, $hookPrompt] = $this->buildHookKeyframe($job, $hook, $faceUrl);
+
         $dispatched = 0;
-        $dispatched += $this->dispatchKeyframe($video, $hook, self::KEYFRAME_PROMPT_HOOK) ? 1 : 0;
-        $dispatched += $this->dispatchKeyframe($video, $cta, self::KEYFRAME_PROMPT_CTA) ? 1 : 0;
+        $dispatched += $this->dispatchKeyframe($video, $hook, $hookPrompt, $hookRefs) ? 1 : 0;
+        $dispatched += $this->dispatchKeyframe($video, $cta, self::KEYFRAME_PROMPT_CTA, [$faceUrl]) ? 1 : 0;
 
         if ($dispatched === 0) {
             // Both keyframe dispatches failed (circuit open / key missing / HTTP) —
@@ -136,15 +143,73 @@ class GenerateRebrandAssets implements ShouldQueue
         );
     }
 
-    private function dispatchKeyframe(GeminiGenVideoService $video, RepurposeVideoSlide $slide, string $prompt): bool
+    /**
+     * Build the topic-aware hook keyframe (#1): refs[] + scene prompt. Authored
+     * via VideoHookSceneAuthor from the surviving tool titles. When a public
+     * figure fits the topic (and the safety fallback hasn't dropped it), resolve
+     * a license-clean photo via EntityReferenceService and add it as reference 2.
+     * Degrades gracefully — empty topic / author failure / unresolved figure all
+     * fall back to the creator-only ref + static prompt; the job never blocks here.
+     *
+     * @return array{0: array<int,string>, 1: string} [refs, prompt]
+     */
+    private function buildHookKeyframe(RepurposeJob $job, RepurposeVideoSlide $hook, string $faceUrl): array
+    {
+        $topic = $this->hookTopic($job);
+        if ($topic === '') {
+            return [[$faceUrl], self::KEYFRAME_PROMPT_HOOK];
+        }
+
+        // figure_dropped sentinel (set by the PollRebrandAssets safety fallback on
+        // a PROMINENT_PEOPLE_UPLOAD refusal) forces a creator-only re-author.
+        $allowFigure = ! (bool) $hook->figure_dropped;
+
+        $authored = app(VideoHookSceneAuthor::class)->author($topic, $allowFigure);
+        if (! ($authored['success'] ?? false)) {
+            Log::warning('[GenerateRebrandAssets] hook author failed — static fallback', [
+                'job' => $job->id,
+                'error' => $authored['error'] ?? null,
+            ]);
+
+            return [[$faceUrl], self::KEYFRAME_PROMPT_HOOK];
+        }
+
+        $refs = [$faceUrl];
+        $figureName = $allowFigure ? ($authored['figure_name'] ?? null) : null;
+        if ($figureName) {
+            $entity = app(EntityReferenceService::class)->findOrFetch($figureName, 'person');
+            $figureUrl = is_array($entity) ? ($entity['url'] ?? null) : null;
+            if (is_string($figureUrl) && $figureUrl !== '') {
+                $refs[] = $figureUrl; // license-checked + downloaded to our storage
+            }
+        }
+
+        return [$refs, (string) $authored['scene_prompt']];
+    }
+
+    /** Topic = surviving content tool titles, in slide order. */
+    private function hookTopic(RepurposeJob $job): string
+    {
+        return (string) $job->videoSlides()
+            ->where('role', RepurposeVideoSlide::ROLE_TOOL)
+            ->orderBy('slide_index')
+            ->pluck('header_title')
+            ->filter()
+            ->implode(', ');
+    }
+
+    /**
+     * @param array<int,string> $refs face reference URL(s) for the keyframe
+     */
+    private function dispatchKeyframe(GeminiGenVideoService $video, RepurposeVideoSlide $slide, string $prompt, array $refs): bool
     {
         // Idempotent — a re-run (recovery) skips a keyframe already in flight/done.
         if (in_array($slide->keyframe_status, ['generating', 'done'], true)) {
             return true;
         }
 
-        $faceUrl = app(CarouselSlideEnhancer::class)->getCreatorFaceUrl();
-        $uuid = $faceUrl ? $video->dispatchKeyframe($faceUrl, $prompt, $slide->id) : null;
+        $refs = array_values(array_filter($refs, fn ($u) => is_string($u) && $u !== ''));
+        $uuid = $refs !== [] ? $video->dispatchKeyframe($refs, $prompt, $slide->id) : null;
         if ($uuid === null) {
             $slide->update(['keyframe_status' => 'failed', 'last_error' => 'keyframe dispatch failed (service unavailable or rejected)']);
 

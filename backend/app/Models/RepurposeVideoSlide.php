@@ -37,12 +37,14 @@ class RepurposeVideoSlide extends Model
         'composited_path',
         'composited_status',
         'last_error',
+        'figure_dropped',
     ];
 
     protected $casts = [
         'slide_index' => 'integer',
         'crop_y' => 'integer',
         'crop_h' => 'integer',
+        'figure_dropped' => 'boolean',
     ];
 
     public function repurposeJob(): BelongsTo

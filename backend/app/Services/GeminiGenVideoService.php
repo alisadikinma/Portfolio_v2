@@ -134,13 +134,20 @@ class GeminiGenVideoService
 
     /**
      * Dispatch a face-gen keyframe for a video_rebrand hook/CTA clip — a 9:16
-     * photoreal portrait built from the creator face ref via GeminiGen
+     * photoreal portrait built from the creator face ref(s) via GeminiGen
      * /generate_image. Poll-based (NO webhook — geminigen never fires one); the
      * finished image URL feeds dispatchVeoClip() as the Veo start frame. Returns
      * the job uuid (poll key at /history/{uuid}) or null on
      * circuit-open / missing key / HTTP failure.
+     *
+     * $faceRefUrls accepts a single URL (CTA / legacy callers) OR an array of
+     * URLs — e.g. [creatorFace, publicFigureFace] for a topic-aware hook where the
+     * figure enters as reference image 2 (its NAME never appears in the prompt).
+     * Each URL becomes its own file_urls multipart entry (what GeminiGen expects).
+     *
+     * @param string|array<int,string> $faceRefUrls
      */
-    public function dispatchKeyframe(string $faceRefUrl, string $prompt, ?int $contextId = null): ?string
+    public function dispatchKeyframe(string|array $faceRefUrls, string $prompt, ?int $contextId = null): ?string
     {
         if (empty($this->apiKey)) {
             Log::error('[GeminiGenVideo] GEMINIGEN_API_KEY missing — cannot dispatch keyframe', ['ctx' => $contextId]);
@@ -150,6 +157,16 @@ class GeminiGenVideoService
 
         if ($this->breaker->state() === 'open') {
             Log::warning('[GeminiGenVideo] dispatchKeyframe skipped — circuit OPEN', ['ctx' => $contextId]);
+
+            return null;
+        }
+
+        $refs = array_values(array_filter(
+            is_array($faceRefUrls) ? $faceRefUrls : [$faceRefUrls],
+            fn ($u) => is_string($u) && $u !== ''
+        ));
+        if ($refs === []) {
+            Log::error('[GeminiGenVideo] dispatchKeyframe called with no usable face ref', ['ctx' => $contextId]);
 
             return null;
         }
@@ -164,9 +181,11 @@ class GeminiGenVideoService
             // without falling back to the 16:9 default — feeds Veo cleanly.
             ['name' => 'aspect_ratio', 'contents' => '9:16'],
             ['name' => 'style', 'contents' => 'Photorealistic'],
-            // GeminiGen expects each ref URL as its own multipart entry.
-            ['name' => 'file_urls', 'contents' => $faceRefUrl],
         ];
+        // GeminiGen expects each ref URL as its own multipart entry.
+        foreach ($refs as $url) {
+            $multipart[] = ['name' => 'file_urls', 'contents' => $url];
+        }
 
         try {
             $response = Http::timeout(30)

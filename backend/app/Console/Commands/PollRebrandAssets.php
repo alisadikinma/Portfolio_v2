@@ -107,8 +107,20 @@ class PollRebrandAssets extends Command
             }
 
             if ($this->hasError($data)) {
+                $reason = $this->errorReason($data);
                 if (! $dry) {
-                    $slide->update(['keyframe_status' => 'failed', 'last_error' => $this->errorReason($data)]);
+                    $update = ['keyframe_status' => 'failed', 'last_error' => $reason];
+                    // Safety fallback (#1): a hook keyframe refused by GeminiGen's
+                    // named-public-figure upload filter → drop the figure ref so
+                    // the recovery pass re-authors a CREATOR-ONLY scene. The
+                    // sentinel is durable (recover() blanks last_error, not this).
+                    if ($slide->role === RepurposeVideoSlide::ROLE_HOOK
+                        && ! $slide->figure_dropped
+                        && $this->isSafetyError($reason)) {
+                        $update['figure_dropped'] = true;
+                        $this->warn("  slide {$slide->id} hook keyframe refused (figure) → dropping figure ref for retry");
+                    }
+                    $slide->update($update);
                 }
                 $this->warn("  slide {$slide->id} keyframe failed");
 
@@ -117,6 +129,38 @@ class PollRebrandAssets extends Command
 
             $this->markStuck($slide, 'keyframe', 'render exceeded stuck window', $dry);
         }
+    }
+
+    /**
+     * GeminiGen's named-public-figure / unsafe-upload refusal class. Mirrors
+     * ImageGenerationService::isSafetyError (same deterministic substring gate) —
+     * a figure photo would fail the same way on every retry, so we drop the figure
+     * ref instead of grinding the retry budget.
+     */
+    private function isSafetyError(?string $reason): bool
+    {
+        if ($reason === null || trim($reason) === '') {
+            return false;
+        }
+        $needle = strtolower($reason);
+        $patterns = [
+            'public_error_prominent_people_upload',
+            'public_error_prominent_people',
+            'public_error_minor',
+            'public_error_unsafe',
+            'prominent people',
+            'prominent person',
+            'do not allow uploading images',
+            'safety filter',
+            'content policy',
+        ];
+        foreach ($patterns as $p) {
+            if (str_contains($needle, $p)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** Pass B — Veo video ready → finalize 4:5 clip → composited done. */
@@ -203,8 +247,10 @@ class PollRebrandAssets extends Command
 
             if ($hardFailed && ! $dry) {
                 // Only fail the job once retries are exhausted (recovery pass owns the budget).
+                // Scope the error check to bookends (like $hardFailed/$allDone) —
+                // a stale tool-slide last_error must not prematurely fail the job.
                 $exhausted = $bookends->every(fn ($s) => $s->keyframe_status !== 'generating' && $s->veo_status !== 'generating')
-                    && (int) $job->videoSlides()->where('last_error', '!=', null)->count() > 0
+                    && $bookends->contains(fn ($s) => $s->last_error !== null)
                     && (int) ($job->asset_retry_count ?? 0) >= self::MAX_RETRIES;
                 if ($exhausted) {
                     $job->transitionTo(RepurposeJobStatus::Failed, 'video_assets_failed', ['last_error' => 'A hook/CTA clip failed to generate after retries — see slide errors.']);

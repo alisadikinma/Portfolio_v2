@@ -7,6 +7,7 @@ use App\Models\RepurposeJob;
 use App\Models\RepurposeVideoSlide;
 use App\Models\Setting;
 use App\Services\GeminiGenVideoService;
+use App\Services\VideoHookSceneAuthor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -36,6 +37,12 @@ class GenerateRebrandAssetsTest extends TestCase
     public function test_creates_hook_and_cta_slides_and_dispatches_keyframes(): void
     {
         $job = $this->jobWithToolSlides();
+
+        // Hook authoring is exercised in HookAuthorAndFallbackTest; here keep it
+        // deterministic (creator-only) so this test stays focused on bookend rows.
+        $this->mock(VideoHookSceneAuthor::class, function ($m) {
+            $m->shouldReceive('author')->andReturn(['success' => true, 'figure_name' => null, 'scene_prompt' => 'creator-only hook scene', 'error' => null]);
+        });
 
         $this->mock(GeminiGenVideoService::class, function ($m) {
             $m->shouldReceive('dispatchKeyframe')->twice()->andReturn('kf-hook', 'kf-cta');

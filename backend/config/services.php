@@ -131,6 +131,11 @@ return [
         'model_vision' => env('REPURPOSE_MODEL_VISION', 'sonnet'),
         'model_research' => env('REPURPOSE_MODEL_RESEARCH', 'sonnet'),
         'model_rewrite' => env('REPURPOSE_MODEL_REWRITE', 'sonnet'),
+        // video_rebrand topic-aware HOOK keyframe author (#1). refs_hook = the
+        // bundled /carousel-gen hook standard on the VPS (appended via
+        // --append-system-prompt-file); empty = author from the prompt alone.
+        'model_hook_author' => env('REPURPOSE_MODEL_HOOK_AUTHOR', 'sonnet'),
+        'refs_hook' => env('REPURPOSE_REFS_HOOK', ''),
         // Style guide refs appended to the rewrite prompt (reuse article refs).
         'refs_rewrite' => env('REPURPOSE_REFS_REWRITE', env('ARTICLE_GEN_REFS_WRITE', '')),
         // CLI budget per attempt — matches carousel-gen (900s). Big IG carousels
