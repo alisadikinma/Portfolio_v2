@@ -1,18 +1,28 @@
 #!/usr/bin/env node
 /**
- * video_rebrand Phase B — download a source Instagram VIDEO carousel headless
- * (no login) and emit one JSON line describing each video slide.
+ * video_rebrand Phase B — capture a source Instagram VIDEO carousel headless
+ * and emit one JSON line describing each video slide.
  *
- * Consumed by App\Services\VideoCarouselCaptureService (ssh|local exec). POC
- * validated yt-dlp pulls all carousel items without cookies. We download each
- * item, keep only those with a video stream, extract a poster frame, and probe
- * dimensions/duration/audio.
+ * Consumed by App\Services\VideoCarouselCaptureService (ssh|local exec).
+ *
+ * CAPTURE METHOD: Playwright (headless browser), NOT yt-dlp (June 13, 2026).
+ * yt-dlp hits IG's internal API which IG rate-limits hard and flags the session
+ * even WITH cookies — a known dead-end (it succeeds once on a fresh account then
+ * throttles for hours). The headless browser renders the real page like a human,
+ * intercepts the video CDN responses, and downloads them THROUGH the browser
+ * context (cookies preserved) — the same resilient pattern the image-carousel
+ * path (scripts/playwright/ig-capture.cjs) uses and which is NOT API-throttled.
+ *
+ * Flow: load post (+ Netscape cookies) → listen for cdninstagram video responses
+ * → swipe through every carousel slide so each video hydrates → download each
+ * unique video via context.request → ffmpeg poster + center 16:9 luminance
+ * band-detect (unchanged from the old yt-dlp version).
  *
  *   node ig-video-capture.cjs --url <ig-url> --out <dir> \
- *        [--timeout 300] [--ytdlp yt-dlp] [--ffmpeg ffmpeg] [--ffprobe ffprobe]
+ *        [--timeout 300] [--ffmpeg ffmpeg] [--ffprobe ffprobe] [--cookies <netscape.txt>]
  *
- * stdout (last line): {"ok":true,"count":N,"slides":[{file,poster,width,height,duration,has_audio}],"error":null}
- * On any failure: {"ok":false,"count":0,"slides":[],"error":"<reason>"}
+ * stdout (last line): {"ok":true,"count":N,"slides":[{file,poster,width,height,duration,has_audio,crop_y,crop_h}],"error":null}
+ * On failure: {"ok":false,"count":0,"slides":[],"error":"<reason>"}  (login_wall | no_video_items | playwright_not_installed | capture_error: ...)
  *
  * @see docs/plans/2026-06-12-ig-video-carousel-rebrand.md
  */
@@ -33,13 +43,12 @@ function emit(obj) {
 
 const url = arg('url', '');
 const outDir = arg('out', '');
-const timeout = parseInt(arg('timeout', '300'), 10) * 1000;
-const YTDLP = arg('ytdlp', 'yt-dlp');
+const timeoutMs = parseInt(arg('timeout', '300'), 10) * 1000;
 const FFMPEG = arg('ffmpeg', 'ffmpeg');
 const FFPROBE = arg('ffprobe', 'ffprobe');
-// IG now requires auth for media download via yt-dlp's API path (anonymous gets
-// metadata but the media bytes return "login required / rate-limit"). A Netscape
-// cookies.txt (exported from a logged-in browser) unlocks it. Empty = anonymous.
+// Netscape cookies.txt exported from a logged-in IG browser session. Passed to
+// the Playwright context so wall-gated / full carousels are reachable. Empty =
+// anonymous (public posts mostly work; private/wall → login_wall).
 const COOKIES = arg('cookies', '');
 
 if (!/^https?:\/\/(www\.)?instagram\.com\/(p|reel|reels|tv)\/[A-Za-z0-9_-]+/i.test(url)) {
@@ -51,8 +60,29 @@ if (!outDir) {
   process.exit(0);
 }
 
+function loadPlaywright() {
+  for (const p of ['/var/www/Portfolio_v2/node_modules/playwright', 'playwright']) {
+    try { return require(p); } catch (e) { /* try next */ }
+  }
+  return null;
+}
+
+/** Netscape cookies.txt → Playwright addCookies objects (scoped to .instagram.com). */
+function parseCookies(file) {
+  if (!file || !fs.existsSync(file)) return [];
+  return fs
+    .readFileSync(file, 'utf8')
+    .split('\n')
+    .filter((l) => l && !l.startsWith('#'))
+    .map((l) => {
+      const p = l.split('\t');
+      return { name: p[5], value: p[6], domain: '.instagram.com', path: '/', secure: true };
+    })
+    .filter((c) => c.name && c.value);
+}
+
 function run(bin, args, opts) {
-  return execFileSync(bin, args, { timeout, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...(opts || {}) });
+  return execFileSync(bin, args, { timeout: timeoutMs, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...(opts || {}) });
 }
 
 function evenInt(n) {
@@ -62,13 +92,12 @@ function evenInt(n) {
 
 /**
  * Deterministic center 16:9 band detection (POC-proven row-luminance method).
- * Dumps one luminance value per row (scale width→1 averages each row), classifies
- * rows dark(<110)/light, and takes the largest contiguous dark run as the center
- * demo video. Falls back to a proportional centered 16:9 band when the detected
- * run is implausible (not ~16:9 of width).
+ * Dumps one luminance value per row, classifies rows dark(<110)/light, and takes
+ * the largest contiguous dark run as the center demo video. Falls back to a
+ * proportional centered 16:9 band when the detected run is implausible.
  */
 function detectBand(file, width, height, ss) {
-  const expected = (width * 9) / 16; // center demo is a 16:9 region of the slide width
+  const expected = (width * 9) / 16;
   const fallback = () => {
     const h = evenInt(Math.min(expected, height));
     return { crop_y: evenInt(Math.max(0, (height - h) / 2)), crop_h: h };
@@ -78,9 +107,8 @@ function detectBand(file, width, height, ss) {
     const buf = execFileSync(
       FFMPEG,
       ['-ss', String(ss), '-i', file, '-frames:v', '1', '-vf', `scale=1:${height},format=gray`, '-f', 'rawvideo', '-'],
-      { timeout, maxBuffer: 1 << 20 }
+      { timeout: timeoutMs, maxBuffer: 1 << 20 }
     );
-    // buf[i] = luminance of row i (0..height-1)
     let bestStart = -1, bestLen = 0, curStart = -1, curLen = 0;
     for (let i = 0; i < buf.length; i++) {
       if (buf[i] < 110) {
@@ -92,7 +120,6 @@ function detectBand(file, width, height, ss) {
       }
     }
     if (bestStart < 0) return fallback();
-    // Plausibility: the dark run should be roughly a 16:9 band (0.6×–1.4× expected).
     if (bestLen < expected * 0.6 || bestLen > expected * 1.4) return fallback();
     return { crop_y: evenInt(bestStart), crop_h: evenInt(bestLen) };
   } catch (e) {
@@ -119,73 +146,138 @@ function probe(file) {
   }
 }
 
-try {
-  fs.mkdirSync(outDir, { recursive: true });
+/** Stable key for a signed IG video URL: the long media-id segments in the path
+ *  (query params + CDN host vary per request, the /o1/v/.../<id> path is stable). */
+function videoKey(u) {
+  const noQ = u.split('?')[0];
+  const segs = (noQ.match(/\/[A-Za-z0-9_-]{16,}/g) || []).join('');
+  return segs || noQ;
+}
 
-  // Download every carousel item as slide_<playlist_index>.<ext>. yt-dlp treats
-  // an IG carousel as a playlist; --ignore-errors keeps going if one item is an
-  // image (no video) and can't be fetched as media.
-  run(YTDLP, [
-    ...(COOKIES ? ['--cookies', COOKIES] : []),
-    '--no-warnings',
-    '--ignore-errors',
-    '--no-part',
-    // Be gentle with IG so a normal run doesn't trip the rate-limiter: retry
-    // transient failures with backoff, pause briefly between item requests.
-    '--retries', '5',
-    '--extractor-retries', '3',
-    '--retry-sleep', '5',
-    '--sleep-requests', '2',
-    '-o', path.join(outDir, 'slide_%(playlist_index)s.%(ext)s'),
-    url,
-  ]);
+function isVideoResponse(u, ct) {
+  if (ct && ct.toLowerCase().includes('video/')) return true;
+  return /cdninstagram\.com\/(o1\/)?v\//i.test(u) || /\.mp4(\?|$)/i.test(u);
+}
 
-  // Collect downloaded media, ordered by the numeric slide index in the name.
-  const files = fs
-    .readdirSync(outDir)
-    .filter((f) => /^slide_\d+\./i.test(f) && !/\.jpg$/i.test(f))
-    .sort((a, b) => {
+async function capturePlaywright() {
+  const pw = loadPlaywright();
+  if (!pw) return { error: 'playwright_not_installed' };
+
+  const browser = await pw.chromium.launch({ headless: true });
+  try {
+    const ctx = await browser.newContext({
+      userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+    });
+    const cks = parseCookies(COOKIES);
+    if (cks.length) await ctx.addCookies(cks);
+    const page = await ctx.newPage();
+
+    // Collect cdninstagram video response URLs in first-seen (≈ carousel) order.
+    const seen = new Map(); // key -> url
+    page.on('response', (resp) => {
+      try {
+        const u = resp.url();
+        const ct = resp.headers()['content-type'] || '';
+        if (isVideoResponse(u, ct)) {
+          const k = videoKey(u);
+          if (!seen.has(k)) seen.set(k, u);
+        }
+      } catch (e) { /* ignore */ }
+    });
+
+    await page.goto(url, { waitUntil: 'load', timeout: Math.min(60000, timeoutMs) });
+    await page.waitForTimeout(5000);
+
+    const title = (await page.title()) || '';
+    const hasLogin = (await page.$('input[name="username"]')) !== null;
+    if (seen.size === 0 && (hasLogin || /log\s?in/i.test(title))) {
+      await browser.close();
+      return { error: 'login_wall' };
+    }
+
+    // Swipe through the carousel so every slide's video hydrates → response fires.
+    for (let i = 0; i < 20; i++) {
+      const next = await page.$('button[aria-label="Next"], [aria-label="Next"]');
+      if (!next) break;
+      try { await next.click({ timeout: 3000 }); } catch (e) { break; }
+      await page.waitForTimeout(2500);
+    }
+    await page.waitForTimeout(1500);
+
+    // Download each unique video via the browser context (cookies/session kept).
+    const files = [];
+    const urls = [...seen.values()];
+    for (let i = 0; i < urls.length; i++) {
+      try {
+        const resp = await ctx.request.get(urls[i], { timeout: 60000, headers: { Referer: 'https://www.instagram.com/' } });
+        if (!resp.ok()) continue;
+        const buf = await resp.body();
+        if (!buf || buf.length < 10000) continue; // skip tiny/non-video payloads
+        const name = 'slide_' + (files.length + 1) + '.mp4';
+        fs.writeFileSync(path.join(outDir, name), buf);
+        files.push(name);
+      } catch (e) { /* skip this url */ }
+    }
+
+    await browser.close();
+    return { error: null, files };
+  } catch (e) {
+    try { await browser.close(); } catch (_) { /* ignore */ }
+    return { error: 'capture_error: ' + (e && e.message ? e.message : String(e)) };
+  }
+}
+
+(async () => {
+  try {
+    fs.mkdirSync(outDir, { recursive: true });
+
+    const cap = await capturePlaywright();
+    if (cap.error) {
+      emit({ ok: false, count: 0, slides: [], error: cap.error });
+      process.exit(0);
+    }
+
+    const files = (cap.files || []).sort((a, b) => {
       const na = parseInt((a.match(/slide_(\d+)/) || [])[1] || '0', 10);
       const nb = parseInt((b.match(/slide_(\d+)/) || [])[1] || '0', 10);
       return na - nb;
     });
 
-  const slides = [];
-  for (const f of files) {
-    const full = path.join(outDir, f);
-    const meta = probe(full);
-    if (!meta) continue; // skip non-video items
+    const slides = [];
+    for (const f of files) {
+      const full = path.join(outDir, f);
+      const meta = probe(full);
+      if (!meta) continue; // skip non-video / corrupt items
 
-    const base = f.replace(/\.[^.]+$/, '');
-    const posterName = base + '.jpg';
-    const posterFull = path.join(outDir, posterName);
-    const ss = meta.duration > 2 ? 2 : Math.max(0, meta.duration / 2);
-    try {
-      run(FFMPEG, ['-y', '-ss', String(ss), '-i', full, '-frames:v', '1', '-q:v', '3', posterFull]);
-    } catch (e) {
-      // poster is best-effort; a slide without one still composites (vision falls back)
+      const base = f.replace(/\.[^.]+$/, '');
+      const posterName = base + '.jpg';
+      const posterFull = path.join(outDir, posterName);
+      const ss = meta.duration > 2 ? 2 : Math.max(0, meta.duration / 2);
+      try {
+        run(FFMPEG, ['-y', '-ss', String(ss), '-i', full, '-frames:v', '1', '-q:v', '3', posterFull]);
+      } catch (e) { /* poster best-effort */ }
+
+      const band = detectBand(full, meta.width, meta.height, ss);
+
+      slides.push({
+        file: f,
+        poster: fs.existsSync(posterFull) ? posterName : '',
+        width: meta.width,
+        height: meta.height,
+        duration: meta.duration,
+        has_audio: meta.has_audio,
+        crop_y: band.crop_y,
+        crop_h: band.crop_h,
+      });
     }
 
-    const band = detectBand(full, meta.width, meta.height, ss);
+    if (slides.length < 1) {
+      emit({ ok: false, count: 0, slides: [], error: 'no_video_items' });
+      process.exit(0);
+    }
 
-    slides.push({
-      file: f,
-      poster: fs.existsSync(posterFull) ? posterName : '',
-      width: meta.width,
-      height: meta.height,
-      duration: meta.duration,
-      has_audio: meta.has_audio,
-      crop_y: band.crop_y,
-      crop_h: band.crop_h,
-    });
+    emit({ ok: true, count: slides.length, slides, error: null });
+  } catch (e) {
+    emit({ ok: false, count: 0, slides: [], error: 'capture_error: ' + (e && e.message ? e.message : String(e)) });
   }
-
-  if (slides.length < 1) {
-    emit({ ok: false, count: 0, slides: [], error: 'no_video_items' });
-    process.exit(0);
-  }
-
-  emit({ ok: true, count: slides.length, slides, error: null });
-} catch (e) {
-  emit({ ok: false, count: 0, slides: [], error: 'capture_error: ' + (e && e.message ? e.message : String(e)) });
-}
+})();
