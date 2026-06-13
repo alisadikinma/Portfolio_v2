@@ -108,6 +108,11 @@ return [
         'ytdlp_path' => env('REPURPOSE_YTDLP_PATH', 'yt-dlp'),
         'ffmpeg_path' => env('REPURPOSE_FFMPEG_PATH', 'ffmpeg'),
         'ffprobe_path' => env('REPURPOSE_FFPROBE_PATH', 'ffprobe'),
+        // Netscape cookies.txt (exported from a logged-in IG browser session) so
+        // yt-dlp can download carousel media — IG now returns "login required /
+        // rate-limit" for anonymous media fetches. Empty = anonymous (metadata
+        // only). On the VPS: /home/claudesn/ig-cookies.txt (mode 600, claudesn).
+        'ytdlp_cookies_path' => env('REPURPOSE_YTDLP_COOKIES', ''),
         // Video downloads + poster extraction run longer than image scraping.
         'video_timeout' => (int) env('REPURPOSE_VIDEO_CAPTURE_TIMEOUT', 300),
     ],

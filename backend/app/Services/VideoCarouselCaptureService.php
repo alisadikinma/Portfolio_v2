@@ -32,6 +32,7 @@ class VideoCarouselCaptureService
     private string $ytdlpPath;
     private string $ffmpegPath;
     private string $ffprobePath;
+    private string $cookiesPath;
     private int $timeout;
 
     public function __construct()
@@ -45,6 +46,7 @@ class VideoCarouselCaptureService
         $this->ytdlpPath = (string) config('services.instagram_capture.ytdlp_path', 'yt-dlp');
         $this->ffmpegPath = (string) config('services.instagram_capture.ffmpeg_path', 'ffmpeg');
         $this->ffprobePath = (string) config('services.instagram_capture.ffprobe_path', 'ffprobe');
+        $this->cookiesPath = (string) config('services.instagram_capture.ytdlp_cookies_path', '');
         $this->timeout = (int) config('services.instagram_capture.video_timeout', 300);
     }
 
@@ -132,7 +134,13 @@ class VideoCarouselCaptureService
      *
      * @return array{stdout: string, stderr: string, exit: int}
      */
-    protected function runCapture(string $url, string $outDir): array
+    /**
+     * Build the cjs argv. Extracted as a seam so the cookies/path wiring is
+     * unit-testable without spawning the node process.
+     *
+     * @return list<string>
+     */
+    protected function buildCaptureArgs(string $url, string $outDir): array
     {
         $args = [
             '--url', $url,
@@ -142,6 +150,20 @@ class VideoCarouselCaptureService
             '--ffmpeg', $this->ffmpegPath,
             '--ffprobe', $this->ffprobePath,
         ];
+
+        // IG requires auth for yt-dlp media download — pass the Netscape cookies
+        // file when configured (anonymous gets metadata only → "login required").
+        if ($this->cookiesPath !== '') {
+            $args[] = '--cookies';
+            $args[] = $this->cookiesPath;
+        }
+
+        return $args;
+    }
+
+    protected function runCapture(string $url, string $outDir): array
+    {
+        $args = $this->buildCaptureArgs($url, $outDir);
 
         $procTimeout = $this->timeout + 30;
 

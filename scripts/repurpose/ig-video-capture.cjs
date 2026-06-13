@@ -37,6 +37,10 @@ const timeout = parseInt(arg('timeout', '300'), 10) * 1000;
 const YTDLP = arg('ytdlp', 'yt-dlp');
 const FFMPEG = arg('ffmpeg', 'ffmpeg');
 const FFPROBE = arg('ffprobe', 'ffprobe');
+// IG now requires auth for media download via yt-dlp's API path (anonymous gets
+// metadata but the media bytes return "login required / rate-limit"). A Netscape
+// cookies.txt (exported from a logged-in browser) unlocks it. Empty = anonymous.
+const COOKIES = arg('cookies', '');
 
 if (!/^https?:\/\/(www\.)?instagram\.com\/(p|reel|reels|tv)\/[A-Za-z0-9_-]+/i.test(url)) {
   emit({ ok: false, count: 0, slides: [], error: 'invalid_url_host' });
@@ -122,6 +126,7 @@ try {
   // an IG carousel as a playlist; --ignore-errors keeps going if one item is an
   // image (no video) and can't be fetched as media.
   run(YTDLP, [
+    ...(COOKIES ? ['--cookies', COOKIES] : []),
     '--no-warnings',
     '--ignore-errors',
     '--no-part',
