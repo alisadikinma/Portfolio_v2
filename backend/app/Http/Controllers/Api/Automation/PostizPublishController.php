@@ -191,11 +191,17 @@ class PostizPublishController extends Controller
         }
 
         // Disable channels that vanished from Postiz (don't delete — audit trail).
-        PostizChannel::query()->where('enabled', true)->get()->each(function (PostizChannel $c) use ($seen) {
-            if (! in_array($c->platform . '|' . $c->handle, $seen, true)) {
-                $c->update(['enabled' => false]);
-            }
-        });
+        // GUARD: only run the disable-sweep on a NON-EMPTY payload. A transient
+        // Postiz GET /integrations returning [] (restart / partial outage) must
+        // NOT cascade into disabling every channel (which would strand publishes
+        // to Publer fallback / Medium). An empty sync is treated as a no-op here.
+        if (! empty($data['channels'])) {
+            PostizChannel::query()->where('enabled', true)->get()->each(function (PostizChannel $c) use ($seen) {
+                if (! in_array($c->platform . '|' . $c->handle, $seen, true)) {
+                    $c->update(['enabled' => false]);
+                }
+            });
+        }
 
         return response()->json(['ok' => true, 'synced' => count($data['channels'])]);
     }
@@ -280,9 +286,14 @@ class PostizPublishController extends Controller
 
     /**
      * Mirror the published state onto the sibling row so Social Studio reflects
-     * it. Reuses the same DB::table() write PublishViaPubler relies on (bypasses
-     * sqlite's legacy CHECK; MySQL enforces the real ENUM). permalink → the
-     * sibling's external_url column when present.
+     * it. Uses DB::table() (mirrors PublishViaPubler — bypasses Eloquent casting).
+     *
+     * The published value is `published` for ALL four sibling tables: migration
+     * 2026_05_08_100001 renamed instagram/tiktok `published_externally →
+     * published` (threads/facebook were always `published`), and
+     * 2026_05_13_000001 patched the sqlite CHECK to match. So `published` is the
+     * authoritative current enum value everywhere — same value PublishViaPubler
+     * writes. permalink → the sibling's external_url column when present.
      */
     private function mirrorSiblingPublished(PostizPublishJob $job, ?string $permalink): void
     {

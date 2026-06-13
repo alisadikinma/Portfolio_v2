@@ -23,6 +23,11 @@ class PostizPublishJob extends Model
     public const STATUS_ACCEPTED = 'accepted';   // Postiz/Temporal owns it — watchdog hand-off
     public const STATUS_PUBLISHED = 'published';
     public const STATUS_FAILED = 'failed';
+    // Ambiguous tail: the poller TOUCHED the job (claimed-then-silent, or reported
+    // a failure that might have still reached Postiz) past its deadline. NEVER
+    // auto-Publer (could double-publish) and NOT claimable (poller won't re-take
+    // it) — operator inspects whether it actually went live on Postiz.
+    public const STATUS_NEEDS_REVIEW = 'needs_review';
 
     protected $fillable = [
         'platform',

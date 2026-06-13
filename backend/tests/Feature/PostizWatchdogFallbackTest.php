@@ -116,4 +116,43 @@ class PostizWatchdogFallbackTest extends TestCase
 
         Queue::assertNotPushed(PublishViaPubler::class);
     }
+
+    public function test_claimed_lease_expired_parked_for_review_not_publer(): void
+    {
+        // Crash-after-accept window: poller claimed it, went silent, lease expired,
+        // postiz_post_id still NULL. Could already be live on Postiz → NEVER Publer.
+        Queue::fake();
+        $ig = $this->makeIgSibling(false);
+        $job = $this->makeJob($ig, [
+            'status' => 'claimed',
+            'claimed_at' => now()->subMinutes(11),
+            'publish_lease_until' => now()->subMinute(),
+        ]);
+
+        $this->artisan('postiz:reap-unclaimed')->assertExitCode(0);
+
+        Queue::assertNotPushed(PublishViaPubler::class);
+        $job->refresh();
+        $this->assertSame('needs_review', $job->status);
+        $this->assertNull($job->fallback_fired_at);
+    }
+
+    public function test_poller_reported_failed_parked_for_review_not_publer(): void
+    {
+        // Poller reported a pre-accept failure that may STILL have reached Postiz
+        // (network timeout after commit). Ambiguous → review, never auto-Publer.
+        Queue::fake();
+        $ig = $this->makeIgSibling(false);
+        $job = $this->makeJob($ig, [
+            'status' => 'failed',
+            'claimed_at' => now()->subMinutes(11),
+            'publish_lease_until' => null,
+        ]);
+
+        $this->artisan('postiz:reap-unclaimed')->assertExitCode(0);
+
+        Queue::assertNotPushed(PublishViaPubler::class);
+        $job->refresh();
+        $this->assertSame('needs_review', $job->status);
+    }
 }

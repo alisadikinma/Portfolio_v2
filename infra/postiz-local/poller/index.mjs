@@ -88,7 +88,7 @@ export async function runClaimPoll({ vps, postiz, worker, accepted }) {
  * window and report the terminal state. GET-poll covers BOTH success AND error
  * (the success-only webhook can't).
  */
-export async function runConfirmPoll({ vps, postiz, accepted, now = new Date() }) {
+export async function runConfirmPoll({ vps, postiz, accepted, attempts = new Map(), maxConfirmAttempts = 30, now = new Date() }) {
   if (accepted.size === 0) return;
 
   const start = new Date(now.getTime() - 6 * 60 * 60 * 1000).toISOString(); // 6h back
@@ -98,13 +98,28 @@ export async function runConfirmPoll({ vps, postiz, accepted, now = new Date() }
 
   for (const [jobId, postId] of [...accepted]) {
     const p = byId.get(String(postId));
-    if (!p) continue;
+    if (!p) {
+      // Not yet visible in the window. Bound the wait so a post that never
+      // appears (id mismatch / out-of-window) doesn't leak the Map forever —
+      // give up after maxConfirmAttempts and let the VPS reconcile.
+      const n = (attempts.get(jobId) ?? 0) + 1;
+      if (n >= maxConfirmAttempts) {
+        await vps.reportResult(jobId, { status: 'failed', error: `Postiz confirm timeout after ${n} checks` });
+        accepted.delete(jobId);
+        attempts.delete(jobId);
+      } else {
+        attempts.set(jobId, n);
+      }
+      continue;
+    }
     if (p.state === 'PUBLISHED') {
       await vps.reportResult(jobId, { status: 'published', permalink: p.releaseURL ?? null });
       accepted.delete(jobId);
+      attempts.delete(jobId);
     } else if (p.state === 'ERROR') {
       await vps.reportResult(jobId, { status: 'failed', error: 'Postiz state=ERROR' });
       accepted.delete(jobId);
+      attempts.delete(jobId);
     }
     // QUEUE/DRAFT → still in flight; check again next tick.
   }
@@ -132,12 +147,13 @@ async function start() {
   const postiz = new PostizClient({ baseUrl: requireEnv('POSTIZ_API_BASE_URL'), apiKey: requireEnv('POSTIZ_API_KEY') });
   const worker = process.env.POLLER_WORKER_ID ?? 'local-1';
   const accepted = new Map();
+  const attempts = new Map();
 
   // integration-sync at startup, then hourly.
   await runIntegrationSync({ vps, postiz }).catch((e) => console.error('[integration-sync]', e.message));
 
   cron.schedule('*/2 * * * *', () => runClaimPoll({ vps, postiz, worker, accepted }).catch((e) => console.error('[claim-poll]', e.message)));
-  cron.schedule('* * * * *', () => runConfirmPoll({ vps, postiz, accepted }).catch((e) => console.error('[confirm-poll]', e.message)));
+  cron.schedule('* * * * *', () => runConfirmPoll({ vps, postiz, accepted, attempts }).catch((e) => console.error('[confirm-poll]', e.message)));
   cron.schedule('0 * * * *', () => runIntegrationSync({ vps, postiz }).catch((e) => console.error('[integration-sync]', e.message)));
 
   console.log(`[poller] started — worker=${worker}, claim every 2m, confirm every 1m, sync hourly`);

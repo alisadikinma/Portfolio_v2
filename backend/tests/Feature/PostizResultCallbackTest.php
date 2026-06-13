@@ -76,6 +76,8 @@ class PostizResultCallbackTest extends TestCase
         $this->assertNull($job->publish_lease_until);
 
         $ig->refresh();
+        // 'published' is the current enum value for all sibling tables
+        // (instagram/tiktok renamed published_externally→published in 2026_05_08).
         $this->assertSame('published', $ig->status);
         $this->assertNotNull($ig->published_at);
     }

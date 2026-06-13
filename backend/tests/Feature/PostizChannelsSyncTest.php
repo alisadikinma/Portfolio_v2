@@ -55,6 +55,17 @@ class PostizChannelsSyncTest extends TestCase
         ]);
     }
 
+    public function test_empty_payload_does_not_disable_existing_channels(): void
+    {
+        Sanctum::actingAs(User::factory()->create());
+        PostizChannel::factory()->create(['platform' => 'instagram', 'handle' => 'ali', 'enabled' => true]);
+
+        // A transient empty integration list must NOT cascade-disable everything.
+        $this->postJson('/api/automation/postiz/channels/sync', ['channels' => []])->assertOk();
+
+        $this->assertDatabaseHas('postiz_channels', ['platform' => 'instagram', 'handle' => 'ali', 'enabled' => true]);
+    }
+
     public function test_sync_updates_existing_integration_id(): void
     {
         Sanctum::actingAs(User::factory()->create());

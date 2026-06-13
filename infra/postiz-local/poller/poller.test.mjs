@@ -166,6 +166,20 @@ test('runConfirmPoll leaves QUEUE jobs pending', async () => {
   assert.equal(accepted.has(12), true);
 });
 
+test('runConfirmPoll gives up and reports failed after maxConfirmAttempts', async () => {
+  const { vps, postiz, fetchImpl } = clients({ posts: [] }); // post never appears
+  const accepted = new Map([[20, 'pz-missing']]);
+  const attempts = new Map();
+  // 2 ticks below cap → still pending; 3rd hits cap → failed.
+  await runConfirmPoll({ vps, postiz, accepted, attempts, maxConfirmAttempts: 3 });
+  await runConfirmPoll({ vps, postiz, accepted, attempts, maxConfirmAttempts: 3 });
+  assert.equal(accepted.has(20), true);
+  await runConfirmPoll({ vps, postiz, accepted, attempts, maxConfirmAttempts: 3 });
+  assert.equal(accepted.has(20), false);
+  const r = fetchImpl.calls.find((c) => c.url.endsWith('/result'));
+  assert.equal(r.body.status, 'failed');
+});
+
 test('runIntegrationSync maps and posts the channel list', async () => {
   const state = {
     integrations: [

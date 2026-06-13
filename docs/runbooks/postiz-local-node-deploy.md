@@ -169,10 +169,18 @@ The race: VPS marks `ready` at 18:00; local publishes 18:01 (IG video child-poll
   the job → the watchdog **permanently hands off** (never fires Publer past
   `accepted`, even on a later Temporal ERROR — that routes to a WARNING log for
   manual handling, never an auto-republish).
-- PC offline → never claimed → watchdog fallback at deadline ✓
-- PC slow → active lease → watchdog waits ✓
-- PC crash mid-publish → lease expires → watchdog may fallback, but only if the
-  job never reached `accepted` (postiz_post_id NULL) ✓
+- The watchdog auto-fires Publer **only for jobs the poller NEVER claimed**
+  (`status=ready_to_publish`, `claimed_at IS NULL` — i.e. the PC was offline at the
+  slot, so Postiz definitively never saw it).
+- **PC offline** → never claimed → Publer fallback at deadline ✓
+- **PC slow** → active lease → watchdog waits ✓
+- **PC crash AFTER Postiz accepted, BEFORE the accepted-callback** (the dangerous
+  window) → the job is `claimed`, lease-expired, `postiz_post_id` still NULL. Since
+  the post **may already be live on Postiz**, the watchdog does NOT auto-Publer —
+  it parks the job as **`needs_review`** (not claimable, so the poller won't re-take
+  it either) and alerts the operator to confirm + finish manually. A slow-but-alive
+  poller still self-heals (a late `accepted`/`published` callback recovers it). This
+  trades a little availability on the rare crash for a hard no-double-post guarantee.
 
 ## 9. Troubleshooting
 
