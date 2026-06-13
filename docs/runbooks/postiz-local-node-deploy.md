@@ -75,6 +75,14 @@ cloudflared tunnel run postiz-local      # or install as a service for 24/7
 
 Verify `https://postiz.alisadikinma.com` resolves to the Postiz UI.
 
+> **Security (defense-in-depth):** the tunnel publicly exposes the Postiz UI +
+> OAuth callback. Postiz has its own login (and `DISABLE_REGISTRATION=true` locks
+> signups), but put **Cloudflare Access** in front of the hostname so only your
+> identity can reach the UI — leave only the OAuth `/callback` paths public if a
+> platform requires it. The VPS↔local channel needs NO inbound exposure (pull
+> model): the only secrets crossing the wire are the VPS automation bearer token
+> and the Postiz API key, both over HTTPS, both env-only (never committed).
+
 ## 4. Connect channels (one-time per channel)
 
 In Postiz UI → add channel → platform OAuth → callback returns to the tunnel URL.
