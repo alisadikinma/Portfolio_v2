@@ -59,6 +59,7 @@ class VideoChromeRenderer
         $args = [
             '--title', (string) ($slide->header_title ?? ''),
             '--desc', (string) ($slide->header_desc ?? ''),
+            '--subtitle', (string) ($slide->header_desc_en ?? ''),
             '--active', (string) $active,
             '--total', (string) $total,
             '--number', (string) $active,

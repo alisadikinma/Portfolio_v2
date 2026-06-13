@@ -78,9 +78,16 @@ class VideoSlideExtractor
             if ($entry === null) {
                 continue;
             }
+            // Bilingual: header_desc = Indonesian primary, header_desc_en = English
+            // companion. Fall back to the legacy single `desc` (source English) for
+            // header_desc when the model didn't return a localized pair.
+            $descId = trim((string) ($entry['desc_id'] ?? ''));
+            $descEn = trim((string) ($entry['desc_en'] ?? ''));
+            $legacyDesc = trim((string) ($entry['desc'] ?? ''));
             $slide->update([
                 'header_title' => trim((string) ($entry['title'] ?? '')) ?: null,
-                'header_desc' => trim((string) ($entry['desc'] ?? '')) ?: null,
+                'header_desc' => ($descId !== '' ? $descId : $legacyDesc) ?: null,
+                'header_desc_en' => $descEn ?: null,
             ]);
 
             $kind = strtolower(trim((string) ($entry['kind'] ?? 'content')));
@@ -129,8 +136,11 @@ You are analyzing slides from an Instagram VIDEO carousel that recommends tools/
 
 {$imageLines}
 For each slide:
-1. Extract the header TITLE (the tool/topic name, 1-4 words) and the one-line DESCRIPTION beneath it. Keep the description faithful to the source (you may lightly clean it), max ~14 words.
-2. Classify the slide KIND as exactly one of:
+1. Extract the header TITLE (the tool/topic name, 1-4 words). Keep it VERBATIM — a tool name is a proper noun, do NOT translate it (e.g. "Opal", "Stitch", "Cursor").
+2. Extract the one-line DESCRIPTION beneath it (faithful to the source, max ~14 words), and provide it in TWO languages:
+   - "desc_id" → Indonesian (PRIMARY display line). Natural, fluent Indonesian — translate the meaning, keep tool/product names verbatim.
+   - "desc_en" → English (companion line). The source English, lightly cleaned.
+3. Classify the slide KIND as exactly one of:
    - "content"     → a real tool/tip slide (names a tool/topic and shows a demo). This is the default.
    - "source_hook" → the ORIGINAL creator's own intro/cover/title slide: a talking-head face, a "swipe for more" / "save this" / "follow for part 2" prompt, NO actual tool being demonstrated.
    - "source_cta"  → the ORIGINAL creator's own outro: a follow / like / subscribe / share / comment ask, NOT a tool.
@@ -144,7 +154,7 @@ STRICT JSON OUTPUT — parsed by a machine, not a human:
 
 Return ONE JSON object with exactly this shape:
 {
-  "slides": [{"n": 1, "kind": "content", "title": "Stitch", "desc": "AI design studio that builds layouts from text"}]
+  "slides": [{"n": 1, "kind": "content", "title": "Stitch", "desc_id": "Studio desain AI yang menyusun layout dari teks", "desc_en": "AI design studio that builds layouts from text"}]
 }
 PROMPT;
     }

@@ -26,6 +26,7 @@ class RepurposeVideoSlide extends Model
         'poster_path',
         'header_title',
         'header_desc',
+        'header_desc_en',
         'crop_y',
         'crop_h',
         'keyframe_job_uuid',

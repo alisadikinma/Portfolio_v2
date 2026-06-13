@@ -79,6 +79,34 @@ class VideoSlideClassifyTest extends TestCase
         $this->assertSame([1], $result['dropped']);
     }
 
+    public function test_maps_bilingual_desc_id_primary_and_desc_en_companion(): void
+    {
+        $job = $this->jobWithTools(2);
+
+        $svc = new class extends VideoSlideExtractor {
+            protected function runVisionParsed(string $prompt): array
+            {
+                return ['success' => true, 'parsed' => ['slides' => [
+                    // bilingual pair → header_desc = ID, header_desc_en = EN
+                    ['n' => 1, 'kind' => 'content', 'title' => 'Opal', 'desc_id' => 'Bikin aplikasi AI sendiri', 'desc_en' => 'Build your own AI app'],
+                    // legacy single `desc` (no id/en) → header_desc = source, companion null
+                    ['n' => 2, 'kind' => 'content', 'title' => 'Cursor', 'desc' => 'AI pair programmer'],
+                ]], 'output' => '', 'error' => null, 'repaired' => false];
+            }
+        };
+
+        $svc->extract($job);
+
+        $s1 = $job->videoSlides()->where('slide_index', 1)->first();
+        $this->assertSame('Opal', $s1->header_title);
+        $this->assertSame('Bikin aplikasi AI sendiri', $s1->header_desc, 'Indonesian goes to the primary header_desc');
+        $this->assertSame('Build your own AI app', $s1->header_desc_en, 'English goes to the companion header_desc_en');
+
+        $s2 = $job->videoSlides()->where('slide_index', 2)->first();
+        $this->assertSame('AI pair programmer', $s2->header_desc, 'legacy desc falls back to header_desc');
+        $this->assertNull($s2->header_desc_en, 'no English companion when none provided');
+    }
+
     public function test_job_drops_source_slides_and_renumbers_contiguously(): void
     {
         Bus::fake([GenerateRebrandAssets::class]);
