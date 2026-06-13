@@ -130,6 +130,12 @@ try {
     '--no-warnings',
     '--ignore-errors',
     '--no-part',
+    // Be gentle with IG so a normal run doesn't trip the rate-limiter: retry
+    // transient failures with backoff, pause briefly between item requests.
+    '--retries', '5',
+    '--extractor-retries', '3',
+    '--retry-sleep', '5',
+    '--sleep-requests', '2',
     '-o', path.join(outDir, 'slide_%(playlist_index)s.%(ext)s'),
     url,
   ]);
