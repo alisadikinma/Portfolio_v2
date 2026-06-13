@@ -1,0 +1,18 @@
+{
+  "name": "postiz-local-poller",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Dumb executor for the Postiz local-node cross-post hub — claims VPS jobs, publishes via Postiz /public/v1, callbacks results.",
+  "main": "index.mjs",
+  "scripts": {
+    "start": "node index.mjs",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "node-cron": "^3.0.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
