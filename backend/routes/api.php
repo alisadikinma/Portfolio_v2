@@ -411,6 +411,13 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
     Route::get('/blog/trending-topic', [\App\Http\Controllers\Api\BlogPipelineController::class, 'trendingTopic']);
     Route::post('/blog/save-draft', [\App\Http\Controllers\Api\BlogPipelineController::class, 'saveDraft']);
 
+    // Postiz local-node pull-model coordination (2026-06-13).
+    // GET pending → atomic claim+lease; POST {job}/result → callback;
+    // POST channels/sync → auto-mapping. See docs/plans/2026-06-13-postiz-local-node-crosspost.md.
+    Route::get('/postiz/pending', [\App\Http\Controllers\Api\Automation\PostizPublishController::class, 'pending']);
+    Route::post('/postiz/channels/sync', [\App\Http\Controllers\Api\Automation\PostizPublishController::class, 'channelsSync']);
+    Route::post('/postiz/{job}/result', [\App\Http\Controllers\Api\Automation\PostizPublishController::class, 'result']);
+
     // Entity Reference lookup (for article-images plugin Phase 3.5b —
     // cache-first check before hitting Wikidata/Commons)
     Route::get('/entity-refs/lookup', function (\Illuminate\Http\Request $request) {

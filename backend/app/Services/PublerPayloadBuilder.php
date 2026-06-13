@@ -90,6 +90,49 @@ class PublerPayloadBuilder
 
     // ─── Public API ──────────────────────────────────────────────────────────
 
+    /**
+     * Resolve the publish content (media + caption) for a cross-post sibling
+     * WITHOUT requiring a Publer account — used by the Postiz pull-model
+     * `pending` endpoint to hand the local poller real media URLs + caption.
+     *
+     * Reuses the same app-hosted-URL resolution as the Publer path (the local
+     * poller fetches these over HTTPS to upload to Postiz, so the same
+     * "must be Publer/Postiz-ingestible" requirement holds — a remote/expiring
+     * GeminiGen edge URL would fail there too). Throws RuntimeException (via
+     * buildMediaUrls) when a slide has no app-hosted image; the caller handles
+     * that per-job (skip + last_error) rather than 500-ing the whole poll.
+     *
+     * @return array{media_urls:array<int,string>,media_types:array<int,string>,caption:string,hashtags:array<int,string>,link_comment:?string}
+     */
+    public function resolveSiblingContent(object $sibling): array
+    {
+        $images = $this->buildMediaUrls($sibling);
+
+        return [
+            'media_urls' => $images,
+            'media_types' => array_fill(0, count($images), 'image'),
+            'caption' => $this->buildCaption($sibling->caption ?? null, $sibling->hashtags ?? null),
+            'hashtags' => $sibling->hashtags ?? [],
+            'link_comment' => $sibling->link_comment ?? null,
+        ];
+    }
+
+    /**
+     * True when an Instagram sibling carries a real (done + app-hosted) video —
+     * i.e. a mixed/all-video carousel that ONLY Postiz can publish (Publer dies
+     * on it: "undefined method 'first' for nil"). The Postiz watchdog uses this
+     * to decide a job is NOT Publer-fallback-eligible (wait for the local node).
+     */
+    public function siblingHasVideoMedia(object $sibling): bool
+    {
+        if (! $sibling instanceof InstagramPost) {
+            return false;
+        }
+
+        return $sibling->hook_video_status === 'done'
+            && $this->isAppHostedUrl($sibling->hook_video_url);
+    }
+
     /** @throws \RuntimeException when publer_instagram_account_id is not set */
     public function buildInstagram(InstagramPost $sibling): array
     {
