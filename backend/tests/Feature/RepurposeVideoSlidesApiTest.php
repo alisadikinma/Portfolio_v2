@@ -35,7 +35,9 @@ class RepurposeVideoSlidesApiTest extends TestCase
         $this->assertCount(3, $slides);
         $this->assertSame([0, 1, 2], array_column($slides, 'slide_index'));
         $this->assertSame('hook', $slides[0]['role']);
-        $this->assertSame('https://x/0.mp4', $slides[0]['composited_url']);
+        // composited_url carries a ?v=<updated_at> cache-buster (a re-skin overwrites
+        // the same file path, so the param forces browser/Cloudflare to refetch).
+        $this->assertStringStartsWith('https://x/0.mp4?v=', $slides[0]['composited_url']);
         $this->assertSame('Cursor', $slides[1]['header_title']);
     }
 

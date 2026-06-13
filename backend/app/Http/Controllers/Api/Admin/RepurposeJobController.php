@@ -293,7 +293,12 @@ class RepurposeJobController extends Controller
             'keyframe_status' => $s->keyframe_status,
             'veo_status' => $s->veo_status,
             'composited_status' => $s->composited_status,
-            'composited_url' => $s->composited_path, // full public MP4 URL (or null)
+            // Cache-bust by updated_at: a re-skin overwrites the SAME file path
+            // (slide_{i}.mp4), so without a version param the browser + Cloudflare
+            // serve the stale MP4 and the operator never sees a re-render.
+            'composited_url' => $s->composited_path
+                ? $s->composited_path.'?v='.($s->updated_at?->timestamp ?? 0)
+                : null, // full public MP4 URL (or null)
         ])->all();
     }
 
