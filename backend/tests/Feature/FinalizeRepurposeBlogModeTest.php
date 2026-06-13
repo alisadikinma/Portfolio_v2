@@ -77,6 +77,12 @@ class FinalizeRepurposeBlogModeTest extends TestCase
         $this->assertSame('ig_repurpose', $idea->source_data['source']);
         $this->assertSame('https://www.instagram.com/p/ABC123/', $idea->source_data['url']);
 
+        // Virality seeded above the LinkedIn scan gate (default 60) so the
+        // post-publish carousel + cross-post fan-out fires; pub_date stamped for
+        // the Content Engine "Published" column.
+        $this->assertGreaterThanOrEqual(60, (int) $idea->virality_score);
+        $this->assertNotEmpty($idea->source_data['pub_date']);
+
         // No pre-written article — the proper pipeline produces it.
         $this->assertNull($idea->generated_article);
 

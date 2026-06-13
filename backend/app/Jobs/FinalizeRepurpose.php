@@ -57,6 +57,13 @@ class FinalizeRepurpose implements ShouldQueue
 
     public int $timeout = 180;
 
+    /**
+     * Default virality_score for a blog-mode repurpose idea. Manual IG curation
+     * is high-intent, so seed comfortably above the LinkedIn scan gate
+     * (linkedin_virality_min_score, default 60) — see finalizeBlog().
+     */
+    private const REPURPOSE_VIRALITY_SCORE = 75;
+
     public function __construct(public readonly int $repurposeJobId)
     {
     }
@@ -154,7 +161,20 @@ class FinalizeRepurpose implements ShouldQueue
             'pillar' => $this->resolvePillar($job),
             'auto_mode' => false,
             'instructions' => $this->buildBlogBrief($job, $caption, $slides, $extracted),
-            'source_data' => ['source' => 'ig_repurpose', 'url' => $job->source_url],
+            // Manual IG curation = high intent. Seed a virality_score ABOVE the
+            // LinkedIn scan gate (linkedin_virality_min_score, default 60) so the
+            // post-publish carousel + cross-post fan-out actually fires —
+            // ScanBlogForLinkedInConversion's virality gate would otherwise skip a
+            // null-score idea, silently breaking the "Blog + Carousel" promise.
+            'virality_score' => self::REPURPOSE_VIRALITY_SCORE,
+            'virality_breakdown' => ['source' => 'ig_repurpose', 'note' => 'manual curation default'],
+            // pub_date drives the Content Engine "Published" column — stamp the
+            // ingest time so the row shows a date instead of "—".
+            'source_data' => [
+                'source' => 'ig_repurpose',
+                'url' => $job->source_url,
+                'pub_date' => now()->toIso8601String(),
+            ],
         ]);
 
         $job->transitionTo(
