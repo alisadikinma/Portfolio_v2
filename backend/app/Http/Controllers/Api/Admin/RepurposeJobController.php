@@ -54,16 +54,19 @@ class RepurposeJobController extends Controller
             $query->where('status', $status);
         }
 
-        // Mirror the blog source's `scope=queue` gate EXACTLY: the blog list shows only
-        // LinkedInPostStatus::queueStatuses() drafts, so a draft leaves Social Studio the
-        // moment it SETTLES — scheduled into the Content Calendar (awaiting_publish) OR
-        // published (also cancelled). Apply the same to IG: hide a job once its downstream
-        // output has settled:
-        //   carousel mode → linked LinkedInPost left queueStatuses (calendar/published/cancelled)
-        //   blog mode     → linked ContentIdea completed with a result Post
-        // Jobs with no downstream yet (in-flight repurpose / drafted-not-routed) and jobs
-        // whose draft is still in the queue (incl. failed → Failed tab) all stay. Opt-in
-        // via ?exclude_settled=1 so any other consumer keeps the full set.
+        // Mirror the blog source's `scope=queue` gate: hide a job once its work has
+        // moved off the Social Studio surface, so nothing is double-listed:
+        //   carousel mode → linked LinkedInPost left queueStatuses (scheduled into the
+        //                   Content Calendar / published / cancelled)
+        //   blog mode     → handed off to Content Engine the moment finalizeBlog seeds a
+        //                   ContentIdea (status drafted, content_idea_id set). The blog
+        //                   work now lives entirely in /admin/content-engine, so the job
+        //                   leaves Social Studio immediately — NOT only once the article
+        //                   finally publishes.
+        // Jobs with no downstream yet (in-flight repurpose, video_rebrand awaiting manual
+        // download, drafted-not-routed) and carousel drafts still in the working queue
+        // (incl. failed → Failed tab) all stay. Opt-in via ?exclude_settled=1 so any other
+        // consumer keeps the full set.
         if ($request->boolean('exclude_settled')) {
             $queue = LinkedInPostStatus::queueStatuses();
             $query
@@ -71,7 +74,10 @@ class RepurposeJobController extends Controller
                     $q->whereDoesntHave('linkedinPost')
                         ->orWhereHas('linkedinPost', fn ($p) => $p->whereIn('status', $queue));
                 })
-                ->whereDoesntHave('contentIdea', fn ($q) => $q->where('status', 'completed')->whereNotNull('result_post_id'));
+                // content_idea_id is set ONLY by the blog hand-off (finalizeBlog);
+                // carousel/video jobs never set it, so this hides handed-off blog jobs
+                // without touching the other modes.
+                ->whereNull('content_idea_id');
         }
 
         $perPage = min((int) $request->query('per_page', 25), 100);

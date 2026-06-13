@@ -19,7 +19,8 @@ use Tests\TestCase;
  *
  *   carousel mode → linked LinkedInPost left queueStatuses
  *                   (awaiting_publish = calendar / published / cancelled) → hidden
- *   blog mode     → linked ContentIdea completed with a result Post → hidden
+ *   blog mode     → handed off to Content Engine (content_idea_id set) → hidden
+ *                   immediately, not only once the article finally publishes
  *   still-in-queue draft (incl. failed), in-flight / drafted-not-routed, no linkage → stays
  *
  * Default (no param) returns the full set — other consumers unaffected.
@@ -110,11 +111,14 @@ class RepurposeJobListExcludeSettledTest extends TestCase
         $this->assertNotContains($job->id, $this->listIds(['exclude_settled' => 1]));
     }
 
-    public function test_keeps_blog_job_whose_content_idea_still_in_progress(): void
+    public function test_excludes_blog_job_once_handed_off_to_content_engine(): void
     {
+        // A blog job leaves Social Studio the moment finalizeBlog seeds a draft
+        // ContentIdea (content_idea_id set) — the work now lives in Content
+        // Engine, regardless of how far the article has progressed there.
         $idea = ContentIdea::create([
-            'title' => 'In progress',
-            'status' => 'article_ready',
+            'title' => 'Just handed off',
+            'status' => 'draft',
             'source' => 'instagram',
             'pillar' => 'general',
         ]);
@@ -124,7 +128,7 @@ class RepurposeJobListExcludeSettledTest extends TestCase
             'content_idea_id' => $idea->id,
         ]);
 
-        $this->assertContains($job->id, $this->listIds(['exclude_settled' => 1]));
+        $this->assertNotContains($job->id, $this->listIds(['exclude_settled' => 1]));
     }
 
     public function test_keeps_inflight_and_unlinked_jobs(): void
