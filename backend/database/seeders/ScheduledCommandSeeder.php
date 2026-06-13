@@ -288,6 +288,20 @@ class ScheduledCommandSeeder extends Seeder
                 'arguments' => ['--days=7'],
                 'sort_order' => 30,
             ],
+            [
+                // Postiz local-node watchdog (2026-06-13). Claim-aware: fires the
+                // Publer fallback only when the local node never published AND
+                // Postiz never took ownership (postiz_post_id NULL). No-ops unless
+                // postiz_enabled and a job is past its fallback deadline.
+                'signature' => 'postiz:reap-unclaimed',
+                'display_name' => 'Postiz — Unclaimed Job Watchdog (Publer fallback)',
+                'description' => 'Tiap menit: kalau local-node Postiz lagi offline dan job publish udah lewat deadline, lempar ke Publer (fallback) untuk platform yang Publer bisa. IG video carousel + Medium nggak di-fallback (cuma Postiz yang bisa) — nunggu + WARNING log. Anti double-publish: skip job yang udah ke-Postiz.',
+                'category' => 'system',
+                'cron_expression' => '* * * * *',
+                'without_overlapping_minutes' => null,
+                'arguments' => null,
+                'sort_order' => 40,
+            ],
         ];
 
         foreach ($rows as $row) {
