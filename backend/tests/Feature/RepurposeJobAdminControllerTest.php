@@ -2,9 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\ComposeVideoCarousel;
 use App\Jobs\FinalizeRepurpose;
+use App\Jobs\GenerateRebrandAssets;
 use App\Jobs\ResearchRepurposeClaims;
 use App\Models\RepurposeJob;
+use App\Models\RepurposeVideoSlide;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -162,6 +165,72 @@ class RepurposeJobAdminControllerTest extends TestCase
         $this->assertSame('extracted', $job->refresh()->status);
         Queue::assertPushed(FinalizeRepurpose::class, fn ($j) => $j->repurposeJobId === $job->id);
         Queue::assertNotPushed(ResearchRepurposeClaims::class);
+    }
+
+    public function test_retry_video_rebrand_asset_failure_resumes_at_extracted(): void
+    {
+        Queue::fake();
+        // A video_rebrand asset failure must re-run GenerateRebrandAssets at its
+        // `extracted` guard — NOT fall back to a full restart from capture.
+        $job = RepurposeJob::factory()->create([
+            'status' => 'failed',
+            'mode' => 'video_rebrand',
+            'asset_retry_count' => 3, // auto-recover budget already spent
+            'pipeline_state_log' => [
+                ['from' => 'extracted', 'to' => 'generating_assets', 'reason' => 'video_assets_start', 'timestamp' => '2026-06-13T00:00:00+00:00'],
+                ['from' => 'generating_assets', 'to' => 'failed', 'reason' => 'video_assets_failed', 'timestamp' => '2026-06-13T00:01:00+00:00'],
+            ],
+        ]);
+        // hook failed at veo, cta fully done — only the hook should be reset.
+        $hook = RepurposeVideoSlide::create([
+            'repurpose_job_id' => $job->id, 'role' => RepurposeVideoSlide::ROLE_HOOK,
+            'slide_index' => 0, 'keyframe_status' => 'done', 'veo_status' => 'failed',
+            'composited_status' => 'pending', 'last_error' => 'Veo audio filter',
+        ]);
+        $cta = RepurposeVideoSlide::create([
+            'repurpose_job_id' => $job->id, 'role' => RepurposeVideoSlide::ROLE_CTA,
+            'slide_index' => 9, 'keyframe_status' => 'done', 'veo_status' => 'done',
+            'composited_status' => 'done',
+        ]);
+
+        $this->actingAs($this->admin(), 'sanctum')
+            ->postJson("/api/admin/repurpose/{$job->id}/retry")
+            ->assertOk()->assertJson(['success' => true]);
+
+        $this->assertSame('extracted', $job->refresh()->status);
+        $this->assertSame(0, (int) $job->asset_retry_count); // budget reset
+        Queue::assertPushed(GenerateRebrandAssets::class, fn ($j) => $j->repurposeJobId === $job->id);
+
+        // failed hook reset for re-run; done cta preserved
+        $hook->refresh();
+        $this->assertNull($hook->keyframe_status);
+        $this->assertNull($hook->veo_status);
+        $cta->refresh();
+        $this->assertSame('done', $cta->keyframe_status);
+        $this->assertSame('done', $cta->composited_status);
+    }
+
+    public function test_retry_video_rebrand_compose_failure_resumes_at_assets_ready(): void
+    {
+        Queue::fake();
+        // A compositing failure (bookends already done) must re-run the composer
+        // at `assets_ready`, NOT regenerate the assets.
+        $job = RepurposeJob::factory()->create([
+            'status' => 'failed',
+            'mode' => 'video_rebrand',
+            'pipeline_state_log' => [
+                ['from' => 'assets_ready', 'to' => 'compositing', 'reason' => 'compose_start', 'timestamp' => '2026-06-13T00:00:00+00:00'],
+                ['from' => 'compositing', 'to' => 'failed', 'reason' => 'compose_failed', 'timestamp' => '2026-06-13T00:01:00+00:00'],
+            ],
+        ]);
+
+        $this->actingAs($this->admin(), 'sanctum')
+            ->postJson("/api/admin/repurpose/{$job->id}/retry")
+            ->assertOk()->assertJson(['success' => true]);
+
+        $this->assertSame('assets_ready', $job->refresh()->status);
+        Queue::assertPushed(ComposeVideoCarousel::class, fn ($j) => $j->repurposeJobId === $job->id);
+        Queue::assertNotPushed(GenerateRebrandAssets::class);
     }
 
     public function test_retry_rejects_non_failed_job(): void

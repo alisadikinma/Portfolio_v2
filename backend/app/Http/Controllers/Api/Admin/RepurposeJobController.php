@@ -6,8 +6,10 @@ use App\Enums\LinkedInPostStatus;
 use App\Enums\RepurposeJobStatus;
 use App\Http\Controllers\Controller;
 use App\Jobs\CaptureInstagramPost;
+use App\Jobs\ComposeVideoCarousel;
 use App\Jobs\ExtractSlideContent;
 use App\Jobs\FinalizeRepurpose;
+use App\Jobs\GenerateRebrandAssets;
 use App\Jobs\RefetchSourceSlides;
 use App\Jobs\ResearchRepurposeClaims;
 use App\Jobs\RewriteRepurposeContent;
@@ -36,6 +38,14 @@ class RepurposeJobController extends Controller
         'researching' => ['extracted', ResearchRepurposeClaims::class],
         'rewriting'   => ['researched', RewriteRepurposeContent::class],
         'finalizing'  => ['rewritten', FinalizeRepurpose::class],
+        // video_rebrand asset branch — resume the exact failed step at its guard
+        // state rather than restarting from capture. GenerateRebrandAssets is
+        // idempotent (skips bookends already keyframe/veo 'done', re-runs the
+        // failed one), so re-entering at `extracted` only regenerates what broke.
+        'generating_assets' => ['extracted', GenerateRebrandAssets::class],
+        'assets_ready'      => ['assets_ready', ComposeVideoCarousel::class],
+        'compositing'       => ['assets_ready', ComposeVideoCarousel::class],
+        'composed'          => ['composed', FinalizeRepurpose::class],
     ];
 
     public function index(Request $request): JsonResponse
@@ -153,10 +163,26 @@ class RepurposeJobController extends Controller
             $guardState = 'extracted';
         }
 
+        // Re-running video_rebrand asset generation: zero the auto-recover budget
+        // so the bounded PollRebrandAssets retry safety-net is live again for this
+        // fresh attempt (a failed job already spent its MAX_RETRIES auto-retries),
+        // and reset the failed/orphaned bookends so GenerateRebrandAssets re-runs
+        // them immediately (its dispatchKeyframe skips kf='done', so a veo-failed
+        // bookend would otherwise wait for the 5-min recover() pass). Done bookends
+        // (e.g. an already-rendered CTA) keep their state and are skipped.
+        $extra = ['last_error' => null];
+        if ($job->mode === 'video_rebrand' && $guardState === 'extracted') {
+            $extra['asset_retry_count'] = 0;
+            $job->videoSlides()
+                ->whereIn('role', [\App\Models\RepurposeVideoSlide::ROLE_HOOK, \App\Models\RepurposeVideoSlide::ROLE_CTA])
+                ->where(fn ($q) => $q->where('keyframe_status', 'failed')->orWhereNull('keyframe_status')->orWhere('veo_status', 'failed'))
+                ->update(['keyframe_status' => null, 'veo_status' => null, 'composited_status' => 'pending', 'last_error' => null]);
+        }
+
         $job->transitionTo(
             RepurposeJobStatus::from($guardState),
             'admin_retry',
-            ['last_error' => null]
+            $extra
         );
         $jobClass::dispatch($job->id);
 
