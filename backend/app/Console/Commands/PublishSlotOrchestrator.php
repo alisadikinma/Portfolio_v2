@@ -145,19 +145,31 @@ class PublishSlotOrchestrator extends Command
         }
 
         // Parallel sibling dispatch — all enqueue same tick, queue workers pick up.
-        // Per-platform gate: skip platforms with no Publer account selected
-        // (operator directive — "cek dulu settingan ke sosmed mana saja").
+        // PostizPublishDispatcher branches per platform: when postiz_enabled it
+        // creates a ready_to_publish Postiz job (local poller publishes), else it
+        // dispatches the legacy Publer path. The Publer-side per-platform gate
+        // (operator directive — "cek dulu settingan ke sosmed mana saja") still
+        // applies on the Publer branch; when Postiz owns publishing, the mapped
+        // postiz_channels enablement is the gate (unmapped → Publer fallback).
+        $postizEnabled = filter_var(
+            Setting::where('group', 'postiz')->where('key', 'postiz_enabled')->value('value'),
+            FILTER_VALIDATE_BOOLEAN
+        );
+        $dispatcher = app(\App\Services\PostizPublishDispatcher::class);
         foreach (['instagram', 'tiktok', 'threads', 'facebook'] as $platform) {
             $rel = $platform . 'Post';
             $sibling = $draft->$rel;
             if ($sibling === null) {
                 continue;
             }
-            if (!\App\Services\PublerPayloadBuilder::isPlatformEnabled($platform)) {
+            // On the legacy Publer path, honor the Publer account-selected gate.
+            // On the Postiz path, the dispatcher resolves the channel mapping
+            // (and falls back to Publer itself when unmapped) so don't pre-gate.
+            if (!$postizEnabled && !\App\Services\PublerPayloadBuilder::isPlatformEnabled($platform)) {
                 $this->line("  ⊘ {$platform} not configured in Publer settings — skipped");
                 continue;
             }
-            PublishViaPubler::dispatch($platform, $sibling->id);
+            $dispatcher->dispatchSibling($platform, $sibling->id);
             $this->line("  → dispatched {$platform} sibling #{$sibling->id}");
         }
     }
