@@ -287,34 +287,45 @@ class PollRebrandAssets extends Command
             ->get();
 
         foreach ($jobs as $job) {
-            $failedBookend = $job->videoSlides()
-                ->whereIn('role', [RepurposeVideoSlide::ROLE_HOOK, RepurposeVideoSlide::ROLE_CTA])
-                ->where(fn ($q) => $q->where('keyframe_status', 'failed')->orWhere('veo_status', 'failed'))
-                ->exists();
+            // Per-job isolation: a single job's recovery error (illegal transition,
+            // DB hiccup) must never crash the whole cron — that would exit 1 every
+            // minute AND starve the keyframe/Veo polling of OTHER in-flight jobs.
+            try {
+                $failedBookend = $job->videoSlides()
+                    ->whereIn('role', [RepurposeVideoSlide::ROLE_HOOK, RepurposeVideoSlide::ROLE_CTA])
+                    ->where(fn ($q) => $q->where('keyframe_status', 'failed')->orWhereNull('keyframe_status')->orWhere('veo_status', 'failed'))
+                    ->exists();
 
-            if (! $failedBookend) {
-                continue;
+                if (! $failedBookend) {
+                    continue;
+                }
+                if ((int) ($job->asset_retry_count ?? 0) >= self::MAX_RETRIES) {
+                    continue;
+                }
+                if ($dry) {
+                    $this->line("  [dry] job {$job->id} has failed bookend → would re-dispatch assets");
+
+                    continue;
+                }
+
+                // Reset failed/orphaned bookends so GenerateRebrandAssets' idempotent
+                // dispatch re-runs them. NULL keyframe_status = a worker died mid-
+                // GenerateRebrandAssets (status committed, dispatch never ran) — the
+                // 5-min cooldown above guarantees we never race an in-flight author.
+                $job->videoSlides()
+                    ->whereIn('role', [RepurposeVideoSlide::ROLE_HOOK, RepurposeVideoSlide::ROLE_CTA])
+                    ->where(fn ($q) => $q->where('keyframe_status', 'failed')->orWhereNull('keyframe_status')->orWhere('veo_status', 'failed'))
+                    ->update(['keyframe_status' => null, 'veo_status' => null, 'last_error' => null]);
+
+                $job->increment('asset_retry_count');
+                // Bounce back to extracted so GenerateRebrandAssets' Extracted guard passes
+                // (the generating_assets → extracted recovery edge — see RepurposeJobStatus).
+                $job->transitionTo(RepurposeJobStatus::Extracted, 'video_assets_retry');
+                GenerateRebrandAssets::dispatch($job->id);
+                $this->info("  job {$job->id} re-dispatched assets (retry #{$job->asset_retry_count})");
+            } catch (\Throwable $e) {
+                Log::warning('[PollRebrandAssets] recover failed for job', ['job' => $job->id, 'error' => $e->getMessage()]);
             }
-            if ((int) ($job->asset_retry_count ?? 0) >= self::MAX_RETRIES) {
-                continue;
-            }
-            if ($dry) {
-                $this->line("  [dry] job {$job->id} has failed bookend → would re-dispatch assets");
-
-                continue;
-            }
-
-            // Reset failed bookends so GenerateRebrandAssets' idempotent dispatch re-runs them.
-            $job->videoSlides()
-                ->whereIn('role', [RepurposeVideoSlide::ROLE_HOOK, RepurposeVideoSlide::ROLE_CTA])
-                ->where(fn ($q) => $q->where('keyframe_status', 'failed')->orWhere('veo_status', 'failed'))
-                ->update(['keyframe_status' => null, 'veo_status' => null, 'last_error' => null]);
-
-            $job->increment('asset_retry_count');
-            // Bounce back to extracted so GenerateRebrandAssets' Extracted guard passes.
-            $job->transitionTo(RepurposeJobStatus::Extracted, 'video_assets_retry');
-            GenerateRebrandAssets::dispatch($job->id);
-            $this->info("  job {$job->id} re-dispatched assets (retry #{$job->asset_retry_count})");
         }
     }
 

@@ -32,6 +32,14 @@ class RepurposeJobStatusVideoTransitionsTest extends TestCase
         $this->assertTrue(RepurposeJobStatus::Finalizing->canTransitionTo(RepurposeJobStatus::Drafted));
     }
 
+    public function test_generating_assets_can_bounce_back_to_extracted_for_recovery(): void
+    {
+        // PollRebrandAssets::recover() bounces a stuck job generating_assets →
+        // extracted so GenerateRebrandAssets re-runs the failed bookends. Without
+        // this edge the recovery transition throws and crashes the whole cron.
+        $this->assertTrue(RepurposeJobStatus::GeneratingAssets->canTransitionTo(RepurposeJobStatus::Extracted));
+    }
+
     public function test_video_states_can_fail(): void
     {
         $this->assertTrue(RepurposeJobStatus::GeneratingAssets->canTransitionTo(RepurposeJobStatus::Failed));

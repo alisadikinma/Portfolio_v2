@@ -56,8 +56,10 @@ enum RepurposeJobStatus: string
         'researched'  => ['rewriting', 'failed'],
         'rewriting'   => ['rewritten', 'failed'],
         'rewritten'   => ['finalizing', 'failed'],
-        // video_rebrand branch states
-        'generating_assets' => ['assets_ready', 'failed'],
+        // video_rebrand branch states. `extracted` is the recovery edge:
+        // PollRebrandAssets::recover() bounces a stuck job back so
+        // GenerateRebrandAssets' Extracted guard re-runs the failed bookends.
+        'generating_assets' => ['assets_ready', 'extracted', 'failed'],
         'assets_ready'      => ['compositing', 'failed'],
         'compositing'       => ['composed', 'failed'],
         'composed'          => ['finalizing', 'failed'],
