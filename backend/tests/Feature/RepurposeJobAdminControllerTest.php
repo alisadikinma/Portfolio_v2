@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\FinalizeRepurpose;
 use App\Jobs\ResearchRepurposeClaims;
 use App\Models\RepurposeJob;
 use App\Models\User;
@@ -138,6 +139,29 @@ class RepurposeJobAdminControllerTest extends TestCase
         // failed-from researching → resume at the researcher's guard state (extracted)
         $this->assertSame('extracted', $job->refresh()->status);
         Queue::assertPushed(ResearchRepurposeClaims::class, fn ($j) => $j->repurposeJobId === $job->id);
+    }
+
+    public function test_retry_blog_finalize_resumes_at_extracted(): void
+    {
+        Queue::fake();
+        // Blog mode skips research+rewrite and enters FinalizeRepurpose at
+        // `extracted`. A finalize failure must resume there (NOT `rewritten`).
+        $job = RepurposeJob::factory()->create([
+            'status' => 'failed',
+            'mode' => 'blog',
+            'pipeline_state_log' => [
+                ['from' => 'extracted', 'to' => 'finalizing', 'reason' => 'finalize_blog_start', 'timestamp' => '2026-06-13T00:00:00+00:00'],
+                ['from' => 'finalizing', 'to' => 'failed', 'reason' => 'finalize_exception', 'timestamp' => '2026-06-13T00:01:00+00:00'],
+            ],
+        ]);
+
+        $this->actingAs($this->admin(), 'sanctum')
+            ->postJson("/api/admin/repurpose/{$job->id}/retry")
+            ->assertOk()->assertJson(['success' => true]);
+
+        $this->assertSame('extracted', $job->refresh()->status);
+        Queue::assertPushed(FinalizeRepurpose::class, fn ($j) => $j->repurposeJobId === $job->id);
+        Queue::assertNotPushed(ResearchRepurposeClaims::class);
     }
 
     public function test_retry_rejects_non_failed_job(): void

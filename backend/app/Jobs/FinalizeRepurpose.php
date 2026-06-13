@@ -201,7 +201,9 @@ class FinalizeRepurpose implements ShouldQueue
         $narr = is_string($narr) ? trim($narr) : trim((string) json_encode($narr));
         $slidesText = implode("\n- ", $slides);
         $claims = collect((array) ($extracted['claims'] ?? []))
-            ->map(fn ($c) => is_array($c) ? (string) ($c['claim'] ?? $c['text'] ?? json_encode($c)) : (string) $c)
+            // Only pull human-readable claim text — never json_encode a malformed
+            // claim object into the operator-facing brief (it'd leak raw JSON).
+            ->map(fn ($c) => is_array($c) ? (string) ($c['claim'] ?? $c['text'] ?? '') : (string) $c)
             ->map(fn ($t) => trim((string) $t))
             ->filter(fn ($t) => strlen($t) > 8)
             ->take(40)
@@ -211,7 +213,7 @@ class FinalizeRepurpose implements ShouldQueue
         if ($caption !== '') {
             $parts[] = "=== Caption sumber ===\n{$caption}";
         }
-        if ($narr !== '' && $narr !== '""' && $narr !== 'null') {
+        if ($narr !== '' && !in_array($narr, ['""', 'null', '[]', '{}'], true)) {
             $parts[] = "=== Ringkasan narasi ===\n{$narr}";
         }
         if ($slidesText !== '') {

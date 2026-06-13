@@ -631,18 +631,18 @@ class TelegramNotificationService
             return false;
         }
 
-        $claimLine = $correctedClaims > 0
-            ? "{$correctedClaims} klaim dikoreksi + sumber dilampirkan."
-            : 'Klaim diverifikasi, sumber dilampirkan.';
-
         if ($job->mode === 'blog') {
             // Blog mode now seeds a DRAFT idea (no pre-written article) — the
-            // operator runs the proper Content Engine pipeline for quality.
+            // operator runs the proper Content Engine pipeline for quality. The
+            // claim-correction count is N/A here (Content Engine re-verifies).
             $text = "📝 *Draft blog dari IG siap* (job #{$job->id})\n"
                 . "Materi sumber sudah disiapkan jadi brief.\n\n"
                 . 'Buka Content Engine → klik *Start Research* untuk tulis artikel '
                 . 'berkualitas (5-gate) → publish → carousel + cross-post otomatis: /admin/content-engine';
         } else {
+            $claimLine = $correctedClaims > 0
+                ? "{$correctedClaims} klaim dikoreksi + sumber dilampirkan."
+                : 'Klaim diverifikasi, sumber dilampirkan.';
             $link = $linkedinDraftId ? "/admin/draft-posts/{$linkedinDraftId}" : '/admin/draft-posts';
             $text = "🎠 *Carousel draft siap* (job #{$job->id})\n{$claimLine}\n\nReview → {$link}";
         }
