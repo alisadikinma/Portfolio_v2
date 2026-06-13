@@ -111,6 +111,7 @@ class RepurposeJobController extends Controller
                 'extracted' => $job->extracted,
                 'research' => $job->research,
                 'rewritten' => $job->rewritten,
+                'caption' => $job->rewritten['caption'] ?? null,
                 'content_idea_id' => $job->content_idea_id,
                 'linkedin_post_id' => $job->linkedin_post_id,
                 'anchor_post_id' => $job->anchor_post_id,

@@ -96,8 +96,44 @@ class VideoChromeRenderer
         return Process::timeout($this->timeout)->run($this->sshCommand($remoteCmd))->successful();
     }
 
-    /** Placeholder brand slugs that must never surface as a handle (#4 bug). */
-    private const PLACEHOLDER_SLUGS = ['creator-brand', 'creator_brand', ''];
+    /**
+     * Render the CTA ask-overlay PNG (#3) — a transparent 1080×1350 card
+     * (Follow/Save/Comment, no comment→DM promise) composited over the CTA Veo
+     * clip by VideoRebrandComposer::overlayCta. Returns the absolute PNG path or
+     * null on failure (caller keeps the plain CTA clip — graceful degrade).
+     */
+    public function renderCtaOverlay(RepurposeVideoSlide $slide): ?string
+    {
+        if ($this->scriptPath === '') {
+            Log::error('[VideoChromeRenderer] chrome_script_path not configured');
+            return null;
+        }
+
+        $jobId = (int) $slide->repurpose_job_id;
+        $dir = storage_path("app/repurpose/{$jobId}/chrome");
+        @mkdir($dir, 0775, true);
+        $out = "{$dir}/cta_overlay.png";
+
+        $args = [
+            '--mode', 'cta',
+            '--handle', $this->handle(),
+            '--overlay-out', $out,
+        ];
+
+        try {
+            $ok = $this->runChrome($args);
+        } catch (\Throwable $e) {
+            Log::error('[VideoChromeRenderer] CTA overlay exec threw', ['slide' => $slide->id, 'error' => $e->getMessage()]);
+            return null;
+        }
+
+        if (!$ok || !is_file($out)) {
+            Log::error('[VideoChromeRenderer] CTA overlay render failed', ['slide' => $slide->id]);
+            return null;
+        }
+
+        return $out;
+    }
 
     protected function logoUrl(): string
     {
@@ -112,13 +148,8 @@ class VideoChromeRenderer
 
     protected function handle(): string
     {
-        $handle = (string) Setting::query()->where('group', 'linkedin')->where('key', 'creator_handle')->value('value');
-        if ($handle !== '') {
-            return str_starts_with($handle, '@') ? $handle : '@' . $handle;
-        }
-        $slug = trim((string) Setting::query()->where('group', 'creator_brand')->where('key', 'creator_brand_slug')->value('value'));
-
-        return in_array($slug, self::PLACEHOLDER_SLUGS, true) ? '@alisadikinma' : '@' . $slug;
+        // Shared resolver (also used by the caption) — placeholder-hardened.
+        return \App\Support\CreatorHandle::resolve();
     }
 
     private function site(): string

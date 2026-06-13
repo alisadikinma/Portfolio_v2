@@ -8,6 +8,8 @@ use App\Jobs\GenerateRebrandAssets;
 use App\Models\RepurposeJob;
 use App\Models\RepurposeVideoSlide;
 use App\Services\GeminiGenVideoService;
+use App\Services\VideoChromeRenderer;
+use App\Services\VideoRebrandComposer;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -189,7 +191,17 @@ class PollRebrandAssets extends Command
                 $relOut = "repurpose/{$slide->repurpose_job_id}/composited/slide_{$slide->slide_index}.mp4";
                 $final = $video->finalizeVeoClip($videoUrl, $relOut);
                 if ($final !== null) {
-                    $slide->update(['veo_status' => 'done', 'veo_url' => $videoUrl, 'composited_path' => $final, 'composited_status' => 'done', 'last_error' => null]);
+                    // CTA gets the Follow/Save/Comment ask overlay (#3) baked on;
+                    // the hook bookend stays plain. Overlay failure is non-fatal —
+                    // the plain clip ships (the ask still lands in the caption).
+                    $composited = $final;
+                    if ($slide->role === RepurposeVideoSlide::ROLE_CTA) {
+                        $overlaid = $this->applyCtaOverlay($slide);
+                        if ($overlaid !== null) {
+                            $composited = $overlaid;
+                        }
+                    }
+                    $slide->update(['veo_status' => 'done', 'veo_url' => $videoUrl, 'composited_path' => $composited, 'composited_status' => 'done', 'last_error' => null]);
                     $this->info("  slide {$slide->id} veo done");
                 } else {
                     $slide->update(['veo_status' => 'failed', 'last_error' => 'Download/crop of finished Veo clip failed — see logs.']);
@@ -298,6 +310,21 @@ class PollRebrandAssets extends Command
             GenerateRebrandAssets::dispatch($job->id);
             $this->info("  job {$job->id} re-dispatched assets (retry #{$job->asset_retry_count})");
         }
+    }
+
+    /**
+     * Render + composite the CTA ask overlay onto the finalized CTA clip. Returns
+     * the new public URL, or null if either step fails (caller keeps the plain
+     * clip — graceful degrade, the ask still ships in the caption).
+     */
+    private function applyCtaOverlay(RepurposeVideoSlide $slide): ?string
+    {
+        $overlayPng = app(VideoChromeRenderer::class)->renderCtaOverlay($slide);
+        if ($overlayPng === null) {
+            return null;
+        }
+
+        return app(VideoRebrandComposer::class)->overlayCta($slide, $overlayPng);
     }
 
     private function poll(?string $uuid): ?array

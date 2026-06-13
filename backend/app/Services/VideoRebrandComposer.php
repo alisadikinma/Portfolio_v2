@@ -118,6 +118,59 @@ class VideoRebrandComposer
     }
 
     /**
+     * Composite the CTA ask overlay (#3) onto the finalized CTA Veo clip. Reads
+     * the 1080×1350 CTA clip from the public disk (written by finalizeVeoClip),
+     * overlays the transparent ask-card PNG, keeps audio, and writes a sibling
+     * `_cta.mp4` on the public disk. Returns the new full public URL, or null on
+     * failure (caller keeps the plain clip — the ask still ships in the caption).
+     */
+    public function overlayCta(RepurposeVideoSlide $slide, string $overlayPng): ?string
+    {
+        $jobId = (int) $slide->repurpose_job_id;
+        $inRel = "repurpose/{$jobId}/composited/slide_{$slide->slide_index}.mp4";
+        $inAbs = Storage::disk('public')->path($inRel);
+        if (!is_file($inAbs)) {
+            Log::error('[VideoRebrandComposer] CTA overlay: finalized clip missing', ['slide' => $slide->id, 'in' => $inRel]);
+            return null;
+        }
+
+        $outRel = "repurpose/{$jobId}/composited/slide_{$slide->slide_index}_cta.mp4";
+        $outAbs = Storage::disk('public')->path($outRel);
+
+        $cmd = [
+            $this->ffmpegPath, '-y',
+            '-i', $inAbs,
+            '-i', $overlayPng,
+            '-filter_complex', '[0:v][1:v]overlay=0:0[v]',
+            '-map', '[v]',
+            '-map', '0:a?',
+            '-c:v', 'libx264', '-crf', '20',
+            '-c:a', 'aac',
+            '-movflags', '+faststart',
+            $outAbs,
+        ];
+
+        try {
+            $ok = $this->runFfmpeg($cmd);
+        } catch (\Throwable $e) {
+            Log::error('[VideoRebrandComposer] CTA overlay exec threw', ['slide' => $slide->id, 'error' => $e->getMessage()]);
+            return null;
+        }
+
+        if (!$ok) {
+            Log::error('[VideoRebrandComposer] CTA overlay ffmpeg failed', ['slide' => $slide->id]);
+            return null;
+        }
+
+        // The plain clip is now superseded by the overlaid _cta.mp4 and is no
+        // longer referenced by composited_path — drop it so it doesn't orphan on
+        // disk (the reaper only knows composited_path).
+        Storage::disk('public')->delete($inRel);
+
+        return url('/storage/' . $outRel);
+    }
+
+    /**
      * Exec ffmpeg (ssh | local). Protected for test seams; Process::fake also
      * intercepts it directly. Returns true on exit 0.
      *

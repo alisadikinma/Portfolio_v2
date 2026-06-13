@@ -8,7 +8,9 @@ use App\Models\ContentIdea;
 use App\Models\LinkedInPost;
 use App\Models\Post;
 use App\Models\RepurposeJob;
+use App\Models\RepurposeVideoSlide;
 use App\Services\TelegramNotificationService;
+use App\Support\CreatorHandle;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -213,8 +215,45 @@ class FinalizeRepurpose implements ShouldQueue
             return;
         }
 
-        $job->transitionTo(RepurposeJobStatus::Drafted, 'finalize_video', ['last_error' => null]);
+        // Build the post caption with a real follow/comment/save ask (#3). No
+        // comment→DM promise — there is no auto-DM infra (CLAUDE.md decision).
+        $caption = $this->buildVideoCaption($job);
+
+        $job->transitionTo(RepurposeJobStatus::Drafted, 'finalize_video', [
+            'last_error' => null,
+            'rewritten' => array_merge((array) $job->rewritten, ['caption' => $caption]),
+        ]);
         app(TelegramNotificationService::class)->sendRepurposeDrafted($job, null, $this->correctedClaims($job));
+    }
+
+    /**
+     * Compose the manual-post caption from the surviving tool titles + a standard
+     * Follow/Save/Comment ask. Deliberately omits any comment→DM auto-delivery
+     * promise (no auto-DM infra).
+     */
+    private function buildVideoCaption(RepurposeJob $job): string
+    {
+        $titles = $job->videoSlides()
+            ->where('role', RepurposeVideoSlide::ROLE_TOOL)
+            ->orderBy('slide_index')
+            ->pluck('header_title')
+            ->filter()
+            // Collapse any embedded newlines from vision extraction so they don't
+            // break the caption's Follow/Save/Comment block formatting.
+            ->map(fn ($t) => trim((string) preg_replace('/\s+/', ' ', (string) $t)))
+            ->filter()
+            ->values();
+
+        $handle = CreatorHandle::resolve();
+        $intro = $titles->isNotEmpty()
+            ? $titles->implode(', ') . ' — the tools worth your time. 🛠️'
+            : 'AI tools worth your time. 🛠️';
+
+        $ask = "Follow {$handle} for more AI tools & workflows.\n"
+            . "Save this so you don't lose it.\n"
+            . 'Comment "AI" if this was useful.';
+
+        return $intro . "\n\n" . $ask;
     }
 
     private function resolvePillar(RepurposeJob $job): string
