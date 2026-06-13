@@ -17,8 +17,10 @@ use Illuminate\Support\Facades\Log;
  * IG repurpose Phase C — vision-extract step. Dispatched by CaptureInstagramPost
  * once slides land (status captured).
  *
- *   - success → persist `extracted` JSON + status extracted + dispatch
- *     ResearchRepurposeClaims
+ *   - success → persist `extracted` JSON + status extracted, then branch on mode:
+ *       carousel → ResearchRepurposeClaims (rewrite seeds /carousel-gen)
+ *       blog     → FinalizeRepurpose (skip research+rewrite; seed a draft
+ *                  ContentIdea for the proper Content Engine pipeline)
  *   - failure → status failed + Telegram reply (no half-state)
  *
  * @see docs/plans/2026-06-10-telegram-ig-repurpose-carousel.md
@@ -71,7 +73,16 @@ class ExtractSlideContent implements ShouldQueue
             'extract_ok',
             ['extracted' => $result['extracted'], 'last_error' => null]
         );
-        ResearchRepurposeClaims::dispatch($job->id);
+
+        // Blog mode skips the internal research+rewrite (low quality, no scoring)
+        // and hands the extracted material straight to FinalizeRepurpose, which
+        // seeds a draft ContentIdea for the proper Content Engine pipeline.
+        // Carousel keeps research+rewrite (the rewrite is just a /carousel-gen seed).
+        if ($job->mode === 'blog') {
+            FinalizeRepurpose::dispatch($job->id);
+        } else {
+            ResearchRepurposeClaims::dispatch($job->id);
+        }
     }
 
     private function failJob(RepurposeJob $job, string $reason): void

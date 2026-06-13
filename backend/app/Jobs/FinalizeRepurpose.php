@@ -24,9 +24,13 @@ use Illuminate\Support\Str;
 /**
  * IG repurpose Phase F — finalize. Branches on $job->mode (D1/D8/D9):
  *
- *   blog     → ContentIdea(article_ready, source=ig_repurpose) — enters the
- *              existing Content Engine pipeline; operator drives Gate-2 images +
- *              publish, which auto-fires the event-driven carousel + cross-post.
+ *   blog     → ContentIdea(draft, source=ig_repurpose) seeded with an
+ *              `instructions` brief from the extracted IG material (enters at
+ *              `extracted`, skipping research+rewrite). Operator clicks
+ *              "Start Research" to run the proper Content Engine pipeline
+ *              (article-prep → write → 5-gate score → images → publish), which
+ *              auto-fires the event-driven carousel + cross-post. NO generated
+ *              article is written here — the old internal rewrite was low quality.
  *   carousel → anchor blog Post(draft, published=false) + primary PostTranslation
  *              + LinkedInPost(carousel, pending_generation), then dispatch
  *              GenerateLinkedInPost — the existing force-carousel path authors
@@ -81,6 +85,26 @@ class FinalizeRepurpose implements ShouldQueue
             return;
         }
 
+        // Blog mode (June 13, 2026) enters at `extracted` — it skips the internal
+        // research+rewrite (low quality, no scoring) and instead seeds a `draft`
+        // ContentIdea from the IG material. The operator drives the proper Content
+        // Engine pipeline (research → write → 5-gate score → images → publish →
+        // auto carousel + cross-post).
+        if ($job->mode === 'blog') {
+            if ($job->status !== RepurposeJobStatus::Extracted->value) {
+                return;
+            }
+            $job->transitionTo(RepurposeJobStatus::Finalizing, 'finalize_blog_start');
+            try {
+                $this->finalizeBlog($job);
+            } catch (\Throwable $e) {
+                // Artifact dir retained (no purge) so the operator can retry.
+                $this->failJob($job, 'finalize_exception: ' . $e->getMessage());
+            }
+            return;
+        }
+
+        // Carousel mode enters at `rewritten` (the rewrite seeds /carousel-gen).
         if ($job->status !== RepurposeJobStatus::Rewritten->value) {
             return;
         }
@@ -94,11 +118,7 @@ class FinalizeRepurpose implements ShouldQueue
         $job->transitionTo(RepurposeJobStatus::Finalizing, 'finalize_start');
 
         try {
-            if ($job->mode === 'blog') {
-                $this->finalizeBlog($job, $rewritten);
-            } else {
-                $this->finalizeCarousel($job, $rewritten);
-            }
+            $this->finalizeCarousel($job, $rewritten);
         } catch (\Throwable $e) {
             // Artifact dir retained (no purge) so the operator can retry.
             $this->failJob($job, 'finalize_exception: ' . $e->getMessage());
@@ -106,27 +126,35 @@ class FinalizeRepurpose implements ShouldQueue
     }
 
     /**
-     * @param array<string,mixed> $r
+     * Blog mode (June 13, 2026) — seed a `draft` ContentIdea from the extracted IG
+     * material and hand off to the proper Content Engine pipeline. We deliberately
+     * do NOT write a generated_article here: the old internal rewrite produced
+     * low-quality blogs with no scoring. The operator clicks "Start Research" in
+     * /admin/content-engine to run article-prep → write → 5-gate score → images →
+     * publish (which then auto-fires the event-driven carousel + cross-post).
      */
-    private function finalizeBlog(RepurposeJob $job, array $r): void
+    private function finalizeBlog(RepurposeJob $job): void
     {
+        $extracted = (array) ($job->extracted ?? []);
+        $caption = trim((string) ($extracted['caption'] ?? ''));
+        $slides = $this->extractedSlideLines($extracted);
+
+        // Need at least a caption or slide substance to build a usable brief.
+        if ($caption === '' && $slides === []) {
+            $this->failJob($job, 'finalize_failed: extracted material empty (no caption/slides)');
+            return;
+        }
+
         $idea = ContentIdea::create([
-            'title' => (string) $r['title'],
-            'status' => 'article_ready',
+            'title' => $this->deriveBlogTitle($caption, $slides),
+            'status' => 'draft',
             // `source` is an enum column — 'instagram' is the closest allowed
             // value; the precise provenance lives in source_data.source below.
             'source' => 'instagram',
             'pillar' => $this->resolvePillar($job),
             'auto_mode' => false,
+            'instructions' => $this->buildBlogBrief($job, $caption, $slides, $extracted),
             'source_data' => ['source' => 'ig_repurpose', 'url' => $job->source_url],
-            'generated_article' => [
-                'language' => 'id',
-                'title' => (string) $r['title'],
-                'content' => (string) $r['body'],
-                'excerpt' => (string) ($r['excerpt'] ?? ''),
-                'meta_keywords' => (string) ($r['meta_keywords'] ?? ''),
-                'sources_appendix' => array_values((array) ($r['sources_appendix'] ?? [])),
-            ],
         ]);
 
         $job->transitionTo(
@@ -135,7 +163,68 @@ class FinalizeRepurpose implements ShouldQueue
             ['content_idea_id' => $idea->id, 'last_error' => null]
         );
         $this->purge($job);
-        app(TelegramNotificationService::class)->sendRepurposeDrafted($job, null, $this->correctedClaims($job));
+        // Blog skips the internal claim-correction step now (Content Engine
+        // research re-verifies), so there is no corrected-claim count to report.
+        app(TelegramNotificationService::class)->sendRepurposeDrafted($job, null, 0);
+    }
+
+    /** Substantive slide text lines (skip pure image descriptions / short labels). */
+    private function extractedSlideLines(array $extracted): array
+    {
+        return collect((array) ($extracted['slides'] ?? []))
+            ->map(fn ($s) => is_array($s) ? (string) ($s['text'] ?? $s['header'] ?? '') : (string) $s)
+            ->map(fn ($t) => trim((string) $t))
+            ->filter(fn ($t) => strlen($t) > 25)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Provisional title — article-prep refines the final one. First sentence of the
+     * caption, else the first substantive slide line.
+     */
+    private function deriveBlogTitle(string $caption, array $slides): string
+    {
+        $seed = $caption !== '' ? $caption : (string) ($slides[0] ?? '');
+        $seed = (string) preg_replace('/^(BREAKING|UPDATE|NEWS)\b[:\-\s]*/i', '', $seed);
+        $seed = trim((string) Str::of($seed)->before("\n"));
+        $sentence = trim((string) Str::of($seed)->before('. '));
+        $title = trim((string) Str::limit($sentence !== '' ? $sentence : $seed, 120, ''));
+
+        return $title !== '' ? $title : 'Repurpose IG — ' . trim((string) Str::limit($caption, 60, ''));
+    }
+
+    /** Compose the Content Engine research brief from the IG source material. */
+    private function buildBlogBrief(RepurposeJob $job, string $caption, array $slides, array $extracted): string
+    {
+        $narr = $extracted['narrative'] ?? null;
+        $narr = is_string($narr) ? trim($narr) : trim((string) json_encode($narr));
+        $slidesText = implode("\n- ", $slides);
+        $claims = collect((array) ($extracted['claims'] ?? []))
+            ->map(fn ($c) => is_array($c) ? (string) ($c['claim'] ?? $c['text'] ?? json_encode($c)) : (string) $c)
+            ->map(fn ($t) => trim((string) $t))
+            ->filter(fn ($t) => strlen($t) > 8)
+            ->take(40)
+            ->implode("\n- ");
+
+        $parts = ["SUMBER: Repurpose dari Instagram carousel ({$job->source_url})."];
+        if ($caption !== '') {
+            $parts[] = "=== Caption sumber ===\n{$caption}";
+        }
+        if ($narr !== '' && $narr !== '""' && $narr !== 'null') {
+            $parts[] = "=== Ringkasan narasi ===\n{$narr}";
+        }
+        if ($slidesText !== '') {
+            $parts[] = "=== Poin-poin slide sumber ===\n- {$slidesText}";
+        }
+        if ($claims !== '') {
+            $parts[] = "=== Klaim yang HARUS di-fact-check ulang ===\n- {$claims}";
+        }
+        $parts[] = 'INSTRUKSI: Tulis artikel mendalam berbahasa Indonesia bergaya Ali '
+            . '(analisis tajam, bukan sekadar berita). Verifikasi ulang setiap klaim ke '
+            . 'sumber kredibel + sitasi. JANGAN menyalin caption mentah.';
+
+        return implode("\n\n", $parts);
     }
 
     /**

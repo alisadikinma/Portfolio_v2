@@ -137,8 +137,15 @@ class RepurposeJobController extends Controller
             ], 422);
         }
 
-        [$guardState, $jobClass] = self::RETRY_MAP[$this->failedFromStep($job)]
+        $failedFrom = $this->failedFromStep($job);
+        [$guardState, $jobClass] = self::RETRY_MAP[$failedFrom]
             ?? self::RETRY_MAP['capturing']; // safe fallback: full restart from capture
+
+        // Blog mode skips research+rewrite and enters FinalizeRepurpose at
+        // `extracted` (not `rewritten`). Resume the failed finalize there.
+        if ($job->mode === 'blog' && $failedFrom === 'finalizing') {
+            $guardState = 'extracted';
+        }
 
         $job->transitionTo(
             RepurposeJobStatus::from($guardState),

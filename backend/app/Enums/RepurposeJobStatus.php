@@ -14,6 +14,15 @@ namespace App\Enums;
  * it does NOT rewrite claims, so it skips researching/rewriting:
  *   extracted → generating_assets → assets_ready → compositing → composed → finalizing → drafted
  * See docs/plans/2026-06-12-ig-video-carousel-rebrand.md.
+ *
+ * The blog mode (June 13, 2026) ALSO forks OFF `extracted` — it no longer runs
+ * the low-quality internal research+rewrite. Instead finalize seeds a `draft`
+ * ContentIdea from the extracted IG material and hands off to the proper Content
+ * Engine article pipeline (5-gate scoring, full refs). So blog skips
+ * researching/rewriting too:
+ *   extracted → finalizing → drafted
+ * Only carousel mode still uses researching → rewriting (the rewrite is just a
+ * seed body that /carousel-gen re-authors — see FinalizeRepurpose).
  */
 enum RepurposeJobStatus: string
 {
@@ -40,8 +49,9 @@ enum RepurposeJobStatus: string
         'capturing'   => ['captured', 'failed'],
         'captured'    => ['extracting', 'failed'],
         'extracting'  => ['extracted', 'failed'],
-        // blog/carousel → researching; video_rebrand → generating_assets
-        'extracted'   => ['researching', 'generating_assets', 'failed'],
+        // carousel → researching; video_rebrand → generating_assets;
+        // blog → finalizing (skips research+rewrite, hands off to Content Engine)
+        'extracted'   => ['researching', 'generating_assets', 'finalizing', 'failed'],
         'researching' => ['researched', 'failed'],
         'researched'  => ['rewriting', 'failed'],
         'rewriting'   => ['rewritten', 'failed'],

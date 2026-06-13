@@ -15,9 +15,10 @@ use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 /**
- * Phase F (blog mode) — finalize creates a ContentIdea(article_ready) only and
- * enters the existing Content Engine pipeline. NO Post / LinkedInPost / carousel
- * dispatch. Success purges the artifact dir + sends a Telegram drafted notice.
+ * Phase F (blog mode, June 13, 2026) — finalize enters at `extracted` and seeds a
+ * DRAFT ContentIdea from the IG material (no pre-written article, no scoring shortcut).
+ * The operator runs the proper Content Engine pipeline. NO Post / LinkedInPost /
+ * carousel dispatch here. Success purges the artifact dir + sends a Telegram notice.
  */
 class FinalizeRepurposeBlogModeTest extends TestCase
 {
@@ -32,29 +33,35 @@ class FinalizeRepurposeBlogModeTest extends TestCase
         Http::fake(['*' => Http::response(['ok' => true], 200)]);
     }
 
-    private function rewritten(): array
+    private function extracted(): array
     {
         return [
-            'title' => 'The Real Story Behind AI Job Claims',
-            'body' => '<h2>Intro</h2><p>...</p><h2>Sumber</h2><ul><li><a href="https://x">x</a></li></ul>',
-            'excerpt' => 'A sharper, fact-checked take.',
-            'meta_keywords' => 'AI, jobs, automation',
-            'sources_appendix' => ['https://example.org/study'],
+            'caption' => 'BREAKING: The US government ordered Anthropic to disable two models. This is a watershed moment for AI policy.',
+            'narrative' => 'The post breaks the news that a government, not a company, pulled a top AI model.',
+            'slides' => [
+                'Claude logo with red X overlay — no headline text on image',
+                'THE US GOVERNMENT ORDERED ANTHROPIC TO BLOCK ACCESS — THIS IS A WATERSHED MOMENT',
+                'This moved from a San Francisco problem to a Washington D.C. problem in one night.',
+            ],
+            'claims' => [
+                ['claim' => 'A government suspended a frontier AI model for the first time.'],
+                ['claim' => 'All users lost access, not only foreign nationals.'],
+            ],
         ];
     }
 
-    public function test_blog_mode_creates_content_idea_and_drafts(): void
+    public function test_blog_mode_seeds_draft_idea_from_extracted(): void
     {
         Bus::fake([GenerateLinkedInPost::class]);
         $dir = storage_path('app/repurpose/777');
         @mkdir($dir, 0775, true);
 
         $job = RepurposeJob::factory()->create([
-            'status' => 'rewritten',
+            'status' => 'extracted',
             'mode' => 'blog',
             'slides_path' => 'repurpose/777',
-            'research' => ['corrected_count' => 2],
-            'rewritten' => $this->rewritten(),
+            'source_url' => 'https://www.instagram.com/p/ABC123/',
+            'extracted' => $this->extracted(),
         ]);
 
         (new FinalizeRepurpose($job->id))->handle();
@@ -65,10 +72,21 @@ class FinalizeRepurposeBlogModeTest extends TestCase
 
         $idea = ContentIdea::find($job->content_idea_id);
         $this->assertNotNull($idea);
-        $this->assertSame('article_ready', $idea->status);
+        $this->assertSame('draft', $idea->status);
         $this->assertSame('instagram', $idea->source);
         $this->assertSame('ig_repurpose', $idea->source_data['source']);
-        $this->assertStringContainsString('Intro', $idea->generated_article['content']);
+        $this->assertSame('https://www.instagram.com/p/ABC123/', $idea->source_data['url']);
+
+        // No pre-written article — the proper pipeline produces it.
+        $this->assertNull($idea->generated_article);
+
+        // Brief carries the IG source material for article-prep.
+        $this->assertNotEmpty($idea->instructions);
+        $this->assertStringContainsString('watershed moment', $idea->instructions);
+        $this->assertStringContainsString('fact-check ulang', $idea->instructions);
+
+        // Provisional title derived from the caption (BREAKING prefix stripped).
+        $this->assertStringContainsString('US government', $idea->title);
 
         // No carousel-side artifacts in blog mode.
         $this->assertSame(0, Post::count());
@@ -80,13 +98,12 @@ class FinalizeRepurposeBlogModeTest extends TestCase
         Http::assertSent(fn ($req) => str_contains($req->url(), '/sendMessage'));
     }
 
-    public function test_missing_body_routes_to_failed(): void
+    public function test_empty_extracted_routes_to_failed(): void
     {
-        Bus::fake([GenerateLinkedInPost::class]);
         $job = RepurposeJob::factory()->create([
-            'status' => 'rewritten',
+            'status' => 'extracted',
             'mode' => 'blog',
-            'rewritten' => ['title' => 'x'], // no body
+            'extracted' => ['caption' => '', 'slides' => []],
         ]);
 
         (new FinalizeRepurpose($job->id))->handle();

@@ -636,8 +636,12 @@ class TelegramNotificationService
             : 'Klaim diverifikasi, sumber dilampirkan.';
 
         if ($job->mode === 'blog') {
-            $text = "📝 *Artikel repurpose siap* (job #{$job->id})\n{$claimLine}\n\n"
-                . 'Approve di Content Engine → images → publish → carousel + cross-post otomatis: /admin/content-engine';
+            // Blog mode now seeds a DRAFT idea (no pre-written article) — the
+            // operator runs the proper Content Engine pipeline for quality.
+            $text = "📝 *Draft blog dari IG siap* (job #{$job->id})\n"
+                . "Materi sumber sudah disiapkan jadi brief.\n\n"
+                . 'Buka Content Engine → klik *Start Research* untuk tulis artikel '
+                . 'berkualitas (5-gate) → publish → carousel + cross-post otomatis: /admin/content-engine';
         } else {
             $link = $linkedinDraftId ? "/admin/draft-posts/{$linkedinDraftId}" : '/admin/draft-posts';
             $text = "🎠 *Carousel draft siap* (job #{$job->id})\n{$claimLine}\n\nReview → {$link}";

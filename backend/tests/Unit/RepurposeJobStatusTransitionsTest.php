@@ -13,6 +13,8 @@ class RepurposeJobStatusTransitionsTest extends TestCase
         $this->assertTrue(RepurposeJobStatus::Captured->canTransitionTo(RepurposeJobStatus::Extracting));
         $this->assertTrue(RepurposeJobStatus::Rewritten->canTransitionTo(RepurposeJobStatus::Finalizing));
         $this->assertTrue(RepurposeJobStatus::Finalizing->canTransitionTo(RepurposeJobStatus::Drafted));
+        // Blog mode forks off `extracted` straight to finalize (skips research+rewrite).
+        $this->assertTrue(RepurposeJobStatus::Extracted->canTransitionTo(RepurposeJobStatus::Finalizing));
     }
 
     public function test_illegal_skips_rejected(): void
