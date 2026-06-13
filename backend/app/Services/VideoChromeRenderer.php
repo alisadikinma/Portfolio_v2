@@ -96,27 +96,29 @@ class VideoChromeRenderer
         return Process::timeout($this->timeout)->run($this->sshCommand($remoteCmd))->successful();
     }
 
-    private function logoUrl(): string
+    /** Placeholder brand slugs that must never surface as a handle (#4 bug). */
+    private const PLACEHOLDER_SLUGS = ['creator-brand', 'creator_brand', ''];
+
+    protected function logoUrl(): string
     {
         $rel = (string) Setting::query()->where('group', 'creator_brand')->where('key', 'creator_brand_logo')->value('value');
         if ($rel === '') {
             return '';
         }
-        // Playwright reads a local file:// URL (same as the POC).
-        $abs = public_path(ltrim($rel, '/'));
-
-        return 'file://' . $abs;
+        // The cjs inlines this as a data:URI (it strips a file:// prefix and reads
+        // bytes), so a plain absolute path is enough — no browser-readable URL.
+        return public_path(ltrim($rel, '/'));
     }
 
-    private function handle(): string
+    protected function handle(): string
     {
         $handle = (string) Setting::query()->where('group', 'linkedin')->where('key', 'creator_handle')->value('value');
         if ($handle !== '') {
             return str_starts_with($handle, '@') ? $handle : '@' . $handle;
         }
-        $slug = (string) Setting::query()->where('group', 'creator_brand')->where('key', 'creator_brand_slug')->value('value');
+        $slug = trim((string) Setting::query()->where('group', 'creator_brand')->where('key', 'creator_brand_slug')->value('value'));
 
-        return $slug !== '' ? '@' . $slug : '@alisadikinma';
+        return in_array($slug, self::PLACEHOLDER_SLUGS, true) ? '@alisadikinma' : '@' . $slug;
     }
 
     private function site(): string

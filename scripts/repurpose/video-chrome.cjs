@@ -10,19 +10,54 @@
  * @handle + site + gold "Geser →" pill.
  *
  *   node video-chrome.cjs --title Stitch --desc "..." --active 2 --total 3 \
- *     --number 2 --logo file:///path/logo.png --handle @alisadikinma \
+ *     --number 2 --logo /abs/logo.png --handle @alisadikinma \
  *     --site alisadikinma.com --header-out /abs/header.png --footer-out /abs/footer.png
  *
  * stdout last line: CHROME_OK  (or a thrown error + non-zero exit)
+ *
+ * Logo is inlined as a `data:image/png;base64,…` URI (NOT `file://`): Playwright
+ * `page.setContent()` runs in an opaque `about:blank` origin that silently blocks
+ * `file://` sub-resources, so a `file://` logo never rendered (the broken-logo
+ * bug). `toDataUri` is exported for unit testing without launching Chromium.
+ *
  * @see docs/plans/2026-06-12-ig-video-carousel-rebrand.md
  */
 'use strict';
 
-const { chromium } = require('/var/www/Portfolio_v2/node_modules/playwright');
+const fs = require('fs');
+const path = require('path');
 
 function arg(name, def) {
   const i = process.argv.indexOf('--' + name);
   return i > -1 && process.argv[i + 1] !== undefined ? process.argv[i + 1] : def;
+}
+
+const MIME_BY_EXT = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+};
+
+/**
+ * Read a local logo image and return an origin-independent
+ * `data:<mime>;base64,…` URI. Accepts a plain path or a `file://` URL; the MIME
+ * is derived from the file extension (the creator_brand_logo setting may store a
+ * jpg/webp, not only png), defaulting to image/png. Returns '' for an empty arg
+ * or an unreadable file (caller then emits no <img>).
+ */
+function toDataUri(logoArg) {
+  const p = String(logoArg || '').replace(/^file:\/\//, '');
+  if (!p) return '';
+  try {
+    const buf = fs.readFileSync(p);
+    const mime = MIME_BY_EXT[path.extname(p).toLowerCase()] || 'image/png';
+    return `data:${mime};base64,` + buf.toString('base64');
+  } catch (e) {
+    return '';
+  }
 }
 
 const TITLE = arg('title', '');
@@ -64,16 +99,20 @@ h1{font-size:92px;font-weight:700;line-height:1;margin:10px 0 18px}
 .handle{font-size:32px;font-weight:700}.site{font-size:22px;color:#F7B733;margin-top:2px}
 .pill{background:linear-gradient(135deg,#F7B733,#E8920A);color:#06203f;font-weight:700;font-size:30px;padding:18px 34px;border-radius:999px;box-shadow:0 0 24px rgba(245,166,35,.55)}</style>`;
 
-const logoTag = LOGO ? `<img class="logo" src="${LOGO}">` : '';
-const footLogo = LOGO ? `<img src="${LOGO}">` : '';
+const LOGO_URI = toDataUri(LOGO);
+const logoTag = LOGO_URI ? `<img class="logo" src="${LOGO_URI}">` : '';
+const footLogo = LOGO_URI ? `<img src="${LOGO_URI}">` : '';
 const header = `<!doctype html><html><head>${base}</head><body><div class="hd"><div class="top">${logoTag}<div class="steps">${chips}</div></div><div class="mid"><div class="ey">${esc(NUMBER)}</div><h1>${esc(TITLE)}</h1><div class="desc">${esc(DESC)}</div></div></div></body></html>`;
 const footer = `<!doctype html><html><head>${base}</head><body><div class="ft"><div class="fl">${footLogo}<div><div class="handle">${esc(HANDLE)}</div><div class="site">${esc(SITE)}</div></div></div><div class="pill">Geser →</div></div></body></html>`;
 
-(async () => {
+async function render() {
   if (!HEADER_OUT || !FOOTER_OUT) {
     console.error('missing --header-out / --footer-out');
     process.exit(1);
   }
+  // Lazy require so the module can be required as a library (tests) without
+  // Playwright installed at the VPS path.
+  const { chromium } = require('/var/www/Portfolio_v2/node_modules/playwright');
   const b = await chromium.launch({
     headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--single-process', '--disable-dev-shm-usage'],
@@ -94,4 +133,10 @@ const footer = `<!doctype html><html><head>${base}</head><body><div class="ft"><
 
   await b.close();
   console.log('CHROME_OK');
-})().catch((e) => { console.error(e); process.exit(1); });
+}
+
+module.exports = { toDataUri };
+
+if (require.main === module) {
+  render().catch((e) => { console.error(e); process.exit(1); });
+}
