@@ -136,6 +136,13 @@ class GenerateRebrandAssets implements ShouldQueue
             Log::warning('[GenerateRebrandAssets] both keyframe dispatches failed', ['job' => $job->id]);
         }
 
+        // Re-skin the source tool slides in PARALLEL with the Veo bookend render.
+        // Tool slides have no dependency on the hook/CTA clips, so a slow or failed
+        // bookend must not block them — each becomes downloadable the moment it
+        // composites. ComposeVideoCarousel (the assets_ready gate) still mops up
+        // any straggler + owns the FSM advance to finalize.
+        ComposeToolSlides::dispatch($job->id);
+
         try {
             app(TelegramNotificationService::class)
                 ->sendRepurposeProgress($job, '🎬 Bikin klip hook + CTA (face-gen → Veo)…');

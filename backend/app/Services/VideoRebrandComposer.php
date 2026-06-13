@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\RepurposeJob;
 use App\Models\RepurposeVideoSlide;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
@@ -38,6 +39,50 @@ class VideoRebrandComposer
         $this->sshKey = (string) config('services.instagram_capture.ssh_key', '');
         $this->ffmpegPath = (string) config('services.instagram_capture.ffmpeg_path', 'ffmpeg');
         $this->timeout = (int) config('services.instagram_capture.video_timeout', 300);
+    }
+
+    /**
+     * Re-skin every `tool` slide of a job into brand chrome (idempotent: skips
+     * slides already composited). Each slide is independent of the Veo bookends —
+     * a tool slide is just the source video re-stacked, it needs no hook/CTA — so
+     * this can run EARLY (in parallel with bookend generation, dispatched by
+     * GenerateRebrandAssets) instead of waiting for both bookends at `assets_ready`.
+     * That makes each tool slide individually downloadable the moment it composites,
+     * so a slow/failed hook never blocks the rest of the carousel. composeSlide
+     * persists per-slide status + the public download URL itself; this loop never
+     * touches the job FSM. Returns the count of tool slides that failed.
+     *
+     * Shared by ComposeToolSlides (early, parallel) and ComposeVideoCarousel (the
+     * assets_ready gate, which mops up any straggler). The `done && path` skip makes
+     * a rare concurrent overlap a harmless re-encode (ffmpeg `-y`, same output path).
+     */
+    public function composeJobToolSlides(RepurposeJob $job, VideoChromeRenderer $chrome): int
+    {
+        $tools = $job->videoSlides()->where('role', RepurposeVideoSlide::ROLE_TOOL)->get();
+        $total = $job->videoSlides()->count();
+
+        $failed = 0;
+        foreach ($tools as $slide) {
+            if ($slide->composited_status === 'done' && $slide->composited_path) {
+                continue;
+            }
+
+            try {
+                $chromePngs = $chrome->renderSlide($slide, $slide->slide_index, $total);
+                if ($chromePngs === null) {
+                    throw new \RuntimeException('chrome render returned null');
+                }
+                if ($this->composeSlide($slide, $chromePngs['header'], $chromePngs['footer']) === null) {
+                    throw new \RuntimeException('composer returned null');
+                }
+            } catch (\Throwable $e) {
+                $failed++;
+                $slide->update(['composited_status' => 'failed', 'last_error' => 'compose failed: '.$e->getMessage()]);
+                Log::warning('[VideoRebrandComposer] tool slide compose failed', ['slide' => $slide->id, 'error' => $e->getMessage()]);
+            }
+        }
+
+        return $failed;
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\ComposeToolSlides;
 use App\Jobs\GenerateRebrandAssets;
 use App\Models\RepurposeJob;
 use App\Models\RepurposeVideoSlide;
@@ -9,6 +10,7 @@ use App\Models\Setting;
 use App\Services\GeminiGenVideoService;
 use App\Services\VideoHookSceneAuthor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use Tests\TestCase;
 
 /**
@@ -66,6 +68,25 @@ class GenerateRebrandAssetsTest extends TestCase
         $this->assertSame(3, $cta->slide_index);
         $this->assertSame('generating', $cta->keyframe_status);
         $this->assertSame('kf-cta', $cta->keyframe_job_uuid);
+    }
+
+    public function test_dispatches_compose_tool_slides_in_parallel(): void
+    {
+        // Tool slides must re-skin in parallel with the Veo bookends — a slow/failed
+        // hook must not block them. GenerateRebrandAssets dispatches ComposeToolSlides.
+        Bus::fake();
+        $job = $this->jobWithToolSlides();
+
+        $this->mock(VideoHookSceneAuthor::class, function ($m) {
+            $m->shouldReceive('author')->andReturn(['success' => true, 'figure_name' => null, 'scene_prompt' => 'creator-only hook scene', 'error' => null]);
+        });
+        $this->mock(GeminiGenVideoService::class, function ($m) {
+            $m->shouldReceive('dispatchKeyframe')->twice()->andReturn('kf-hook', 'kf-cta');
+        });
+
+        (new GenerateRebrandAssets($job->id))->handle(app(GeminiGenVideoService::class));
+
+        Bus::assertDispatched(ComposeToolSlides::class, fn ($j) => $j->repurposeJobId === $job->id);
     }
 
     public function test_fails_loudly_when_creator_face_missing(): void

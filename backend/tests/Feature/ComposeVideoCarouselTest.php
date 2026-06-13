@@ -40,14 +40,11 @@ class ComposeVideoCarouselTest extends TestCase
         Bus::fake();
         $job = $this->jobReadyToCompose();
 
-        $chrome = $this->mock(VideoChromeRenderer::class, function ($m) {
-            $m->shouldReceive('renderSlide')->once()->andReturn(['header' => 'hdr.png', 'footer' => 'ftr.png']);
-        });
+        // The job now delegates the tool loop to the composer's shared method;
+        // 0 failed → carousel whole → advance + finalize.
+        $chrome = $this->mock(VideoChromeRenderer::class);
         $composer = $this->mock(VideoRebrandComposer::class, function ($m) {
-            $m->shouldReceive('composeSlide')->once()->andReturnUsing(function ($slide) {
-                $slide->update(['composited_status' => 'done', 'composited_path' => 'tool.mp4']);
-                return 'tool.mp4';
-            });
+            $m->shouldReceive('composeJobToolSlides')->once()->andReturn(0);
         });
 
         (new ComposeVideoCarousel($job->id))->handle($chrome, $composer);
@@ -62,11 +59,9 @@ class ComposeVideoCarouselTest extends TestCase
         Bus::fake();
         $job = $this->jobReadyToCompose();
 
-        $chrome = $this->mock(VideoChromeRenderer::class, function ($m) {
-            $m->shouldReceive('renderSlide')->once()->andReturn(null); // chrome render fails
-        });
+        $chrome = $this->mock(VideoChromeRenderer::class);
         $composer = $this->mock(VideoRebrandComposer::class, function ($m) {
-            $m->shouldReceive('composeSlide')->never();
+            $m->shouldReceive('composeJobToolSlides')->once()->andReturn(1); // a tool slide failed
         });
 
         (new ComposeVideoCarousel($job->id))->handle($chrome, $composer);
@@ -81,8 +76,8 @@ class ComposeVideoCarouselTest extends TestCase
         Bus::fake();
         $job = RepurposeJob::factory()->create(['mode' => 'video_rebrand', 'status' => 'composed']);
 
-        $chrome = $this->mock(VideoChromeRenderer::class, fn ($m) => $m->shouldReceive('renderSlide')->never());
-        $composer = $this->mock(VideoRebrandComposer::class, fn ($m) => $m->shouldReceive('composeSlide')->never());
+        $chrome = $this->mock(VideoChromeRenderer::class);
+        $composer = $this->mock(VideoRebrandComposer::class, fn ($m) => $m->shouldReceive('composeJobToolSlides')->never());
 
         (new ComposeVideoCarousel($job->id))->handle($chrome, $composer);
 

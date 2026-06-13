@@ -4,7 +4,6 @@ namespace App\Jobs;
 
 use App\Enums\RepurposeJobStatus;
 use App\Models\RepurposeJob;
-use App\Models\RepurposeVideoSlide;
 use App\Services\TelegramNotificationService;
 use App\Services\VideoChromeRenderer;
 use App\Services\VideoRebrandComposer;
@@ -52,31 +51,11 @@ class ComposeVideoCarousel implements ShouldQueue
 
         $job->transitionTo(RepurposeJobStatus::Compositing, 'video_compose_start', ['last_error' => null]);
 
-        $toolSlides = $job->videoSlides()->where('role', RepurposeVideoSlide::ROLE_TOOL)->get();
-        $total = $job->videoSlides()->count();
-
-        $failed = 0;
-        foreach ($toolSlides as $slide) {
-            // Skip slides already composited (idempotent re-run).
-            if ($slide->composited_status === 'done' && $slide->composited_path) {
-                continue;
-            }
-
-            try {
-                $chromePngs = $chrome->renderSlide($slide, $slide->slide_index, $total);
-                if ($chromePngs === null) {
-                    throw new \RuntimeException('chrome render returned null');
-                }
-                $out = $composer->composeSlide($slide, $chromePngs['header'], $chromePngs['footer']);
-                if ($out === null) {
-                    throw new \RuntimeException('composer returned null');
-                }
-            } catch (\Throwable $e) {
-                $failed++;
-                $slide->update(['composited_status' => 'failed', 'last_error' => 'compose failed: '.$e->getMessage()]);
-                Log::warning('[ComposeVideoCarousel] slide compose failed', ['slide' => $slide->id, 'error' => $e->getMessage()]);
-            }
-        }
+        // Mop up any tool slide not already re-skinned by the early ComposeToolSlides
+        // pass (idempotent — done slides are skipped). This is the assets_ready gate:
+        // by here the bookends are done, so once every tool slide is composited the
+        // carousel is whole and we advance to finalize.
+        $failed = $composer->composeJobToolSlides($job, $chrome);
 
         if ($failed > 0) {
             $job->transitionTo(RepurposeJobStatus::Failed, 'video_compose_failed', ['last_error' => "{$failed} tool slide(s) failed to composite — see slide errors."]);
