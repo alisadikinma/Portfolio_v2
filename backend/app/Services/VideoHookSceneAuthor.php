@@ -33,7 +33,7 @@ class VideoHookSceneAuthor
      * creator-only scene (figure_name null) — used by the safety fallback after a
      * PROMINENT_PEOPLE_UPLOAD refusal.
      *
-     * @return array{success: bool, figure_name: string|null, scene_prompt: string, error: string|null}
+     * @return array{success: bool, figure_name: string|null, brand_name?: string|null, scene_prompt: string, error: string|null}
      */
     public function author(string $topic, bool $allowFigure = true, string $medium = 'video', ?string $headline = null): array
     {
@@ -69,9 +69,18 @@ class VideoHookSceneAuthor
             }
         }
 
+        // Dominant product brand for the topic (e.g. "Google") — metadata used to
+        // resolve a brand logo for the hook overlay. Independent of figures.
+        $brand = null;
+        $rawBrand = trim((string) ($parsed['brand_name'] ?? ''));
+        if ($rawBrand !== '' && strtolower($rawBrand) !== 'null' && strtolower($rawBrand) !== 'none') {
+            $brand = $rawBrand;
+        }
+
         return [
             'success' => true,
             'figure_name' => $figure,
+            'brand_name' => $brand,
             // Strip the name even on success — the LLM occasionally leaks it into
             // the prose; it must never reach the image prompt.
             'scene_prompt' => $this->sanitizeScene($scene, $figure),
@@ -177,10 +186,12 @@ STRICT JSON OUTPUT — parsed by a machine, not a human:
 - Output ONE compact JSON object only. No markdown fences, no preamble, no trailing prose.
 - Escape EVERY double-quote inside a string value as \".
 - The figure's real NAME must appear ONLY in "figure_name", NEVER inside "scene_prompt".
+- Set "brand_name" to the SINGLE dominant product brand / company behind this topic (e.g. tools that are all Google products → "Google"; all OpenAI products → "OpenAI"); null if no one brand dominates. Metadata only — NEVER put the brand name or its logo into "scene_prompt".
 
 Return ONE JSON object with exactly this shape:
 {
   "figure_name": "Full Name or null",
+  "brand_name": "Dominant brand or null",
   "scene_prompt": "..."
 }
 PROMPT;

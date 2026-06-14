@@ -79,6 +79,28 @@ class VideoSlideClassifyTest extends TestCase
         $this->assertSame([1], $result['dropped']);
     }
 
+    public function test_preserves_source_hook_title_onto_job(): void
+    {
+        // The original creator's cover headline is captured onto the job BEFORE its
+        // row is dropped — the rebrand hook overlay reuses it ("dari IG source asli").
+        $job = $this->jobWithTools(3);
+
+        $svc = new class extends VideoSlideExtractor {
+            protected function runVisionParsed(string $prompt): array
+            {
+                return ['success' => true, 'parsed' => ['slides' => [
+                    ['n' => 1, 'kind' => 'source_hook', 'title' => '7 Google AI Tools you need', 'desc' => 'swipe'],
+                    ['n' => 2, 'kind' => 'content', 'title' => 'Stitch', 'desc' => 'AI design studio'],
+                    ['n' => 3, 'kind' => 'content', 'title' => 'Cursor', 'desc' => 'AI pair programmer'],
+                ]], 'output' => '', 'error' => null, 'repaired' => false];
+            }
+        };
+
+        $svc->extract($job);
+
+        $this->assertSame('7 Google AI Tools you need', $job->fresh()->extracted['source_hook_title']);
+    }
+
     public function test_maps_bilingual_desc_id_primary_and_desc_en_companion(): void
     {
         $job = $this->jobWithTools(2);

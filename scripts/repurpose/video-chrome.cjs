@@ -146,8 +146,9 @@ const footer = buildFooterHtml({ logoUri: toDataUri(LOGO), handle: HANDLE, site:
 /**
  * CTA ask overlay (#3) — a transparent full-canvas (1080×1350) page with a
  * navy/gold ask card anchored in the bottom third (above the mobile dead zone).
- * Composited over the CTA Veo clip so Follow/Save/Comment is visible in-feed.
- * Deliberately NO comment→DM promise (no auto-DM infra). Pure → unit-testable.
+ * Composited over the CTA Veo clip so the SINGLE ask (Follow @handle for more AI
+ * Tools) is visible in-feed. Exactly ONE command per the carousel/video CTA
+ * standard — NO Save/Comment stacking, NO comment→DM promise. Pure → unit-testable.
  */
 function buildCtaOverlayHtml(handle) {
   const h = esc(handle || '@alisadikinma');
@@ -160,18 +161,40 @@ html,body{width:1080px;height:1350px;background:transparent}
 .ic{display:inline-flex;align-items:center;justify-content:center;width:60px;height:60px;border-radius:16px;background:linear-gradient(135deg,#F7B733,#E8920A);color:#06203f;font-size:32px;font-weight:700;flex:none}
 .hl{color:#F7B733;font-weight:700}</style></head><body><div class="wrap"><div class="card">
 <div class="cta-h">Found this useful?</div>
-<div class="row"><span class="ic">+</span><span>Follow <span class="hl">${h}</span> for more AI tools</span></div>
-<div class="row"><span class="ic">&#9662;</span><span>Save this so you don't lose it</span></div>
-<div class="row"><span class="ic">&#10022;</span><span>Comment <span class="hl">&quot;AI&quot;</span> if it helped</span></div>
+<div class="row"><span class="ic">+</span><span>Follow <span class="hl">${h}</span> for more AI Tools</span></div>
 </div></div></body></html>`;
 }
 
+/**
+ * Hook title overlay — a transparent full-canvas (1080×1350) page with the cover
+ * headline (sourced from the ORIGINAL IG carousel's hook slide) anchored in the
+ * bottom third over a dark scrim, so it reads over the creator clip without
+ * covering the face (upper-center). Composited over the hook clip via ffmpeg.
+ * Pure → unit-testable.
+ */
+function buildHookTitleHtml(title, logoUri) {
+  const t = esc(title || '');
+  // Topic brand logo (e.g. Google) sits above the title — a white rounded chip so
+  // any logo colourway reads over the clip. Omitted when no logo resolved.
+  const logo = logoUri ? `<div class="logo"><img src="${logoUri}"/></div>` : '';
+  return `<!doctype html><html><head><style>${F}*{margin:0;padding:0;box-sizing:border-box;font-family:'Space Grotesk','Inter',sans-serif}
+html,body{width:1080px;height:1350px;background:transparent}
+.wrap{position:relative;width:1080px;height:1350px}
+.scrim{position:absolute;left:0;right:0;bottom:0;height:680px;background:linear-gradient(to top,rgba(4,16,34,.94) 6%,rgba(4,16,34,.72) 40%,rgba(4,16,34,0) 100%)}
+.box{position:absolute;left:0;right:0;bottom:0;padding:0 72px 200px;text-align:center}
+.logo{display:inline-flex;align-items:center;justify-content:center;background:#fff;border-radius:24px;padding:20px 34px;margin:0 auto 30px;box-shadow:0 8px 30px rgba(0,0,0,.45)}
+.logo img{height:72px;width:auto;max-width:360px;object-fit:contain;display:block}
+.bar{width:104px;height:9px;border-radius:6px;background:linear-gradient(90deg,#F7B733,#E8920A);margin:0 auto 34px;box-shadow:0 0 22px rgba(245,166,35,.6)}
+h1{font-size:72px;line-height:1.08;font-weight:700;color:#fff;letter-spacing:-.5px;text-shadow:0 4px 30px rgba(0,0,0,.6)}</style></head><body><div class="wrap"><div class="scrim"></div><div class="box">${logo}<div class="bar"></div><h1>${t}</h1></div></div></body></html>`;
+}
+
 async function render() {
-  if (MODE !== 'cta' && (!HEADER_OUT || !FOOTER_OUT)) {
+  const isOverlay = MODE === 'cta' || MODE === 'hook';
+  if (!isOverlay && (!HEADER_OUT || !FOOTER_OUT)) {
     console.error('missing --header-out / --footer-out');
     process.exit(1);
   }
-  if (MODE === 'cta' && !OVERLAY_OUT) {
+  if (isOverlay && !OVERLAY_OUT) {
     console.error('missing --overlay-out');
     process.exit(1);
   }
@@ -196,6 +219,17 @@ async function render() {
     return;
   }
 
+  if (MODE === 'hook') {
+    await p.setViewportSize({ width: 1080, height: 1350 });
+    await p.setContent(buildHookTitleHtml(TITLE, toDataUri(LOGO)), { waitUntil: 'networkidle' });
+    try { await p.evaluate(() => document.fonts.ready); } catch (e) {}
+    await p.waitForTimeout(400);
+    await p.screenshot({ path: OVERLAY_OUT, omitBackground: true });
+    await b.close();
+    console.log('CHROME_OK');
+    return;
+  }
+
   await p.setViewportSize({ width: 1080, height: 508 });
   await p.setContent(header, { waitUntil: 'networkidle' });
   try { await p.evaluate(() => document.fonts.ready); } catch (e) {}
@@ -212,7 +246,7 @@ async function render() {
   console.log('CHROME_OK');
 }
 
-module.exports = { toDataUri, buildCtaOverlayHtml, buildHeaderHtml, buildFooterHtml };
+module.exports = { toDataUri, buildCtaOverlayHtml, buildHookTitleHtml, buildHeaderHtml, buildFooterHtml };
 
 if (require.main === module) {
   render().catch((e) => { console.error(e); process.exit(1); });

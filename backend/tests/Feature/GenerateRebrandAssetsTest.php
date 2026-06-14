@@ -143,6 +143,29 @@ class GenerateRebrandAssetsTest extends TestCase
         $this->assertSame('veo', $cta->video_provider);   // no figure → stays Veo
     }
 
+    public function test_resolves_topic_brand_logo_onto_job(): void
+    {
+        // The author detects the dominant brand ("Google"); a license-clean logo is
+        // resolved + stashed on the job for the hook overlay.
+        $job = $this->jobWithToolSlides();
+
+        $this->mock(VideoHookSceneAuthor::class, function ($m) {
+            $m->shouldReceive('author')->andReturn(['success' => true, 'figure_name' => null, 'brand_name' => 'Google', 'scene_prompt' => 'creator-only hook scene', 'error' => null]);
+        });
+        $this->mock(\App\Services\EntityReferenceService::class, function ($m) {
+            $m->shouldReceive('findOrFetch')->with('Google', 'logo')->andReturn(['url' => 'https://alisadikinma.com/storage/entity-refs/logo/Q95_google.png']);
+        });
+        $this->mock(GeminiGenVideoService::class, function ($m) {
+            $m->shouldReceive('dispatchKeyframe')->twice()->andReturn('kf-hook', 'kf-cta');
+        });
+
+        (new GenerateRebrandAssets($job->id))->handle(app(GeminiGenVideoService::class));
+
+        $fresh = $job->fresh();
+        $this->assertSame('https://alisadikinma.com/storage/entity-refs/logo/Q95_google.png', $fresh->extracted['hook_brand_logo']);
+        $this->assertSame('Google', $fresh->extracted['hook_brand_name']);
+    }
+
     public function test_fails_loudly_when_creator_face_missing(): void
     {
         // No profile_photo setting → getCreatorFaceUrl returns null.

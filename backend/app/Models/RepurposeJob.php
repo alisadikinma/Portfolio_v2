@@ -117,6 +117,31 @@ class RepurposeJob extends Model
     }
 
     /**
+     * Title text for the video_rebrand hook overlay, sourced from the ORIGINAL IG
+     * carousel ("dari IG source asli"): the captured source-hook headline
+     * (preserved by VideoSlideExtractor before its row is dropped), falling back to
+     * the first non-empty line of the IG caption. Empty string → render no title
+     * (hook ships as a plain clip).
+     */
+    public function videoHookTitle(): string
+    {
+        $fromHook = trim((string) ($this->extracted['source_hook_title'] ?? ''));
+        if ($fromHook !== '') {
+            return mb_substr($fromHook, 0, 90);
+        }
+
+        $caption = (string) ($this->extracted['caption'] ?? '');
+        foreach (preg_split('/\r\n|\r|\n/', $caption) as $line) {
+            $line = trim($line);
+            if ($line !== '') {
+                return mb_substr($line, 0, 90);
+            }
+        }
+
+        return '';
+    }
+
+    /**
      * Single source of truth: does this Post / LinkedIn draft originate from an
      * IG-repurpose job? Repurpose carousels anchor an UNPUBLISHED Post purely to
      * generate slides — that post's /blog/{slug} URL 404s, so NO platform should

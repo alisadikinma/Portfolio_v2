@@ -218,6 +218,14 @@ class PollRebrandAssets extends Command
                         if ($overlaid !== null) {
                             $composited = $overlaid;
                         }
+                    } elseif ($slide->role === RepurposeVideoSlide::ROLE_HOOK) {
+                        // Overlay the cover headline (from the original IG hook) onto
+                        // the hook clip. Non-fatal — a missing title or render miss
+                        // ships the plain clip.
+                        $titled = $this->applyHookTitle($slide);
+                        if ($titled !== null) {
+                            $composited = $titled;
+                        }
                     }
                     $slide->update(['veo_status' => 'done', 'veo_url' => $videoUrl, 'composited_path' => $composited, 'composited_status' => 'done', 'last_error' => null]);
                     $this->info("  slide {$slide->id} veo done");
@@ -504,6 +512,30 @@ class PollRebrandAssets extends Command
         }
 
         return app(VideoRebrandComposer::class)->overlayCta($slide, $overlayPng);
+    }
+
+    /**
+     * Render + composite the hook TITLE overlay (cover headline from the original
+     * IG hook) onto the finalized hook clip. Returns the new public URL, or null if
+     * there's no title or either step fails (caller keeps the plain hook clip).
+     */
+    private function applyHookTitle(RepurposeVideoSlide $slide): ?string
+    {
+        $job = $slide->repurposeJob;
+        $title = (string) (optional($job)->videoHookTitle() ?? '');
+        if (trim($title) === '') {
+            return null;
+        }
+
+        // Topic brand logo (e.g. Google), auto-resolved at keyframe-build time.
+        $logo = $job ? ($job->extracted['hook_brand_logo'] ?? null) : null;
+
+        $overlayPng = app(VideoChromeRenderer::class)->renderHookTitle($slide, $title, is_string($logo) ? $logo : null);
+        if ($overlayPng === null) {
+            return null;
+        }
+
+        return app(VideoRebrandComposer::class)->overlayClip($slide, $overlayPng, 'title');
     }
 
     private function poll(?string $uuid): ?array

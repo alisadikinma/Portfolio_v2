@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /**
  * Phase D unit test (#3 CTA ask) — video-chrome.cjs must build a CTA overlay
- * card with a real Follow / Save / Comment ask, and MUST NOT promise a
- * comment→DM auto-delivery (no auto-DM infra). The card is composited over the
+ * card with EXACTLY ONE command (Follow @handle for more AI Tools) per the
+ * carousel/video CTA standard — NO Save/Comment stacking — and MUST NOT promise
+ * a comment→DM auto-delivery (no auto-DM infra). The card is composited over the
  * CTA Veo clip so the ask is visible in-feed regardless of caption truncation.
  *
  * Tests the pure buildCtaOverlayHtml(handle) export (no Chromium launch).
@@ -31,9 +32,10 @@ check('renders the Follow ask with the handle', () => {
   assert.ok(html.includes('@alisadikinma'), 'missing handle');
 });
 
-check('renders Save + Comment asks', () => {
-  assert.ok(/Save/i.test(html), 'missing Save ask');
-  assert.ok(/Comment/i.test(html), 'missing Comment ask');
+check('renders EXACTLY ONE command (no Save/Comment stacking)', () => {
+  assert.ok(/for more AI Tools/i.test(html), 'Follow ask should read "for more AI Tools"');
+  assert.ok(!/Save this/i.test(html), 'must NOT stack a Save ask (one command only)');
+  assert.ok(!/Comment\b/i.test(html), 'must NOT stack a Comment ask (one command only)');
 });
 
 check('does NOT promise a comment→DM auto-delivery', () => {

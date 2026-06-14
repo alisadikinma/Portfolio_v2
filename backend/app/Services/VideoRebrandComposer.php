@@ -177,15 +177,26 @@ class VideoRebrandComposer
      */
     public function overlayCta(RepurposeVideoSlide $slide, string $overlayPng): ?string
     {
+        return $this->overlayClip($slide, $overlayPng, 'cta');
+    }
+
+    /**
+     * Composite a transparent overlay PNG onto a finalized bookend clip and write a
+     * sibling `_{suffix}.mp4` on the public disk (keeps audio). Generic over CTA
+     * ask-cards ('cta') and hook title cards ('title'). Returns the new full public
+     * URL, or null on failure (caller keeps the plain clip — graceful degrade).
+     */
+    public function overlayClip(RepurposeVideoSlide $slide, string $overlayPng, string $suffix): ?string
+    {
         $jobId = (int) $slide->repurpose_job_id;
         $inRel = "repurpose/{$jobId}/composited/slide_{$slide->slide_index}.mp4";
         $inAbs = Storage::disk('public')->path($inRel);
         if (!is_file($inAbs)) {
-            Log::error('[VideoRebrandComposer] CTA overlay: finalized clip missing', ['slide' => $slide->id, 'in' => $inRel]);
+            Log::error('[VideoRebrandComposer] overlay: finalized clip missing', ['slide' => $slide->id, 'in' => $inRel, 'suffix' => $suffix]);
             return null;
         }
 
-        $outRel = "repurpose/{$jobId}/composited/slide_{$slide->slide_index}_cta.mp4";
+        $outRel = "repurpose/{$jobId}/composited/slide_{$slide->slide_index}_{$suffix}.mp4";
         $outAbs = Storage::disk('public')->path($outRel);
 
         $cmd = [

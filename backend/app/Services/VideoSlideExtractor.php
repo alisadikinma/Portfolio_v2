@@ -73,6 +73,7 @@ class VideoSlideExtractor
         // vision entry (or an unknown kind) is treated as content (conservative —
         // never drop what we couldn't classify).
         $dropped = [];
+        $sourceHookTitle = null;
         foreach ($toolSlides as $slide) {
             $entry = $bySlideNumber[$slide->slide_index] ?? null;
             if ($entry === null) {
@@ -93,7 +94,22 @@ class VideoSlideExtractor
             $kind = strtolower(trim((string) ($entry['kind'] ?? 'content')));
             if (in_array($kind, self::NON_CONTENT_KINDS, true)) {
                 $dropped[] = (int) $slide->slide_index;
+                // Preserve the ORIGINAL creator's cover/hook headline before the
+                // caller deletes this row — the rebrand hook overlay reuses it as
+                // its title ("dari IG source asli"). First source_hook wins.
+                if ($kind === 'source_hook' && $sourceHookTitle === null) {
+                    $t = trim((string) ($entry['title'] ?? ''));
+                    if ($t !== '') {
+                        $sourceHookTitle = $t;
+                    }
+                }
             }
+        }
+
+        if ($sourceHookTitle !== null) {
+            $extracted = (array) ($job->extracted ?? []);
+            $extracted['source_hook_title'] = $sourceHookTitle;
+            $job->update(['extracted' => $extracted]);
         }
 
         Log::info('[VideoSlideExtractor] extracted', [

@@ -56,6 +56,33 @@ class HookAuthorAndFallbackTest extends TestCase
         $this->assertStringContainsString('reference image 2', $res['scene_prompt']);
     }
 
+    public function test_author_returns_brand_name_for_logo_resolution(): void
+    {
+        $svc = $this->fakeAuthor([
+            'figure_name' => null,
+            'brand_name' => 'Google',
+            'scene_prompt' => 'Creator alone in a bright studio with abstract floating glows.',
+        ]);
+
+        $res = $svc->author('Stitch, Mixboard, Google AI Studio, Lyria', true);
+
+        $this->assertTrue($res['success']);
+        $this->assertSame('Google', $res['brand_name']);
+    }
+
+    public function test_author_brand_name_null_when_no_dominant_brand(): void
+    {
+        $svc = $this->fakeAuthor([
+            'figure_name' => null,
+            'brand_name' => 'null',
+            'scene_prompt' => 'Creator alone in a studio.',
+        ]);
+
+        $res = $svc->author('mixed AI tips', true);
+
+        $this->assertNull($res['brand_name']);
+    }
+
     public function test_sanitize_strips_figure_name_from_scene(): void
     {
         $svc = new VideoHookSceneAuthor();

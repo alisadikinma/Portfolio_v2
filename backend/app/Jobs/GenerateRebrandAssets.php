@@ -238,6 +238,12 @@ class GenerateRebrandAssets implements ShouldQueue
             return [[$faceUrl], self::KEYFRAME_PROMPT_HOOK];
         }
 
+        // Auto-detect the topic's dominant brand → resolve a license-clean logo for
+        // the hook overlay (e.g. "Google"). Best-effort: no brand, or a corporate
+        // logo that fails the CC-license gate → no logo (hook ships with just the
+        // title). Stored on the job; PollRebrandAssets' hook overlay reads it.
+        $this->resolveHookBrandLogo($job, (string) ($authored['brand_name'] ?? ''));
+
         $refs = [$faceUrl];
         $figureName = $allowFigure ? ($authored['figure_name'] ?? null) : null;
         if ($figureName) {
@@ -276,6 +282,33 @@ class GenerateRebrandAssets implements ShouldQueue
         }
 
         return [$refs, (string) $authored['scene_prompt']];
+    }
+
+    /**
+     * Resolve a license-clean logo for the topic's dominant brand and stash it on
+     * the job (`extracted.hook_brand_logo`) for the hook title overlay. Best-effort
+     * + idempotent — never blocks keyframe generation.
+     */
+    private function resolveHookBrandLogo(RepurposeJob $job, string $brand): void
+    {
+        $brand = trim($brand);
+        if ($brand === '') {
+            return;
+        }
+        try {
+            $entity = app(EntityReferenceService::class)->findOrFetch($brand, 'logo');
+            $url = is_array($entity) ? ($entity['url'] ?? null) : null;
+            if (is_string($url) && $url !== '') {
+                $extracted = (array) ($job->extracted ?? []);
+                $extracted['hook_brand_logo'] = $url;
+                $extracted['hook_brand_name'] = $brand;
+                $job->update(['extracted' => $extracted]);
+            } else {
+                Log::info('[GenerateRebrandAssets] hook brand logo unresolved (license/notability)', ['job' => $job->id, 'brand' => $brand]);
+            }
+        } catch (\Throwable $e) {
+            Log::info('[GenerateRebrandAssets] hook brand logo resolve failed', ['job' => $job->id, 'brand' => $brand, 'error' => $e->getMessage()]);
+        }
     }
 
     /** Topic = surviving content tool titles, in slide order. */
