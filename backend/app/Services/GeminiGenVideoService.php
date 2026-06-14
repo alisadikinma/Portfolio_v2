@@ -313,6 +313,85 @@ class GeminiGenVideoService
     }
 
     /**
+     * Dispatch a GROK (xAI grok-video) image-to-video job for a video_rebrand
+     * hook/CTA clip — the FAILOVER generator when Veo can't be used: a public
+     * figure is on the keyframe (Veo blocks prominent-people) OR Veo failed
+     * PUBLIC_ERROR_AUDIO_FILTERED (Veo 3.x forces audio gen, no off-switch, and
+     * its audio filter trips nondeterministically). GROK strips audio on download
+     * and is xAI (not Google) so it clears both walls. Proven live 2026-06-14.
+     *
+     * IMPORTANT: GROK only accepts aspect_ratio 2:3 (9:16 → HTTP 400). The 2:3
+     * output is later center-cropped to 4:5 by finalizeVeoClip (same crop math —
+     * any source taller than 4:5 works). Returns the GROK job uuid (poll key at
+     * /history/{uuid}) or null on circuit-open / missing key / HTTP failure.
+     */
+    public function dispatchGrokClip(string $keyframeUrl, string $prompt, ?int $contextId = null): ?string
+    {
+        if (empty($this->apiKey)) {
+            Log::error('[GeminiGenVideo] GEMINIGEN_API_KEY missing — cannot dispatch GROK', ['ctx' => $contextId]);
+
+            return null;
+        }
+
+        if ($this->breaker->state() === 'open') {
+            Log::warning('[GeminiGenVideo] dispatchGrokClip skipped — circuit OPEN', ['ctx' => $contextId]);
+
+            return null;
+        }
+
+        $multipart = [
+            ['name' => 'prompt', 'contents' => $prompt],
+            ['name' => 'model', 'contents' => (string) config('services.geminigen.video_model', 'grok-3')],
+            // GROK rejects 9:16 (HTTP 400) — 2:3 is the only vertical it accepts;
+            // cropped 2:3 → 4:5 downstream in finalizeVeoClip.
+            ['name' => 'aspect_ratio', 'contents' => '2:3'],
+            ['name' => 'mode', 'contents' => 'custom'],
+            ['name' => 'duration', 'contents' => '6'],
+            ['name' => 'resolution', 'contents' => '720p'],
+            ['name' => 'file_urls', 'contents' => $keyframeUrl],
+        ];
+
+        try {
+            $response = Http::timeout(90)
+                ->withHeaders(['x-api-key' => $this->apiKey])
+                ->asMultipart()
+                ->post("{$this->baseUrl}/video-gen/grok", $multipart);
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            $this->breaker->recordFailure(null, null, $e);
+            Log::error('[GeminiGenVideo] GROK clip HTTP connection exception', ['ctx' => $contextId, 'error' => $e->getMessage()]);
+
+            return null;
+        } catch (\Throwable $e) {
+            Log::error('[GeminiGenVideo] GROK clip HTTP unexpected exception', ['ctx' => $contextId, 'error' => $e->getMessage()]);
+
+            return null;
+        }
+
+        if (! $response->successful()) {
+            $errorCode = $response->json('error_code') ?? $response->json('code');
+            $this->breaker->recordFailure($response->status(), is_string($errorCode) ? $errorCode : null);
+            Log::error('[GeminiGenVideo] GROK clip dispatch non-2xx', [
+                'ctx' => $contextId,
+                'status' => $response->status(),
+                'body' => mb_substr($response->body(), 0, 500),
+            ]);
+
+            return null;
+        }
+
+        $this->breaker->recordSuccess();
+
+        $uuid = $response->json('uuid');
+        if (! is_string($uuid) || $uuid === '') {
+            Log::error('[GeminiGenVideo] GROK clip 2xx but no uuid', ['ctx' => $contextId, 'body' => mb_substr($response->body(), 0, 300)]);
+
+            return null;
+        }
+
+        return $uuid;
+    }
+
+    /**
      * Download a finished Veo 9:16 MP4, center-crop to 4:5 + scale to 1080×1350
      * (match the carousel slides). Audio kept (Veo clips may carry it). $relOut is
      * the public-disk relative path. Returns the public MP4 URL or null on failure.

@@ -204,27 +204,120 @@ class PollRebrandAssetsTest extends TestCase
         Bus::assertDispatched(GenerateRebrandAssets::class);
     }
 
-    public function test_recover_respects_max_retries(): void
+    public function test_recover_respects_max_retries_after_grok_failover(): void
     {
+        // A GROK bookend (already failed over from Veo) that exhausts its OWN budget
+        // is genuinely stuck — recover dispatches nothing, checkCompletion fails it.
         Bus::fake();
 
         $job = RepurposeJob::factory()->create([
             'mode' => 'video_rebrand', 'status' => 'generating_assets',
-            'asset_retry_count' => 3, // already at MAX_RETRIES
+            'asset_retry_count' => 3, // already at MAX_RETRIES on GROK
             'updated_at' => now()->subMinutes(10),
         ]);
         $hook = RepurposeVideoSlide::create([
             'repurpose_job_id' => $job->id, 'slide_index' => 0, 'role' => 'hook',
             'keyframe_status' => 'done', 'keyframe_url' => 'https://cdn/kf.jpg', 'veo_status' => 'failed',
+            'video_provider' => 'grok', // no further provider to escape to
         ]);
 
-        $this->mock(GeminiGenVideoService::class); // no dispatchVeoClip expected
+        $this->mock(GeminiGenVideoService::class); // no dispatch expected
 
         $this->artisan('repurpose:poll-rebrand-assets')->assertSuccessful();
 
         $hook->refresh();
         $this->assertSame('failed', $hook->veo_status); // untouched — budget exhausted
         Bus::assertNotDispatched(GenerateRebrandAssets::class);
+    }
+
+    public function test_keyframe_ready_dispatches_grok_when_provider_is_grok(): void
+    {
+        // A figure hook is flipped to provider=grok in buildHookKeyframe → the poll
+        // must dispatch GROK (not Veo) for the clip.
+        $job = RepurposeJob::factory()->create(['mode' => 'video_rebrand', 'status' => 'generating_assets']);
+        $hook = RepurposeVideoSlide::create([
+            'repurpose_job_id' => $job->id, 'slide_index' => 0, 'role' => 'hook',
+            'keyframe_status' => 'generating', 'keyframe_job_uuid' => 'kf-g', 'video_provider' => 'grok',
+        ]);
+
+        Http::fake([
+            '*/history/kf-g' => Http::response(['generated_image' => [['image_url' => 'https://cdn/kf-fig.jpg']], 'status' => 2], 200),
+        ]);
+
+        $this->mock(GeminiGenVideoService::class, function ($m) {
+            $m->shouldReceive('dispatchGrokClip')->once()->with('https://cdn/kf-fig.jpg', \Mockery::type('string'), \Mockery::any())->andReturn('grok-1');
+            $m->shouldNotReceive('dispatchVeoClip');
+        });
+
+        $this->artisan('repurpose:poll-rebrand-assets')->assertSuccessful();
+
+        $hook->refresh();
+        $this->assertSame('generating', $hook->veo_status);
+        $this->assertSame('grok-1', $hook->veo_job_uuid);
+    }
+
+    public function test_veo_prominent_people_fails_over_to_grok_immediately(): void
+    {
+        // Veo refuses a figure clip (PROMINENT_PEOPLE) → flip the bookend to GROK
+        // RIGHT AWAY (no point retrying Veo on a celebrity), keeping the figure.
+        $job = RepurposeJob::factory()->create(['mode' => 'video_rebrand', 'status' => 'generating_assets']);
+        $hook = RepurposeVideoSlide::create([
+            'repurpose_job_id' => $job->id, 'slide_index' => 0, 'role' => 'hook',
+            'keyframe_status' => 'done', 'keyframe_url' => 'https://cdn/kf.jpg',
+            'veo_status' => 'generating', 'veo_job_uuid' => 'veo-1', 'video_provider' => 'veo',
+        ]);
+
+        Http::fake([
+            '*/history/veo-1' => Http::response(['error_message' => 'PUBLIC_ERROR_PROMINENT_PEOPLE_FILTER_FAILED', 'status' => 3], 200),
+        ]);
+
+        $this->mock(GeminiGenVideoService::class);
+
+        $this->artisan('repurpose:poll-rebrand-assets')->assertSuccessful();
+
+        $hook->refresh();
+        $this->assertSame('failed', $hook->veo_status);
+        $this->assertSame('prominent_people', $hook->last_error_class);
+        $this->assertSame('grok', $hook->video_provider); // immediate failover
+    }
+
+    public function test_veo_audio_failure_stays_on_veo_until_budget_then_fails_over_to_grok(): void
+    {
+        // Audio failure is NOT immediate-failover: Veo keeps the clip and burns its
+        // 3-retry budget first; only once spent does recover escape to GROK.
+        Bus::fake();
+
+        $job = RepurposeJob::factory()->create([
+            'mode' => 'video_rebrand', 'status' => 'generating_assets',
+            'asset_retry_count' => 3, // Veo budget already spent
+            'updated_at' => now()->subMinutes(10),
+        ]);
+        $hook = RepurposeVideoSlide::create([
+            'repurpose_job_id' => $job->id, 'slide_index' => 0, 'role' => 'hook',
+            'keyframe_status' => 'done', 'keyframe_url' => 'https://cdn/kf.jpg',
+            'veo_status' => 'failed', 'last_error_class' => 'audio_filtered', 'video_provider' => 'veo',
+        ]);
+        RepurposeVideoSlide::create([
+            'repurpose_job_id' => $job->id, 'slide_index' => 2, 'role' => 'cta',
+            'keyframe_status' => 'done', 'keyframe_url' => 'https://cdn/kf-cta.jpg',
+            'composited_status' => 'done', 'composited_path' => 'cta.mp4', 'veo_status' => 'done',
+        ]);
+
+        $this->mock(GeminiGenVideoService::class, function ($m) {
+            // failover dispatch goes to GROK from the preserved keyframe
+            $m->shouldReceive('dispatchGrokClip')->once()->with('https://cdn/kf.jpg', \Mockery::type('string'), \Mockery::any())->andReturn('grok-fo');
+            $m->shouldNotReceive('dispatchVeoClip');
+        });
+
+        $this->artisan('repurpose:poll-rebrand-assets')->assertSuccessful();
+
+        $hook->refresh();
+        $job->refresh();
+        $this->assertSame('grok', $hook->video_provider); // failed over
+        $this->assertSame('generating', $hook->veo_status);
+        $this->assertSame('grok-fo', $hook->veo_job_uuid);
+        $this->assertSame(1, $job->asset_retry_count); // budget reset (0) then +1 this tick
+        $this->assertSame('generating_assets', $job->status); // NOT failed — GROK got its shot
     }
 
     public function test_exhaustion_fails_job_and_sends_telegram_alert(): void

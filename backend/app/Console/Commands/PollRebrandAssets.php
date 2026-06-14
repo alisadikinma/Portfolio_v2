@@ -99,24 +99,25 @@ class PollRebrandAssets extends Command
 
                     continue;
                 }
-                $prompt = $slide->role === RepurposeVideoSlide::ROLE_CTA
-                    ? GenerateRebrandAssets::VEO_PROMPT_CTA
-                    : GenerateRebrandAssets::VEO_PROMPT_HOOK;
+                // Persist the keyframe FIRST so a dispatch failure never loses the
+                // rendered image — recover() re-dispatches the clip from keyframe_url
+                // without re-rendering. Provider is Veo by default; a figure hook is
+                // already flipped to GROK in GenerateRebrandAssets::buildHookKeyframe.
+                $slide->update(['keyframe_status' => 'done', 'keyframe_url' => $imageUrl]);
 
-                $uuid = $video->dispatchVeoClip($imageUrl, $prompt, '9:16', $slide->id);
+                $uuid = $this->dispatchClipForProvider($video, $slide, $imageUrl);
                 if ($uuid === null) {
-                    // Circuit open / dispatch rejected — keep keyframe done so the
-                    // recovery pass can re-dispatch Veo without re-rendering the image.
-                    $slide->update(['keyframe_status' => 'done', 'keyframe_url' => $imageUrl, 'veo_status' => 'failed', 'last_error' => 'Veo dispatch failed (service unavailable)', 'last_error_class' => VideoGenErrorClassifier::TRANSIENT]);
-                    $this->warn("  slide {$slide->id} Veo dispatch failed");
+                    // Circuit open / dispatch rejected — keyframe stays done so the
+                    // recovery pass can re-dispatch the clip without re-rendering.
+                    $slide->update(['veo_status' => 'failed', 'last_error' => 'Clip dispatch failed (service unavailable)', 'last_error_class' => VideoGenErrorClassifier::TRANSIENT]);
+                    $this->warn("  slide {$slide->id} clip dispatch failed");
 
                     continue;
                 }
                 $slide->update([
-                    'keyframe_status' => 'done', 'keyframe_url' => $imageUrl,
                     'veo_status' => 'generating', 'veo_job_uuid' => $uuid, 'last_error' => null, 'last_error_class' => null,
                 ]);
-                $this->info("  slide {$slide->id} keyframe done → Veo {$uuid}");
+                $this->info("  slide {$slide->id} keyframe done → {$slide->video_provider} clip {$uuid}");
 
                 continue;
             }
@@ -232,23 +233,23 @@ class PollRebrandAssets extends Command
                 $reason = $this->errorReason($data);
                 $signature = $this->errorSignature($data);
                 if (! $dry) {
-                    $update = ['veo_status' => 'failed', 'last_error' => $reason, 'last_error_class' => $this->classifier->classify($signature)];
-                    // Safety self-heal (mirrors the keyframe branch): Veo can refuse a
-                    // hook clip whose keyframe shows a recognizable public figure
-                    // (PROMINENT_PEOPLE_FILTER_FAILED) even when the keyframe itself
-                    // passed image-gen. Without dropping the figure here, recover()
-                    // would re-author the SAME figure keyframe and loop on the same
-                    // refusal forever. Set the sentinel so the recovery pass re-authors
-                    // a CREATOR-ONLY scene (GenerateRebrandAssets reads figure_dropped).
-                    if ($slide->role === RepurposeVideoSlide::ROLE_HOOK
-                        && ! $slide->figure_dropped
-                        && $this->isSafetyError($signature)) {
-                        $update['figure_dropped'] = true;
-                        $this->warn("  slide {$slide->id} hook VEO refused (figure) → dropping figure ref for retry");
+                    $class = $this->classifier->classify($signature);
+                    $update = ['veo_status' => 'failed', 'last_error' => $reason, 'last_error_class' => $class];
+                    // IMMEDIATE failover (prominent_people ONLY): Veo (Google) will
+                    // NEVER animate a recognizable public figure, so retrying Veo is
+                    // pointless — switch this clip to GROK (xAI allows figures) now,
+                    // KEEPING the figure keyframe. Every OTHER failure class
+                    // (audio_filtered / transient / …) stays on Veo and burns the
+                    // 3-retry budget first; recover() escapes to GROK only after that
+                    // budget is spent (Ali's policy 2026-06-14 — preserve Veo quality).
+                    if ($slide->video_provider === RepurposeVideoSlide::PROVIDER_VEO
+                        && $class === VideoGenErrorClassifier::PROMINENT_PEOPLE) {
+                        $update['video_provider'] = RepurposeVideoSlide::PROVIDER_GROK;
+                        $this->warn("  slide {$slide->id} Veo prominent-people → immediate GROK failover (figure kept)");
                     }
                     $slide->update($update);
                 }
-                $this->warn("  slide {$slide->id} veo failed");
+                $this->warn("  slide {$slide->id} veo clip failed");
 
                 continue;
             }
@@ -294,9 +295,16 @@ class PollRebrandAssets extends Command
                 // Only fail the job once retries are exhausted (recovery pass owns the budget).
                 // Scope the error check to bookends (like $hardFailed/$allDone) —
                 // a stale tool-slide last_error must not prematurely fail the job.
+                // A Veo bookend that still has its keyframe can fail over to GROK
+                // (recover() owns that escape) — don't fail the job while that's
+                // still possible, or we'd kill it one tick before the GROK attempt.
+                $canFailover = $bookends->contains(fn ($s) => $s->video_provider === RepurposeVideoSlide::PROVIDER_VEO
+                    && $s->veo_status === 'failed'
+                    && filled($s->keyframe_url));
                 $exhausted = $bookends->every(fn ($s) => $s->keyframe_status !== 'generating' && $s->veo_status !== 'generating')
                     && $bookends->contains(fn ($s) => $s->last_error !== null)
-                    && (int) ($job->asset_retry_count ?? 0) >= self::MAX_RETRIES;
+                    && (int) ($job->asset_retry_count ?? 0) >= self::MAX_RETRIES
+                    && ! $canFailover;
                 if ($exhausted) {
                     $lastSlideError = (string) ($bookends->first(fn ($s) => $s->last_error !== null)?->last_error ?? '');
                     $job->transitionTo(RepurposeJobStatus::Failed, 'video_assets_failed', ['last_error' => 'A hook/CTA clip failed to generate after retries — see slide errors.']);
@@ -358,8 +366,37 @@ class PollRebrandAssets extends Command
         if ($failed->isEmpty()) {
             return;
         }
+
+        // Current-provider retry budget spent → before giving up, fail over any
+        // still-Veo failed bookend to GROK with a FRESH budget. (Ali's policy
+        // 2026-06-14: a NON-figure Veo failure — audio/timeout — retries 3x on Veo
+        // FIRST, then escapes to GROK; a figure bookend is on GROK from the start.)
+        // A bookend already on GROK that's exhausted is genuinely stuck → leave it
+        // for checkCompletion to fail the job.
         if ((int) ($job->asset_retry_count ?? 0) >= self::MAX_RETRIES) {
-            return;
+            $veoFailover = $failed->filter(fn ($s) => $s->video_provider === RepurposeVideoSlide::PROVIDER_VEO
+                && $s->veo_status === 'failed'
+                && filled($s->keyframe_url));
+            if ($veoFailover->isEmpty()) {
+                return; // nothing left to escape to → checkCompletion fails the job
+            }
+            if ($dry) {
+                $this->line("  [dry] job {$job->id} Veo budget spent → would fail over ".$veoFailover->count().' bookend to GROK');
+
+                return;
+            }
+            $job->videoSlides()
+                ->whereIn('id', $veoFailover->pluck('id')->all())
+                ->update(['video_provider' => RepurposeVideoSlide::PROVIDER_GROK, 'last_error' => null, 'last_error_class' => null]);
+            $job->update(['asset_retry_count' => 0]); // fresh budget for GROK
+            $this->warn("  job {$job->id} Veo retries exhausted → GROK failover (".$veoFailover->count().' bookend)');
+            // Reload so the dispatch below sees provider=grok + cleared errors.
+            $bookends = $job->videoSlides()
+                ->whereIn('role', [RepurposeVideoSlide::ROLE_HOOK, RepurposeVideoSlide::ROLE_CTA])
+                ->get();
+            $failed = $bookends->filter(fn ($s) => $s->keyframe_status === 'failed'
+                || $s->keyframe_status === null
+                || $s->veo_status === 'failed');
         }
 
         $veoOnly = $failed->filter(fn ($s) => $s->keyframe_status === 'done'
@@ -368,25 +405,26 @@ class PollRebrandAssets extends Command
         $keyframeBroken = $failed->reject(fn ($s) => $veoOnly->contains('id', $s->id));
 
         if ($dry) {
-            $this->line("  [dry] job {$job->id} recover → ".$veoOnly->count().' veo-only + '.$keyframeBroken->count().' keyframe-broken');
+            $this->line("  [dry] job {$job->id} recover → ".$veoOnly->count().' clip-only + '.$keyframeBroken->count().' keyframe-broken');
 
             return;
         }
 
+        $video = app(GeminiGenVideoService::class);
         $acted = false;
 
-        // Veo-only: re-dispatch straight from the preserved keyframe.
+        // Clip-only (keyframe survived): re-dispatch straight from the preserved
+        // keyframe via the slide's provider — Veo with a degraded motion prompt, or
+        // GROK (figure / post-budget failover) with its static audio-free prompt.
         foreach ($veoOnly as $slide) {
-            $prompt = $this->veoRetryPrompt($slide);
-            $uuid = app(GeminiGenVideoService::class)
-                ->dispatchVeoClip($slide->keyframe_url, $prompt, '9:16', $slide->id);
+            $uuid = $this->dispatchClipForProvider($video, $slide, $slide->keyframe_url, $this->veoRetryPrompt($slide));
             if ($uuid !== null) {
                 $slide->update(['veo_status' => 'generating', 'veo_job_uuid' => $uuid, 'last_error' => null, 'last_error_class' => null]);
-                $this->info("  slide {$slide->id} Veo-only retry → {$uuid}");
+                $this->info("  slide {$slide->id} {$slide->video_provider}-only retry → {$uuid}");
             } else {
                 // Circuit open / rejected — stay failed, next eligible tick retries.
-                $slide->update(['last_error' => 'Veo re-dispatch failed (service unavailable)', 'last_error_class' => VideoGenErrorClassifier::TRANSIENT]);
-                $this->warn("  slide {$slide->id} Veo-only re-dispatch failed");
+                $slide->update(['last_error' => 'Clip re-dispatch failed (service unavailable)', 'last_error_class' => VideoGenErrorClassifier::TRANSIENT]);
+                $this->warn("  slide {$slide->id} clip-only re-dispatch failed");
             }
             $acted = true;
         }
@@ -411,6 +449,29 @@ class PollRebrandAssets extends Command
             $job->increment('asset_retry_count');
             $this->info("  job {$job->id} recover tick (retry #{$job->asset_retry_count})");
         }
+    }
+
+    /**
+     * Dispatch a bookend's i2v clip via its provider: GROK (figure / Veo-failover)
+     * or Veo (default). $veoPromptOverride lets the recovery pass supply a degraded
+     * Veo motion prompt; it's IGNORED on the GROK path (GROK has its own static,
+     * audio-free motion prompt). Returns the job uuid or null on dispatch failure.
+     */
+    private function dispatchClipForProvider(GeminiGenVideoService $video, RepurposeVideoSlide $slide, string $imageUrl, ?string $veoPromptOverride = null): ?string
+    {
+        if ($slide->video_provider === RepurposeVideoSlide::PROVIDER_GROK) {
+            $prompt = $slide->role === RepurposeVideoSlide::ROLE_CTA
+                ? GenerateRebrandAssets::GROK_PROMPT_CTA
+                : GenerateRebrandAssets::GROK_PROMPT_HOOK;
+
+            return $video->dispatchGrokClip($imageUrl, $prompt, $slide->id);
+        }
+
+        $prompt = $veoPromptOverride ?? ($slide->role === RepurposeVideoSlide::ROLE_CTA
+            ? GenerateRebrandAssets::VEO_PROMPT_CTA
+            : GenerateRebrandAssets::VEO_PROMPT_HOOK);
+
+        return $video->dispatchVeoClip($imageUrl, $prompt, '9:16', $slide->id);
     }
 
     /**

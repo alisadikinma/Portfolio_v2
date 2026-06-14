@@ -106,6 +106,29 @@ class GenerateRebrandAssets implements ShouldQueue
         .'Maintain exact lighting, environment, appearance from reference frame. '
         .'Photorealistic, smooth natural motion, no morphing. 9:16 output.';
 
+    /**
+     * GROK (xAI) motion prompts — used when a bookend clip runs on GROK instead of
+     * Veo (figure on the keyframe, or Veo audio-filter failover). GROK has NO audio
+     * model to satisfy (audio is stripped on download), so — unlike VEO_PROMPT_* —
+     * these carry NO `Audio:` clause. Motion-only, frame-respecting ("animate only
+     * what exists"), and figure-safe ("everyone in the frame" covers the 2-subject
+     * Ali+figure hook as well as a solo CTA).
+     */
+    public const GROK_PROMPT_HOOK = 'Everyone in the frame holds their relaxed pose and shares a warm easy smile with a gentle natural laugh, '
+        .'light natural head movement and subtle eye blinks, '
+        .'animate only the elements that already exist and introduce no new object or element, '
+        .'both hands and anything being held stay exactly as in the frame with no duplicated or extra hand, '
+        .'the camera stays completely static with no zoom or pan, '
+        .'mouths stay closed and no one is speaking, '
+        .'photorealistic with natural micro-motion and no morphing';
+
+    public const GROK_PROMPT_CTA = 'The creator holds the warm inviting pose from the frame with a gentle welcoming hand gesture and a soft nod, '
+        .'an easy friendly smile and subtle eye blinks, '
+        .'animate only the elements that already exist and introduce no new object or element, '
+        .'the camera stays completely static with no zoom or pan, '
+        .'the mouth stays closed and the person is not speaking, '
+        .'photorealistic with natural micro-motion and no morphing';
+
     public function __construct(public readonly int $repurposeJobId)
     {
     }
@@ -222,6 +245,10 @@ class GenerateRebrandAssets implements ShouldQueue
             $figureUrl = is_array($entity) ? ($entity['url'] ?? null) : null;
             if (is_string($figureUrl) && $figureUrl !== '') {
                 $refs[] = $figureUrl; // license-checked + downloaded to our storage
+                // Figure present → Veo (Google) will refuse to animate the celebrity
+                // face (PROMINENT_PEOPLE). Route this bookend straight to GROK (xAI,
+                // allows figures) so we never waste a Veo attempt. See PollRebrandAssets.
+                $hook->forceFill(['video_provider' => RepurposeVideoSlide::PROVIDER_GROK])->save();
             } else {
                 // Figure photo unresolvable (Wikidata/notability/license miss, or a
                 // storage-write conflict). The authored scene was built AROUND the

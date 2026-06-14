@@ -300,7 +300,7 @@ class RepurposeJobController extends Controller
         ], 202);
     }
 
-    /** Reset payload for a Veo bookend so GenerateRebrandAssets re-renders it. */
+    /** Reset payload for a bookend so GenerateRebrandAssets re-renders it. */
     private function bookendResetPayload(): array
     {
         return [
@@ -313,7 +313,11 @@ class RepurposeJobController extends Controller
             'composited_status' => 'pending',
             'composited_path' => null,
             'last_error' => null,
+            'last_error_class' => null,
             'figure_dropped' => 0,
+            // Restart on Veo (default, better quality); buildHookKeyframe re-flips a
+            // figure hook to GROK, and the audio/timeout failover re-applies as needed.
+            'video_provider' => 'veo',
         ];
     }
 

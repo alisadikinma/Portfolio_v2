@@ -18,6 +18,10 @@ class RepurposeVideoSlide extends Model
     public const ROLE_TOOL = 'tool';
     public const ROLE_CTA = 'cta';
 
+    /** i2v generator for a bookend clip — Veo by default, GROK on figure/audio failover. */
+    public const PROVIDER_VEO = 'veo';
+    public const PROVIDER_GROK = 'grok';
+
     protected $fillable = [
         'repurpose_job_id',
         'slide_index',
@@ -35,6 +39,7 @@ class RepurposeVideoSlide extends Model
         'veo_job_uuid',
         'veo_status',
         'veo_url',
+        'video_provider',
         'composited_path',
         'composited_status',
         'last_error',

@@ -119,6 +119,30 @@ class GenerateRebrandAssetsTest extends TestCase
         $this->assertSame('kf-hook-static', $hook->keyframe_job_uuid);
     }
 
+    public function test_figure_hook_routes_to_grok_provider(): void
+    {
+        // A resolvable public figure on the hook flips the bookend to GROK (Veo
+        // would refuse the celebrity) so the clip never wastes a Veo attempt.
+        $job = $this->jobWithToolSlides();
+
+        $this->mock(VideoHookSceneAuthor::class, function ($m) {
+            $m->shouldReceive('author')->andReturn(['success' => true, 'figure_name' => 'Sundar Pichai', 'scene_prompt' => 'creator + figure hook scene', 'error' => null]);
+        });
+        $this->mock(\App\Services\EntityReferenceService::class, function ($m) {
+            $m->shouldReceive('findOrFetch')->with('Sundar Pichai', 'person')->andReturn(['url' => 'https://cdn/sundar.jpg']);
+        });
+        $this->mock(GeminiGenVideoService::class, function ($m) {
+            $m->shouldReceive('dispatchKeyframe')->twice()->andReturn('kf-hook', 'kf-cta');
+        });
+
+        (new GenerateRebrandAssets($job->id))->handle(app(GeminiGenVideoService::class));
+
+        $hook = $job->videoSlides()->where('role', RepurposeVideoSlide::ROLE_HOOK)->first();
+        $cta = $job->videoSlides()->where('role', RepurposeVideoSlide::ROLE_CTA)->first();
+        $this->assertSame('grok', $hook->video_provider); // figure → GROK
+        $this->assertSame('veo', $cta->video_provider);   // no figure → stays Veo
+    }
+
     public function test_fails_loudly_when_creator_face_missing(): void
     {
         // No profile_photo setting → getCreatorFaceUrl returns null.

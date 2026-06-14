@@ -226,12 +226,14 @@ class HookAuthorAndFallbackTest extends TestCase
     }
 
     /**
-     * Defect (c): Veo can refuse a hook clip whose keyframe shows a recognizable
-     * public figure (PROMINENT_PEOPLE_FILTER_FAILED) even though the keyframe itself
-     * passed image-gen. The VEO-stage failure (not just the keyframe stage) must set
-     * figure_dropped so recover() re-authors creator-only instead of looping forever.
+     * Defect (c) — UPDATED 2026-06-14 (Veo→GROK failover): Veo refuses a hook clip
+     * whose keyframe shows a recognizable public figure (PROMINENT_PEOPLE_FILTER_FAILED)
+     * even though the keyframe passed image-gen. We no longer DROP the figure +
+     * re-author creator-only (that loses the figure the topic wanted) — instead we
+     * fail the bookend over to GROK (xAI, which animates figures), KEEPING the
+     * figure keyframe. recover() then re-dispatches the SAME keyframe via GROK.
      */
-    public function test_poll_marks_figure_dropped_on_hook_veo_safety_refusal(): void
+    public function test_hook_veo_prominent_people_fails_over_to_grok_keeping_figure(): void
     {
         config()->set('services.geminigen.api_key', 'test-key');
 
@@ -248,13 +250,14 @@ class HookAuthorAndFallbackTest extends TestCase
             'repurpose_job_id' => $job->id, 'slide_index' => 0, 'role' => 'hook',
             'keyframe_status' => 'done', 'keyframe_url' => 'https://cdn/kf.jpg',
             'veo_status' => 'generating', 'veo_job_uuid' => 'veo-uuid-1',
-            'composited_status' => 'pending', 'figure_dropped' => false,
+            'composited_status' => 'pending', 'figure_dropped' => false, 'video_provider' => 'veo',
         ]);
 
         $this->artisan('repurpose:poll-rebrand-assets')->assertExitCode(0);
 
         $hook->refresh();
         $this->assertSame('failed', $hook->veo_status);
-        $this->assertTrue($hook->figure_dropped, 'a VEO-stage prominent-people refusal must set figure_dropped for the creator-only retry');
+        $this->assertSame('grok', $hook->video_provider, 'a VEO prominent-people refusal must fail over to GROK (keeping the figure)');
+        $this->assertFalse((bool) $hook->figure_dropped, 'figure must be KEPT for the GROK retry, not dropped');
     }
 }
