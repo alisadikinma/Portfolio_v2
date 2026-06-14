@@ -79,6 +79,44 @@ class RepurposeJob extends Model
     }
 
     /**
+     * Human topic label for operator-facing notifications ("gak tau topik apa").
+     * Priority: video_rebrand tool-slide header titles (the actual carousel topic)
+     * → rewritten title → first non-empty source-caption line → source_url host.
+     * Always returns a non-empty, ≤80-char string.
+     */
+    public function displayTopic(): string
+    {
+        if ($this->mode === 'video_rebrand') {
+            $titles = $this->videoSlides()
+                ->where('role', RepurposeVideoSlide::ROLE_TOOL)
+                ->orderBy('slide_index')
+                ->pluck('header_title')
+                ->filter()
+                ->implode(', ');
+            if ($titles !== '') {
+                return mb_substr($titles, 0, 80);
+            }
+        }
+
+        $rewrittenTitle = trim((string) ($this->rewritten['title'] ?? ''));
+        if ($rewrittenTitle !== '') {
+            return mb_substr($rewrittenTitle, 0, 80);
+        }
+
+        $caption = (string) ($this->extracted['caption'] ?? '');
+        foreach (preg_split('/\r\n|\r|\n/', $caption) as $line) {
+            $line = trim($line);
+            if ($line !== '') {
+                return mb_substr($line, 0, 80);
+            }
+        }
+
+        $host = parse_url((string) $this->source_url, PHP_URL_HOST);
+
+        return is_string($host) && $host !== '' ? $host : ('job #'.$this->id);
+    }
+
+    /**
      * Single source of truth: does this Post / LinkedIn draft originate from an
      * IG-repurpose job? Repurpose carousels anchor an UNPUBLISHED Post purely to
      * generate slides — that post's /blog/{slug} URL 404s, so NO platform should

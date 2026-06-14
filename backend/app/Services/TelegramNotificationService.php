@@ -611,7 +611,7 @@ class TelegramNotificationService
         $url = $this->escapeMarkdown($this->truncate((string) $job->source_url, 80));
         $reasonLine = $this->escapeMarkdown($this->truncate($reason, 200));
 
-        $text = "⚠️ *IG repurpose gagal* (job #{$job->id})\n{$url}\n\nAlasan: {$reasonLine}\n\n"
+        $text = "⚠️ *IG repurpose gagal* — {$this->repurposeHeader($job)}\n{$url}\n\nAlasan: {$reasonLine}\n\n"
             . 'Cek post-nya public/bisa diakses, atau paste ulang URL untuk retry.';
 
         return $this->send($text);
@@ -638,7 +638,7 @@ class TelegramNotificationService
         $reasonLine = $this->escapeMarkdown($this->truncate($lastError !== '' ? $lastError : 'render failed after retries', 200));
 
         $lines = [];
-        $lines[] = '🎬 *Video rebrand gagal* (job #'.$job->id.')';
+        $lines[] = '🎬 '.$this->repurposeHeader($job).' — *klip gagal*';
         $lines[] = '';
         $lines[] = 'Hook/CTA gagal di-generate setelah 3x retry otomatis. Perlu action.';
         $lines[] = 'Error terakhir: '.$reasonLine;
@@ -667,11 +667,12 @@ class TelegramNotificationService
             return false;
         }
 
+        $header = $this->repurposeHeader($job);
         if ($job->mode === 'blog') {
             // Blog mode now seeds a DRAFT idea (no pre-written article) — the
             // operator runs the proper Content Engine pipeline for quality. The
             // claim-correction count is N/A here (Content Engine re-verifies).
-            $text = "📝 *Draft blog dari IG siap* (job #{$job->id})\n"
+            $text = "📝 *Draft blog dari IG siap* — {$header}\n"
                 . "Materi sumber sudah disiapkan jadi brief.\n\n"
                 . 'Buka Content Engine → klik *Start Research* untuk tulis artikel '
                 . 'berkualitas (5-gate) → publish → carousel + cross-post otomatis: /admin/content-engine';
@@ -680,7 +681,7 @@ class TelegramNotificationService
                 ? "{$correctedClaims} klaim dikoreksi + sumber dilampirkan."
                 : 'Klaim diverifikasi, sumber dilampirkan.';
             $link = $linkedinDraftId ? "/admin/draft-posts/{$linkedinDraftId}" : '/admin/draft-posts';
-            $text = "🎠 *Carousel draft siap* (job #{$job->id})\n{$claimLine}\n\nReview → {$link}";
+            $text = "🎠 *Carousel draft siap* — {$header}\n{$claimLine}\n\nReview → {$link}";
         }
 
         return $this->send($text);
@@ -701,7 +702,17 @@ class TelegramNotificationService
             return false;
         }
 
-        return $this->send($text);
+        // A6: prepend "job #id · topic" so the operator knows WHICH job is running.
+        return $this->send($this->repurposeHeader($job)."\n".$text);
+    }
+
+    /**
+     * A6: a consistent "job #id · _topic_" header line prepended to every repurpose
+     * notification so the operator can tell which job/topic is being processed.
+     */
+    public function repurposeHeader(\App\Models\RepurposeJob $job): string
+    {
+        return 'job #'.$job->id.' · _'.$this->escapeMarkdown($this->truncate($job->displayTopic(), 80)).'_';
     }
 
     /**
