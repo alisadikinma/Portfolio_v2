@@ -35,7 +35,7 @@ class VideoHookSceneAuthor
      *
      * @return array{success: bool, figure_name: string|null, scene_prompt: string, error: string|null}
      */
-    public function author(string $topic, bool $allowFigure = true): array
+    public function author(string $topic, bool $allowFigure = true, string $medium = 'video', ?string $headline = null): array
     {
         $topic = trim($topic);
         if ($topic === '') {
@@ -43,7 +43,7 @@ class VideoHookSceneAuthor
         }
 
         try {
-            $res = $this->runHookAuthor($this->buildPrompt($topic, $allowFigure));
+            $res = $this->runHookAuthor($this->buildPrompt($topic, $allowFigure, $medium, $headline));
         } catch (\Throwable $e) {
             Log::warning('[VideoHookSceneAuthor] exec threw', ['error' => $e->getMessage()]);
 
@@ -139,30 +139,32 @@ class VideoHookSceneAuthor
         return $refs !== '' ? $refs : (string) config('carousel-gen.refs_pipeline', '');
     }
 
-    private function buildPrompt(string $topic, bool $allowFigure): string
+    private function buildPrompt(string $topic, bool $allowFigure, string $medium = 'video', ?string $headline = null): string
     {
         // The full hook/cover + creator + visual standard lives in the SYSTEM
         // PROMPT (the /carousel-gen knowledge bundle via refsBundle) — the single
         // source of truth. Do NOT restate visual rules here (no hardcoded base
         // colour / outfit / floating-UI / grade — that would duplicate + drift).
-        // This prompt only frames the task + the video-specific deltas and defers
+        // This prompt only frames the task + the medium-specific deltas and defers
         // every creative/visual decision to the bundle. Reuse, don't recreate.
         $figureBlock = $allowFigure
             ? <<<'FIG'
-2. Decide whether ONE iconic public figure strongly fits this topic (e.g. a Google product → Google's CEO; an OpenAI product → OpenAI's CEO; a company's tool → that company's well-known leader). If yes, set "figure_name" to that person's full real name AND make the hook an INTERACTION with them (creator on the LEFT, "the person matching reference image 2" on the RIGHT, spatially separated so faces don't blend). If no single figure clearly fits, set "figure_name" to null. NEVER write the figure's real name in scene_prompt — refer to them ONLY as "the person matching reference image 2".
+2. Decide whether ONE iconic public figure strongly fits this topic (e.g. a Google product → Google's CEO; an OpenAI product → OpenAI's CEO; a person's life-journey carousel → that person; a company's tool → that company's well-known leader). If yes, set "figure_name" to that person's full real name AND make the scene a natural human INTERACTION between the creator and them (creator on the LEFT, "the person matching reference image 2" on the RIGHT, spatially separated so faces don't blend) — pick the interaction setting that genuinely fits THIS topic (e.g. coding side-by-side, talking over coffee, at a whiteboard, on a stage), do not default to one fixed setting. If no single figure clearly fits, set "figure_name" to null. NEVER write the figure's real name in scene_prompt — refer to them ONLY as "the person matching reference image 2".
 FIG
             : <<<'NOFIG'
 2. Set "figure_name" to null — creator only, no second person.
 NOFIG;
 
+        [$intro, $mediumConstraints] = $this->mediumFraming($medium, $topic, $headline);
+
         return <<<PROMPT
-You are authoring the cover/HOOK keyframe image prompt for a short branded vertical video that OPENS an Instagram carousel about: "{$topic}". The image is animated by a video model, so describe ONE held moment, not motion.
+{$intro}
 
 Apply the hook + cover + creator + visual standards from your system prompt (the /carousel-gen knowledge) and choose the STRONGEST hook approach for THIS specific topic. Think creatively per topic — do not fall back on one fixed formula.
 
 Hard constraints for THIS medium (these override nothing in the standard, they just scope it):
-- 9:16 vertical, photorealistic, 4K, sharp focus. No on-image text, no captions, no watermark.
-- CURIOSITY GAP — this carousel reveals a LIST of items across the later slides. The hook MUST NOT reveal, enumerate, or display those specific items (no row of tool cards / logos spelling out the list). Showing everything up front kills the reason to keep swiping — tease and withhold instead.
+{$mediumConstraints}
+- CURIOSITY GAP — this carousel reveals a LIST of items across the later slides. The cover/hook MUST NOT reveal, enumerate, or display those specific items (no row of tool cards / logos spelling out the list). Showing everything up front kills the reason to keep swiping — tease and withhold instead.
 - Scroll-stopping and a little eccentric — a genuine pattern interrupt.
 - ~70-130 words, one descriptive paragraph.
 
@@ -182,5 +184,33 @@ Return ONE JSON object with exactly this shape:
   "scene_prompt": "..."
 }
 PROMPT;
+    }
+
+    /**
+     * Medium-specific framing line + hard constraints. Default 'video' keeps the
+     * original 9:16 keyframe behaviour byte-identical (existing tests). The
+     * 'carousel_cover' medium reframes for a 4:5 STILL cover slide and asks the
+     * scene to render the provided bilingual headline so replacing the cover
+     * image_prompt never drops the headline copy.
+     *
+     * @return array{0:string,1:string} [intro, constraints]
+     */
+    private function mediumFraming(string $medium, string $topic, ?string $headline): array
+    {
+        if ($medium === 'carousel_cover') {
+            $headlineLine = ($headline !== null && trim($headline) !== '')
+                ? "- Render the cover HEADLINE text \"" . trim($headline) . "\" following the bilingual headline hierarchy in your standard (Indonesian dominant white + amber accent words, English subtitle smaller). Do NOT invent other on-image text; the page number / @handle watermark / swipe pill are added separately, so omit them."
+                : "- Follow the bilingual headline hierarchy in your standard for any cover headline; the page number / @handle watermark / swipe pill are added separately, so omit them.";
+
+            return [
+                "You are authoring the COVER (slide 1) image prompt for an Instagram/LinkedIn carousel about: \"{$topic}\". This is a STILL image — describe one composed frame, not motion.",
+                "- 4:5 portrait (1080x1350), photorealistic, 4K, sharp focus.\n{$headlineLine}",
+            ];
+        }
+
+        return [
+            "You are authoring the cover/HOOK keyframe image prompt for a short branded vertical video that OPENS an Instagram carousel about: \"{$topic}\". The image is animated by a video model, so describe ONE held moment, not motion.",
+            "- 9:16 vertical, photorealistic, 4K, sharp focus. No on-image text, no captions, no watermark.",
+        ];
     }
 }

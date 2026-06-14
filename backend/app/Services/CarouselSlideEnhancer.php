@@ -86,6 +86,12 @@ class CarouselSlideEnhancer
         $isCta = (bool) ($slide['is_cta'] ?? false);
         $rawPrompt = (string) ($slide['image_prompt'] ?? '');
 
+        // Topic-aware public figure on the cover (set by CarouselCoverFigureEnricher):
+        // a license-clean photo of the figure the topic is about, rendered as
+        // "reference image 2" interacting with the creator. The figure NAME is
+        // never here — only the photo URL.
+        $entityFaceRef = trim((string) ($slide['entity_face_ref'] ?? ''));
+
         $handle = $this->resolveHandle();
         $portfolioUrl = $this->resolvePortfolioUrl();
         $pageIndicator = ($slideIndex + 1) . '/' . $totalSlides;
@@ -120,7 +126,8 @@ class CarouselSlideEnhancer
         $promptText = $this->prependCreatorFaceMandate(
             $promptText,
             $layoutHint,
-            $creatorFaceUrl
+            $creatorFaceUrl,
+            $entityFaceRef !== '' ? $entityFaceRef : null
         );
 
         // 4. Append brand chrome instruction (idempotent — skip when plugin
@@ -154,6 +161,16 @@ class CarouselSlideEnhancer
 
         if ($needsFace && $creatorFaceUrl !== null) {
             $faceRefs[] = $creatorFaceUrl;
+            // Public figure = reference image 2, ALWAYS after the creator (image 1)
+            // so the authored scene's "the person matching reference image 2"
+            // resolves to the right face. Only when the creator is attached.
+            if ($entityFaceRef !== '') {
+                $faceRefs[] = $entityFaceRef;
+                Log::info('[CarouselSlideEnhancer] attached public-figure face as reference image 2', [
+                    'layout_hint' => $layoutHint,
+                    'slide_index' => $slideIndex,
+                ]);
+            }
             if (! $layoutMandates && $promptMentionsCreator) {
                 Log::info('[CarouselSlideEnhancer] auto-attached creator face on non-mandated layout (prompt references creator)', [
                     'layout_hint' => $layoutHint,
@@ -217,10 +234,18 @@ class CarouselSlideEnhancer
      * face reference image"), or when face_url is unresolvable. Returns the
      * body unchanged for layouts that aren't FACE_REQUIRED.
      */
-    private function prependCreatorFaceMandate(string $body, string $layoutHint, ?string $faceUrl): string
+    private function prependCreatorFaceMandate(string $body, string $layoutHint, ?string $faceUrl, ?string $entityFaceRef = null): string
     {
         if ($faceUrl === null) {
             return $body;
+        }
+
+        // Public-figure cover: a TWO-subject interaction (creator = ref image 1,
+        // figure = ref image 2). Override the single-creator mandate so GeminiGen
+        // renders BOTH real faces and doesn't treat the second person as generic.
+        // Always prepended (bypasses the single-creator idempotency guard).
+        if ($entityFaceRef !== null && $entityFaceRef !== '' && $layoutHint === 'cover') {
+            return "PRIMARY SUBJECTS (mandatory): render TWO real people from the provided reference images — the creator from reference image 1 and the person from reference image 2 — both as photographic, naturally lit, exact-likeness portraits, positioned side by side and BOTH clearly visible. Do not blend, merge, or average their faces; do not generate generic people, avatars, or icons. They are interacting naturally as the scene below describes. The headline and any floating elements must yield canvas space so both faces stay unobstructed.\n\n" . $body;
         }
 
         $layoutMandates = in_array($layoutHint, self::FACE_REQUIRED_LAYOUTS, true);

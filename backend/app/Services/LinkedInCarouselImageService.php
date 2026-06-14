@@ -80,6 +80,11 @@ class LinkedInCarouselImageService
             return 0;
         }
 
+        // Topic-aware public-figure cover (original blog→carousel only; IG-source
+        // skipped). Idempotent + fail-safe — authors at most once, any failure
+        // leaves the plugin's creator cover untouched. Re-read slides after.
+        $slides = $this->enrichCoverFigure($draft, $slides);
+
         $totalSlides = count($slides);
         $dispatched = 0;
 
@@ -136,6 +141,9 @@ class LinkedInCarouselImageService
             return null;
         }
 
+        // Re-rendering the cover alone must still pick up the topic-aware figure.
+        $this->enrichCoverFigure($draft, $draft->carousel_slides ?? []);
+
         $slides = $draft->carousel_slides ?? [];
         if (! isset($slides[$slideIndex])) {
             Log::warning('[LinkedInCarouselImage] dispatchSingleSlide: slide index out of range', [
@@ -160,6 +168,31 @@ class LinkedInCarouselImageService
 
         $draft->update(['carousel_slides' => $slides]);
         return $uuid;
+    }
+
+    /**
+     * Apply topic-aware public-figure cover enrichment, returning the (possibly
+     * mutated) slides array. Idempotent + fully non-fatal — any failure logs and
+     * returns the input slides unchanged so image dispatch always proceeds with
+     * the plugin's creator-fronted cover.
+     *
+     * @param  array<int,array<string,mixed>>  $slides
+     * @return array<int,array<string,mixed>>
+     */
+    private function enrichCoverFigure(LinkedInPost $draft, array $slides): array
+    {
+        try {
+            app(CarouselCoverFigureEnricher::class)->enrich($draft);
+
+            return $draft->carousel_slides ?? $slides;
+        } catch (\Throwable $e) {
+            Log::warning('[LinkedInCarouselImage] cover figure enrich failed (non-fatal)', [
+                'draft_id' => $draft->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $slides;
+        }
     }
 
     /**
