@@ -7,6 +7,7 @@ import {
   useRefetchRepurposeSource,
   useRegenerateAllRepurposeSlides,
   useRegenerateRepurposeSlide,
+  useReskinRepurposeSlide,
   fetchSlideObjectUrl,
 } from '@/composables/useRepurposeJobs'
 import { useLinkedInDraft } from '@/composables/useLinkedInDrafts'
@@ -175,7 +176,9 @@ function downloadAll() {
 // --- regenerate (per-slide + batch) -----------------------------------------
 const regenAll = useRegenerateAllRepurposeSlides()
 const regenSlide = useRegenerateRepurposeSlide()
+const reskinSlide = useReskinRepurposeSlide()
 const regeneratingIndex = ref(null) // slide_index currently re-dispatching (single)
+const reskinningIndex = ref(null)    // slide_index currently re-skinning (bookend)
 
 async function doRegenerateAll() {
   if (!window.confirm('Regenerate ALL slides? The hook & CTA are re-rendered with Veo (uses video credits); tool slides re-skin for free. This replaces the current carousel.')) return
@@ -195,6 +198,21 @@ async function doRegenerateSlide(s) {
     refetch()
   } finally {
     regeneratingIndex.value = null
+  }
+}
+
+// Credit-free re-skin of a hook/CTA bookend — re-applies the brand overlay
+// (title/logo/CTA ask) onto the existing Veo clip without re-rendering the video.
+async function doReskinSlide(s) {
+  if (!window.confirm(`Re-skin the ${roleLabel(s.role)} slide? Free — re-applies the title/logo/CTA overlay onto the existing video (no Veo credits, keeps the clip).`)) return
+  reskinningIndex.value = s.slide_index
+  try {
+    await reskinSlide.mutateAsync({ id: id.value, slideIndex: s.slide_index })
+    refetch()
+  } catch (e) {
+    window.alert(e?.response?.data?.error?.message || 'Re-skin failed.')
+  } finally {
+    reskinningIndex.value = null
   }
 }
 
@@ -412,6 +430,18 @@ function goBack() { router.push({ name: 'admin-social-studio' }) }
               >
                 <svg class="h-3 w-3" :class="{ 'animate-spin': regeneratingIndex === s.slide_index }" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5M5.5 14a7 7 0 0 0 12.4 2M18.5 10A7 7 0 0 0 6.1 8" /></svg>
                 {{ regeneratingIndex === s.slide_index ? 'Queuing…' : (s.role === 'tool' ? 'Re-skin' : 'Re-render') }}
+              </button>
+              <!-- Bookend-only credit-free re-skin: re-apply the title/logo/CTA overlay
+                   onto the existing Veo clip without a Veo re-render. -->
+              <button
+                v-if="s.role !== 'tool'"
+                :disabled="reskinningIndex === s.slide_index || regeneratingIndex === s.slide_index"
+                @click="doReskinSlide(s)"
+                title="Re-skin this slide — re-apply the title/logo/CTA overlay onto the existing video (free, no Veo credits)"
+                class="flex flex-1 items-center justify-center gap-1 bg-emerald-50 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/40"
+              >
+                <svg class="h-3 w-3" :class="{ 'animate-spin': reskinningIndex === s.slide_index }" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5M5.5 14a7 7 0 0 0 12.4 2M18.5 10A7 7 0 0 0 6.1 8" /></svg>
+                {{ reskinningIndex === s.slide_index ? 'Queuing…' : 'Re-skin' }}
               </button>
             </div>
           </div>

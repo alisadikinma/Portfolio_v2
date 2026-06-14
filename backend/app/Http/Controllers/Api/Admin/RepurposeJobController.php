@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Jobs\ComposeToolSlides;
 use App\Jobs\GenerateRebrandAssets;
 use App\Jobs\RefetchSourceSlides;
+use App\Jobs\ReskinBookendSlide;
 use App\Models\RepurposeJob;
 use App\Models\RepurposeVideoSlide;
 use App\Services\RepurposeRetryService;
@@ -296,6 +297,52 @@ class RepurposeJobController extends Controller
         return response()->json([
             'success' => true,
             'message' => "Slide #{$n} ({$slide->role}) queued for regeneration.",
+            'data' => ['status' => $job->status],
+        ], 202);
+    }
+
+    /**
+     * CREDIT-FREE re-skin of a SINGLE hook/CTA bookend by its slide_index. Re-applies
+     * the brand overlay (hook → cover headline + topic logo; CTA → single Follow ask
+     * card) onto the ALREADY-RENDERED Veo/GROK clip — no keyframe, no i2v render, no
+     * Veo credits. The cheap way to pick up a new title/logo/CTA-overlay treatment
+     * without re-rendering the video. Requires a rendered clip (veo_url present);
+     * otherwise 422 (operator must Re-render). FSM-neutral. video_rebrand only.
+     */
+    public function reskinSlide(int $id, int $n): JsonResponse
+    {
+        $job = RepurposeJob::find($id);
+        if (!$job) {
+            return $this->notFound();
+        }
+        if ($job->mode !== 'video_rebrand') {
+            return $this->notVideoRebrand();
+        }
+
+        $slide = $job->videoSlides()->where('slide_index', $n)->first();
+        if (!$slide) {
+            return $this->notFound();
+        }
+        if (!in_array($slide->role, [RepurposeVideoSlide::ROLE_HOOK, RepurposeVideoSlide::ROLE_CTA], true)) {
+            return response()->json([
+                'success' => false,
+                'error' => ['code' => 'NOT_A_BOOKEND', 'message' => 'Re-skin only applies to the hook/CTA bookends. Tool slides re-skin via Regenerate.'],
+            ], 422);
+        }
+        if (trim((string) $slide->veo_url) === '') {
+            return response()->json([
+                'success' => false,
+                'error' => ['code' => 'NO_RENDERED_CLIP', 'message' => 'This bookend has no rendered clip yet — use Re-render first.'],
+            ], 422);
+        }
+
+        // Optimistic status flip so the widened detail poll keeps ticking immediately.
+        $slide->update(['composited_status' => 'compositing', 'last_error' => null]);
+        ReskinBookendSlide::dispatch($job->id, $n);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Slide #{$n} ({$slide->role}) queued for re-skin (no credits).",
             'data' => ['status' => $job->status],
         ], 202);
     }

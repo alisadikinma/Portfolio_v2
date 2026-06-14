@@ -8,10 +8,9 @@ use App\Jobs\GenerateRebrandAssets;
 use App\Models\RepurposeJob;
 use App\Models\RepurposeVideoSlide;
 use App\Services\GeminiGenVideoService;
-use App\Services\VideoChromeRenderer;
+use App\Services\VideoBookendOverlayApplier;
 use App\Services\VideoGenErrorClassifier;
 use App\Services\VideoGenPromptDegrader;
-use App\Services\VideoRebrandComposer;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -213,19 +212,11 @@ class PollRebrandAssets extends Command
                     // the hook bookend stays plain. Overlay failure is non-fatal —
                     // the plain clip ships (the ask still lands in the caption).
                     $composited = $final;
-                    if ($slide->role === RepurposeVideoSlide::ROLE_CTA) {
-                        $overlaid = $this->applyCtaOverlay($slide);
-                        if ($overlaid !== null) {
-                            $composited = $overlaid;
-                        }
-                    } elseif ($slide->role === RepurposeVideoSlide::ROLE_HOOK) {
-                        // Overlay the cover headline (from the original IG hook) onto
-                        // the hook clip. Non-fatal — a missing title or render miss
-                        // ships the plain clip.
-                        $titled = $this->applyHookTitle($slide);
-                        if ($titled !== null) {
-                            $composited = $titled;
-                        }
+                    // CTA → Follow ask card; hook → cover headline + brand logo.
+                    // Non-fatal — a missing title / render miss ships the plain clip.
+                    $overlaid = app(VideoBookendOverlayApplier::class)->apply($slide);
+                    if ($overlaid !== null) {
+                        $composited = $overlaid;
                     }
                     $slide->update(['veo_status' => 'done', 'veo_url' => $videoUrl, 'composited_path' => $composited, 'composited_status' => 'done', 'last_error' => null]);
                     $this->info("  slide {$slide->id} veo done");
@@ -497,45 +488,6 @@ class PollRebrandAssets extends Command
             (string) ($slide->last_error_class ?? VideoGenErrorClassifier::TRANSIENT),
             (int) (($slide->repurposeJob->asset_retry_count ?? 0) + 1),
         );
-    }
-
-    /**
-     * Render + composite the CTA ask overlay onto the finalized CTA clip. Returns
-     * the new public URL, or null if either step fails (caller keeps the plain
-     * clip — graceful degrade, the ask still ships in the caption).
-     */
-    private function applyCtaOverlay(RepurposeVideoSlide $slide): ?string
-    {
-        $overlayPng = app(VideoChromeRenderer::class)->renderCtaOverlay($slide);
-        if ($overlayPng === null) {
-            return null;
-        }
-
-        return app(VideoRebrandComposer::class)->overlayCta($slide, $overlayPng);
-    }
-
-    /**
-     * Render + composite the hook TITLE overlay (cover headline from the original
-     * IG hook) onto the finalized hook clip. Returns the new public URL, or null if
-     * there's no title or either step fails (caller keeps the plain hook clip).
-     */
-    private function applyHookTitle(RepurposeVideoSlide $slide): ?string
-    {
-        $job = $slide->repurposeJob;
-        $title = (string) (optional($job)->videoHookTitle() ?? '');
-        if (trim($title) === '') {
-            return null;
-        }
-
-        // Topic brand logo (e.g. Google), auto-resolved at keyframe-build time.
-        $logo = $job ? ($job->extracted['hook_brand_logo'] ?? null) : null;
-
-        $overlayPng = app(VideoChromeRenderer::class)->renderHookTitle($slide, $title, is_string($logo) ? $logo : null);
-        if ($overlayPng === null) {
-            return null;
-        }
-
-        return app(VideoRebrandComposer::class)->overlayClip($slide, $overlayPng, 'title');
     }
 
     private function poll(?string $uuid): ?array

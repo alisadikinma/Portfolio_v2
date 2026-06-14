@@ -1351,6 +1351,9 @@ Route::middleware(['auth:sanctum'])->prefix('admin/repurpose')->group(function (
     Route::post('/{id}/regenerate-slides', [RepurposeJobController::class, 'regenerateAllSlides'])->whereNumber('id');
     Route::post('/{id}/slides/{n}/regenerate', [RepurposeJobController::class, 'regenerateSlide'])
         ->whereNumber('id')->whereNumber('n');
+    // Credit-free re-skin of a hook/CTA bookend (re-apply overlay, no Veo re-render).
+    Route::post('/{id}/slides/{n}/reskin', [RepurposeJobController::class, 'reskinSlide'])
+        ->whereNumber('id')->whereNumber('n');
     Route::get('/{id}/slide/{n}', [RepurposeJobController::class, 'slide'])
         ->whereNumber('id')->whereNumber('n');
     Route::delete('/{id}', [RepurposeJobController::class, 'destroy'])->whereNumber('id');

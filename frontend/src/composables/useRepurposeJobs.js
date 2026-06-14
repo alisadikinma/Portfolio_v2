@@ -137,6 +137,24 @@ export function useRegenerateRepurposeSlide() {
 }
 
 /**
+ * CREDIT-FREE re-skin of a hook/CTA bookend. Re-applies the brand overlay
+ * (hook → cover headline + topic logo; CTA → single Follow ask card) onto the
+ * already-rendered Veo/GROK clip — NO keyframe, NO i2v render, NO Veo credits.
+ * Backend 422s if the bookend was never rendered (use Re-render first).
+ * Arg: { id, slideIndex }.
+ */
+export function useReskinRepurposeSlide() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, slideIndex }) =>
+      api.post(`/admin/repurpose/${id}/slides/${slideIndex}/reskin`).then(r => r.data),
+    onSuccess: (_data, { id }) => {
+      qc.invalidateQueries({ queryKey: [LIST_KEY, id] })
+    },
+  })
+}
+
+/**
  * Re-download a job's source IG slides (the reaper clears them ~7 days after
  * publish). Backend dispatches the capture asynchronously; the detail view
  * polls slide_count until the images reappear.

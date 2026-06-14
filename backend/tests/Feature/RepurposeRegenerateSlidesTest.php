@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Jobs\ComposeToolSlides;
 use App\Jobs\GenerateRebrandAssets;
+use App\Jobs\ReskinBookendSlide;
 use App\Models\RepurposeJob;
 use App\Models\RepurposeVideoSlide;
 use App\Models\User;
@@ -159,5 +160,70 @@ class RepurposeRegenerateSlidesTest extends TestCase
             ->postJson("/api/admin/repurpose/{$job->id}/slides/0/regenerate")
             ->assertStatus(422)
             ->assertJson(['error' => ['code' => 'NOT_VIDEO_REBRAND']]);
+    }
+
+    // ---- credit-free re-skin (bookend only) ----
+
+    public function test_reskin_requires_auth(): void
+    {
+        $this->postJson('/api/admin/repurpose/1/slides/0/reskin')->assertUnauthorized();
+    }
+
+    public function test_reskin_bookend_with_clip_dispatches_reskin_job_no_credits(): void
+    {
+        Queue::fake();
+        $job = $this->draftedVideoJob();
+        // The hook bookend HAS a rendered clip (veo_url) → re-skin is allowed.
+        $job->videoSlides()->where('slide_index', 0)->update(['veo_url' => 'https://cdn/raw-veo.mp4']);
+
+        $res = $this->actingAs($this->admin(), 'sanctum')
+            ->postJson("/api/admin/repurpose/{$job->id}/slides/0/reskin");
+
+        $res->assertStatus(202)->assertJson(['success' => true]);
+        // FSM untouched (free re-skin), slide flipped to compositing for the poll.
+        $this->assertSame('drafted', $job->refresh()->status);
+        $this->assertSame('compositing', $job->videoSlides()->where('slide_index', 0)->first()->composited_status);
+
+        Queue::assertPushed(ReskinBookendSlide::class, fn ($j) => $j->repurposeJobId === $job->id && $j->slideIndex === 0);
+        Queue::assertNotPushed(GenerateRebrandAssets::class);
+    }
+
+    public function test_reskin_rejects_bookend_without_rendered_clip(): void
+    {
+        Queue::fake();
+        $job = $this->draftedVideoJob(); // bookends have no veo_url
+
+        $this->actingAs($this->admin(), 'sanctum')
+            ->postJson("/api/admin/repurpose/{$job->id}/slides/3/reskin")
+            ->assertStatus(422)
+            ->assertJson(['error' => ['code' => 'NO_RENDERED_CLIP']]);
+
+        Queue::assertNotPushed(ReskinBookendSlide::class);
+    }
+
+    public function test_reskin_rejects_tool_slide(): void
+    {
+        Queue::fake();
+        $job = $this->draftedVideoJob();
+
+        $this->actingAs($this->admin(), 'sanctum')
+            ->postJson("/api/admin/repurpose/{$job->id}/slides/1/reskin")
+            ->assertStatus(422)
+            ->assertJson(['error' => ['code' => 'NOT_A_BOOKEND']]);
+
+        Queue::assertNotPushed(ReskinBookendSlide::class);
+    }
+
+    public function test_reskin_rejects_non_video_rebrand(): void
+    {
+        Queue::fake();
+        $job = RepurposeJob::factory()->create(['mode' => 'carousel', 'status' => 'drafted']);
+
+        $this->actingAs($this->admin(), 'sanctum')
+            ->postJson("/api/admin/repurpose/{$job->id}/slides/0/reskin")
+            ->assertStatus(422)
+            ->assertJson(['error' => ['code' => 'NOT_VIDEO_REBRAND']]);
+
+        Queue::assertNotPushed(ReskinBookendSlide::class);
     }
 }
