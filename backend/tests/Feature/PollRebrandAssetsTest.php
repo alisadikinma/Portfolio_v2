@@ -227,6 +227,35 @@ class PollRebrandAssetsTest extends TestCase
         Bus::assertNotDispatched(GenerateRebrandAssets::class);
     }
 
+    public function test_exhaustion_fails_job_and_sends_telegram_alert(): void
+    {
+        // A5: once retries are spent and a bookend is hard-failed, checkCompletion
+        // fails the job AND fires the operator "take action" Telegram alert (was
+        // a silent transition before).
+        $job = RepurposeJob::factory()->create([
+            'mode' => 'video_rebrand', 'status' => 'generating_assets',
+            'asset_retry_count' => 3, // MAX_RETRIES
+        ]);
+        RepurposeVideoSlide::create([
+            'repurpose_job_id' => $job->id, 'slide_index' => 0, 'role' => 'hook',
+            'keyframe_status' => 'failed', 'last_error' => 'PUBLIC_ERROR_AUDIO_FILTERED',
+        ]);
+        RepurposeVideoSlide::create([
+            'repurpose_job_id' => $job->id, 'slide_index' => 2, 'role' => 'cta',
+            'composited_status' => 'done', 'composited_path' => 'b.mp4', 'veo_status' => 'done',
+        ]);
+
+        $this->mock(GeminiGenVideoService::class);
+        $telegram = $this->mock(\App\Services\TelegramNotificationService::class);
+        $telegram->shouldReceive('sendRepurposeAssetsFailed')->once()
+            ->with(\Mockery::on(fn ($j) => $j->id === $job->id), \Mockery::type('string'))
+            ->andReturn(true);
+
+        $this->artisan('repurpose:poll-rebrand-assets')->assertSuccessful();
+
+        $this->assertSame('failed', $job->refresh()->status);
+    }
+
     public function test_both_bookends_composited_promotes_job_and_dispatches_compose(): void
     {
         Bus::fake();

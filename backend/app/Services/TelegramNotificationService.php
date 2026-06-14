@@ -618,6 +618,42 @@ class TelegramNotificationService
     }
 
     /**
+     * video_rebrand A5: a hook/CTA clip exhausted its 3 auto-retries and the job
+     * is now Failed — alert the operator to take action, with a one-tap inline
+     * Retry button (HMAC-signed, kind='repurpose' → RepurposeRetryService) plus an
+     * admin deep-link. Master-toggle gated like the sibling repurpose notifications
+     * (an operator-triggered job's terminal failure should always surface).
+     */
+    public function sendRepurposeAssetsFailed(\App\Models\RepurposeJob $job, string $lastError): bool
+    {
+        if ($this->getSetting('telegram_enabled') !== 'true') {
+            return false;
+        }
+        if (empty($this->getBotToken()) || empty($this->getChatId())) {
+            return false;
+        }
+
+        $secret = (string) $this->getSetting('telegram_webhook_secret');
+        $adminUrl = rtrim((string) config('app.url'), '/').'/admin/repurpose/'.$job->id;
+        $reasonLine = $this->escapeMarkdown($this->truncate($lastError !== '' ? $lastError : 'render failed after retries', 200));
+
+        $lines = [];
+        $lines[] = '🎬 *Video rebrand gagal* (job #'.$job->id.')';
+        $lines[] = '';
+        $lines[] = 'Hook/CTA gagal di-generate setelah 3x retry otomatis. Perlu action.';
+        $lines[] = 'Error terakhir: '.$reasonLine;
+
+        $keyboard = [
+            'inline_keyboard' => [[
+                ['text' => '🔁 Retry', 'callback_data' => self::signCallback('retry', 'repurpose', $job->id, $secret)],
+                ['text' => '🛠 Buka admin', 'url' => $adminUrl],
+            ]],
+        ];
+
+        return $this->send(implode("\n", $lines), $keyboard);
+    }
+
+    /**
      * IG repurpose: notify the operator that a draft is ready (finalize done).
      * blog mode → Content Engine link; carousel mode → /admin/draft-posts link.
      * Plain status reply (master-toggle gated).

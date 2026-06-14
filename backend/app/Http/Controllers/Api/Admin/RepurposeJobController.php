@@ -5,17 +5,12 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Enums\LinkedInPostStatus;
 use App\Enums\RepurposeJobStatus;
 use App\Http\Controllers\Controller;
-use App\Jobs\CaptureInstagramPost;
 use App\Jobs\ComposeToolSlides;
-use App\Jobs\ComposeVideoCarousel;
-use App\Jobs\ExtractSlideContent;
-use App\Jobs\FinalizeRepurpose;
 use App\Jobs\GenerateRebrandAssets;
 use App\Jobs\RefetchSourceSlides;
-use App\Jobs\ResearchRepurposeClaims;
-use App\Jobs\RewriteRepurposeContent;
 use App\Models\RepurposeJob;
 use App\Models\RepurposeVideoSlide;
+use App\Services\RepurposeRetryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -29,27 +24,6 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class RepurposeJobController extends Controller
 {
-    /**
-     * Map a failed-from FSM state → [resume guard state, step job class]. The
-     * guard state is the status each step job requires before it will run.
-     */
-    private const RETRY_MAP = [
-        'received'    => ['capturing', CaptureInstagramPost::class],
-        'capturing'   => ['capturing', CaptureInstagramPost::class],
-        'extracting'  => ['captured', ExtractSlideContent::class],
-        'researching' => ['extracted', ResearchRepurposeClaims::class],
-        'rewriting'   => ['researched', RewriteRepurposeContent::class],
-        'finalizing'  => ['rewritten', FinalizeRepurpose::class],
-        // video_rebrand asset branch — resume the exact failed step at its guard
-        // state rather than restarting from capture. GenerateRebrandAssets is
-        // idempotent (skips bookends already keyframe/veo 'done', re-runs the
-        // failed one), so re-entering at `extracted` only regenerates what broke.
-        'generating_assets' => ['extracted', GenerateRebrandAssets::class],
-        'assets_ready'      => ['assets_ready', ComposeVideoCarousel::class],
-        'compositing'       => ['assets_ready', ComposeVideoCarousel::class],
-        'composed'          => ['composed', FinalizeRepurpose::class],
-    ];
-
     public function index(Request $request): JsonResponse
     {
         $query = RepurposeJob::query()->with('linkedinPost')->orderByDesc('id');
@@ -141,57 +115,25 @@ class RepurposeJobController extends Controller
         ]);
     }
 
-    public function retry(int $id): JsonResponse
+    public function retry(int $id, RepurposeRetryService $retryService): JsonResponse
     {
         $job = RepurposeJob::find($id);
         if (!$job) {
             return $this->notFound();
         }
 
-        if ($job->status !== RepurposeJobStatus::Failed->value) {
+        $result = $retryService->retry($job);
+        if (!$result['ok']) {
             return response()->json([
                 'success' => false,
-                'error' => ['code' => 'NOT_FAILED', 'message' => 'Only a failed job can be retried.'],
+                'error' => ['code' => 'NOT_FAILED', 'message' => $result['message']],
             ], 422);
         }
 
-        $failedFrom = $this->failedFromStep($job);
-        [$guardState, $jobClass] = self::RETRY_MAP[$failedFrom]
-            ?? self::RETRY_MAP['capturing']; // safe fallback: full restart from capture
-
-        // Blog mode skips research+rewrite and enters FinalizeRepurpose at
-        // `extracted` (not `rewritten`). Resume the failed finalize there.
-        if ($job->mode === 'blog' && $failedFrom === 'finalizing') {
-            $guardState = 'extracted';
-        }
-
-        // Re-running video_rebrand asset generation: zero the auto-recover budget
-        // so the bounded PollRebrandAssets retry safety-net is live again for this
-        // fresh attempt (a failed job already spent its MAX_RETRIES auto-retries),
-        // and reset the failed/orphaned bookends so GenerateRebrandAssets re-runs
-        // them immediately (its dispatchKeyframe skips kf='done', so a veo-failed
-        // bookend would otherwise wait for the 5-min recover() pass). Done bookends
-        // (e.g. an already-rendered CTA) keep their state and are skipped.
-        $extra = ['last_error' => null];
-        if ($job->mode === 'video_rebrand' && $guardState === 'extracted') {
-            $extra['asset_retry_count'] = 0;
-            $job->videoSlides()
-                ->whereIn('role', [\App\Models\RepurposeVideoSlide::ROLE_HOOK, \App\Models\RepurposeVideoSlide::ROLE_CTA])
-                ->where(fn ($q) => $q->where('keyframe_status', 'failed')->orWhereNull('keyframe_status')->orWhere('veo_status', 'failed'))
-                ->update(['keyframe_status' => null, 'veo_status' => null, 'composited_status' => 'pending', 'last_error' => null]);
-        }
-
-        $job->transitionTo(
-            RepurposeJobStatus::from($guardState),
-            'admin_retry',
-            $extra
-        );
-        $jobClass::dispatch($job->id);
-
         return response()->json([
             'success' => true,
-            'message' => 'Retry dispatched.',
-            'data' => ['status' => $job->status],
+            'message' => $result['message'],
+            'data' => ['status' => $result['status']],
         ]);
     }
 
@@ -436,18 +378,6 @@ class RepurposeJobController extends Controller
             ->filter(fn ($f) => str_starts_with(basename($f), 'slide-') && str_ends_with($f, '.jpg'))
             ->sort()
             ->values();
-    }
-
-    /** Last pipeline_state_log entry whose target was `failed` → its `from`. */
-    private function failedFromStep(RepurposeJob $job): string
-    {
-        $log = $job->pipeline_state_log ?? [];
-        for ($i = count($log) - 1; $i >= 0; $i--) {
-            if (($log[$i]['to'] ?? null) === RepurposeJobStatus::Failed->value) {
-                return (string) ($log[$i]['from'] ?? 'capturing');
-            }
-        }
-        return 'capturing';
     }
 
     /** @return array<string,mixed> compact list-row shape. */

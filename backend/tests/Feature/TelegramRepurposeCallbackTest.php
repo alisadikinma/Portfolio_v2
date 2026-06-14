@@ -4,7 +4,9 @@ namespace Tests\Feature;
 
 use App\Jobs\CaptureInstagramPost;
 use App\Jobs\CaptureVideoCarousel;
+use App\Jobs\GenerateRebrandAssets;
 use App\Models\RepurposeJob;
+use App\Models\RepurposeVideoSlide;
 use App\Models\Setting;
 use App\Services\TelegramNotificationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -94,6 +96,39 @@ class TelegramRepurposeCallbackTest extends TestCase
 
         $this->assertSame('blog', $job->refresh()->mode);
         Bus::assertNotDispatched(CaptureInstagramPost::class);
+    }
+
+    public function test_retry_button_re_dispatches_failed_video_rebrand_job(): void
+    {
+        // A5: the exhaustion alert's inline Retry button re-runs a Failed
+        // video_rebrand asset job through the shared RepurposeRetryService.
+        Bus::fake();
+        $job = RepurposeJob::factory()->create(['status' => 'failed', 'mode' => 'video_rebrand', 'asset_retry_count' => 3]);
+        $job->update(['pipeline_state_log' => [['from' => 'generating_assets', 'to' => 'failed', 'reason' => 'video_assets_failed']]]);
+        RepurposeVideoSlide::create([
+            'repurpose_job_id' => $job->id, 'slide_index' => 0, 'role' => 'hook',
+            'keyframe_status' => 'done', 'keyframe_url' => 'https://cdn/kf.jpg', 'veo_status' => 'failed',
+        ]);
+
+        $data = TelegramNotificationService::signCallback('retry', 'repurpose', $job->id, $this->secret);
+        $this->tap($data)->assertOk();
+
+        $job->refresh();
+        $this->assertSame('extracted', $job->status);   // resume guard for GenerateRebrandAssets
+        $this->assertSame(0, $job->asset_retry_count);   // budget reset
+        Bus::assertDispatched(GenerateRebrandAssets::class, fn ($j) => $j->repurposeJobId === $job->id);
+    }
+
+    public function test_retry_button_noop_when_job_not_failed(): void
+    {
+        Bus::fake();
+        $job = RepurposeJob::factory()->create(['status' => 'generating_assets', 'mode' => 'video_rebrand']);
+        $data = TelegramNotificationService::signCallback('retry', 'repurpose', $job->id, $this->secret);
+
+        $this->tap($data)->assertOk();
+
+        $this->assertSame('generating_assets', $job->refresh()->status);
+        Bus::assertNotDispatched(GenerateRebrandAssets::class);
     }
 
     public function test_tampered_hmac_is_noop(): void

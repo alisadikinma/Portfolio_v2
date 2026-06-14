@@ -386,6 +386,15 @@ class TelegramWebhookController extends Controller
      */
     private function resolveRepurposeAction(RepurposeJob $job, string $action): string
     {
+        // A5: the exhaustion-alert inline Retry button re-runs a Failed job through
+        // the SAME path as the admin HTTP endpoint (RepurposeRetryService). Idempotent
+        // — the service no-ops when the job isn't Failed.
+        if ($action === 'retry') {
+            $result = app(\App\Services\RepurposeRetryService::class)->retry($job);
+
+            return $result['ok'] ? '🔁 Retry dispatched.' : $result['message'];
+        }
+
         if (!in_array($action, ['blog', 'carousel', 'video_rebrand'], true)) {
             return 'Unknown action.';
         }

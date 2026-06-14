@@ -293,8 +293,16 @@ class PollRebrandAssets extends Command
                     && $bookends->contains(fn ($s) => $s->last_error !== null)
                     && (int) ($job->asset_retry_count ?? 0) >= self::MAX_RETRIES;
                 if ($exhausted) {
+                    $lastSlideError = (string) ($bookends->first(fn ($s) => $s->last_error !== null)?->last_error ?? '');
                     $job->transitionTo(RepurposeJobStatus::Failed, 'video_assets_failed', ['last_error' => 'A hook/CTA clip failed to generate after retries — see slide errors.']);
                     $this->warn("  job {$job->id} → failed (asset generation exhausted)");
+                    // A5: surface the terminal failure to the operator with a one-tap
+                    // Retry — was a silent FSM transition before. Best-effort.
+                    try {
+                        app(\App\Services\TelegramNotificationService::class)->sendRepurposeAssetsFailed($job, $lastSlideError);
+                    } catch (\Throwable $e) {
+                        Log::warning('[PollRebrandAssets] exhaustion notify failed', ['job' => $job->id, 'error' => $e->getMessage()]);
+                    }
                 }
             }
         }
