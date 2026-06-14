@@ -58,17 +58,23 @@ class VideoRebrandComposer
      */
     public function composeJobToolSlides(RepurposeJob $job, VideoChromeRenderer $chrome): int
     {
-        $tools = $job->videoSlides()->where('role', RepurposeVideoSlide::ROLE_TOOL)->get();
-        $total = $job->videoSlides()->count();
+        $tools = $job->videoSlides()->where('role', RepurposeVideoSlide::ROLE_TOOL)
+            ->orderBy('slide_index')->get()->values();
+        // Pagination counts the TOOL slides only (1..N). The hook/CTA Veo bookends
+        // are full-bleed clips without this header chrome, so counting them
+        // (videoSlides()->count()) printed 1-9 dots for 7 tools. $active is the
+        // slide's 1-based position AMONG TOOLS — robust to dropped source bookends
+        // / renumbered slide_index — matching renderSlide's documented contract.
+        $total = $tools->count();
 
         $failed = 0;
-        foreach ($tools as $slide) {
+        foreach ($tools as $position => $slide) {
             if ($slide->composited_status === 'done' && $slide->composited_path) {
                 continue;
             }
 
             try {
-                $chromePngs = $chrome->renderSlide($slide, $slide->slide_index, $total);
+                $chromePngs = $chrome->renderSlide($slide, $position + 1, $total);
                 if ($chromePngs === null) {
                     throw new \RuntimeException('chrome render returned null');
                 }
