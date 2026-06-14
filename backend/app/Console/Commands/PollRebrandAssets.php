@@ -123,15 +123,19 @@ class PollRebrandAssets extends Command
 
             if ($this->hasError($data)) {
                 $reason = $this->errorReason($data);
+                // Detect + classify against code+message: GeminiGen often carries the
+                // figure/safety signal ONLY in error_code (e.g. PROMINENT_PEOPLE_*)
+                // while error_message is a generic sentence.
+                $signature = $this->errorSignature($data);
                 if (! $dry) {
-                    $update = ['keyframe_status' => 'failed', 'last_error' => $reason, 'last_error_class' => $this->classifier->classify($reason)];
+                    $update = ['keyframe_status' => 'failed', 'last_error' => $reason, 'last_error_class' => $this->classifier->classify($signature)];
                     // Safety fallback (#1): a hook keyframe refused by GeminiGen's
                     // named-public-figure upload filter → drop the figure ref so
                     // the recovery pass re-authors a CREATOR-ONLY scene. The
                     // sentinel is durable (recover() blanks last_error, not this).
                     if ($slide->role === RepurposeVideoSlide::ROLE_HOOK
                         && ! $slide->figure_dropped
-                        && $this->isSafetyError($reason)) {
+                        && $this->isSafetyError($signature)) {
                         $update['figure_dropped'] = true;
                         $this->warn("  slide {$slide->id} hook keyframe refused (figure) → dropping figure ref for retry");
                     }
@@ -226,8 +230,9 @@ class PollRebrandAssets extends Command
 
             if ($this->hasError($data)) {
                 $reason = $this->errorReason($data);
+                $signature = $this->errorSignature($data);
                 if (! $dry) {
-                    $update = ['veo_status' => 'failed', 'last_error' => $reason, 'last_error_class' => $this->classifier->classify($reason)];
+                    $update = ['veo_status' => 'failed', 'last_error' => $reason, 'last_error_class' => $this->classifier->classify($signature)];
                     // Safety self-heal (mirrors the keyframe branch): Veo can refuse a
                     // hook clip whose keyframe shows a recognizable public figure
                     // (PROMINENT_PEOPLE_FILTER_FAILED) even when the keyframe itself
@@ -237,7 +242,7 @@ class PollRebrandAssets extends Command
                     // a CREATOR-ONLY scene (GenerateRebrandAssets reads figure_dropped).
                     if ($slide->role === RepurposeVideoSlide::ROLE_HOOK
                         && ! $slide->figure_dropped
-                        && $this->isSafetyError($reason)) {
+                        && $this->isSafetyError($signature)) {
                         $update['figure_dropped'] = true;
                         $this->warn("  slide {$slide->id} hook VEO refused (figure) → dropping figure ref for retry");
                     }
@@ -476,6 +481,19 @@ class PollRebrandAssets extends Command
         $errCode = is_string($data['error_code'] ?? null) ? trim($data['error_code']) : '';
 
         return $errMsg !== '' ? $errMsg : ($errCode !== '' ? $errCode : 'GeminiGen reported a render failure.');
+    }
+
+    /**
+     * Combined error_code + error_message — the input for safety detection +
+     * classification. GeminiGen frequently puts the actionable signal (figure /
+     * audio / policy code) ONLY in error_code while error_message is generic prose.
+     */
+    private function errorSignature(array $data): string
+    {
+        $errCode = is_string($data['error_code'] ?? null) ? trim($data['error_code']) : '';
+        $errMsg = is_string($data['error_message'] ?? null) ? trim($data['error_message']) : '';
+
+        return trim($errCode.' '.$errMsg);
     }
 
     private function markStuck(RepurposeVideoSlide $slide, string $stage, string $reason, bool $dry): void

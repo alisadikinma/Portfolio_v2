@@ -179,4 +179,82 @@ class HookAuthorAndFallbackTest extends TestCase
         $this->assertSame('failed', $hook->keyframe_status);
         $this->assertTrue($hook->figure_dropped, 'a PROMINENT_PEOPLE_UPLOAD refusal must set the figure_dropped sentinel');
     }
+
+    /**
+     * Defect (b): the author picks a figure but its photo fails to resolve (Wikidata
+     * miss OR storage write conflict). The figure-authored scene references "image 2"
+     * — shipping it with no ref-2 leaves a dangling celebrity reference that trips the
+     * prominent-people filter. The job must RE-AUTHOR creator-only + persist the
+     * sentinel, never dispatch the figure scene.
+     */
+    public function test_hook_unresolved_figure_reauthors_creator_only_and_sets_sentinel(): void
+    {
+        $job = $this->jobWithTools();
+
+        $calls = [];
+        $this->mock(VideoHookSceneAuthor::class, function ($m) use (&$calls) {
+            $m->shouldReceive('author')->andReturnUsing(function ($topic, $allowFigure) use (&$calls) {
+                $calls[] = $allowFigure;
+
+                return $allowFigure
+                    ? ['success' => true, 'figure_name' => 'Sundar Pichai', 'scene_prompt' => 'creator left, reference image 2 right', 'error' => null]
+                    : ['success' => true, 'figure_name' => null, 'scene_prompt' => 'solo creator portrait on a tech campus', 'error' => null];
+            });
+        });
+        // Figure photo unresolvable.
+        $this->mock(EntityReferenceService::class, function ($m) {
+            $m->shouldReceive('findOrFetch')->with('Sundar Pichai', 'person')->andReturnNull();
+        });
+
+        $captured = [];
+        $this->mock(GeminiGenVideoService::class, function ($m) use (&$captured) {
+            $m->shouldReceive('dispatchKeyframe')->andReturnUsing(function ($refs, $prompt, $ctx) use (&$captured) {
+                $captured[] = ['refs' => $refs, 'prompt' => $prompt];
+
+                return 'kf-' . count($captured);
+            });
+        });
+
+        (new GenerateRebrandAssets($job->id))->handle(app(GeminiGenVideoService::class));
+
+        $this->assertSame([true, false], $calls, 'must re-author creator-only after the figure fails to resolve');
+        $this->assertSame(['https://cdn/face.jpg'], $captured[0]['refs'], 'hook must be creator-only (no dangling figure ref)');
+        $this->assertStringContainsString('solo creator portrait', $captured[0]['prompt'], 'hook must use the clean creator-only scene');
+
+        $hook = RepurposeVideoSlide::where('repurpose_job_id', $job->id)->where('role', 'hook')->first();
+        $this->assertTrue((bool) $hook->figure_dropped, 'unresolved figure must persist the sentinel so recovery skips the failing fetch');
+    }
+
+    /**
+     * Defect (c): Veo can refuse a hook clip whose keyframe shows a recognizable
+     * public figure (PROMINENT_PEOPLE_FILTER_FAILED) even though the keyframe itself
+     * passed image-gen. The VEO-stage failure (not just the keyframe stage) must set
+     * figure_dropped so recover() re-authors creator-only instead of looping forever.
+     */
+    public function test_poll_marks_figure_dropped_on_hook_veo_safety_refusal(): void
+    {
+        config()->set('services.geminigen.api_key', 'test-key');
+
+        Http::fake([
+            '*/history/*' => Http::response([
+                'status' => 3,
+                'error_code' => 'PUBLIC_ERROR_PROMINENT_PEOPLE_FILTER_FAILED',
+                'error_message' => 'The prompt contains words that describe characteristics related to a celebrity.',
+            ], 200),
+        ]);
+
+        $job = RepurposeJob::factory()->create(['mode' => 'video_rebrand', 'status' => 'generating_assets']);
+        $hook = RepurposeVideoSlide::create([
+            'repurpose_job_id' => $job->id, 'slide_index' => 0, 'role' => 'hook',
+            'keyframe_status' => 'done', 'keyframe_url' => 'https://cdn/kf.jpg',
+            'veo_status' => 'generating', 'veo_job_uuid' => 'veo-uuid-1',
+            'composited_status' => 'pending', 'figure_dropped' => false,
+        ]);
+
+        $this->artisan('repurpose:poll-rebrand-assets')->assertExitCode(0);
+
+        $hook->refresh();
+        $this->assertSame('failed', $hook->veo_status);
+        $this->assertTrue($hook->figure_dropped, 'a VEO-stage prominent-people refusal must set figure_dropped for the creator-only retry');
+    }
 }
