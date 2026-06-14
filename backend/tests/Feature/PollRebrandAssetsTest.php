@@ -80,6 +80,50 @@ class PollRebrandAssetsTest extends TestCase
         $this->assertStringContainsString('slide_0.mp4', $hook->composited_path);
     }
 
+    public function test_veo_failure_persists_error_class(): void
+    {
+        // A2: the GeminiGen error must be classified + persisted so recover() can
+        // degrade the retry prompt after it blanks last_error.
+        $job = RepurposeJob::factory()->create(['mode' => 'video_rebrand', 'status' => 'generating_assets']);
+        $hook = RepurposeVideoSlide::create([
+            'repurpose_job_id' => $job->id, 'slide_index' => 0, 'role' => 'hook',
+            'keyframe_status' => 'done', 'veo_status' => 'generating', 'veo_job_uuid' => 'veo-1',
+        ]);
+
+        Http::fake([
+            '*/history/veo-1' => Http::response(['error_message' => 'PUBLIC_ERROR_AUDIO_FILTERED', 'status' => 3], 200),
+        ]);
+
+        $this->mock(GeminiGenVideoService::class);
+
+        $this->artisan('repurpose:poll-rebrand-assets')->assertSuccessful();
+
+        $hook->refresh();
+        $this->assertSame('failed', $hook->veo_status);
+        $this->assertSame('audio_filtered', $hook->last_error_class);
+    }
+
+    public function test_keyframe_failure_persists_error_class(): void
+    {
+        $job = RepurposeJob::factory()->create(['mode' => 'video_rebrand', 'status' => 'generating_assets']);
+        $cta = RepurposeVideoSlide::create([
+            'repurpose_job_id' => $job->id, 'slide_index' => 1, 'role' => 'cta',
+            'keyframe_status' => 'generating', 'keyframe_job_uuid' => 'kf-2',
+        ]);
+
+        Http::fake([
+            '*/history/kf-2' => Http::response(['error_message' => 'Blocked by safety filter', 'status' => 3], 200),
+        ]);
+
+        $this->mock(GeminiGenVideoService::class);
+
+        $this->artisan('repurpose:poll-rebrand-assets')->assertSuccessful();
+
+        $cta->refresh();
+        $this->assertSame('failed', $cta->keyframe_status);
+        $this->assertSame('content_policy', $cta->last_error_class);
+    }
+
     public function test_both_bookends_composited_promotes_job_and_dispatches_compose(): void
     {
         Bus::fake();

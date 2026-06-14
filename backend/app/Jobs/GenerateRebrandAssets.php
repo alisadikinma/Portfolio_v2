@@ -215,12 +215,28 @@ class GenerateRebrandAssets implements ShouldQueue
             if (is_string($figureUrl) && $figureUrl !== '') {
                 $refs[] = $figureUrl; // license-checked + downloaded to our storage
             } else {
-                // Distinguish a Wikidata/notability/license miss (silent creator-only
-                // here) from a GeminiGen safety refusal (figure_dropped, logged later).
-                Log::info('[GenerateRebrandAssets] hook figure unresolved — creator-only scene', [
+                // Figure photo unresolvable (Wikidata/notability/license miss, or a
+                // storage-write conflict). The authored scene was built AROUND the
+                // figure — it references "image 2" — so shipping it with no ref-2
+                // leaves a dangling celebrity reference that trips GeminiGen's
+                // prominent-people filter at keyframe/Veo. Persist the drop sentinel
+                // (so recovery never retries the same failing fetch) and RE-AUTHOR a
+                // clean creator-only scene instead of returning the figure scene.
+                $hook->forceFill(['figure_dropped' => true])->save();
+                Log::info('[GenerateRebrandAssets] hook figure unresolved — re-authoring creator-only', [
                     'job' => $job->id,
                     'figure' => $figureName,
                 ]);
+
+                $creatorOnly = app(VideoHookSceneAuthor::class)->author($topic, false);
+                $creatorScene = trim((string) ($creatorOnly['scene_prompt'] ?? ''));
+                if (($creatorOnly['success'] ?? false) && $creatorScene !== '') {
+                    return [[$faceUrl], $creatorScene];
+                }
+
+                // Re-author failed too → static creator-only keyframe (never the
+                // figure scene). The hook still renders; it just isn't topic-bespoke.
+                return [[$faceUrl], self::KEYFRAME_PROMPT_HOOK];
             }
         }
 
@@ -251,7 +267,7 @@ class GenerateRebrandAssets implements ShouldQueue
         $refs = array_values(array_filter($refs, fn ($u) => is_string($u) && $u !== ''));
         $uuid = $refs !== [] ? $video->dispatchKeyframe($refs, $prompt, $slide->id) : null;
         if ($uuid === null) {
-            $slide->update(['keyframe_status' => 'failed', 'last_error' => 'keyframe dispatch failed (service unavailable or rejected)']);
+            $slide->update(['keyframe_status' => 'failed', 'last_error' => 'keyframe dispatch failed (service unavailable or rejected)', 'last_error_class' => \App\Services\VideoGenErrorClassifier::TRANSIENT]);
 
             return false;
         }

@@ -9,6 +9,7 @@ use App\Models\RepurposeJob;
 use App\Models\RepurposeVideoSlide;
 use App\Services\GeminiGenVideoService;
 use App\Services\VideoChromeRenderer;
+use App\Services\VideoGenErrorClassifier;
 use App\Services\VideoRebrandComposer;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
@@ -49,6 +50,11 @@ class PollRebrandAssets extends Command
     private const MAX_RETRIES = 3;
 
     private const FAILED_RETRY_COOLDOWN_MINUTES = 5;
+
+    public function __construct(private readonly VideoGenErrorClassifier $classifier)
+    {
+        parent::__construct();
+    }
 
     public function handle(GeminiGenVideoService $video): int
     {
@@ -100,7 +106,7 @@ class PollRebrandAssets extends Command
                 if ($uuid === null) {
                     // Circuit open / dispatch rejected — keep keyframe done so the
                     // recovery pass can re-dispatch Veo without re-rendering the image.
-                    $slide->update(['keyframe_status' => 'done', 'keyframe_url' => $imageUrl, 'veo_status' => 'failed', 'last_error' => 'Veo dispatch failed (service unavailable)']);
+                    $slide->update(['keyframe_status' => 'done', 'keyframe_url' => $imageUrl, 'veo_status' => 'failed', 'last_error' => 'Veo dispatch failed (service unavailable)', 'last_error_class' => VideoGenErrorClassifier::TRANSIENT]);
                     $this->warn("  slide {$slide->id} Veo dispatch failed");
 
                     continue;
@@ -117,7 +123,7 @@ class PollRebrandAssets extends Command
             if ($this->hasError($data)) {
                 $reason = $this->errorReason($data);
                 if (! $dry) {
-                    $update = ['keyframe_status' => 'failed', 'last_error' => $reason];
+                    $update = ['keyframe_status' => 'failed', 'last_error' => $reason, 'last_error_class' => $this->classifier->classify($reason)];
                     // Safety fallback (#1): a hook keyframe refused by GeminiGen's
                     // named-public-figure upload filter → drop the figure ref so
                     // the recovery pass re-authors a CREATOR-ONLY scene. The
@@ -210,7 +216,7 @@ class PollRebrandAssets extends Command
                     $slide->update(['veo_status' => 'done', 'veo_url' => $videoUrl, 'composited_path' => $composited, 'composited_status' => 'done', 'last_error' => null]);
                     $this->info("  slide {$slide->id} veo done");
                 } else {
-                    $slide->update(['veo_status' => 'failed', 'last_error' => 'Download/crop of finished Veo clip failed — see logs.']);
+                    $slide->update(['veo_status' => 'failed', 'last_error' => 'Download/crop of finished Veo clip failed — see logs.', 'last_error_class' => VideoGenErrorClassifier::TRANSIENT]);
                     $this->warn("  slide {$slide->id} finalize failed");
                 }
 
@@ -218,8 +224,23 @@ class PollRebrandAssets extends Command
             }
 
             if ($this->hasError($data)) {
+                $reason = $this->errorReason($data);
                 if (! $dry) {
-                    $slide->update(['veo_status' => 'failed', 'last_error' => $this->errorReason($data)]);
+                    $update = ['veo_status' => 'failed', 'last_error' => $reason, 'last_error_class' => $this->classifier->classify($reason)];
+                    // Safety self-heal (mirrors the keyframe branch): Veo can refuse a
+                    // hook clip whose keyframe shows a recognizable public figure
+                    // (PROMINENT_PEOPLE_FILTER_FAILED) even when the keyframe itself
+                    // passed image-gen. Without dropping the figure here, recover()
+                    // would re-author the SAME figure keyframe and loop on the same
+                    // refusal forever. Set the sentinel so the recovery pass re-authors
+                    // a CREATOR-ONLY scene (GenerateRebrandAssets reads figure_dropped).
+                    if ($slide->role === RepurposeVideoSlide::ROLE_HOOK
+                        && ! $slide->figure_dropped
+                        && $this->isSafetyError($reason)) {
+                        $update['figure_dropped'] = true;
+                        $this->warn("  slide {$slide->id} hook VEO refused (figure) → dropping figure ref for retry");
+                    }
+                    $slide->update($update);
                 }
                 $this->warn("  slide {$slide->id} veo failed");
 
@@ -390,7 +411,9 @@ class PollRebrandAssets extends Command
         }
         $col = $stage === 'veo' ? 'veo_status' : 'keyframe_status';
         if (! $dry) {
-            $slide->update([$col => 'failed', 'last_error' => "{$reason} (stuck {$age}min)"]);
+            // A stuck/poll-failed slide is an infra timeout, not a prompt fault →
+            // transient (recover() retries the SAME prompt rather than degrading it).
+            $slide->update([$col => 'failed', 'last_error' => "{$reason} (stuck {$age}min)", 'last_error_class' => VideoGenErrorClassifier::TRANSIENT]);
         }
         $this->warn("  slide {$slide->id} {$stage} stuck {$age}min → failed");
     }

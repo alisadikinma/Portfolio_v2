@@ -38,6 +38,7 @@ class RepurposeVideoSlide extends Model
         'composited_path',
         'composited_status',
         'last_error',
+        'last_error_class',
         'figure_dropped',
     ];
 
