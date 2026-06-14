@@ -62,15 +62,40 @@ class RepurposeJobListTitleTest extends TestCase
         $this->assertSame('Marketing pakai AI itu gini', $this->listRow($job->id)['title']);
     }
 
-    public function test_compact_title_null_when_neither(): void
+    public function test_compact_title_falls_back_to_source_host_when_no_content(): void
     {
+        // No rewritten + no caption + non-video mode → derivedTitle now delegates
+        // to RepurposeJob::displayTopic(), whose final fallback is the source host
+        // (then "job #id"). Never null for a job with a source_url, so the card
+        // never shows the bare "Untitled repurpose" placeholder.
         $job = RepurposeJob::factory()->create([
             'status' => 'received',
+            'source_url' => 'https://instagram.com/p/ABC123/',
             'rewritten' => null,
             'extracted' => null,
         ]);
 
-        $this->assertNull($this->listRow($job->id)['title']);
+        $this->assertSame('instagram.com', $this->listRow($job->id)['title']);
+    }
+
+    public function test_compact_title_video_rebrand_from_tool_slide_headers(): void
+    {
+        // video_rebrand jobs skip the rewrite step and carry no caption (only
+        // source_hook_title + tool slides). The old derivedTitle() whiffed on both
+        // checks and returned null → "Untitled repurpose". It now falls through to
+        // displayTopic(), which composes the topic from the tool-slide headers.
+        $job = RepurposeJob::factory()->create([
+            'status' => 'drafted',
+            'mode' => 'video_rebrand',
+            'rewritten' => null,
+            'extracted' => ['source_hook_title' => 'AI Tools That Save Hours'],
+        ]);
+        \App\Models\RepurposeVideoSlide::create(['repurpose_job_id' => $job->id, 'slide_index' => 0, 'role' => 'hook', 'composited_status' => 'done']);
+        \App\Models\RepurposeVideoSlide::create(['repurpose_job_id' => $job->id, 'slide_index' => 1, 'role' => 'tool', 'header_title' => 'Opal', 'composited_status' => 'done']);
+        \App\Models\RepurposeVideoSlide::create(['repurpose_job_id' => $job->id, 'slide_index' => 2, 'role' => 'tool', 'header_title' => 'Stitch', 'composited_status' => 'done']);
+        \App\Models\RepurposeVideoSlide::create(['repurpose_job_id' => $job->id, 'slide_index' => 3, 'role' => 'cta', 'composited_status' => 'done']);
+
+        $this->assertSame('Opal, Stitch', $this->listRow($job->id)['title']);
     }
 
     public function test_compact_includes_slide_count_and_has_cover(): void

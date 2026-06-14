@@ -568,7 +568,14 @@ class RepurposeJobController extends Controller
             }
         }
 
-        return null;
+        // video_rebrand jobs skip the rewrite step and carry no caption (only
+        // source_hook_title + tool slides), so the two checks above whiff and the
+        // Social Studio card showed "Untitled repurpose". Fall back to the model's
+        // richer topic resolver (video tool-slide header titles → source host →
+        // job #id), which never returns empty.
+        $topic = trim($job->displayTopic());
+
+        return $topic !== '' ? $topic : null;
     }
 
     private function notFound(): JsonResponse
