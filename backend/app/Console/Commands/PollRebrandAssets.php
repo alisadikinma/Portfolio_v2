@@ -10,6 +10,7 @@ use App\Models\RepurposeVideoSlide;
 use App\Services\GeminiGenVideoService;
 use App\Services\VideoChromeRenderer;
 use App\Services\VideoGenErrorClassifier;
+use App\Services\VideoGenPromptDegrader;
 use App\Services\VideoRebrandComposer;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
@@ -113,7 +114,7 @@ class PollRebrandAssets extends Command
                 }
                 $slide->update([
                     'keyframe_status' => 'done', 'keyframe_url' => $imageUrl,
-                    'veo_status' => 'generating', 'veo_job_uuid' => $uuid, 'last_error' => null,
+                    'veo_status' => 'generating', 'veo_job_uuid' => $uuid, 'last_error' => null, 'last_error_class' => null,
                 ]);
                 $this->info("  slide {$slide->id} keyframe done → Veo {$uuid}");
 
@@ -379,9 +380,12 @@ class PollRebrandAssets extends Command
 
         // Keyframe-broken: full reset + GenerateRebrandAssets re-render path.
         if ($keyframeBroken->isNotEmpty()) {
+            // Keep last_error_class through the reset — buildHookKeyframe reads it to
+            // force a static safe scene on a content_policy refusal (cleared on the
+            // next successful keyframe poll). Only blank the human last_error.
             $job->videoSlides()
                 ->whereIn('id', $keyframeBroken->pluck('id')->all())
-                ->update(['keyframe_status' => null, 'veo_status' => null, 'last_error' => null, 'last_error_class' => null]);
+                ->update(['keyframe_status' => null, 'veo_status' => null, 'last_error' => null]);
             // Bounce to extracted so GenerateRebrandAssets' Extracted guard passes
             // (the generating_assets → extracted recovery edge — see RepurposeJobStatus).
             $job->transitionTo(RepurposeJobStatus::Extracted, 'video_assets_retry');
@@ -397,14 +401,20 @@ class PollRebrandAssets extends Command
     }
 
     /**
-     * The Veo motion prompt for a bookend re-dispatch. Base = the role's static
-     * VEO_PROMPT_*; A4 wraps this with error-class degradation.
+     * The Veo motion prompt for a bookend re-dispatch, error-degraded per the
+     * slide's last_error_class (A4). Base = the role's static VEO_PROMPT_*.
      */
     private function veoRetryPrompt(RepurposeVideoSlide $slide): string
     {
-        return $slide->role === RepurposeVideoSlide::ROLE_CTA
+        $base = $slide->role === RepurposeVideoSlide::ROLE_CTA
             ? GenerateRebrandAssets::VEO_PROMPT_CTA
             : GenerateRebrandAssets::VEO_PROMPT_HOOK;
+
+        return app(VideoGenPromptDegrader::class)->degradeVeo(
+            $base,
+            (string) ($slide->last_error_class ?? VideoGenErrorClassifier::TRANSIENT),
+            (int) (($slide->repurposeJob->asset_retry_count ?? 0) + 1),
+        );
     }
 
     /**

@@ -188,6 +188,14 @@ class GenerateRebrandAssets implements ShouldQueue
      */
     private function buildHookKeyframe(RepurposeJob $job, RepurposeVideoSlide $hook, string $faceUrl): array
     {
+        // A4: a prior keyframe refused for content policy would be refused the same
+        // way on a re-author — force the static safe scene instead of re-running the
+        // SSH author. (recover() preserves last_error_class through the reset; it's
+        // cleared on the next successful keyframe poll.)
+        if ($hook->last_error_class === \App\Services\VideoGenErrorClassifier::CONTENT_POLICY) {
+            return [[$faceUrl], self::KEYFRAME_PROMPT_HOOK];
+        }
+
         $topic = $this->hookTopic($job);
         if ($topic === '') {
             return [[$faceUrl], self::KEYFRAME_PROMPT_HOOK];

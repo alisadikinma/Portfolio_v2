@@ -89,6 +89,36 @@ class GenerateRebrandAssetsTest extends TestCase
         Bus::assertDispatched(ComposeToolSlides::class, fn ($j) => $j->repurposeJobId === $job->id);
     }
 
+    public function test_content_policy_hook_forces_static_scene_no_author(): void
+    {
+        // A4: a hook whose prior keyframe was refused for content policy must NOT
+        // re-author the same scene (deterministic repeat) — force the static safe
+        // KEYFRAME_PROMPT_HOOK and skip VideoHookSceneAuthor entirely.
+        $job = $this->jobWithToolSlides();
+        // Pre-create the hook row carrying the content_policy hint (as recover()
+        // leaves it after a keyframe-broken reset).
+        RepurposeVideoSlide::create([
+            'repurpose_job_id' => $job->id, 'slide_index' => 0, 'role' => 'hook',
+            'keyframe_status' => null, 'last_error_class' => 'content_policy',
+        ]);
+
+        $this->mock(VideoHookSceneAuthor::class, function ($m) {
+            $m->shouldReceive('author')->never();
+        });
+        $this->mock(GeminiGenVideoService::class, function ($m) {
+            $m->shouldReceive('dispatchKeyframe')
+                ->once()
+                ->with(\Mockery::any(), GenerateRebrandAssets::KEYFRAME_PROMPT_HOOK, \Mockery::any())
+                ->andReturn('kf-hook-static');
+            $m->shouldReceive('dispatchKeyframe')->andReturn('kf-cta'); // CTA
+        });
+
+        (new GenerateRebrandAssets($job->id))->handle(app(GeminiGenVideoService::class));
+
+        $hook = $job->videoSlides()->where('role', RepurposeVideoSlide::ROLE_HOOK)->first();
+        $this->assertSame('kf-hook-static', $hook->keyframe_job_uuid);
+    }
+
     public function test_fails_loudly_when_creator_face_missing(): void
     {
         // No profile_photo setting → getCreatorFaceUrl returns null.
