@@ -1347,6 +1347,10 @@ Route::middleware(['auth:sanctum'])->prefix('admin/repurpose')->group(function (
     Route::get('/{id}', [RepurposeJobController::class, 'show'])->whereNumber('id');
     Route::post('/{id}/retry', [RepurposeJobController::class, 'retry'])->whereNumber('id');
     Route::post('/{id}/refetch-source', [RepurposeJobController::class, 'refetchSource'])->whereNumber('id');
+    // video_rebrand slide regeneration — batch (all) + single (by slide_index).
+    Route::post('/{id}/regenerate-slides', [RepurposeJobController::class, 'regenerateAllSlides'])->whereNumber('id');
+    Route::post('/{id}/slides/{n}/regenerate', [RepurposeJobController::class, 'regenerateSlide'])
+        ->whereNumber('id')->whereNumber('n');
     Route::get('/{id}/slide/{n}', [RepurposeJobController::class, 'slide'])
         ->whereNumber('id')->whereNumber('n');
     Route::delete('/{id}', [RepurposeJobController::class, 'destroy'])->whereNumber('id');

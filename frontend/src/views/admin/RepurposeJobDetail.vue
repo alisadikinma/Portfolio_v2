@@ -5,6 +5,8 @@ import {
   useRepurposeJob,
   useRetryRepurposeJob,
   useRefetchRepurposeSource,
+  useRegenerateAllRepurposeSlides,
+  useRegenerateRepurposeSlide,
   fetchSlideObjectUrl,
 } from '@/composables/useRepurposeJobs'
 import { useLinkedInDraft } from '@/composables/useLinkedInDrafts'
@@ -170,6 +172,32 @@ function downloadAll() {
   readyVideoSlides.value.forEach((s, i) => setTimeout(() => downloadSlide(s), i * 350))
 }
 
+// --- regenerate (per-slide + batch) -----------------------------------------
+const regenAll = useRegenerateAllRepurposeSlides()
+const regenSlide = useRegenerateRepurposeSlide()
+const regeneratingIndex = ref(null) // slide_index currently re-dispatching (single)
+
+async function doRegenerateAll() {
+  if (!window.confirm('Regenerate ALL slides? The hook & CTA are re-rendered with Veo (uses video credits); tool slides re-skin for free. This replaces the current carousel.')) return
+  await regenAll.mutateAsync(id.value)
+  refetch()
+}
+
+async function doRegenerateSlide(s) {
+  const isBookend = s.role === 'hook' || s.role === 'cta'
+  const msg = isBookend
+    ? `Re-render the ${roleLabel(s.role)} slide? This runs Veo video generation (uses credits).`
+    : `Re-skin the "${s.header_title || 'tool'}" slide? Free — re-renders the brand chrome only.`
+  if (!window.confirm(msg)) return
+  regeneratingIndex.value = s.slide_index
+  try {
+    await regenSlide.mutateAsync({ id: id.value, slideIndex: s.slide_index })
+    refetch()
+  } finally {
+    regeneratingIndex.value = null
+  }
+}
+
 function genState(s) {
   if (s && s.image_status === 'done' && s.image_url) return null
   if (s && s.image_status === 'failed') return 'failed'
@@ -312,14 +340,25 @@ function goBack() { router.push({ name: 'admin-social-studio' }) }
             Branded video carousel
             <span class="ml-1 font-normal text-neutral-400 dark:text-neutral-500">· {{ readyVideoSlides.length }}/{{ videoSlides.length }} ready</span>
           </h2>
-          <button
-            v-if="readyVideoSlides.length"
-            @click="downloadAll"
-            class="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-amber-700"
-          >
-            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" /></svg>
-            Download all ({{ readyVideoSlides.length }})
-          </button>
+          <div class="flex flex-wrap items-center gap-2">
+            <button
+              :disabled="regenAll.isPending.value"
+              @click="doRegenerateAll"
+              title="Re-render every slide (hook & CTA use Veo credits; tool slides re-skin free)"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-700/50 dark:bg-amber-900/20 dark:text-amber-300 dark:hover:bg-amber-900/40"
+            >
+              <svg class="h-3.5 w-3.5" :class="{ 'animate-spin': regenAll.isPending.value }" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5M5.5 14a7 7 0 0 0 12.4 2M18.5 10A7 7 0 0 0 6.1 8" /></svg>
+              {{ regenAll.isPending.value ? 'Queuing…' : 'Regenerate all' }}
+            </button>
+            <button
+              v-if="readyVideoSlides.length"
+              @click="downloadAll"
+              class="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-amber-700"
+            >
+              <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" /></svg>
+              Download all ({{ readyVideoSlides.length }})
+            </button>
+          </div>
         </div>
 
         <p v-if="videoGenerating" class="mb-4 flex items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400">
@@ -353,14 +392,28 @@ function goBack() { router.push({ name: 'admin-social-studio' }) }
                 {{ s.slide_index }} · {{ roleLabel(s.role) }}
               </span>
             </div>
-            <button
-              v-if="!videoSlideState(s)"
-              @click="downloadSlide(s)"
-              class="flex w-full items-center justify-center gap-1 bg-neutral-50 py-1.5 text-xs font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900 dark:bg-neutral-900/60 dark:text-neutral-300 dark:hover:bg-neutral-900 dark:hover:text-neutral-100"
-            >
-              <svg class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" /></svg>
-              Download
-            </button>
+            <div class="flex divide-x divide-neutral-200 dark:divide-neutral-700">
+              <button
+                v-if="!videoSlideState(s)"
+                @click="downloadSlide(s)"
+                class="flex flex-1 items-center justify-center gap-1 bg-neutral-50 py-1.5 text-xs font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900 dark:bg-neutral-900/60 dark:text-neutral-300 dark:hover:bg-neutral-900 dark:hover:text-neutral-100"
+              >
+                <svg class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" /></svg>
+                Download
+              </button>
+              <button
+                :disabled="regeneratingIndex === s.slide_index"
+                @click="doRegenerateSlide(s)"
+                :title="s.role === 'tool' ? 'Re-skin this slide (free, chrome only)' : 'Re-render this slide with Veo (uses credits)'"
+                class="flex flex-1 items-center justify-center gap-1 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                :class="s.role === 'tool'
+                  ? 'bg-neutral-50 text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 dark:bg-neutral-900/60 dark:text-neutral-300 dark:hover:bg-neutral-900 dark:hover:text-neutral-100'
+                  : 'bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/20 dark:text-amber-300 dark:hover:bg-amber-900/40'"
+              >
+                <svg class="h-3 w-3" :class="{ 'animate-spin': regeneratingIndex === s.slide_index }" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5M5.5 14a7 7 0 0 0 12.4 2M18.5 10A7 7 0 0 0 6.1 8" /></svg>
+                {{ regeneratingIndex === s.slide_index ? 'Queuing…' : (s.role === 'tool' ? 'Re-skin' : 'Re-render') }}
+              </button>
+            </div>
           </div>
         </div>
 

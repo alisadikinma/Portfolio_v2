@@ -6,6 +6,7 @@ use App\Enums\LinkedInPostStatus;
 use App\Enums\RepurposeJobStatus;
 use App\Http\Controllers\Controller;
 use App\Jobs\CaptureInstagramPost;
+use App\Jobs\ComposeToolSlides;
 use App\Jobs\ComposeVideoCarousel;
 use App\Jobs\ExtractSlideContent;
 use App\Jobs\FinalizeRepurpose;
@@ -14,6 +15,7 @@ use App\Jobs\RefetchSourceSlides;
 use App\Jobs\ResearchRepurposeClaims;
 use App\Jobs\RewriteRepurposeContent;
 use App\Models\RepurposeJob;
+use App\Models\RepurposeVideoSlide;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -269,6 +271,126 @@ class RepurposeJobController extends Controller
         }
 
         return Storage::disk('local')->response($files->values()[$n]);
+    }
+
+    /**
+     * Re-render EVERY slide of a video_rebrand carousel (batch). Resets the
+     * hook/CTA Veo bookends (keyframe + clip re-render — burns Veo credits) AND
+     * the tool slides (free ffmpeg re-skin), forces the job back to `extracted`,
+     * then dispatches GenerateRebrandAssets — which re-authors the hook, re-fires
+     * both bookend keyframes, and dispatches ComposeToolSlides for the tools. The
+     * PollRebrandAssets cron drives keyframe→Veo→composite→finalize. video_rebrand
+     * only.
+     */
+    public function regenerateAllSlides(int $id): JsonResponse
+    {
+        $job = RepurposeJob::find($id);
+        if (!$job) {
+            return $this->notFound();
+        }
+        if ($job->mode !== 'video_rebrand') {
+            return $this->notVideoRebrand();
+        }
+
+        $job->videoSlides()
+            ->whereIn('role', [RepurposeVideoSlide::ROLE_HOOK, RepurposeVideoSlide::ROLE_CTA])
+            ->update($this->bookendResetPayload());
+        $job->videoSlides()
+            ->where('role', RepurposeVideoSlide::ROLE_TOOL)
+            ->update($this->toolResetPayload());
+
+        $job->forceStatus(RepurposeJobStatus::Extracted, 'admin_regenerate_all_slides', [
+            'asset_retry_count' => 0,
+            'last_error' => null,
+        ]);
+        GenerateRebrandAssets::dispatch($job->id);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'All slides queued for regeneration.',
+            'data' => ['status' => $job->status],
+        ], 202);
+    }
+
+    /**
+     * Re-render a SINGLE slide by its slide_index. A `tool` slide re-skins via
+     * ComposeToolSlides (free, FSM-neutral — runs even on a `drafted` job; the
+     * other done tools are skipped). A `hook`/`cta` bookend resets its keyframe +
+     * clip and forces `extracted` → GenerateRebrandAssets, which re-renders only
+     * that bookend (dispatchKeyframe skips slides already `done`/`generating`) and
+     * leaves done tools untouched. video_rebrand only.
+     */
+    public function regenerateSlide(int $id, int $n): JsonResponse
+    {
+        $job = RepurposeJob::find($id);
+        if (!$job) {
+            return $this->notFound();
+        }
+        if ($job->mode !== 'video_rebrand') {
+            return $this->notVideoRebrand();
+        }
+
+        $slide = $job->videoSlides()->where('slide_index', $n)->first();
+        if (!$slide) {
+            return $this->notFound();
+        }
+
+        if ($slide->role === RepurposeVideoSlide::ROLE_TOOL) {
+            // Free re-skin — composite only this slide (the rest stay done → skipped).
+            // FSM-neutral: ComposeToolSlides never transitions the job, so a `drafted`
+            // job stays drafted and the widened detail poll picks up the live status.
+            $slide->update($this->toolResetPayload());
+            ComposeToolSlides::dispatch($job->id);
+        } else {
+            // Bookend — re-render keyframe + Veo clip (burns Veo credits).
+            $slide->update($this->bookendResetPayload());
+            $job->forceStatus(RepurposeJobStatus::Extracted, "admin_regenerate_slide:{$slide->role}", [
+                'asset_retry_count' => 0,
+                'last_error' => null,
+            ]);
+            GenerateRebrandAssets::dispatch($job->id);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "Slide #{$n} ({$slide->role}) queued for regeneration.",
+            'data' => ['status' => $job->status],
+        ], 202);
+    }
+
+    /** Reset payload for a Veo bookend so GenerateRebrandAssets re-renders it. */
+    private function bookendResetPayload(): array
+    {
+        return [
+            'keyframe_status' => null,
+            'keyframe_job_uuid' => null,
+            'keyframe_url' => null,
+            'veo_status' => null,
+            'veo_job_uuid' => null,
+            'veo_url' => null,
+            'composited_status' => 'pending',
+            'composited_path' => null,
+            'last_error' => null,
+            'figure_dropped' => 0,
+        ];
+    }
+
+    /** Reset payload for a tool slide so ComposeToolSlides re-skins it. */
+    private function toolResetPayload(): array
+    {
+        return [
+            'composited_status' => 'pending',
+            'composited_path' => null,
+            'last_error' => null,
+        ];
+    }
+
+    private function notVideoRebrand(): JsonResponse
+    {
+        return response()->json([
+            'success' => false,
+            'error' => ['code' => 'NOT_VIDEO_REBRAND', 'message' => 'Slide regeneration is only available for video_rebrand jobs.'],
+        ], 422);
     }
 
     /**

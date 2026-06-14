@@ -68,8 +68,19 @@ export function useRepurposeJob(id) {
     staleTime: 30_000,
     refetchOnMount: 'always',
     refetchInterval: (q) => {
-      const status = q.state.data?.data?.status
-      return status && !isTerminal(status) ? 4_000 : false
+      const job = q.state.data?.data
+      const status = job?.status
+      if (status && !isTerminal(status)) return 4_000
+      // Keep polling while any video_rebrand slide is mid-flight even on a
+      // `drafted` (terminal) job — a single-tool re-skin is FSM-neutral, so the
+      // job status never leaves `drafted` while the slide re-composites.
+      const slides = Array.isArray(job?.video_slides) ? job.video_slides : []
+      const slideActive = slides.some(s =>
+        ['pending', 'compositing'].includes(s.composited_status) ||
+        ['pending', 'generating'].includes(s.keyframe_status) ||
+        ['pending', 'generating'].includes(s.veo_status),
+      )
+      return slideActive ? 4_000 : false
     },
   })
 
@@ -88,6 +99,38 @@ export function useRetryRepurposeJob() {
     mutationFn: (id) => api.post(`/admin/repurpose/${id}/retry`).then(r => r.data),
     onSuccess: (_data, id) => {
       qc.invalidateQueries({ queryKey: [LIST_KEY] })
+      qc.invalidateQueries({ queryKey: [LIST_KEY, id] })
+    },
+  })
+}
+
+/**
+ * Regenerate ALL slides of a video_rebrand carousel (batch). Re-renders the
+ * hook/CTA Veo bookends (burns Veo credits) AND re-skins every tool slide.
+ * Backend forces the job to `extracted` + dispatches GenerateRebrandAssets.
+ */
+export function useRegenerateAllRepurposeSlides() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) => api.post(`/admin/repurpose/${id}/regenerate-slides`).then(r => r.data),
+    onSuccess: (_data, id) => {
+      qc.invalidateQueries({ queryKey: [LIST_KEY, id] })
+      qc.invalidateQueries({ queryKey: [LIST_KEY] })
+    },
+  })
+}
+
+/**
+ * Regenerate a SINGLE slide by its slide_index. A `tool` slide is a free ffmpeg
+ * re-skin; a `hook`/`cta` bookend is a Veo re-render (burns credits).
+ * Arg: { id, slideIndex }.
+ */
+export function useRegenerateRepurposeSlide() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, slideIndex }) =>
+      api.post(`/admin/repurpose/${id}/slides/${slideIndex}/regenerate`).then(r => r.data),
+    onSuccess: (_data, { id }) => {
       qc.invalidateQueries({ queryKey: [LIST_KEY, id] })
     },
   })

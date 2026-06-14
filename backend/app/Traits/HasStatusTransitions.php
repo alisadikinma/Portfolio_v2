@@ -73,4 +73,39 @@ trait HasStatusTransitions
 
         return $this;
     }
+
+    /**
+     * Operator-forced status set that BYPASSES the FSM adjacency check. For a
+     * deliberate admin re-run from a terminal/any state (e.g. "Regenerate all
+     * slides" on a `drafted` repurpose job, where no legal forward edge exists).
+     * Still appends an audited pipeline_state_log entry tagged `forced => true`.
+     * Use sparingly — normal pipeline movement must go through transitionTo().
+     */
+    public function forceStatus(BackedEnum|string $next, ?string $reason = null, array $extra = []): self
+    {
+        $enumClass = $this->statusEnumClass();
+        $nextEnum = is_string($next) ? $enumClass::from($next) : $next;
+
+        $log = $this->pipeline_state_log ?? [];
+        $log[] = [
+            'from' => $this->status,
+            'to' => $nextEnum->value,
+            'reason' => $reason,
+            'timestamp' => now()->toIso8601String(),
+            'forced' => true,
+        ];
+        if (count($log) > 20) {
+            $log = array_values(array_slice($log, -20));
+        }
+
+        $this->status = $nextEnum->value;
+        $this->pipeline_state_log = $log;
+
+        $this->update(array_merge($extra, [
+            'status' => $nextEnum->value,
+            'pipeline_state_log' => $log,
+        ]));
+
+        return $this;
+    }
 }

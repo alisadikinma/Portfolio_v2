@@ -136,8 +136,12 @@ class GenerateRebrandAssets implements ShouldQueue
 
         // Hook keyframe is topic-aware (#1): authored from the surviving tool
         // titles, optionally with a public figure as a face reference. CTA stays
-        // the static branded portrait this phase.
-        [$hookRefs, $hookPrompt] = $this->buildHookKeyframe($job, $hook, $faceUrl);
+        // the static branded portrait this phase. Skip the costly SSH author when
+        // the hook keyframe is already `done` (single-CTA / re-run regen where
+        // dispatchKeyframe will skip the hook anyway) — saves a ~1-3min author call.
+        [$hookRefs, $hookPrompt] = $hook->keyframe_status === 'done'
+            ? [[$faceUrl], self::KEYFRAME_PROMPT_HOOK]
+            : $this->buildHookKeyframe($job, $hook, $faceUrl);
 
         $dispatched = 0;
         $dispatched += $this->dispatchKeyframe($video, $hook, $hookPrompt, $hookRefs) ? 1 : 0;
