@@ -299,7 +299,7 @@ class PollRebrandAssets extends Command
         }
     }
 
-    /** Pass D — bounded re-dispatch of failed bookends after a cooldown. */
+    /** Pass D — bounded, STAGE-AWARE re-dispatch of failed bookends after a cooldown. */
     private function recover(bool $dry): void
     {
         $jobs = RepurposeJob::where('mode', 'video_rebrand')
@@ -312,42 +312,99 @@ class PollRebrandAssets extends Command
             // DB hiccup) must never crash the whole cron — that would exit 1 every
             // minute AND starve the keyframe/Veo polling of OTHER in-flight jobs.
             try {
-                $failedBookend = $job->videoSlides()
-                    ->whereIn('role', [RepurposeVideoSlide::ROLE_HOOK, RepurposeVideoSlide::ROLE_CTA])
-                    ->where(fn ($q) => $q->where('keyframe_status', 'failed')->orWhereNull('keyframe_status')->orWhere('veo_status', 'failed'))
-                    ->exists();
-
-                if (! $failedBookend) {
-                    continue;
-                }
-                if ((int) ($job->asset_retry_count ?? 0) >= self::MAX_RETRIES) {
-                    continue;
-                }
-                if ($dry) {
-                    $this->line("  [dry] job {$job->id} has failed bookend → would re-dispatch assets");
-
-                    continue;
-                }
-
-                // Reset failed/orphaned bookends so GenerateRebrandAssets' idempotent
-                // dispatch re-runs them. NULL keyframe_status = a worker died mid-
-                // GenerateRebrandAssets (status committed, dispatch never ran) — the
-                // 5-min cooldown above guarantees we never race an in-flight author.
-                $job->videoSlides()
-                    ->whereIn('role', [RepurposeVideoSlide::ROLE_HOOK, RepurposeVideoSlide::ROLE_CTA])
-                    ->where(fn ($q) => $q->where('keyframe_status', 'failed')->orWhereNull('keyframe_status')->orWhere('veo_status', 'failed'))
-                    ->update(['keyframe_status' => null, 'veo_status' => null, 'last_error' => null]);
-
-                $job->increment('asset_retry_count');
-                // Bounce back to extracted so GenerateRebrandAssets' Extracted guard passes
-                // (the generating_assets → extracted recovery edge — see RepurposeJobStatus).
-                $job->transitionTo(RepurposeJobStatus::Extracted, 'video_assets_retry');
-                GenerateRebrandAssets::dispatch($job->id);
-                $this->info("  job {$job->id} re-dispatched assets (retry #{$job->asset_retry_count})");
+                $this->recoverJob($job, $dry);
             } catch (\Throwable $e) {
                 Log::warning('[PollRebrandAssets] recover failed for job', ['job' => $job->id, 'error' => $e->getMessage()]);
             }
         }
+    }
+
+    /**
+     * Route each failed bookend by which STAGE broke (request #2):
+     *   - Veo-only (keyframe 'done' + keyframe_url present + veo 'failed') → keep the
+     *     keyframe, reset Veo only, re-dispatch the Veo clip DIRECTLY from the stored
+     *     keyframe_url with an error-degraded prompt. No keyframe re-render, no SSH
+     *     hook re-author, no Extracted bounce.
+     *   - Keyframe-broken (keyframe 'failed'/NULL, or veo-failed without a usable
+     *     keyframe) → full reset + bounce to Extracted so GenerateRebrandAssets
+     *     re-renders the keyframe (its idempotent dispatch skips 'done' bookends).
+     * asset_retry_count is incremented ONCE per recover tick (job-level budget);
+     * MAX_RETRIES + the 5-min cooldown are unchanged.
+     */
+    private function recoverJob(RepurposeJob $job, bool $dry): void
+    {
+        $bookends = $job->videoSlides()
+            ->whereIn('role', [RepurposeVideoSlide::ROLE_HOOK, RepurposeVideoSlide::ROLE_CTA])
+            ->get();
+
+        $failed = $bookends->filter(fn ($s) => $s->keyframe_status === 'failed'
+            || $s->keyframe_status === null
+            || $s->veo_status === 'failed');
+
+        if ($failed->isEmpty()) {
+            return;
+        }
+        if ((int) ($job->asset_retry_count ?? 0) >= self::MAX_RETRIES) {
+            return;
+        }
+
+        $veoOnly = $failed->filter(fn ($s) => $s->keyframe_status === 'done'
+            && $s->veo_status === 'failed'
+            && filled($s->keyframe_url));
+        $keyframeBroken = $failed->reject(fn ($s) => $veoOnly->contains('id', $s->id));
+
+        if ($dry) {
+            $this->line("  [dry] job {$job->id} recover → ".$veoOnly->count().' veo-only + '.$keyframeBroken->count().' keyframe-broken');
+
+            return;
+        }
+
+        $acted = false;
+
+        // Veo-only: re-dispatch straight from the preserved keyframe.
+        foreach ($veoOnly as $slide) {
+            $prompt = $this->veoRetryPrompt($slide);
+            $uuid = app(GeminiGenVideoService::class)
+                ->dispatchVeoClip($slide->keyframe_url, $prompt, '9:16', $slide->id);
+            if ($uuid !== null) {
+                $slide->update(['veo_status' => 'generating', 'veo_job_uuid' => $uuid, 'last_error' => null, 'last_error_class' => null]);
+                $this->info("  slide {$slide->id} Veo-only retry → {$uuid}");
+            } else {
+                // Circuit open / rejected — stay failed, next eligible tick retries.
+                $slide->update(['last_error' => 'Veo re-dispatch failed (service unavailable)', 'last_error_class' => VideoGenErrorClassifier::TRANSIENT]);
+                $this->warn("  slide {$slide->id} Veo-only re-dispatch failed");
+            }
+            $acted = true;
+        }
+
+        // Keyframe-broken: full reset + GenerateRebrandAssets re-render path.
+        if ($keyframeBroken->isNotEmpty()) {
+            $job->videoSlides()
+                ->whereIn('id', $keyframeBroken->pluck('id')->all())
+                ->update(['keyframe_status' => null, 'veo_status' => null, 'last_error' => null, 'last_error_class' => null]);
+            // Bounce to extracted so GenerateRebrandAssets' Extracted guard passes
+            // (the generating_assets → extracted recovery edge — see RepurposeJobStatus).
+            $job->transitionTo(RepurposeJobStatus::Extracted, 'video_assets_retry');
+            GenerateRebrandAssets::dispatch($job->id);
+            $this->info("  job {$job->id} keyframe re-render dispatched (".$keyframeBroken->count().' bookend)');
+            $acted = true;
+        }
+
+        if ($acted) {
+            $job->increment('asset_retry_count');
+            $this->info("  job {$job->id} recover tick (retry #{$job->asset_retry_count})");
+        }
+    }
+
+    /**
+     * The Veo motion prompt for a bookend re-dispatch. Base = the role's static
+     * VEO_PROMPT_*; A4 wraps this with error-class degradation.
+     */
+    private function veoRetryPrompt(RepurposeVideoSlide $slide): string
+    {
+        return $slide->role === RepurposeVideoSlide::ROLE_CTA
+            ? GenerateRebrandAssets::VEO_PROMPT_CTA
+            : GenerateRebrandAssets::VEO_PROMPT_HOOK;
     }
 
     /**
