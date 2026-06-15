@@ -26,6 +26,7 @@ class PublishViaZernioTest extends TestCase
     {
         parent::setUp();
         config(['app.url' => 'https://alisadikinma.com']);
+        config(['social-cross-post.zernio.enabled' => true]); // master switch on for publish tests
         Setting::create(['group' => 'zernio', 'key' => 'zernio_api_key_igtt', 'value' => Crypt::encryptString('sk_igtt')]);
         Setting::create(['group' => 'zernio', 'key' => 'zernio_instagram_account_id', 'value' => 'ig_acc']);
     }

@@ -921,7 +921,7 @@ class LinkedInDraftController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => $draft->fresh(['post.translations', 'post.contentIdea:id,result_post_id,virality_score', 'account']),
-                'message' => 'Scheduled for ' . $publishAt->toIso8601String() . ' — cross-post fan-out queued to Publer.',
+                'message' => 'Scheduled for ' . $publishAt->toIso8601String() . ' — cross-post fan-out queued.',
             ]);
         } catch (InvalidStateTransitionException $e) {
             return $this->illegalTransition($e);
@@ -1062,7 +1062,7 @@ class LinkedInDraftController extends Controller
         return response()->json([
             'success' => true,
             'data' => $draft->fresh(['post.translations', 'post.contentIdea:id,result_post_id,virality_score', 'account']),
-            'message' => 'LinkedIn published. Cross-post fan-out queued — IG/TikTok/Threads will publish via Publer (~1-3 min).',
+            'message' => 'LinkedIn published. Cross-post fan-out queued — IG/TikTok/Threads will publish via their configured publisher (~1-3 min).',
         ]);
     }
 
@@ -1708,7 +1708,7 @@ class LinkedInDraftController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Publishing ' . ucfirst($platform) . ' to Publer…',
+            'message' => 'Publishing ' . ucfirst($platform) . ' via ' . ucfirst(\App\Support\PublisherResolver::for($platform)) . '…',
         ], 202);
     }
 

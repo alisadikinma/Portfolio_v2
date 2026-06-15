@@ -26,6 +26,9 @@ class LinkedInPublishCrossPostTest extends TestCase
     private function enableInstagram(): void
     {
         Setting::create(['group' => 'publer', 'key' => 'publer_instagram_account_id', 'value' => 'acc_ig_1', 'type' => 'text']);
+        // Pin to Publer — the PublisherResolver now defaults to Zernio (primary),
+        // so this Publer-path test must select Publer explicitly.
+        Setting::create(['group' => 'zernio', 'key' => 'crosspost_publisher_instagram', 'value' => 'publer', 'type' => 'text']);
     }
 
     private function carouselWithFailedIg(): LinkedInPost

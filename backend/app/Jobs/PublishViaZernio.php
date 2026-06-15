@@ -79,6 +79,16 @@ class PublishViaZernio implements ShouldQueue
             return;
         }
 
+        // Master kill-switch: ZERNIO_PUBLISH_ENABLED=false stops all Zernio
+        // publishing (draft stays at its current state, re-dispatchable later).
+        if (! (bool) config('social-cross-post.zernio.enabled', false)) {
+            Log::info('[PublishViaZernio] Zernio publishing disabled (master switch) — skipping', [
+                'platform' => $this->platform, 'sibling_id' => $this->siblingPostId,
+            ]);
+
+            return;
+        }
+
         // Defense-in-depth: never publish to a platform with no Zernio account id
         // (a stale queued job could outlive a settings change). Skip silently.
         if (! ZernioPayloadBuilder::isPlatformEnabled($this->platform)) {
@@ -93,8 +103,11 @@ class PublishViaZernio implements ShouldQueue
         $requestId = $sibling->zernio_request_id ?: (string) Str::uuid();
 
         try {
-            $method = 'build'.ucfirst($this->platform);
-            $payload = $builder->$method($sibling);
+            $payload = match ($this->platform) {
+                'instagram' => $builder->buildInstagram($sibling),
+                'tiktok'    => $builder->buildTiktok($sibling),
+                'threads'   => $builder->buildThreads($sibling),
+            };
             $payload = $this->applyScheduling($payload, $sibling);
 
             DB::table($sibling->getTable())->where('id', $sibling->id)->update([
@@ -107,7 +120,13 @@ class PublishViaZernio implements ShouldQueue
 
             // HTTP 409 content-dedup → already live on the platform; idempotent success.
             if (($result['duplicate'] ?? false) === true) {
-                $this->markPublished($sibling, $result['existingPostId'] ?? $requestId, null);
+                $existingId = $result['existingPostId'] ?? null;
+                if ($existingId === null) {
+                    Log::warning('[PublishViaZernio] 409 duplicate without existingPostId — storing request id as fallback', [
+                        'platform' => $this->platform, 'sibling_id' => $this->siblingPostId,
+                    ]);
+                }
+                $this->markPublished($sibling, $existingId ?? $requestId, null);
 
                 return;
             }

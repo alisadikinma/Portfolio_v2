@@ -42,6 +42,14 @@ class CrossPostDraftControllersTest extends TestCase
                 'key' => "publer_{$p}_account_id",
                 'value' => "{$p}_test_acc",
             ]);
+            // Pin the publisher to Publer for these Publer-path tests — the
+            // PublisherResolver now defaults to Zernio (primary), so without
+            // this pin the gate would check the (unset) Zernio account.
+            \App\Models\Setting::create([
+                'group' => 'zernio',
+                'key' => "crosspost_publisher_{$p}",
+                'value' => 'publer',
+            ]);
         }
         $this->admin = User::factory()->create();
     }

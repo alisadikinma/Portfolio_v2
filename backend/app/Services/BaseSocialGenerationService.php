@@ -304,11 +304,13 @@ abstract class BaseSocialGenerationService
             // Publer. Derive the short name: InstagramPost → instagram.
             $platform = strtolower(str_replace('Post', '', class_basename($modelClass)));
 
-            // Per-platform gate: don't promote/dispatch a platform the operator
-            // hasn't selected a Publer account for — leave it at AwaitingReview.
-            if (!\App\Services\PublerPayloadBuilder::isPlatformEnabled($platform)) {
-                \Illuminate\Support\Facades\Log::info('[BaseSocialGen] Cascade skipped — platform not configured in Publer', [
+            // Per-platform gate: don't promote/dispatch a platform whose SELECTED
+            // publisher (Zernio primary / Publer fallback) has no account
+            // configured — leave it at AwaitingReview.
+            if (!\App\Support\PublisherResolver::isPlatformEnabled($platform)) {
+                \Illuminate\Support\Facades\Log::info('[BaseSocialGen] Cascade skipped — platform not configured for its selected publisher', [
                     'platform' => $platform,
+                    'publisher' => \App\Support\PublisherResolver::for($platform),
                     'draft_id' => $draft->id,
                 ]);
                 return;

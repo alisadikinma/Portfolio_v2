@@ -1695,7 +1695,7 @@ class SettingsController extends Controller
         $platform = $workspace === 'threads' ? 'threads' : 'instagram';
 
         try {
-            $accounts = (new \App\Services\ZernioClient)->forPlatform($platform)->listAccounts();
+            $accounts = app(\App\Services\ZernioClient::class)->forPlatform($platform)->listAccounts();
 
             return response()->json([
                 'success' => true,
