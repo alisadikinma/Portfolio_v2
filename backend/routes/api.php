@@ -329,6 +329,12 @@ Route::middleware(['auth:sanctum'])->prefix('admin/settings')->group(function ()
     Route::put('/publer', [SettingsController::class, 'updatePublerSettings']);
     Route::post('/publer/test', [SettingsController::class, 'testPublerConnection']);
     Route::post('/publer/sync-accounts', [SettingsController::class, 'syncPublerAccounts']);
+    // Zernio cross-post integration (group=zernio) — 2 encrypted workspace API
+    // keys + 3 platform account IDs + 3 per-platform publisher selectors.
+    // Primary publisher for IG/TikTok/Threads. See ZernioSettingsSeeder.
+    Route::get('/zernio', [SettingsController::class, 'getZernioSettings']);
+    Route::put('/zernio', [SettingsController::class, 'updateZernioSettings']);
+    Route::post('/zernio/verify', [SettingsController::class, 'verifyZernioConnection']);
     // CV Master Export (group=cv) — feeds /api/cv/export schema_version 2.0.0
     Route::get('/cv', [SettingsController::class, 'getCvSettings']);
     Route::put('/cv', [SettingsController::class, 'updateCvSettings']);

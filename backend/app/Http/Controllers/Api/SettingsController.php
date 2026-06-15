@@ -1584,4 +1584,130 @@ class SettingsController extends Controller
             'debug_total_accounts' => count($accounts),
         ]);
     }
+
+    // ─── Zernio (primary IG/TikTok/Threads publisher, 2026-06-15) ────────────
+
+    /**
+     * GET /api/admin/settings/zernio — return Zernio config. Both workspace API
+     * keys are masked (***SET*** + *_configured flag); the encrypted blob and
+     * plaintext are never returned.
+     */
+    public function getZernioSettings(): JsonResponse
+    {
+        try {
+            $data = [];
+            foreach (Setting::byGroup('zernio')->get() as $setting) {
+                $data[$setting->key] = $setting->value;
+            }
+
+            $data = array_merge([
+                'zernio_api_key_igtt' => null,
+                'zernio_api_key_threads' => null,
+                'zernio_instagram_account_id' => null,
+                'zernio_tiktok_account_id' => null,
+                'zernio_threads_account_id' => null,
+                'crosspost_publisher_instagram' => 'zernio',
+                'crosspost_publisher_tiktok' => 'zernio',
+                'crosspost_publisher_threads' => 'zernio',
+            ], $data);
+
+            foreach (['zernio_api_key_igtt', 'zernio_api_key_threads'] as $keyName) {
+                $has = ! empty($data[$keyName]);
+                $data[$keyName] = $has ? '***SET***' : '';
+                $data[$keyName . '_configured'] = $has;
+            }
+
+            return response()->json(['success' => true, 'data' => $data]);
+        } catch (\Exception $e) {
+            Log::error('Failed to fetch zernio settings', ['error' => $e->getMessage()]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch zernio settings',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred',
+            ], 500);
+        }
+    }
+
+    /**
+     * PUT /api/admin/settings/zernio — update Zernio config. Empty/sentinel
+     * (***SET***) values for either workspace key preserve the existing
+     * encrypted value; non-empty values are encrypted before storage. Publisher
+     * selectors are validated to zernio|publer.
+     */
+    public function updateZernioSettings(\Illuminate\Http\Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'zernio_api_key_igtt' => ['nullable', 'string', 'max:512'],
+            'zernio_api_key_threads' => ['nullable', 'string', 'max:512'],
+            'zernio_instagram_account_id' => ['nullable', 'string', 'max:100'],
+            'zernio_tiktok_account_id' => ['nullable', 'string', 'max:100'],
+            'zernio_threads_account_id' => ['nullable', 'string', 'max:100'],
+            'crosspost_publisher_instagram' => ['nullable', 'in:zernio,publer'],
+            'crosspost_publisher_tiktok' => ['nullable', 'in:zernio,publer'],
+            'crosspost_publisher_threads' => ['nullable', 'in:zernio,publer'],
+        ]);
+
+        DB::beginTransaction();
+        try {
+            foreach (['zernio_api_key_igtt', 'zernio_api_key_threads'] as $keyName) {
+                $value = $request->input($keyName);
+                if ($value === null || $value === '' || $value === '***SET***') {
+                    unset($validated[$keyName]); // preserve existing
+                } else {
+                    $validated[$keyName] = \Illuminate\Support\Facades\Crypt::encryptString($value);
+                }
+            }
+
+            foreach ($validated as $key => $value) {
+                Setting::updateOrCreate(
+                    ['key' => $key, 'group' => 'zernio'],
+                    ['value' => $value, 'type' => 'text']
+                );
+            }
+
+            DB::commit();
+
+            return response()->json(['success' => true, 'message' => 'Zernio settings updated.']);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Failed to update zernio settings', ['error' => $e->getMessage()]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update zernio settings',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred',
+            ], 500);
+        }
+    }
+
+    /**
+     * POST /api/admin/settings/zernio/verify — list the connected accounts for a
+     * workspace (igtt|threads) so the operator can copy the accountId into the
+     * per-platform field. Returns 200 + success=false on failure (operator's
+     * error, not server's) so the UI renders it inline.
+     */
+    public function verifyZernioConnection(\Illuminate\Http\Request $request): JsonResponse
+    {
+        $workspace = $request->input('workspace', 'igtt');
+        // igtt workspace holds IG+TikTok; pick 'instagram' as its representative
+        // platform so ZernioClient::forPlatform() selects the right key.
+        $platform = $workspace === 'threads' ? 'threads' : 'instagram';
+
+        try {
+            $accounts = (new \App\Services\ZernioClient)->forPlatform($platform)->listAccounts();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Zernio connection OK.',
+                'data' => ['accounts' => $accounts],
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Zernio connection failed.',
+                'error' => $e->getMessage(),
+            ], 200);
+        }
+    }
 }
