@@ -264,16 +264,17 @@ trait HandlesCrossPostDraftActions
             default => throw new \InvalidArgumentException("Unknown cross-post model: {$modelClass}"),
         };
 
-        // Per-platform gate: refuse to approve-publish a platform with no Publer
-        // account selected (operator directive — don't blindly publish). Clear
-        // 422 so the operator selects the account in Publer settings first.
-        if (!\App\Services\PublerPayloadBuilder::isPlatformEnabled($platform)) {
+        // Per-platform gate: refuse to approve-publish a platform whose SELECTED
+        // publisher (Zernio primary, Publer fallback) has no account configured
+        // (operator directive — don't blindly publish). Clear 422 so the operator
+        // configures the account in the matching admin settings card first.
+        if (!\App\Support\PublisherResolver::isPlatformEnabled($platform)) {
             return response()->json([
                 'success' => false,
                 'error' => [
                     'code' => 'platform_not_configured',
-                    'message' => "No Publer account selected for {$platform}. "
-                        . "Select one in admin → Publer Integration before publishing.",
+                    'message' => "No publisher account configured for {$platform}. "
+                        . "Set one in admin → Zernio Publishing (or Publer Integration) before publishing.",
                 ],
             ], 422);
         }
@@ -291,8 +292,8 @@ trait HandlesCrossPostDraftActions
             ], 422);
         }
 
-        // Publer dispatch (real impl shipped May 12 — see PublishViaPubler P4).
-        PublishViaPubler::dispatch($platform, $draft->id);
+        // Route to the platform's selected publisher (Zernio primary / Publer fallback).
+        \App\Support\PublisherResolver::dispatchPublish($platform, $draft->id);
 
         return response()->json([
             'success' => true,

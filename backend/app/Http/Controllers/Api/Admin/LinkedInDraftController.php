@@ -1042,12 +1042,13 @@ class LinkedInDraftController extends Controller
             $sibling = $draft->{$platform . 'Post'};
             // Per-platform gate: only publish to platforms the operator has
             // selected a Publer account for (disabled platform = skipped).
+            $publishedIdColumn = \App\Support\PublisherResolver::publishedIdColumn($platform);
             if ($sibling !== null
-                && \App\Services\PublerPayloadBuilder::isPlatformEnabled($platform)
+                && \App\Support\PublisherResolver::isPlatformEnabled($platform)
                 && in_array($sibling->status, ['awaiting_review', 'publishing'], true)
-                && $sibling->publer_post_id === null) {
+                && $sibling->{$publishedIdColumn} === null) {
                 try {
-                    \App\Jobs\PublishViaPubler::dispatch($platform, $sibling->id);
+                    \App\Support\PublisherResolver::dispatchPublish($platform, $sibling->id);
                 } catch (\Throwable $e) {
                     Log::warning('[LinkedInDraftController] direct sibling publish dispatch failed', [
                         'draft_id' => $draft->id,
@@ -1679,27 +1680,31 @@ class LinkedInDraftController extends Controller
             ], 404);
         }
 
-        if (!\App\Services\PublerPayloadBuilder::isPlatformEnabled($platform)) {
+        if (!\App\Support\PublisherResolver::isPlatformEnabled($platform)) {
             return response()->json([
                 'success' => false,
-                'error' => ['code' => 'platform_not_configured', 'message' => 'Select a ' . ucfirst($platform) . ' account in admin → Publer Integration before publishing.'],
+                'error' => ['code' => 'platform_not_configured', 'message' => 'Configure a ' . ucfirst($platform) . ' account in admin → Zernio Publishing (or Publer Integration) before publishing.'],
             ], 422);
         }
 
-        if ($sibling->publer_post_id !== null && $sibling->status === 'published') {
+        // Published-id column tracks the SELECTED publisher (zernio_post_id /
+        // publer_post_id) so re-publish works whichever adapter is active.
+        $publishedIdColumn = \App\Support\PublisherResolver::publishedIdColumn($platform);
+
+        if ($sibling->{$publishedIdColumn} !== null && $sibling->status === 'published') {
             return response()->json([
                 'success' => true,
                 'message' => ucfirst($platform) . ' is already published.',
             ], 200);
         }
 
-        // Reset a failed/stale sibling so PublishViaPubler's idempotency guard
-        // (skip when publer_post_id set) doesn't short-circuit the re-publish.
+        // Reset a failed/stale sibling so the publish job's idempotency guard
+        // (skip when the published-id is set) doesn't short-circuit re-publish.
         \Illuminate\Support\Facades\DB::table($sibling->getTable())
             ->where('id', $sibling->id)
-            ->update(['status' => 'publishing', 'publer_post_id' => null, 'last_error' => null, 'updated_at' => now()]);
+            ->update(['status' => 'publishing', $publishedIdColumn => null, 'last_error' => null, 'updated_at' => now()]);
 
-        \App\Jobs\PublishViaPubler::dispatch($platform, $sibling->id);
+        \App\Support\PublisherResolver::dispatchPublish($platform, $sibling->id);
 
         return response()->json([
             'success' => true,

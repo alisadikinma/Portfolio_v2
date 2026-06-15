@@ -321,7 +321,7 @@ abstract class BaseSocialGenerationService
                 ['source' => 'linkedin_publish_all_flag']
             );
 
-            \App\Jobs\PublishViaPubler::dispatch($platform, $draft->id);
+            \App\Support\PublisherResolver::dispatchPublish($platform, $draft->id);
 
             \Illuminate\Support\Facades\Log::info('[BaseSocialGen] Cascade promoted draft to Publishing', [
                 'platform' => $platform,
