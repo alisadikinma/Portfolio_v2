@@ -202,6 +202,7 @@ class AutoScheduleManualReviewLinkedInPosts extends Command
             ->selectRaw('COALESCE(content_ideas.virality_score, 0) as virality_score')
             ->leftJoin('posts', 'linkedin_posts.post_id', '=', 'posts.id')
             ->leftJoin('content_ideas', 'posts.id', '=', 'content_ideas.result_post_id')
+            ->where('linkedin_posts.format', '!=', LinkedInPost::FORMAT_VIDEO_CAROUSEL) // Zernio-only IG-video anchors
             ->where('linkedin_posts.status', LinkedInPostStatus::ManualReview->value)
             ->whereNull('linkedin_posts.deleted_at')
             ->orderByDesc('virality_score')

@@ -557,3 +557,19 @@ export const ICON = {
   linkedin: 'M4 4h4v16H4V4zm2 0a2 2 0 1 1 0-4 2 2 0 0 1 0 4zM10 8h4v2c.5-1 2-2.5 4-2.5 4 0 6 2.5 6 6v6.5h-4v-6c0-2-1-3-2.5-3s-3 1.5-3 3v6h-4V8z',
   sparkle: 'M12 2l2 6 6 2-6 2-2 6-2-6-6-2 6-2 2-6zM18 13l1 3 3 1-3 1-1 3-1-3-3-1 3-1 1-3z',
 }
+
+/**
+ * Where a calendar/queue card navigates on click. A video_carousel anchor is a
+ * display-only LinkedIn row whose real publish UI (Zernio IG + Threads) lives on the
+ * repurpose detail, so it deep-links there; everything else opens the normal draft
+ * detail (LinkedIn) or the cross-post detail (FB/IG/TikTok). Pure — unit-tested.
+ */
+export function detailTarget(item, platform) {
+  if (item?.format === 'video_carousel' && item?.repurpose_job_id) {
+    return { name: 'admin-repurpose-detail', params: { id: item.repurpose_job_id } }
+  }
+  if (platform === 'linkedin') {
+    return { name: 'admin-sosmed-draft-detail', params: { id: item.id } }
+  }
+  return { name: 'admin-cross-post-detail', params: { platform, id: item.id } }
+}

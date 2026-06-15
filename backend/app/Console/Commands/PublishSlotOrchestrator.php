@@ -62,6 +62,7 @@ class PublishSlotOrchestrator extends Command
         $limit = (int) ($this->option('limit') ?: 10);
 
         $due = LinkedInPost::query()
+            ->excludeVideoCarousel() // IG-video anchors publish via Zernio, never the LinkedIn slot
             ->where('status', LinkedInPostStatus::AwaitingPublish->value)
             ->whereNotNull('cancel_window_ends_at')
             ->where('cancel_window_ends_at', '<=', now())

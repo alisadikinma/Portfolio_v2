@@ -155,6 +155,41 @@ class RepurposeJobListTitleTest extends TestCase
         $this->assertNull($this->listRow($job->id)['cover_url']);
     }
 
+    public function test_compact_cover_url_for_video_rebrand_uses_first_clip_keyframe(): void
+    {
+        // video_rebrand has no carousel_slides — its list thumbnail falls back to
+        // the first clip's hook keyframe (the still that seeds the first video).
+        // The hook (slide_index 0) sorts first, so its keyframe wins over a later
+        // CTA keyframe.
+        $job = RepurposeJob::factory()->create([
+            'status' => 'drafted',
+            'mode' => 'video_rebrand',
+            'linkedin_post_id' => null,
+        ]);
+        \App\Models\RepurposeVideoSlide::create(['repurpose_job_id' => $job->id, 'slide_index' => 0, 'role' => 'hook', 'keyframe_url' => 'https://alisadikinma.com/storage/repurpose/hook.png', 'composited_status' => 'done']);
+        \App\Models\RepurposeVideoSlide::create(['repurpose_job_id' => $job->id, 'slide_index' => 1, 'role' => 'tool', 'header_title' => 'Opal', 'composited_status' => 'done']);
+        \App\Models\RepurposeVideoSlide::create(['repurpose_job_id' => $job->id, 'slide_index' => 2, 'role' => 'cta', 'keyframe_url' => 'https://alisadikinma.com/storage/repurpose/cta.png', 'composited_status' => 'done']);
+
+        $row = $this->listRow($job->id);
+        $this->assertFalse($row['has_cover']); // no private slide-*.jpg → no blob fetch
+        $this->assertSame('https://alisadikinma.com/storage/repurpose/hook.png', $row['cover_url']);
+    }
+
+    public function test_compact_cover_url_null_for_video_rebrand_before_keyframe(): void
+    {
+        // Mid-generation: tool slides exist but no bookend keyframe has rendered
+        // yet → no still to show, cover stays null (placeholder), no crash.
+        $job = RepurposeJob::factory()->create([
+            'status' => 'generating_assets',
+            'mode' => 'video_rebrand',
+            'linkedin_post_id' => null,
+        ]);
+        \App\Models\RepurposeVideoSlide::create(['repurpose_job_id' => $job->id, 'slide_index' => 0, 'role' => 'hook', 'keyframe_url' => null, 'composited_status' => 'pending']);
+        \App\Models\RepurposeVideoSlide::create(['repurpose_job_id' => $job->id, 'slide_index' => 1, 'role' => 'tool', 'header_title' => 'Opal', 'composited_status' => 'pending']);
+
+        $this->assertNull($this->listRow($job->id)['cover_url']);
+    }
+
     public function test_compact_render_state_reflects_in_flight_carousel(): void
     {
         Storage::fake('local');

@@ -13,6 +13,7 @@ import {
   formatDateTime,
   formatPinTimeWIB,
   pinTimeLabel,
+  detailTarget,
   ICON,
 } from './linkedinHelpers'
 
@@ -349,7 +350,19 @@ async function reviveToStudio(id) {
   }
 }
 
-function openDetail(id) {
+function openDetail(item) {
+  // Accept either the full calendar item (preferred — lets us route video_carousel
+  // anchors to their repurpose detail) or a bare id (back-compat).
+  const post = item && typeof item === 'object' ? item : { id: item }
+  const target = detailTarget(post, platformRef.value)
+
+  // A video_carousel anchor lives in the repurpose pipeline — no draft-detail origin
+  // breadcrumb applies, jump straight there.
+  if (target.name === 'admin-repurpose-detail') {
+    router.push(target)
+    return
+  }
+
   // Origin key contract:
   //   sessionStorage[`${platform}:detail:origin`] = 'feed' | 'queue'
   // Consumed by:
@@ -358,14 +371,7 @@ function openDetail(id) {
   // If you add a new write-site or change the key shape, audit both
   // readers — silent mismatch produces a wrong-destination back button.
   sessionStorage.setItem(`${platformRef.value}:detail:origin`, 'feed')
-  if (platformRef.value === 'linkedin') {
-    router.push({ name: 'admin-sosmed-draft-detail', params: { id } })
-  } else {
-    router.push({
-      name: 'admin-cross-post-detail',
-      params: { platform: platformRef.value, id },
-    })
-  }
+  router.push(target)
 }
 
 // ---------------------------------------------------------------------------
@@ -582,9 +588,10 @@ function statusDotClass(status) {
               v-for="post in postsForDate(date).slice(0, 3)"
               :key="post.id"
               class="flex items-center gap-1.5 text-[11px] truncate"
-              @click.stop="openDetail(post.id)"
+              @click.stop="openDetail(post)"
             >
               <span :class="['inline-block w-1.5 h-1.5 rounded-full flex-shrink-0', statusDotClass(post.status)]"></span>
+              <span v-if="post.format === 'video_carousel'" title="IG + Threads video carousel">🎬</span>
               <span class="truncate text-neutral-300 group-hover:text-neutral-100">{{ post.post_title }}</span>
             </div>
             <div v-if="postsForDate(date).length > 3" class="text-[10px] font-mono text-neutral-500">
@@ -612,12 +619,13 @@ function statusDotClass(status) {
       <div
         v-for="post in calendarItems"
         :key="post.id"
-        @click="openDetail(post.id)"
+        @click="openDetail(post)"
         class="cursor-pointer rounded-xl border border-neutral-800/80 bg-neutral-950/40 px-4 py-3 hover:bg-neutral-900/40 transition"
       >
         <div class="flex items-center justify-between gap-3">
           <div class="flex items-center gap-2 min-w-0 flex-1">
             <span :class="['inline-block w-2 h-2 rounded-full flex-shrink-0', statusDotClass(post.status)]"></span>
+            <span v-if="post.format === 'video_carousel'" class="flex-shrink-0 rounded bg-fuchsia-500/15 px-1.5 py-0.5 text-[10px] font-mono uppercase tracking-wider text-fuchsia-300">🎬 IG·Threads</span>
             <span class="text-sm text-neutral-100 truncate">{{ post.post_title }}</span>
           </div>
           <div class="flex items-center gap-3 text-xs text-neutral-400 flex-shrink-0">
@@ -683,7 +691,7 @@ function statusDotClass(status) {
             <div class="space-y-2">
               <div v-for="post in selectedDayPosts" :key="post.id">
                 <button
-                  @click="openDetail(post.id)"
+                  @click="openDetail(post)"
                   class="w-full text-left rounded-lg border border-neutral-800 bg-neutral-900/40 px-3 py-2.5 hover:bg-neutral-800/60 transition"
                 >
                   <div class="flex items-center gap-2 mb-1">

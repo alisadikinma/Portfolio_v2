@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\LinkedInPostStatus;
 use App\Enums\RepurposeJobStatus;
 use App\Traits\HasStatusTransitions;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -182,6 +183,70 @@ class RepurposeJob extends Model
     public function zernioPublishState(string $platform): ?array
     {
         return ($this->zernio_publish ?? [])[$platform] ?? null;
+    }
+
+    /**
+     * Resolve the linked video_carousel calendar anchor (a LinkedInPost), or null
+     * when this job has no anchor / the anchor isn't a video_carousel row.
+     */
+    public function videoAnchor(): ?LinkedInPost
+    {
+        if (! $this->linkedin_post_id) {
+            return null;
+        }
+        $anchor = $this->linkedinPost()->first();
+
+        return $anchor && $anchor->isVideoCarousel() ? $anchor : null;
+    }
+
+    /**
+     * Mirror a Zernio schedule / publish-now action onto the video_carousel anchor so
+     * it lands on the LinkedIn-tab calendar grid. The publisher guard
+     * (scopeExcludeVideoCarousel) keeps awaiting_publish inert for LinkedIn — Zernio is
+     * the only real publisher.
+     */
+    public function mirrorAnchorScheduled(?\Illuminate\Support\Carbon $scheduledFor): void
+    {
+        $anchor = $this->videoAnchor();
+        if ($anchor === null) {
+            return;
+        }
+        $when = $scheduledFor ?? now();
+
+        if ($anchor->status === LinkedInPostStatus::ManualReview->value) {
+            $anchor->transitionTo(LinkedInPostStatus::AwaitingPublish, 'zernio_scheduled', [
+                'scheduled_at' => $when,
+                'cancel_window_ends_at' => $when,
+            ]);
+        } else {
+            // Already awaiting_publish (re-schedule) — just move the pin date.
+            $anchor->update(['scheduled_at' => $when, 'cancel_window_ends_at' => $when]);
+        }
+    }
+
+    /**
+     * Flip the anchor to published only once EVERY dispatched Zernio platform has
+     * published (the keys in zernio_publish ARE the dispatched platforms). A still-
+     * pending/scheduled/failed platform keeps the anchor un-published. Idempotent.
+     */
+    public function mirrorAnchorPublishedIfComplete(): void
+    {
+        $anchor = $this->videoAnchor();
+        if ($anchor === null || $anchor->status === LinkedInPostStatus::Published->value) {
+            return;
+        }
+        $states = $this->zernio_publish ?? [];
+        if ($states === [] || ! collect($states)->every(fn ($s) => ($s['status'] ?? null) === 'published')) {
+            return;
+        }
+        // Bridge a publish-now anchor still in manual_review through awaiting_publish
+        // (published is only reachable from awaiting_publish in the FSM).
+        if ($anchor->status === LinkedInPostStatus::ManualReview->value) {
+            $anchor->transitionTo(LinkedInPostStatus::AwaitingPublish, 'zernio_published_bridge');
+        }
+        $anchor->transitionTo(LinkedInPostStatus::Published, 'zernio_published', [
+            'published_at' => now(),
+        ]);
     }
 
     /**

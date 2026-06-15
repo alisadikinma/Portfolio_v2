@@ -67,6 +67,17 @@ class GenerateLinkedInPost implements ShouldQueue
             return;
         }
 
+        // Defensive bail: a video_carousel anchor never runs /linkedin-gen — it is a
+        // display-only calendar row whose media (composited MP4s) publishes to IG +
+        // Threads via Zernio. finalizeVideoRebrand never dispatches this job for one,
+        // but guard anyway so a future mis-dispatch can't fire an SSH generation run.
+        if ($draft->isVideoCarousel()) {
+            Log::info('[GenerateLinkedInPost] video_carousel anchor, skipping LinkedIn generation', [
+                'draft_id' => $draft->id,
+            ]);
+            return;
+        }
+
         $generatable = [
             LinkedInPostStatus::PendingGeneration->value,
             LinkedInPostStatus::Failed->value,

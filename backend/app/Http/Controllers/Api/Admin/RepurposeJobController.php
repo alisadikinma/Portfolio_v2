@@ -30,7 +30,10 @@ class RepurposeJobController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $query = RepurposeJob::query()->with('linkedinPost')->orderByDesc('id');
+        // videoSlides eager-loaded so generatedCoverUrl() can read a video_rebrand
+        // job's first-clip keyframe without an N+1 per list row (relation is already
+        // ordered by slide_index).
+        $query = RepurposeJob::query()->with(['linkedinPost', 'videoSlides'])->orderByDesc('id');
 
         $status = (string) $request->query('status', '');
         if ($status !== '') {
@@ -65,9 +68,17 @@ class RepurposeJobController extends Controller
                         ->orWhereHas('linkedinPost', fn ($p) => $p->whereIn('status', $queue));
                 })
                 // content_idea_id is set ONLY by the blog hand-off (finalizeBlog);
-                // carousel/video jobs never set it, so this hides handed-off blog jobs
-                // without touching the other modes.
-                ->whereNull('content_idea_id');
+                // carousel jobs never set it, so this hides handed-off blog jobs
+                // without touching carousel.
+                ->whereNull('content_idea_id')
+                // video_rebrand settles the moment finalizeVideoRebrand links a
+                // video_carousel anchor (linkedin_post_id) — it's now in the Content
+                // Calendar. Unlike carousel (which stays visible while its draft is in
+                // the working queue), a video job leaves immediately once anchored.
+                ->where(function ($q) {
+                    $q->where('mode', '!=', 'video_rebrand')
+                        ->orWhereNull('linkedin_post_id');
+                });
         }
 
         $perPage = min((int) $request->query('per_page', 25), 100);
@@ -420,6 +431,10 @@ class RepurposeJobController extends Controller
             ], 422);
         }
 
+        // Reflect the schedule/publish-now onto the Content Calendar anchor so it lands
+        // on the LinkedIn-tab grid date (publish completion is mirrored later by the job).
+        $job->mirrorAnchorScheduled($scheduledForIso ? Carbon::parse($scheduledForIso) : null);
+
         $verb = $scheduledForIso ? 'scheduled' : 'queued to publish now';
         $msg = 'Repurpose carousel '.$verb.' via Zernio: '.implode(', ', $dispatched);
         if ($skipped !== []) {
@@ -552,9 +567,33 @@ class RepurposeJobController extends Controller
      * slides have been purged (the reaper clears them a week after publish), so
      * the operator still sees a "1st image" on the list. Null when the job has
      * no linked carousel draft yet. Reads the eager-loaded `linkedinPost`.
+     *
+     * video_rebrand mode has no carousel_slides (its output lives in the separate
+     * repurpose_video_slides table), so it falls back to the first clip's hook
+     * keyframe — the still that seeds the first video and is therefore literally
+     * "the first image of the first video". keyframe_url is a full public GeminiGen
+     * URL; only bookend (hook/cta) slides have one and the hook sorts first, so the
+     * first non-empty keyframe_url over the slide_index-ordered relation is the
+     * cover frame. poster_path is intentionally NOT used — it points at a private
+     * local-disk path that 404s for the public <img>.
      */
     private function generatedCoverUrl(RepurposeJob $job): ?string
     {
+        if ($job->mode === 'video_rebrand') {
+            $slides = $job->relationLoaded('videoSlides')
+                ? $job->getRelation('videoSlides')
+                : $job->videoSlides()->get();
+
+            foreach ($slides as $slide) {
+                $url = trim((string) ($slide->keyframe_url ?? ''));
+                if ($url !== '') {
+                    return $url;
+                }
+            }
+
+            return null;
+        }
+
         $li = $job->relationLoaded('linkedinPost')
             ? $job->getRelation('linkedinPost')
             : ($job->linkedin_post_id ? $job->linkedinPost()->first() : null);

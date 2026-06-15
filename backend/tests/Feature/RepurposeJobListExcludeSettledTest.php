@@ -91,6 +91,39 @@ class RepurposeJobListExcludeSettledTest extends TestCase
         $this->assertContains($job->id, $this->listIds(['exclude_settled' => 1]));
     }
 
+    private function videoJob(?int $linkedinPostId): RepurposeJob
+    {
+        return RepurposeJob::factory()->create([
+            'status' => 'drafted',
+            'mode' => 'video_rebrand',
+            'linkedin_post_id' => $linkedinPostId,
+        ]);
+    }
+
+    public function test_excludes_video_rebrand_once_anchored(): void
+    {
+        // A video job settles the moment finalizeVideoRebrand links a video_carousel
+        // anchor (it's now in the Content Calendar / LinkedIn tab) — unlike carousel,
+        // it leaves immediately regardless of the anchor's working-queue status.
+        $cat = Category::create(['name' => 'AI & Tech']);
+        $post = Post::factory()->create(['category_id' => $cat->id, 'title' => 'Anchor', 'content' => '<p>b</p>']);
+        $anchor = LinkedInPost::factory()->create([
+            'post_id' => $post->id,
+            'format' => LinkedInPost::FORMAT_VIDEO_CAROUSEL,
+            'status' => 'manual_review',
+        ]);
+        $job = $this->videoJob($anchor->id);
+
+        $this->assertNotContains($job->id, $this->listIds(['exclude_settled' => 1]));
+    }
+
+    public function test_keeps_video_rebrand_before_anchor(): void
+    {
+        // Composited but not yet finalized → no anchor → still in Social Studio.
+        $job = $this->videoJob(null);
+        $this->assertContains($job->id, $this->listIds(['exclude_settled' => 1]));
+    }
+
     public function test_excludes_blog_job_whose_content_idea_completed_with_result_post(): void
     {
         $cat = Category::create(['name' => 'AI & Tech']);

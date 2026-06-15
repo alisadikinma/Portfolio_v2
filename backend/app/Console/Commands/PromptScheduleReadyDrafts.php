@@ -55,6 +55,7 @@ class PromptScheduleReadyDrafts extends Command
         }
 
         $candidates = LinkedInPost::query()
+            ->excludeVideoCarousel() // IG-video anchors are scheduled via Zernio, not the Telegram prompt
             ->where('status', LinkedInPostStatus::ManualReview->value)
             ->whereNull('scheduled_at')
             ->whereNull('schedule_prompt_sent_at')

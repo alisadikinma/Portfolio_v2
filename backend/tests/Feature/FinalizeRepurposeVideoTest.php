@@ -3,10 +3,13 @@
 namespace Tests\Feature;
 
 use App\Jobs\FinalizeRepurpose;
+use App\Jobs\GenerateLinkedInPost;
+use App\Models\LinkedInPost;
 use App\Models\RepurposeJob;
 use App\Models\RepurposeVideoSlide;
 use App\Services\TelegramNotificationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 /**
@@ -38,6 +41,41 @@ class FinalizeRepurposeVideoTest extends TestCase
         $this->assertSame('drafted', $job->status);
         // Composited slides retained for the manual-download UI (no purge).
         $this->assertSame(3, $job->videoSlides()->count());
+    }
+
+    public function test_video_finalize_creates_video_carousel_anchor(): void
+    {
+        Queue::fake();
+
+        $job = RepurposeJob::factory()->create([
+            'mode' => 'video_rebrand',
+            'status' => 'composed',
+            'rewritten' => null,
+            'extracted' => ['source_hook_title' => 'AI Tools That Save Hours'],
+        ]);
+        RepurposeVideoSlide::create(['repurpose_job_id' => $job->id, 'slide_index' => 0, 'role' => 'hook', 'composited_status' => 'done', 'composited_path' => 'https://x/0.mp4']);
+        RepurposeVideoSlide::create(['repurpose_job_id' => $job->id, 'slide_index' => 1, 'role' => 'tool', 'header_title' => 'Opal', 'composited_status' => 'done', 'composited_path' => 'https://x/1.mp4']);
+
+        $this->mock(TelegramNotificationService::class, function ($m) {
+            $m->shouldReceive('sendRepurposeDrafted')->once();
+        });
+
+        (new FinalizeRepurpose($job->id))->handle();
+
+        $job->refresh();
+        $this->assertSame('drafted', $job->status);
+        $this->assertNotNull($job->linkedin_post_id, 'finalize must link a calendar anchor');
+
+        $anchor = LinkedInPost::find($job->linkedin_post_id);
+        $this->assertNotNull($anchor);
+        $this->assertSame(LinkedInPost::FORMAT_VIDEO_CAROUSEL, $anchor->format);
+        $this->assertSame('manual_review', $anchor->status);
+        $this->assertNotSame('', trim((string) $anchor->content), 'caption mirrored onto the anchor');
+        // Caption is still stored on the job too (manual-download UI reads it).
+        $this->assertNotSame('', trim((string) ($job->rewritten['caption'] ?? '')));
+
+        // The anchor is display-only — it must NEVER run /linkedin-gen.
+        Queue::assertNotPushed(GenerateLinkedInPost::class);
     }
 
     public function test_video_rebrand_finalize_noop_when_not_composed(): void

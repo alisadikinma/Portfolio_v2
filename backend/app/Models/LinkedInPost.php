@@ -19,6 +19,14 @@ class LinkedInPost extends Model
 
     protected $table = 'linkedin_posts';
 
+    /**
+     * Display-only anchor for an IG-video repurpose carousel. It surfaces the
+     * post in the LinkedIn calendar/queue but is NEVER published to LinkedIn —
+     * it publishes to Instagram + Threads via Zernio (see PublishRepurposeViaZernio).
+     * Every LinkedIn publisher excludes this format via scopeExcludeVideoCarousel().
+     */
+    public const FORMAT_VIDEO_CAROUSEL = 'video_carousel';
+
     protected $fillable = [
         'post_id',
         'linkedin_account_id',
@@ -135,6 +143,31 @@ class LinkedInPost extends Model
     public function scopeInQueue(Builder $q): Builder
     {
         return $q->whereIn('status', LinkedInPostStatus::queueStatuses());
+    }
+
+    /** True for an IG-video repurpose anchor that must never publish to LinkedIn. */
+    public function isVideoCarousel(): bool
+    {
+        return $this->format === self::FORMAT_VIDEO_CAROUSEL;
+    }
+
+    /**
+     * The repurpose job this row anchors (set for video_carousel anchors). Lets the
+     * calendar/queue deep-link to /admin/repurpose/{id} where the Zernio publish UI lives.
+     */
+    public function repurposeJob(): HasOne
+    {
+        return $this->hasOne(RepurposeJob::class, 'linkedin_post_id');
+    }
+
+    /**
+     * Every LinkedIn publish/schedule selector composes this so a video_carousel
+     * anchor (published to IG + Threads via Zernio, never LinkedIn) is never picked
+     * up — letting it safely sit in awaiting_publish/manual_review for calendar display.
+     */
+    public function scopeExcludeVideoCarousel(Builder $q): Builder
+    {
+        return $q->where('format', '!=', self::FORMAT_VIDEO_CAROUSEL);
     }
 
     /**

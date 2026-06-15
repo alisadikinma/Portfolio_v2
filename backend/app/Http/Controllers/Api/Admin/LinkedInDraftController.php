@@ -55,7 +55,7 @@ class LinkedInDraftController extends Controller
     {
         $validated = $request->validate([
             'status' => ['nullable', 'string'],
-            'format' => ['nullable', Rule::in(['text', 'carousel'])],
+            'format' => ['nullable', Rule::in(['text', 'carousel', LinkedInPost::FORMAT_VIDEO_CAROUSEL])],
             'scope' => ['nullable', Rule::in(['feed', 'queue', 'all'])],
             'exclude_repurpose' => ['nullable', 'boolean'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:200'],
@@ -1484,7 +1484,7 @@ class LinkedInDraftController extends Controller
         $to = Carbon::parse($validated['to'])->endOfDay();
 
         $query = LinkedInPost::query()
-            ->with(['post.translations'])
+            ->with(['post.translations', 'repurposeJob:id,linkedin_post_id'])
             ->where(function ($q) use ($from, $to) {
                 $q->whereBetween('cancel_window_ends_at', [$from, $to])
                     ->orWhereBetween('scheduled_at', [$from, $to])
@@ -1518,6 +1518,9 @@ class LinkedInDraftController extends Controller
                 'published_at' => $draft->published_at?->toIso8601String(),
                 'pin_at' => $pinAt?->toIso8601String(),
                 'depth_score' => $draft->depth_score,
+                // Video anchors deep-link to /admin/repurpose/{id} (Zernio publish UI);
+                // null for normal LinkedIn drafts.
+                'repurpose_job_id' => $draft->isVideoCarousel() ? $draft->repurposeJob?->id : null,
             ];
         })->values();
 

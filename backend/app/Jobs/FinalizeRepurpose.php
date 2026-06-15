@@ -313,10 +313,13 @@ class FinalizeRepurpose implements ShouldQueue
     }
 
     /**
-     * video_rebrand v1 — ship the composited 4:5 MP4 carousel for MANUAL download.
-     * No ContentIdea / anchor Post / LinkedIn draft (auto-publish deferred). Slides
-     * are RETAINED (the manual-download UI streams composited_path); `repurpose:reap`
-     * clears them on the same publish-anchored retention as the image carousels.
+     * video_rebrand — ship the composited 4:5 MP4 carousel. It publishes to Instagram
+     * + Threads via Zernio (never LinkedIn), but we ALSO create a `video_carousel`
+     * LinkedInPost anchor so the job appears in the Content Calendar (LinkedIn tab) and
+     * leaves Social Studio. The anchor is display-only — guarded out of every LinkedIn
+     * publisher (LinkedInPost::scopeExcludeVideoCarousel) and NEVER runs /linkedin-gen.
+     * Composited slides are RETAINED (manual-download UI streams composited_path);
+     * `repurpose:reap` clears them on the publish-anchored retention.
      */
     private function finalizeVideoRebrand(RepurposeJob $job): void
     {
@@ -330,11 +333,57 @@ class FinalizeRepurpose implements ShouldQueue
         // comment→DM promise — there is no auto-DM infra (CLAUDE.md decision).
         $caption = $this->buildVideoCaption($job);
 
+        // post_id is NOT NULL on linkedin_posts, so mirror finalizeCarousel: create a
+        // minimal UNPUBLISHED anchor Post (its /blog/{slug} 404s — RepurposeJob::
+        // isRepurposePost keys off anchor_post_id, so no platform emits a "Full
+        // article" first-comment). status=manual_review keeps it in the LinkedIn queue
+        // until the operator schedules it via the repurpose detail's Zernio action.
+        [$postId, $anchorId] = DB::transaction(function () use ($job, $caption) {
+            $title = $job->displayTopic();
+            $slug = (Str::slug($title) ?: 'repurpose-video') . '-' . Str::lower(Str::random(6));
+
+            $postData = [
+                'category_id' => $this->resolveCategoryId(),
+                'slug' => $slug,
+                'published' => false,
+                'published_at' => null,
+            ];
+            foreach (['title' => $title, 'excerpt' => '', 'content' => $caption] as $col => $val) {
+                if (Schema::hasColumn('posts', $col)) {
+                    $postData[$col] = $val;
+                }
+            }
+            $post = Post::create($postData);
+
+            // Translation so the calendar/queue shows a real title (prod posts keep
+            // title in post_translations, not on the posts table).
+            $post->translations()->create([
+                'language' => 'id',
+                'title' => $title,
+                'slug' => $slug,
+                'excerpt' => '',
+                'content' => $caption,
+                'meta_keywords' => '',
+            ]);
+
+            $anchor = LinkedInPost::create([
+                'post_id' => $post->id,
+                'format' => LinkedInPost::FORMAT_VIDEO_CAROUSEL,
+                'content' => $caption,
+                'hashtags' => [], // NOT NULL json
+                'status' => 'manual_review',
+            ]);
+
+            return [$post->id, $anchor->id];
+        });
+
         $job->transitionTo(RepurposeJobStatus::Drafted, 'finalize_video', [
             'last_error' => null,
+            'anchor_post_id' => $postId,
+            'linkedin_post_id' => $anchorId,
             'rewritten' => array_merge((array) $job->rewritten, ['caption' => $caption]),
         ]);
-        app(TelegramNotificationService::class)->sendRepurposeDrafted($job, null, $this->correctedClaims($job));
+        app(TelegramNotificationService::class)->sendRepurposeDrafted($job, $anchorId, $this->correctedClaims($job));
     }
 
     /**

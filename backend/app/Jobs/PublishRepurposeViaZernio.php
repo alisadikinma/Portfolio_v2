@@ -163,6 +163,10 @@ class PublishRepurposeViaZernio implements ShouldQueue
     {
         $this->mergeState(['status' => 'published', 'post_id' => $postId, 'url' => $url, 'scheduled_for' => null, 'error' => null]);
         Log::info('[PublishRepurposeViaZernio] Published', $this->ctx(['post_id' => $postId]));
+
+        // Mirror onto the Content Calendar anchor — flips to published once EVERY
+        // dispatched platform (IG + Threads) has shipped. No-op on partial completion.
+        RepurposeJob::find($this->repurposeJobId)?->mirrorAnchorPublishedIfComplete();
     }
 
     private function markScheduled(string $postId, string $scheduledFor): void
