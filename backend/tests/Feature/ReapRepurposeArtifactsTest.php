@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
 use Tests\TestCase;
 
@@ -11,6 +12,8 @@ use Tests\TestCase;
  */
 class ReapRepurposeArtifactsTest extends TestCase
 {
+    use RefreshDatabase;
+
     private string $base;
 
     protected function setUp(): void

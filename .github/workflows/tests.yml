@@ -11,10 +11,17 @@ name: tests
 # work. Until then this gate runs the IG-repurpose feature suite (green).
 # Broaden the `--filter` (or drop it for the full suite) once the legacy
 # failures are cleaned up.
+#
+# Triggers on PRs + pushes to NON-main branches only. Pushes to main are NOT
+# tested here — main is the deploy branch (deploy.yml runs on push:main), and
+# running both workflows on every main push produced two runs per commit
+# (one of them perpetually red). Code is gated at PR time before it reaches
+# main; main push = deploy only.
 
 on:
-  push:
   pull_request:
+  push:
+    branches-ignore: [main]
 
 jobs:
   phpunit:
