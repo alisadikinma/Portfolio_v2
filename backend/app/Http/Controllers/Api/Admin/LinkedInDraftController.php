@@ -978,6 +978,15 @@ class LinkedInDraftController extends Controller
                 ['draft_id' => $draft->id]
             );
 
+            // Drop the stale schedule slot so the draft LEAVES the Content
+            // Calendar (calendar() pins on scheduled_at / cancel_window_ends_at)
+            // and returns to Social Studio as an unscheduled, re-schedulable
+            // draft — matching the "balik ke social studio" intent.
+            $draft->forceFill([
+                'scheduled_at' => null,
+                'cancel_window_ends_at' => null,
+            ])->save();
+
             return response()->json([
                 'success' => true,
                 'data' => $draft->fresh(['post.translations', 'post.contentIdea:id,result_post_id,virality_score', 'account']),

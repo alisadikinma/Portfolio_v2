@@ -57,6 +57,29 @@ class LinkedInDraftReviveTest extends TestCase
         $this->assertSame($slides, $fresh->carousel_slides);
     }
 
+    public function test_revive_clears_schedule_so_it_leaves_the_calendar(): void
+    {
+        Sanctum::actingAs(User::factory()->create());
+        // A cancelled draft that still carries its old schedule slot — the
+        // calendar query pins on scheduled_at / cancel_window_ends_at, so
+        // without clearing these the revived draft would stay on the calendar
+        // instead of returning to Social Studio.
+        $draft = LinkedInPost::factory()->cancelled()->create([
+            'post_id' => $this->makePost()->id,
+            'format' => 'carousel',
+            'scheduled_at' => now()->addDay(),
+            'cancel_window_ends_at' => now()->addDay(),
+        ]);
+
+        $this->postJson("/api/admin/linkedin-drafts/{$draft->id}/revive")
+            ->assertOk();
+
+        $fresh = $draft->fresh();
+        $this->assertSame('manual_review', $fresh->status);
+        $this->assertNull($fresh->scheduled_at, 'scheduled_at must clear so the draft leaves the calendar');
+        $this->assertNull($fresh->cancel_window_ends_at, 'cancel_window_ends_at must clear so the draft leaves the calendar');
+    }
+
     public function test_revive_rejected_when_not_cancelled(): void
     {
         Sanctum::actingAs(User::factory()->create());
