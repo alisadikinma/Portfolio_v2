@@ -10,6 +10,7 @@ use App\Models\Post;
 use App\Models\RepurposeJob;
 use App\Models\RepurposeVideoSlide;
 use App\Services\TelegramNotificationService;
+use App\Services\VideoCarouselAnchorService;
 use App\Support\CreatorHandle;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -333,57 +334,17 @@ class FinalizeRepurpose implements ShouldQueue
         // comment→DM promise — there is no auto-DM infra (CLAUDE.md decision).
         $caption = $this->buildVideoCaption($job);
 
-        // post_id is NOT NULL on linkedin_posts, so mirror finalizeCarousel: create a
-        // minimal UNPUBLISHED anchor Post (its /blog/{slug} 404s — RepurposeJob::
-        // isRepurposePost keys off anchor_post_id, so no platform emits a "Full
-        // article" first-comment). status=manual_review keeps it in the LinkedIn queue
-        // until the operator schedules it via the repurpose detail's Zernio action.
-        [$postId, $anchorId] = DB::transaction(function () use ($job, $caption) {
-            $title = $job->displayTopic();
-            $slug = (Str::slug($title) ?: 'repurpose-video') . '-' . Str::lower(Str::random(6));
-
-            $postData = [
-                'category_id' => $this->resolveCategoryId(),
-                'slug' => $slug,
-                'published' => false,
-                'published_at' => null,
-            ];
-            foreach (['title' => $title, 'excerpt' => '', 'content' => $caption] as $col => $val) {
-                if (Schema::hasColumn('posts', $col)) {
-                    $postData[$col] = $val;
-                }
-            }
-            $post = Post::create($postData);
-
-            // Translation so the calendar/queue shows a real title (prod posts keep
-            // title in post_translations, not on the posts table).
-            $post->translations()->create([
-                'language' => 'id',
-                'title' => $title,
-                'slug' => $slug,
-                'excerpt' => '',
-                'content' => $caption,
-                'meta_keywords' => '',
-            ]);
-
-            $anchor = LinkedInPost::create([
-                'post_id' => $post->id,
-                'format' => LinkedInPost::FORMAT_VIDEO_CAROUSEL,
-                'content' => $caption,
-                'hashtags' => [], // NOT NULL json
-                'status' => 'manual_review',
-            ]);
-
-            return [$post->id, $anchor->id];
-        });
+        // The display-only video_carousel anchor (Post + manual_review LinkedInPost)
+        // is created by the shared factory — the SAME path the Zernio schedule/
+        // publish flow self-heals through for pre-feature jobs. It sets
+        // linkedin_post_id + anchor_post_id on the job; we only transition status.
+        $anchor = app(VideoCarouselAnchorService::class)->ensureFor($job, $caption);
 
         $job->transitionTo(RepurposeJobStatus::Drafted, 'finalize_video', [
             'last_error' => null,
-            'anchor_post_id' => $postId,
-            'linkedin_post_id' => $anchorId,
             'rewritten' => array_merge((array) $job->rewritten, ['caption' => $caption]),
         ]);
-        app(TelegramNotificationService::class)->sendRepurposeDrafted($job, $anchorId, $this->correctedClaims($job));
+        app(TelegramNotificationService::class)->sendRepurposeDrafted($job, $anchor->id, $this->correctedClaims($job));
     }
 
     /**

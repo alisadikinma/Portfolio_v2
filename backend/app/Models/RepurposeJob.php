@@ -207,10 +207,13 @@ class RepurposeJob extends Model
      */
     public function mirrorAnchorScheduled(?\Illuminate\Support\Carbon $scheduledFor): void
     {
-        $anchor = $this->videoAnchor();
-        if ($anchor === null) {
+        if ($this->mode !== 'video_rebrand') {
             return;
         }
+        // Lazily materialize the anchor so a job finalized BEFORE this feature
+        // shipped (linkedin_post_id NULL) still lands on the calendar when
+        // scheduled, instead of the schedule silently skipping the calendar.
+        $anchor = app(\App\Services\VideoCarouselAnchorService::class)->ensureFor($this);
         $when = $scheduledFor ?? now();
 
         if ($anchor->status === LinkedInPostStatus::ManualReview->value) {
@@ -231,8 +234,11 @@ class RepurposeJob extends Model
      */
     public function mirrorAnchorPublishedIfComplete(): void
     {
-        $anchor = $this->videoAnchor();
-        if ($anchor === null || $anchor->status === LinkedInPostStatus::Published->value) {
+        if ($this->mode !== 'video_rebrand') {
+            return;
+        }
+        $anchor = app(\App\Services\VideoCarouselAnchorService::class)->ensureFor($this);
+        if ($anchor->status === LinkedInPostStatus::Published->value) {
             return;
         }
         $states = $this->zernio_publish ?? [];
