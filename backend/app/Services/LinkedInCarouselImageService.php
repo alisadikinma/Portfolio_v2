@@ -142,6 +142,13 @@ class LinkedInCarouselImageService
         }
 
         // Re-rendering the cover alone must still pick up the topic-aware figure.
+        // The enricher is idempotent on carousel_slides[cover].figure_enriched, so
+        // an EXPLICIT operator re-render of the cover clears that lock first —
+        // otherwise a cover resolved as creator-only before a topic/figure fix
+        // (e.g. empty_topic / figure_unresolved) could only gain its figure via a
+        // full, token-heavy "Regenerate All Images". This makes single-slide
+        // re-render the cheap equivalent of the fresh slides regenerate produces.
+        $this->resetCoverFigureLockIfTargetingCover($draft, $slideIndex);
         $this->enrichCoverFigure($draft, $draft->carousel_slides ?? []);
 
         $slides = $draft->carousel_slides ?? [];
@@ -193,6 +200,57 @@ class LinkedInCarouselImageService
 
             return $slides;
         }
+    }
+
+    /**
+     * When the operator re-renders the COVER slide alone, clear the
+     * figure_enriched idempotency flag so CarouselCoverFigureEnricher runs again
+     * (re-resolving the topic-aware public figure). No-op for body/CTA slides,
+     * when the target index isn't the cover, and when the cover was never locked.
+     * Only an explicit operator action reaches here, so a one-off re-run of the
+     * (cheap, text-only) SSH author is intended — no image tokens are spent until
+     * the slide actually renders.
+     */
+    private function resetCoverFigureLockIfTargetingCover(LinkedInPost $draft, int $slideIndex): void
+    {
+        $slides = $draft->carousel_slides ?? [];
+        if (! isset($slides[$slideIndex]) || ! $this->isCoverSlide($slides, $slideIndex)) {
+            return;
+        }
+        if (empty($slides[$slideIndex]['figure_enriched'])) {
+            return; // not locked — nothing to reset
+        }
+
+        unset($slides[$slideIndex]['figure_enriched']);
+        $draft->update(['carousel_slides' => $slides]);
+
+        Log::info('[LinkedInCarouselImage] cleared cover figure_enriched lock for explicit single re-render', [
+            'draft_id' => $draft->id,
+            'slide_index' => $slideIndex,
+        ]);
+    }
+
+    /**
+     * Mirror of CarouselCoverFigureEnricher::coverIndex resolution so the targeted
+     * index and the enricher's cover index agree: first is_cover===true slide,
+     * else first layout_hint==='cover', else index 0.
+     *
+     * @param  array<int,array<string,mixed>>  $slides
+     */
+    private function isCoverSlide(array $slides, int $slideIndex): bool
+    {
+        foreach ($slides as $i => $s) {
+            if (! empty($s['is_cover'])) {
+                return $i === $slideIndex;
+            }
+        }
+        foreach ($slides as $i => $s) {
+            if (($s['layout_hint'] ?? null) === 'cover') {
+                return $i === $slideIndex;
+            }
+        }
+
+        return $slideIndex === 0;
     }
 
     /**

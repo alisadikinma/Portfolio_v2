@@ -118,6 +118,32 @@ class EntityReferenceServiceTest extends TestCase
         $this->assertSame(0, EntityReference::count());
     }
 
+    /**
+     * Defect (a): a prior fetch may have already written the file — possibly in a
+     * different execution context (HTTP www-data vs queue claudesn). The second call
+     * must REUSE the on-disk file and NOT re-download/overwrite (the overwrite raced
+     * on cross-owner perms and logged "file missing after put", returning null
+     * forever so the EntityReference row never cached).
+     */
+    public function test_download_and_store_reuses_existing_file_without_redownloading(): void
+    {
+        $imageUrl = 'https://example.com/pichai.jpg';
+        Http::fake([$imageUrl => Http::response(str_repeat('fake-png-bytes', 200), 200)]);
+
+        /** @var EntityReferenceService $service */
+        $service = app(EntityReferenceService::class);
+
+        // First call downloads + stores the file.
+        $url1 = $service->downloadAndStore($imageUrl, 'Q3503829', 'person', 'Sundar Pichai');
+        $this->assertNotNull($url1);
+        Http::assertSentCount(1);
+
+        // Second call: a valid file is already on disk → reuse, NO second download.
+        $url2 = $service->downloadAndStore($imageUrl, 'Q3503829', 'person', 'Sundar Pichai');
+        $this->assertSame($url1, $url2);
+        Http::assertSentCount(1);
+    }
+
     private function mockWikidataSparql(string $name, string $qid, int $sitelinks, string $p18): void
     {
         Http::fake([

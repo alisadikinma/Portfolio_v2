@@ -278,11 +278,40 @@ class EntityReferenceService
     }
 
     /**
+     * A stored entity image is valid when it exists on the public disk with a
+     * plausible size (>= 512 bytes — same floor the download path enforces).
+     * Wrapped in try/catch because a transient FS/permission hiccup must read as
+     * "not valid", never throw.
+     */
+    private function storedFileIsValid(string $relativePath): bool
+    {
+        try {
+            return Storage::disk('public')->exists($relativePath)
+                && Storage::disk('public')->size($relativePath) >= 512;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
      * Download image bytes to public disk and return the served URL.
      * Returns null on any failure (network, empty body, storage write fail).
      */
     public function downloadAndStore(string $imageUrl, string $qid, string $type, string $name): ?string
     {
+        $relativePath = $this->buildLocalPath($qid, $type, $name, $imageUrl);
+
+        // Idempotent reuse: a prior fetch may have already written this file,
+        // possibly in a DIFFERENT execution context (HTTP runs as www-data, the
+        // queue worker runs as claudesn). Re-downloading would try to overwrite a
+        // cross-owner file and fail the post-put exists() check ("file missing
+        // after put"), returning null forever and never caching the DB row. If a
+        // valid file is already on disk, reuse it — this call then persists the
+        // EntityReference row so the entity is cached for good.
+        if ($this->storedFileIsValid($relativePath)) {
+            return url('/storage/' . $relativePath);
+        }
+
         try {
             $response = Http::timeout(30)
                 ->withHeaders(['User-Agent' => self::USER_AGENT])
@@ -305,10 +334,12 @@ class EntityReferenceService
                 return null;
             }
 
-            $relativePath = $this->buildLocalPath($qid, $type, $name, $imageUrl);
             Storage::disk('public')->put($relativePath, $body);
 
-            if (!Storage::disk('public')->exists($relativePath)) {
+            // Trust the filesystem over Flysystem's cached view — a cross-owner
+            // write can leave exists() momentarily false even when the bytes
+            // landed; storedFileIsValid re-checks size directly on disk.
+            if (!$this->storedFileIsValid($relativePath)) {
                 Log::error('EntityReferenceService: file missing after put', [
                     'path' => $relativePath,
                 ]);
