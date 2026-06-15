@@ -19,7 +19,6 @@ import {
   useRegenerateTiktok,
   useRegenerateThreads,
   useRegenerateAllCaptions,
-  usePublishCrossPost,
   useRegenerateHookVideo,
   postTitle,
 } from '@/composables/useLinkedInDrafts'
@@ -193,9 +192,7 @@ const regenerateInstagramMutation = useRegenerateInstagram()
 const regenerateTiktokMutation = useRegenerateTiktok()
 const regenerateThreadsMutation = useRegenerateThreads()
 const regenerateAllCaptionsMutation = useRegenerateAllCaptions()
-const publishCrossPostMutation = usePublishCrossPost()
 const regenerateHookVideoMutation = useRegenerateHookVideo()
-const publishingPlatform = ref(null)
 
 // --- IG hook video (GROK mixed carousel) --------------------------------
 // The IG hook slide ships in two forms: the rendered carousel slide 1 image
@@ -231,32 +228,29 @@ async function doRegenerateHookVideo() {
   }
 }
 
-// Cross-post platforms eligible for a manual "Publish to Publer" button:
-// the sibling exists and isn't already published / mid-publish.
-const crossPostPlatforms = computed(() => {
-  if (!draft.value) return []
-  return draft.value.format === 'carousel' ? ['instagram', 'tiktok', 'threads'] : ['threads']
-})
-function crossPostPublishable(p) {
-  const s = draft.value?.[`${p}_post`]
-  return !!s && !['published', 'publishing'].includes(s.status)
-}
-const manualPublishPlatforms = computed(() => crossPostPlatforms.value.filter(crossPostPublishable))
-async function doPublishCrossPost(platform) {
-  if (publishingPlatform.value) return
-  publishingPlatform.value = platform
-  try {
-    const res = await publishCrossPostMutation.mutateAsync({ id: draftId.value, platform })
-    toast.success(res?.message || `Publishing ${platform} to Publer…`)
-    refetch()
-  } catch (e) {
-    toast.error(e?.response?.data?.error?.message || `Failed to publish ${platform}.`)
-  } finally {
-    publishingPlatform.value = null
-  }
-}
 const regenerateMutation = useRegenerateLinkedInDraft()
 const toast = useToast()
+
+// "Open on <platform>" external links — one per cross-post sibling that actually
+// published and carries a live URL (IG/TikTok/Threads via Zernio). Mirrors the
+// "Open on LinkedIn" affordance so the operator can jump straight to each post.
+const OPEN_LINK_CLASS = {
+  instagram: 'bg-gradient-to-r from-fuchsia-600 to-pink-600 hover:from-fuchsia-500 hover:to-pink-500',
+  tiktok: 'bg-neutral-900 hover:bg-black border border-neutral-700',
+  threads: 'bg-neutral-700 hover:bg-neutral-600',
+}
+const publishedExternalLinks = computed(() => {
+  if (!draft.value) return []
+  const platforms = draft.value.format === 'carousel' ? ['instagram', 'tiktok', 'threads'] : ['threads']
+  return platforms
+    .map((p) => ({
+      platform: p,
+      label: PLATFORM_META[p]?.label || p,
+      url: draft.value?.[`${p}_post`]?.external_url || null,
+      status: draft.value?.[`${p}_post`]?.status || null,
+    }))
+    .filter((x) => x.status === 'published' && x.url)
+})
 
 // Inline result panel for the unified "Regenerate ALL captions" button.
 // Auto-clears after 12s so it doesn't linger forever, but stays long
@@ -1320,30 +1314,6 @@ const showThumbnailUploadCaption = computed(() =>
                 </span>
               </div>
 
-              <!-- Manual per-platform (re)publish to Publer. Shows for any
-                   cross-post sibling that isn't already published — recovers a
-                   FAILED platform without regenerating its caption. -->
-              <div v-if="manualPublishPlatforms.length" class="flex flex-wrap items-center gap-1.5 text-[11px]">
-                <span class="font-mono uppercase tracking-[0.14em] text-neutral-500 mr-1">
-                  Publish to Publer:
-                </span>
-                <button
-                  v-for="p in manualPublishPlatforms"
-                  :key="p"
-                  type="button"
-                  :disabled="!!publishingPlatform"
-                  @click="doPublishCrossPost(p)"
-                  class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border border-emerald-400/30 bg-emerald-500/5 text-emerald-300 transition hover:bg-emerald-500/15 hover:text-emerald-200 active:scale-[0.98] disabled:opacity-50 motion-reduce:transition-none"
-                  :title="`Publish ${PLATFORM_META[p].label} to Publer now`"
-                >
-                  <svg v-if="publishingPlatform === p" class="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                  <svg v-else class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m5 12 4 4L19 6" /></svg>
-                  {{ publishingPlatform === p ? 'Publishing…' : PLATFORM_META[p].label }}
-                </button>
-                <span class="ml-1 text-neutral-600 hidden sm:inline">
-                  · one platform at a time
-                </span>
-              </div>
             </div>
 
             <!-- Operator-facing sentence (suppressed when live progress panel is active) -->
@@ -1619,6 +1589,23 @@ const showThumbnailUploadCaption = computed(() =>
                 <path :d="ICON.externalLink" />
               </svg>
               Open on LinkedIn
+            </a>
+
+            <!-- Published cross-posts: one "Open on <platform>" link per sibling
+                 that actually went live (IG/TikTok/Threads via Zernio). -->
+            <a
+              v-for="link in publishedExternalLinks"
+              :key="link.platform"
+              :href="link.url"
+              target="_blank"
+              rel="noopener"
+              class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-white active:scale-[0.98] text-sm font-semibold transition"
+              :class="OPEN_LINK_CLASS[link.platform]"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
+                <path :d="ICON.externalLink" />
+              </svg>
+              Open on {{ link.label }}
             </a>
 
             <!-- Failed/cancelled: restart-from-blog is primary -->
