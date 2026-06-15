@@ -19,6 +19,7 @@ import {
   useRegenerateTiktok,
   useRegenerateThreads,
   useRegenerateAllCaptions,
+  usePublishCrossPost,
   useRegenerateHookVideo,
   postTitle,
 } from '@/composables/useLinkedInDrafts'
@@ -230,6 +231,28 @@ async function doRegenerateHookVideo() {
 
 const regenerateMutation = useRegenerateLinkedInDraft()
 const toast = useToast()
+
+// Per-platform retry — only surfaced on a FAILED cross-post chip. Re-publishes
+// that one sibling via the publisher-aware endpoint (Zernio) without touching
+// the others or regenerating its caption.
+const publishCrossPostMutation = usePublishCrossPost()
+const publishingPlatform = ref(null)
+function platformStatus(p) {
+  return draft.value?.[`${p}_post`]?.status || null
+}
+async function doRetryPlatform(platform) {
+  if (publishingPlatform.value) return
+  publishingPlatform.value = platform
+  try {
+    const res = await publishCrossPostMutation.mutateAsync({ id: draftId.value, platform })
+    toast.success(res?.message || `Retrying ${platform}…`)
+    refetch()
+  } catch (e) {
+    toast.error(e?.response?.data?.error?.message || `Retry ${platform} failed.`)
+  } finally {
+    publishingPlatform.value = null
+  }
+}
 
 // "Open on <platform>" external links — one per cross-post sibling that actually
 // published and carries a live URL (IG/TikTok/Threads via Zernio). Mirrors the
@@ -1282,6 +1305,17 @@ const showThumbnailUploadCaption = computed(() =>
                     </span>
                   </button>
                   <button
+                    v-if="platformStatus('instagram') === 'failed'"
+                    type="button"
+                    :disabled="!!publishingPlatform"
+                    @click="doRetryPlatform('instagram')"
+                    title="Retry publishing Instagram"
+                    class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border border-amber-400/30 bg-amber-500/5 text-amber-300 hover:bg-amber-500/15 transition disabled:opacity-50"
+                  >
+                    <svg class="h-3 w-3" :class="{ 'animate-spin': publishingPlatform === 'instagram' }" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5M5.5 14a7 7 0 0 0 12.4 2M18.5 10A7 7 0 0 0 6.1 8" /></svg>
+                    {{ publishingPlatform === 'instagram' ? '…' : 'Retry' }}
+                  </button>
+                  <button
                     type="button"
                     @click="activatePlatformAndScroll('tiktok')"
                     class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border border-rose-400/30 bg-rose-500/5 text-rose-300 hover:bg-rose-500/15 hover:text-rose-200 transition cursor-pointer"
@@ -1293,6 +1327,17 @@ const showThumbnailUploadCaption = computed(() =>
                       <span :class="['w-1 h-1 rounded-full', platformStatusMeta('tiktok').dot]" />
                       <span :class="platformStatusMeta('tiktok').text">{{ platformStatusMeta('tiktok').label }}</span>
                     </span>
+                  </button>
+                  <button
+                    v-if="platformStatus('tiktok') === 'failed'"
+                    type="button"
+                    :disabled="!!publishingPlatform"
+                    @click="doRetryPlatform('tiktok')"
+                    title="Retry publishing TikTok"
+                    class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border border-amber-400/30 bg-amber-500/5 text-amber-300 hover:bg-amber-500/15 transition disabled:opacity-50"
+                  >
+                    <svg class="h-3 w-3" :class="{ 'animate-spin': publishingPlatform === 'tiktok' }" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5M5.5 14a7 7 0 0 0 12.4 2M18.5 10A7 7 0 0 0 6.1 8" /></svg>
+                    {{ publishingPlatform === 'tiktok' ? '…' : 'Retry' }}
                   </button>
                 </template>
                 <!-- Threads — fanned out for both text and carousel formats -->
@@ -1308,6 +1353,17 @@ const showThumbnailUploadCaption = computed(() =>
                     <span :class="['w-1 h-1 rounded-full', platformStatusMeta('threads').dot]" />
                     <span :class="platformStatusMeta('threads').text">{{ platformStatusMeta('threads').label }}</span>
                   </span>
+                </button>
+                <button
+                  v-if="platformStatus('threads') === 'failed'"
+                  type="button"
+                  :disabled="!!publishingPlatform"
+                  @click="doRetryPlatform('threads')"
+                  title="Retry publishing Threads"
+                  class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border border-amber-400/30 bg-amber-500/5 text-amber-300 hover:bg-amber-500/15 transition disabled:opacity-50"
+                >
+                  <svg class="h-3 w-3" :class="{ 'animate-spin': publishingPlatform === 'threads' }" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5M5.5 14a7 7 0 0 0 12.4 2M18.5 10A7 7 0 0 0 6.1 8" /></svg>
+                  {{ publishingPlatform === 'threads' ? '…' : 'Retry' }}
                 </button>
                 <span class="ml-1 text-neutral-600 hidden sm:inline">
                   · click to view caption
