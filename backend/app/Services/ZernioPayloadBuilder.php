@@ -93,12 +93,20 @@ class ZernioPayloadBuilder
     public function buildInstagram(InstagramPost $sibling): array
     {
         $images = $this->slideMediaItems($sibling);
+        $hookVideo = $this->resolveHookVideoUrl($sibling);
+
+        // When the GROK hook video is ready it IS the (animated) cover — drop the
+        // static cover image (slide 1) so the video leads the carousel in its
+        // place instead of publishing both the video AND a redundant still cover.
+        if ($hookVideo !== null) {
+            $images = array_slice($images, 1);
+        }
+
         // IG rejects the whole carousel if any slide is outside its ratio window
         // (0.75–1.91) — pad out-of-range slides to a compliant canvas first.
         foreach ($images as $i => $item) {
             $images[$i]['url'] = $this->normalizer->normalizeForInstagram($item['url']);
         }
-        $hookVideo = $this->resolveHookVideoUrl($sibling);
 
         $mediaItems = $hookVideo !== null
             ? array_merge([['url' => $hookVideo, 'type' => 'video']], $images)
@@ -106,8 +114,14 @@ class ZernioPayloadBuilder
 
         $mediaItems = array_slice($mediaItems, 0, self::IG_MAX_ITEMS);
 
+        // First comment ("Full article: …") belongs ONLY to posts backed by a real
+        // blog article (blog, or blog+carousel). An IG-repurpose carousel anchors
+        // an UNPUBLISHED Post purely for slide-gen — its /blog/{slug} 404s, so there
+        // is no article to link. Suppress firstComment for carousel-only posts even
+        // if a stale link_comment lingers.
         $platformSpecificData = [];
-        if (! empty($sibling->link_comment)) {
+        $isRepurpose = $sibling->linkedinPost !== null && $sibling->linkedinPost->isRepurpose();
+        if (! $isRepurpose && ! empty($sibling->link_comment)) {
             $platformSpecificData['firstComment'] = $sibling->link_comment;
         }
 

@@ -83,19 +83,46 @@ class ZernioPayloadBuilderTest extends TestCase
         $this->assertSame('https://alisadikinma.com/blog/x', $payload['platforms'][0]['platformSpecificData']['firstComment']);
     }
 
-    public function test_instagram_prepends_hook_video_when_done(): void
+    public function test_instagram_hook_video_replaces_the_cover_image(): void
     {
+        // When the hook video is ready it IS the animated cover, so the static
+        // cover (slide 1) is dropped: [video, slide2, slide3] — NOT [video, cover, …].
         $ig = $this->ig([
             'hook_video_status' => 'done',
             'hook_video_url' => 'https://alisadikinma.com/storage/linkedin-carousel/grok-hook.mp4',
-        ]);
+        ], 3);
 
         $payload = (new ZernioPayloadBuilder)->buildInstagram($ig);
 
-        $this->assertCount(4, $payload['mediaItems']);
+        $this->assertCount(3, $payload['mediaItems']); // video + 2 body slides (cover dropped)
         $this->assertSame('video', $payload['mediaItems'][0]['type']);
         $this->assertSame('https://alisadikinma.com/storage/linkedin-carousel/grok-hook.mp4', $payload['mediaItems'][0]['url']);
         $this->assertSame('image', $payload['mediaItems'][1]['type']);
+        // First image after the video is slide 2, not the cover (slide 1).
+        $this->assertStringContainsString('slide-02', $payload['mediaItems'][1]['url']);
+    }
+
+    public function test_instagram_keeps_all_slides_when_no_hook_video(): void
+    {
+        $ig = $this->ig([], 3);
+
+        $payload = (new ZernioPayloadBuilder)->buildInstagram($ig);
+
+        $this->assertCount(3, $payload['mediaItems']); // cover + 2 body slides, all images
+        $this->assertStringContainsString('slide-01', $payload['mediaItems'][0]['url']);
+    }
+
+    public function test_instagram_suppresses_first_comment_for_repurpose_carousel(): void
+    {
+        // Carousel-only (IG-repurpose) posts have no public blog article → no
+        // "Full article" first comment, even if a stale link_comment lingers.
+        $ig = $this->ig(['link_comment' => 'https://alisadikinma.com/r/fXnVmsq']);
+        \App\Models\RepurposeJob::factory()->create(['linkedin_post_id' => $ig->linkedin_post_id]);
+        $ig->load('linkedinPost');
+
+        $payload = (new ZernioPayloadBuilder)->buildInstagram($ig);
+
+        $this->assertArrayNotHasKey('platformSpecificData', $payload['platforms'][0]);
     }
 
     public function test_tiktok_is_image_only_even_capped(): void

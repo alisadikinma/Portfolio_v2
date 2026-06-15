@@ -207,6 +207,22 @@ class ScheduledCommandSeeder extends Seeder
             ],
 
             [
+                // Zernio external_url backfill (June 15, 2026). Zernio's createPost
+                // is async — IG/TikTok return no platformPostUrl at publish time, so
+                // the admin "Open on <platform>" links stayed dark. This polls
+                // GET /posts/{id} for published siblings missing external_url and
+                // fills it once Zernio finishes pushing to the network.
+                'signature' => 'crosspost:backfill-zernio-urls',
+                'display_name' => 'Social — Backfill Zernio Post URLs',
+                'description' => 'Tiap 2 menit: poll Zernio GET /posts/{id} untuk IG/TikTok/Threads yang sudah published tapi external_url-nya masih kosong (Zernio publish async, URL muncul belakangan), supaya tombol "Open on …" nyala.',
+                'category' => 'linkedin',
+                'cron_expression' => '*/2 * * * *',
+                'without_overlapping_minutes' => 2,
+                'arguments' => null,
+                'sort_order' => 95,
+            ],
+
+            [
                 // GROK hook-video poll + recovery (June 12, 2026). GeminiGen
                 // never fires webhooks, so this per-minute command is the SOLE
                 // completion driver for IG hook videos: polls /history, finalizes
