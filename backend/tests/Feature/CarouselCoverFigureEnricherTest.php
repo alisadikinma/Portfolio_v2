@@ -97,6 +97,46 @@ class CarouselCoverFigureEnricherTest extends TestCase
         $this->assertNull($cover['image_url']);
     }
 
+    public function test_uses_post_title_as_topic_when_slide_copy_is_empty(): void
+    {
+        // Real sketchnote draft shape (e.g. prod draft 153): copy_id / copy_en
+        // are EMPTY — all headline text is baked into image_prompt. Topic must
+        // come from the linked blog Post title, which names the figure.
+        $this->fakeAuthor([
+            'success' => true,
+            'figure_name' => 'Sam Altman',
+            'scene_prompt' => 'Creator and the person matching reference image 2 reviewing an S-1 filing.',
+            'error' => null,
+        ]);
+        $this->mock(EntityReferenceService::class, function ($m) {
+            $m->shouldReceive('findOrFetch')->with('Sam Altman', 'person')
+                ->andReturn(['url' => 'https://cdn/altman.png', 'entity_type' => 'person']);
+        });
+
+        $post = Post::factory()->create(['category_id' => Category::create(['name' => 'AI & Tech'])->id]);
+        $post->translations()->create([
+            'language' => 'id',
+            'title' => 'IPO OpenAI: 3 Fakta yang Altman sembunyikan',
+            'slug' => 'ipo-openai-altman-' . uniqid(),
+            'content' => 'Body.',
+        ]);
+        $draft = LinkedInPost::factory()->create([
+            'post_id' => $post->id,
+            'format' => 'carousel',
+            'carousel_slides' => [
+                ['slide_number' => 1, 'layout_hint' => 'cover', 'is_cover' => true, 'copy_id' => '', 'copy_en' => '', 'image_prompt' => 'Spotlight Portrait on blue gradient', 'image_status' => 'done', 'image_url' => 'https://cdn/old.png'],
+                ['slide_number' => 2, 'layout_hint' => 'body', 'copy_id' => '', 'copy_en' => '', 'image_prompt' => 'sketchnote infographic'],
+            ],
+        ]);
+
+        $injected = app(CarouselCoverFigureEnricher::class)->enrich($draft);
+
+        $this->assertTrue($injected, 'empty slide copy must fall back to the figure-naming Post title');
+        $cover = $draft->fresh()->carousel_slides[0];
+        $this->assertSame('https://cdn/altman.png', $cover['entity_face_ref']);
+        $this->assertStringContainsString('reference image 2', $cover['image_prompt']);
+    }
+
     public function test_skips_ig_source_repurpose_when_topic_not_tools(): void
     {
         // Repurpose carousel whose topic is NOT tools/plugins/skills → stays

@@ -68,7 +68,7 @@ class CarouselCoverFigureEnricher
             return false;
         }
 
-        $topic = $this->topic($slides);
+        $topic = $this->topic($draft, $slides);
         if ($topic === '') {
             return $this->markResolved($draft, $slides, $coverIdx, 'empty_topic');
         }
@@ -194,20 +194,27 @@ class CarouselCoverFigureEnricher
     }
 
     /**
-     * Topic text for the author = the cover headline + the first few slide copy
-     * lines, in order. Self-contained (no Post/idea relation lookup) — enough for
-     * the author to identify the figure and the subject.
+     * Topic text for the author. PRIMARY source is the linked blog Post title —
+     * the highest-signal, figure-naming string available ("OpenAI IPO: 3 Fakta
+     * yang Altman sembunyikan"). Slide copy is only a FALLBACK for repurpose
+     * drafts that have no Post: the sketchnote carousel style bakes all headline
+     * text INTO image_prompt and leaves copy_id / copy_en empty, so a copy-only
+     * topic came back empty for blog→carousel drafts → empty_topic → the figure
+     * was never resolved even after the lock cleared. (2026-06-15 fix.)
      *
      * @param array<int,array<string,mixed>> $slides
      */
-    private function topic(array $slides): string
+    private function topic(LinkedInPost $draft, array $slides): string
     {
+        $title = $this->postTitle($draft);
+        if ($title !== '') {
+            return $title;
+        }
+
         $lines = [];
         foreach ($slides as $s) {
             // carousel-gen slides store text in copy_id / copy_en (the adapter
-            // never writes a plain `copy` key). Reading `copy` here left the
-            // topic empty for EVERY real draft → the author/Wikidata path never
-            // ran and the cover silently stayed creator-only. (2026-06-15 fix.)
+            // never writes a plain `copy` key).
             $copy = trim((string) ($s['copy_id'] ?? $s['copy_en'] ?? $s['copy'] ?? ''));
             if ($copy !== '') {
                 $lines[] = $copy;
@@ -218,6 +225,28 @@ class CarouselCoverFigureEnricher
         }
 
         return trim(implode(' — ', $lines));
+    }
+
+    /**
+     * Resolve the linked blog Post title (primary language EN, then ID, then
+     * any). Empty string when there is no Post (repurpose drafts) or on any
+     * lookup failure — the caller then falls back to slide copy. Never throws.
+     */
+    private function postTitle(LinkedInPost $draft): string
+    {
+        try {
+            $post = $draft->post;
+            if ($post === null) {
+                return '';
+            }
+            $t = $post->translations->firstWhere('language', 'en')
+                ?? $post->translations->firstWhere('language', 'id')
+                ?? $post->translations->first();
+
+            return trim((string) ($t->title ?? ''));
+        } catch (\Throwable $e) {
+            return '';
+        }
     }
 
     /**
