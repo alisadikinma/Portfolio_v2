@@ -925,7 +925,7 @@ LINKEDIN_OAUTH_REDIRECT_URI=https://alisadikinma.com/api/admin/linkedin/oauth/ca
                 <BaseButton type="button" button-type="secondary" :disabled="zernioVerifying === 'threads' || !zernioThreadsKeyConfigured" :loading="zernioVerifying === 'threads'" @click="handleZernioVerify('threads')">🔌 Verify</BaseButton>
               </div>
               <p class="text-xs text-neutral-500 mt-1">
-                Click <em>Verify</em> after saving a key to list the workspace's accounts and copy each account ID below.
+                Click <em>Verify</em> after saving a key — the workspace's account IDs are filled in automatically below (just click Save).
                 <strong class="text-amber-700 dark:text-amber-400">Rotate keys in the Zernio dashboard if they have ever been exposed.</strong>
               </p>
             </div>
@@ -944,8 +944,8 @@ LINKEDIN_OAUTH_REDIRECT_URI=https://alisadikinma.com/api/admin/linkedin/oauth/ca
             <div class="pt-4 border-t border-neutral-200 dark:border-neutral-700 space-y-4">
               <h3 class="text-sm font-semibold text-neutral-700 dark:text-neutral-300">Account IDs &amp; publisher per platform</h3>
               <p class="text-xs text-neutral-500">
-                Paste the account ID from <em>Verify</em> above. The publisher selector chooses Zernio (primary)
-                or Publer (fallback) per platform.
+                Account IDs are auto-filled by <em>Verify</em> above (editable if needed). The publisher selector
+                chooses Zernio (primary) or Publer (fallback) per platform.
               </p>
 
               <div v-for="p in zernioPlatforms" :key="p.key" class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
@@ -957,7 +957,7 @@ LINKEDIN_OAUTH_REDIRECT_URI=https://alisadikinma.com/api/admin/linkedin/oauth/ca
                     :id="`zernio_${p.key}_account_id`"
                     v-model="zernioFormData[`zernio_${p.key}_account_id`]"
                     type="text"
-                    placeholder="acc_..."
+                    placeholder="auto-filled by Verify (e.g. 6a2fb1…)"
                     class="w-full border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono text-sm"
                   />
                 </div>
@@ -2145,12 +2145,36 @@ async function handleZernioVerify(workspace) {
   zernioVerifyResult.value = null
   try {
     const result = await settingsStore.verifyZernioConnection(workspace)
-    zernioVerifyResult.value = result.success
-      ? { success: true, message: `✓ ${workspace} connection OK — ${result.accounts.length} account(s)`, accounts: result.accounts }
-      : { success: false, message: '✗ ' + (result.error || result.message || 'Zernio verify failed') }
+    if (result.success) {
+      const filled = autoFillZernioAccountIds(result.accounts)
+      zernioVerifyResult.value = {
+        success: true,
+        message: `✓ ${workspace} connection OK — ${result.accounts.length} account(s)`
+          + (filled.length ? ` · auto-filled: ${filled.join(', ')} (click Save to persist)` : ''),
+        accounts: result.accounts,
+      }
+    } else {
+      zernioVerifyResult.value = { success: false, message: '✗ ' + (result.error || result.message || 'Zernio verify failed') }
+    }
   } finally {
     zernioVerifying.value = null
   }
+}
+
+// Map each discovered account onto its platform's account-ID field so the
+// operator never copies hex IDs by hand. Returns the platform keys filled.
+function autoFillZernioAccountIds(accounts) {
+  const filled = []
+  for (const acc of accounts || []) {
+    const platform = String(acc?.platform || '').toLowerCase()
+    const id = acc?._id || acc?.id || acc?.accountId
+    if (!platform || !id) continue
+    const match = zernioPlatforms.find((p) => platform === p.key || platform.includes(p.key))
+    if (!match) continue
+    zernioFormData.value[`zernio_${match.key}_account_id`] = id
+    if (!filled.includes(match.label)) filled.push(match.label)
+  }
+  return filled
 }
 
 // ===========================================================================
