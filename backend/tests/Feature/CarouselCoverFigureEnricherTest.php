@@ -40,9 +40,21 @@ class CarouselCoverFigureEnricherTest extends TestCase
 
     private function defaultSlides(): array
     {
+        // Real adapter shape: carousel-gen writes copy_id / copy_en, NOT a plain
+        // `copy` key (the old fixtures used `copy`, which is why the field-name
+        // bug shipped green). Topic here is a person bio, no tools keyword.
         return [
-            ['slide_number' => 1, 'layout_hint' => 'cover', 'is_cover' => true, 'copy' => 'PERJALANAN SOUMITH CHINTALA', 'image_prompt' => 'plugin creator cover', 'image_status' => 'done', 'image_url' => 'https://cdn/old-cover.png'],
-            ['slide_number' => 2, 'layout_hint' => 'body', 'copy' => 'VIT Hyderabad → NYU → FAIR', 'image_prompt' => 'sketchnote journey'],
+            ['slide_number' => 1, 'layout_hint' => 'cover', 'is_cover' => true, 'copy_id' => 'PERJALANAN SOUMITH CHINTALA', 'image_prompt' => 'plugin creator cover', 'image_status' => 'done', 'image_url' => 'https://cdn/old-cover.png'],
+            ['slide_number' => 2, 'layout_hint' => 'body', 'copy_id' => 'VIT Hyderabad menuju New York University', 'image_prompt' => 'sketchnote journey'],
+        ];
+    }
+
+    /** Repurpose-eligible topic: mentions Tools / Plugins / Skills (AI niche). */
+    private function toolsTopicSlides(): array
+    {
+        return [
+            ['slide_number' => 1, 'layout_hint' => 'cover', 'is_cover' => true, 'copy_id' => '7 Plugin Claude yang Soumith Chintala pakai tiap hari', 'image_prompt' => 'plugin creator cover', 'image_status' => 'done', 'image_url' => 'https://cdn/old-cover.png'],
+            ['slide_number' => 2, 'layout_hint' => 'body', 'copy_id' => 'Tools coding AI yang bikin kerja makin cepat', 'image_prompt' => 'sketchnote'],
         ];
     }
 
@@ -85,8 +97,10 @@ class CarouselCoverFigureEnricherTest extends TestCase
         $this->assertNull($cover['image_url']);
     }
 
-    public function test_skips_ig_source_repurpose_carousel(): void
+    public function test_skips_ig_source_repurpose_when_topic_not_tools(): void
     {
+        // Repurpose carousel whose topic is NOT tools/plugins/skills → stays
+        // creator-only (the default v3 Spotlight). Author never runs.
         $this->authorNeverCalled();
         $draft = $this->carouselDraft($this->defaultSlides());
         RepurposeJob::factory()->create(['linkedin_post_id' => $draft->id, 'mode' => 'carousel', 'status' => 'drafted']);
@@ -97,6 +111,33 @@ class CarouselCoverFigureEnricherTest extends TestCase
         $cover = $draft->fresh()->carousel_slides[0];
         $this->assertArrayNotHasKey('entity_face_ref', $cover);
         $this->assertTrue($cover['figure_enriched'], 'IG-source cover is marked resolved so the author never re-runs');
+    }
+
+    public function test_injects_figure_on_repurpose_when_topic_is_tools(): void
+    {
+        // Operator rule (2026-06-15): repurpose carousels ABOUT tools/plugins/
+        // skills DO get the figure interaction. Topic mentions "Plugin Claude" +
+        // "Tools coding AI" → gate loosens, author runs, figure attaches.
+        $this->fakeAuthor([
+            'success' => true,
+            'figure_name' => 'Soumith Chintala',
+            'scene_prompt' => 'Creator and the person matching reference image 2 pairing at a laptop.',
+            'error' => null,
+        ]);
+        $this->mock(EntityReferenceService::class, function ($m) {
+            $m->shouldReceive('findOrFetch')->with('Soumith Chintala', 'person')
+                ->andReturn(['url' => 'https://cdn/soumith.png', 'entity_type' => 'person']);
+        });
+
+        $draft = $this->carouselDraft($this->toolsTopicSlides());
+        RepurposeJob::factory()->create(['linkedin_post_id' => $draft->id, 'mode' => 'carousel', 'status' => 'drafted']);
+
+        $injected = app(CarouselCoverFigureEnricher::class)->enrich($draft);
+
+        $this->assertTrue($injected, 'repurpose + tools topic must loosen the gate and inject the figure');
+        $cover = $draft->fresh()->carousel_slides[0];
+        $this->assertSame('https://cdn/soumith.png', $cover['entity_face_ref']);
+        $this->assertStringContainsString('reference image 2', $cover['image_prompt']);
     }
 
     public function test_no_figure_for_non_person_topic_leaves_creator_cover(): void

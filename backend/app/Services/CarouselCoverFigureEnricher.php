@@ -68,11 +68,20 @@ class CarouselCoverFigureEnricher
             return false;
         }
 
+        $topic = $this->topic($slides);
+        if ($topic === '') {
+            return $this->markResolved($draft, $slides, $coverIdx, 'empty_topic');
+        }
+
         // Source gate — IG-source (repurpose) carousels keep the v3
-        // creator-fronted Spotlight Portrait. Only original blog→carousel is
-        // topic-aware. Mark enriched so we don't re-check forever.
+        // creator-fronted Spotlight Portrait BY DEFAULT. Operator exception
+        // (2026-06-15): when the repurpose topic is about Tools / Plugins /
+        // Skills (the AI-tools niche), loosen the gate so a public figure (e.g.
+        // a tool's creator) can interact with the creator on the cover. Every
+        // other repurpose topic stays creator-only. Original blog→carousel is
+        // always topic-aware. Mark enriched so we don't re-check forever.
         try {
-            if ($draft->isRepurpose()) {
+            if ($draft->isRepurpose() && ! $this->isToolsSkillsPluginsTopic($topic)) {
                 return $this->markResolved($draft, $slides, $coverIdx, 'ig_source_skip');
             }
         } catch (\Throwable $e) {
@@ -82,12 +91,7 @@ class CarouselCoverFigureEnricher
             ]);
         }
 
-        $topic = $this->topic($slides);
-        if ($topic === '') {
-            return $this->markResolved($draft, $slides, $coverIdx, 'empty_topic');
-        }
-
-        $headline = trim((string) ($cover['copy'] ?? ''));
+        $headline = trim((string) ($cover['copy_id'] ?? $cover['copy_en'] ?? $cover['copy'] ?? ''));
 
         try {
             $authored = $this->author->author($topic, true, 'carousel_cover', $headline !== '' ? $headline : null);
@@ -200,7 +204,11 @@ class CarouselCoverFigureEnricher
     {
         $lines = [];
         foreach ($slides as $s) {
-            $copy = trim((string) ($s['copy'] ?? ''));
+            // carousel-gen slides store text in copy_id / copy_en (the adapter
+            // never writes a plain `copy` key). Reading `copy` here left the
+            // topic empty for EVERY real draft → the author/Wikidata path never
+            // ran and the cover silently stayed creator-only. (2026-06-15 fix.)
+            $copy = trim((string) ($s['copy_id'] ?? $s['copy_en'] ?? $s['copy'] ?? ''));
             if ($copy !== '') {
                 $lines[] = $copy;
             }
@@ -210,5 +218,23 @@ class CarouselCoverFigureEnricher
         }
 
         return trim(implode(' — ', $lines));
+    }
+
+    /**
+     * Does the topic centre on Tools / Plugins / Skills (the AI-tools niche)?
+     * Operator rule (2026-06-15): on IG-repurpose carousels the public-figure
+     * cover interaction is loosened ONLY for this topic class — every other
+     * repurpose topic keeps the creator-only Spotlight cover. Deliberately broad
+     * for the niche (ai / llm / agent / code count), because a repurpose figure
+     * here is almost always a tool/framework creator and the figure-resolution
+     * gate downstream still leaves non-figure topics creator-only. Tunable —
+     * narrow the term set if a non-tools repurpose ever picks up a stray figure.
+     */
+    private function isToolsSkillsPluginsTopic(string $topic): bool
+    {
+        return (bool) preg_match(
+            '/\b(ai|llm|ml|tools?|plugins?|skills?|extensions?|librar(?:y|ies)|frameworks?|sdk|api|apps?|software|no[- ]?code|automation|otomasi|coding|code|kode|github|repo|models?|agents?|alat|aplikasi|pustaka)\b/i',
+            $topic
+        );
     }
 }
