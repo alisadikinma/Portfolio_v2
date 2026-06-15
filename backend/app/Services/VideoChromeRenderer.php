@@ -142,8 +142,11 @@ class VideoChromeRenderer
      * over a scrim, composited over the hook clip by VideoRebrandComposer::overlayClip.
      * Returns the absolute PNG path, or null on empty title / render failure (caller
      * keeps the plain hook clip — graceful degrade).
+     *
+     * Bilingual: $title is the Indonesian-primary headline; $subtitle is the English
+     * companion (rendered smaller under the gold bar; omitted when empty / equal).
      */
-    public function renderHookTitle(RepurposeVideoSlide $slide, string $title, ?string $logoUrl = null): ?string
+    public function renderHookTitle(RepurposeVideoSlide $slide, string $title, ?string $logoUrl = null, string $subtitle = ''): ?string
     {
         $title = trim($title);
         if ($title === '' || $this->scriptPath === '') {
@@ -160,6 +163,11 @@ class VideoChromeRenderer
             '--title', $title,
             '--overlay-out', $out,
         ];
+        $subtitle = trim($subtitle);
+        if ($subtitle !== '') {
+            $args[] = '--subtitle';
+            $args[] = $subtitle;
+        }
         // The cjs inlines the logo as a data:URI from a LOCAL path (a remote URL is
         // blocked under setContent's opaque origin). Convert the entity-ref storage
         // URL → public/storage path. Omitted cleanly when unresolved.

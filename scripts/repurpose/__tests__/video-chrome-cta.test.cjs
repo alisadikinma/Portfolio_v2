@@ -32,6 +32,14 @@ check('renders the Follow ask with the handle', () => {
   assert.ok(html.includes('@alisadikinma'), 'missing handle');
 });
 
+check('is BILINGUAL — Indonesian primary command + English companion', () => {
+  assert.ok(/Ikuti/i.test(html), 'missing Indonesian primary "Ikuti"');
+  assert.ok(/untuk lebih banyak/i.test(html), 'missing Indonesian "untuk lebih banyak"');
+  assert.ok(/Bermanfaat/i.test(html), 'missing Indonesian header "Bermanfaat?"');
+  // English companion still present (Indonesian leads, English follows).
+  assert.ok(/Follow .*for more AI Tools/is.test(html), 'missing English companion line');
+});
+
 check('renders EXACTLY ONE command (no Save/Comment stacking)', () => {
   assert.ok(/for more AI Tools/i.test(html), 'Follow ask should read "for more AI Tools"');
   assert.ok(!/Save this/i.test(html), 'must NOT stack a Save ask (one command only)');

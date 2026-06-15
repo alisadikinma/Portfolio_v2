@@ -138,6 +138,10 @@ return [
         // of truth with /carousel-gen. See VideoHookSceneAuthor::refsBundle().
         'model_hook_author' => env('REPURPOSE_MODEL_HOOK_AUTHOR', 'sonnet'),
         'refs_hook' => env('REPURPOSE_REFS_HOOK', ''),
+        // video_rebrand bookend HOOK title bilingual localizer (ID primary + EN
+        // companion) — RepurposeHookTitleResolver. Light text-only call, cached
+        // onto the job after first run.
+        'model_hook_translate' => env('REPURPOSE_MODEL_HOOK_TRANSLATE', 'sonnet'),
         // Style guide refs appended to the rewrite prompt (reuse article refs).
         'refs_rewrite' => env('REPURPOSE_REFS_REWRITE', env('ARTICLE_GEN_REFS_WRITE', '')),
         // CLI budget per attempt — matches carousel-gen (900s). Big IG carousels

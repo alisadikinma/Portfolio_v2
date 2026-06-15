@@ -9,9 +9,9 @@ use App\Models\RepurposeVideoSlide;
  * card onto a finalized 4:5 bookend clip (the plain `slide_{i}.mp4` written by
  * finalizeVeoClip / composeSlide):
  *
- *   - HOOK → the cover headline (from the original IG hook, via
- *     RepurposeJob::videoHookTitle) + the auto-resolved topic brand logo.
- *   - CTA  → the single-command "Follow @… for more AI Tools" ask card.
+ *   - HOOK → the cover headline, bilingual (Indonesian primary + English companion
+ *     via RepurposeHookTitleResolver) + the auto-resolved topic brand logo.
+ *   - CTA  → the single-command bilingual "Ikuti @… / Follow @…" ask card.
  *
  * Shared by PollRebrandAssets (first finalize) AND ReskinBookendSlide (credit-free
  * re-skin of an already-rendered clip). Returns the new public URL, or null when
@@ -22,6 +22,7 @@ class VideoBookendOverlayApplier
     public function __construct(
         private readonly VideoChromeRenderer $chrome,
         private readonly VideoRebrandComposer $composer,
+        private readonly RepurposeHookTitleResolver $hookTitle,
     ) {
     }
 
@@ -50,20 +51,27 @@ class VideoBookendOverlayApplier
     }
 
     /**
-     * Render + composite the hook TITLE overlay (cover headline from the original
-     * IG hook + auto-resolved topic brand logo) onto the finalized hook clip.
+     * Render + composite the hook TITLE overlay (bilingual cover headline —
+     * Indonesian primary + English companion — + auto-resolved topic brand logo)
+     * onto the finalized hook clip.
      */
     private function applyHookTitle(RepurposeVideoSlide $slide): ?string
     {
         $job = $slide->repurposeJob;
-        $title = (string) (optional($job)->videoHookTitle() ?? '');
-        if (trim($title) === '') {
+        if ($job === null) {
             return null;
         }
 
-        $logo = $job ? ($job->extracted['hook_brand_logo'] ?? null) : null;
+        $pair = $this->hookTitle->resolve($job);
+        $title = trim($pair['id']);
+        if ($title === '') {
+            return null;
+        }
+        $subtitle = trim($pair['en']);
 
-        $overlayPng = $this->chrome->renderHookTitle($slide, $title, is_string($logo) ? $logo : null);
+        $logo = $job->extracted['hook_brand_logo'] ?? null;
+
+        $overlayPng = $this->chrome->renderHookTitle($slide, $title, is_string($logo) ? $logo : null, $subtitle);
         if ($overlayPng === null) {
             return null;
         }

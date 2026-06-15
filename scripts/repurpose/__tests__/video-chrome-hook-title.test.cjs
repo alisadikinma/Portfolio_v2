@@ -54,6 +54,26 @@ check('omits the logo chip when no logo provided', () => {
   assert.ok(!/class="logo"/.test(html), 'must not render a logo chip without a logo');
 });
 
+check('renders the English companion subtitle when provided (bilingual hook)', () => {
+  const bi = buildHookTitleHtml('7 Tools AI Google yang Game-Changer', '', '7 Game-Changing Google AI Tools');
+  assert.ok(/class="hsub"/.test(bi), 'expected a companion subtitle element');
+  assert.ok(bi.includes('7 Game-Changing Google AI Tools'), 'expected the English companion text');
+  // Indonesian primary stays the h1.
+  assert.ok(/<h1>7 Tools AI Google yang Game-Changer<\/h1>/.test(bi), 'Indonesian title must be the h1');
+});
+
+check('omits the companion when empty or identical to the title', () => {
+  assert.ok(!/class="hsub"/.test(html), 'no subtitle arg → no companion element');
+  const same = buildHookTitleHtml('Same Title', '', 'Same Title');
+  assert.ok(!/class="hsub"/.test(same), 'identical subtitle must be suppressed (no duplicate line)');
+});
+
+check('escapes HTML in the companion subtitle', () => {
+  const evil = buildHookTitleHtml('Judul', '', '<b>x</b>');
+  assert.ok(!evil.includes('<b>x</b>'), 'subtitle must be HTML-escaped');
+  assert.ok(evil.includes('&lt;b&gt;x&lt;/b&gt;'), 'expected escaped companion entities');
+});
+
 if (failures > 0) {
   console.error(`\n${failures} assertion(s) failed.`);
   process.exit(1);

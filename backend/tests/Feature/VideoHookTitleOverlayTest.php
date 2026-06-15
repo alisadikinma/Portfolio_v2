@@ -38,9 +38,16 @@ class VideoHookTitleOverlayTest extends TestCase
         Bus::fake();
 
         $logo = 'https://alisadikinma.com/storage/entity-refs/logo/Q95_google.png';
+        // Pre-cached bilingual hook title → RepurposeHookTitleResolver short-circuits
+        // (no CLI), so the test exercises only the overlay path.
         $job = RepurposeJob::factory()->create([
             'mode' => 'video_rebrand', 'status' => 'generating_assets',
-            'extracted' => ['source_hook_title' => '7 Google AI Tools', 'hook_brand_logo' => $logo],
+            'extracted' => [
+                'source_hook_title' => '7 Google AI Tools',
+                'source_hook_title_id' => '7 Tools AI Google',
+                'source_hook_title_en' => '7 Google AI Tools',
+                'hook_brand_logo' => $logo,
+            ],
         ]);
         $hook = RepurposeVideoSlide::create([
             'repurpose_job_id' => $job->id, 'slide_index' => 0, 'role' => 'hook',
@@ -54,7 +61,7 @@ class VideoHookTitleOverlayTest extends TestCase
         });
         $this->mock(VideoChromeRenderer::class, function ($m) use ($logo) {
             $m->shouldReceive('renderHookTitle')->once()
-                ->with(\Mockery::any(), '7 Google AI Tools', $logo)
+                ->with(\Mockery::any(), '7 Tools AI Google', $logo, '7 Google AI Tools')
                 ->andReturn('/abs/hook_title.png');
         });
         $this->mock(VideoRebrandComposer::class, function ($m) {

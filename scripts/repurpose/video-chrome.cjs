@@ -148,7 +148,11 @@ const footer = buildFooterHtml({ logoUri: toDataUri(LOGO), handle: HANDLE, site:
  * navy/gold ask card VERTICALLY CENTERED on the canvas (not crammed at the bottom).
  * Composited over the CTA Veo clip so the SINGLE ask (Follow @handle for more AI
  * Tools) is visible in-feed. Exactly ONE command per the carousel/video CTA
- * standard — NO Save/Comment stacking, NO comment→DM promise. Pure → unit-testable.
+ * standard — NO Save/Comment stacking, NO comment→DM promise.
+ *
+ * BILINGUAL (Indonesian primary + English companion): the command reads as one
+ * Indonesian line (large) with a smaller English companion under it. Pure →
+ * unit-testable.
  */
 function buildCtaOverlayHtml(handle) {
   const h = esc(handle || '@alisadikinma');
@@ -157,23 +161,31 @@ html,body{width:1080px;height:1350px;background:transparent}
 .wrap{width:1080px;height:1350px;display:flex;align-items:center;justify-content:center;padding:0 60px}
 .card{width:100%;background:linear-gradient(135deg,rgba(4,48,95,.95),rgba(10,58,122,.95));border:2px solid rgba(245,166,35,.6);border-radius:34px;padding:46px 54px;box-shadow:0 18px 60px rgba(0,0,0,.45),inset 0 3px 34px rgba(245,166,35,.18);color:#fff}
 .cta-h{font-size:42px;font-weight:700;color:#F7B733;margin-bottom:26px;letter-spacing:.5px}
-.row{display:flex;align-items:center;gap:20px;font-size:34px;font-weight:600;margin:16px 0;color:#fff}
+.row{display:flex;align-items:center;gap:20px;font-size:34px;font-weight:600;margin:16px 0 8px;color:#fff}
+.rowsub{font-size:26px;font-weight:400;color:rgba(255,255,255,.78);margin:0 0 4px 80px}
 .ic{display:inline-flex;align-items:center;justify-content:center;width:60px;height:60px;border-radius:16px;background:linear-gradient(135deg,#F7B733,#E8920A);color:#06203f;font-size:32px;font-weight:700;flex:none}
 .hl{color:#F7B733;font-weight:700}</style></head><body><div class="wrap"><div class="card">
-<div class="cta-h">Found this useful?</div>
-<div class="row"><span class="ic">+</span><span>Follow <span class="hl">${h}</span> for more AI Tools</span></div>
+<div class="cta-h">Bermanfaat?</div>
+<div class="row"><span class="ic">+</span><span>Ikuti <span class="hl">${h}</span> untuk lebih banyak AI Tools</span></div>
+<div class="rowsub">Follow <span class="hl">${h}</span> for more AI Tools</div>
 </div></div></body></html>`;
 }
 
 /**
  * Hook title overlay — a transparent full-canvas (1080×1350) page with the cover
- * headline (sourced from the ORIGINAL IG carousel's hook slide) VERTICALLY CENTERED
- * over a centered dark scrim band (matching the source IG cover's big-centered
- * treatment), so it reads large over the creator clip. Composited over the hook
- * clip via ffmpeg. Pure → unit-testable.
+ * headline VERTICALLY CENTERED over a centered dark scrim band (matching the source
+ * IG cover's big-centered treatment), so it reads large over the creator clip.
+ * Composited over the hook clip via ffmpeg.
+ *
+ * BILINGUAL (Indonesian primary + English companion): `title` is the Indonesian
+ * headline (large h1); `subtitle` is the English companion (smaller, gold, under
+ * the gold bar). The subtitle is omitted when empty / identical to the title.
+ * Pure → unit-testable.
  */
-function buildHookTitleHtml(title, logoUri) {
+function buildHookTitleHtml(title, logoUri, subtitle) {
   const t = esc(title || '');
+  const subRaw = String(subtitle || '').trim();
+  const sub = subRaw && subRaw !== String(title || '').trim() ? `<div class="hsub">${esc(subRaw)}</div>` : '';
   // Topic brand logo (e.g. Google) sits above the title — a white rounded chip so
   // any logo colourway reads over the clip. Omitted when no logo resolved.
   const logo = logoUri ? `<div class="logo"><img src="${logoUri}"/></div>` : '';
@@ -185,7 +197,8 @@ html,body{width:1080px;height:1350px;background:transparent}
 .logo{display:inline-flex;align-items:center;justify-content:center;background:#fff;border-radius:26px;padding:22px 40px;margin:0 auto 38px;box-shadow:0 8px 30px rgba(0,0,0,.45)}
 .logo img{height:96px;width:auto;max-width:460px;object-fit:contain;display:block}
 .bar{width:132px;height:11px;border-radius:6px;background:linear-gradient(90deg,#F7B733,#E8920A);margin:0 auto 42px;box-shadow:0 0 22px rgba(245,166,35,.6)}
-h1{font-size:92px;line-height:1.07;font-weight:700;color:#fff;letter-spacing:-.5px;text-shadow:0 4px 32px rgba(0,0,0,.72)}</style></head><body><div class="wrap"><div class="scrim"></div><div class="box">${logo}<div class="bar"></div><h1>${t}</h1></div></div></body></html>`;
+h1{font-size:92px;line-height:1.07;font-weight:700;color:#fff;letter-spacing:-.5px;text-shadow:0 4px 32px rgba(0,0,0,.72)}
+.hsub{font-size:40px;line-height:1.2;font-weight:600;color:#F7B733;margin-top:28px;text-shadow:0 3px 22px rgba(0,0,0,.7)}</style></head><body><div class="wrap"><div class="scrim"></div><div class="box">${logo}<div class="bar"></div><h1>${t}</h1>${sub}</div></div></body></html>`;
 }
 
 async function render() {
@@ -221,7 +234,7 @@ async function render() {
 
   if (MODE === 'hook') {
     await p.setViewportSize({ width: 1080, height: 1350 });
-    await p.setContent(buildHookTitleHtml(TITLE, toDataUri(LOGO)), { waitUntil: 'networkidle' });
+    await p.setContent(buildHookTitleHtml(TITLE, toDataUri(LOGO), SUBTITLE), { waitUntil: 'networkidle' });
     try { await p.evaluate(() => document.fonts.ready); } catch (e) {}
     await p.waitForTimeout(400);
     await p.screenshot({ path: OVERLAY_OUT, omitBackground: true });
