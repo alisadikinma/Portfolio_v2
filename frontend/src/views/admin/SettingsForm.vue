@@ -351,6 +351,22 @@
           >
             Publer
           </button>
+          <button
+            type="button"
+            role="tab"
+            id="sub-tab-sosmed-zernio"
+            :aria-selected="activeSosmedSub === 'zernio'"
+            aria-controls="sub-panel-sosmed-zernio"
+            :class="[
+              'px-4 py-2 text-sm font-medium rounded-md transition-colors',
+              activeSosmedSub === 'zernio'
+                ? 'bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 shadow-sm'
+                : 'text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200',
+            ]"
+            @click="setSosmedSub('zernio')"
+          >
+            Zernio
+          </button>
         </nav>
 
       <!-- ================================================================ -->
@@ -848,6 +864,126 @@ LINKEDIN_OAUTH_REDIRECT_URI=https://alisadikinma.com/api/admin/linkedin/oauth/ca
         </BaseCard>
       </section>
       <!-- /SUB-TAB Publer -->
+
+      <!-- ================================================================ -->
+      <!-- SUB-TAB: Zernio Cross-Post Integration (primary IG/TikTok/Threads)-->
+      <!-- ================================================================ -->
+      <section
+        v-show="activeSosmedSub === 'zernio'"
+        role="tabpanel"
+        id="sub-panel-sosmed-zernio"
+        aria-labelledby="sub-tab-sosmed-zernio"
+      >
+        <BaseCard>
+          <h2 class="text-xl font-display font-semibold text-neutral-900 dark:text-neutral-100 mb-2">
+            Zernio Publishing — Primary publisher for Instagram, TikTok, Threads
+          </h2>
+          <p class="text-sm text-neutral-600 dark:text-neutral-400 mb-6">
+            Backend POSTs draft captions + carousel slides to Zernio's REST API
+            (<code class="text-xs bg-neutral-100 dark:bg-neutral-800 px-1 rounded">zernio.com/api/v1</code>).
+            Accounts are connected in Zernio's dashboard (no dev-app registration). Zernio publishes
+            native IG video carousels. <strong>Two workspace API keys</strong> — one for IG + TikTok,
+            one for Threads — are <strong>encrypted at rest</strong> and never returned (only
+            <code class="text-xs">***SET***</code> + a boolean flag).
+          </p>
+
+          <form @submit.prevent="handleZernioSubmit" class="space-y-5">
+            <!-- API key: IG + TikTok workspace -->
+            <div>
+              <label for="zernio_api_key_igtt" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                API Key — Instagram + TikTok workspace
+                <span v-if="zernioIgttKeyConfigured" class="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">✓ Configured</span>
+              </label>
+              <div class="flex gap-2">
+                <input
+                  id="zernio_api_key_igtt"
+                  v-model="zernioFormData.zernio_api_key_igtt"
+                  type="password"
+                  autocomplete="new-password"
+                  :placeholder="zernioIgttKeyConfigured ? 'Leave blank to keep current key' : 'Paste Zernio IG+TikTok key (sk_...)'"
+                  class="flex-1 border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono text-sm"
+                />
+                <BaseButton type="button" button-type="secondary" :disabled="zernioVerifying === 'igtt' || !zernioIgttKeyConfigured" :loading="zernioVerifying === 'igtt'" @click="handleZernioVerify('igtt')">🔌 Verify</BaseButton>
+              </div>
+            </div>
+
+            <!-- API key: Threads workspace -->
+            <div>
+              <label for="zernio_api_key_threads" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                API Key — Threads workspace
+                <span v-if="zernioThreadsKeyConfigured" class="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">✓ Configured</span>
+              </label>
+              <div class="flex gap-2">
+                <input
+                  id="zernio_api_key_threads"
+                  v-model="zernioFormData.zernio_api_key_threads"
+                  type="password"
+                  autocomplete="new-password"
+                  :placeholder="zernioThreadsKeyConfigured ? 'Leave blank to keep current key' : 'Paste Zernio Threads key (sk_...)'"
+                  class="flex-1 border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono text-sm"
+                />
+                <BaseButton type="button" button-type="secondary" :disabled="zernioVerifying === 'threads' || !zernioThreadsKeyConfigured" :loading="zernioVerifying === 'threads'" @click="handleZernioVerify('threads')">🔌 Verify</BaseButton>
+              </div>
+              <p class="text-xs text-neutral-500 mt-1">
+                Click <em>Verify</em> after saving a key to list the workspace's accounts and copy each account ID below.
+                <strong class="text-amber-700 dark:text-amber-400">Rotate keys in the Zernio dashboard if they have ever been exposed.</strong>
+              </p>
+            </div>
+
+            <p v-if="zernioVerifyResult" :class="zernioVerifyResult.success ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'" class="text-sm leading-relaxed">
+              {{ zernioVerifyResult.message }}
+            </p>
+            <ul v-if="zernioVerifyResult?.accounts?.length" class="text-xs text-neutral-600 dark:text-neutral-400 space-y-1 border-l-2 border-neutral-200 dark:border-neutral-700 pl-3">
+              <li v-for="acc in zernioVerifyResult.accounts" :key="acc._id">
+                <span class="font-medium">{{ acc.platform }}</span> · {{ acc.username || acc.displayName || '—' }} ·
+                <code class="bg-neutral-100 dark:bg-neutral-800 px-1 rounded select-all">{{ acc._id }}</code>
+              </li>
+            </ul>
+
+            <!-- Account IDs (manual entry) + per-platform publisher selector -->
+            <div class="pt-4 border-t border-neutral-200 dark:border-neutral-700 space-y-4">
+              <h3 class="text-sm font-semibold text-neutral-700 dark:text-neutral-300">Account IDs &amp; publisher per platform</h3>
+              <p class="text-xs text-neutral-500">
+                Paste the account ID from <em>Verify</em> above. The publisher selector chooses Zernio (primary)
+                or Publer (fallback) per platform.
+              </p>
+
+              <div v-for="p in zernioPlatforms" :key="p.key" class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+                <div>
+                  <label :for="`zernio_${p.key}_account_id`" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                    {{ p.icon }} {{ p.label }} account ID
+                  </label>
+                  <input
+                    :id="`zernio_${p.key}_account_id`"
+                    v-model="zernioFormData[`zernio_${p.key}_account_id`]"
+                    type="text"
+                    placeholder="acc_..."
+                    class="w-full border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono text-sm"
+                  />
+                </div>
+                <div>
+                  <label :for="`crosspost_publisher_${p.key}`" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">Publisher</label>
+                  <select
+                    :id="`crosspost_publisher_${p.key}`"
+                    v-model="zernioFormData[`crosspost_publisher_${p.key}`]"
+                    class="w-full border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="zernio">Zernio (primary)</option>
+                    <option value="publer">Publer (fallback)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="pt-3 border-t border-neutral-200 dark:border-neutral-700">
+              <BaseButton type="submit" :disabled="zernioSubmitting" button-type="primary">
+                {{ zernioSubmitting ? 'Saving...' : 'Save Zernio Settings' }}
+              </BaseButton>
+            </div>
+          </form>
+        </BaseCard>
+      </section>
+      <!-- /SUB-TAB Zernio -->
       </section>
       <!-- /TAB sosmed (Sosmed Connection parent) -->
 
@@ -1454,7 +1590,7 @@ const tabIds = tabs.map(t => t.id)
 //   ?tab=sosmed_publer   → top tab "sosmed" + sub tab "publer"
 // The flat-ID approach (D2 in the brainstorm) avoids ?tab=sosmed&sub=
 // nested URL juggling and stays compatible with existing setTab/watch.
-const SOSMED_SUBS = ['linkedin', 'publer']
+const SOSMED_SUBS = ['linkedin', 'publer', 'zernio']
 const SOSMED_FLAT_IDS = SOSMED_SUBS.map((k) => `sosmed_${k}`)
 
 function resolveInitialTab(rawTab) {
@@ -1943,6 +2079,81 @@ async function handlePublerSyncAccounts() {
 }
 
 // ===========================================================================
+// ZERNIO — primary IG/TikTok/Threads publisher (June 15, 2026)
+// ===========================================================================
+const zernioPlatforms = [
+  { key: 'instagram', label: 'Instagram', icon: '📸' },
+  { key: 'tiktok', label: 'TikTok', icon: '🎵' },
+  { key: 'threads', label: 'Threads', icon: '🧵' },
+]
+const zernioSubmitting = ref(false)
+const zernioVerifying = ref(null) // 'igtt' | 'threads' | null
+const zernioVerifyResult = ref(null) // { success, message, accounts } | null
+const zernioFormData = ref({
+  zernio_api_key_igtt: '',
+  zernio_api_key_threads: '',
+  zernio_instagram_account_id: '',
+  zernio_tiktok_account_id: '',
+  zernio_threads_account_id: '',
+  crosspost_publisher_instagram: 'zernio',
+  crosspost_publisher_tiktok: 'zernio',
+  crosspost_publisher_threads: 'zernio',
+})
+const zernioIgttKeyConfigured = computed(() => settingsStore.zernioSettings?.zernio_api_key_igtt_configured === true)
+const zernioThreadsKeyConfigured = computed(() => settingsStore.zernioSettings?.zernio_api_key_threads_configured === true)
+
+async function loadZernioSettings() {
+  try {
+    await settingsStore.fetchZernioSettings()
+    const s = settingsStore.zernioSettings
+    zernioFormData.value = {
+      zernio_api_key_igtt: '', // never bind the masked sentinel — let placeholder show
+      zernio_api_key_threads: '',
+      zernio_instagram_account_id: s.zernio_instagram_account_id || '',
+      zernio_tiktok_account_id: s.zernio_tiktok_account_id || '',
+      zernio_threads_account_id: s.zernio_threads_account_id || '',
+      crosspost_publisher_instagram: s.crosspost_publisher_instagram || 'zernio',
+      crosspost_publisher_tiktok: s.crosspost_publisher_tiktok || 'zernio',
+      crosspost_publisher_threads: s.crosspost_publisher_threads || 'zernio',
+    }
+  } catch (err) {
+    console.warn('[Settings] zernio fetch failed — using defaults', err)
+  }
+}
+
+async function handleZernioSubmit() {
+  zernioSubmitting.value = true
+  try {
+    const payload = { ...zernioFormData.value }
+    // Empty key = preserve existing (operator chose not to change).
+    if (!payload.zernio_api_key_igtt) delete payload.zernio_api_key_igtt
+    if (!payload.zernio_api_key_threads) delete payload.zernio_api_key_threads
+
+    await settingsStore.updateZernioSettings(payload)
+    uiStore.showSuccess('Zernio settings saved.', 'Saved')
+    zernioFormData.value.zernio_api_key_igtt = ''
+    zernioFormData.value.zernio_api_key_threads = ''
+  } catch (err) {
+    uiStore.showError(err.response?.data?.message || err.message || 'Failed to save Zernio settings', 'Save Failed')
+  } finally {
+    zernioSubmitting.value = false
+  }
+}
+
+async function handleZernioVerify(workspace) {
+  zernioVerifying.value = workspace
+  zernioVerifyResult.value = null
+  try {
+    const result = await settingsStore.verifyZernioConnection(workspace)
+    zernioVerifyResult.value = result.success
+      ? { success: true, message: `✓ ${workspace} connection OK — ${result.accounts.length} account(s)`, accounts: result.accounts }
+      : { success: false, message: '✗ ' + (result.error || result.message || 'Zernio verify failed') }
+  } finally {
+    zernioVerifying.value = null
+  }
+}
+
+// ===========================================================================
 // CV MASTER EXPORT — schema_version 2.0.0
 // ===========================================================================
 const cvVariantOrder = ['vibe_coding', 'ai_automation', 'ai_video']
@@ -2219,6 +2430,7 @@ onMounted(() => {
     loadTelegramSettings(),
     loadMailSettings(),
     loadPublerSettings(),
+    loadZernioSettings(),
     loadCvSettings(),
   ])
   consumeOauthFlash()

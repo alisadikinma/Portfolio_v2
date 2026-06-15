@@ -61,6 +61,23 @@ export const useSettingsStore = defineStore('settings', {
       publer_tiktok_account_id: null,
       publer_last_account_sync_at: null,
     },
+    // Zernio cross-post integration settings (group=zernio, June 15, 2026).
+    // Primary publisher for IG/TikTok/Threads. Two workspace API keys (igtt
+    // for IG+TikTok, threads for Threads) — both masked ***SET*** + *_configured
+    // flags. Account IDs entered manually; per-platform publisher selector
+    // (zernio|publer) defaults to zernio.
+    zernioSettings: {
+      zernio_api_key_igtt: '',
+      zernio_api_key_igtt_configured: false,
+      zernio_api_key_threads: '',
+      zernio_api_key_threads_configured: false,
+      zernio_instagram_account_id: null,
+      zernio_tiktok_account_id: null,
+      zernio_threads_account_id: null,
+      crosspost_publisher_instagram: 'zernio',
+      crosspost_publisher_tiktok: 'zernio',
+      crosspost_publisher_threads: 'zernio',
+    },
     // CV Master Export settings (group=cv) — feeds /api/cv/export schema 2.0.0.
     // Each value is the JSON-decoded blob (object/array). UI textareas serialize
     // back to JSON strings before posting via updateCvSettings.
@@ -427,6 +444,58 @@ export const useSettingsStore = defineStore('settings', {
         return {
           success: false,
           error: error.response?.data?.error || error.message || 'Failed to sync Publer accounts',
+        }
+      }
+    },
+
+    // Zernio cross-post integration (group=zernio, June 15, 2026)
+    async fetchZernioSettings() {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await api.get('/admin/settings/zernio')
+        if (response.data.success) {
+          this.zernioSettings = response.data.data
+        }
+        return this.zernioSettings
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to fetch zernio settings'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async updateZernioSettings(payload) {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await api.put('/admin/settings/zernio', payload)
+        if (response.data.success) {
+          await this.fetchZernioSettings() // refresh masked-key state
+        }
+        return response.data
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to update zernio settings'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async verifyZernioConnection(workspace) {
+      try {
+        const response = await api.post('/admin/settings/zernio/verify', { workspace })
+        return {
+          success: response.data.success,
+          message: response.data.message,
+          accounts: response.data.data?.accounts || [],
+          error: response.data.error,
+        }
+      } catch (error) {
+        return {
+          success: false,
+          error: error.response?.data?.error || error.message || 'Zernio connection failed',
         }
       }
     },
