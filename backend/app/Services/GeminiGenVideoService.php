@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\InstagramPost;
+use App\Support\SharedDir;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
@@ -414,7 +415,7 @@ class GeminiGenVideoService
         $rawPath = $this->writeTempFile('veo-raw-'.uniqid().'.mp4', $resp->body());
 
         $outPath = Storage::disk('public')->path($relOut);
-        @mkdir(dirname($outPath), 0775, true);
+        SharedDir::ensure(dirname($outPath));
 
         // 9:16 → 4:5: keep full width, center-crop height to iw*5/4, then normalize
         // to exactly 1080×1350.
@@ -471,7 +472,7 @@ class GeminiGenVideoService
 
         $outRel = "linkedin-carousel/grok-frame-{$igId}.jpg";
         $outPath = Storage::disk('public')->path($outRel);
-        @mkdir(dirname($outPath), 0775, true);
+        SharedDir::ensure(dirname($outPath));
 
         // Flatten to rgb24 (drop alpha) + pad to 2:3 with brand-blue bars.
         // try/catch returns null on a ffmpeg timeout/throw; finally guarantees
@@ -524,7 +525,7 @@ class GeminiGenVideoService
 
         $outRel = "linkedin-carousel/grok-hook-{$igId}.mp4";
         $outPath = Storage::disk('public')->path($outRel);
-        @mkdir(dirname($outPath), 0775, true);
+        SharedDir::ensure(dirname($outPath));
 
         // Center-crop 2:3 → 4:5 (even dims) + drop the audio track.
         // try/catch returns null on timeout/throw; finally removes the temp raw.

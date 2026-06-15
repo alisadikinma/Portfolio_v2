@@ -70,7 +70,11 @@ class ReskinBookendSlide implements ShouldQueue
         $relBase = "repurpose/{$job->id}/composited/slide_{$slide->slide_index}.mp4";
         $base = $video->finalizeVeoClip($slide->veo_url, $relBase);
         if ($base === null) {
-            $slide->update(['composited_status' => 'failed', 'last_error' => 'Re-skin failed: could not re-fetch the rendered clip (it may have expired — use Re-render).']);
+            // finalizeVeoClip null = download OR ffmpeg failure (incl. a write
+            // "Permission denied" when the composited dir isn't group-writable —
+            // see App\Support\SharedDir). Stay neutral so the operator isn't
+            // pushed to a credit-burning Re-render when the clip is actually fine.
+            $slide->update(['composited_status' => 'failed', 'last_error' => 'Re-skin failed while processing the rendered clip — check the worker logs. If the source clip has expired, use Re-render.']);
             Log::warning('[ReskinBookendSlide] base re-finalize failed', ['slide' => $slide->id, 'job' => $job->id]);
 
             return;

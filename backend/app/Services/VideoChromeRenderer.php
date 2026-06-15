@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\RepurposeVideoSlide;
 use App\Models\Setting;
+use App\Support\SharedDir;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 
@@ -52,7 +53,7 @@ class VideoChromeRenderer
 
         $jobId = (int) $slide->repurpose_job_id;
         $dir = storage_path("app/repurpose/{$jobId}/chrome");
-        @mkdir($dir, 0775, true);
+        SharedDir::ensure($dir);
         $headerOut = "{$dir}/slide_{$slide->slide_index}_header.png";
         $footerOut = "{$dir}/slide_{$slide->slide_index}_footer.png";
 
@@ -112,7 +113,7 @@ class VideoChromeRenderer
 
         $jobId = (int) $slide->repurpose_job_id;
         $dir = storage_path("app/repurpose/{$jobId}/chrome");
-        @mkdir($dir, 0775, true);
+        SharedDir::ensure($dir);
         $out = "{$dir}/cta_overlay.png";
 
         $args = [
@@ -155,7 +156,7 @@ class VideoChromeRenderer
 
         $jobId = (int) $slide->repurpose_job_id;
         $dir = storage_path("app/repurpose/{$jobId}/chrome");
-        @mkdir($dir, 0775, true);
+        SharedDir::ensure($dir);
         $out = "{$dir}/hook_title.png";
 
         $args = [

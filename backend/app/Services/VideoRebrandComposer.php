@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\RepurposeJob;
 use App\Models\RepurposeVideoSlide;
+use App\Support\SharedDir;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
@@ -130,7 +131,7 @@ class VideoRebrandComposer
         // slides (tool + hook + cta), not just the bookends.
         $outRel = "repurpose/{$jobId}/composited/slide_{$slide->slide_index}.mp4";
         $outAbs = Storage::disk('public')->path($outRel);
-        @mkdir(dirname($outAbs), 0775, true);
+        SharedDir::ensure(dirname($outAbs));
 
         $slide->update(['composited_status' => 'compositing']);
 
