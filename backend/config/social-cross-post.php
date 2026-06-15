@@ -105,4 +105,28 @@ return [
         'http_timeout_seconds' => (int) env('PUBLER_HTTP_TIMEOUT_SECONDS', 30),
     ],
 
+    // Zernio publisher (primary for IG/TikTok/Threads since 2026-06-15).
+    // Unlike Publer, Zernio takes PUBLIC CDN media URLs directly in createPost
+    // (mediaItems[]), so there is NO async media-ingest/poll step — hence no
+    // media_poll_* keys here. Two workspace API keys live in the `zernio`
+    // settings group (zernio_api_key_igtt for IG+TikTok, zernio_api_key_threads
+    // for Threads), selected per-platform by ZernioClient::forPlatform().
+    'zernio' => [
+        // Master gate for the Zernio publish path (mirror of publer.enabled).
+        'enabled' => env('ZERNIO_PUBLISH_ENABLED', false),
+        'base_url' => env('ZERNIO_BASE_URL', 'https://zernio.com'),
+        'api_path' => env('ZERNIO_API_PATH', '/api/v1'),
+        // HTTP retry policy for transient failures (5xx, network), applied via
+        // Laravel HTTP retry() in ZernioClient.
+        'max_retries' => (int) env('ZERNIO_MAX_RETRIES', 3),
+        'retry_backoff_ms' => (int) env('ZERNIO_RETRY_BACKOFF_MS', 500),
+        // createPost with publishNow returns synchronously (no Publer-style
+        // job poll), but a multi-slide carousel ingest server-side can take a
+        // few seconds — generous ceiling, well under the 900s worker cap.
+        'http_timeout_seconds' => (int) env('ZERNIO_HTTP_TIMEOUT_SECONDS', 60),
+        // When true, a sibling with scheduled_at set publishes via Zernio
+        // scheduledFor+timezone instead of publishNow. Off → always publishNow.
+        'schedule_enabled' => env('ZERNIO_SCHEDULE_ENABLED', true),
+    ],
+
 ];
