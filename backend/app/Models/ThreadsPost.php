@@ -43,6 +43,8 @@ class ThreadsPost extends Model
         'publer_job_id',
         'publer_status',
         'publer_account_id',
+        'zernio_post_id',
+        'zernio_request_id',
         'last_error',
         'auto_retry_count',
         'last_classified_error_class',

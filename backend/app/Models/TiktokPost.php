@@ -40,6 +40,8 @@ class TiktokPost extends Model
         'published_at',
         'external_url',
         'publer_post_id',
+        'zernio_post_id',
+        'zernio_request_id',
         'last_error',
         'auto_retry_count',
         'last_classified_error_class',

@@ -46,6 +46,8 @@ class InstagramPost extends Model
         'hook_video_error',
         'hook_video_retry_count',
         'publer_post_id',
+        'zernio_post_id',
+        'zernio_request_id',
         'last_error',
         'auto_retry_count',
         'last_classified_error_class',
