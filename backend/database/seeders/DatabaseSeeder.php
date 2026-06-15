@@ -35,6 +35,7 @@ class DatabaseSeeder extends Seeder
             LinkedInSettingsSeeder::class, // linkedin admin UI publishing flags
             PublerSettingsSeeder::class, // publer cross-post integration — api_key (encrypted) + 3 account IDs + master toggle
             PostizSettingsSeeder::class, // postiz local-node cross-post pull model — default OFF (5 keys)
+            ZernioSettingsSeeder::class, // zernio cross-post integration — 2 workspace api keys (encrypted) + 3 account IDs + 3 per-platform publisher selectors (default zernio)
             BlogPromoSettingsSeeder::class, // blog.blog_promo_project_id for mid-article promo rotator
             CvSettingsSeeder::class, // /api/cv/export schema_version 2.0.0 — summary_variants, work_experience, skills_matrix, education
             ScheduledCommandSeeder::class, // /admin/scheduler tab — 14 real artisan commands + 4 IG/FB/TikTok placeholders
