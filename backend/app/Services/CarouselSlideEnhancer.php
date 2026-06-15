@@ -185,10 +185,27 @@ class CarouselSlideEnhancer
             ]);
         }
 
-        // 5. Build file_urls: brand logo (always — chrome on every slide)
+        // 5. Build file_urls: brand logo (chrome on every slide) — EXCEPT the
+        //    two-subject public-figure cover. The brand logo is a bald-with-
+        //    glasses face icon; GeminiGen has no param to mark a reference as
+        //    "logo, not face", so it lands in the same file_urls bucket as the
+        //    real face refs and competes as a third identity reference. On a
+        //    single-creator slide that's harmless, but on a 2-subject cover
+        //    (creator = ref image 1, figure = ref image 2) the generic bald-
+        //    glasses logo blends into the creator's likeness — Ali's exact
+        //    (Asian) face drifts toward a generic bald-glasses everyman while
+        //    the distinct figure (ref image 2) binds cleanly. Drop the logo ref
+        //    here; the brand icon still renders from the appendBrandChrome text
+        //    instruction ("bald-with-glasses icon appears once, top bar").
+        $isTwoSubjectCover = $layoutHint === 'cover' && $entityFaceRef !== '';
         $fileUrls = [];
-        if ($brandLogoUrl !== null) {
+        if ($brandLogoUrl !== null && ! $isTwoSubjectCover) {
             $fileUrls[] = $brandLogoUrl;
+        } elseif ($brandLogoUrl !== null && $isTwoSubjectCover) {
+            Log::info('[CarouselSlideEnhancer] dropped brand-logo reference on 2-subject cover to protect creator face identity', [
+                'layout_hint' => $layoutHint,
+                'slide_index' => $slideIndex,
+            ]);
         }
 
         return [

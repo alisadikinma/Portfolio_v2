@@ -8,7 +8,6 @@ use App\Enums\LinkedInPostStatus;
 use App\Enums\TiktokPostStatus;
 use App\Enums\ThreadsPostStatus;
 use App\Jobs\GenerateFacebookPost;
-use App\Jobs\GenerateHookVideo;
 use App\Jobs\GenerateInstagramPost;
 use App\Jobs\GenerateThreadsPost;
 use App\Jobs\GenerateTiktokPost;
@@ -359,13 +358,17 @@ class ScanLinkedInForCrossPost extends Command
 
         GenerateInstagramPost::dispatch($draft->id)->onQueue('social-crosspost');
 
-        // GROK hook video (IG mixed carousel). Fan-out only fires once the
-        // carousel slides are 'done', so the hook slide is rendered — dispatch
-        // the hook-video job here (it re-checks + is idempotent). IG-only: the
-        // hook ships as carousel item 1 video; LinkedIn/TikTok stay all-image.
-        GenerateHookVideo::dispatch($draft->id)->onQueue('social-crosspost');
+        // GROK hook video (image→video for IG carousel slide 1) is MANUAL-ONLY
+        // (operator request, 2026-06-15) — it is NOT auto-dispatched here. The
+        // operator starts it on demand from the draft detail "Video" tab →
+        // POST /admin/linkedin-drafts/{id}/regenerate-hook-video. The IG sibling
+        // row created above is sufficient for the Image|Video toggle to appear
+        // (hasHookVideo only needs format=carousel + an instagram_post), so the
+        // manual trigger is always available without an auto-generated clip.
+        // PollHookVideos only recovers rows already in pending/failed, so with
+        // no auto-dispatch nothing ever auto-starts a hook video.
 
-        Log::info('[CrossPostScan] IG draft created + dispatched (caption + hook video)', [
+        Log::info('[CrossPostScan] IG draft created + dispatched (caption only; hook video is manual-trigger)', [
             'linkedin_post_id' => $li->id,
             'instagram_post_id' => $draft->id,
         ]);

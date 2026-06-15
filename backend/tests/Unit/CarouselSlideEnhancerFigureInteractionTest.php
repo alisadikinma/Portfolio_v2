@@ -100,4 +100,39 @@ class CarouselSlideEnhancerFigureInteractionTest extends TestCase
         $figureCount = count(array_filter($result['face_refs'], fn ($u) => $u === 'https://cdn.example.com/figure.png'));
         $this->assertSame(1, $figureCount);
     }
+
+    /**
+     * Root cause of draft 165 (2026-06-15): the brand logo is a bald-with-
+     * glasses FACE icon. GeminiGen has no param to mark a reference as "logo,
+     * not face", so it competes as a third identity reference and blends into
+     * the creator's likeness on a 2-subject cover (creator's exact face drifts
+     * toward a generic bald-glasses everyman). The logo must NOT be sent as a
+     * reference on a 2-subject public-figure cover — the brand icon still
+     * renders from the brand-chrome text instruction.
+     */
+    public function test_brand_logo_dropped_on_two_subject_cover(): void
+    {
+        $slide = $this->coverSlide(['entity_face_ref' => 'https://cdn.example.com/figure.png']);
+
+        $result = $this->enhancer()->enhance($slide, 0, 7);
+
+        $this->assertNotContains('https://cdn.example.com/logo.png', $result['file_urls'],
+            '2-subject cover must NOT send the bald-glasses brand logo as a competing face reference');
+        $this->assertSame([], $result['file_urls']);
+        // The two real faces are untouched — only the logo is dropped.
+        $this->assertSame(
+            ['https://cdn.example.com/face.png', 'https://cdn.example.com/figure.png'],
+            $result['face_refs']
+        );
+    }
+
+    public function test_brand_logo_kept_on_single_creator_cover(): void
+    {
+        $slide = $this->coverSlide(); // no entity_face_ref → single creator
+
+        $result = $this->enhancer()->enhance($slide, 0, 7);
+
+        $this->assertContains('https://cdn.example.com/logo.png', $result['file_urls'],
+            'single-creator cover keeps the brand logo reference (no competing second face)');
+    }
 }

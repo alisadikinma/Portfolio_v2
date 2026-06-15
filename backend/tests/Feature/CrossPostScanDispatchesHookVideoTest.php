@@ -13,12 +13,11 @@ use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 /**
- * Phase F — auto-dispatch the GROK hook video on IG fan-out.
- *
- * The cross-post scan only fans out a carousel once its slides are 'done', so
- * the hook slide is rendered by the time the IG sibling is created — that's the
- * single trigger point for GenerateHookVideo (the job itself re-checks + is
- * idempotent).
+ * Hook video (image→video for IG carousel slide 1) is MANUAL-ONLY as of
+ * 2026-06-15 (operator request). The cross-post scan still creates the IG
+ * sibling (so the Image|Video toggle + manual "Regenerate video" trigger are
+ * available) but must NOT auto-dispatch GenerateHookVideo — the operator starts
+ * it on demand from the draft detail "Video" tab.
  */
 class CrossPostScanDispatchesHookVideoTest extends TestCase
 {
@@ -38,7 +37,7 @@ class CrossPostScanDispatchesHookVideoTest extends TestCase
         ];
     }
 
-    public function test_fanout_dispatches_hook_video_for_the_ig_sibling(): void
+    public function test_fanout_creates_ig_sibling_but_does_not_auto_dispatch_hook_video(): void
     {
         // Build the draft manually (the LinkedInPost factory inserts a Post with
         // no category_id → NOT NULL violation on sqlite; passes on CI MySQL).
@@ -63,8 +62,9 @@ class CrossPostScanDispatchesHookVideoTest extends TestCase
         Artisan::call('social-cross-post:scan', ['--min-virality' => 0]);
 
         $ig = InstagramPost::where('linkedin_post_id', $draft->id)->first();
-        $this->assertNotNull($ig, 'IG sibling should be created on fan-out');
+        $this->assertNotNull($ig, 'IG sibling should still be created on fan-out (keeps the manual Image|Video trigger available)');
 
-        Queue::assertPushed(GenerateHookVideo::class, fn ($j) => $j->instagramPostId === $ig->id);
+        // Hook video is manual-only — the scan must NOT auto-dispatch it.
+        Queue::assertNotPushed(GenerateHookVideo::class);
     }
 }
