@@ -93,8 +93,20 @@ class CarouselCoverFigureEnricher
 
         $headline = trim((string) ($cover['copy_id'] ?? $cover['copy_en'] ?? $cover['copy'] ?? ''));
 
+        // Pass the carousel-gen cover prompt as the BASE so the author rewrites
+        // ONLY the human subject (creator → creator + figure) and preserves the
+        // headline + floating cards + composition verbatim. Without a base the
+        // author would compose a bare interaction scene and drop both.
+        $basePrompt = trim((string) ($cover['image_prompt'] ?? ''));
+
         try {
-            $authored = $this->author->author($topic, true, 'carousel_cover', $headline !== '' ? $headline : null);
+            $authored = $this->author->author(
+                $topic,
+                true,
+                'carousel_cover',
+                $headline !== '' ? $headline : null,
+                $basePrompt !== '' ? $basePrompt : null,
+            );
         } catch (\Throwable $e) {
             // Transient CLI failure — DON'T mark enriched, let the next dispatch retry.
             Log::warning('[CarouselCoverFigure] author threw — leaving plugin cover, will retry', [

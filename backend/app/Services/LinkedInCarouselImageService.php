@@ -286,14 +286,23 @@ class LinkedInCarouselImageService
         // the prompt anchors to (subject-1.png / subject-2.jpg) so GeminiGen binds
         // each face by filename — the original figure file (e.g. "Q…_sam-altman.jpg")
         // both leaks the name and gives the model only an ordinal anchor, which
-        // rendered the 2nd subject as a random person. On any hosting failure we
-        // fall back to the original refs (degraded, not broken).
+        // rendered the 2nd subject as a random person.
         $aliases = $enhanced['face_ref_aliases'] ?? [];
         if (! empty($aliases)) {
             $hosted = $this->hostNeutralRefs($draft, $slideIndex, $aliases);
-            if (! empty($hosted)) {
-                $faceRefs = $hosted;
+            if (empty($hosted)) {
+                // The prompt already anchors to subject-N.<ext>. Dispatching the
+                // original refs would BOTH mismatch the handle the prompt names
+                // AND leak the figure's name to GeminiGen — fail the slide so the
+                // reaper retries (re-hosting is idempotent), never send a mismatch.
+                Log::warning('[LinkedInCarouselImage] neutral ref hosting failed on figure cover — failing slide for retry', [
+                    'draft_id' => $draft->id,
+                    'slide_index' => $slideIndex,
+                ]);
+
+                return null;
             }
+            $faceRefs = $hosted;
         }
 
         $plannedFilename = $this->buildBrandedFilename($draft, $slideIndex, $layoutHint);
@@ -479,9 +488,9 @@ class LinkedInCarouselImageService
         $out = [];
         foreach ($aliases as $alias) {
             $src = trim((string) ($alias['url'] ?? ''));
-            $as = trim((string) ($alias['as'] ?? ''));
-            // basename only — guard against any path traversal in the alias name.
-            $as = basename($as);
+            // basename last — guard path traversal AND re-check empty AFTER it
+            // (basename('/') === '' would otherwise slip an empty name through).
+            $as = basename(trim((string) ($alias['as'] ?? '')));
             if ($src === '' || $as === '') {
                 return [];
             }
@@ -489,7 +498,7 @@ class LinkedInCarouselImageService
             try {
                 $resp = Http::timeout(20)->get($src);
             } catch (\Throwable $e) {
-                Log::warning('[LinkedInCarouselImage] neutral ref host download threw — keeping original refs', [
+                Log::warning('[LinkedInCarouselImage] neutral ref host download threw', [
                     'draft_id' => $draft->id,
                     'slide_index' => $slideIndex,
                     'error' => $e->getMessage(),
@@ -498,10 +507,22 @@ class LinkedInCarouselImageService
                 return [];
             }
             if (! $resp->successful()) {
-                Log::warning('[LinkedInCarouselImage] neutral ref host download non-2xx — keeping original refs', [
+                Log::warning('[LinkedInCarouselImage] neutral ref host download non-2xx', [
                     'draft_id' => $draft->id,
                     'slide_index' => $slideIndex,
                     'status' => $resp->status(),
+                ]);
+
+                return [];
+            }
+            // Guard against a redirect/error body (HTML/XML) being stored as an
+            // image and confusing GeminiGen. The refs are our own image files.
+            $contentType = (string) $resp->header('Content-Type');
+            if ($contentType !== '' && ! str_starts_with($contentType, 'image/')) {
+                Log::warning('[LinkedInCarouselImage] neutral ref returned non-image content-type', [
+                    'draft_id' => $draft->id,
+                    'slide_index' => $slideIndex,
+                    'content_type' => $contentType,
                 ]);
 
                 return [];

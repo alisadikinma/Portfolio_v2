@@ -219,11 +219,13 @@ class CarouselSlideEnhancer
         //     the neutral file handles so the body matches the mandate and
         //     GeminiGen binds the figure by file, not by image order.
         if ($sub1Name !== null && $sub2Name !== null) {
-            $promptText = str_ireplace(
-                ['reference image 2', 'reference image 1'],
-                ['the reference photo file "' . $sub2Name . '"', 'the reference photo file "' . $sub1Name . '"'],
-                $promptText
-            );
+            // strtr (single-pass, longest-key-first) — NOT str_ireplace, whose
+            // sequential passes could let "reference image 1" match inside an
+            // already-rewritten "reference image 10+" token.
+            $promptText = strtr($promptText, [
+                'reference image 1' => 'the reference photo file "' . $sub1Name . '"',
+                'reference image 2' => 'the reference photo file "' . $sub2Name . '"',
+            ]);
         }
 
         $fileUrls = [];

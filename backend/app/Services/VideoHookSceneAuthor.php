@@ -35,7 +35,7 @@ class VideoHookSceneAuthor
      *
      * @return array{success: bool, figure_name: string|null, brand_name?: string|null, scene_prompt: string, error: string|null}
      */
-    public function author(string $topic, bool $allowFigure = true, string $medium = 'video', ?string $headline = null): array
+    public function author(string $topic, bool $allowFigure = true, string $medium = 'video', ?string $headline = null, ?string $basePrompt = null): array
     {
         $topic = trim($topic);
         if ($topic === '') {
@@ -43,7 +43,7 @@ class VideoHookSceneAuthor
         }
 
         try {
-            $res = $this->runHookAuthor($this->buildPrompt($topic, $allowFigure, $medium, $headline));
+            $res = $this->runHookAuthor($this->buildPrompt($topic, $allowFigure, $medium, $headline, $basePrompt));
         } catch (\Throwable $e) {
             Log::warning('[VideoHookSceneAuthor] exec threw', ['error' => $e->getMessage()]);
 
@@ -148,8 +148,18 @@ class VideoHookSceneAuthor
         return $refs !== '' ? $refs : (string) config('carousel-gen.refs_pipeline', '');
     }
 
-    private function buildPrompt(string $topic, bool $allowFigure, string $medium = 'video', ?string $headline = null): string
+    private function buildPrompt(string $topic, bool $allowFigure, string $medium = 'video', ?string $headline = null, ?string $basePrompt = null): string
     {
+        // Carousel cover SUBJECT-REWRITE mode: an existing carousel-gen cover
+        // prompt (already carrying the bilingual headline + floating topic cards +
+        // composition + chrome) is preserved verbatim — the author changes ONLY
+        // the human subject to a creator+figure interaction. This is what keeps
+        // the figure cover identical to a normal cover except the subject
+        // ("hanya subject yg berubah, sisanya sama").
+        if ($medium === 'carousel_cover' && $basePrompt !== null && trim($basePrompt) !== '') {
+            return $this->buildCoverSubjectRewritePrompt($topic, trim($basePrompt));
+        }
+
         // The full hook/cover + creator + visual standard lives in the SYSTEM
         // PROMPT (the /carousel-gen knowledge bundle via refsBundle) — the single
         // source of truth. Do NOT restate visual rules here (no hardcoded base
@@ -193,6 +203,49 @@ Return ONE JSON object with exactly this shape:
   "figure_name": "Full Name or null",
   "brand_name": "Dominant brand or null",
   "scene_prompt": "..."
+}
+PROMPT;
+    }
+
+    /**
+     * Cover SUBJECT-REWRITE prompt: hand the model the existing carousel-gen cover
+     * prompt and ask it to change ONLY the human subject (single creator → creator
+     * + figure interaction), preserving the headline, every floating element, the
+     * composition, and all {{PLACEHOLDER}} tokens verbatim. The figure's real name
+     * is returned separately and NEVER written into scene_prompt.
+     */
+    private function buildCoverSubjectRewritePrompt(string $topic, string $basePrompt): string
+    {
+        return <<<PROMPT
+You are editing an EXISTING Instagram/LinkedIn carousel COVER (slide 1) image prompt about: "{$topic}".
+
+Below, between <<<BASE and BASE>>>, is the current cover prompt. It already contains the FINISHED composition — a bilingual headline, floating topic elements (data cards / logos / chips / percentages), the brand chrome, lighting and styling, and possibly {{PLACEHOLDER}} tokens.
+
+<<<BASE
+{$basePrompt}
+BASE>>>
+
+Your ONLY job: decide whether ONE iconic public figure strongly fits this topic (e.g. an OpenAI topic → OpenAI's CEO; a Google tool → Google's CEO; a person's life-journey carousel → that person).
+- If YES: rewrite the base prompt so the SINGLE creator subject becomes the creator AND that figure TOGETHER — creator on the LEFT, "the person matching reference image 2" on the RIGHT, spatially separated so the two faces never blend, interacting naturally in a way that fits this topic. Set "figure_name" to the figure's full real name.
+- If NO single figure clearly fits: set "figure_name" to null and return the base prompt UNCHANGED in scene_prompt.
+
+ABSOLUTE PRESERVATION RULES — change NOTHING except the human-subject description:
+- Keep the bilingual HEADLINE text EXACTLY (same words, same languages, same accent words).
+- Keep EVERY floating element EXACTLY — each data card, logo, chip, number, label — do not drop, rename, reorder, or invent any.
+- Keep the composition, background, lighting, grade, and styling.
+- Keep every {{PLACEHOLDER}} token verbatim.
+- The two people must be composed so they do NOT cover the headline or the floating elements — make room for both faces while everything else stays.
+- NEVER write the figure's real name inside scene_prompt — refer to them ONLY as "the person matching reference image 2". The real name goes ONLY in "figure_name".
+
+STRICT JSON OUTPUT — parsed by a machine, not a human:
+- Output ONE compact JSON object only. No markdown fences, no preamble, no trailing prose.
+- Escape EVERY double-quote inside a string value as \\".
+
+Return ONE JSON object with exactly this shape:
+{
+  "figure_name": "Full Name or null",
+  "brand_name": "Dominant brand or null",
+  "scene_prompt": "the full rewritten cover prompt"
 }
 PROMPT;
     }

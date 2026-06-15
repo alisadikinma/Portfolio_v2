@@ -59,4 +59,35 @@ class VideoHookSceneAuthorMediumTest extends TestCase
         $this->assertTrue($res['success']);
         $this->assertStringContainsString('4:5 portrait', $svc->captured);
     }
+
+    public function test_carousel_cover_with_base_prompt_switches_to_subject_rewrite(): void
+    {
+        // When the carousel-gen cover prompt is supplied as the base, the author
+        // must PRESERVE it (headline + floating cards) and change only the subject
+        // — not author a fresh bare scene ("hanya subject yg berubah").
+        $base = 'A Spotlight cover: the creator centered, bilingual headline "IPO OPENAI: 3 FAKTA" '
+            . 'plus floating cards OpenAI S-1 FILING, OPERATING MARGIN -122%, $1T VALUATION. {{PAGE_INDICATOR}} {{HANDLE}}';
+
+        $svc = $this->capturingAuthor();
+        $svc->author('IPO OpenAI: 3 fakta yang Altman sembunyikan', true, 'carousel_cover', 'IPO OPENAI: 3 FAKTA', $base);
+
+        // The base prompt is embedded verbatim for the model to edit in place.
+        $this->assertStringContainsString($base, $svc->captured);
+        // Preservation rules present; only the subject may change.
+        $this->assertStringContainsString('change NOTHING except the human-subject', $svc->captured);
+        $this->assertStringContainsString('Keep EVERY floating element EXACTLY', $svc->captured);
+        $this->assertStringContainsString('the person matching reference image 2', $svc->captured);
+        // It must NOT fall back to the fresh-scene framing.
+        $this->assertStringNotContainsString('animated by a video model', $svc->captured);
+    }
+
+    public function test_carousel_cover_without_base_prompt_keeps_fresh_scene_framing(): void
+    {
+        // No base → original behaviour (author a fresh cover scene).
+        $svc = $this->capturingAuthor();
+        $svc->author('Perjalanan Soumith Chintala', true, 'carousel_cover', 'PERJALANAN', null);
+
+        $this->assertStringContainsString('4:5 portrait', $svc->captured);
+        $this->assertStringNotContainsString('change NOTHING except the human-subject', $svc->captured);
+    }
 }
