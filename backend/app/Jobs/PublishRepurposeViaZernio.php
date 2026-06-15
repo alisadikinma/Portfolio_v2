@@ -106,7 +106,15 @@ class PublishRepurposeViaZernio implements ShouldQueue
             $url = data_get($result, 'platforms.0.platformPostUrl')
                 ?? data_get($result, 'existingPost.platforms.0.platformPostUrl');
 
-            $this->markPublished($postId, $url);
+            // A future scheduledFor means Zernio is HOLDING the post (status
+            // "scheduled"), not publishing now — label it accordingly so the UI
+            // chip shows the scheduled time instead of a misleading "published".
+            $scheduledFor = $this->scheduledForOrNull();
+            if ($scheduledFor !== null) {
+                $this->markScheduled($postId, $scheduledFor);
+            } else {
+                $this->markPublished($postId, $url);
+            }
         } catch (ZernioApiException $e) {
             $message = $e->getMessage();
             if ($this->isTransientError($message)) {
@@ -123,28 +131,44 @@ class PublishRepurposeViaZernio implements ShouldQueue
     /** publishNow, OR a FUTURE scheduledFor when the operator scheduled it. */
     private function applyScheduling(array $payload): array
     {
-        $scheduleEnabled = (bool) config('social-cross-post.zernio.schedule_enabled', true);
+        $scheduledFor = $this->scheduledForOrNull();
 
-        if ($scheduleEnabled && $this->scheduledForIso) {
-            $when = Carbon::parse($this->scheduledForIso);
-            if ($when->isFuture()) {
-                $payload['scheduledFor'] = $when->toIso8601String();
-                $payload['timezone'] = config('app.timezone', 'UTC');
-                $payload['publishNow'] = false;
-
-                return $payload;
-            }
+        if ($scheduledFor !== null) {
+            $payload['scheduledFor'] = $scheduledFor;
+            $payload['timezone'] = config('app.timezone', 'UTC');
+            $payload['publishNow'] = false;
+        } else {
+            $payload['publishNow'] = true;
         }
-
-        $payload['publishNow'] = true;
 
         return $payload;
     }
 
+    /**
+     * The normalized FUTURE scheduledFor ISO instant, or null when this is a
+     * publish-now (no schedule, scheduling disabled, or a past instant). Single
+     * source of truth for both the payload and the persisted status label.
+     */
+    private function scheduledForOrNull(): ?string
+    {
+        if (! (bool) config('social-cross-post.zernio.schedule_enabled', true) || ! $this->scheduledForIso) {
+            return null;
+        }
+        $when = Carbon::parse($this->scheduledForIso);
+
+        return $when->isFuture() ? $when->toIso8601String() : null;
+    }
+
     private function markPublished(string $postId, ?string $url): void
     {
-        $this->mergeState(['status' => 'published', 'post_id' => $postId, 'url' => $url, 'error' => null]);
+        $this->mergeState(['status' => 'published', 'post_id' => $postId, 'url' => $url, 'scheduled_for' => null, 'error' => null]);
         Log::info('[PublishRepurposeViaZernio] Published', $this->ctx(['post_id' => $postId]));
+    }
+
+    private function markScheduled(string $postId, string $scheduledFor): void
+    {
+        $this->mergeState(['status' => 'scheduled', 'post_id' => $postId, 'url' => null, 'scheduled_for' => $scheduledFor, 'error' => null]);
+        Log::info('[PublishRepurposeViaZernio] Scheduled', $this->ctx(['post_id' => $postId, 'scheduled_for' => $scheduledFor]));
     }
 
     private function markFailed(string $message): void

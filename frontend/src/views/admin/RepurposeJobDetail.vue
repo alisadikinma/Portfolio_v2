@@ -445,12 +445,16 @@ function goBack() { router.push({ name: 'admin-social-studio' }) }
               class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium"
               :class="{
                 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300': zernioState[plat].status === 'published',
+                'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300': zernioState[plat].status === 'scheduled',
                 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300': zernioState[plat].status === 'publishing',
                 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300': zernioState[plat].status === 'failed',
               }"
             >
               <span class="uppercase">{{ plat }}</span>
               <span>· {{ zernioState[plat].status }}</span>
+              <span v-if="zernioState[plat].status === 'scheduled' && zernioState[plat].scheduled_for" class="opacity-80">
+                {{ new Date(zernioState[plat].scheduled_for).toLocaleString() }}
+              </span>
               <a v-if="zernioState[plat].url" :href="zernioState[plat].url" target="_blank" rel="noopener" class="underline">view</a>
               <span v-if="zernioState[plat].error" :title="zernioState[plat].error">⚠</span>
             </span>

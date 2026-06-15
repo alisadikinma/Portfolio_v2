@@ -60,14 +60,21 @@ class PublishRepurposeViaZernioTest extends TestCase
         Http::assertSent(fn ($r) => ($r['publishNow'] ?? false) === true);
     }
 
-    public function test_scheduled_future_sends_scheduled_for(): void
+    public function test_scheduled_future_sends_scheduled_for_and_marks_scheduled(): void
     {
-        Http::fake(['zernio.com/api/v1/posts' => Http::response(['post' => ['_id' => 'z-2']], 201)]);
+        Http::fake(['zernio.com/api/v1/posts' => Http::response(['post' => ['_id' => 'z-2', 'status' => 'scheduled']], 201)]);
 
         $job = $this->job();
-        PublishRepurposeViaZernio::dispatchSync($job->id, 'instagram', now()->addDay()->toIso8601String());
+        $when = now()->addDay();
+        PublishRepurposeViaZernio::dispatchSync($job->id, 'instagram', $when->toIso8601String());
 
         Http::assertSent(fn ($r) => isset($r['scheduledFor']) && ! ($r['publishNow'] ?? false));
+
+        // A scheduled post is HELD by Zernio — not published yet. State must say so.
+        $state = $job->fresh()->zernioPublishState('instagram');
+        $this->assertSame('scheduled', $state['status']);
+        $this->assertSame('z-2', $state['post_id']);
+        $this->assertNotNull($state['scheduled_for']);
     }
 
     public function test_4xx_marks_failed(): void
