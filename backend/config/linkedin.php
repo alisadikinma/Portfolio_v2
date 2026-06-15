@@ -8,6 +8,13 @@
  * endpoints, OAuth app credentials) stay in env vars.
  */
 return [
+    // Source-mirrored repurpose carousel (2026-06-15) — one slide per source
+    // tool. GATED OFF until the per-slide CLI authoring is parallelized: the
+    // current sequential authoring exceeds the 360s queue budget (Phase E
+    // measured >10 min for 10 tools). OFF → repurpose carousels use the
+    // existing /carousel-gen path. See docs/plans/2026-06-15-carousel-one-tool-per-slide.md.
+    'repurpose_source_mirror' => env('LINKEDIN_REPURPOSE_SOURCE_MIRROR', false),
+
     // OAuth app credentials — register at https://linkedin.com/developers
     'oauth' => [
         'client_id' => env('LINKEDIN_OAUTH_CLIENT_ID'),

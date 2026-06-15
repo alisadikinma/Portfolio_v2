@@ -263,6 +263,7 @@ class LinkedInGenerationServiceCarouselGenRouterTest extends TestCase
 
     public function test_repurpose_uses_source_mirror_slides_and_skips_carousel_gen(): void
     {
+        config()->set('linkedin.repurpose_source_mirror', true);
         // Source-mirror builder returns canned slides → /carousel-gen is NOT called.
         $fakeBuilder = Mockery::mock(\App\Services\RepurposeCarouselBuilder::class);
         $fakeBuilder->shouldReceive('buildForDraftId')->with(77)->once()->andReturn([
@@ -288,6 +289,7 @@ class LinkedInGenerationServiceCarouselGenRouterTest extends TestCase
 
     public function test_repurpose_falls_back_to_carousel_gen_when_no_source_slides(): void
     {
+        config()->set('linkedin.repurpose_source_mirror', true);
         // No parseable tool list → builder returns [] → normal /carousel-gen path runs.
         $fakeBuilder = Mockery::mock(\App\Services\RepurposeCarouselBuilder::class);
         $fakeBuilder->shouldReceive('buildForDraftId')->andReturn([]);
@@ -303,6 +305,26 @@ class LinkedInGenerationServiceCarouselGenRouterTest extends TestCase
 
         $this->assertSame('complete', $result['status']);
         $this->assertCount(5, $result['carousel']['slides']); // from /carousel-gen, not the mirror
+    }
+
+    public function test_repurpose_with_flag_off_uses_carousel_gen_not_mirror(): void
+    {
+        // Default OFF → even a repurpose carousel skips the (slow) source-mirror
+        // builder and uses /carousel-gen. Safety gate pending parallelization.
+        config()->set('linkedin.repurpose_source_mirror', false);
+        $fakeBuilder = Mockery::mock(\App\Services\RepurposeCarouselBuilder::class);
+        $fakeBuilder->shouldReceive('buildForDraftId')->never();
+        app()->instance(\App\Services\RepurposeCarouselBuilder::class, $fakeBuilder);
+
+        $svc = Mockery::mock(LinkedInGenerationService::class . '[dispatchCarouselGenEngine]', [
+            Mockery::mock(PipelineGuard::class), new CarouselGenOutputAdapter(),
+        ])->makePartial();
+        $svc->shouldReceive('dispatchCarouselGenEngine')->once()->andReturn($this->fakeCarouselGenOutput());
+
+        $parsed = ['status' => 'route_to_carousel_gen', 'format' => 'carousel', 'brief' => [], 'carousel' => null];
+        $result = $svc->applyCarouselGenAdapter($parsed, 'https://x/blog', 66, null, true, 'sketchnote');
+
+        $this->assertSame('complete', $result['status']);
     }
 
     public function test_non_repurpose_carousel_always_uses_carousel_gen(): void

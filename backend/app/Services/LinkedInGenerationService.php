@@ -1016,7 +1016,13 @@ class LinkedInGenerationService
         // source caption yields a parseable tool list we assemble the slides
         // from it (bilingual, fact-checked, per-tool); otherwise we fall through
         // to the normal /carousel-gen path below. See the 2026-06-15 plan.
-        if ($isRepurpose) {
+        //
+        // GATED OFF by default: buildSlides authors each slide with its own CLI
+        // call (~N+2 sequential, each loading the 291KB bundle), which Phase E
+        // measured at >10 min for 10 tools — far past the 360s queue budget. The
+        // flag stays OFF until the per-slide authoring is parallelized; with it
+        // OFF a repurpose carousel safely uses the existing /carousel-gen path.
+        if ($isRepurpose && config('linkedin.repurpose_source_mirror', false)) {
             $sourceSlides = app(RepurposeCarouselBuilder::class)->buildForDraftId($draftId);
             if ($sourceSlides !== []) {
                 $parsed['carousel'] = ['slides' => $sourceSlides, 'bilingual' => true];
