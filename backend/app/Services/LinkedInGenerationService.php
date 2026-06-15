@@ -1010,6 +1010,29 @@ class LinkedInGenerationService
             );
         }
 
+        // Source-mirrored repurpose carousel (2026-06-15): an IG-repurpose
+        // carousel follows the SOURCE's tool list — one Tool/Skill/Plugin per
+        // slide — instead of re-narrating into a flat 7-slide story. When the
+        // source caption yields a parseable tool list we assemble the slides
+        // from it (bilingual, fact-checked, per-tool); otherwise we fall through
+        // to the normal /carousel-gen path below. See the 2026-06-15 plan.
+        if ($isRepurpose) {
+            $sourceSlides = app(RepurposeCarouselBuilder::class)->buildForDraftId($draftId);
+            if ($sourceSlides !== []) {
+                $parsed['carousel'] = ['slides' => $sourceSlides, 'bilingual' => true];
+                $parsed['status'] = 'complete';
+                Log::info('[LinkedInGeneration] repurpose source-mirror carousel assembled', [
+                    'draft_id' => $draftId,
+                    'slide_count' => count($sourceSlides),
+                ]);
+
+                return $parsed;
+            }
+            Log::info('[LinkedInGeneration] repurpose source-mirror yielded no slides — falling back to /carousel-gen', [
+                'draft_id' => $draftId,
+            ]);
+        }
+
         $brief = is_array($parsed['brief'] ?? null) ? $parsed['brief'] : [];
 
         Log::info('[LinkedInGeneration] dispatching /carousel-gen engine', [

@@ -138,6 +138,21 @@ class RepurposeCarouselBuilder
     }
 
     /**
+     * Resolve the source RepurposeJob for a carousel draft and build its
+     * source-mirrored slides. Returns [] when the draft isn't a repurpose, has
+     * no source job, or no tool list can be parsed — the caller then falls back
+     * to the legacy /carousel-gen path.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function buildForDraftId(int $draftId): array
+    {
+        $job = RepurposeJob::where('linkedin_post_id', $draftId)->latest('id')->first();
+
+        return $job ? $this->buildSlides($job) : [];
+    }
+
+    /**
      * Build one carousel_slides[] entry. On a failed author, degrade to a
      * deterministic bilingual-ish fallback from the source text (never empty) so
      * the pipeline stays whole.

@@ -260,4 +260,66 @@ class LinkedInGenerationServiceCarouselGenRouterTest extends TestCase
             'generated_at' => '2026-04-28T10:00:00Z',
         ];
     }
+
+    public function test_repurpose_uses_source_mirror_slides_and_skips_carousel_gen(): void
+    {
+        // Source-mirror builder returns canned slides → /carousel-gen is NOT called.
+        $fakeBuilder = Mockery::mock(\App\Services\RepurposeCarouselBuilder::class);
+        $fakeBuilder->shouldReceive('buildForDraftId')->with(77)->once()->andReturn([
+            ['slide_number' => 1, 'layout_hint' => 'cover', 'copy_id' => 'ID', 'copy_en' => 'EN', 'image_prompt' => 'p', 'image_status' => 'pending', 'is_cover' => true],
+            ['slide_number' => 2, 'layout_hint' => 'body', 'copy_id' => 'ID2', 'copy_en' => 'EN2', 'image_prompt' => 'p2', 'image_status' => 'pending'],
+            ['slide_number' => 3, 'layout_hint' => 'cta', 'copy_id' => 'ID3', 'copy_en' => 'EN3', 'image_prompt' => 'p3', 'image_status' => 'pending', 'is_cta' => true],
+        ]);
+        app()->instance(\App\Services\RepurposeCarouselBuilder::class, $fakeBuilder);
+
+        $svc = Mockery::mock(LinkedInGenerationService::class . '[dispatchCarouselGenEngine]', [
+            Mockery::mock(PipelineGuard::class), new CarouselGenOutputAdapter(),
+        ])->makePartial();
+        $svc->shouldReceive('dispatchCarouselGenEngine')->never();
+
+        $parsed = ['status' => 'route_to_carousel_gen', 'format' => 'carousel', 'brief' => [], 'carousel' => null];
+        $result = $svc->applyCarouselGenAdapter($parsed, 'https://x/blog', 77, null, true, 'sketchnote');
+
+        $this->assertSame('complete', $result['status']);
+        $this->assertCount(3, $result['carousel']['slides']);
+        $this->assertSame('cover', $result['carousel']['slides'][0]['layout_hint']);
+        $this->assertTrue($result['carousel']['bilingual']);
+    }
+
+    public function test_repurpose_falls_back_to_carousel_gen_when_no_source_slides(): void
+    {
+        // No parseable tool list → builder returns [] → normal /carousel-gen path runs.
+        $fakeBuilder = Mockery::mock(\App\Services\RepurposeCarouselBuilder::class);
+        $fakeBuilder->shouldReceive('buildForDraftId')->andReturn([]);
+        app()->instance(\App\Services\RepurposeCarouselBuilder::class, $fakeBuilder);
+
+        $svc = Mockery::mock(LinkedInGenerationService::class . '[dispatchCarouselGenEngine]', [
+            Mockery::mock(PipelineGuard::class), new CarouselGenOutputAdapter(),
+        ])->makePartial();
+        $svc->shouldReceive('dispatchCarouselGenEngine')->once()->andReturn($this->fakeCarouselGenOutput());
+
+        $parsed = ['status' => 'route_to_carousel_gen', 'format' => 'carousel', 'brief' => [], 'carousel' => null];
+        $result = $svc->applyCarouselGenAdapter($parsed, 'https://x/blog', 88, null, true, 'sketchnote');
+
+        $this->assertSame('complete', $result['status']);
+        $this->assertCount(5, $result['carousel']['slides']); // from /carousel-gen, not the mirror
+    }
+
+    public function test_non_repurpose_carousel_always_uses_carousel_gen(): void
+    {
+        // Original blog→carousel must NOT touch the source-mirror builder.
+        $fakeBuilder = Mockery::mock(\App\Services\RepurposeCarouselBuilder::class);
+        $fakeBuilder->shouldReceive('buildForDraftId')->never();
+        app()->instance(\App\Services\RepurposeCarouselBuilder::class, $fakeBuilder);
+
+        $svc = Mockery::mock(LinkedInGenerationService::class . '[dispatchCarouselGenEngine]', [
+            Mockery::mock(PipelineGuard::class), new CarouselGenOutputAdapter(),
+        ])->makePartial();
+        $svc->shouldReceive('dispatchCarouselGenEngine')->once()->andReturn($this->fakeCarouselGenOutput());
+
+        $parsed = ['status' => 'route_to_carousel_gen', 'format' => 'carousel', 'brief' => [], 'carousel' => null];
+        $result = $svc->applyCarouselGenAdapter($parsed, 'https://x/blog', 99, null, false, 'sketchnote');
+
+        $this->assertSame('complete', $result['status']);
+    }
 }
