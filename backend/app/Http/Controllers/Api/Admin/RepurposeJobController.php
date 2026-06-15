@@ -7,13 +7,16 @@ use App\Enums\RepurposeJobStatus;
 use App\Http\Controllers\Controller;
 use App\Jobs\ComposeToolSlides;
 use App\Jobs\GenerateRebrandAssets;
+use App\Jobs\PublishRepurposeViaZernio;
 use App\Jobs\RefetchSourceSlides;
 use App\Jobs\ReskinBookendSlide;
 use App\Models\RepurposeJob;
 use App\Models\RepurposeVideoSlide;
 use App\Services\RepurposeRetryService;
+use App\Services\ZernioPayloadBuilder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -110,6 +113,7 @@ class RepurposeJobController extends Controller
                 'anchor_post_id' => $job->anchor_post_id,
                 'last_error' => $job->last_error,
                 'pipeline_state_log' => $job->pipeline_state_log ?? [],
+                'zernio_publish' => $job->zernio_publish ?? null,
                 'created_at' => $job->created_at,
                 'updated_at' => $job->updated_at,
             ],
@@ -344,6 +348,88 @@ class RepurposeJobController extends Controller
             'success' => true,
             'message' => "Slide #{$n} ({$slide->role}) queued for re-skin (no credits).",
             'data' => ['status' => $job->status],
+        ], 202);
+    }
+
+    /**
+     * Publish a video_rebrand carousel to Zernio (Instagram + Threads) — Approve
+     * (publish now) or Schedule for later. TikTok is intentionally absent: it
+     * rejects video carousels (single-video-only). One queued job per selected,
+     * Zernio-configured platform; state lands in repurpose_jobs.zernio_publish.
+     */
+    public function publishZernio(int $id, Request $request): JsonResponse
+    {
+        $job = RepurposeJob::find($id);
+        if (! $job) {
+            return $this->notFound();
+        }
+        if ($job->mode !== 'video_rebrand') {
+            return $this->notVideoRebrand();
+        }
+
+        if (! (bool) config('social-cross-post.zernio.enabled', false)) {
+            return response()->json([
+                'success' => false,
+                'error' => ['code' => 'ZERNIO_DISABLED', 'message' => 'Zernio publishing is disabled. Enable ZERNIO_PUBLISH_ENABLED first.'],
+            ], 503);
+        }
+
+        $data = $request->validate([
+            'platforms' => 'sometimes|array|min:1',
+            'platforms.*' => 'in:instagram,threads',
+            'scheduled_at' => 'sometimes|nullable|date',
+        ]);
+
+        if ($job->compositedVideoUrls() === []) {
+            return response()->json([
+                'success' => false,
+                'error' => ['code' => 'NOT_COMPOSITED', 'message' => 'No composited video clips yet — wait for compositing to finish, then retry.'],
+            ], 422);
+        }
+
+        $scheduledForIso = null;
+        if (! empty($data['scheduled_at'])) {
+            $when = Carbon::parse($data['scheduled_at']);
+            if (! $when->isFuture()) {
+                return response()->json([
+                    'success' => false,
+                    'error' => ['code' => 'SCHEDULE_IN_PAST', 'message' => 'scheduled_at must be a future time.'],
+                ], 422);
+            }
+            $scheduledForIso = $when->toIso8601String();
+        }
+
+        $platforms = array_values(array_unique($data['platforms'] ?? ['instagram', 'threads']));
+
+        $dispatched = [];
+        $skipped = [];
+        foreach ($platforms as $platform) {
+            if (! ZernioPayloadBuilder::isPlatformEnabled($platform)) {
+                $skipped[] = $platform;
+
+                continue;
+            }
+            PublishRepurposeViaZernio::dispatch($job->id, $platform, $scheduledForIso);
+            $dispatched[] = $platform;
+        }
+
+        if ($dispatched === []) {
+            return response()->json([
+                'success' => false,
+                'error' => ['code' => 'NO_PLATFORM_CONFIGURED', 'message' => 'No selected platform has a Zernio account configured.'],
+            ], 422);
+        }
+
+        $verb = $scheduledForIso ? 'scheduled' : 'queued to publish now';
+        $msg = 'Repurpose carousel '.$verb.' via Zernio: '.implode(', ', $dispatched);
+        if ($skipped !== []) {
+            $msg .= ' (skipped — no Zernio account: '.implode(', ', $skipped).')';
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $msg,
+            'data' => ['dispatched' => $dispatched, 'skipped' => $skipped, 'scheduled_at' => $scheduledForIso],
         ], 202);
     }
 

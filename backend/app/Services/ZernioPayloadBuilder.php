@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\ImageGenerationJob;
 use App\Models\InstagramPost;
+use App\Models\RepurposeJob;
 use App\Models\Setting;
 use App\Models\ThreadsPost;
 use App\Models\TiktokPost;
@@ -137,6 +138,41 @@ class ZernioPayloadBuilder
             accountId: $this->resolveAccountId('threads'),
             content: $content,
             mediaItems: $images,
+        );
+    }
+
+    /**
+     * video_rebrand repurpose carousel → Zernio. All slides are VIDEO clips
+     * (composited MP4s on public storage URLs). Live-validated 2026-06-15 that
+     * Zernio publishes a multi-clip video carousel on Instagram + Threads
+     * (TikTok rejects it — single-video-only — so it's not a target here).
+     *
+     * @param  string  $platform  'instagram'|'threads'
+     * @throws RuntimeException when the job has no composited video clips
+     */
+    public function buildRepurposeVideoCarousel(RepurposeJob $job, string $platform, ?string $caption = null): array
+    {
+        $urls = $job->compositedVideoUrls();
+        if ($urls === []) {
+            throw new RuntimeException(
+                "Repurpose job #{$job->id} has no composited video clips to publish. "
+                .'Wait for compositing to finish (or re-skin/regenerate), then retry.'
+            );
+        }
+
+        $mediaItems = array_map(fn (string $u) => ['url' => $u, 'type' => 'video'], $urls);
+        $mediaItems = array_slice($mediaItems, 0, self::IG_MAX_ITEMS);
+
+        $content = $caption ?? $job->igCaption();
+        if ($platform === 'threads') {
+            $content = $this->capThreadsContent($content, (int) $job->id);
+        }
+
+        return $this->payload(
+            platform: $platform,
+            accountId: $this->resolveAccountId($platform),
+            content: $content,
+            mediaItems: $mediaItems,
         );
     }
 

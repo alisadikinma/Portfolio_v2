@@ -8,6 +8,7 @@ import {
   useRegenerateAllRepurposeSlides,
   useRegenerateRepurposeSlide,
   useReskinRepurposeSlide,
+  usePublishRepurposeZernio,
   fetchSlideObjectUrl,
 } from '@/composables/useRepurposeJobs'
 import { useLinkedInDraft } from '@/composables/useLinkedInDrafts'
@@ -216,6 +217,43 @@ async function doReskinSlide(s) {
   }
 }
 
+// --- Zernio publish (video_rebrand → IG + Threads) --------------------------
+const publishZernio = usePublishRepurposeZernio()
+const zernioState = computed(() => job.value?.zernio_publish || {})
+const canPublishZernio = computed(() => isVideoRebrand.value && readyVideoSlides.value.length > 0)
+const showScheduleModal = ref(false)
+const scheduleAt = ref('') // <input type="datetime-local"> value
+
+async function doPublishNow() {
+  if (!window.confirm('Publish this video carousel to Instagram + Threads via Zernio NOW? This posts live & publicly.')) return
+  try {
+    const res = await publishZernio.mutateAsync({ id: id.value })
+    window.alert(res?.message || 'Queued to publish.')
+    refetch()
+  } catch (e) {
+    window.alert(e?.response?.data?.error?.message || 'Publish failed.')
+  }
+}
+
+function openScheduleModal() {
+  scheduleAt.value = ''
+  showScheduleModal.value = true
+}
+
+async function doSchedule() {
+  if (!scheduleAt.value) { window.alert('Pick a date & time first.'); return }
+  const when = new Date(scheduleAt.value)
+  if (isNaN(when.getTime()) || when.getTime() <= Date.now()) { window.alert('Schedule must be a future time.'); return }
+  try {
+    const res = await publishZernio.mutateAsync({ id: id.value, scheduledAt: when.toISOString() })
+    showScheduleModal.value = false
+    window.alert(res?.message || 'Scheduled.')
+    refetch()
+  } catch (e) {
+    window.alert(e?.response?.data?.error?.message || 'Schedule failed.')
+  }
+}
+
 function genState(s) {
   if (s && s.image_status === 'done' && s.image_url) return null
   if (s && s.image_status === 'failed') return 'failed'
@@ -376,7 +414,47 @@ function goBack() { router.push({ name: 'admin-social-studio' }) }
               <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" /></svg>
               Download all ({{ readyVideoSlides.length }})
             </button>
+            <button
+              v-if="canPublishZernio"
+              :disabled="publishZernio.isPending.value"
+              @click="doPublishNow"
+              title="Publish the video carousel to Instagram + Threads via Zernio now (live)"
+              class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+              {{ publishZernio.isPending.value ? 'Publishing…' : 'Approve & Publish (IG + Threads)' }}
+            </button>
+            <button
+              v-if="canPublishZernio"
+              :disabled="publishZernio.isPending.value"
+              @click="openScheduleModal"
+              title="Schedule the video carousel for later (Zernio holds it)"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-700/50 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/40"
+            >
+              <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3M4 11h16M5 5h14a1 1 0 011 1v13a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1z" /></svg>
+              Schedule for later
+            </button>
           </div>
+        </div>
+
+        <!-- Per-platform Zernio publish status (TikTok absent — video carousel unsupported there) -->
+        <div v-if="Object.keys(zernioState).length" class="mb-4 flex flex-wrap gap-2">
+          <template v-for="plat in ['instagram', 'threads']" :key="plat">
+            <span
+              v-if="zernioState[plat]"
+              class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium"
+              :class="{
+                'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300': zernioState[plat].status === 'published',
+                'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300': zernioState[plat].status === 'publishing',
+                'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300': zernioState[plat].status === 'failed',
+              }"
+            >
+              <span class="uppercase">{{ plat }}</span>
+              <span>· {{ zernioState[plat].status }}</span>
+              <a v-if="zernioState[plat].url" :href="zernioState[plat].url" target="_blank" rel="noopener" class="underline">view</a>
+              <span v-if="zernioState[plat].error" :title="zernioState[plat].error">⚠</span>
+            </span>
+          </template>
         </div>
 
         <p v-if="videoGenerating" class="mb-4 flex items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400">
@@ -528,5 +606,35 @@ function goBack() { router.push({ name: 'admin-social-studio' }) }
         </ol>
       </details>
     </div>
+
+    <!-- Schedule-for-later modal (Zernio native scheduledFor) -->
+    <Teleport to="body">
+      <div
+        v-if="showScheduleModal"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+        @click.self="showScheduleModal = false"
+      >
+        <div class="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl dark:bg-neutral-800">
+          <h3 class="mb-1 text-sm font-semibold text-neutral-900 dark:text-neutral-100">Schedule to IG + Threads</h3>
+          <p class="mb-3 text-xs text-neutral-500 dark:text-neutral-400">Zernio holds the post and publishes it at this time.</p>
+          <input
+            v-model="scheduleAt"
+            type="datetime-local"
+            class="mb-4 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-100"
+          />
+          <div class="flex justify-end gap-2">
+            <button
+              @click="showScheduleModal = false"
+              class="rounded-lg px-3 py-1.5 text-xs font-medium text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-700"
+            >Cancel</button>
+            <button
+              :disabled="publishZernio.isPending.value"
+              @click="doSchedule"
+              class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
+            >{{ publishZernio.isPending.value ? 'Scheduling…' : 'Schedule' }}</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>

@@ -80,7 +80,11 @@ export function useRepurposeJob(id) {
         ['pending', 'generating'].includes(s.keyframe_status) ||
         ['pending', 'generating'].includes(s.veo_status),
       )
-      return slideActive ? 4_000 : false
+      // Also keep polling while a Zernio publish is in flight so the per-platform
+      // status chip flips publishing → published/failed without a manual refresh.
+      const zernioActive = Object.values(job?.zernio_publish || {})
+        .some(s => s?.status === 'publishing')
+      return (slideActive || zernioActive) ? 4_000 : false
     },
   })
 
@@ -150,6 +154,26 @@ export function useReskinRepurposeSlide() {
       api.post(`/admin/repurpose/${id}/slides/${slideIndex}/reskin`).then(r => r.data),
     onSuccess: (_data, { id }) => {
       qc.invalidateQueries({ queryKey: [LIST_KEY, id] })
+    },
+  })
+}
+
+/**
+ * Publish a video_rebrand carousel to Zernio (IG + Threads) — now or scheduled.
+ * Arg: { id, platforms?: string[], scheduledAt?: ISO string|null }.
+ * Approve = omit scheduledAt; Schedule = pass a future ISO instant.
+ */
+export function usePublishRepurposeZernio() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, platforms, scheduledAt }) =>
+      api.post(`/admin/repurpose/${id}/publish-zernio`, {
+        ...(platforms ? { platforms } : {}),
+        ...(scheduledAt ? { scheduled_at: scheduledAt } : {}),
+      }).then(r => r.data),
+    onSuccess: (_data, { id }) => {
+      qc.invalidateQueries({ queryKey: [LIST_KEY, id] })
+      qc.invalidateQueries({ queryKey: [LIST_KEY] })
     },
   })
 }

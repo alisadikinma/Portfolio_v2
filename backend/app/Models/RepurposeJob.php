@@ -40,6 +40,7 @@ class RepurposeJob extends Model
         'asset_retry_count',
         'pipeline_state_log',
         'chat_id',
+        'zernio_publish',
     ];
 
     protected $casts = [
@@ -48,6 +49,7 @@ class RepurposeJob extends Model
         'rewritten' => 'array',
         'pipeline_state_log' => 'array',
         'asset_retry_count' => 'integer',
+        'zernio_publish' => 'array',
     ];
 
     protected function statusEnumClass(): string
@@ -139,6 +141,47 @@ class RepurposeJob extends Model
         }
 
         return '';
+    }
+
+    /**
+     * Ordered public MP4 URLs of the composited video slides — the mediaItems a
+     * Zernio video carousel publishes. Only `done` clips with a stored path,
+     * ordered by slide_index (hook → tools → cta).
+     *
+     * @return array<int,string>
+     */
+    public function compositedVideoUrls(): array
+    {
+        return $this->videoSlides()
+            ->where('composited_status', 'done')
+            ->whereNotNull('composited_path')
+            ->orderBy('slide_index')
+            ->pluck('composited_path')
+            ->filter(fn ($u) => is_string($u) && $u !== '')
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Caption for the cross-posted video carousel. Prefers the source IG caption,
+     * falls back to the topic label so the post never ships caption-less.
+     */
+    public function igCaption(): string
+    {
+        $caption = trim((string) ($this->extracted['caption'] ?? ''));
+
+        return $caption !== '' ? $caption : $this->displayTopic();
+    }
+
+    /**
+     * Per-platform Zernio publish state, or null if this platform was never
+     * dispatched. See migration 2026_06_15_000002 for the entry shape.
+     *
+     * @return array<string,mixed>|null
+     */
+    public function zernioPublishState(string $platform): ?array
+    {
+        return ($this->zernio_publish ?? [])[$platform] ?? null;
     }
 
     /**
