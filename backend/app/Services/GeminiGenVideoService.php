@@ -61,6 +61,22 @@ class GeminiGenVideoService
     }
 
     /**
+     * Build a UNIQUE /storage relative path for a regenerable GROK asset.
+     *
+     * The keyframe (input to GROK) and the finished hook video are both re-rendered
+     * by "Regenerate video". /storage is served by Cloudflare with
+     * `cache-control: immutable, max-age=30d`, so reusing a deterministic filename
+     * (grok-frame-{ig}.jpg / grok-hook-{ig}.mp4) made the CDN keep serving the
+     * PREVIOUSLY-cached bytes — GROK animated the stale cover, and the admin saw
+     * the old video. A fresh filename per render forces a cache MISS every time
+     * (mirrors the slide renderer's -vN collision suffix).
+     */
+    public static function carouselAssetPath(string $prefix, int $igId, string $ext): string
+    {
+        return sprintf('linkedin-carousel/%s-%d-%s.%s', $prefix, $igId, bin2hex(random_bytes(8)), $ext);
+    }
+
+    /**
      * Write a transient download to the OS temp dir (world-writable /tmp), NOT
      * storage/app/private/tmp — that dir is 0700 www-data and unreadable by the
      * claudesn queue worker that runs the rebrand poller. Durable replacement for
@@ -470,7 +486,7 @@ class GeminiGenVideoService
         // can't overwrite the other's source PNG mid-ffmpeg.
         $srcPath = $this->writeTempFile("grok-src-{$igId}-".uniqid().'.png', $resp->body());
 
-        $outRel = "linkedin-carousel/grok-frame-{$igId}.jpg";
+        $outRel = self::carouselAssetPath('grok-frame', $igId, 'jpg');
         $outPath = Storage::disk('public')->path($outRel);
         SharedDir::ensure(dirname($outPath));
 
@@ -523,7 +539,7 @@ class GeminiGenVideoService
 
         $rawPath = $this->writeTempFile("grok-raw-{$igId}-".uniqid().'.mp4', $resp->body());
 
-        $outRel = "linkedin-carousel/grok-hook-{$igId}.mp4";
+        $outRel = self::carouselAssetPath('grok-hook', $igId, 'mp4');
         $outPath = Storage::disk('public')->path($outRel);
         SharedDir::ensure(dirname($outPath));
 
