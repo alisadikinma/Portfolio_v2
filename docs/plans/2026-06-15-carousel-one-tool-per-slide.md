@@ -1,7 +1,7 @@
 # Repurpose carousel: one Tool/Skill/Plugin per slide (caption-driven, fact-checked)
 
 **Date:** 2026-06-15
-**Status:** PLAN — decisions LOCKED, ready to implement
+**Status:** IMPLEMENTED (backend, 2026-06-15) — builder + integration + tests landed; not yet exercised on the VPS (Phase E). NOT pushed.
 **Operator decisions (2026-06-15):**
 - Slide count follows the SOURCE's natural tool count (10 tools → 10 slides). No artificial ceiling — a real listicle is never "puluhan" slides; keep only a sanity guard.
 - Per-tool slide content authored via a **light CLI call per tool** (on-brand, opsi A) — NOT a deterministic template.
