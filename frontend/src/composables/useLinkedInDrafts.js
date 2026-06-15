@@ -414,6 +414,26 @@ export function useCancelLinkedInDraft() {
 }
 
 /**
+ * POST /admin/linkedin-drafts/{id}/revive — "Balik ke Social Studio".
+ *
+ * Un-cancels a CANCELLED draft back to manual_review (rendered slides kept) so
+ * it returns to Social Studio as an actionable, re-schedulable draft. Invalidates
+ * the lists + the unified social calendar so the cancelled card flips immediately.
+ */
+export function useReviveLinkedInDraft() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) =>
+      api.post(`/admin/linkedin-drafts/${id}/revive`).then(r => r.data),
+    onSuccess: (_, id) => {
+      qc.invalidateQueries({ queryKey: [LIST_KEY] })
+      qc.invalidateQueries({ queryKey: [LIST_KEY, id] })
+      qc.invalidateQueries({ queryKey: ['social-calendar'] })
+    },
+  })
+}
+
+/**
  * POST /admin/linkedin-drafts/{id}/publish-now
  *
  * Carousel publishes upload N slide PNGs to LinkedIn DigitalMedia (3-step

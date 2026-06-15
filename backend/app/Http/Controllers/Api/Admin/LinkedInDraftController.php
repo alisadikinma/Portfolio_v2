@@ -953,6 +953,41 @@ class LinkedInDraftController extends Controller
         }
     }
 
+    /**
+     * POST /admin/linkedin-drafts/{id}/revive
+     *
+     * "Balik ke Social Studio" — un-cancel a CANCELLED draft back into an
+     * actionable state (manual_review) WITHOUT regenerating: the already-rendered
+     * carousel slides are preserved, the draft just becomes re-schedulable again.
+     * Cancel never soft-deletes (the row stays the single live draft per post),
+     * so reviving introduces no duplicate-live-draft. The FSM guard rejects revive
+     * from any status other than cancelled.
+     */
+    public function revive(int $id): JsonResponse
+    {
+        $draft = LinkedInPost::find($id);
+        if ($draft === null) {
+            return $this->notFound();
+        }
+
+        try {
+            $this->guard->advance(
+                $draft,
+                LinkedInPostStatus::ManualReview,
+                'revive_to_social_studio',
+                ['draft_id' => $draft->id]
+            );
+
+            return response()->json([
+                'success' => true,
+                'data' => $draft->fresh(['post.translations', 'post.contentIdea:id,result_post_id,virality_score', 'account']),
+                'message' => 'Draft restored to Social Studio (manual review).',
+            ]);
+        } catch (InvalidStateTransitionException $e) {
+            return $this->illegalTransition($e);
+        }
+    }
+
     public function publishNow(int $id): JsonResponse
     {
         $draft = LinkedInPost::find($id);

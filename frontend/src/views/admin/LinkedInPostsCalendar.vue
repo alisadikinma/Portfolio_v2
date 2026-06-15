@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import {
   usePostingRules,
   useRefreshPostingRules,
+  useReviveLinkedInDraft,
 } from '@/composables/useLinkedInDrafts'
 import { useSocialCalendar } from '@/composables/useSocialCalendar'
 import {
@@ -323,6 +324,29 @@ const selectedDaySuggestedHours = computed(() => {
 
 function formatHour(h) {
   return `${String(h).padStart(2, '0')}:00 WIB`
+}
+
+// "Balik ke Social Studio" — un-cancel a cancelled draft (→ manual_review,
+// slides preserved) so it returns to Social Studio as an actionable draft.
+// LinkedIn-only (cross-post siblings have their own controllers); the button
+// is gated on platform==='linkedin' && status==='cancelled' in the template.
+const reviveMutation = useReviveLinkedInDraft()
+const revivingId = ref(null)
+
+async function reviveToStudio(id) {
+  if (revivingId.value) return
+  revivingId.value = id
+  try {
+    await reviveMutation.mutateAsync(id)
+    // Calendar query is invalidated by the mutation; the card flips status
+    // (cancelled → manual review) on the next refetch. Close the panel so the
+    // operator lands back on a clean board.
+    closeSidePanel()
+  } catch (e) {
+    alert('Gagal balik ke Social Studio: ' + (e?.response?.data?.error?.message || e?.message || 'unknown error'))
+  } finally {
+    revivingId.value = null
+  }
 }
 
 function openDetail(id) {
@@ -657,26 +681,37 @@ function statusDotClass(status) {
               Posts ({{ selectedDayPosts.length }})
             </p>
             <div class="space-y-2">
-              <button
-                v-for="post in selectedDayPosts"
-                :key="post.id"
-                @click="openDetail(post.id)"
-                class="w-full text-left rounded-lg border border-neutral-800 bg-neutral-900/40 px-3 py-2.5 hover:bg-neutral-800/60 transition"
-              >
-                <div class="flex items-center gap-2 mb-1">
-                  <span :class="['inline-block w-1.5 h-1.5 rounded-full flex-shrink-0', statusDotClass(post.status)]"></span>
-                  <span class="text-[10px] font-mono uppercase tracking-wider text-neutral-500">
-                    {{ post.status.replace(/_/g, ' ') }} · {{ post.format }}
-                  </span>
-                </div>
-                <p class="text-sm text-neutral-100 truncate mb-1.5">{{ post.post_title }}</p>
-                <div v-if="post.pin_at" class="flex items-center gap-1.5 text-[11px]">
-                  <span :class="['font-mono uppercase tracking-wider', post.status === 'awaiting_publish' ? 'text-amber-400/80' : post.status === 'published' ? 'text-emerald-400/80' : 'text-neutral-500']">
-                    {{ pinTimeLabel(post) }}:
-                  </span>
-                  <span class="font-mono text-neutral-300">{{ formatPinTimeWIB(post.pin_at) }}</span>
-                </div>
-              </button>
+              <div v-for="post in selectedDayPosts" :key="post.id">
+                <button
+                  @click="openDetail(post.id)"
+                  class="w-full text-left rounded-lg border border-neutral-800 bg-neutral-900/40 px-3 py-2.5 hover:bg-neutral-800/60 transition"
+                >
+                  <div class="flex items-center gap-2 mb-1">
+                    <span :class="['inline-block w-1.5 h-1.5 rounded-full flex-shrink-0', statusDotClass(post.status)]"></span>
+                    <span class="text-[10px] font-mono uppercase tracking-wider text-neutral-500">
+                      {{ post.status.replace(/_/g, ' ') }} · {{ post.format }}
+                    </span>
+                  </div>
+                  <p class="text-sm text-neutral-100 truncate mb-1.5">{{ post.post_title }}</p>
+                  <div v-if="post.pin_at" class="flex items-center gap-1.5 text-[11px]">
+                    <span :class="['font-mono uppercase tracking-wider', post.status === 'awaiting_publish' ? 'text-amber-400/80' : post.status === 'published' ? 'text-emerald-400/80' : 'text-neutral-500']">
+                      {{ pinTimeLabel(post) }}:
+                    </span>
+                    <span class="font-mono text-neutral-300">{{ formatPinTimeWIB(post.pin_at) }}</span>
+                  </div>
+                </button>
+                <!-- Cancelled drafts: one-click revive back into Social Studio
+                     (un-cancel → manual review, slides preserved). LinkedIn only. -->
+                <button
+                  v-if="platformRef === 'linkedin' && post.status === 'cancelled'"
+                  @click="reviveToStudio(post.id)"
+                  :disabled="revivingId === post.id"
+                  class="mt-1 w-full inline-flex items-center justify-center gap-1.5 rounded-lg border border-cyan-400/30 bg-cyan-500/10 px-3 py-1.5 text-[11px] font-mono uppercase tracking-wider text-cyan-300 hover:bg-cyan-500/20 transition disabled:opacity-50 disabled:cursor-wait"
+                >
+                  <span v-if="revivingId === post.id">Mengembalikan…</span>
+                  <span v-else>↩ Balik ke Social Studio</span>
+                </button>
+              </div>
             </div>
           </div>
           <div v-else class="rounded-lg border border-dashed border-neutral-800 bg-neutral-900/30 px-3 py-6 text-center">

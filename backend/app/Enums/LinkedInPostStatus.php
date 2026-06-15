@@ -20,6 +20,10 @@ enum LinkedInPostStatus: string
      *     LINKEDIN_AUTO_PUBLISH=false at fire time (reason: 'kill_switch_demotion')
      *   - Cancelled/Failed → Generating : regenerate endpoint
      *     (reason: 'admin_regenerate')
+     *   - Cancelled → ManualReview : "Balik ke Social Studio" revive action
+     *     (reason: 'revive_to_social_studio'). Un-cancels a draft WITHOUT
+     *     regenerating — its already-rendered carousel slides are preserved and
+     *     it lands back in Social Studio as an actionable (re-schedulable) draft.
      *   - Failed → PendingGeneration : bounded auto-retry cron
      *     (linkedin:retry-failed, reason: 'auto_retry_class_*'). Distinct
      *     from regenerate edge — the cron re-queues the draft and lets the
@@ -44,7 +48,7 @@ enum LinkedInPostStatus: string
         'awaiting_publish' => ['published', 'cancelled', 'manual_review', 'failed'],
         'failed' => ['generating', 'cancelled', 'pending_generation'],
         'published' => [],
-        'cancelled' => ['generating'],
+        'cancelled' => ['generating', 'manual_review'],
     ];
 
     public function canTransitionTo(self $next): bool

@@ -28,6 +28,10 @@ vi.mock('@/composables/useLinkedInDrafts', () => ({
     mutateAsync: vi.fn(),
     isPending: ref(false),
   }),
+  useReviveLinkedInDraft: () => ({
+    mutateAsync: vi.fn(),
+    isPending: ref(false),
+  }),
 }))
 
 import LinkedInPostsCalendar from './LinkedInPostsCalendar.vue'

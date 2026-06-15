@@ -1322,6 +1322,7 @@ Route::middleware(['auth:sanctum'])->prefix('admin/linkedin-drafts')->group(func
     Route::post('/{id}/regenerate-all-captions', [LinkedInDraftController::class, 'regenerateAllCaptions']);
     Route::post('/{id}/approve', [LinkedInDraftController::class, 'approve']);
     Route::post('/{id}/cancel', [LinkedInDraftController::class, 'cancel']);
+    Route::post('/{id}/revive', [LinkedInDraftController::class, 'revive']);
     Route::post('/{id}/publish-now', [LinkedInDraftController::class, 'publishNow']);
     Route::post('/{id}/publish-all', [LinkedInDraftController::class, 'publishAll'])
         ->name('admin.linkedin-drafts.publish-all');
