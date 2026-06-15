@@ -62,10 +62,61 @@ class CarouselSlideEnhancerFigureInteractionTest extends TestCase
         $result = $this->enhancer()->enhance($slide, 0, 7);
 
         $this->assertStringContainsString('PRIMARY SUBJECTS (mandatory): render TWO real people', $result['prompt_text']);
-        $this->assertStringContainsString('reference image 2', $result['prompt_text']);
         // The single-creator "do not generate a generic person" mandate must NOT
         // fire — it would suppress the second real face.
         $this->assertStringNotContainsString('do not generate a generic person, an avatar, or an icon', $result['prompt_text']);
+    }
+
+    public function test_figure_anchored_by_neutral_filename_not_ordinal(): void
+    {
+        // The 2-subject cover must bind each face to a NEUTRAL filename
+        // (subject-1 / subject-2), not "reference image N". The ordinal anchor
+        // rendered the figure as a random person.
+        $slide = $this->coverSlide(['entity_face_ref' => 'https://cdn.example.com/figure.png']);
+
+        $result = $this->enhancer()->enhance($slide, 0, 7);
+
+        // Both faces bound by their neutral file handles, in the mandate AND the
+        // rewritten body scene ("...matching reference image 2..." → subject-2.png).
+        $this->assertStringContainsString('subject-1.png', $result['prompt_text']);
+        $this->assertStringContainsString('subject-2.png', $result['prompt_text']);
+        // No ordinal "reference image N" anchor survives for the two subjects.
+        $this->assertStringNotContainsString('reference image 2', $result['prompt_text']);
+        $this->assertStringNotContainsString('reference image 1', $result['prompt_text']);
+
+        // The dispatcher gets ordered aliasing instructions mapping each ref URL
+        // to its neutral basename.
+        $this->assertSame(
+            [
+                ['url' => 'https://cdn.example.com/face.png', 'as' => 'subject-1.png'],
+                ['url' => 'https://cdn.example.com/figure.png', 'as' => 'subject-2.png'],
+            ],
+            $result['face_ref_aliases'],
+        );
+    }
+
+    public function test_figure_filename_carries_no_identity(): void
+    {
+        // A figure file whose name leaks the person (Q…_sam-altman.jpg) must be
+        // aliased to a neutral handle — the name must reach neither the prompt
+        // nor the filename GeminiGen sees.
+        $slide = $this->coverSlide([
+            'entity_face_ref' => 'https://alisadikinma.com/storage/entity-refs/person/Q7407093_sam-altman.jpg',
+        ]);
+
+        $result = $this->enhancer()->enhance($slide, 0, 7);
+
+        $this->assertStringNotContainsStringIgnoringCase('sam-altman', $result['prompt_text']);
+        $this->assertSame('subject-2.jpg', $result['face_ref_aliases'][1]['as']);
+        $this->assertStringContainsString('subject-2.jpg', $result['prompt_text']);
+    }
+
+    public function test_single_creator_cover_emits_no_aliases(): void
+    {
+        $result = $this->enhancer()->enhance($this->coverSlide(), 0, 7);
+
+        $this->assertSame([], $result['face_ref_aliases'],
+            'single-creator cover (1 ref) must not trigger neutral aliasing');
     }
 
     public function test_cover_without_entity_face_ref_stays_single_creator(): void

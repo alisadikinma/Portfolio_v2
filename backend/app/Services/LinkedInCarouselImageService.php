@@ -282,6 +282,20 @@ class LinkedInCarouselImageService
         $faceRefs = $enhanced['face_refs'] ?? [];
         $fileUrls = $enhanced['file_urls'] ?? [];
 
+        // Two-subject figure cover: re-host each face under the NEUTRAL basename
+        // the prompt anchors to (subject-1.png / subject-2.jpg) so GeminiGen binds
+        // each face by filename — the original figure file (e.g. "Q…_sam-altman.jpg")
+        // both leaks the name and gives the model only an ordinal anchor, which
+        // rendered the 2nd subject as a random person. On any hosting failure we
+        // fall back to the original refs (degraded, not broken).
+        $aliases = $enhanced['face_ref_aliases'] ?? [];
+        if (! empty($aliases)) {
+            $hosted = $this->hostNeutralRefs($draft, $slideIndex, $aliases);
+            if (! empty($hosted)) {
+                $faceRefs = $hosted;
+            }
+        }
+
         $plannedFilename = $this->buildBrandedFilename($draft, $slideIndex, $layoutHint);
 
         // Build GeminiGen multipart payload (mirrors ImageGenerationService::queue).
@@ -445,6 +459,60 @@ class LinkedInCarouselImageService
         ]);
 
         return $uuid;
+    }
+
+    /**
+     * Re-host each face reference under its neutral, per-render basename
+     * (subject-1.png / subject-2.jpg) so the file handle GeminiGen sees matches
+     * the filename the prompt anchors to. Downloads each source ref (on our own
+     * domain) and republishes it to the public disk under the requested basename.
+     *
+     * Returns the hosted public URLs IN ORDER, or [] if ANY ref fails (caller
+     * then keeps the original refs — degraded, never broken). Idempotent: the
+     * per-draft/slide path is overwritten on re-render.
+     *
+     * @param  array<int,array{url?:string,as?:string}>  $aliases
+     * @return array<int,string>
+     */
+    private function hostNeutralRefs(LinkedInPost $draft, int $slideIndex, array $aliases): array
+    {
+        $out = [];
+        foreach ($aliases as $alias) {
+            $src = trim((string) ($alias['url'] ?? ''));
+            $as = trim((string) ($alias['as'] ?? ''));
+            // basename only — guard against any path traversal in the alias name.
+            $as = basename($as);
+            if ($src === '' || $as === '') {
+                return [];
+            }
+
+            try {
+                $resp = Http::timeout(20)->get($src);
+            } catch (\Throwable $e) {
+                Log::warning('[LinkedInCarouselImage] neutral ref host download threw — keeping original refs', [
+                    'draft_id' => $draft->id,
+                    'slide_index' => $slideIndex,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return [];
+            }
+            if (! $resp->successful()) {
+                Log::warning('[LinkedInCarouselImage] neutral ref host download non-2xx — keeping original refs', [
+                    'draft_id' => $draft->id,
+                    'slide_index' => $slideIndex,
+                    'status' => $resp->status(),
+                ]);
+
+                return [];
+            }
+
+            $rel = "linkedin-carousel/refs/{$draft->id}/{$slideIndex}/{$as}";
+            Storage::disk('public')->put($rel, $resp->body());
+            $out[] = url('/storage/' . $rel);
+        }
+
+        return $out;
     }
 
     /**

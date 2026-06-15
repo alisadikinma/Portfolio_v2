@@ -105,6 +105,20 @@ class CarouselSlideEnhancer
         $creatorFaceUrl = $this->getCreatorFaceUrl();
         $brandLogoUrl = $this->getCreatorBrandLogoUrl();
 
+        // 1b. Two-subject public-figure cover: bind each face to a NEUTRAL,
+        //     per-slot filename (subject-1 / subject-2) and reference those exact
+        //     filenames in the prompt. nano-banana-pro binds multi-ref faces by
+        //     FILE HANDLE, not by "reference image N" ordinals — with only
+        //     "reference image 2" as the anchor the 2nd face renders generic
+        //     (the figure came out a random person, not the intended one). The
+        //     figure's NAME appears nowhere — not in the prompt, not in the
+        //     filename — the neutral handle is the sole anchor. The dispatcher
+        //     re-hosts the refs under these basenames (LinkedInCarouselImageService
+        //     ::hostNeutralRefs) so what GeminiGen sees matches the prompt.
+        $isTwoSubjectCover = $layoutHint === 'cover' && $entityFaceRef !== '' && $creatorFaceUrl !== null;
+        $sub1Name = $isTwoSubjectCover ? $this->neutralRefName((string) $creatorFaceUrl, 1) : null;
+        $sub2Name = $isTwoSubjectCover ? $this->neutralRefName($entityFaceRef, 2) : null;
+
         // 2. Replace placeholder tokens in plugin-authored prompt
         $promptText = $this->replacePlaceholders($rawPrompt, [
             '{{CREATOR_FACE}}' => 'the provided creator face reference image',
@@ -127,7 +141,9 @@ class CarouselSlideEnhancer
             $promptText,
             $layoutHint,
             $creatorFaceUrl,
-            $entityFaceRef !== '' ? $entityFaceRef : null
+            $entityFaceRef !== '' ? $entityFaceRef : null,
+            $sub1Name,
+            $sub2Name
         );
 
         // 4. Append brand chrome instruction (idempotent — skip when plugin
@@ -197,7 +213,19 @@ class CarouselSlideEnhancer
         //    the distinct figure (ref image 2) binds cleanly. Drop the logo ref
         //    here; the brand icon still renders from the appendBrandChrome text
         //    instruction ("bald-with-glasses icon appears once, top bar").
-        $isTwoSubjectCover = $layoutHint === 'cover' && $entityFaceRef !== '';
+        //
+        // 4c. The authored scene body still anchors the figure by ordinal
+        //     ("the person matching reference image 2") — rewrite both ordinals to
+        //     the neutral file handles so the body matches the mandate and
+        //     GeminiGen binds the figure by file, not by image order.
+        if ($sub1Name !== null && $sub2Name !== null) {
+            $promptText = str_ireplace(
+                ['reference image 2', 'reference image 1'],
+                ['the reference photo file "' . $sub2Name . '"', 'the reference photo file "' . $sub1Name . '"'],
+                $promptText
+            );
+        }
+
         $fileUrls = [];
         if ($brandLogoUrl !== null && ! $isTwoSubjectCover) {
             $fileUrls[] = $brandLogoUrl;
@@ -208,12 +236,40 @@ class CarouselSlideEnhancer
             ]);
         }
 
+        // Neutral-filename aliasing instructions for the dispatcher: each face_ref
+        // must be re-hosted under its subject-N basename so GeminiGen sees the same
+        // handle the prompt references. Only the 2-subject figure cover needs it.
+        $faceRefAliases = [];
+        if ($isTwoSubjectCover && count($faceRefs) >= 2 && $sub1Name !== null && $sub2Name !== null) {
+            $faceRefAliases = [
+                ['url' => $faceRefs[0], 'as' => $sub1Name],
+                ['url' => $faceRefs[1], 'as' => $sub2Name],
+            ];
+        }
+
         return [
             'prompt_text' => $promptText,
             'face_refs' => $faceRefs,
+            'face_ref_aliases' => $faceRefAliases,
             'file_urls' => $fileUrls,
             'layout_hint' => $layoutHint,
         ];
+    }
+
+    /**
+     * Neutral per-slot reference basename (subject-1.png / subject-2.jpg) derived
+     * from the source URL's extension. Carries NO identity — a public figure's name
+     * must never appear in a filename sent to GeminiGen.
+     */
+    private function neutralRefName(string $url, int $slot): string
+    {
+        $path = parse_url($url, PHP_URL_PATH) ?: $url;
+        $ext = strtolower((string) pathinfo($path, PATHINFO_EXTENSION));
+        if (! in_array($ext, ['png', 'jpg', 'jpeg', 'webp'], true)) {
+            $ext = 'png';
+        }
+
+        return "subject-{$slot}.{$ext}";
     }
 
     private function replacePlaceholders(string $body, array $map): string
@@ -251,18 +307,23 @@ class CarouselSlideEnhancer
      * face reference image"), or when face_url is unresolvable. Returns the
      * body unchanged for layouts that aren't FACE_REQUIRED.
      */
-    private function prependCreatorFaceMandate(string $body, string $layoutHint, ?string $faceUrl, ?string $entityFaceRef = null): string
+    private function prependCreatorFaceMandate(string $body, string $layoutHint, ?string $faceUrl, ?string $entityFaceRef = null, ?string $sub1Name = null, ?string $sub2Name = null): string
     {
         if ($faceUrl === null) {
             return $body;
         }
 
-        // Public-figure cover: a TWO-subject interaction (creator = ref image 1,
-        // figure = ref image 2). Override the single-creator mandate so GeminiGen
-        // renders BOTH real faces and doesn't treat the second person as generic.
+        // Public-figure cover: a TWO-subject interaction. Bind each face to its
+        // NEUTRAL reference FILENAME (subject-1 / subject-2) rather than a
+        // "reference image N" ordinal — nano-banana-pro reliably maps a face to a
+        // named file handle but drops/genericises a face anchored only by image
+        // order. The figure's real name is never used (not here, not in the file).
         // Always prepended (bypasses the single-creator idempotency guard).
         if ($entityFaceRef !== null && $entityFaceRef !== '' && $layoutHint === 'cover') {
-            return "PRIMARY SUBJECTS (mandatory): render TWO real people from the provided reference images — the creator from reference image 1 and the person from reference image 2 — both as photographic, naturally lit, exact-likeness portraits, positioned side by side and BOTH clearly visible. Do not blend, merge, or average their faces; do not generate generic people, avatars, or icons. They are interacting naturally as the scene below describes. The headline and any floating elements must yield canvas space so both faces stay unobstructed.\n\n" . $body;
+            $s1 = $sub1Name ?? 'reference image 1';
+            $s2 = $sub2Name ?? 'reference image 2';
+
+            return "PRIMARY SUBJECTS (mandatory): render TWO real people, each rendered as the EXACT face from their own named reference photo file — the creator's face from the reference photo file \"{$s1}\" and the second person's face from the reference photo file \"{$s2}\" — both as photographic, naturally lit, exact-likeness portraits, positioned side by side and BOTH clearly visible. Use the precise face from each named file; do not blend, merge, average, or swap their faces; do not generate generic people, avatars, or icons. They are interacting naturally as the scene below describes. The headline and any floating elements must yield canvas space so both faces stay unobstructed.\n\n" . $body;
         }
 
         $layoutMandates = in_array($layoutHint, self::FACE_REQUIRED_LAYOUTS, true);
