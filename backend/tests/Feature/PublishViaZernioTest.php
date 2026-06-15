@@ -77,6 +77,21 @@ class PublishViaZernioTest extends TestCase
         Http::assertSent(fn ($r) => isset($r['scheduledFor']) && ! ($r['publishNow'] ?? false));
     }
 
+    public function test_past_scheduled_at_publishes_now_not_scheduled(): void
+    {
+        // Slot-orchestrator model: the local cron holds the post until its slot,
+        // then fires this job — by which point scheduled_at is in the PAST. A
+        // past scheduledFor would be rejected by Zernio, so applyScheduling must
+        // treat a non-future scheduled_at as publishNow.
+        config(['social-cross-post.zernio.schedule_enabled' => true]);
+        Http::fake(['zernio.com/api/v1/posts' => Http::response(['post' => ['_id' => 'z-3']], 201)]);
+
+        $ig = $this->igSibling(['scheduled_at' => now()->subMinutes(5)]);
+        PublishViaZernio::dispatchSync('instagram', $ig->id);
+
+        Http::assertSent(fn ($r) => ($r['publishNow'] ?? false) === true && ! isset($r['scheduledFor']));
+    }
+
     public function test_409_duplicate_marks_published_with_existing_id(): void
     {
         Http::fake(['zernio.com/api/v1/posts' => Http::response([

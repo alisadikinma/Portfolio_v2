@@ -158,7 +158,11 @@ class PublishViaZernio implements ShouldQueue
     {
         $scheduleEnabled = (bool) config('social-cross-post.zernio.schedule_enabled', true);
 
-        if ($scheduleEnabled && $sibling->scheduled_at !== null) {
+        // Only hand Zernio a FUTURE scheduledFor. In the local slot-orchestrator
+        // model the cron holds the post until its slot, then fires this job — by
+        // which point scheduled_at is in the past. A past scheduledFor would be
+        // rejected by Zernio, so treat a non-future schedule as publish-now.
+        if ($scheduleEnabled && $sibling->scheduled_at !== null && $sibling->scheduled_at->isFuture()) {
             $payload['scheduledFor'] = $sibling->scheduled_at->toIso8601String();
             $payload['timezone'] = config('app.timezone', 'UTC');
             $payload['publishNow'] = false;

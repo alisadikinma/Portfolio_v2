@@ -6,6 +6,7 @@ namespace Tests\Feature;
 
 use App\Enums\LinkedInPostStatus;
 use App\Jobs\PublishViaPubler;
+use App\Jobs\PublishViaZernio;
 use App\Models\Category;
 use App\Models\InstagramPost;
 use App\Models\LinkedInPost;
@@ -53,6 +54,15 @@ class PublishSlotOrchestratorTest extends TestCase
             Setting::firstOrCreate(
                 ['group' => 'publer', 'key' => "publer_{$p}_account_id"],
                 ['value' => "{$p}_test_acc"]
+            );
+        }
+
+        // PublisherResolver now defaults IG/TT/TH to Zernio (primary). Pin the
+        // legacy assertions in this suite to Publer; Zernio-path tests opt in.
+        foreach (['instagram', 'tiktok', 'threads'] as $p) {
+            Setting::firstOrCreate(
+                ['group' => 'zernio', 'key' => "crosspost_publisher_{$p}"],
+                ['value' => 'publer']
             );
         }
 
@@ -220,6 +230,46 @@ class PublishSlotOrchestratorTest extends TestCase
 
         $draft->refresh();
         $this->assertSame($originalStatus, $draft->status);
+        Queue::assertNotPushed(PublishViaPubler::class);
+    }
+
+    public function test_carousel_ready_dispatches_zernio_when_platform_selected(): void
+    {
+        // Flip Instagram to Zernio + configure its account.
+        Setting::updateOrCreate(['group' => 'zernio', 'key' => 'crosspost_publisher_instagram'], ['value' => 'zernio']);
+        Setting::firstOrCreate(['group' => 'zernio', 'key' => 'zernio_instagram_account_id'], ['value' => 'ig_acc']);
+
+        $draft = $this->makeDueCarouselDraft();
+        InstagramPost::create([
+            'linkedin_post_id' => $draft->id,
+            'post_id' => $draft->post_id,
+            'status' => 'awaiting_review',
+            'caption' => 'IG ready',
+        ]);
+
+        $this->artisan('social:publish-slot')->assertExitCode(0);
+
+        Queue::assertPushed(PublishViaZernio::class, fn ($j) => $j->platform === 'instagram');
+        Queue::assertNotPushed(PublishViaPubler::class); // IG routed to Zernio, not Publer
+    }
+
+    public function test_zernio_selected_but_unconfigured_is_skipped(): void
+    {
+        // Instagram routed to Zernio but no zernio account id → gate skips it,
+        // and it must NOT silently fall back to Publer.
+        Setting::updateOrCreate(['group' => 'zernio', 'key' => 'crosspost_publisher_instagram'], ['value' => 'zernio']);
+
+        $draft = $this->makeDueCarouselDraft();
+        InstagramPost::create([
+            'linkedin_post_id' => $draft->id,
+            'post_id' => $draft->post_id,
+            'status' => 'awaiting_review',
+            'caption' => 'IG ready',
+        ]);
+
+        $this->artisan('social:publish-slot')->assertExitCode(0);
+
+        Queue::assertNotPushed(PublishViaZernio::class);
         Queue::assertNotPushed(PublishViaPubler::class);
     }
 }

@@ -162,9 +162,26 @@ class PublishSlotOrchestrator extends Command
             if ($sibling === null) {
                 continue;
             }
-            // On the legacy Publer path, honor the Publer account-selected gate.
-            // On the Postiz path, the dispatcher resolves the channel mapping
-            // (and falls back to Publer itself when unmapped) so don't pre-gate.
+
+            // Publisher-aware routing (2026-06-15): Zernio is the primary
+            // publisher for IG/TT/TH. When a platform is routed to Zernio, gate
+            // on its Zernio account and dispatch PublishViaZernio. The slot has
+            // already fired, so the now-past scheduled_at is treated as publish-
+            // now by PublishViaZernio::applyScheduling (future-only scheduledFor).
+            if (\App\Support\PublisherResolver::for($platform) === 'zernio') {
+                if (!\App\Services\ZernioPayloadBuilder::isPlatformEnabled($platform)) {
+                    $this->line("  ⊘ {$platform} not configured in Zernio settings — skipped");
+                    continue;
+                }
+                \App\Support\PublisherResolver::dispatchPublish($platform, $sibling->id);
+                $this->line("  → dispatched {$platform} sibling #{$sibling->id} (Zernio)");
+                continue;
+            }
+
+            // Publer/Postiz path (fallback + Facebook). On the legacy Publer path
+            // honor the Publer account-selected gate. On the Postiz path the
+            // dispatcher resolves the channel mapping (and falls back to Publer
+            // itself when unmapped) so don't pre-gate.
             if (!$postizEnabled && !\App\Services\PublerPayloadBuilder::isPlatformEnabled($platform)) {
                 $this->line("  ⊘ {$platform} not configured in Publer settings — skipped");
                 continue;
