@@ -112,6 +112,27 @@ class CarouselCoverReRenderUnlocksFigureTest extends TestCase
     }
 
     /** @test */
+    public function re_rendering_an_already_enriched_cover_keeps_the_figure_and_does_not_reset(): void
+    {
+        // A cover that already carries a resolved figure must NOT have its lock
+        // cleared — re-render uses the existing interaction prompt + figure ref,
+        // no redundant (slow) re-author.
+        $draft = $this->makeDraft();
+        $slides = $draft->carousel_slides;
+        $slides[0]['entity_face_ref'] = 'https://cdn/altman.png';
+        $slides[0]['figure_name'] = 'Sam Altman';
+        $draft->update(['carousel_slides' => $slides]);
+
+        app(LinkedInCarouselImageService::class)->dispatchSingleSlide($draft, 0);
+
+        $draft->refresh();
+        $cover = $draft->carousel_slides[0];
+        $this->assertTrue($cover['figure_enriched'], 'enriched cover lock must be preserved');
+        $this->assertSame('https://cdn/altman.png', $cover['entity_face_ref']);
+        $this->assertSame('generating', $cover['image_status']);
+    }
+
+    /** @test */
     public function re_rendering_a_body_slide_leaves_the_cover_lock_intact(): void
     {
         $draft = $this->makeDraft();

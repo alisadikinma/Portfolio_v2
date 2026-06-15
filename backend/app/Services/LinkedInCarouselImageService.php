@@ -220,6 +220,14 @@ class LinkedInCarouselImageService
         if (empty($slides[$slideIndex]['figure_enriched'])) {
             return; // not locked — nothing to reset
         }
+        // Already carries a resolved figure → re-render the existing interaction
+        // prompt directly (the enricher would short-circuit anyway). Only a
+        // creator-only lock (figure_enriched but NO figure attached) is worth
+        // clearing to give the enricher another attempt — that's the stale
+        // empty_topic / figure_unresolved case this gate exists for.
+        if (! empty($slides[$slideIndex]['entity_face_ref'])) {
+            return;
+        }
 
         unset($slides[$slideIndex]['figure_enriched']);
         $draft->update(['carousel_slides' => $slides]);
