@@ -57,6 +57,17 @@ class ZernioPayloadBuilder
 
     private const THREADS_CHAR_LIMIT = 500;
 
+    /**
+     * TikTok PHOTO posts use the post content as the slideshow TITLE, which
+     * TikTok caps at 90 chars (Zernio 400s past that). Hard-cap defensively.
+     */
+    private const TIKTOK_TITLE_LIMIT = 90;
+
+    public function __construct(private ?ZernioImageNormalizer $normalizer = null)
+    {
+        $this->normalizer ??= new ZernioImageNormalizer();
+    }
+
     // ─── Per-platform enabled gate ───────────────────────────────────────────
 
     /**
@@ -82,6 +93,11 @@ class ZernioPayloadBuilder
     public function buildInstagram(InstagramPost $sibling): array
     {
         $images = $this->slideMediaItems($sibling);
+        // IG rejects the whole carousel if any slide is outside its ratio window
+        // (0.75–1.91) — pad out-of-range slides to a compliant canvas first.
+        foreach ($images as $i => $item) {
+            $images[$i]['url'] = $this->normalizer->normalizeForInstagram($item['url']);
+        }
         $hookVideo = $this->resolveHookVideoUrl($sibling);
 
         $mediaItems = $hookVideo !== null
@@ -115,7 +131,10 @@ class ZernioPayloadBuilder
         return $this->payload(
             platform: 'tiktok',
             accountId: $this->resolveAccountId('tiktok'),
-            content: $this->buildCaption($sibling->caption, $sibling->hashtags),
+            content: $this->capTiktokTitle(
+                $this->buildCaption($sibling->caption, $sibling->hashtags),
+                (int) ($sibling->id ?? 0)
+            ),
             mediaItems: $images,
         );
     }
@@ -359,5 +378,17 @@ class ZernioPayloadBuilder
         Log::warning("Zernio Threads caption truncated to 500 chars (threads_post #{$siblingId})");
 
         return mb_substr($content, 0, self::THREADS_CHAR_LIMIT);
+    }
+
+    /** Hard-cap the TikTok photo-slideshow title at 90 chars (Zernio 400s past it). */
+    private function capTiktokTitle(string $content, int $siblingId): string
+    {
+        if (mb_strlen($content) <= self::TIKTOK_TITLE_LIMIT) {
+            return $content;
+        }
+
+        Log::warning("Zernio TikTok title truncated to 90 chars (tiktok_post #{$siblingId})");
+
+        return rtrim(mb_substr($content, 0, self::TIKTOK_TITLE_LIMIT));
     }
 }

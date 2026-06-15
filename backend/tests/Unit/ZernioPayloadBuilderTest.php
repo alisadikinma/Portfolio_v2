@@ -148,4 +148,42 @@ class ZernioPayloadBuilderTest extends TestCase
         $this->expectException(\RuntimeException::class);
         (new ZernioPayloadBuilder)->buildInstagram($ig);
     }
+
+    public function test_tiktok_title_capped_at_90(): void
+    {
+        // TikTok photo posts use the content as the slideshow title (≤90 chars).
+        $li = $this->makeLinkedInPost(3);
+        $tt = TiktokPost::create([
+            'linkedin_post_id' => $li->id,
+            'post_id' => $li->post_id,
+            'status' => 'awaiting_review',
+            'caption' => str_repeat('x', 241),
+            'hashtags' => [],
+        ]);
+        $tt->load('linkedinPost');
+
+        $payload = (new ZernioPayloadBuilder)->buildTiktok($tt);
+
+        $this->assertLessThanOrEqual(90, mb_strlen($payload['content']));
+    }
+
+    public function test_instagram_slides_run_through_ratio_normalizer(): void
+    {
+        // Every IG image slide must pass through the aspect-ratio normalizer.
+        $stub = new class extends \App\Services\ZernioImageNormalizer
+        {
+            public function normalizeForInstagram(string $url): string
+            {
+                return $url.'?normalized';
+            }
+        };
+
+        $payload = (new ZernioPayloadBuilder($stub))->buildInstagram($this->ig());
+
+        foreach ($payload['mediaItems'] as $item) {
+            if ($item['type'] === 'image') {
+                $this->assertStringEndsWith('?normalized', $item['url']);
+            }
+        }
+    }
 }
