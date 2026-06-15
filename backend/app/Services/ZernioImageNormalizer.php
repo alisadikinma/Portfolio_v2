@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\SharedDir;
 use Intervention\Image\Drivers\Gd\Driver as GdDriver;
 use Intervention\Image\Drivers\Imagick\Driver as ImagickDriver;
 use Intervention\Image\ImageManager;
@@ -109,7 +110,29 @@ class ZernioImageNormalizer
             $image = $this->manager()->read($sourceAbs);
             $bg = $image->pickColor(0, 0); // blend bars into the slide's background
             $image->resizeCanvas($tw, $th, background: $bg, position: 'center');
-            $disk->put($outRelative, (string) $image->toPng());
+
+            // The social-crosspost queue worker runs as `claudesn`, but this dir is
+            // often first created by `www-data` (php-fpm) at mode 0755 — the worker
+            // (group member, no group-write) then can't write into it. Force 0775
+            // so whichever user writes first, the other can too (same class as the
+            // video_rebrand SharedDir fix). Production: draft 163 IG publish failed
+            // with "Image 2: Image not found" because the write silently failed.
+            SharedDir::ensure(dirname($outAbs));
+
+            // Storage::put() returns FALSE on a write failure (e.g. permission
+            // denied) WITHOUT throwing — so a phantom normalized URL pointing at a
+            // file that was never written would slip past the catch below and reach
+            // Zernio, which 404s it ("Image not found at the provided URL"). Verify
+            // the write actually landed; otherwise fail-open to the original URL
+            // (worst case: the pre-existing IG ratio rejection — a TRUE error).
+            $ok = $disk->put($outRelative, (string) $image->toPng());
+            if ($ok === false || ! $disk->exists($outRelative)) {
+                Log::warning('[ZernioImageNormalizer] write failed — using original', [
+                    'out' => $outRelative, 'src' => $relative, 'put_result' => $ok,
+                ]);
+
+                return $url;
+            }
 
             Log::info('[ZernioImageNormalizer] padded slide to IG ratio', [
                 'from' => "{$w}x{$h}", 'to' => "{$tw}x{$th}", 'src' => $relative,
