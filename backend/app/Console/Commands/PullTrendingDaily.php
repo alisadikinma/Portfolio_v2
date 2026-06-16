@@ -24,8 +24,9 @@ class PullTrendingDaily extends Command
             : (int) config('content.trending.virality_threshold', 70);
         $threshold = max(0, min(100, $threshold));
         $dryRun = (bool) $this->option('dry-run');
+        $pickLimit = (int) config('content.trending.daily_pick_limit', 5);
 
-        $this->info("Fetching trending topics from all sources… (virality threshold: {$threshold}" . ($dryRun ? ', DRY RUN' : '') . ')');
+        $this->info("Fetching trending topics from all sources… (virality threshold: {$threshold}, pick limit: {$pickLimit}" . ($dryRun ? ', DRY RUN' : '') . ')');
 
         try {
             // getScoredTopics() runs TopicScoringService::scoreBatch under the
@@ -45,27 +46,40 @@ class PullTrendingDaily extends Command
             return self::SUCCESS;
         }
 
+        // --- Best-N selection ---
+        // 1. Discard topics below the virality threshold (editorial floor).
+        // 2. Sort the survivors by virality_score DESC so the purest AI
+        //    signal (not the composite with heat/tier noise) drives picking.
+        // 3. Cap at daily_pick_limit — import only the BEST topics each day.
+        //    A duplicate slot is simply dropped; no auto-backfill from
+        //    lower-ranked topics so the daily cadence stays intentional.
+        $skippedLowVirality = 0;
+        $candidates = [];
+        foreach ($scored as $trend) {
+            $virality = (int) ($trend['virality_score'] ?? 0);
+            if ($virality < $threshold) {
+                $skippedLowVirality++;
+                continue;
+            }
+            $candidates[] = $trend;
+        }
+
+        usort($candidates, fn ($a, $b) => ($b['virality_score'] ?? 0) <=> ($a['virality_score'] ?? 0));
+        $candidates = array_slice($candidates, 0, $pickLimit);
+
+        $this->line("  Candidates after threshold+sort+cap: " . count($candidates) . " (skipped low-virality: {$skippedLowVirality})");
+
         $imported = 0;
         $skippedDup = 0;
-        $skippedLowVirality = 0;
         $errors = 0;
 
-        foreach ($scored as $trend) {
+        foreach ($candidates as $trend) {
             $title = trim((string) ($trend['title'] ?? ''));
             if ($title === '') {
                 continue;
             }
 
             $virality = (int) ($trend['virality_score'] ?? 0);
-
-            // Hard editorial gate. Below threshold = skip without writing —
-            // the queue should only fill with topics we'd actually want to
-            // publish. Filter ratio is monitored via the Done line at end.
-            if ($virality < $threshold) {
-                $skippedLowVirality++;
-                $this->line("  SKIP (virality={$virality}<{$threshold}): {$title}");
-                continue;
-            }
 
             try {
                 $duplicate = $dedup->isDuplicate($title);
@@ -89,11 +103,13 @@ class PullTrendingDaily extends Command
                     'auto_mode' => true,
                     'source_data' => $trend,
                     'virality_score' => $virality,
-                    // STEPPS triggers from TopicScoringService — preserved on
-                    // the row so the admin tooltip can explain WHY a topic
-                    // scored high (social_currency, high_arousal, etc).
+                    // STEPPS triggers + carousel_fit from TopicScoringService —
+                    // preserved on the row so the admin tooltip can explain WHY
+                    // a topic scored high (social_currency, high_arousal, etc).
                     'virality_breakdown' => is_array($trend['triggers'] ?? null)
-                        ? $trend['triggers']
+                        ? array_merge($trend['triggers'], [
+                            'carousel_fit' => (bool) ($trend['carousel_fit'] ?? false),
+                        ])
                         : null,
                 ]);
                 $imported++;

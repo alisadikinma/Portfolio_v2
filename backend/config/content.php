@@ -62,5 +62,14 @@ return [
         // Trends / TikTok / YouTube — inherently live trend feeds) are kept.
         // 0 disables the gate.
         'max_age_days' => (int) env('TRENDING_MAX_AGE_DAYS', 3),
+
+        // Maximum topics the daily auto-import (PullTrendingDaily) will
+        // insert per run, selected by virality_score DESC after the threshold
+        // gate. This prevents queue flooding on high-signal days while
+        // guaranteeing the content pipeline always gets the BEST topics.
+        // Dedup still applies inside the cap — a duplicate slot is simply
+        // dropped (no auto-backfill from lower-ranked topics by design).
+        // Tune up during content sprints, down to 1 for single-topic cadence.
+        'daily_pick_limit' => (int) env('TRENDING_DAILY_PICK_LIMIT', 5),
     ],
 ];
