@@ -45,6 +45,20 @@ class RepurposeRetryService
      */
     public function retry(RepurposeJob $job): array
     {
+        // A drafted blog job whose ContentIdea was subsequently deleted (hard-delete
+        // via /admin/content-engine) results in MySQL ON DELETE SET NULL silently
+        // severing content_idea_id. The job appears stuck: status=drafted but no
+        // linked idea to "Start Research" on. Recovery: re-run finalizeBlog from
+        // `extracted` — it reads $job->extracted (already persisted) and creates a
+        // fresh ContentIdea, identical to the original finalize call.
+        if ($job->status === RepurposeJobStatus::Drafted->value
+            && $job->mode === 'blog'
+            && $job->content_idea_id === null) {
+            $job->forceStatus(RepurposeJobStatus::Extracted, 'retry_lost_content_idea', ['last_error' => null]);
+            FinalizeRepurpose::dispatch($job->id);
+            return ['ok' => true, 'message' => 'ContentIdea was deleted — re-running finalizeBlog to re-create it.', 'status' => $job->status];
+        }
+
         if ($job->status !== RepurposeJobStatus::Failed->value) {
             return ['ok' => false, 'message' => 'Only a failed job can be retried.', 'status' => $job->status];
         }

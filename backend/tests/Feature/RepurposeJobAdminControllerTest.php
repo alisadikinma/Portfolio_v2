@@ -245,6 +245,47 @@ class RepurposeJobAdminControllerTest extends TestCase
         Queue::assertNothingPushed();
     }
 
+    public function test_retry_drafted_blog_with_lost_content_idea_reruns_finalize(): void
+    {
+        Queue::fake();
+        // Simulate: finalizeBlog ran correctly, created ContentIdea, but it was
+        // subsequently hard-deleted via /admin/content-engine. MySQL ON DELETE SET
+        // NULL set content_idea_id=null; job is stuck in `drafted` with no linked idea.
+        $job = RepurposeJob::factory()->create([
+            'status' => 'drafted',
+            'mode' => 'blog',
+            'content_idea_id' => null,
+            'extracted' => ['caption' => 'AI Tools that save you hours every week'],
+        ]);
+
+        $this->actingAs($this->admin(), 'sanctum')
+            ->postJson("/api/admin/repurpose/{$job->id}/retry")
+            ->assertOk()->assertJson(['success' => true]);
+
+        // forceStatus → extracted so FinalizeRepurpose can enter at its blog guard
+        $this->assertSame('extracted', $job->refresh()->status);
+        Queue::assertPushed(FinalizeRepurpose::class, fn ($j) => $j->repurposeJobId === $job->id);
+    }
+
+    public function test_retry_drafted_blog_with_linked_idea_still_rejects(): void
+    {
+        Queue::fake();
+        // A drafted blog job whose ContentIdea still exists should NOT be re-run —
+        // the operator just needs to click "Start Research" in Content Engine.
+        $job = RepurposeJob::factory()->create([
+            'status' => 'drafted',
+            'mode' => 'blog',
+            'content_idea_id' => 999, // non-null = idea still exists (or row was orphaned but linked)
+        ]);
+
+        $this->actingAs($this->admin(), 'sanctum')
+            ->postJson("/api/admin/repurpose/{$job->id}/retry")
+            ->assertStatus(422);
+
+        Queue::assertNothingPushed();
+        $this->assertSame('drafted', $job->refresh()->status);
+    }
+
     // ---- delete ----
 
     public function test_destroy_removes_the_job(): void
