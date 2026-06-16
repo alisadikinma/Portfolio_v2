@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\ImageGenerationJob;
 use App\Models\InstagramPost;
+use App\Models\RedditPost;
 use App\Models\RepurposeJob;
 use App\Models\Setting;
 use App\Models\ThreadsPost;
@@ -62,6 +63,11 @@ class ZernioPayloadBuilder
      * TikTok caps at 90 chars (Zernio 400s past that). Hard-cap defensively.
      */
     private const TIKTOK_TITLE_LIMIT = 90;
+
+    /** Reddit: image gallery ≤20 images; title required (cap 300). */
+    private const REDDIT_MAX_IMAGES = 20;
+
+    private const REDDIT_TITLE_LIMIT = 300;
 
     public function __construct(private ?ZernioImageNormalizer $normalizer = null)
     {
@@ -171,6 +177,34 @@ class ZernioPayloadBuilder
             accountId: $this->resolveAccountId('threads'),
             content: $content,
             mediaItems: $images,
+        );
+    }
+
+    /**
+     * Reddit: image gallery (Reddit has NO multi-video carousel / mixed media).
+     * Reddit needs a `subreddit` (required) + `title` (≤300) in platformSpecificData;
+     * the body rides in `content`. Subreddit snapshots from the sibling, falling
+     * back to the zernio_reddit_subreddit setting (default u_alisadikinma — own
+     * profile, zero moderation). No first-comment (the body holds everything).
+     */
+    public function buildReddit(RedditPost $sibling): array
+    {
+        $images = array_slice($this->slideMediaItems($sibling), 0, self::REDDIT_MAX_IMAGES);
+
+        $subreddit = $sibling->subreddit
+            ?: ((string) (Setting::where('group', 'zernio')
+                ->where('key', 'zernio_reddit_subreddit')
+                ->value('value')) ?: 'u_alisadikinma');
+
+        return $this->payload(
+            platform: 'reddit',
+            accountId: $this->resolveAccountId('reddit'),
+            content: (string) ($sibling->caption ?? ''),
+            mediaItems: $images,
+            platformSpecificData: [
+                'subreddit' => $subreddit,
+                'title' => $this->capRedditTitle((string) ($sibling->title ?? ''), (int) ($sibling->id ?? 0)),
+            ],
         );
     }
 
@@ -431,5 +465,17 @@ class ZernioPayloadBuilder
         Log::warning("Zernio TikTok title truncated to 90 chars (tiktok_post #{$siblingId})");
 
         return rtrim(mb_substr($content, 0, self::TIKTOK_TITLE_LIMIT));
+    }
+
+    /** Hard-cap the Reddit title at 300 chars (Reddit's title limit). */
+    private function capRedditTitle(string $title, int $siblingId): string
+    {
+        if (mb_strlen($title) <= self::REDDIT_TITLE_LIMIT) {
+            return $title;
+        }
+
+        Log::warning("Zernio Reddit title truncated to 300 chars (reddit_post #{$siblingId})");
+
+        return rtrim(mb_substr($title, 0, self::REDDIT_TITLE_LIMIT));
     }
 }
