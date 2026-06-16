@@ -49,7 +49,30 @@ node -e "import('./pipeline.js').then(m => m.buildManifestForReel('https://www.i
 Requires: the Whisper model above, network access to Instagram, and the `claude`
 CLI authenticated (used for classify + translate).
 
+## Run the worker daemon (Phase G)
+The daemon long-polls the VPS bridge, claims a `queued_local` job, runs the full
+pipeline (capture → ASR → segment → translate → keyframe → Veo/GROK → voice-change
+→ compose), uploads per-segment previews + the final MP4, then loops.
+
+```bash
+# one-time deps beyond Phase A: Remotion (cd remotion && npm install), RVC, tesseract
+export VIDEO_FULL_BRIDGE_URL=https://alisadikinma.com/api
+export VIDEO_FULL_WORKER_TOKEN=<sanctum token with video-full:work ability>
+export GEMINIGEN_API_KEY=<key>          # same key the backend uses
+export WHISPER_MODEL=~/.video-full-worker/models/ggml-base.en.bin
+export RVC_CLI=/path/to/rvc/infer.py RVC_MODEL=/path/to/ali.pth   # or ELEVENLABS_API_KEY+ELEVENLABS_VOICE_ID
+node index.js
+```
+Mint the token on the VPS:
+`php artisan tinker --execute="echo User::find(1)->createToken('video-full-worker',['video-full:work'])->plainTextToken;"`
+
+Keep it alive with **launchd** (macOS) or **pm2** (`pm2 start index.js --name video-full-worker`).
+
 ## Config (env)
-See `config.js`. Phase-A keys: `WHISPER_MODEL`, `VIDEO_FULL_WORK_DIR`,
-`*_BIN` overrides, `VIDEO_FULL_SCENE_THRESHOLD`,
-`VIDEO_FULL_CLASSIFY_MODEL`/`VIDEO_FULL_TRANSLATE_MODEL`.
+See `config.js`.
+- **Phase A:** `WHISPER_MODEL`, `VIDEO_FULL_WORK_DIR`, `*_BIN` overrides,
+  `VIDEO_FULL_SCENE_THRESHOLD`, `VIDEO_FULL_CLASSIFY_MODEL`/`VIDEO_FULL_TRANSLATE_MODEL`.
+- **Phase B:** `GEMINIGEN_API_KEY`, `GEMINIGEN_IMAGE_MODEL`/`_VEO_MODEL`/`_VIDEO_MODEL`,
+  `VIDEO_FULL_ALI_FACE_URL`, `RVC_CLI`/`RVC_MODEL`/`RVC_INDEX`/`RVC_PYTHON`,
+  `ELEVENLABS_API_KEY`/`ELEVENLABS_VOICE_ID`.
+- **Phase G:** `VIDEO_FULL_BRIDGE_URL`, `VIDEO_FULL_WORKER_TOKEN`, `VIDEO_FULL_POLL_MS`.

@@ -35,6 +35,12 @@ export const config = {
   // local-path refs; see vault indusia-image-gen-face-ref-gotcha).
   aliFaceUrl: process.env.VIDEO_FULL_ALI_FACE_URL
     || 'https://alisadikinma.com/uploads/about/1776545803_creator-face.png',
+  // VPS bridge API (Phase E). The Sanctum token must carry the video-full:work ability.
+  bridge: {
+    baseUrl: process.env.VIDEO_FULL_BRIDGE_URL || 'https://alisadikinma.com/api',
+    token: process.env.VIDEO_FULL_WORKER_TOKEN || '',
+    pollIntervalMs: Number(process.env.VIDEO_FULL_POLL_MS || 15000),
+  },
   // Voice change: RVC (local, speech-to-speech) primary, ElevenLabs fallback.
   voice: {
     rvcPython: process.env.RVC_PYTHON || 'python3',
