@@ -15,6 +15,13 @@ return [
     // existing /carousel-gen path. See docs/plans/2026-06-15-carousel-one-tool-per-slide.md.
     'repurpose_source_mirror' => env('LINKEDIN_REPURPOSE_SOURCE_MIRROR', false),
 
+    // Button-path source-mirror (2026-06-16). SEPARATE from the auto-pipeline
+    // flag above: the "Regenerate all images" job has a 20-min budget so it can
+    // run sequential per-slide authoring safely, whereas the auto-pipeline (360s)
+    // cannot. Default ON for the button; revert lever via env.
+    // See docs/plans/2026-06-16-source-mirror-on-regenerate-button.md.
+    'repurpose_source_mirror_regenerate' => env('LINKEDIN_REPURPOSE_SOURCE_MIRROR_REGENERATE', true),
+
     // OAuth app credentials — register at https://linkedin.com/developers
     'oauth' => [
         'client_id' => env('LINKEDIN_OAUTH_CLIENT_ID'),
