@@ -27,10 +27,14 @@ return new class extends Migration
                 ->nullOnDelete()
                 ->comment('FK to linkedin_posts owning the slide PNGs');
 
+            // Non-nullable + cascade, mirroring threads_posts: a reddit_posts row
+            // is ALWAYS a carousel sibling of a blog-anchored LinkedIn draft
+            // (video_full Reddit uses repurpose_jobs.zernio_publish JSON, never a
+            // sibling row), so post_id is always present. Avoids the orphan/NPE
+            // footgun of a nullable post_id.
             $table->foreignId('post_id')
-                ->nullable()
                 ->constrained('posts')
-                ->nullOnDelete();
+                ->cascadeOnDelete();
 
             $table->enum('status', [
                 'pending_generation',
