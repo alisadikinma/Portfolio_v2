@@ -310,6 +310,15 @@ function goBack() { router.push({ name: 'admin-social-studio' }) }
             class="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-600 active:scale-[0.98] motion-reduce:transition-none"
           >Open in Content Engine →</router-link>
           <button
+            v-else-if="isBlog && !job.content_idea_id && job.status === 'drafted'"
+            class="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-600 active:scale-[0.98] disabled:opacity-60 motion-reduce:transition-none"
+            :disabled="retry.isPending.value"
+            @click="doRetry"
+          >
+            <svg class="h-4 w-4" :class="{ 'animate-spin': retry.isPending.value }" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5M5.5 14a7 7 0 0 0 12.4 2M18.5 10A7 7 0 0 0 6.1 8" /></svg>
+            {{ retry.isPending.value ? 'Re-creating idea…' : 'Retry — re-create Content Idea' }}
+          </button>
+          <button
             v-else-if="isFailed"
             class="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-600 active:scale-[0.98] disabled:opacity-60 motion-reduce:transition-none"
             :disabled="retry.isPending.value"
