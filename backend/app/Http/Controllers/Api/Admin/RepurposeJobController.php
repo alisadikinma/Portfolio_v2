@@ -448,6 +448,42 @@ class RepurposeJobController extends Controller
         ], 202);
     }
 
+    /**
+     * PUT /admin/repurpose/{id}/captions — edit the per-platform IG + Threads
+     * captions used by the Zernio video-carousel publish. Both optional; Threads
+     * is hard-capped at 500 by setCaption(). video_rebrand only.
+     */
+    public function updateCaptions(int $id, Request $request): JsonResponse
+    {
+        $job = RepurposeJob::find($id);
+        if (! $job) {
+            return $this->notFound();
+        }
+        if ($job->mode !== 'video_rebrand') {
+            return $this->notVideoRebrand();
+        }
+
+        $data = $request->validate([
+            'instagram' => 'sometimes|nullable|string|max:4000',
+            'threads' => 'sometimes|nullable|string|max:4000',
+        ]);
+
+        if (array_key_exists('instagram', $data)) {
+            $job->setCaption('instagram', (string) $data['instagram']);
+        }
+        if (array_key_exists('threads', $data)) {
+            $job->setCaption('threads', (string) $data['threads']);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'caption_instagram' => $job->captionFor('instagram'),
+                'caption_threads' => $job->captionFor('threads'),
+            ],
+        ], 200);
+    }
+
     /** Reset payload for a bookend so GenerateRebrandAssets re-renders it. */
     private function bookendResetPayload(): array
     {

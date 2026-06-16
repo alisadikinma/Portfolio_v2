@@ -174,6 +174,40 @@ class RepurposeJob extends Model
         return $caption !== '' ? $caption : $this->displayTopic();
     }
 
+    /** Threads hard caption cap (mirrors ZernioPayloadBuilder::THREADS_CHAR_LIMIT). */
+    public const THREADS_CAPTION_LIMIT = 500;
+
+    /**
+     * Resolve the caption used for a platform's Zernio video-carousel publish.
+     * The editor AND the publisher both call this so what the operator edits is
+     * exactly what ships. Resolution (always non-empty):
+     *   rewritten["caption_$platform"] → rewritten['caption'] → igCaption()
+     */
+    public function captionFor(string $platform): string
+    {
+        $perPlatform = trim((string) ($this->rewritten["caption_{$platform}"] ?? ''));
+        if ($perPlatform !== '') {
+            return $perPlatform;
+        }
+        $branded = trim((string) ($this->rewritten['caption'] ?? ''));
+
+        return $branded !== '' ? $branded : $this->igCaption();
+    }
+
+    /**
+     * Persist a per-platform caption onto rewritten["caption_$platform"]. Threads
+     * is hard-capped at 500 chars (the platform limit) so the stored value never
+     * diverges from what Zernio will accept. Saves immediately.
+     */
+    public function setCaption(string $platform, string $text): void
+    {
+        $text = trim($text);
+        if ($platform === 'threads') {
+            $text = mb_substr($text, 0, self::THREADS_CAPTION_LIMIT);
+        }
+        $this->update(['rewritten' => array_merge((array) $this->rewritten, ["caption_{$platform}" => $text])]);
+    }
+
     /**
      * Per-platform Zernio publish state, or null if this platform was never
      * dispatched. See migration 2026_06_15_000002 for the entry shape.

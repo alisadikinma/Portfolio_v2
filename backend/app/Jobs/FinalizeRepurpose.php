@@ -342,7 +342,14 @@ class FinalizeRepurpose implements ShouldQueue
 
         $job->transitionTo(RepurposeJobStatus::Drafted, 'finalize_video', [
             'last_error' => null,
-            'rewritten' => array_merge((array) $job->rewritten, ['caption' => $caption]),
+            'rewritten' => array_merge((array) $job->rewritten, [
+                'caption' => $caption,
+                // Seed BOTH per-platform captions so the draft editor + Zernio
+                // publisher have independent, non-empty starting values. IG = full
+                // branded caption; Threads pre-capped to its 500-char platform limit.
+                'caption_instagram' => $caption,
+                'caption_threads' => mb_substr($caption, 0, RepurposeJob::THREADS_CAPTION_LIMIT),
+            ]),
         ]);
         app(TelegramNotificationService::class)->sendRepurposeDrafted($job, $anchor->id, $this->correctedClaims($job));
     }

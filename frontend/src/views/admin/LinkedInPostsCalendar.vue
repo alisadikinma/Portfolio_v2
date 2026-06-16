@@ -351,17 +351,11 @@ async function reviveToStudio(id) {
 }
 
 function openDetail(item) {
-  // Accept either the full calendar item (preferred — lets us route video_carousel
-  // anchors to their repurpose detail) or a bare id (back-compat).
+  // Accept either the full calendar item or a bare id (back-compat). A
+  // video_carousel anchor now opens the LinkedIn draft detail like any other
+  // LinkedIn row (its detail hosts the video preview + caption editing).
   const post = item && typeof item === 'object' ? item : { id: item }
   const target = detailTarget(post, platformRef.value)
-
-  // A video_carousel anchor lives in the repurpose pipeline — no draft-detail origin
-  // breadcrumb applies, jump straight there.
-  if (target.name === 'admin-repurpose-detail') {
-    router.push(target)
-    return
-  }
 
   // Origin key contract:
   //   sessionStorage[`${platform}:detail:origin`] = 'feed' | 'queue'

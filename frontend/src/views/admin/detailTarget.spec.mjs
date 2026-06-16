@@ -2,18 +2,14 @@ import { describe, it, expect } from 'vitest'
 import { detailTarget } from './linkedinHelpers.js'
 
 /**
- * Phase F — a video_carousel calendar/queue card deep-links to the repurpose detail
- * (where the Zernio IG+Threads publish UI lives), NOT the LinkedIn draft detail.
- * Everything else keeps its existing destination.
+ * A video_carousel anchor is now a first-class sosmed draft: its calendar card
+ * opens the LinkedIn draft detail (/sosmed-drafts/{anchor}), which hosts the
+ * video preview + IG/Threads caption editing + Approve/Schedule. The repurpose
+ * (Social Studio) page stays for video production only.
  */
 describe('detailTarget', () => {
-  it('routes a video_carousel anchor to the repurpose detail', () => {
+  it('routes a video_carousel anchor to the LinkedIn draft detail', () => {
     const t = detailTarget({ id: 7, format: 'video_carousel', repurpose_job_id: 42 }, 'linkedin')
-    expect(t).toEqual({ name: 'admin-repurpose-detail', params: { id: 42 } })
-  })
-
-  it('falls back to the LinkedIn draft detail when a video row lacks a repurpose_job_id', () => {
-    const t = detailTarget({ id: 7, format: 'video_carousel', repurpose_job_id: null }, 'linkedin')
     expect(t).toEqual({ name: 'admin-sosmed-draft-detail', params: { id: 7 } })
   })
 

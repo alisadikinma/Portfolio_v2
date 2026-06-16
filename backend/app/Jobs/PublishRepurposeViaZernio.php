@@ -86,7 +86,12 @@ class PublishRepurposeViaZernio implements ShouldQueue
         $requestId = $state['request_id'] ?? (string) Str::uuid();
 
         try {
-            $payload = $this->applyScheduling($builder->buildRepurposeVideoCarousel($job, $this->platform));
+            // Per-platform caption (caption_instagram / caption_threads) so what
+            // the operator edited in the draft is exactly what ships — not the raw
+            // source caption igCaption() used to fall through to.
+            $payload = $this->applyScheduling(
+                $builder->buildRepurposeVideoCarousel($job, $this->platform, $job->captionFor($this->platform))
+            );
 
             $this->mergeState(['status' => 'publishing', 'request_id' => $requestId, 'error' => null]);
 

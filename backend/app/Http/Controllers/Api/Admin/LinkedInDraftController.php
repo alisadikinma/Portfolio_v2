@@ -203,10 +203,43 @@ class LinkedInDraftController extends Controller
         $data['caption_readiness'] = app(\App\Services\LinkedInSlotReadinessService::class)
             ->captionReadinessForApproval($draft);
 
+        // A video_carousel anchor is a display-only LinkedIn row whose real content
+        // (composited MP4s + IG/Threads captions + Zernio publish state) lives on
+        // the linked repurpose job. Surface it so the draft detail can be the full
+        // management surface (preview + caption editing + Approve/Schedule).
+        if ($draft->isVideoCarousel()) {
+            $data['repurpose'] = $this->videoCarouselBlock($draft);
+        }
+
         return response()->json([
             'success' => true,
             'data' => $data,
         ]);
+    }
+
+    /**
+     * Assemble the `repurpose` block for a video_carousel anchor's draft detail:
+     * the job id, ordered composited MP4 URLs (hook→tools→cta), per-platform
+     * Zernio publish state, and the editable IG + Threads captions. Returns null
+     * when no linked job exists (defensive — every anchor should have one).
+     *
+     * @return array<string,mixed>|null
+     */
+    private function videoCarouselBlock(LinkedInPost $draft): ?array
+    {
+        $job = \App\Models\RepurposeJob::where('linkedin_post_id', $draft->id)->first();
+        if ($job === null) {
+            return null;
+        }
+
+        return [
+            'id' => $job->id,
+            'mode' => $job->mode,
+            'composited_videos' => $job->compositedVideoUrls(),
+            'zernio_publish' => $job->zernio_publish ?? [],
+            'caption_instagram' => $job->captionFor('instagram'),
+            'caption_threads' => $job->captionFor('threads'),
+        ];
     }
 
     /**

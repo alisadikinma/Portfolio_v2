@@ -99,6 +99,20 @@ class PublishRepurposeViaZernioTest extends TestCase
         $this->assertSame('already', $job->fresh()->zernioPublishState('instagram')['post_id']);
     }
 
+    public function test_publish_uses_per_platform_caption_not_source(): void
+    {
+        Http::fake(['zernio.com/api/v1/posts' => Http::response(['post' => ['_id' => 'z-9']], 201)]);
+
+        $job = $this->job(); // extracted caption = 'cap'
+        $job->setCaption('instagram', 'IG-ONLY edited caption');
+
+        PublishRepurposeViaZernio::dispatchSync($job->id, 'instagram');
+
+        // The sent payload content must be the per-platform caption, not the raw
+        // source caption (igCaption) — the see-≠-ship bug this phase fixes.
+        Http::assertSent(fn ($r) => ($r['content'] ?? null) === 'IG-ONLY edited caption');
+    }
+
     public function test_master_switch_off_skips(): void
     {
         config(['social-cross-post.zernio.enabled' => false]);

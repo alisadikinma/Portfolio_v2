@@ -1363,6 +1363,8 @@ Route::middleware(['auth:sanctum'])->prefix('admin/repurpose')->group(function (
         ->whereNumber('id')->whereNumber('n');
     // Publish a video_rebrand carousel to Zernio (IG + Threads) — now or scheduled.
     Route::post('/{id}/publish-zernio', [RepurposeJobController::class, 'publishZernio'])->whereNumber('id');
+    // Edit the per-platform IG + Threads captions used by the Zernio publish.
+    Route::put('/{id}/captions', [RepurposeJobController::class, 'updateCaptions'])->whereNumber('id');
     Route::get('/{id}/slide/{n}', [RepurposeJobController::class, 'slide'])
         ->whereNumber('id')->whereNumber('n');
     Route::delete('/{id}', [RepurposeJobController::class, 'destroy'])->whereNumber('id');

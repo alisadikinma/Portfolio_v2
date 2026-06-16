@@ -23,6 +23,10 @@ import {
   useRegenerateHookVideo,
   postTitle,
 } from '@/composables/useLinkedInDrafts'
+import {
+  usePublishRepurposeZernio,
+  useUpdateRepurposeCaptions,
+} from '@/composables/useRepurposeJobs'
 import { useToast } from '@/composables/useToast'
 import {
   statusMeta,
@@ -45,6 +49,88 @@ const router = useRouter()
 
 const draftId = computed(() => Number(route.params.id))
 const { draft, isLoading, error, refetch } = useLinkedInDraft(draftId)
+
+// --- video_carousel (IG + Threads) management -------------------------------
+// A video_carousel anchor is a display-only LinkedIn row; its real content lives
+// on the linked repurpose job, surfaced by show() as draft.repurpose. This page
+// is the full management surface: video preview + IG/Threads caption editing +
+// Approve/Schedule (reusing the repurpose Zernio publish endpoint).
+const THREADS_CAP = 500
+const isVideoCarousel = computed(() => draft.value?.format === 'video_carousel')
+const repurpose = computed(() => draft.value?.repurpose || null)
+const repurposeJobId = computed(() => repurpose.value?.id ?? null)
+
+const igCaptionDraft = ref('')
+const threadsCaptionDraft = ref('')
+// Seed the editors whenever the loaded captions change (initial load + refetch).
+watch(repurpose, (r) => {
+  if (!r) return
+  igCaptionDraft.value = r.caption_instagram || ''
+  threadsCaptionDraft.value = r.caption_threads || ''
+}, { immediate: true })
+
+const captionsDirty = computed(() =>
+  !!repurpose.value &&
+  (igCaptionDraft.value !== (repurpose.value.caption_instagram || '') ||
+    threadsCaptionDraft.value !== (repurpose.value.caption_threads || '')))
+const threadsRemaining = computed(() => THREADS_CAP - threadsCaptionDraft.value.length)
+
+const updateCaptions = useUpdateRepurposeCaptions()
+const publishZernioMut = usePublishRepurposeZernio()
+
+async function saveVideoCaptions() {
+  if (!repurposeJobId.value) return
+  try {
+    await updateCaptions.mutateAsync({
+      id: repurposeJobId.value,
+      instagram: igCaptionDraft.value,
+      threads: threadsCaptionDraft.value.slice(0, THREADS_CAP),
+    })
+    await refetch()
+    toast.success('Captions saved.')
+  } catch (e) {
+    toast.error(e?.response?.data?.error?.message || 'Failed to save captions.')
+  }
+}
+
+const videoScheduleAt = ref('')
+const VIDEO_PLATFORMS = ['instagram', 'threads']
+
+function zernioPlatformState(platform) {
+  return repurpose.value?.zernio_publish?.[platform] || null
+}
+
+async function publishVideoNow() {
+  if (!repurposeJobId.value) return
+  if (!confirm('Publish this video carousel to Instagram + Threads now?')) return
+  try {
+    if (captionsDirty.value) await saveVideoCaptions()
+    await publishZernioMut.mutateAsync({ id: repurposeJobId.value, platforms: VIDEO_PLATFORMS })
+    await refetch()
+    toast.success('Publishing to Instagram + Threads…')
+  } catch (e) {
+    toast.error(e?.response?.data?.error?.message || 'Publish failed.')
+  }
+}
+
+async function scheduleVideo() {
+  if (!repurposeJobId.value) return
+  if (!videoScheduleAt.value) { toast.error('Pick a date + time first.'); return }
+  const iso = new Date(videoScheduleAt.value).toISOString()
+  if (new Date(iso) <= new Date()) { toast.error('Scheduled time must be in the future.'); return }
+  try {
+    if (captionsDirty.value) await saveVideoCaptions()
+    await publishZernioMut.mutateAsync({ id: repurposeJobId.value, platforms: VIDEO_PLATFORMS, scheduledAt: iso })
+    await refetch()
+    toast.success('Scheduled to Instagram + Threads.')
+  } catch (e) {
+    toast.error(e?.response?.data?.error?.message || 'Schedule failed.')
+  }
+}
+
+function openSocialStudio() {
+  if (repurposeJobId.value) router.push({ name: 'admin-repurpose-detail', params: { id: repurposeJobId.value } })
+}
 
 // --- Per-platform caption switcher --------------------------------------
 // Operator toggles between LinkedIn / FB / IG / TikTok in-place — only
@@ -1211,6 +1297,140 @@ const showThumbnailUploadCaption = computed(() =>
     <div v-else-if="!draft" class="rounded-2xl border border-neutral-800 p-8 text-center text-neutral-500">
       Draft not found.
     </div>
+
+    <!-- ====================================================================
+         VIDEO CAROUSEL (IG + Threads) — display-only LinkedIn anchor whose real
+         content lives on the linked repurpose job (draft.repurpose).
+         ==================================================================== -->
+    <template v-else-if="isVideoCarousel">
+      <section class="rounded-2xl border border-neutral-800/80 bg-neutral-950/40 p-6 space-y-2">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="rounded bg-fuchsia-500/15 px-2 py-0.5 text-[10px] font-mono uppercase tracking-wider text-fuchsia-300">🎬 Video carousel · IG · Threads</span>
+              <span class="rounded-full px-2.5 py-0.5 text-[11px] font-mono uppercase tracking-wide" :class="mood.chip">{{ meta.label }}</span>
+            </div>
+            <h1 class="mt-2 text-lg font-semibold text-neutral-100">{{ postTitle(draft) }}</h1>
+            <p class="text-xs text-neutral-500">Published to Instagram + Threads via Zernio. LinkedIn has no video-carousel format, so this never posts to LinkedIn.</p>
+          </div>
+          <button
+            type="button"
+            class="shrink-0 rounded-lg border border-neutral-700 px-3 py-2 text-xs text-neutral-300 hover:bg-neutral-800/60"
+            @click="openSocialStudio"
+          >↪ Open in Social Studio (re-render clips)</button>
+        </div>
+      </section>
+
+      <div v-if="!repurpose" class="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-6 text-sm text-amber-200">
+        No linked repurpose job found for this anchor — manage it from Social Studio.
+      </div>
+
+      <template v-else>
+        <!-- Video preview grid -->
+        <section class="rounded-2xl border border-neutral-800/80 bg-neutral-950/40 p-6">
+          <h2 class="mb-3 text-sm font-semibold text-neutral-200">Clips <span class="text-neutral-500">· {{ repurpose.composited_videos.length }}</span></h2>
+          <div v-if="repurpose.composited_videos.length" class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            <video
+              v-for="(url, i) in repurpose.composited_videos"
+              :key="i"
+              :src="url"
+              controls
+              preload="metadata"
+              class="aspect-[4/5] w-full rounded-lg border border-neutral-800 bg-black object-cover"
+            />
+          </div>
+          <p v-else class="text-xs text-neutral-500">No composited clips yet — render them in Social Studio.</p>
+        </section>
+
+        <!-- Per-platform caption editors -->
+        <section class="rounded-2xl border border-neutral-800/80 bg-neutral-950/40 p-6 space-y-4">
+          <div class="flex items-center justify-between">
+            <h2 class="text-sm font-semibold text-neutral-200">Captions</h2>
+            <button
+              type="button"
+              :disabled="!captionsDirty || updateCaptions.isPending.value"
+              class="rounded-lg bg-emerald-600/90 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-600 disabled:opacity-40"
+              @click="saveVideoCaptions"
+            >{{ updateCaptions.isPending.value ? 'Saving…' : 'Save captions' }}</button>
+          </div>
+
+          <div>
+            <label class="mb-1 flex items-center gap-2 text-xs font-medium text-fuchsia-300">Instagram caption</label>
+            <textarea
+              v-model="igCaptionDraft"
+              rows="5"
+              class="w-full rounded-lg border border-neutral-700 bg-neutral-900/60 px-3 py-2 text-sm text-neutral-100 focus:border-fuchsia-400/60 focus:outline-none"
+              placeholder="Instagram caption…"
+            />
+            <div class="mt-1 text-right text-[11px] text-neutral-500">{{ igCaptionDraft.length }} chars</div>
+          </div>
+
+          <div>
+            <label class="mb-1 flex items-center gap-2 text-xs font-medium text-neutral-300">Threads caption</label>
+            <textarea
+              v-model="threadsCaptionDraft"
+              rows="4"
+              :maxlength="THREADS_CAP"
+              class="w-full rounded-lg border border-neutral-700 bg-neutral-900/60 px-3 py-2 text-sm text-neutral-100 focus:border-neutral-400/60 focus:outline-none"
+              placeholder="Threads caption…"
+            />
+            <div class="mt-1 text-right text-[11px]" :class="threadsRemaining < 0 ? 'text-red-400' : 'text-neutral-500'">
+              {{ threadsRemaining }} / {{ THREADS_CAP }} left
+            </div>
+          </div>
+        </section>
+
+        <!-- Publish / Schedule + per-platform status -->
+        <section class="rounded-2xl border border-neutral-800/80 bg-neutral-950/40 p-6 space-y-4">
+          <h2 class="text-sm font-semibold text-neutral-200">Publish</h2>
+
+          <div class="flex flex-wrap gap-3">
+            <div
+              v-for="p in VIDEO_PLATFORMS"
+              :key="p"
+              class="flex items-center gap-2 rounded-lg border border-neutral-800 px-3 py-2 text-xs"
+            >
+              <span class="font-mono uppercase tracking-wide" :class="p === 'instagram' ? 'text-fuchsia-300' : 'text-neutral-300'">{{ p }}</span>
+              <span v-if="zernioPlatformState(p)" class="rounded-full bg-neutral-800 px-2 py-0.5 text-[10px] uppercase text-neutral-300">{{ zernioPlatformState(p).status }}</span>
+              <span v-else class="text-neutral-600">not sent</span>
+              <a
+                v-if="zernioPlatformState(p)?.url"
+                :href="zernioPlatformState(p).url"
+                target="_blank"
+                rel="noopener"
+                class="text-cyan-400 hover:underline"
+              >open ↗</a>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-end gap-3 pt-1">
+            <button
+              type="button"
+              :disabled="publishZernioMut.isPending.value || !repurpose.composited_videos.length"
+              class="rounded-lg bg-emerald-600/90 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600 disabled:opacity-40"
+              @click="publishVideoNow"
+            >✓ Approve &amp; Publish now (IG + Threads)</button>
+
+            <div class="flex items-end gap-2">
+              <div>
+                <label class="mb-1 block text-[11px] text-neutral-500">Schedule for</label>
+                <input
+                  v-model="videoScheduleAt"
+                  type="datetime-local"
+                  class="rounded-lg border border-neutral-700 bg-neutral-900/60 px-3 py-2 text-sm text-neutral-100 focus:border-cyan-400/60 focus:outline-none"
+                />
+              </div>
+              <button
+                type="button"
+                :disabled="publishZernioMut.isPending.value || !videoScheduleAt || !repurpose.composited_videos.length"
+                class="rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-4 py-2 text-sm font-medium text-cyan-200 hover:bg-cyan-500/20 disabled:opacity-40"
+                @click="scheduleVideo"
+              >🗓 Schedule</button>
+            </div>
+          </div>
+        </section>
+      </template>
+    </template>
 
     <!-- ====================================================================
          Main layout

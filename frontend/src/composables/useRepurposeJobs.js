@@ -179,6 +179,21 @@ export function usePublishRepurposeZernio() {
 }
 
 /**
+ * Edit the per-platform IG + Threads captions used by the Zernio video-carousel
+ * publish. Caller refetches the draft (the captions live behind the LinkedIn
+ * draft's `repurpose` block) on success.
+ */
+export function useUpdateRepurposeCaptions() {
+  return useMutation({
+    mutationFn: ({ id, instagram, threads }) =>
+      api.put(`/admin/repurpose/${id}/captions`, {
+        ...(instagram != null ? { instagram } : {}),
+        ...(threads != null ? { threads } : {}),
+      }).then(r => r.data),
+  })
+}
+
+/**
  * Re-download a job's source IG slides (the reaper clears them ~7 days after
  * publish). Backend dispatches the capture asynchronously; the detail view
  * polls slide_count until the images reappear.

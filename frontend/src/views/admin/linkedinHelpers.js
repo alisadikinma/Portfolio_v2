@@ -559,15 +559,14 @@ export const ICON = {
 }
 
 /**
- * Where a calendar/queue card navigates on click. A video_carousel anchor is a
- * display-only LinkedIn row whose real publish UI (Zernio IG + Threads) lives on the
- * repurpose detail, so it deep-links there; everything else opens the normal draft
- * detail (LinkedIn) or the cross-post detail (FB/IG/TikTok). Pure — unit-tested.
+ * Where a calendar/queue card navigates on click. A video_carousel anchor is now
+ * a first-class sosmed draft — its detail (/sosmed-drafts/{anchor}) hosts the
+ * video preview + IG/Threads caption editing + Approve/Schedule, so it opens the
+ * LinkedIn draft detail like any other LinkedIn row. The repurpose (Social
+ * Studio) page is reached via an explicit link there, for video production only.
+ * Cross-post platforms (FB/IG/TikTok) open the cross-post detail. Pure — unit-tested.
  */
 export function detailTarget(item, platform) {
-  if (item?.format === 'video_carousel' && item?.repurpose_job_id) {
-    return { name: 'admin-repurpose-detail', params: { id: item.repurpose_job_id } }
-  }
   if (platform === 'linkedin') {
     return { name: 'admin-sosmed-draft-detail', params: { id: item.id } }
   }
