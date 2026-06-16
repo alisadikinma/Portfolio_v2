@@ -41,8 +41,40 @@ class PublisherResolverTest extends TestCase
 
     public function test_unknown_platform_falls_back_to_publer(): void
     {
-        // Facebook has no zernio selector seeded → publer (Zernio doesn't do FB).
-        $this->assertSame('publer', PublisherResolver::for('facebook'));
+        // A platform with no Zernio path (e.g. pinterest) → publer.
+        $this->assertSame('publer', PublisherResolver::for('pinterest'));
+    }
+
+    public function test_reddit_facebook_youtube_default_to_zernio(): void
+    {
+        // 2026-06-16 — these joined ZERNIO_PLATFORMS. With no explicit selector
+        // row the resolver defaults to zernio (the seeder sets reddit='off' /
+        // fb,yt='zernio' separately — see ZernioSettingsSeederTest).
+        $this->assertSame('zernio', PublisherResolver::for('reddit'));
+        $this->assertSame('zernio', PublisherResolver::for('facebook'));
+        $this->assertSame('zernio', PublisherResolver::for('youtube'));
+    }
+
+    public function test_off_selector_disables_and_never_dispatches(): void
+    {
+        Queue::fake();
+        $this->selector('reddit', 'off');
+        // Even with an account id present, an 'off' platform is hard-disabled.
+        Setting::create(['group' => 'zernio', 'key' => 'zernio_reddit_account_id', 'value' => 'rd_acc']);
+
+        $this->assertSame('off', PublisherResolver::for('reddit'));
+        $this->assertFalse(PublisherResolver::isPlatformEnabled('reddit'));
+
+        PublisherResolver::dispatchPublish('reddit', 99);
+        Queue::assertNothingPushed();
+    }
+
+    public function test_facebook_dispatches_to_zernio_by_default(): void
+    {
+        Queue::fake();
+        PublisherResolver::dispatchPublish('facebook', 5);
+        Queue::assertPushed(PublishViaZernio::class, fn ($j) => $j->platform === 'facebook' && $j->siblingPostId === 5);
+        Queue::assertNotPushed(PublishViaPubler::class);
     }
 
     public function test_published_id_column_is_publisher_aware(): void
