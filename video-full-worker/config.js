@@ -21,5 +21,7 @@ export const config = {
     classify: process.env.VIDEO_FULL_CLASSIFY_MODEL || 'sonnet',
     translate: process.env.VIDEO_FULL_TRANSLATE_MODEL || 'sonnet',
   },
-  sceneThreshold: Number(process.env.VIDEO_FULL_SCENE_THRESHOLD || 0.3),
+  sceneThreshold: Number.isFinite(Number(process.env.VIDEO_FULL_SCENE_THRESHOLD))
+    ? Number(process.env.VIDEO_FULL_SCENE_THRESHOLD)
+    : 0.3,
 };

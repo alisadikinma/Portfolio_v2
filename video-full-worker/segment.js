@@ -50,7 +50,7 @@ export async function sampleFrames(mp4Path, spans, outDir, { ffmpegBin = 'ffmpeg
 export function buildClassifyPrompt(spans, framePaths) {
   const lines = spans.map((s, i) =>
     `Span ${i}: time ${s.start.toFixed(1)}-${s.end.toFixed(1)}s, frame ${framePaths[i]}` +
-    (s.sourceTextEn ? `, speech: "${s.sourceTextEn}"` : ', no speech'));
+    (s.sourceTextEn ? `, speech: "${s.sourceTextEn.replace(/"/g, "'")}"` : ', no speech'));
   return [
     'You classify each span of a talking-head Instagram reel by reading its frame image.',
     'Categories:',
