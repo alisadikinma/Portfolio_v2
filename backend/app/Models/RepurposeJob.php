@@ -42,7 +42,18 @@ class RepurposeJob extends Model
         'pipeline_state_log',
         'chat_id',
         'zernio_publish',
+        // video_full worker lifecycle (MacBook-local worker writes these via bridge API)
+        'worker_progress',
+        'worker_step',
+        'worker_claimed_at',
+        'worker_heartbeat_at',
+        'final_video_url',
     ];
+
+    public const MODE_BLOG = 'blog';
+    public const MODE_CAROUSEL = 'carousel';
+    public const MODE_VIDEO_REBRAND = 'video_rebrand';
+    public const MODE_VIDEO_FULL = 'video_full';
 
     protected $casts = [
         'extracted' => 'array',
@@ -51,6 +62,9 @@ class RepurposeJob extends Model
         'pipeline_state_log' => 'array',
         'asset_retry_count' => 'integer',
         'zernio_publish' => 'array',
+        'worker_progress' => 'integer',
+        'worker_claimed_at' => 'datetime',
+        'worker_heartbeat_at' => 'datetime',
     ];
 
     protected function statusEnumClass(): string
@@ -79,6 +93,14 @@ class RepurposeJob extends Model
     public function videoSlides(): HasMany
     {
         return $this->hasMany(RepurposeVideoSlide::class)->orderBy('slide_index');
+    }
+
+    /**
+     * Per-segment rows for the video_full mode (talking/b-roll timeline order).
+     */
+    public function videoFullSegments(): HasMany
+    {
+        return $this->hasMany(VideoFullSegment::class)->orderBy('segment_index');
     }
 
     /**
