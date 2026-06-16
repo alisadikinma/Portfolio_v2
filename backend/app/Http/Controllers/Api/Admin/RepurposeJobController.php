@@ -71,14 +71,12 @@ class RepurposeJobController extends Controller
                 // carousel jobs never set it, so this hides handed-off blog jobs
                 // without touching carousel.
                 ->whereNull('content_idea_id')
-                // video_rebrand settles the moment finalizeVideoRebrand links a
-                // video_carousel anchor (linkedin_post_id) — it's now in the Content
-                // Calendar. Unlike carousel (which stays visible while its draft is in
-                // the working queue), a video job leaves immediately once anchored.
-                ->where(function ($q) {
-                    $q->where('mode', '!=', 'video_rebrand')
-                        ->orWhereNull('linkedin_post_id');
-                });
+                // video_rebrand: Condition 1 above (linkedinPost status in queueStatuses)
+                // already handles settlement correctly — awaiting_publish/published/
+                // cancelled anchors are NOT in queueStatuses, so those jobs are excluded.
+                // An anchor in manual_review (queueStatuses) means the operator hasn't
+                // scheduled it yet and the job must stay visible in Social Studio.
+                // No separate video_rebrand block needed: Condition 1 is sufficient.
         }
 
         $perPage = min((int) $request->query('per_page', 25), 100);

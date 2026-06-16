@@ -17,10 +17,13 @@ use Tests\TestCase;
  * drafts, so a draft leaves the moment it's scheduled into the Content Calendar
  * OR published). Opt-in via ?exclude_settled=1.
  *
- *   carousel mode → linked LinkedInPost left queueStatuses
- *                   (awaiting_publish = calendar / published / cancelled) → hidden
- *   blog mode     → handed off to Content Engine (content_idea_id set) → hidden
- *                   immediately, not only once the article finally publishes
+ *   carousel mode     → linked LinkedInPost left queueStatuses
+ *                       (awaiting_publish = calendar / published / cancelled) → hidden
+ *   blog mode         → handed off to Content Engine (content_idea_id set) → hidden
+ *                       immediately, not only once the article finally publishes
+ *   video_rebrand     → hidden only when anchor is scheduled/published (in feed-states);
+ *                       an unscheduled manual_review anchor stays visible in Social Studio
+ *                       so the operator can reach RepurposeJobDetail → "Schedule for later"
  *   still-in-queue draft (incl. failed), in-flight / drafted-not-routed, no linkage → stays
  *
  * Default (no param) returns the full set — other consumers unaffected.
@@ -100,17 +103,53 @@ class RepurposeJobListExcludeSettledTest extends TestCase
         ]);
     }
 
-    public function test_excludes_video_rebrand_once_anchored(): void
+    public function test_keeps_video_rebrand_when_anchor_is_unscheduled_manual_review(): void
     {
-        // A video job settles the moment finalizeVideoRebrand links a video_carousel
-        // anchor (it's now in the Content Calendar / LinkedIn tab) — unlike carousel,
-        // it leaves immediately regardless of the anchor's working-queue status.
+        // Regression test for prod draft #168: FinalizeRepurpose creates the anchor
+        // in manual_review with scheduled_at=NULL. The job must STAY in Social Studio
+        // so the operator can reach RepurposeJobDetail → "Schedule for later".
+        // A video_rebrand is only settled once the anchor is actually on the calendar
+        // (has scheduled_at OR is in a feed status).
         $cat = Category::create(['name' => 'AI & Tech']);
         $post = Post::factory()->create(['category_id' => $cat->id, 'title' => 'Anchor', 'content' => '<p>b</p>']);
         $anchor = LinkedInPost::factory()->create([
             'post_id' => $post->id,
             'format' => LinkedInPost::FORMAT_VIDEO_CAROUSEL,
             'status' => 'manual_review',
+            'scheduled_at' => null,
+        ]);
+        $job = $this->videoJob($anchor->id);
+
+        $this->assertContains($job->id, $this->listIds(['exclude_settled' => 1]));
+    }
+
+    public function test_excludes_video_rebrand_when_anchor_scheduled(): void
+    {
+        // Once the operator schedules via Zernio, mirrorAnchorScheduled sets
+        // scheduled_at + advances anchor to awaiting_publish → job is on the
+        // Content Calendar → settled → leaves Social Studio.
+        $cat = Category::create(['name' => 'AI & Tech']);
+        $post = Post::factory()->create(['category_id' => $cat->id, 'title' => 'Anchor', 'content' => '<p>b</p>']);
+        $anchor = LinkedInPost::factory()->create([
+            'post_id' => $post->id,
+            'format' => LinkedInPost::FORMAT_VIDEO_CAROUSEL,
+            'status' => 'awaiting_publish',
+            'scheduled_at' => now()->addHours(2),
+        ]);
+        $job = $this->videoJob($anchor->id);
+
+        $this->assertNotContains($job->id, $this->listIds(['exclude_settled' => 1]));
+    }
+
+    public function test_excludes_video_rebrand_when_anchor_published(): void
+    {
+        $cat = Category::create(['name' => 'AI & Tech']);
+        $post = Post::factory()->create(['category_id' => $cat->id, 'title' => 'Anchor', 'content' => '<p>b</p>']);
+        $anchor = LinkedInPost::factory()->create([
+            'post_id' => $post->id,
+            'format' => LinkedInPost::FORMAT_VIDEO_CAROUSEL,
+            'status' => 'published',
+            'scheduled_at' => now()->subHour(),
         ]);
         $job = $this->videoJob($anchor->id);
 
