@@ -22,6 +22,30 @@ class ZernioClientTest extends TestCase
     {
         Setting::create(['group' => 'zernio', 'key' => 'zernio_api_key_igtt', 'value' => Crypt::encryptString('sk_igtt_key'), 'type' => 'text']);
         Setting::create(['group' => 'zernio', 'key' => 'zernio_api_key_threads', 'value' => Crypt::encryptString('sk_threads_key'), 'type' => 'text']);
+        Setting::create(['group' => 'zernio', 'key' => 'zernio_api_key_fbyt', 'value' => Crypt::encryptString('sk_fbyt_key'), 'type' => 'text']);
+    }
+
+    public function test_reddit_reuses_threads_workspace_key(): void
+    {
+        $this->seedKeys();
+        Http::fake(['zernio.com/api/v1/posts' => Http::response(['post' => ['_id' => 'zr']], 201)]);
+
+        (new ZernioClient)->forPlatform('reddit')->createPost(['content' => 'hi']);
+
+        Http::assertSent(fn ($r) => $r->hasHeader('Authorization', 'Bearer sk_threads_key'));
+    }
+
+    public function test_facebook_and_youtube_use_fbyt_key(): void
+    {
+        $this->seedKeys();
+        Http::fake(['zernio.com/api/v1/posts' => Http::response(['post' => ['_id' => 'zf']], 201)]);
+
+        (new ZernioClient)->forPlatform('facebook')->createPost(['content' => 'hi']);
+        (new ZernioClient)->forPlatform('youtube')->createPost(['content' => 'hi']);
+
+        Http::assertSent(fn ($r) => $r->hasHeader('Authorization', 'Bearer sk_fbyt_key'));
+        // The igtt key must NOT be used for fb/yt.
+        Http::assertNotSent(fn ($r) => $r->hasHeader('Authorization', 'Bearer sk_igtt_key'));
     }
 
     public function test_instagram_and_tiktok_use_igtt_key(): void

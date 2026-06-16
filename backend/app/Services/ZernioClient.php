@@ -34,15 +34,19 @@ class ZernioClient
     private ?string $platform = null;
 
     /**
-     * Bind the client to a platform's workspace key. IG/TikTok share the
-     * "igtt" workspace; Threads uses its own.
+     * Bind the client to a platform's workspace key. Three workspaces:
+     *   instagram, tiktok   → zernio_api_key_igtt
+     *   threads, reddit     → zernio_api_key_threads  (Reddit shares the Threads workspace)
+     *   facebook, youtube   → zernio_api_key_fbyt     (2026-06-16)
      */
     public function forPlatform(string $platform): self
     {
         $this->platform = $platform;
-        $settingKey = $platform === 'threads'
-            ? 'zernio_api_key_threads'
-            : 'zernio_api_key_igtt';
+        $settingKey = match ($platform) {
+            'threads', 'reddit' => 'zernio_api_key_threads',
+            'facebook', 'youtube' => 'zernio_api_key_fbyt',
+            default => 'zernio_api_key_igtt', // instagram, tiktok (preserves prior fallback)
+        };
 
         $this->apiKey = $this->resolveKey($settingKey);
 
