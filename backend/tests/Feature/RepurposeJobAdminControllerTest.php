@@ -245,6 +245,28 @@ class RepurposeJobAdminControllerTest extends TestCase
         Queue::assertNothingPushed();
     }
 
+    public function test_retry_video_full_requeues_for_the_local_worker_without_dispatching(): void
+    {
+        Queue::fake();
+        $job = RepurposeJob::factory()->create([
+            'mode' => RepurposeJob::MODE_VIDEO_FULL,
+            'status' => 'failed',
+            'last_error' => 'veo timeout',
+            'pipeline_state_log' => [
+                ['from' => 'processing_local', 'to' => 'failed', 'reason' => 'worker reported failure', 'timestamp' => '2026-06-16T00:00:00+00:00'],
+            ],
+        ]);
+
+        $this->actingAs($this->admin(), 'sanctum')
+            ->postJson("/api/admin/repurpose/{$job->id}/retry")
+            ->assertOk()->assertJson(['success' => true]);
+
+        // No VPS job — the MacBook worker re-claims from queued_local.
+        $this->assertSame('queued_local', $job->refresh()->status);
+        $this->assertNull($job->last_error);
+        Queue::assertNothingPushed();
+    }
+
     public function test_retry_drafted_blog_with_lost_content_idea_reruns_finalize(): void
     {
         Queue::fake();

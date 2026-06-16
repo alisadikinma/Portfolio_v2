@@ -1,0 +1,19 @@
+{
+  "name": "video-full-remotion",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Remotion compositions for video_full: timed Indonesian caption overlay + explainer-recreate templates (kinetic typography, bullet reveal). Rendered headless by ../compose.js via `npx remotion render`.",
+  "scripts": {
+    "studio": "remotion studio",
+    "render:captions": "remotion render Captions out/captions.mov --codec prores --prores-profile 4444"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "^4.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  }
+}

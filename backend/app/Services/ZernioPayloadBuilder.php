@@ -209,6 +209,33 @@ class ZernioPayloadBuilder
         );
     }
 
+    /**
+     * video_full (mode #4): a single rendered MP4 reel → one video mediaItem.
+     * The simplest Zernio case — every platform (LinkedIn/IG/TikTok/Threads)
+     * supports a single video post. Caption is per-platform via captionFor().
+     */
+    public function buildVideoFull(RepurposeJob $job, string $platform, ?string $caption = null): array
+    {
+        $url = trim((string) $job->final_video_url);
+        if ($url === '') {
+            throw new RuntimeException(
+                "video_full job #{$job->id} has no final video to publish yet — wait for the worker to upload it."
+            );
+        }
+
+        $content = $caption ?? $job->captionFor($platform);
+        if ($platform === 'threads') {
+            $content = $this->capThreadsContent($content, (int) $job->id);
+        }
+
+        return $this->payload(
+            platform: $platform,
+            accountId: $this->resolveAccountId($platform),
+            content: $content,
+            mediaItems: [['url' => $url, 'type' => 'video']],
+        );
+    }
+
     // ─── Private helpers ─────────────────────────────────────────────────────
 
     /** Assemble the single-platform Zernio create-post body (sans scheduling). */

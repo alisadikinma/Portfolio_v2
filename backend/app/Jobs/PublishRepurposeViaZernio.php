@@ -89,9 +89,12 @@ class PublishRepurposeViaZernio implements ShouldQueue
             // Per-platform caption (caption_instagram / caption_threads) so what
             // the operator edited in the draft is exactly what ships — not the raw
             // source caption igCaption() used to fall through to.
-            $payload = $this->applyScheduling(
-                $builder->buildRepurposeVideoCarousel($job, $this->platform, $job->captionFor($this->platform))
-            );
+            // video_full ships a single MP4 (buildVideoFull); video_rebrand ships the
+            // composited carousel clips (buildRepurposeVideoCarousel).
+            $built = $job->mode === RepurposeJob::MODE_VIDEO_FULL
+                ? $builder->buildVideoFull($job, $this->platform, $job->captionFor($this->platform))
+                : $builder->buildRepurposeVideoCarousel($job, $this->platform, $job->captionFor($this->platform));
+            $payload = $this->applyScheduling($built);
 
             $this->mergeState(['status' => 'publishing', 'request_id' => $requestId, 'error' => null]);
 

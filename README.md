@@ -143,10 +143,13 @@ Public        GET  /api/posts /projects /awards /galleries /testimonials /servic
 Admin         CRUD /api/admin/{posts,projects,awards,galleries,testimonials,...}
  (sanctum)         /api/admin/content-engine/*   (idea pipeline + 2-gate approval)
                    /api/admin/linkedin-drafts/*  (social drafts, carousel render, publish)
-                   /api/admin/repurpose/*        (Telegram IG intake jobs)
+                   /api/admin/repurpose/*        (Telegram IG intake → carousel / blog / video)
+                   /api/admin/video-full/*       (Video 60s reels — list / detail / publish)
                    /api/admin/scheduler/*        (DB-driven cron control)
 Automation    CRUD /api/automation/posts        (n8n / Zapier / Make.com)
               POST /api/automation/blog/image-webhook  /api/automation/geminigen/webhook
+Worker        GET  /api/worker/video-full/claim  +/progress /segments /assets /fail
+ (token)           (VPS↔MacBook bridge — local-worker daemon, ability:video-full:work)
 CV Export     GET  /api/cv/export  /api/cv/master.md   (token-scoped, for jobhunter)
 ```
 
@@ -199,7 +202,8 @@ Production runs on a VPS (Nginx + SSL + Cloudflare). The queue worker (`portfoli
 | [CLAUDE.md](./CLAUDE.md) | Architecture reference + conventions + ops gotchas (the source of truth) |
 | [backend/README.md](./backend/README.md) | Backend technical details |
 | [frontend/README.md](./frontend/README.md) | Frontend architecture |
-| [docs/runbooks/](./docs/runbooks/) | Deploy + ops runbooks (SEO/SSR, newsletter, repurpose, cross-post) |
+| [docs/runbooks/](./docs/runbooks/) | Deploy + ops runbooks (SEO/SSR, newsletter, repurpose, cross-post, video reels) |
+| [video-full-worker/README.md](./video-full-worker/README.md) | MacBook local-worker daemon (Video 60s pipeline + bridge) |
 | [docs/plans/](./docs/plans/) | Design + implementation plans per feature |
 
 ---

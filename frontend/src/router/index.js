@@ -540,6 +540,18 @@ const routes = [
     component: () => import('@/views/admin/RepurposeJobDetail.vue'),
     meta: { title: 'Repurpose Job - Admin', requiresAuth: true, layout: 'admin' }
   },
+  {
+    path: '/admin/video-full',
+    name: 'admin-video-full',
+    component: () => import('@/views/admin/VideoFullList.vue'),
+    meta: { title: 'Video 60s - Admin', requiresAuth: true, layout: 'admin' }
+  },
+  {
+    path: '/admin/video-full/:id',
+    name: 'admin-video-full-detail',
+    component: () => import('@/views/admin/VideoFullDetail.vue'),
+    meta: { title: 'Video 60s Job - Admin', requiresAuth: true, layout: 'admin' }
+  },
 
   // Cross-post admin (Facebook + Instagram + TikTok).
   //

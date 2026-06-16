@@ -41,11 +41,17 @@ enum RepurposeJobStatus: string
     case Compositing = 'compositing';
     case Composed = 'composed';
     case Finalizing = 'finalizing';
+    // video_full-only branch (MacBook-local worker lifecycle). The VPS only
+    // tracks state; capture→ASR→segment→Veo/GROK→voice→compose runs off-box.
+    case QueuedLocal = 'queued_local';
+    case ClaimedLocal = 'claimed_local';
+    case ProcessingLocal = 'processing_local';
+    case Uploaded = 'uploaded';
     case Drafted = 'drafted';
     case Failed = 'failed';
 
     public const TRANSITIONS = [
-        'received'    => ['capturing', 'failed'],
+        'received'    => ['capturing', 'queued_local', 'failed'],
         'capturing'   => ['captured', 'failed'],
         'captured'    => ['extracting', 'failed'],
         'extracting'  => ['extracted', 'failed'],
@@ -64,6 +70,14 @@ enum RepurposeJobStatus: string
         'compositing'       => ['composed', 'failed'],
         'composed'          => ['finalizing', 'failed'],
         'finalizing'  => ['drafted', 'failed'],
+        // video_full local-worker lifecycle. Telegram "Video 60s" creates the job
+        // at queued_local; the MacBook worker claims → processes → uploads → drafted.
+        // re-queue edges (claimed/processing → queued_local) cover worker crash;
+        // uploaded → processing_local is the per-segment regenerate edge.
+        'queued_local'     => ['claimed_local', 'failed'],
+        'claimed_local'    => ['processing_local', 'queued_local', 'failed'],
+        'processing_local' => ['uploaded', 'queued_local', 'failed'],
+        'uploaded'         => ['drafted', 'processing_local', 'failed'],
         'drafted'     => [],
         // Per-step retry entrypoints after a failure. These are the guard states
         // each step job accepts (CaptureInstagramPost@capturing,
@@ -72,7 +86,7 @@ enum RepurposeJobStatus: string
         // admin retry can resume the exact failed step rather than restart.
         // video_rebrand guard states: GenerateRebrandAssets@extracted (already
         // listed), ComposeVideoCarousel@assets_ready, FinalizeRepurpose(video)@composed.
-        'failed'      => ['capturing', 'captured', 'extracted', 'researched', 'rewritten', 'assets_ready', 'composed'],
+        'failed'      => ['capturing', 'captured', 'extracted', 'researched', 'rewritten', 'assets_ready', 'composed', 'queued_local', 'processing_local'],
     ];
 
     public function canTransitionTo(self $next): bool
