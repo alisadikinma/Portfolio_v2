@@ -6,6 +6,7 @@ use App\Models\LinkedInPost;
 use App\Models\Setting;
 use App\Services\CarouselGenOutputAdapter;
 use App\Services\LinkedInGenerationService;
+use App\Services\RepurposeCarouselBuilder;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -48,6 +49,20 @@ class RegenerateLinkedInCarouselContent implements ShouldQueue
 
     public function __construct(public readonly int $draftId)
     {
+    }
+
+    /**
+     * Drop duplicate dispatches silently (dontRelease) rather than requeueing.
+     * expireAfter exceeds the job $timeout + worker --timeout margin so the lock
+     * never outlives a legitimately in-flight run.
+     */
+    public function middleware(): array
+    {
+        return [
+            (new \Illuminate\Queue\Middleware\WithoutOverlapping($this->draftId))
+                ->dontRelease()
+                ->expireAfter(1320), // > $timeout(1200) + worker --timeout(1260) margin
+        ];
     }
 
     public function handle(
@@ -115,6 +130,30 @@ class RegenerateLinkedInCarouselContent implements ShouldQueue
         // and ignored a cinematic revert.
         $style = (string) Setting::get('linkedin_carousel_style', 'sketchnote');
         $isRepurpose = $generation->isRepurposeDraft($draft);
+
+        // Source-mirror path: for IG-repurpose carousels, build one slide per source
+        // tool instead of calling /carousel-gen. The 20-min job budget (vs 360s for the
+        // auto-pipeline) makes sequential per-slide authoring safe here. Falls back to
+        // /carousel-gen when the builder returns [] (no parseable tool list in caption).
+        if ($isRepurpose && config('linkedin.repurpose_source_mirror_regenerate', true)) {
+            $sourceSlides = app(RepurposeCarouselBuilder::class)->buildForDraftId($this->draftId);
+            if ($sourceSlides !== []) {
+                $draft->update([
+                    'carousel_slides'  => $sourceSlides,
+                    'slide_asset_urns' => null,
+                    'last_error'       => null,
+                ]);
+                Log::info('[RegenerateCarouselContent] source-mirror slides assembled (skipping /carousel-gen)', [
+                    'draft_id'    => $this->draftId,
+                    'slide_count' => count($sourceSlides),
+                ]);
+                GenerateLinkedInCarouselImages::dispatch($this->draftId);
+                return;
+            }
+            Log::info('[RegenerateCarouselContent] source-mirror yielded no slides — falling back to /carousel-gen', [
+                'draft_id' => $this->draftId,
+            ]);
+        }
 
         Log::info('[RegenerateCarouselContent] dispatching /carousel-gen', [
             'draft_id' => $this->draftId,
