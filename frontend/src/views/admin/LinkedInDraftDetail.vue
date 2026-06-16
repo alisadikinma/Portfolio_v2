@@ -132,6 +132,38 @@ function openSocialStudio() {
   if (repurposeJobId.value) router.push({ name: 'admin-repurpose-detail', params: { id: repurposeJobId.value } })
 }
 
+// Clip viewer (mirrors the carousel slide viewer: one large player + prev/next +
+// thumbnail strip) instead of a flat grid.
+const videoClips = computed(() => repurpose.value?.composited_videos || [])
+const activeClipIndex = ref(0)
+watch(videoClips, () => { activeClipIndex.value = 0 })
+function prevClip() { if (activeClipIndex.value > 0) activeClipIndex.value-- }
+function nextClip() { if (activeClipIndex.value < videoClips.value.length - 1) activeClipIndex.value++ }
+
+// Caption tabs (mirrors the carousel platform switcher: IG / Threads). The
+// editor binds to the active platform's draft; Save persists both.
+const videoPlatform = ref('instagram')
+const videoCaptionModel = computed({
+  get: () => (videoPlatform.value === 'threads' ? threadsCaptionDraft.value : igCaptionDraft.value),
+  set: (v) => {
+    if (videoPlatform.value === 'threads') threadsCaptionDraft.value = v
+    else igCaptionDraft.value = v
+  },
+})
+const videoCaptionRemaining = computed(() =>
+  videoPlatform.value === 'threads' ? THREADS_CAP - threadsCaptionDraft.value.length : null)
+
+const VIDEO_STATUS_CHIP = {
+  published: { label: 'Published', dot: 'bg-emerald-400', text: 'text-emerald-300' },
+  scheduled: { label: 'Scheduled', dot: 'bg-amber-400', text: 'text-amber-300' },
+  publishing: { label: 'Publishing', dot: 'bg-cyan-400 animate-pulse', text: 'text-cyan-300' },
+  failed: { label: 'Failed', dot: 'bg-red-400', text: 'text-red-300' },
+}
+function videoPlatformChip(p) {
+  const st = zernioPlatformState(p)?.status
+  return (st && VIDEO_STATUS_CHIP[st]) || { label: 'Not sent', dot: 'bg-neutral-600', text: 'text-neutral-500' }
+}
+
 // --- Per-platform caption switcher --------------------------------------
 // Operator toggles between LinkedIn / FB / IG / TikTok in-place — only
 // caption + hashtags + status pill swap. The carousel slide imagery is
@@ -1301,23 +1333,38 @@ const showThumbnailUploadCaption = computed(() =>
     <!-- ====================================================================
          VIDEO CAROUSEL (IG + Threads) — display-only LinkedIn anchor whose real
          content lives on the linked repurpose job (draft.repurpose).
+         Shell mirrors the image carousel layout: status hero + 1fr/360px grid.
          ==================================================================== -->
     <template v-else-if="isVideoCarousel">
-      <section class="rounded-2xl border border-neutral-800/80 bg-neutral-950/40 p-6 space-y-2">
-        <div class="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div class="flex items-center gap-2">
-              <span class="rounded bg-fuchsia-500/15 px-2 py-0.5 text-[10px] font-mono uppercase tracking-wider text-fuchsia-300">🎬 Video carousel · IG · Threads</span>
-              <span class="rounded-full px-2.5 py-0.5 text-[11px] font-mono uppercase tracking-wide" :class="mood.chip">{{ meta.label }}</span>
+      <!-- ============== STATUS HERO PANEL ============== -->
+      <section
+        class="relative overflow-hidden rounded-2xl border border-neutral-800/80 bg-neutral-950/40"
+        :class="['ring-1', mood.chip.split(' ').filter(c => c.startsWith('ring-')).join(' ')]"
+      >
+        <div class="absolute left-0 top-0 bottom-0 w-[3px] bg-gradient-to-b" :class="mood.rail" />
+        <div class="relative p-6 sm:p-7 grid gap-5 lg:grid-cols-[1fr_auto] lg:items-start">
+          <div class="space-y-3">
+            <div class="flex flex-wrap items-center gap-2.5">
+              <span
+                class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-mono font-medium uppercase tracking-[0.12em]"
+                :class="mood.chip"
+              >
+                <span class="w-1.5 h-1.5 rounded-full" :class="mood.dot" />
+                {{ meta.label }}
+              </span>
+              <span class="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-500">
+                🎬 VIDEO CAROUSEL · {{ videoClips.length }} clips
+              </span>
+              <span class="text-[10px] font-mono uppercase tracking-[0.18em] text-neutral-400">IG + Threads via Zernio</span>
             </div>
-            <h1 class="mt-2 text-lg font-semibold text-neutral-100">{{ postTitle(draft) }}</h1>
-            <p class="text-xs text-neutral-500">Published to Instagram + Threads via Zernio. LinkedIn has no video-carousel format, so this never posts to LinkedIn.</p>
+            <h1 class="text-xl font-semibold text-neutral-100">{{ postTitle(draft) }}</h1>
+            <p class="text-xs text-neutral-500">Published to Instagram + Threads via Zernio. LinkedIn has no video-carousel format — this anchor is display-only.</p>
           </div>
           <button
             type="button"
-            class="shrink-0 rounded-lg border border-neutral-700 px-3 py-2 text-xs text-neutral-300 hover:bg-neutral-800/60"
+            class="shrink-0 rounded-lg border border-neutral-700 px-3 py-2 text-xs text-neutral-300 hover:bg-neutral-800/60 transition-colors"
             @click="openSocialStudio"
-          >↪ Open in Social Studio (re-render clips)</button>
+          >↪ Open in Social Studio</button>
         </div>
       </section>
 
@@ -1326,109 +1373,165 @@ const showThumbnailUploadCaption = computed(() =>
       </div>
 
       <template v-else>
-        <!-- Video preview grid -->
-        <section class="rounded-2xl border border-neutral-800/80 bg-neutral-950/40 p-6">
-          <h2 class="mb-3 text-sm font-semibold text-neutral-200">Clips <span class="text-neutral-500">· {{ repurpose.composited_videos.length }}</span></h2>
-          <div v-if="repurpose.composited_videos.length" class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            <video
-              v-for="(url, i) in repurpose.composited_videos"
-              :key="i"
-              :src="url"
-              controls
-              preload="metadata"
-              class="aspect-[4/5] w-full rounded-lg border border-neutral-800 bg-black object-cover"
-            />
-          </div>
-          <p v-else class="text-xs text-neutral-500">No composited clips yet — render them in Social Studio.</p>
-        </section>
+        <!-- ============== BODY GRID (mirrors image carousel: 1fr / 360px) ============== -->
+        <div class="grid gap-6 lg:grid-cols-[1fr_360px]">
 
-        <!-- Per-platform caption editors -->
-        <section class="rounded-2xl border border-neutral-800/80 bg-neutral-950/40 p-6 space-y-4">
-          <div class="flex items-center justify-between">
-            <h2 class="text-sm font-semibold text-neutral-200">Captions</h2>
-            <button
-              type="button"
-              :disabled="!captionsDirty || updateCaptions.isPending.value"
-              class="rounded-lg bg-emerald-600/90 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-600 disabled:opacity-40"
-              @click="saveVideoCaptions"
-            >{{ updateCaptions.isPending.value ? 'Saving…' : 'Save captions' }}</button>
-          </div>
-
-          <div>
-            <label class="mb-1 flex items-center gap-2 text-xs font-medium text-fuchsia-300">Instagram caption</label>
-            <textarea
-              v-model="igCaptionDraft"
-              rows="5"
-              class="w-full rounded-lg border border-neutral-700 bg-neutral-900/60 px-3 py-2 text-sm text-neutral-100 focus:border-fuchsia-400/60 focus:outline-none"
-              placeholder="Instagram caption…"
-            />
-            <div class="mt-1 text-right text-[11px] text-neutral-500">{{ igCaptionDraft.length }} chars</div>
-          </div>
-
-          <div>
-            <label class="mb-1 flex items-center gap-2 text-xs font-medium text-neutral-300">Threads caption</label>
-            <textarea
-              v-model="threadsCaptionDraft"
-              rows="4"
-              :maxlength="THREADS_CAP"
-              class="w-full rounded-lg border border-neutral-700 bg-neutral-900/60 px-3 py-2 text-sm text-neutral-100 focus:border-neutral-400/60 focus:outline-none"
-              placeholder="Threads caption…"
-            />
-            <div class="mt-1 text-right text-[11px]" :class="threadsRemaining < 0 ? 'text-red-400' : 'text-neutral-500'">
-              {{ threadsRemaining }} / {{ THREADS_CAP }} left
-            </div>
-          </div>
-        </section>
-
-        <!-- Publish / Schedule + per-platform status -->
-        <section class="rounded-2xl border border-neutral-800/80 bg-neutral-950/40 p-6 space-y-4">
-          <h2 class="text-sm font-semibold text-neutral-200">Publish</h2>
-
-          <div class="flex flex-wrap gap-3">
-            <div
-              v-for="p in VIDEO_PLATFORMS"
-              :key="p"
-              class="flex items-center gap-2 rounded-lg border border-neutral-800 px-3 py-2 text-xs"
-            >
-              <span class="font-mono uppercase tracking-wide" :class="p === 'instagram' ? 'text-fuchsia-300' : 'text-neutral-300'">{{ p }}</span>
-              <span v-if="zernioPlatformState(p)" class="rounded-full bg-neutral-800 px-2 py-0.5 text-[10px] uppercase text-neutral-300">{{ zernioPlatformState(p).status }}</span>
-              <span v-else class="text-neutral-600">not sent</span>
-              <a
-                v-if="zernioPlatformState(p)?.url"
-                :href="zernioPlatformState(p).url"
-                target="_blank"
-                rel="noopener"
-                class="text-cyan-400 hover:underline"
-              >open ↗</a>
-            </div>
-          </div>
-
-          <div class="flex flex-wrap items-end gap-3 pt-1">
-            <button
-              type="button"
-              :disabled="publishZernioMut.isPending.value || !repurpose.composited_videos.length"
-              class="rounded-lg bg-emerald-600/90 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600 disabled:opacity-40"
-              @click="publishVideoNow"
-            >✓ Approve &amp; Publish now (IG + Threads)</button>
-
-            <div class="flex items-end gap-2">
-              <div>
-                <label class="mb-1 block text-[11px] text-neutral-500">Schedule for</label>
-                <input
-                  v-model="videoScheduleAt"
-                  type="datetime-local"
-                  class="rounded-lg border border-neutral-700 bg-neutral-900/60 px-3 py-2 text-sm text-neutral-100 focus:border-cyan-400/60 focus:outline-none"
-                />
+          <!-- LEFT: swipeable clip viewer + thumbnail strip -->
+          <div class="space-y-3">
+            <div class="relative rounded-2xl overflow-hidden border border-neutral-800/80 bg-black aspect-[4/5]">
+              <video
+                v-if="videoClips.length"
+                :key="activeClipIndex"
+                :src="videoClips[activeClipIndex]"
+                controls
+                preload="metadata"
+                class="w-full h-full object-contain"
+              />
+              <div v-else class="flex items-center justify-center h-full text-neutral-500 text-sm px-6 text-center">
+                No composited clips yet — render them in Social Studio.
               </div>
+
+              <!-- Prev -->
+              <button
+                v-if="activeClipIndex > 0"
+                type="button"
+                class="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 flex items-center justify-center text-white hover:bg-black/80 transition-colors z-10"
+                @click="prevClip"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </button>
+
+              <!-- Next -->
+              <button
+                v-if="activeClipIndex < videoClips.length - 1"
+                type="button"
+                class="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 flex items-center justify-center text-white hover:bg-black/80 transition-colors z-10"
+                @click="nextClip"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
+              </button>
+
+              <!-- Counter badge -->
+              <div
+                v-if="videoClips.length > 1"
+                class="absolute top-3 right-3 rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-mono text-neutral-300"
+              >
+                {{ activeClipIndex + 1 }} / {{ videoClips.length }}
+              </div>
+            </div>
+
+            <!-- Thumbnail strip -->
+            <div v-if="videoClips.length > 1" class="flex gap-2 overflow-x-auto pb-1">
+              <button
+                v-for="(url, i) in videoClips"
+                :key="i"
+                type="button"
+                class="shrink-0 rounded-lg overflow-hidden border-2 transition-all"
+                :class="i === activeClipIndex
+                  ? 'border-amber-400 ring-1 ring-amber-400/40'
+                  : 'border-neutral-700 hover:border-neutral-500'"
+                style="width:60px"
+                @click="activeClipIndex = i"
+              >
+                <video :src="url" preload="metadata" muted class="w-full aspect-[4/5] object-cover bg-black" />
+              </button>
+            </div>
+          </div>
+
+          <!-- RIGHT: platform tab strip + caption + actions -->
+          <div class="space-y-4">
+            <!-- Platform tabs -->
+            <div class="flex gap-1 rounded-xl border border-neutral-800 bg-neutral-900/60 p-1">
+              <button
+                v-for="p in ['instagram', 'threads']"
+                :key="p"
+                type="button"
+                class="flex-1 rounded-lg px-3 py-1.5 text-xs font-medium transition-all border"
+                :class="videoPlatform === p
+                  ? PLATFORM_META[p].activeBg
+                  : 'border-transparent text-neutral-500 hover:text-neutral-300'"
+                @click="videoPlatform = p"
+              >{{ PLATFORM_META[p].label }}</button>
+            </div>
+
+            <!-- Caption editor -->
+            <div class="rounded-2xl border border-neutral-800/80 bg-neutral-950/40 p-4 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-medium" :class="PLATFORM_META[videoPlatform].accent">
+                  {{ PLATFORM_META[videoPlatform].label }} caption
+                </span>
+                <button
+                  type="button"
+                  :disabled="!captionsDirty || updateCaptions.isPending.value"
+                  class="rounded-lg bg-emerald-600/90 px-3 py-1 text-xs font-medium text-white hover:bg-emerald-600 disabled:opacity-40 transition-colors"
+                  @click="saveVideoCaptions"
+                >{{ updateCaptions.isPending.value ? 'Saving…' : 'Save' }}</button>
+              </div>
+              <textarea
+                v-model="videoCaptionModel"
+                rows="6"
+                class="w-full rounded-lg border border-neutral-700 bg-neutral-900/60 px-3 py-2 text-sm text-neutral-100 focus:outline-none transition-colors resize-none"
+                :class="videoPlatform === 'instagram' ? 'focus:border-fuchsia-400/60' : 'focus:border-neutral-400/60'"
+                :placeholder="`${PLATFORM_META[videoPlatform].label} caption…`"
+              />
+              <div class="text-right text-[11px]" :class="videoCaptionRemaining !== null && videoCaptionRemaining < 0 ? 'text-red-400' : 'text-neutral-500'">
+                <template v-if="videoCaptionRemaining !== null">{{ videoCaptionRemaining }} / {{ THREADS_CAP }} left</template>
+                <template v-else>{{ videoCaptionModel.length }} chars</template>
+              </div>
+            </div>
+
+            <!-- Per-platform publish status -->
+            <div class="rounded-2xl border border-neutral-800/80 bg-neutral-950/40 p-4 space-y-2">
+              <p class="text-[11px] font-mono uppercase tracking-[0.14em] text-neutral-500 mb-2">Publish status</p>
+              <div v-for="p in VIDEO_PLATFORMS" :key="p" class="flex items-center justify-between gap-2 py-0.5">
+                <div class="flex items-center gap-2">
+                  <span class="text-[11px] font-mono uppercase tracking-wide" :class="p === 'instagram' ? 'text-fuchsia-300' : 'text-neutral-300'">{{ p }}</span>
+                  <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-mono uppercase" :class="videoPlatformChip(p).text">
+                    <span class="w-1 h-1 rounded-full" :class="videoPlatformChip(p).dot" />
+                    {{ videoPlatformChip(p).label }}
+                  </span>
+                </div>
+                <a
+                  v-if="zernioPlatformState(p)?.url"
+                  :href="zernioPlatformState(p).url"
+                  target="_blank" rel="noopener"
+                  class="text-[11px] text-cyan-400 hover:underline"
+                >↗</a>
+              </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="rounded-2xl border border-neutral-800/80 bg-neutral-950/40 p-4 space-y-3">
               <button
                 type="button"
-                :disabled="publishZernioMut.isPending.value || !videoScheduleAt || !repurpose.composited_videos.length"
-                class="rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-4 py-2 text-sm font-medium text-cyan-200 hover:bg-cyan-500/20 disabled:opacity-40"
-                @click="scheduleVideo"
-              >🗓 Schedule</button>
+                :disabled="publishZernioMut.isPending.value || !videoClips.length"
+                class="w-full rounded-lg bg-emerald-600/90 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-600 disabled:opacity-40 transition-colors"
+                @click="publishVideoNow"
+              >✓ Approve &amp; Publish now (IG + Threads)</button>
+
+              <div class="flex items-end gap-2">
+                <div class="flex-1">
+                  <label class="mb-1 block text-[11px] text-neutral-500">Schedule for</label>
+                  <input
+                    v-model="videoScheduleAt"
+                    type="datetime-local"
+                    class="w-full rounded-lg border border-neutral-700 bg-neutral-900/60 px-3 py-2 text-sm text-neutral-100 focus:border-cyan-400/60 focus:outline-none"
+                  />
+                </div>
+                <button
+                  type="button"
+                  :disabled="publishZernioMut.isPending.value || !videoScheduleAt || !videoClips.length"
+                  class="rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-4 py-2 text-sm font-medium text-cyan-200 hover:bg-cyan-500/20 disabled:opacity-40 transition-colors"
+                  @click="scheduleVideo"
+                >🗓 Schedule</button>
+              </div>
             </div>
           </div>
-        </section>
+        </div>
       </template>
     </template>
 
