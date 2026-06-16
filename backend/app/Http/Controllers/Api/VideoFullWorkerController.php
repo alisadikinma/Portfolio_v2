@@ -139,6 +139,33 @@ class VideoFullWorkerController extends Controller
         return response()->json(['ok' => true]);
     }
 
+    /**
+     * The worker hit an unrecoverable error mid-job. Surface it as a Failed job on
+     * the VPS so the operator sees it (and can retry) instead of a silently stuck
+     * row that only reveals itself via a stale heartbeat. No-op if the job already
+     * left the in-flight states (e.g. a late crash after the final upload landed).
+     */
+    public function fail(Request $request, int $id): JsonResponse
+    {
+        $job = $this->job($id);
+        $data = $request->validate([
+            'error' => ['nullable', 'string', 'max:2000'],
+            'step' => ['nullable', 'string', 'max:32'],
+        ]);
+
+        if (in_array($job->status, [
+            RepurposeJobStatus::ClaimedLocal->value,
+            RepurposeJobStatus::ProcessingLocal->value,
+        ], true)) {
+            $job->forceFill(['worker_step' => $data['step'] ?? $job->worker_step])->save();
+            $job->transitionTo(RepurposeJobStatus::Failed, 'worker reported failure', [
+                'last_error' => $data['error'] ?? 'worker pipeline error',
+            ]);
+        }
+
+        return response()->json(['ok' => true, 'status' => $job->status]);
+    }
+
     private function job(int $id): RepurposeJob
     {
         return RepurposeJob::where('mode', RepurposeJob::MODE_VIDEO_FULL)->findOrFail($id);

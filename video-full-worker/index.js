@@ -108,6 +108,9 @@ export async function run({ bridge = new Bridge(), once = false } = {}) {
         console.log(`[video-full-worker] job ${job.id} done → ${out}`);
       } catch (e) {
         console.error(`[video-full-worker] job ${job.id} failed:`, e.message);
+        // Surface the crash on the VPS so the operator sees a Failed job (retryable)
+        // rather than a row stuck at processing_local until the heartbeat goes stale.
+        await bridge.fail(job.id, e.message).catch(() => {});
       }
     }
     if (once) return;

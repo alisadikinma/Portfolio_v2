@@ -116,6 +116,30 @@ class VideoFullBridgeTest extends TestCase
         $this->assertSame(100, $job->worker_progress);
     }
 
+    public function test_fail_marks_an_in_flight_job_failed_with_the_reported_error(): void
+    {
+        $this->workerActing();
+        $job = $this->job('processing_local');
+
+        $this->putJson("/api/worker/video-full/{$job->id}/fail", ['error' => 'veo timeout', 'step' => 'animate'])
+            ->assertOk()->assertJsonPath('status', 'failed');
+
+        $job->refresh();
+        $this->assertSame('failed', $job->status);
+        $this->assertSame('veo timeout', $job->last_error);
+    }
+
+    public function test_fail_is_a_noop_once_the_job_left_the_in_flight_states(): void
+    {
+        $this->workerActing();
+        $job = $this->job('uploaded');
+
+        $this->putJson("/api/worker/video-full/{$job->id}/fail", ['error' => 'late crash'])
+            ->assertOk()->assertJsonPath('status', 'uploaded');
+
+        $this->assertSame('uploaded', $job->fresh()->status);
+    }
+
     public function test_admin_regenerate_segment_marks_pending_and_bounces_to_processing(): void
     {
         Sanctum::actingAs(User::factory()->create());

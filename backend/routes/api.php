@@ -1375,11 +1375,12 @@ Route::middleware(['auth:sanctum'])->prefix('admin/repurpose')->group(function (
 // video_full (mode #4) — VPS↔MacBook bridge. WORKER side: every route gated by a
 // Sanctum token with the `video-full:work` ability (mint: User::find(1)
 // ->createToken('video-full-worker', ['video-full:work'])->plainTextToken).
-Route::middleware(['auth:sanctum', 'ability:video-full:work'])->prefix('worker/video-full')->group(function () {
+Route::middleware(['auth:sanctum', 'ability:video-full:work', 'throttle:240,1'])->prefix('worker/video-full')->group(function () {
     Route::get('/claim', [VideoFullWorkerController::class, 'claim']);
     Route::put('/{id}/progress', [VideoFullWorkerController::class, 'progress'])->whereNumber('id');
     Route::post('/{id}/segments', [VideoFullWorkerController::class, 'segments'])->whereNumber('id');
     Route::post('/{id}/assets', [VideoFullWorkerController::class, 'assets'])->whereNumber('id');
+    Route::put('/{id}/fail', [VideoFullWorkerController::class, 'fail'])->whereNumber('id');
 });
 
 // video_full — ADMIN side: list / detail / per-segment regenerate.

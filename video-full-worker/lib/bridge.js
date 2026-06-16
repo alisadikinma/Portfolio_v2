@@ -34,6 +34,14 @@ export class Bridge {
     return this.#json('PUT', `/worker/video-full/${id}/progress`, { progress, step });
   }
 
+  /** Report an unrecoverable error so the VPS marks the job Failed (not stuck). */
+  fail(id, error, step) {
+    return this.#json('PUT', `/worker/video-full/${id}/fail`, {
+      error: String(error ?? '').slice(0, 2000),
+      step,
+    });
+  }
+
   putSegments(id, segments) {
     return this.#json('POST', `/worker/video-full/${id}/segments`, { segments });
   }

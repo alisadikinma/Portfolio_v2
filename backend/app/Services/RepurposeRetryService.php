@@ -63,6 +63,15 @@ class RepurposeRetryService
             return ['ok' => false, 'message' => 'Only a failed job can be retried.', 'status' => $job->status];
         }
 
+        // video_full has NO VPS job — the MacBook worker re-claims from queued_local.
+        // Without this guard the RETRY_MAP fallback would misroute it to 'capturing'
+        // and wrongly dispatch the VPS capture pipeline.
+        if ($job->mode === RepurposeJob::MODE_VIDEO_FULL) {
+            $job->transitionTo(RepurposeJobStatus::QueuedLocal, 'job_retry', ['last_error' => null]);
+
+            return ['ok' => true, 'message' => 'Re-queued for the local worker.', 'status' => $job->status];
+        }
+
         $failedFrom = $this->failedFromStep($job);
         [$guardState, $jobClass] = self::RETRY_MAP[$failedFrom] ?? self::RETRY_MAP['capturing'];
 
