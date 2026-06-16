@@ -70,7 +70,7 @@ class RepurposeJobController extends Controller
                 // content_idea_id is set ONLY by the blog hand-off (finalizeBlog);
                 // carousel jobs never set it, so this hides handed-off blog jobs
                 // without touching carousel.
-                ->whereNull('content_idea_id')
+                ->whereNull('content_idea_id');
                 // video_rebrand: Condition 1 above (linkedinPost status in queueStatuses)
                 // already handles settlement correctly — awaiting_publish/published/
                 // cancelled anchors are NOT in queueStatuses, so those jobs are excluded.
