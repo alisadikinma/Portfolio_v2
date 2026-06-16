@@ -134,6 +134,18 @@
                 Content Calendar
               </router-link>
 
+              <!-- Video 60s — full talking-head reels (MacBook-local worker). -->
+              <router-link
+                to="/admin/video-full"
+                class="flex items-center px-4 py-3 rounded-lg text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
+                active-class="bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 font-semibold"
+              >
+                <svg class="h-5 w-5 mr-3" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" />
+                </svg>
+                🎥 Video 60s
+              </router-link>
+
               <!-- End Social Media section -->
               <div class="my-4 border-t border-neutral-200 dark:border-neutral-700"></div>
 
