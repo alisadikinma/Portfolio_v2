@@ -306,7 +306,7 @@ class TelegramNotificationService
 
         $format = strtoupper((string) ($draft->format ?? 'text'));
         $url = $draft->linkedin_post_url ?? null;
-        $adminUrl = rtrim((string) config('app.url'), '/') . '/admin/linkedin-drafts/' . $draft->id;
+        $adminUrl = rtrim((string) config('app.url'), '/') . '/admin/sosmed-drafts/' . $draft->id;
 
         $lines = [];
         $lines[] = '✅ *Published to LinkedIn* — ' . $format;
@@ -353,7 +353,7 @@ class TelegramNotificationService
             ?? "(post #{$draft->post_id})";
 
         $errorClass = $draft->last_classified_error_class ?? 'unknown';
-        $adminUrl = rtrim((string) config('app.url'), '/') . '/admin/linkedin-drafts/' . $draft->id;
+        $adminUrl = rtrim((string) config('app.url'), '/') . '/admin/sosmed-drafts/' . $draft->id;
 
         $lines = [];
         $lines[] = '⚠️ *LinkedIn auto-retry exhausted*';
@@ -413,7 +413,7 @@ class TelegramNotificationService
             return false;
         }
 
-        $adminUrl = rtrim((string) config('app.url'), '/') . '/admin/linkedin-drafts/' . $draft->id;
+        $adminUrl = rtrim((string) config('app.url'), '/') . '/admin/sosmed-drafts/' . $draft->id;
 
         $lines = [];
         $lines[] = '🛑 *Carousel slide tier-2 fallback failed*';
@@ -655,7 +655,7 @@ class TelegramNotificationService
 
     /**
      * IG repurpose: notify the operator that a draft is ready (finalize done).
-     * blog mode → Content Engine link; carousel mode → /admin/draft-posts link.
+     * blog mode → Content Engine link; carousel mode → /admin/sosmed-drafts link.
      * Plain status reply (master-toggle gated).
      */
     public function sendRepurposeDrafted(\App\Models\RepurposeJob $job, ?int $linkedinDraftId, int $correctedClaims): bool
@@ -680,7 +680,7 @@ class TelegramNotificationService
             $claimLine = $correctedClaims > 0
                 ? "{$correctedClaims} klaim dikoreksi + sumber dilampirkan."
                 : 'Klaim diverifikasi, sumber dilampirkan.';
-            $link = $linkedinDraftId ? "/admin/draft-posts/{$linkedinDraftId}" : '/admin/draft-posts';
+            $link = $linkedinDraftId ? "/admin/sosmed-drafts/{$linkedinDraftId}" : '/admin/social-studio';
             $text = "🎠 *Carousel draft siap* — {$header}\n{$claimLine}\n\nReview → {$link}";
         }
 
@@ -966,7 +966,7 @@ class TelegramNotificationService
         }
 
         $platformList = implode(', ', array_map(fn ($p) => '`' . strtoupper($p) . '`', $platforms));
-        $adminUrl = rtrim((string) config('app.url'), '/') . '/admin/linkedin-drafts/' . $linkedinPostId;
+        $adminUrl = rtrim((string) config('app.url'), '/') . '/admin/sosmed-drafts/' . $linkedinPostId;
 
         $lines = [];
         $lines[] = '🔀 *Cross-post fanout*';
