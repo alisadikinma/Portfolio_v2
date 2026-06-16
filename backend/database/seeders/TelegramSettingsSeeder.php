@@ -59,6 +59,9 @@ class TelegramSettingsSeeder extends Seeder
             // When 'true', an Instagram URL sent to the bot from telegram_chat_id
             // triggers the capture → research → carousel pipeline. Default OFF.
             ['key' => 'telegram_repurpose_enabled',                     'value' => 'false', 'type' => 'text'],
+            // video_full (mode #4) — shows the "🎥 Video 60s" button + allows the
+            // mode. Default OFF (needs the MacBook worker running to render).
+            ['key' => 'telegram_video_full_enabled',                    'value' => 'false', 'type' => 'text'],
         ];
 
         // firstOrCreate — NOT updateOrCreate — so running this seeder on every

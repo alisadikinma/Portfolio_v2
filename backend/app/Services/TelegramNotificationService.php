@@ -575,17 +575,24 @@ class TelegramNotificationService
 
         $text = "🔗 *IG repurpose* — pilih output:\n{$url}{$angleLine}";
 
+        $secondRow = [
+            // video_rebrand (June 13): re-skins a VIDEO carousel into Ali's
+            // brand chrome — ships composited 4:5 MP4s for manual download.
+            ['text' => '🎬 Video rebrand', 'callback_data' => self::signCallback('video_rebrand', 'repurpose', $job->id, $secret)],
+        ];
+        // video_full (June 16): full talking-head regenerate (Ali face/voice/ID),
+        // rendered by the MacBook-local worker. Only shown when explicitly enabled.
+        if ($this->getSetting('telegram_video_full_enabled') === 'true') {
+            $secondRow[] = ['text' => '🎥 Video 60s', 'callback_data' => self::signCallback('video_full', 'repurpose', $job->id, $secret)];
+        }
+
         $replyMarkup = [
             'inline_keyboard' => [
                 [
                     ['text' => '📝 Blog + Carousel', 'callback_data' => self::signCallback('blog', 'repurpose', $job->id, $secret)],
                     ['text' => '🎠 Carousel saja', 'callback_data' => self::signCallback('carousel', 'repurpose', $job->id, $secret)],
                 ],
-                [
-                    // video_rebrand (June 13): re-skins a VIDEO carousel into Ali's
-                    // brand chrome — ships composited 4:5 MP4s for manual download.
-                    ['text' => '🎬 Video rebrand', 'callback_data' => self::signCallback('video_rebrand', 'repurpose', $job->id, $secret)],
-                ],
+                $secondRow,
             ],
         ];
 

@@ -395,7 +395,7 @@ class TelegramWebhookController extends Controller
             return $result['ok'] ? '🔁 Retry dispatched.' : $result['message'];
         }
 
-        if (!in_array($action, ['blog', 'carousel', 'video_rebrand'], true)) {
+        if (!in_array($action, ['blog', 'carousel', 'video_rebrand', 'video_full'], true)) {
             return 'Unknown action.';
         }
 
@@ -404,22 +404,36 @@ class TelegramWebhookController extends Controller
             return 'Already started.';
         }
 
-        $job->update(['mode' => $action]);
-        $job->transitionTo(RepurposeJobStatus::Capturing, "telegram_mode_{$action}");
-
-        // video_rebrand re-skins a VIDEO carousel (yt-dlp download path), the other
-        // two modes scrape image slides (Playwright). Different capture job per mode.
-        if ($action === 'video_rebrand') {
-            CaptureVideoCarousel::dispatch($job->id);
+        // video_full (mode #4): full talking-head regenerate, rendered by the
+        // MacBook-local worker. No VPS capture job — the job parks at queued_local
+        // and the worker claims it via the bridge API. Gated by its own flag.
+        if ($action === 'video_full') {
+            $enabled = (string) Setting::where('group', 'telegram')
+                ->where('key', 'telegram_video_full_enabled')->value('value');
+            if ($enabled !== 'true') {
+                return '🎥 Video 60s belum diaktifkan.';
+            }
+            $job->update(['mode' => RepurposeJob::MODE_VIDEO_FULL]);
+            $job->transitionTo(RepurposeJobStatus::QueuedLocal, 'telegram_mode_video_full');
+            $label = '🎥 Video 60s';
         } else {
-            CaptureInstagramPost::dispatch($job->id);
-        }
+            $job->update(['mode' => $action]);
+            $job->transitionTo(RepurposeJobStatus::Capturing, "telegram_mode_{$action}");
 
-        $label = match ($action) {
-            'blog' => '📝 Blog + Carousel',
-            'video_rebrand' => '🎬 Video rebrand',
-            default => '🎠 Carousel saja',
-        };
+            // video_rebrand re-skins a VIDEO carousel (yt-dlp download path), the other
+            // two modes scrape image slides (Playwright). Different capture job per mode.
+            if ($action === 'video_rebrand') {
+                CaptureVideoCarousel::dispatch($job->id);
+            } else {
+                CaptureInstagramPost::dispatch($job->id);
+            }
+
+            $label = match ($action) {
+                'blog' => '📝 Blog + Carousel',
+                'video_rebrand' => '🎬 Video rebrand',
+                default => '🎠 Carousel saja',
+            };
+        }
 
         // Persistent chat bubble so the operator sees the pipeline actually
         // started — the answerCallbackQuery toast is transient and easy to miss.

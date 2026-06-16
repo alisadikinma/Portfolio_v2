@@ -51,7 +51,7 @@ enum RepurposeJobStatus: string
     case Failed = 'failed';
 
     public const TRANSITIONS = [
-        'received'    => ['capturing', 'failed'],
+        'received'    => ['capturing', 'queued_local', 'failed'],
         'capturing'   => ['captured', 'failed'],
         'captured'    => ['extracting', 'failed'],
         'extracting'  => ['extracted', 'failed'],
