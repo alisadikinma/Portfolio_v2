@@ -70,6 +70,23 @@ class ZernioPayloadBuilderTest extends TestCase
         return $ig;
     }
 
+    public function test_is_platform_enabled_covers_reddit_facebook_youtube(): void
+    {
+        // The gate reads zernio_{platform}_account_id dynamically, so the new
+        // platforms work the moment their account-id setting is non-empty.
+        foreach (['reddit', 'facebook', 'youtube'] as $platform) {
+            $this->assertFalse(
+                ZernioPayloadBuilder::isPlatformEnabled($platform),
+                "{$platform} must be disabled when its account id is unset"
+            );
+            Setting::create(['group' => 'zernio', 'key' => "zernio_{$platform}_account_id", 'value' => "{$platform}_acc"]);
+            $this->assertTrue(
+                ZernioPayloadBuilder::isPlatformEnabled($platform),
+                "{$platform} must be enabled once its account id is set"
+            );
+        }
+    }
+
     public function test_instagram_all_image_with_first_comment(): void
     {
         $ig = $this->ig(['link_comment' => 'https://alisadikinma.com/blog/x']);
