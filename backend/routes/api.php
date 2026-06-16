@@ -1388,6 +1388,8 @@ Route::middleware(['auth:sanctum'])->prefix('admin/video-full')->group(function 
     Route::get('/{id}', [VideoFullController::class, 'show'])->whereNumber('id');
     Route::post('/{id}/regenerate-segment/{n}', [VideoFullController::class, 'regenerateSegment'])
         ->whereNumber('id')->whereNumber('n');
+    // Publish the final reel to LinkedIn/IG/TikTok/Threads via Zernio.
+    Route::post('/{id}/publish-zernio', [VideoFullController::class, 'publishZernio'])->whereNumber('id');
 });
 
 // ============================================================================

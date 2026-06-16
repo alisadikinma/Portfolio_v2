@@ -1,17 +1,27 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
-import { useVideoFullJob, useRegenerateSegment } from '@/composables/useVideoFull.js'
+import { useVideoFullJob, useRegenerateSegment, usePublishVideoFull } from '@/composables/useVideoFull.js'
 import { statusLabel, segmentDot } from './videoFullHelpers.js'
 
 const route = useRoute()
 const id = computed(() => Number(route.params.id))
 const { job, segments, workerOnline, isLoading } = useVideoFullJob(id)
 const regen = useRegenerateSegment()
+const publish = usePublishVideoFull()
+
+const PLATFORMS = ['linkedin', 'instagram', 'tiktok', 'threads']
+const selected = ref(['instagram', 'tiktok', 'threads'])
 
 function regenerate(index) {
   if (!confirm(`Regenerate segmen ${index}? Worker akan render ulang segmen ini.`)) return
   regen.mutate({ id: id.value, index })
+}
+
+function doPublish() {
+  if (!selected.value.length) return
+  if (!confirm(`Publish reel ke: ${selected.value.join(', ')}?`)) return
+  publish.mutate({ id: id.value, platforms: selected.value })
 }
 </script>
 
@@ -37,6 +47,21 @@ function regenerate(index) {
         <h2 class="text-sm font-semibold text-slate-300 mb-2">Final reel</h2>
         <video :src="job.final_video_url" controls class="max-w-[360px] rounded-lg border border-slate-800" />
         <a :href="job.final_video_url" download class="block text-sm text-amber-400 hover:underline mt-2">⬇ Download MP4</a>
+
+        <div class="mt-4 p-3 rounded bg-slate-900/60 border border-slate-800 max-w-[360px]">
+          <p class="text-sm font-semibold text-slate-300 mb-2">Publish via Zernio</p>
+          <label v-for="p in PLATFORMS" :key="p" class="inline-flex items-center mr-3 text-xs text-slate-300">
+            <input type="checkbox" :value="p" v-model="selected" class="mr-1" /> {{ p }}
+          </label>
+          <button class="mt-3 block w-full px-3 py-2 rounded bg-amber-600 hover:bg-amber-500 text-sm font-semibold disabled:opacity-50"
+                  :disabled="publish.isPending.value || !selected.length" @click="doPublish">
+            {{ publish.isPending.value ? 'Publishing…' : 'Approve & Publish' }}
+          </button>
+          <p v-if="publish.data.value" class="text-xs text-emerald-400 mt-2">
+            Dispatched: {{ (publish.data.value.dispatched || []).join(', ') || '—' }}
+            <span v-if="(publish.data.value.skipped || []).length" class="text-slate-500">· skipped: {{ publish.data.value.skipped.join(', ') }}</span>
+          </p>
+        </div>
       </div>
 
       <h2 class="text-sm font-semibold text-slate-300 mb-3">Segmen ({{ segments.length }})</h2>

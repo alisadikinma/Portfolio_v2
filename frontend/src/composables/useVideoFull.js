@@ -81,3 +81,15 @@ export function useRegenerateSegment() {
     },
   })
 }
+
+export function usePublishVideoFull() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, platforms, scheduledAt }) =>
+      api.post(`/admin/video-full/${id}/publish-zernio`, {
+        platforms,
+        ...(scheduledAt ? { scheduled_at: scheduledAt } : {}),
+      }).then((r) => r.data),
+    onSuccess: (_data, vars) => qc.invalidateQueries({ queryKey: ['video-full-job', vars.id] }),
+  })
+}
