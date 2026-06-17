@@ -3,10 +3,12 @@
 namespace Tests\Unit;
 
 use App\Models\Category;
+use App\Models\FacebookPost;
 use App\Models\InstagramPost;
 use App\Models\LinkedInPost;
 use App\Models\Post;
 use App\Models\Setting;
+use App\Models\RedditPost;
 use App\Models\ThreadsPost;
 use App\Models\TiktokPost;
 use App\Services\ZernioPayloadBuilder;
@@ -68,6 +70,130 @@ class ZernioPayloadBuilderTest extends TestCase
         $ig->load('linkedinPost');
 
         return $ig;
+    }
+
+    private function facebook(array $attrs = [], int $slides = 3, ?LinkedInPost $li = null): FacebookPost
+    {
+        $li ??= $this->makeLinkedInPost($slides);
+        $fb = FacebookPost::create(array_merge([
+            'linkedin_post_id' => $li->id,
+            'post_id' => $li->post_id,
+            'status' => 'awaiting_review',
+            'format' => 'carousel',
+            'caption' => 'FB body',
+            'hashtags' => [],
+        ], $attrs));
+        $fb->load('linkedinPost');
+
+        return $fb;
+    }
+
+    public function test_facebook_multi_image_with_first_comment_from_link_url(): void
+    {
+        Setting::create(['group' => 'zernio', 'key' => 'zernio_facebook_account_id', 'value' => 'fb_acc']);
+        $fb = $this->facebook(['link_url' => 'https://alisadikinma.com/blog/x']);
+
+        $payload = (new ZernioPayloadBuilder)->buildFacebook($fb);
+
+        $this->assertSame('facebook', $payload['platforms'][0]['platform']);
+        $this->assertSame('fb_acc', $payload['platforms'][0]['accountId']);
+        $this->assertCount(3, $payload['mediaItems']);
+        $this->assertSame('image', $payload['mediaItems'][0]['type']);
+        $this->assertSame('https://alisadikinma.com/blog/x', $payload['platforms'][0]['platformSpecificData']['firstComment']);
+    }
+
+    public function test_facebook_caps_at_ten_images(): void
+    {
+        Setting::create(['group' => 'zernio', 'key' => 'zernio_facebook_account_id', 'value' => 'fb_acc']);
+        $fb = $this->facebook([], 12);
+
+        $payload = (new ZernioPayloadBuilder)->buildFacebook($fb);
+
+        $this->assertCount(10, $payload['mediaItems']);
+    }
+
+    public function test_facebook_suppresses_first_comment_for_repurpose(): void
+    {
+        Setting::create(['group' => 'zernio', 'key' => 'zernio_facebook_account_id', 'value' => 'fb_acc']);
+        $fb = $this->facebook(['link_url' => 'https://alisadikinma.com/blog/x']);
+        \App\Models\RepurposeJob::factory()->create(['linkedin_post_id' => $fb->linkedin_post_id]);
+        $fb->load('linkedinPost');
+
+        $payload = (new ZernioPayloadBuilder)->buildFacebook($fb);
+
+        $this->assertArrayNotHasKey('firstComment', $payload['platforms'][0]['platformSpecificData'] ?? []);
+    }
+
+    private function reddit(array $attrs = [], int $slides = 3): RedditPost
+    {
+        $li = $this->makeLinkedInPost($slides);
+        $reddit = RedditPost::create(array_merge([
+            'linkedin_post_id' => $li->id,
+            'post_id' => $li->post_id,
+            'status' => 'awaiting_review',
+            'format' => 'carousel',
+            'title' => 'AI tools that save hours',
+            'caption' => 'Reddit body text',
+            'subreddit' => 'u_alisadikinma',
+        ], $attrs));
+        $reddit->load('linkedinPost');
+
+        return $reddit;
+    }
+
+    public function test_reddit_gallery_with_subreddit_and_title(): void
+    {
+        Setting::create(['group' => 'zernio', 'key' => 'zernio_reddit_account_id', 'value' => 'rd_acc']);
+        $reddit = $this->reddit();
+
+        $payload = (new ZernioPayloadBuilder)->buildReddit($reddit);
+
+        $this->assertSame('reddit', $payload['platforms'][0]['platform']);
+        $this->assertSame('rd_acc', $payload['platforms'][0]['accountId']);
+        $this->assertSame('u_alisadikinma', $payload['platforms'][0]['platformSpecificData']['subreddit']);
+        $this->assertSame('AI tools that save hours', $payload['platforms'][0]['platformSpecificData']['title']);
+        $this->assertSame('Reddit body text', $payload['content']);
+        // Image gallery (carousel slides), images only.
+        $this->assertCount(3, $payload['mediaItems']);
+        $this->assertSame('image', $payload['mediaItems'][0]['type']);
+    }
+
+    public function test_reddit_title_capped_at_300(): void
+    {
+        Setting::create(['group' => 'zernio', 'key' => 'zernio_reddit_account_id', 'value' => 'rd_acc']);
+        $reddit = $this->reddit(['title' => str_repeat('x', 320)]);
+
+        $payload = (new ZernioPayloadBuilder)->buildReddit($reddit);
+
+        $this->assertLessThanOrEqual(300, mb_strlen($payload['platforms'][0]['platformSpecificData']['title']));
+    }
+
+    public function test_reddit_subreddit_falls_back_to_setting_when_blank(): void
+    {
+        Setting::create(['group' => 'zernio', 'key' => 'zernio_reddit_account_id', 'value' => 'rd_acc']);
+        Setting::create(['group' => 'zernio', 'key' => 'zernio_reddit_subreddit', 'value' => 'u_fallback']);
+        $reddit = $this->reddit(['subreddit' => null]);
+
+        $payload = (new ZernioPayloadBuilder)->buildReddit($reddit);
+
+        $this->assertSame('u_fallback', $payload['platforms'][0]['platformSpecificData']['subreddit']);
+    }
+
+    public function test_is_platform_enabled_covers_reddit_facebook_youtube(): void
+    {
+        // The gate reads zernio_{platform}_account_id dynamically, so the new
+        // platforms work the moment their account-id setting is non-empty.
+        foreach (['reddit', 'facebook', 'youtube'] as $platform) {
+            $this->assertFalse(
+                ZernioPayloadBuilder::isPlatformEnabled($platform),
+                "{$platform} must be disabled when its account id is unset"
+            );
+            Setting::create(['group' => 'zernio', 'key' => "zernio_{$platform}_account_id", 'value' => "{$platform}_acc"]);
+            $this->assertTrue(
+                ZernioPayloadBuilder::isPlatformEnabled($platform),
+                "{$platform} must be enabled once its account id is set"
+            );
+        }
     }
 
     public function test_instagram_all_image_with_first_comment(): void

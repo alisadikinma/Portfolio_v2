@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Enums\FacebookPostStatus;
+use App\Enums\RedditPostStatus;
 use App\Traits\HasStatusTransitions;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -11,29 +11,21 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
- * Facebook Page cross-post draft (May 8, 2026 cross-post pipeline).
+ * Reddit cross-post draft (2026-06-16 — 4th Zernio platform).
  *
- * Sibling model to InstagramPost + TiktokPost. Two divergences:
- *   1. `format` ENUM column (text|carousel) — FB receives both LinkedIn
- *      output formats. Caption authoring branches on this:
- *        text → clone $linkedinPost->content
- *        carousel → reuse /instagram-gen plugin output
- *   2. `link_url` column — populated for text format (Publer/FB unfurls
- *      preview), NULL for carousel
- *
- * Slides for carousel format read live via $this->linkedinPost->carousel_slides.
- *
- * App-level invariant: one live (deleted_at IS NULL) row per post_id, enforced
- * by FacebookDraftController::regenerate (Phase E). Same precedent as
- * LinkedInPost + InstagramPost + TiktokPost.
+ * Carousel path = image gallery (Reddit has no multi-video carousel). Reddit
+ * is ZERNIO-ONLY (reuses the Threads workspace key via ZernioClient::forPlatform).
+ * Slides not stored here — read live via $this->linkedinPost->carousel_slides.
+ * Reddit-specific: a required `title` (≤300) + a `subreddit` (snapshot at create,
+ * default u_alisadikinma — own profile, zero moderation).
  */
-class FacebookPost extends Model
+class RedditPost extends Model
 {
     use HasFactory;
     use HasStatusTransitions;
     use SoftDeletes;
 
-    protected $table = 'facebook_posts';
+    protected $table = 'reddit_posts';
 
     protected $fillable = [
         'linkedin_post_id',
@@ -43,14 +35,11 @@ class FacebookPost extends Model
         'title',
         'caption',
         'hashtags',
+        'subreddit',
+        'flair_id',
         'scheduled_at',
         'published_at',
         'external_url',
-        'link_url',
-        'publer_post_id',
-        'publer_job_id',
-        'publer_status',
-        'publer_account_id',
         'zernio_post_id',
         'zernio_request_id',
         'last_error',
@@ -67,7 +56,7 @@ class FacebookPost extends Model
 
     protected function statusEnumClass(): string
     {
-        return FacebookPostStatus::class;
+        return RedditPostStatus::class;
     }
 
     public function post(): BelongsTo
@@ -87,16 +76,11 @@ class FacebookPost extends Model
 
     public function scopeInFeed(Builder $q): Builder
     {
-        return $q->whereIn('status', FacebookPostStatus::feedStatuses());
+        return $q->whereIn('status', RedditPostStatus::feedStatuses());
     }
 
     public function scopeInQueue(Builder $q): Builder
     {
-        return $q->whereIn('status', FacebookPostStatus::queueStatuses());
-    }
-
-    public function scopeOfFormat(Builder $q, string $format): Builder
-    {
-        return $q->where('format', $format);
+        return $q->whereIn('status', RedditPostStatus::queueStatuses());
     }
 }

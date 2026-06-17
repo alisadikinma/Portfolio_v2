@@ -85,6 +85,11 @@ class LinkedInCarouselImageService
         // leaves the plugin's creator cover untouched. Re-read slides after.
         $slides = $this->enrichCoverFigure($draft, $slides);
 
+        // people_spotlight: for IG-repurpose drafts, resolve + crop real photos of
+        // the people the plugin flagged (needs_real_faces) so the post-render
+        // composite can drop them into the reserved band. Idempotent + fail-safe.
+        $slides = $this->enrichPersonPhotos($draft, $slides);
+
         $totalSlides = count($slides);
         $dispatched = 0;
 
@@ -151,6 +156,11 @@ class LinkedInCarouselImageService
         $this->resetCoverFigureLockIfTargetingCover($draft, $slideIndex);
         $this->enrichCoverFigure($draft, $draft->carousel_slides ?? []);
 
+        // Same for people_spotlight: an explicit re-render of a person-photo slide
+        // clears its lock so the enricher re-resolves + re-crops the real photos.
+        $this->resetPersonPhotoLockIfTargeting($draft, $slideIndex);
+        $this->enrichPersonPhotos($draft, $draft->carousel_slides ?? []);
+
         $slides = $draft->carousel_slides ?? [];
         if (! isset($slides[$slideIndex])) {
             Log::warning('[LinkedInCarouselImage] dispatchSingleSlide: slide index out of range', [
@@ -200,6 +210,136 @@ class LinkedInCarouselImageService
 
             return $slides;
         }
+    }
+
+    /**
+     * Apply people_spotlight enrichment (real founder/people photos from the
+     * captured source slides), returning the possibly-mutated slides. Idempotent
+     * + fully non-fatal — any failure logs and returns the input slides so image
+     * dispatch always proceeds with the plugin's authored slides.
+     *
+     * @param  array<int,array<string,mixed>>  $slides
+     * @return array<int,array<string,mixed>>
+     */
+    private function enrichPersonPhotos(LinkedInPost $draft, array $slides): array
+    {
+        try {
+            app(CarouselPersonPhotoEnricher::class)->enrich($draft);
+
+            return $draft->carousel_slides ?? $slides;
+        } catch (\Throwable $e) {
+            Log::warning('[LinkedInCarouselImage] person-photo enrich failed (non-fatal)', [
+                'draft_id' => $draft->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $slides;
+        }
+    }
+
+    /**
+     * When an operator explicitly re-renders a person-photo slide, clear its
+     * person_photos_enriched lock + stale refs so CarouselPersonPhotoEnricher
+     * re-resolves the real photos on the next enrich pass. No-op for slides that
+     * never carried the lock.
+     */
+    private function resetPersonPhotoLockIfTargeting(LinkedInPost $draft, int $slideIndex): void
+    {
+        $slides = $draft->carousel_slides ?? [];
+        if (! isset($slides[$slideIndex]) || empty($slides[$slideIndex]['person_photos_enriched'])) {
+            return;
+        }
+
+        unset($slides[$slideIndex]['person_photos_enriched'], $slides[$slideIndex]['person_photo_refs']);
+        $draft->update(['carousel_slides' => $slides]);
+
+        Log::info('[LinkedInCarouselImage] cleared person-photo lock for explicit single re-render', [
+            'draft_id' => $draft->id,
+            'slide_index' => $slideIndex,
+        ]);
+    }
+
+    /**
+     * If the slide carries person_photo_refs, composite the real face cut-outs
+     * into the freshly-rendered slide PNG's reserved band. Returns the composited
+     * public URL on success, or the original $localUrl on any miss (graceful
+     * degrade — the plain rendered slide still ships).
+     */
+    private function compositePersonStripIfNeeded(int $draftId, int $slideIndex, string $localUrl): string
+    {
+        try {
+            $draft = LinkedInPost::find($draftId);
+            $slides = $draft?->carousel_slides ?? [];
+            $slide = $slides[$slideIndex] ?? null;
+            $refs = is_array($slide['person_photo_refs'] ?? null) ? $slide['person_photo_refs'] : [];
+            if ($refs === []) {
+                return $localUrl;
+            }
+
+            $baseAbs = $this->storageUrlToPath($localUrl);
+            if ($baseAbs === null || ! is_file($baseAbs)) {
+                return $localUrl;
+            }
+
+            $faces = [];
+            foreach ($refs as $ref) {
+                $abs = $this->storageUrlToPath((string) ($ref['url'] ?? ''));
+                if ($abs !== null && is_file($abs)) {
+                    $faces[] = ['path' => $abs, 'name' => (string) ($ref['name'] ?? ''), 'role' => (string) ($ref['role'] ?? '')];
+                }
+            }
+            if ($faces === []) {
+                return $localUrl;
+            }
+
+            $band = $this->bandGeometry((string) ($slide['face_layout'] ?? 'photo_band_top'));
+            $rel = sprintf('linkedin-carousel/person-strip/%d-%d-%s.png', $draftId, $slideIndex, bin2hex(random_bytes(6)));
+            $outAbs = Storage::disk('public')->path($rel);
+
+            $ok = app(CarouselPersonStripRenderer::class)->render($baseAbs, $faces, $band, $outAbs);
+            if (! $ok || ! is_file($outAbs)) {
+                return $localUrl;
+            }
+
+            Log::info('[LinkedInCarouselImage] composited person strip onto slide', [
+                'draft_id' => $draftId,
+                'slide_index' => $slideIndex,
+                'faces' => count($faces),
+            ]);
+
+            return url('/storage/' . $rel);
+        } catch (\Throwable $e) {
+            Log::warning('[LinkedInCarouselImage] person-strip composite failed (non-fatal)', [
+                'draft_id' => $draftId,
+                'slide_index' => $slideIndex,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $localUrl;
+        }
+    }
+
+    /** Normalized band geometry per face_layout. */
+    private function bandGeometry(string $faceLayout): array
+    {
+        return $faceLayout === 'photo_band_inline'
+            ? ['y' => 0.40, 'h' => 0.24]
+            : ['y' => 0.12, 'h' => 0.26]; // photo_band_top (default)
+    }
+
+    /**
+     * Convert an app-hosted /storage/ URL to its absolute path on the public
+     * disk. Returns null for a foreign/non-storage URL.
+     */
+    private function storageUrlToPath(string $url): ?string
+    {
+        $pos = strpos($url, '/storage/');
+        if ($pos === false) {
+            return null;
+        }
+        $rel = substr($url, $pos + strlen('/storage/'));
+
+        return $rel !== '' ? Storage::disk('public')->path($rel) : null;
     }
 
     /**
@@ -615,13 +755,18 @@ class LinkedInCarouselImageService
                 return false;
             }
 
+            // people_spotlight: if this slide carries real person photos, composite
+            // them into the freshly-rendered slide's reserved band. On any miss the
+            // helper returns $localUrl unchanged (plain slide still ships).
+            $finalUrl = $this->compositePersonStripIfNeeded((int) $job->linkedin_post_id, (int) $job->slide_index, $localUrl);
+
             $job->update([
                 'status' => 'completed',
-                'image_url' => $localUrl,
+                'image_url' => $finalUrl,
                 'remote_url' => $remoteUrl,
             ]);
 
-            $this->mirrorSlideStatus($job->linkedin_post_id, $uuid, 'done', $localUrl);
+            $this->mirrorSlideStatus($job->linkedin_post_id, $uuid, 'done', $finalUrl);
             $this->emitSlideProgress($job->linkedin_post_id, $job->slide_index, 'done');
 
             Log::info('[LinkedInCarouselImage] webhook completed', [

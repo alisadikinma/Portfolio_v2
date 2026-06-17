@@ -188,6 +188,8 @@ class LinkedInDraftController extends Controller
             // to UI so operator sees what'll ship to TikTok.
             'tiktokPost:id,linkedin_post_id,status,title,caption,hashtags,link_comment,scheduled_at,published_at,external_url',
             'threadsPost:id,linkedin_post_id,status,title,caption,hashtags,link_comment,scheduled_at,published_at,external_url',
+            // Reddit (2026-06-16): carousel gallery sibling — title + body + subreddit.
+            'redditPost:id,linkedin_post_id,status,title,caption,subreddit,hashtags,scheduled_at,published_at,external_url',
         ])->find($id);
         if ($draft === null) {
             return $this->notFound();

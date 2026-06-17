@@ -6,7 +6,9 @@ use App\Jobs\PublishViaZernio;
 use App\Models\Category;
 use App\Models\InstagramPost;
 use App\Models\LinkedInPost;
+use App\Models\FacebookPost;
 use App\Models\Post;
+use App\Models\RedditPost;
 use App\Models\Setting;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
@@ -48,6 +50,93 @@ class PublishViaZernioTest extends TestCase
             'linkedin_post_id' => $li->id, 'post_id' => $post->id,
             'status' => 'awaiting_review', 'caption' => 'cap', 'hashtags' => [],
         ], $attrs));
+    }
+
+    private function redditSibling(array $attrs = []): RedditPost
+    {
+        // Reddit uses the Threads workspace key + its own account id.
+        Setting::create(['group' => 'zernio', 'key' => 'zernio_api_key_threads', 'value' => Crypt::encryptString('sk_threads')]);
+        Setting::create(['group' => 'zernio', 'key' => 'zernio_reddit_account_id', 'value' => 'rd_acc']);
+
+        $category = Category::create(['name' => 'AI', 'slug' => 'ai-'.uniqid()]);
+        $post = Post::create(['category_id' => $category->id, 'slug' => 'p-'.uniqid(), 'title' => 'T', 'content' => 'B']);
+        $li = LinkedInPost::create([
+            'post_id' => $post->id, 'format' => 'carousel', 'content' => 'c',
+            'carousel_slides' => [
+                ['slide_number' => 1, 'image_url' => 'https://alisadikinma.com/storage/linkedin-carousel/s1.png'],
+            ],
+            'hashtags' => [], 'status' => 'awaiting_publish', 'pipeline_state_log' => [],
+        ]);
+
+        return RedditPost::create(array_merge([
+            'linkedin_post_id' => $li->id, 'post_id' => $post->id,
+            'status' => 'awaiting_review', 'format' => 'carousel',
+            'title' => 'AI tools', 'caption' => 'body', 'subreddit' => 'u_alisadikinma',
+        ], $attrs));
+    }
+
+    private function facebookSibling(array $attrs = []): FacebookPost
+    {
+        // Facebook uses the fbyt workspace key + its own account id.
+        Setting::create(['group' => 'zernio', 'key' => 'zernio_api_key_fbyt', 'value' => Crypt::encryptString('sk_fbyt')]);
+        Setting::create(['group' => 'zernio', 'key' => 'zernio_facebook_account_id', 'value' => 'fb_acc']);
+
+        $category = Category::create(['name' => 'AI', 'slug' => 'ai-'.uniqid()]);
+        $post = Post::create(['category_id' => $category->id, 'slug' => 'p-'.uniqid(), 'title' => 'T', 'content' => 'B']);
+        $li = LinkedInPost::create([
+            'post_id' => $post->id, 'format' => 'carousel', 'content' => 'c',
+            'carousel_slides' => [
+                ['slide_number' => 1, 'image_url' => 'https://alisadikinma.com/storage/linkedin-carousel/s1.png'],
+            ],
+            'hashtags' => [], 'status' => 'awaiting_publish', 'pipeline_state_log' => [],
+        ]);
+
+        return FacebookPost::create(array_merge([
+            'linkedin_post_id' => $li->id, 'post_id' => $post->id,
+            'status' => 'awaiting_review', 'format' => 'carousel', 'caption' => 'fb body',
+        ], $attrs));
+    }
+
+    public function test_facebook_publishes_via_fbyt_key_and_stores_zernio_post_id(): void
+    {
+        Http::fake(['zernio.com/api/v1/posts' => Http::response([
+            'post' => ['_id' => 'z-fb', 'platforms' => [['platformPostUrl' => 'https://facebook.com/p/abc']]],
+        ], 201)]);
+
+        $fb = $this->facebookSibling();
+        PublishViaZernio::dispatchSync('facebook', $fb->id);
+
+        $this->assertDatabaseHas('facebook_posts', [
+            'id' => $fb->id, 'status' => 'published', 'zernio_post_id' => 'z-fb',
+        ]);
+        Http::assertSent(fn ($r) => $r->hasHeader('Authorization', 'Bearer sk_fbyt'));
+    }
+
+    public function test_reddit_publishes_and_stores_zernio_post_id(): void
+    {
+        Http::fake(['zernio.com/api/v1/posts' => Http::response([
+            'post' => ['_id' => 'z-rd', 'platforms' => [['platformPostUrl' => 'https://reddit.com/r/u_alisadikinma/abc']]],
+        ], 201)]);
+
+        $reddit = $this->redditSibling();
+        PublishViaZernio::dispatchSync('reddit', $reddit->id);
+
+        $this->assertDatabaseHas('reddit_posts', [
+            'id' => $reddit->id, 'status' => 'published', 'zernio_post_id' => 'z-rd',
+        ]);
+        // Reddit must use the Threads workspace key.
+        Http::assertSent(fn ($r) => $r->hasHeader('Authorization', 'Bearer sk_threads'));
+    }
+
+    public function test_reddit_idempotent_skip_when_already_published(): void
+    {
+        Http::fake();
+        $reddit = $this->redditSibling(['zernio_post_id' => 'already-rd']);
+
+        PublishViaZernio::dispatchSync('reddit', $reddit->id);
+
+        Http::assertNothingSent();
+        $this->assertSame('already-rd', RedditPost::find($reddit->id)->zernio_post_id);
     }
 
     public function test_publishes_now_and_stores_post_id_and_url(): void

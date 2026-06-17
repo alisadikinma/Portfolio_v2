@@ -1,5 +1,11 @@
 // Pure helpers for the video_full admin UI (mirrors repurposeHelpers.js).
 
+// Platforms a single 60s reel (video_full) can publish to via Zernio.
+// YouTube is video_full-ONLY (it gets the clip as a Short); reddit/facebook
+// added 2026-06-16. The publish endpoint gates each on an account being
+// configured, so listing one here is safe even before it's wired in settings.
+export const VIDEO_FULL_PLATFORMS = ['linkedin', 'instagram', 'tiktok', 'threads', 'reddit', 'facebook', 'youtube']
+
 const TERMINAL = ['drafted', 'failed']
 
 /** Whether a job is in a terminal state (stops the detail/list poll). */

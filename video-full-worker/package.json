@@ -5,7 +5,8 @@
   "type": "module",
   "description": "MacBook-local worker for the Portfolio_v2 `video_full` repurpose mode (talking-head IG reel → Ali's Indonesian reel). Polls the VPS bridge API, runs the heavy pipeline locally (yt-dlp/Whisper/ffmpeg/geminigen/RVC/Remotion), uploads results back. Node daemon (locked decision, ADR 2026-06-16).",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "start": "node --env-file=.env index.js"
   },
   "engines": {
     "node": ">=20"

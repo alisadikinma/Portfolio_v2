@@ -105,6 +105,9 @@ return [
         'video_script_path' => env('REPURPOSE_VIDEO_CAPTURE_SCRIPT', dirname(base_path()) . '/scripts/repurpose/ig-video-capture.cjs'),
         // Phase D — Playwright HTML→PNG brand chrome (header/footer) for tool slides.
         'chrome_script_path' => env('REPURPOSE_VIDEO_CHROME_SCRIPT', dirname(base_path()) . '/scripts/repurpose/video-chrome.cjs'),
+        // people_spotlight — Playwright composite of real face cut-outs into a
+        // carousel slide's reserved photo band.
+        'person_strip_script_path' => env('CAROUSEL_PERSON_STRIP_SCRIPT', dirname(base_path()) . '/scripts/repurpose/carousel-person-strip.cjs'),
         'ytdlp_path' => env('REPURPOSE_YTDLP_PATH', 'yt-dlp'),
         'ffmpeg_path' => env('REPURPOSE_FFMPEG_PATH', 'ffmpeg'),
         'ffprobe_path' => env('REPURPOSE_FFPROBE_PATH', 'ffprobe'),

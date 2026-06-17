@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { isTerminal, statusLabel, segmentDot, workerOnline } from './videoFullHelpers.js'
+import { isTerminal, statusLabel, segmentDot, workerOnline, VIDEO_FULL_PLATFORMS } from './videoFullHelpers.js'
 
 describe('videoFullHelpers', () => {
+  it('VIDEO_FULL_PLATFORMS includes reddit, facebook, youtube', () => {
+    expect(VIDEO_FULL_PLATFORMS).toEqual(
+      expect.arrayContaining(['linkedin', 'instagram', 'tiktok', 'threads', 'reddit', 'facebook', 'youtube'])
+    )
+  })
+
   it('isTerminal only for drafted/failed', () => {
     expect(isTerminal('drafted')).toBe(true)
     expect(isTerminal('failed')).toBe(true)

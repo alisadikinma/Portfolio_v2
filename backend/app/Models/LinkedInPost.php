@@ -115,6 +115,11 @@ class LinkedInPost extends Model
         return $this->hasOne(ThreadsPost::class, 'linkedin_post_id');
     }
 
+    public function redditPost(): HasOne
+    {
+        return $this->hasOne(RedditPost::class, 'linkedin_post_id');
+    }
+
     /**
      * Check whether the operator opted into the publish-all cascade
      * (auto-approve cross-post drafts). Reads the flag set by the

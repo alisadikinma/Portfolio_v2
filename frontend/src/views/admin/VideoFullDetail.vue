@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
 import { useVideoFullJob, useRegenerateSegment, usePublishVideoFull } from '@/composables/useVideoFull.js'
-import { statusLabel, segmentDot } from './videoFullHelpers.js'
+import { statusLabel, segmentDot, VIDEO_FULL_PLATFORMS } from './videoFullHelpers.js'
 
 const route = useRoute()
 const id = computed(() => Number(route.params.id))
@@ -10,7 +10,7 @@ const { job, segments, workerOnline, isLoading } = useVideoFullJob(id)
 const regen = useRegenerateSegment()
 const publish = usePublishVideoFull()
 
-const PLATFORMS = ['linkedin', 'instagram', 'tiktok', 'threads']
+const PLATFORMS = VIDEO_FULL_PLATFORMS
 const selected = ref(['instagram', 'tiktok', 'threads'])
 
 function regenerate(index) {

@@ -78,7 +78,7 @@ class VideoFullController extends Controller
 
         $data = $request->validate([
             'platforms' => 'sometimes|array|min:1',
-            'platforms.*' => 'in:linkedin,instagram,tiktok,threads',
+            'platforms.*' => 'in:linkedin,instagram,tiktok,threads,reddit,facebook,youtube',
             'scheduled_at' => 'sometimes|nullable|date',
         ]);
 

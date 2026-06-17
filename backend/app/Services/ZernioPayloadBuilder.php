@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Models\ImageGenerationJob;
+use App\Models\FacebookPost;
 use App\Models\InstagramPost;
+use App\Models\RedditPost;
 use App\Models\RepurposeJob;
 use App\Models\Setting;
 use App\Models\ThreadsPost;
@@ -62,6 +64,17 @@ class ZernioPayloadBuilder
      * TikTok caps at 90 chars (Zernio 400s past that). Hard-cap defensively.
      */
     private const TIKTOK_TITLE_LIMIT = 90;
+
+    /** Reddit: image gallery ≤20 images; title required (cap 300). */
+    private const REDDIT_MAX_IMAGES = 20;
+
+    private const REDDIT_TITLE_LIMIT = 300;
+
+    /** Facebook: ≤10 images (image-only — no mixed video+image). */
+    private const FB_MAX_IMAGES = 10;
+
+    /** YouTube: title cap 100; AI clips disclosed; category 28 = Science & Tech. */
+    private const YOUTUBE_TITLE_LIMIT = 100;
 
     public function __construct(private ?ZernioImageNormalizer $normalizer = null)
     {
@@ -175,6 +188,57 @@ class ZernioPayloadBuilder
     }
 
     /**
+     * Facebook: multi-image post (≤10 images, image-only — FB cannot mix
+     * video+image in one post). Body = caption + hashtags. The blog "first
+     * comment" link rides in platformSpecificData.firstComment from the FB
+     * link_url field, suppressed for IG-repurpose posts (no public article to
+     * link — mirrors buildInstagram). FB carousel rows have link_url=null, so
+     * firstComment is naturally absent there.
+     */
+    public function buildFacebook(FacebookPost $sibling): array
+    {
+        $images = array_slice($this->slideMediaItems($sibling), 0, self::FB_MAX_IMAGES);
+        $content = $this->buildCaption($sibling->caption, $sibling->hashtags);
+
+        $platformSpecificData = [];
+        $isRepurpose = $sibling->linkedinPost !== null && $sibling->linkedinPost->isRepurpose();
+        if (! $isRepurpose && ! empty($sibling->link_url)) {
+            $platformSpecificData['firstComment'] = $sibling->link_url;
+        }
+
+        return $this->payload(
+            platform: 'facebook',
+            accountId: $this->resolveAccountId('facebook'),
+            content: $content,
+            mediaItems: $images,
+            platformSpecificData: $platformSpecificData,
+        );
+    }
+
+    /**
+     * Reddit: image gallery (Reddit has NO multi-video carousel / mixed media).
+     * Reddit needs a `subreddit` (required) + `title` (≤300) in platformSpecificData;
+     * the body rides in `content`. Subreddit snapshots from the sibling, falling
+     * back to the zernio_reddit_subreddit setting (default u_alisadikinma — own
+     * profile, zero moderation). No first-comment (the body holds everything).
+     */
+    public function buildReddit(RedditPost $sibling): array
+    {
+        $images = array_slice($this->slideMediaItems($sibling), 0, self::REDDIT_MAX_IMAGES);
+
+        return $this->payload(
+            platform: 'reddit',
+            accountId: $this->resolveAccountId('reddit'),
+            content: (string) ($sibling->caption ?? ''),
+            mediaItems: $images,
+            platformSpecificData: [
+                'subreddit' => $this->resolveRedditSubreddit($sibling->subreddit),
+                'title' => $this->capRedditTitle((string) ($sibling->title ?? ''), (int) ($sibling->id ?? 0)),
+            ],
+        );
+    }
+
+    /**
      * video_rebrand repurpose carousel → Zernio. All slides are VIDEO clips
      * (composited MP4s on public storage URLs). Live-validated 2026-06-15 that
      * Zernio publishes a multi-clip video carousel on Instagram + Threads
@@ -233,7 +297,43 @@ class ZernioPayloadBuilder
             accountId: $this->resolveAccountId($platform),
             content: $content,
             mediaItems: [['url' => $url, 'type' => 'video']],
+            platformSpecificData: $this->videoFullPlatformData($platform, $content, (int) $job->id),
         );
+    }
+
+    /**
+     * Per-platform platformSpecificData for a video_full single-video post.
+     * YouTube needs a title (≤100) + AI-disclosure + category/visibility flags;
+     * Reddit needs a subreddit + title. IG/TikTok/Threads/Facebook need none
+     * (single video carries everything in `content`).
+     */
+    private function videoFullPlatformData(string $platform, string $content, int $jobId): array
+    {
+        $firstLine = trim((string) strtok(trim(strip_tags($content)), "\n"));
+
+        return match ($platform) {
+            'youtube' => [
+                'title' => $this->capYoutubeTitle($firstLine !== '' ? $firstLine : 'New video', $jobId),
+                'visibility' => 'public',
+                'categoryId' => '28', // Science & Technology
+                'madeForKids' => false,
+                'containsSyntheticMedia' => true, // clips are AI-generated — YouTube enforces disclosure
+            ],
+            'reddit' => [
+                'subreddit' => $this->resolveRedditSubreddit(),
+                'title' => $this->capRedditTitle($firstLine !== '' ? $firstLine : 'New post', $jobId),
+            ],
+            default => [],
+        };
+    }
+
+    /** The Reddit target subreddit: explicit snapshot → setting → u_alisadikinma. */
+    private function resolveRedditSubreddit(?string $snapshot = null): string
+    {
+        return $snapshot
+            ?: ((string) (Setting::where('group', 'zernio')
+                ->where('key', 'zernio_reddit_subreddit')
+                ->value('value')) ?: 'u_alisadikinma');
     }
 
     // ─── Private helpers ─────────────────────────────────────────────────────
@@ -431,5 +531,29 @@ class ZernioPayloadBuilder
         Log::warning("Zernio TikTok title truncated to 90 chars (tiktok_post #{$siblingId})");
 
         return rtrim(mb_substr($content, 0, self::TIKTOK_TITLE_LIMIT));
+    }
+
+    /** Hard-cap the Reddit title at 300 chars (Reddit's title limit). */
+    private function capRedditTitle(string $title, int $siblingId): string
+    {
+        if (mb_strlen($title) <= self::REDDIT_TITLE_LIMIT) {
+            return $title;
+        }
+
+        Log::warning("Zernio Reddit title truncated to 300 chars (reddit_post #{$siblingId})");
+
+        return rtrim(mb_substr($title, 0, self::REDDIT_TITLE_LIMIT));
+    }
+
+    /** Hard-cap the YouTube title at 100 chars (YouTube's title limit). */
+    private function capYoutubeTitle(string $title, int $jobId): string
+    {
+        if (mb_strlen($title) <= self::YOUTUBE_TITLE_LIMIT) {
+            return $title;
+        }
+
+        Log::warning("Zernio YouTube title truncated to 100 chars (repurpose_job #{$jobId})");
+
+        return rtrim(mb_substr($title, 0, self::YOUTUBE_TITLE_LIMIT));
     }
 }

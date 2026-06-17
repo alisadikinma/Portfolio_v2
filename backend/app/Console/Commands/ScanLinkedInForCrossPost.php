@@ -7,6 +7,7 @@ use App\Enums\InstagramPostStatus;
 use App\Enums\LinkedInPostStatus;
 use App\Enums\TiktokPostStatus;
 use App\Enums\ThreadsPostStatus;
+use App\Enums\RedditPostStatus;
 use App\Jobs\GenerateFacebookPost;
 use App\Jobs\GenerateInstagramPost;
 use App\Jobs\GenerateThreadsPost;
@@ -14,6 +15,7 @@ use App\Jobs\GenerateTiktokPost;
 use App\Models\FacebookPost;
 use App\Models\InstagramPost;
 use App\Models\LinkedInPost;
+use App\Models\RedditPost;
 use App\Models\Setting;
 use App\Models\ThreadsPost;
 use App\Models\TiktokPost;
@@ -196,6 +198,9 @@ class ScanLinkedInForCrossPost extends Command
                     $this->createThreads($linkedinPost, 'carousel');
                     $stats['threads_carousel'] = ($stats['threads_carousel'] ?? 0) + 1;
                     $platforms[] = 'threads';
+                    $this->createReddit($linkedinPost);
+                    $stats['reddit'] = ($stats['reddit'] ?? 0) + 1;
+                    $platforms[] = 'reddit';
                 }
 
                 // Phase G — Telegram fanout alert. Dormant by default
@@ -210,8 +215,8 @@ class ScanLinkedInForCrossPost extends Command
                 // the same minute tick on carousel-atomic-publish.
                 if ($linkedinPost->scheduled_at !== null) {
                     \Illuminate\Support\Facades\DB::transaction(function () use ($linkedinPost) {
-                        $linkedinPost->refresh()->load(['facebookPost', 'instagramPost', 'tiktokPost', 'threadsPost']);
-                        foreach (['facebookPost', 'instagramPost', 'tiktokPost', 'threadsPost'] as $rel) {
+                        $linkedinPost->refresh()->load(['facebookPost', 'instagramPost', 'tiktokPost', 'threadsPost', 'redditPost']);
+                        foreach (['facebookPost', 'instagramPost', 'tiktokPost', 'threadsPost', 'redditPost'] as $rel) {
                             $linkedinPost->$rel?->update(['scheduled_at' => $linkedinPost->scheduled_at]);
                         }
                     });
@@ -288,6 +293,9 @@ class ScanLinkedInForCrossPost extends Command
             if ($this->hasLiveTiktokRow($linkedinPost)) {
                 return 'tiktok_posts row already exists (idempotent skip)';
             }
+            if ($this->hasLiveRedditRow($linkedinPost)) {
+                return 'reddit_posts row already exists (idempotent skip)';
+            }
         }
 
         return null;
@@ -317,6 +325,11 @@ class ScanLinkedInForCrossPost extends Command
     private function hasLiveThreadsRow(LinkedInPost $li): bool
     {
         return ThreadsPost::where('linkedin_post_id', $li->id)->exists();
+    }
+
+    private function hasLiveRedditRow(LinkedInPost $li): bool
+    {
+        return RedditPost::where('linkedin_post_id', $li->id)->exists();
     }
 
     private function createFacebook(LinkedInPost $li, string $format): void
@@ -416,5 +429,61 @@ class ScanLinkedInForCrossPost extends Command
             'threads_post_id' => $draft->id,
             'format' => $format,
         ]);
+    }
+
+    /**
+     * Reddit carousel sibling (image gallery). Unlike the other platforms,
+     * Reddit has NO dedicated caption-authoring plugin — it REUSES the LinkedIn
+     * caption as the body and derives a hook title, so it's created directly in
+     * awaiting_review (no Generate*Post dispatch). Reddit is Zernio-only and
+     * defaults to publisher 'off', so it publishes only once the operator flips
+     * crosspost_publisher_reddit → zernio (after the deploy live-probe).
+     */
+    private function createReddit(LinkedInPost $li): void
+    {
+        $subreddit = (string) (Setting::where('group', 'zernio')
+            ->where('key', 'zernio_reddit_subreddit')
+            ->value('value')) ?: 'u_alisadikinma';
+
+        $draft = RedditPost::create([
+            'linkedin_post_id' => $li->id,
+            'post_id' => $li->post_id,
+            'format' => 'carousel',
+            'status' => RedditPostStatus::AwaitingReview->value,
+            'title' => $this->deriveRedditTitle($li),
+            'caption' => (string) ($li->content ?? ''),
+            'subreddit' => $subreddit,
+            'pipeline_state_log' => [[
+                'from' => 'scan',
+                'to' => 'awaiting_review',
+                'reason' => 'cross_post_scan_fanout_reuse',
+                'timestamp' => now()->toIso8601String(),
+            ]],
+        ]);
+
+        Log::info('[CrossPostScan] Reddit draft created (content reused, awaiting_review)', [
+            'linkedin_post_id' => $li->id,
+            'reddit_post_id' => $draft->id,
+            'subreddit' => $subreddit,
+        ]);
+    }
+
+    /**
+     * Reddit title (≤300): prefer an already-authored TikTok sibling title
+     * (same short-hook shape) when one exists, else the first non-empty line of
+     * the LinkedIn caption. At scan time the TikTok title is usually still being
+     * authored, so the hook-line fallback is the common path.
+     */
+    private function deriveRedditTitle(LinkedInPost $li): string
+    {
+        $ttTitle = TiktokPost::where('linkedin_post_id', $li->id)->value('title');
+        if (is_string($ttTitle) && trim($ttTitle) !== '') {
+            return mb_substr(trim($ttTitle), 0, 300);
+        }
+
+        $body = trim(strip_tags((string) ($li->content ?? '')));
+        $firstLine = trim((string) strtok($body, "\n"));
+
+        return mb_substr($firstLine !== '' ? $firstLine : 'New post', 0, 300);
     }
 }

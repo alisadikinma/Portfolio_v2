@@ -111,6 +111,15 @@ class CarouselGenOutputAdapter
                 'is_cover' => (bool) ($slide['is_cover'] ?? false),
                 'is_cta' => (bool) ($slide['is_cta'] ?? false),
                 'direct_answer_block' => $this->resolveDirectAnswerBlock($slide),
+                // people_spotlight contract (plugin v3.0.6+) — passed through so
+                // the backend fulfilment layer (CarouselPersonPhotoEnricher) can
+                // resolve + composite REAL photos of the named people. Defaults
+                // are safe (false / [] / null) so legacy slides + pre-feature
+                // plugin output never trip the downstream `needs_real_faces`
+                // check. See plugin schema.ts CarouselSlideSchema.
+                'needs_real_faces' => (bool) ($slide['needs_real_faces'] ?? false),
+                'people' => $this->resolvePeople($slide),
+                'face_layout' => $this->resolveFaceLayout($slide),
                 // Backend-managed lifecycle fields — always initialized to
                 // pending/null on first adapt. LinkedInCarouselImageService
                 // flips these as GeminiGen returns slide PNGs.
@@ -148,6 +157,61 @@ class CarouselGenOutputAdapter
             $slide['copy'] ?? null,
             null,
         ];
+    }
+
+    /**
+     * Sanitize the plugin's people_spotlight `people[]` into a clean list of
+     * {name, role?} entries. Drops entries without a usable name (>= 2 chars),
+     * coerces role to a trimmed string or omits it, and caps the list at 6
+     * (mirrors the plugin schema's .max(6)). Returns [] when absent/malformed —
+     * the downstream enricher treats an empty list as "nothing to fulfil".
+     *
+     * @return array<int, array{name: string, role?: string}>
+     */
+    private function resolvePeople(array $slide): array
+    {
+        $raw = $slide['people'] ?? null;
+        if (! is_array($raw)) {
+            return [];
+        }
+
+        $people = [];
+        foreach ($raw as $entry) {
+            if (! is_array($entry)) {
+                continue;
+            }
+            $name = trim((string) ($entry['name'] ?? ''));
+            if (mb_strlen($name) < 2) {
+                continue;
+            }
+            $person = ['name' => $name];
+            $role = trim((string) ($entry['role'] ?? ''));
+            if ($role !== '') {
+                $person['role'] = $role;
+            }
+            $people[] = $person;
+            if (count($people) >= 6) {
+                break;
+            }
+        }
+
+        return $people;
+    }
+
+    /**
+     * face_layout is one of the plugin enum values; anything else (or absent)
+     * resolves to null. 'none' is normalized to null too — it means "no faces",
+     * which is equivalent to the field being unset for the fulfilment layer.
+     */
+    private function resolveFaceLayout(array $slide): ?string
+    {
+        $value = $slide['face_layout'] ?? null;
+        if (! is_string($value)) {
+            return null;
+        }
+        $value = trim($value);
+
+        return in_array($value, ['photo_band_top', 'photo_band_inline'], true) ? $value : null;
     }
 
     /**
