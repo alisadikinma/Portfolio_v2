@@ -45,6 +45,50 @@ class VideoFullZernioPublishTest extends TestCase
         $this->assertSame('Halo dunia', $payload['content']);
     }
 
+    public function test_build_video_full_youtube_sets_short_metadata(): void
+    {
+        Setting::create(['group' => 'zernio', 'key' => 'zernio_youtube_account_id', 'value' => 'acc_yt', 'type' => 'text']);
+        $job = $this->job();
+
+        $payload = app(ZernioPayloadBuilder::class)->buildVideoFull($job, 'youtube', "My Short Title\nmore body text");
+
+        $psd = $payload['platforms'][0]['platformSpecificData'];
+        $this->assertSame('My Short Title', $psd['title']);
+        $this->assertTrue($psd['containsSyntheticMedia'], 'AI-generated clips must be disclosed');
+        $this->assertSame('public', $psd['visibility']);
+        $this->assertSame('28', $psd['categoryId']);
+        $this->assertFalse($psd['madeForKids']);
+        $this->assertCount(1, $payload['mediaItems']);
+        $this->assertSame('video', $payload['mediaItems'][0]['type']);
+    }
+
+    public function test_build_video_full_youtube_title_capped_at_100(): void
+    {
+        Setting::create(['group' => 'zernio', 'key' => 'zernio_youtube_account_id', 'value' => 'acc_yt', 'type' => 'text']);
+
+        $payload = app(ZernioPayloadBuilder::class)->buildVideoFull($this->job(), 'youtube', str_repeat('x', 130));
+
+        $this->assertLessThanOrEqual(100, mb_strlen($payload['platforms'][0]['platformSpecificData']['title']));
+    }
+
+    public function test_build_video_full_reddit_sets_subreddit_and_title(): void
+    {
+        Setting::create(['group' => 'zernio', 'key' => 'zernio_reddit_account_id', 'value' => 'acc_rd', 'type' => 'text']);
+        $payload = app(ZernioPayloadBuilder::class)->buildVideoFull($this->job(), 'reddit', "Reddit video hook\nbody");
+
+        $psd = $payload['platforms'][0]['platformSpecificData'];
+        $this->assertSame('u_alisadikinma', $psd['subreddit']);
+        $this->assertSame('Reddit video hook', $psd['title']);
+    }
+
+    public function test_build_video_full_facebook_has_no_platform_specific_data(): void
+    {
+        Setting::create(['group' => 'zernio', 'key' => 'zernio_facebook_account_id', 'value' => 'acc_fb', 'type' => 'text']);
+        $payload = app(ZernioPayloadBuilder::class)->buildVideoFull($this->job(), 'facebook', 'FB video caption');
+
+        $this->assertArrayNotHasKey('platformSpecificData', $payload['platforms'][0]);
+    }
+
     public function test_build_video_full_throws_without_final_video(): void
     {
         $this->expectException(\RuntimeException::class);
