@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Exceptions\ZernioApiException;
+use App\Models\FacebookPost;
 use App\Models\InstagramPost;
 use App\Models\RedditPost;
 use App\Models\ThreadsPost;
@@ -19,7 +20,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 /**
- * Publish a cross-post sibling (Instagram/TikTok/Threads/Reddit) via Zernio.
+ * Publish a cross-post sibling (Instagram/TikTok/Threads/Reddit/Facebook) via Zernio.
  *
  * Mirror of PublishViaPubler with three simplifications enabled by Zernio:
  *   - NO media pre-upload/poll — Zernio fetches public CDN URLs directly.
@@ -109,6 +110,7 @@ class PublishViaZernio implements ShouldQueue
                 'tiktok'    => $builder->buildTiktok($sibling),
                 'threads'   => $builder->buildThreads($sibling),
                 'reddit'    => $builder->buildReddit($sibling),
+                'facebook'  => $builder->buildFacebook($sibling),
             };
             $payload = $this->applyScheduling($payload, $sibling);
 
@@ -214,15 +216,16 @@ class PublishViaZernio implements ShouldQueue
         }
     }
 
-    private function loadSibling(): InstagramPost|TiktokPost|ThreadsPost|RedditPost|null
+    private function loadSibling(): InstagramPost|TiktokPost|ThreadsPost|RedditPost|FacebookPost|null
     {
         return match ($this->platform) {
             'instagram' => InstagramPost::find($this->siblingPostId),
             'tiktok'    => TiktokPost::find($this->siblingPostId),
             'threads'   => ThreadsPost::find($this->siblingPostId),
             'reddit'    => RedditPost::find($this->siblingPostId),
+            'facebook'  => FacebookPost::find($this->siblingPostId),
             default     => throw new \InvalidArgumentException(
-                "Unknown platform: {$this->platform}. Zernio handles instagram|tiktok|threads|reddit."
+                "Unknown platform: {$this->platform}. Zernio handles instagram|tiktok|threads|reddit|facebook."
             ),
         };
     }
