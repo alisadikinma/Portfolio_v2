@@ -67,7 +67,7 @@ class PublishSlotOrchestrator extends Command
             ->whereNotNull('cancel_window_ends_at')
             ->where('cancel_window_ends_at', '<=', now())
             ->whereNull('deleted_at')
-            ->with(['account', 'facebookPost', 'instagramPost', 'tiktokPost', 'threadsPost'])
+            ->with(['account', 'facebookPost', 'instagramPost', 'tiktokPost', 'threadsPost', 'redditPost'])
             ->limit($limit)
             ->get();
 
@@ -128,7 +128,7 @@ class PublishSlotOrchestrator extends Command
         PipelineGuard $guard,
         bool $dryRun
     ): void {
-        $siblingCount = collect(['facebookPost', 'instagramPost', 'tiktokPost', 'threadsPost'])
+        $siblingCount = collect(['facebookPost', 'instagramPost', 'tiktokPost', 'threadsPost', 'redditPost'])
             ->filter(fn ($rel) => $draft->$rel !== null)
             ->count();
 
@@ -157,18 +157,26 @@ class PublishSlotOrchestrator extends Command
             FILTER_VALIDATE_BOOLEAN
         );
         $dispatcher = app(\App\Services\PostizPublishDispatcher::class);
-        foreach (['instagram', 'tiktok', 'threads', 'facebook'] as $platform) {
+        foreach (['instagram', 'tiktok', 'threads', 'facebook', 'reddit'] as $platform) {
             $rel = $platform . 'Post';
             $sibling = $draft->$rel;
             if ($sibling === null) {
                 continue;
             }
 
+            // A platform whose selector is 'off' (Reddit defaults off, never
+            // publishes blind) is skipped entirely — it must NOT fall into the
+            // Zernio OR Publer branch below.
+            if (\App\Support\PublisherResolver::for($platform) === 'off') {
+                $this->line("  ⊘ {$platform} publisher off — skipped");
+                continue;
+            }
+
             // Publisher-aware routing (2026-06-15): Zernio is the primary
-            // publisher for IG/TT/TH. When a platform is routed to Zernio, gate
-            // on its Zernio account and dispatch PublishViaZernio. The slot has
-            // already fired, so the now-past scheduled_at is treated as publish-
-            // now by PublishViaZernio::applyScheduling (future-only scheduledFor).
+            // publisher for IG/TT/TH/Reddit. When a platform is routed to Zernio,
+            // gate on its Zernio account and dispatch PublishViaZernio. The slot
+            // has already fired, so the now-past scheduled_at is treated as
+            // publish-now by PublishViaZernio::applyScheduling (future-only scheduledFor).
             if (\App\Support\PublisherResolver::for($platform) === 'zernio') {
                 if (!\App\Services\ZernioPayloadBuilder::isPlatformEnabled($platform)) {
                     $this->line("  ⊘ {$platform} not configured in Zernio settings — skipped");
@@ -259,7 +267,7 @@ class PublishSlotOrchestrator extends Command
             $draft->save();
 
             // Propagate to siblings
-            foreach (['facebookPost', 'instagramPost', 'tiktokPost', 'threadsPost'] as $rel) {
+            foreach (['facebookPost', 'instagramPost', 'tiktokPost', 'threadsPost', 'redditPost'] as $rel) {
                 $draft->$rel?->update([
                     'scheduled_at' => $nextSlot,
                 ]);

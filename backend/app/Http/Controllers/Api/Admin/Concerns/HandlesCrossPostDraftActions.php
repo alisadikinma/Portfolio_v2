@@ -261,6 +261,7 @@ trait HandlesCrossPostDraftActions
             \App\Models\InstagramPost::class => 'instagram',
             \App\Models\TiktokPost::class => 'tiktok',
             \App\Models\ThreadsPost::class => 'threads',
+            \App\Models\RedditPost::class => 'reddit',
             default => throw new \InvalidArgumentException("Unknown cross-post model: {$modelClass}"),
         };
 

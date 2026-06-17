@@ -11,6 +11,7 @@ use App\Models\Category;
 use App\Models\InstagramPost;
 use App\Models\LinkedInPost;
 use App\Models\Post;
+use App\Models\RedditPost;
 use App\Models\Setting;
 use App\Models\ThreadsPost;
 use App\Models\TiktokPost;
@@ -251,6 +252,51 @@ class PublishSlotOrchestratorTest extends TestCase
 
         Queue::assertPushed(PublishViaZernio::class, fn ($j) => $j->platform === 'instagram');
         Queue::assertNotPushed(PublishViaPubler::class); // IG routed to Zernio, not Publer
+    }
+
+    public function test_reddit_sibling_dispatches_zernio_when_selected(): void
+    {
+        Setting::updateOrCreate(['group' => 'zernio', 'key' => 'crosspost_publisher_reddit'], ['value' => 'zernio']);
+        Setting::firstOrCreate(['group' => 'zernio', 'key' => 'zernio_reddit_account_id'], ['value' => 'rd_acc']);
+
+        $draft = $this->makeDueCarouselDraft();
+        RedditPost::create([
+            'linkedin_post_id' => $draft->id,
+            'post_id' => $draft->post_id,
+            'status' => 'awaiting_review',
+            'format' => 'carousel',
+            'title' => 'RD title',
+            'caption' => 'RD body',
+            'subreddit' => 'u_alisadikinma',
+        ]);
+
+        $this->artisan('social:publish-slot')->assertExitCode(0);
+
+        Queue::assertPushed(PublishViaZernio::class, fn ($j) => $j->platform === 'reddit');
+    }
+
+    public function test_reddit_off_is_not_dispatched(): void
+    {
+        // Reddit defaults off (never publishes blind) — must NOT dispatch to
+        // Zernio OR fall into the Publer branch.
+        Setting::updateOrCreate(['group' => 'zernio', 'key' => 'crosspost_publisher_reddit'], ['value' => 'off']);
+        Setting::firstOrCreate(['group' => 'zernio', 'key' => 'zernio_reddit_account_id'], ['value' => 'rd_acc']);
+
+        $draft = $this->makeDueCarouselDraft();
+        RedditPost::create([
+            'linkedin_post_id' => $draft->id,
+            'post_id' => $draft->post_id,
+            'status' => 'awaiting_review',
+            'format' => 'carousel',
+            'title' => 'RD title',
+            'caption' => 'RD body',
+            'subreddit' => 'u_alisadikinma',
+        ]);
+
+        $this->artisan('social:publish-slot')->assertExitCode(0);
+
+        Queue::assertNotPushed(PublishViaZernio::class, fn ($j) => $j->platform === 'reddit');
+        Queue::assertNotPushed(PublishViaPubler::class);
     }
 
     public function test_zernio_selected_but_unconfigured_is_skipped(): void
