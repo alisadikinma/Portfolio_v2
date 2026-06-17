@@ -105,6 +105,89 @@ class SourceFaceLocator
     }
 
     /**
+     * Group fallback — find the ONE source slide that introduces this set of
+     * people (e.g. an unlabelled founders group photo: "4 MIT dropouts who
+     * started Cursor") and return EVERY visible face on it, left-to-right, capped
+     * to the requested headcount. Used when per-name {@see locate()} matching
+     * can't attribute faces because the source doesn't label each person — the
+     * vision model refuses to identify people by appearance alone, so a group
+     * portrait yields zero name matches even though the faces are right there.
+     *
+     * Faces come back WITHOUT name attribution (name/role null): showing the real
+     * faces IS the human touch the slide wants; guessing which face is whom would
+     * be wrong. Fail-safe: any miss returns [].
+     *
+     * @param  array<int,string>  $slidePaths  Absolute paths to source slide images, in order.
+     * @param  array<int,array{name:string,role?:string}>  $people  The named people (context + headcount only).
+     * @param  string  $topic  The profile slide's headline/copy, to help pick the right source slide.
+     * @return array<int,array{name:null,role:null,slide_path:string,bbox:array{0:float,1:float,2:float,3:float}}>
+     */
+    public function locateGroup(array $slidePaths, array $people, string $topic = ''): array
+    {
+        $slidePaths = array_values(array_filter($slidePaths, static fn ($p) => is_string($p) && $p !== ''));
+        $names = [];
+        foreach ($people as $person) {
+            $name = trim((string) ($person['name'] ?? ''));
+            if (mb_strlen($name) >= 2) {
+                $names[] = $name;
+            }
+        }
+        $headcount = count($names);
+        if ($slidePaths === [] || $headcount === 0) {
+            return [];
+        }
+
+        try {
+            $res = $this->runGroupLocate($this->buildGroupPrompt($slidePaths, $names, $headcount, $topic));
+        } catch (\Throwable $e) {
+            Log::warning('[SourceFaceLocator] group exec threw — no faces located', ['error' => $e->getMessage()]);
+
+            return [];
+        }
+
+        if (! ($res['success'] ?? false)) {
+            return [];
+        }
+
+        $parsed = (array) ($res['parsed'] ?? []);
+        $slideIdx = $this->resolveSlideIndex($parsed['slide'] ?? $parsed['slide_index'] ?? null, count($slidePaths));
+        if ($slideIdx === null) {
+            return [];
+        }
+
+        $rawFaces = $parsed['faces'] ?? [];
+        if (! is_array($rawFaces)) {
+            return [];
+        }
+
+        $boxes = [];
+        foreach ($rawFaces as $f) {
+            // Accept a bare [x,y,w,h] OR a {"bbox":[...]} wrapper.
+            $bbox = (is_array($f) && isset($f['bbox'])) ? $f['bbox'] : $f;
+            $clamped = $this->clampBbox($bbox);
+            if ($clamped !== null) {
+                $boxes[] = $clamped;
+            }
+        }
+        if ($boxes === []) {
+            return [];
+        }
+
+        // Left-to-right, capped to the requested headcount (never crop a crowd).
+        usort($boxes, static fn ($a, $b) => $a[0] <=> $b[0]);
+        $boxes = array_slice($boxes, 0, $headcount);
+
+        $path = $slidePaths[$slideIdx];
+
+        return array_map(static fn ($b) => [
+            'name' => null,
+            'role' => null,
+            'slide_path' => $path,
+            'bbox' => $b,
+        ], $boxes);
+    }
+
+    /**
      * Test seam — wraps the CLI call so tests subclass + inject canned matches
      * without a real Claude CLI. Requires `status` (always truthy) rather than
      * `matches` so a legitimate empty-matches response isn't treated as a parse
@@ -117,6 +200,18 @@ class SourceFaceLocator
         return $this->runRepurposeParsed(
             $prompt,
             'source-face-locate',
+            ['status'],
+            (string) config('services.repurpose.model_vision', 'sonnet'),
+            ''
+        );
+    }
+
+    /** Test seam for the group-locate CLI call (mirrors {@see runFaceLocate}). */
+    protected function runGroupLocate(string $prompt): array
+    {
+        return $this->runRepurposeParsed(
+            $prompt,
+            'source-face-group',
             ['status'],
             (string) config('services.repurpose.model_vision', 'sonnet'),
             ''
@@ -156,6 +251,42 @@ Return ONE JSON object with exactly this shape:
   "matches": [
     { "name": "Full Name", "slide": 1, "bbox": [0.10, 0.15, 0.30, 0.40] }
   ]
+}
+PROMPT;
+    }
+
+    /** @param array<int,string> $names */
+    private function buildGroupPrompt(array $slidePaths, array $names, int $headcount, string $topic): string
+    {
+        $imageLines = '';
+        foreach ($slidePaths as $i => $path) {
+            $n = $i + 1;
+            $imageLines .= "Slide {$n}: read the image file at this path: {$path}\n";
+        }
+        $nameList = implode(', ', $names);
+        $topicLine = trim($topic) !== '' ? "The carousel slide that needs these photos is about: \"{$topic}\".\n" : '';
+
+        return <<<PROMPT
+You are finding ONE source slide: the photograph that introduces a specific group of people, so their real faces can be cropped and reused.
+
+Source slide images:
+{$imageLines}
+{$topicLine}The people are: {$nameList} (about {$headcount} people). They may NOT be individually name-labelled in the slide — that is fine and expected. Find the single slide that is clearly the GROUP PHOTO / portrait of these people together (a founders photo, a team photo, the people the topic is about). Use the slide's visible text and the number of people shown to choose it.
+
+Return that one slide and a bounding box for EVERY human face visible on it.
+- bbox = [x, y, w, h], each a fraction 0..1. x,y = top-left corner; w,h = width,height. Frame the HEAD AND SHOULDERS with a little margin.
+- Return faces left-to-right. Return no more than {$headcount} faces.
+- If NO single slide clearly shows this group together, return an empty faces list.
+
+STRICT JSON OUTPUT — parsed by a machine, not a human:
+- Output ONE compact JSON object only. No markdown fences, no preamble, no trailing prose.
+- "slide" is the 1-based slide number from the list above.
+
+Return ONE JSON object with exactly this shape:
+{
+  "status": "ok",
+  "slide": 4,
+  "faces": [ [0.10, 0.15, 0.18, 0.30], [0.32, 0.15, 0.18, 0.30] ]
 }
 PROMPT;
     }

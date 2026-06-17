@@ -35,6 +35,19 @@ names never fabricated.
 "Regenerate All Images" on draft 172 + 161 on the VPS → the profile slide renders with the real
 founder photo(s) framed in the band; a non-profile slide is untouched. Manual visual sign-off.
 
+### E5 — group fallback for UNLABELLED people (the real Cursor blocker)
+`SourceFaceLocator::locate()` matches faces BY NAME against visible labels, but a founders GROUP
+photo ("4 MIT dropouts") shows the people **together, unlabelled** → 0 name matches → empty band.
+`locateGroup($paths, $people, $topic)` is the fallback: it finds the ONE slide that is the group
+portrait (by topic text + headcount) and returns EVERY face bbox on it, left-to-right, capped to the
+headcount, **without name attribution** (showing the real faces is the human touch; guessing whom is
+which would be wrong). The enricher invokes it whenever name-matching yields fewer faces than
+`people`. **Pass@3 ≥ 2/3** that for F1 (`SourceFaceLocator::locateGroup(F1.paths, [4 founders],
+'SIAPA CURSOR? 4 MIT Dropouts')`) it picks the founders group slide and returns ~4 plausible boxes.
+> **Verified live 2026-06-17** (VPS, real job 33 slides): picked slide 4, returned 4 left-to-right
+> boxes `x≈[0.07,0.27,0.46,0.67]`. The stale-bundle recompile (Cause #1) was necessary but NOT
+> sufficient — without the group fallback the named-but-unlabelled founders never resolve.
+
 ## Regression evals (must not break)
 
 - **R1** — a blog→carousel draft (no RepurposeJob) is a no-op: no slide gains `person_photo_refs`,

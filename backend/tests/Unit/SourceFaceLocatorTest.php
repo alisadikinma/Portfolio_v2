@@ -135,4 +135,109 @@ class SourceFaceLocatorTest extends TestCase
         $this->assertCount(1, $out);
         $this->assertSame('/src/slide-01.jpg', $out[0]['slide_path']); // first kept
     }
+
+    // --- Group fallback (unlabelled group photo) -----------------------------
+
+    private function groupLocator(array $cannedParsed, bool $success = true): SourceFaceLocator
+    {
+        return new class($cannedParsed, $success) extends SourceFaceLocator {
+            public function __construct(private array $canned, private bool $ok)
+            {
+            }
+
+            protected function runGroupLocate(string $prompt): array
+            {
+                return [
+                    'success' => $this->ok,
+                    'parsed' => $this->ok ? $this->canned : null,
+                    'output' => '',
+                    'error' => $this->ok ? null : 'fake_failure',
+                    'repaired' => false,
+                ];
+            }
+        };
+    }
+
+    public function test_group_returns_all_faces_left_to_right_without_names(): void
+    {
+        $loc = $this->groupLocator([
+            'status' => 'ok',
+            'slide' => 2,
+            // Deliberately out of left-to-right order.
+            'faces' => [
+                [0.60, 0.2, 0.15, 0.30],
+                [0.10, 0.2, 0.15, 0.30],
+                [0.35, 0.2, 0.15, 0.30],
+            ],
+        ]);
+
+        $people = [['name' => 'Michael Truell'], ['name' => 'Sualeh Asif'], ['name' => 'Arvid Lunnemark'], ['name' => 'Aman Sanger']];
+        $out = $loc->locateGroup($this->paths, $people, 'SIAPA CURSOR? 4 MIT Dropouts');
+
+        $this->assertCount(3, $out);
+        // Sorted by x ascending.
+        $this->assertEqualsWithDelta(0.10, $out[0]['bbox'][0], 1e-9);
+        $this->assertEqualsWithDelta(0.35, $out[1]['bbox'][0], 1e-9);
+        $this->assertEqualsWithDelta(0.60, $out[2]['bbox'][0], 1e-9);
+        // All point at the chosen slide, no name attribution.
+        foreach ($out as $f) {
+            $this->assertSame('/src/slide-02.jpg', $f['slide_path']);
+            $this->assertNull($f['name']);
+            $this->assertNull($f['role']);
+        }
+    }
+
+    public function test_group_caps_faces_to_headcount(): void
+    {
+        $loc = $this->groupLocator([
+            'status' => 'ok',
+            'slide' => 1,
+            'faces' => [
+                [0.10, 0.2, 0.1, 0.2], [0.30, 0.2, 0.1, 0.2], [0.50, 0.2, 0.1, 0.2], [0.70, 0.2, 0.1, 0.2],
+            ],
+        ]);
+
+        // Only 2 people requested → never return more than 2 faces.
+        $out = $loc->locateGroup($this->paths, [['name' => 'One Name'], ['name' => 'Two Name']], 'topic');
+        $this->assertCount(2, $out);
+    }
+
+    public function test_group_accepts_bbox_wrapper_objects(): void
+    {
+        $loc = $this->groupLocator([
+            'status' => 'ok',
+            'slide' => 1,
+            'faces' => [
+                ['bbox' => [0.10, 0.2, 0.2, 0.3]],
+                ['bbox' => [0.40, 0.2, 0.2, 0.3]],
+            ],
+        ]);
+        $out = $loc->locateGroup($this->paths, [['name' => 'One Name'], ['name' => 'Two Name']], 'topic');
+        $this->assertCount(2, $out);
+        $this->assertEqualsWithDelta(0.10, $out[0]['bbox'][0], 1e-9);
+    }
+
+    public function test_group_returns_empty_when_no_faces(): void
+    {
+        $loc = $this->groupLocator(['status' => 'ok', 'slide' => 1, 'faces' => []]);
+        $this->assertSame([], $loc->locateGroup($this->paths, [['name' => 'One Name'], ['name' => 'Two Name']], 't'));
+    }
+
+    public function test_group_returns_empty_on_out_of_range_slide(): void
+    {
+        $loc = $this->groupLocator(['status' => 'ok', 'slide' => 99, 'faces' => [[0.1, 0.1, 0.2, 0.2]]]);
+        $this->assertSame([], $loc->locateGroup($this->paths, [['name' => 'One Name']], 't'));
+    }
+
+    public function test_group_returns_empty_on_cli_failure(): void
+    {
+        $loc = $this->groupLocator([], false);
+        $this->assertSame([], $loc->locateGroup($this->paths, [['name' => 'One Name']], 't'));
+    }
+
+    public function test_group_returns_empty_when_no_people(): void
+    {
+        $loc = $this->groupLocator(['status' => 'ok', 'slide' => 1, 'faces' => [[0.1, 0.1, 0.2, 0.2]]]);
+        $this->assertSame([], $loc->locateGroup($this->paths, [], 't'));
+    }
 }

@@ -106,6 +106,21 @@ class CarouselPersonPhotoEnricher
             }
 
             $matches = $this->locator->locate($sourcePaths, $people);
+
+            // Group fallback — an UNLABELLED group photo (e.g. "4 MIT dropouts who
+            // started Cursor") yields too few per-name matches: the source shows
+            // the people together but doesn't label each face, and vision won't
+            // attribute a name by appearance alone. Find the group-introduction
+            // slide and crop every face (no name attribution — the real faces ARE
+            // the human touch). Only when it actually finds more than name-matching.
+            if (count($matches) < count($people)) {
+                $headline = (string) ($slide['copy_id'] ?? $slide['copy_en'] ?? $slide['copy'] ?? '');
+                $group = $this->locator->locateGroup($sourcePaths, $people, $headline);
+                if (count($group) > count($matches)) {
+                    $matches = $group;
+                }
+            }
+
             $refs = [];
             $faceNo = 0;
             foreach ($matches as $match) {
