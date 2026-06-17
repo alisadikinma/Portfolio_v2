@@ -110,6 +110,34 @@ class VideoFullZernioPublishTest extends TestCase
         $this->postJson("/api/admin/video-full/{$job->id}/publish-zernio")->assertStatus(422);
     }
 
+    public function test_publish_endpoint_allows_reddit_facebook_youtube(): void
+    {
+        Queue::fake();
+        config()->set('social-cross-post.zernio.enabled', true);
+        foreach (['reddit', 'facebook', 'youtube'] as $p) {
+            Setting::create(['group' => 'zernio', 'key' => "zernio_{$p}_account_id", 'value' => "acc_{$p}", 'type' => 'text']);
+        }
+        Sanctum::actingAs(User::factory()->create());
+        $job = $this->job();
+
+        $res = $this->postJson("/api/admin/video-full/{$job->id}/publish-zernio", [
+            'platforms' => ['reddit', 'facebook', 'youtube'],
+        ]);
+
+        $res->assertStatus(202)->assertJsonPath('dispatched', ['reddit', 'facebook', 'youtube']);
+        Queue::assertPushed(PublishRepurposeViaZernio::class, 3);
+    }
+
+    public function test_publish_endpoint_rejects_unknown_platform(): void
+    {
+        config()->set('social-cross-post.zernio.enabled', true);
+        Sanctum::actingAs(User::factory()->create());
+
+        $this->postJson("/api/admin/video-full/{$this->job()->id}/publish-zernio", [
+            'platforms' => ['pinterest'],
+        ])->assertStatus(422);
+    }
+
     public function test_publish_endpoint_dispatches_per_configured_platform(): void
     {
         Queue::fake();
