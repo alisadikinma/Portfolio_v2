@@ -1,0 +1,16 @@
+# Secrets — NEVER commit
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+
+# Python venv (RVC voice-change runtime)
+.venv*/
+__pycache__/
+
+# Local work artifacts + downloaded models
+work/
+*.bin
+remotion/out/
