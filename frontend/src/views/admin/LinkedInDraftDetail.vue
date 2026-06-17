@@ -178,13 +178,14 @@ const PLATFORM_META = {
   instagram: { label: 'Instagram', accent: 'text-fuchsia-400', activeBg: 'bg-fuchsia-500/10 text-fuchsia-200 border-fuchsia-400/40' },
   tiktok: { label: 'TikTok', accent: 'text-rose-400', activeBg: 'bg-rose-500/10 text-rose-200 border-rose-400/40' },
   threads: { label: 'Threads', accent: 'text-neutral-300', activeBg: 'bg-neutral-200/10 text-neutral-100 border-neutral-300/40' },
+  reddit: { label: 'Reddit', accent: 'text-orange-400', activeBg: 'bg-orange-500/10 text-orange-200 border-orange-400/40' },
 }
 
-// Platforms shown in the caption tab strip. Facebook hidden (May 10, 2026)
-// — moved off Publer to direct Graph API integration, no UI surface yet.
-// PLATFORM_META.facebook stays intact so server-side lookups (labels, status
-// chips, draft.facebook_post deserialization) keep working.
-const VISIBLE_PLATFORMS = ['linkedin', 'instagram', 'tiktok', 'threads']
+// Platforms shown in the caption tab strip. Facebook re-shown (2026-06-16) now
+// that it publishes via Zernio; Reddit added as the 4th Zernio carousel sibling.
+// YouTube is intentionally absent — it's video_full-only (no carousel sibling),
+// managed from the /admin/video-full surface, not here.
+const VISIBLE_PLATFORMS = ['linkedin', 'instagram', 'tiktok', 'threads', 'reddit', 'facebook']
 const VISIBLE_PLATFORM_META = computed(() =>
   Object.fromEntries(VISIBLE_PLATFORMS.map((k) => [k, PLATFORM_META[k]]))
 )
