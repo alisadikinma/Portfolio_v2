@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Models\Category;
+use App\Models\FacebookPost;
 use App\Models\InstagramPost;
 use App\Models\LinkedInPost;
 use App\Models\Post;
@@ -69,6 +70,58 @@ class ZernioPayloadBuilderTest extends TestCase
         $ig->load('linkedinPost');
 
         return $ig;
+    }
+
+    private function facebook(array $attrs = [], int $slides = 3, ?LinkedInPost $li = null): FacebookPost
+    {
+        $li ??= $this->makeLinkedInPost($slides);
+        $fb = FacebookPost::create(array_merge([
+            'linkedin_post_id' => $li->id,
+            'post_id' => $li->post_id,
+            'status' => 'awaiting_review',
+            'format' => 'carousel',
+            'caption' => 'FB body',
+            'hashtags' => [],
+        ], $attrs));
+        $fb->load('linkedinPost');
+
+        return $fb;
+    }
+
+    public function test_facebook_multi_image_with_first_comment_from_link_url(): void
+    {
+        Setting::create(['group' => 'zernio', 'key' => 'zernio_facebook_account_id', 'value' => 'fb_acc']);
+        $fb = $this->facebook(['link_url' => 'https://alisadikinma.com/blog/x']);
+
+        $payload = (new ZernioPayloadBuilder)->buildFacebook($fb);
+
+        $this->assertSame('facebook', $payload['platforms'][0]['platform']);
+        $this->assertSame('fb_acc', $payload['platforms'][0]['accountId']);
+        $this->assertCount(3, $payload['mediaItems']);
+        $this->assertSame('image', $payload['mediaItems'][0]['type']);
+        $this->assertSame('https://alisadikinma.com/blog/x', $payload['platforms'][0]['platformSpecificData']['firstComment']);
+    }
+
+    public function test_facebook_caps_at_ten_images(): void
+    {
+        Setting::create(['group' => 'zernio', 'key' => 'zernio_facebook_account_id', 'value' => 'fb_acc']);
+        $fb = $this->facebook([], 12);
+
+        $payload = (new ZernioPayloadBuilder)->buildFacebook($fb);
+
+        $this->assertCount(10, $payload['mediaItems']);
+    }
+
+    public function test_facebook_suppresses_first_comment_for_repurpose(): void
+    {
+        Setting::create(['group' => 'zernio', 'key' => 'zernio_facebook_account_id', 'value' => 'fb_acc']);
+        $fb = $this->facebook(['link_url' => 'https://alisadikinma.com/blog/x']);
+        \App\Models\RepurposeJob::factory()->create(['linkedin_post_id' => $fb->linkedin_post_id]);
+        $fb->load('linkedinPost');
+
+        $payload = (new ZernioPayloadBuilder)->buildFacebook($fb);
+
+        $this->assertArrayNotHasKey('firstComment', $payload['platforms'][0]['platformSpecificData'] ?? []);
     }
 
     private function reddit(array $attrs = [], int $slides = 3): RedditPost

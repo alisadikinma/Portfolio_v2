@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\ImageGenerationJob;
+use App\Models\FacebookPost;
 use App\Models\InstagramPost;
 use App\Models\RedditPost;
 use App\Models\RepurposeJob;
@@ -68,6 +69,9 @@ class ZernioPayloadBuilder
     private const REDDIT_MAX_IMAGES = 20;
 
     private const REDDIT_TITLE_LIMIT = 300;
+
+    /** Facebook: ≤10 images (image-only — no mixed video+image). */
+    private const FB_MAX_IMAGES = 10;
 
     public function __construct(private ?ZernioImageNormalizer $normalizer = null)
     {
@@ -177,6 +181,34 @@ class ZernioPayloadBuilder
             accountId: $this->resolveAccountId('threads'),
             content: $content,
             mediaItems: $images,
+        );
+    }
+
+    /**
+     * Facebook: multi-image post (≤10 images, image-only — FB cannot mix
+     * video+image in one post). Body = caption + hashtags. The blog "first
+     * comment" link rides in platformSpecificData.firstComment from the FB
+     * link_url field, suppressed for IG-repurpose posts (no public article to
+     * link — mirrors buildInstagram). FB carousel rows have link_url=null, so
+     * firstComment is naturally absent there.
+     */
+    public function buildFacebook(FacebookPost $sibling): array
+    {
+        $images = array_slice($this->slideMediaItems($sibling), 0, self::FB_MAX_IMAGES);
+        $content = $this->buildCaption($sibling->caption, $sibling->hashtags);
+
+        $platformSpecificData = [];
+        $isRepurpose = $sibling->linkedinPost !== null && $sibling->linkedinPost->isRepurpose();
+        if (! $isRepurpose && ! empty($sibling->link_url)) {
+            $platformSpecificData['firstComment'] = $sibling->link_url;
+        }
+
+        return $this->payload(
+            platform: 'facebook',
+            accountId: $this->resolveAccountId('facebook'),
+            content: $content,
+            mediaItems: $images,
+            platformSpecificData: $platformSpecificData,
         );
     }
 
