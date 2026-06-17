@@ -1603,15 +1603,23 @@ class SettingsController extends Controller
             $data = array_merge([
                 'zernio_api_key_igtt' => null,
                 'zernio_api_key_threads' => null,
+                'zernio_api_key_fbyt' => null,
                 'zernio_instagram_account_id' => null,
                 'zernio_tiktok_account_id' => null,
                 'zernio_threads_account_id' => null,
+                'zernio_reddit_account_id' => null,
+                'zernio_facebook_account_id' => null,
+                'zernio_youtube_account_id' => null,
+                'zernio_reddit_subreddit' => 'u_alisadikinma',
                 'crosspost_publisher_instagram' => 'zernio',
                 'crosspost_publisher_tiktok' => 'zernio',
                 'crosspost_publisher_threads' => 'zernio',
+                'crosspost_publisher_reddit' => 'off',
+                'crosspost_publisher_facebook' => 'zernio',
+                'crosspost_publisher_youtube' => 'zernio',
             ], $data);
 
-            foreach (['zernio_api_key_igtt', 'zernio_api_key_threads'] as $keyName) {
+            foreach (['zernio_api_key_igtt', 'zernio_api_key_threads', 'zernio_api_key_fbyt'] as $keyName) {
                 $has = ! empty($data[$keyName]);
                 $data[$keyName] = $has ? '***SET***' : '';
                 $data[$keyName . '_configured'] = $has;
@@ -1640,17 +1648,26 @@ class SettingsController extends Controller
         $validated = $request->validate([
             'zernio_api_key_igtt' => ['nullable', 'string', 'max:512'],
             'zernio_api_key_threads' => ['nullable', 'string', 'max:512'],
+            'zernio_api_key_fbyt' => ['nullable', 'string', 'max:512'],
             'zernio_instagram_account_id' => ['nullable', 'string', 'max:100'],
             'zernio_tiktok_account_id' => ['nullable', 'string', 'max:100'],
             'zernio_threads_account_id' => ['nullable', 'string', 'max:100'],
-            'crosspost_publisher_instagram' => ['nullable', 'in:zernio,publer'],
-            'crosspost_publisher_tiktok' => ['nullable', 'in:zernio,publer'],
-            'crosspost_publisher_threads' => ['nullable', 'in:zernio,publer'],
+            'zernio_reddit_account_id' => ['nullable', 'string', 'max:100'],
+            'zernio_facebook_account_id' => ['nullable', 'string', 'max:100'],
+            'zernio_youtube_account_id' => ['nullable', 'string', 'max:100'],
+            'zernio_reddit_subreddit' => ['nullable', 'string', 'max:100'],
+            // 'off' hard-disables a platform (Reddit's default until its live-probe).
+            'crosspost_publisher_instagram' => ['nullable', 'in:zernio,publer,off'],
+            'crosspost_publisher_tiktok' => ['nullable', 'in:zernio,publer,off'],
+            'crosspost_publisher_threads' => ['nullable', 'in:zernio,publer,off'],
+            'crosspost_publisher_reddit' => ['nullable', 'in:zernio,publer,off'],
+            'crosspost_publisher_facebook' => ['nullable', 'in:zernio,publer,off'],
+            'crosspost_publisher_youtube' => ['nullable', 'in:zernio,publer,off'],
         ]);
 
         DB::beginTransaction();
         try {
-            foreach (['zernio_api_key_igtt', 'zernio_api_key_threads'] as $keyName) {
+            foreach (['zernio_api_key_igtt', 'zernio_api_key_threads', 'zernio_api_key_fbyt'] as $keyName) {
                 $value = $request->input($keyName);
                 if ($value === null || $value === '' || $value === '***SET***') {
                     unset($validated[$keyName]); // preserve existing
@@ -1690,9 +1707,13 @@ class SettingsController extends Controller
     public function verifyZernioConnection(\Illuminate\Http\Request $request): JsonResponse
     {
         $workspace = $request->input('workspace', 'igtt');
-        // igtt workspace holds IG+TikTok; pick 'instagram' as its representative
-        // platform so ZernioClient::forPlatform() selects the right key.
-        $platform = $workspace === 'threads' ? 'threads' : 'instagram';
+        // Pick a representative platform per workspace so ZernioClient::forPlatform()
+        // selects the right key: igtt→instagram, threads→threads, fbyt→facebook.
+        $platform = match ($workspace) {
+            'threads' => 'threads',
+            'fbyt' => 'facebook',
+            default => 'instagram',
+        };
 
         try {
             $accounts = app(\App\Services\ZernioClient::class)->forPlatform($platform)->listAccounts();
