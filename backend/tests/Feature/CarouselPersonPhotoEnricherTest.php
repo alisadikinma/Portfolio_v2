@@ -171,4 +171,115 @@ class CarouselPersonPhotoEnricherTest extends TestCase
         $this->assertSame(0, $count);
         $this->assertArrayNotHasKey('person_photo_refs', $draft->fresh()->carousel_slides[1]);
     }
+
+    // --- Group fallback (unlabelled founders photo, e.g. "4 MIT Dropouts") ----
+
+    /** A profile slide about 4 named founders (the Cursor case). */
+    private function slidesWithGroupProfile(): array
+    {
+        return [
+            [
+                'slide_number' => 1, 'layout_hint' => 'body', 'copy_id' => 'SIAPA CURSOR? 4 MIT Dropouts', 'copy_en' => 'Who is Cursor?',
+                'image_prompt' => str_repeat('profile ', 60), 'is_cover' => false, 'is_cta' => false,
+                'image_status' => 'pending', 'image_url' => null,
+                'needs_real_faces' => true,
+                'people' => [
+                    ['name' => 'Michael Truell'], ['name' => 'Sualeh Asif'],
+                    ['name' => 'Arvid Lunnemark'], ['name' => 'Aman Sanger'],
+                ],
+                'face_layout' => 'photo_band_top',
+            ],
+        ];
+    }
+
+    /**
+     * @param  array<int,array<string,mixed>>  $nameMatches  canned per-name matches (slide_path filled in)
+     * @param  array<int,array{0:float,1:float,2:float,3:float}>  $groupFaces  canned group bboxes
+     */
+    private function groupEnricher(array $nameMatches, array $groupFaces): CarouselPersonPhotoEnricher
+    {
+        $locator = new class($nameMatches, $groupFaces) extends SourceFaceLocator {
+            public function __construct(private array $nm, private array $gf)
+            {
+            }
+
+            public function locate(array $slidePaths, array $people): array
+            {
+                if ($slidePaths === []) {
+                    return [];
+                }
+
+                return array_map(fn ($m) => array_merge($m, ['slide_path' => $slidePaths[0]]), $this->nm);
+            }
+
+            public function locateGroup(array $slidePaths, array $people, string $topic = ''): array
+            {
+                if ($slidePaths === []) {
+                    return [];
+                }
+
+                return array_map(fn ($b) => [
+                    'name' => null, 'role' => null, 'slide_path' => $slidePaths[0], 'bbox' => $b,
+                ], $this->gf);
+            }
+        };
+
+        return new CarouselPersonPhotoEnricher($locator);
+    }
+
+    public function test_group_fallback_crops_all_faces_when_people_unlabelled(): void
+    {
+        Storage::fake('local');
+        Storage::fake('public');
+        $this->seedSourceSlides('repurpose/80');
+
+        $draft = LinkedInPost::factory()->create(['format' => 'carousel', 'carousel_slides' => $this->slidesWithGroupProfile()]);
+        RepurposeJob::factory()->create(['linkedin_post_id' => $draft->id, 'mode' => 'carousel', 'slides_path' => 'repurpose/80', 'status' => 'drafted']);
+
+        // Name-matching finds NOTHING (no labels) → group locate finds all 4 faces.
+        $enricher = $this->groupEnricher([], [
+            [0.08, 0.30, 0.18, 0.28], [0.30, 0.30, 0.18, 0.28],
+            [0.52, 0.30, 0.18, 0.28], [0.74, 0.30, 0.18, 0.28],
+        ]);
+
+        $count = $enricher->enrich($draft->fresh());
+
+        $this->assertSame(1, $count);
+        $slide = $draft->fresh()->carousel_slides[0];
+        $this->assertCount(4, $slide['person_photo_refs']);
+        // No name attribution on group crops.
+        $this->assertNull($slide['person_photo_refs'][0]['name']);
+        $this->assertSame('pending', $slide['image_status']);
+        $this->assertNull($slide['image_url']);
+        // Each cut-out actually written.
+        foreach ($slide['person_photo_refs'] as $ref) {
+            Storage::disk('public')->assertExists(str_replace(url('/storage/'), '', $ref['url']));
+        }
+    }
+
+    public function test_group_fallback_not_used_when_name_matches_suffice(): void
+    {
+        Storage::fake('local');
+        Storage::fake('public');
+        $this->seedSourceSlides('repurpose/81');
+
+        $draft = LinkedInPost::factory()->create(['format' => 'carousel', 'carousel_slides' => $this->slidesWithGroupProfile()]);
+        RepurposeJob::factory()->create(['linkedin_post_id' => $draft->id, 'mode' => 'carousel', 'slides_path' => 'repurpose/81', 'status' => 'drafted']);
+
+        // All 4 names matched by label → group must NOT override (names preserved).
+        $named = [
+            ['name' => 'Michael Truell', 'role' => null, 'bbox' => [0.08, 0.3, 0.18, 0.28]],
+            ['name' => 'Sualeh Asif', 'role' => null, 'bbox' => [0.30, 0.3, 0.18, 0.28]],
+            ['name' => 'Arvid Lunnemark', 'role' => null, 'bbox' => [0.52, 0.3, 0.18, 0.28]],
+            ['name' => 'Aman Sanger', 'role' => null, 'bbox' => [0.74, 0.3, 0.18, 0.28]],
+        ];
+        $enricher = $this->groupEnricher($named, [[0.0, 0.0, 0.5, 0.5]]); // group would only give 1
+
+        $count = $enricher->enrich($draft->fresh());
+
+        $this->assertSame(1, $count);
+        $refs = $draft->fresh()->carousel_slides[0]['person_photo_refs'];
+        $this->assertCount(4, $refs);
+        $this->assertSame('Michael Truell', $refs[0]['name']); // name-match kept, not group
+    }
 }
