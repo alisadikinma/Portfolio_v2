@@ -20,6 +20,8 @@ class ZernioColumnsMigrationTest extends TestCase
             ['instagram_posts'],
             ['tiktok_posts'],
             ['threads_posts'],
+            ['facebook_posts'], // 2026-06-16 — Publer→Zernio cutover
+            ['reddit_posts'],   // 2026-06-16 — 4th Zernio platform
         ];
     }
 

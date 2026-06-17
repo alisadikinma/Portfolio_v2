@@ -51,6 +51,8 @@ class FacebookPost extends Model
         'publer_job_id',
         'publer_status',
         'publer_account_id',
+        'zernio_post_id',
+        'zernio_request_id',
         'last_error',
         'pipeline_state_log',
         'created_by_user_id',
