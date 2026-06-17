@@ -924,6 +924,25 @@ LINKEDIN_OAUTH_REDIRECT_URI=https://alisadikinma.com/api/admin/linkedin/oauth/ca
                 />
                 <BaseButton type="button" button-type="secondary" :disabled="zernioVerifying === 'threads' || !zernioThreadsKeyConfigured" :loading="zernioVerifying === 'threads'" @click="handleZernioVerify('threads')">🔌 Verify</BaseButton>
               </div>
+            </div>
+
+            <!-- API key: Facebook + YouTube workspace -->
+            <div>
+              <label for="zernio_api_key_fbyt" class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                API Key — Facebook + YouTube workspace
+                <span v-if="zernioFbytKeyConfigured" class="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">✓ Configured</span>
+              </label>
+              <div class="flex gap-2">
+                <input
+                  id="zernio_api_key_fbyt"
+                  v-model="zernioFormData.zernio_api_key_fbyt"
+                  type="password"
+                  autocomplete="new-password"
+                  :placeholder="zernioFbytKeyConfigured ? 'Leave blank to keep current key' : 'Paste Zernio Facebook+YouTube key (sk_...)'"
+                  class="flex-1 border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono text-sm"
+                />
+                <BaseButton type="button" button-type="secondary" :disabled="zernioVerifying === 'fbyt' || !zernioFbytKeyConfigured" :loading="zernioVerifying === 'fbyt'" @click="handleZernioVerify('fbyt')">🔌 Verify</BaseButton>
+              </div>
               <p class="text-xs text-neutral-500 mt-1">
                 Click <em>Verify</em> after saving a key — the workspace's account IDs are filled in automatically below (just click Save).
                 <strong class="text-amber-700 dark:text-amber-400">Rotate keys in the Zernio dashboard if they have ever been exposed.</strong>
@@ -970,6 +989,7 @@ LINKEDIN_OAUTH_REDIRECT_URI=https://alisadikinma.com/api/admin/linkedin/oauth/ca
                   >
                     <option value="zernio">Zernio (primary)</option>
                     <option value="publer">Publer (fallback)</option>
+                    <option value="off">Off (don't publish)</option>
                   </select>
                 </div>
               </div>
@@ -2085,22 +2105,33 @@ const zernioPlatforms = [
   { key: 'instagram', label: 'Instagram', icon: '📸' },
   { key: 'tiktok', label: 'TikTok', icon: '🎵' },
   { key: 'threads', label: 'Threads', icon: '🧵' },
+  { key: 'reddit', label: 'Reddit', icon: '🔴' },
+  { key: 'facebook', label: 'Facebook', icon: '👍' },
+  { key: 'youtube', label: 'YouTube', icon: '📺' },
 ]
 const zernioSubmitting = ref(false)
-const zernioVerifying = ref(null) // 'igtt' | 'threads' | null
+const zernioVerifying = ref(null) // 'igtt' | 'threads' | 'fbyt' | null
 const zernioVerifyResult = ref(null) // { success, message, accounts } | null
 const zernioFormData = ref({
   zernio_api_key_igtt: '',
   zernio_api_key_threads: '',
+  zernio_api_key_fbyt: '',
   zernio_instagram_account_id: '',
   zernio_tiktok_account_id: '',
   zernio_threads_account_id: '',
+  zernio_reddit_account_id: '',
+  zernio_facebook_account_id: '',
+  zernio_youtube_account_id: '',
   crosspost_publisher_instagram: 'zernio',
   crosspost_publisher_tiktok: 'zernio',
   crosspost_publisher_threads: 'zernio',
+  crosspost_publisher_reddit: 'off',
+  crosspost_publisher_facebook: 'zernio',
+  crosspost_publisher_youtube: 'zernio',
 })
 const zernioIgttKeyConfigured = computed(() => settingsStore.zernioSettings?.zernio_api_key_igtt_configured === true)
 const zernioThreadsKeyConfigured = computed(() => settingsStore.zernioSettings?.zernio_api_key_threads_configured === true)
+const zernioFbytKeyConfigured = computed(() => settingsStore.zernioSettings?.zernio_api_key_fbyt_configured === true)
 
 async function loadZernioSettings() {
   try {
@@ -2109,12 +2140,19 @@ async function loadZernioSettings() {
     zernioFormData.value = {
       zernio_api_key_igtt: '', // never bind the masked sentinel — let placeholder show
       zernio_api_key_threads: '',
+      zernio_api_key_fbyt: '',
       zernio_instagram_account_id: s.zernio_instagram_account_id || '',
       zernio_tiktok_account_id: s.zernio_tiktok_account_id || '',
       zernio_threads_account_id: s.zernio_threads_account_id || '',
+      zernio_reddit_account_id: s.zernio_reddit_account_id || '',
+      zernio_facebook_account_id: s.zernio_facebook_account_id || '',
+      zernio_youtube_account_id: s.zernio_youtube_account_id || '',
       crosspost_publisher_instagram: s.crosspost_publisher_instagram || 'zernio',
       crosspost_publisher_tiktok: s.crosspost_publisher_tiktok || 'zernio',
       crosspost_publisher_threads: s.crosspost_publisher_threads || 'zernio',
+      crosspost_publisher_reddit: s.crosspost_publisher_reddit || 'off',
+      crosspost_publisher_facebook: s.crosspost_publisher_facebook || 'zernio',
+      crosspost_publisher_youtube: s.crosspost_publisher_youtube || 'zernio',
     }
   } catch (err) {
     console.warn('[Settings] zernio fetch failed — using defaults', err)
@@ -2128,11 +2166,13 @@ async function handleZernioSubmit() {
     // Empty key = preserve existing (operator chose not to change).
     if (!payload.zernio_api_key_igtt) delete payload.zernio_api_key_igtt
     if (!payload.zernio_api_key_threads) delete payload.zernio_api_key_threads
+    if (!payload.zernio_api_key_fbyt) delete payload.zernio_api_key_fbyt
 
     await settingsStore.updateZernioSettings(payload)
     uiStore.showSuccess('Zernio settings saved.', 'Saved')
     zernioFormData.value.zernio_api_key_igtt = ''
     zernioFormData.value.zernio_api_key_threads = ''
+    zernioFormData.value.zernio_api_key_fbyt = ''
   } catch (err) {
     uiStore.showError(err.response?.data?.message || err.message || 'Failed to save Zernio settings', 'Save Failed')
   } finally {
