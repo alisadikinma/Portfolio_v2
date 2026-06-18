@@ -58,9 +58,10 @@ class RegenerateLinkedInCarouselContentTest extends TestCase
 
         $gen = Mockery::mock(LinkedInGenerationService::class);
         $gen->shouldReceive('isRepurposeDraft')->once()->andReturn(true);
+        $gen->shouldReceive('sourceSlideCount')->andReturn(null);
         $gen->shouldReceive('dispatchCarouselGenEngine')
             ->once()
-            ->withArgs(function ($brief, $blogUrl, $draftId, $blogContent, $isRepurpose, $style) {
+            ->withArgs(function ($brief, $blogUrl, $draftId, $blogContent, $isRepurpose, $style, $sourceSlideCount = null) {
                 return $isRepurpose === true && $style === 'sketchnote';
             })
             ->andReturn(null); // null → job bails before adapter/image dispatch

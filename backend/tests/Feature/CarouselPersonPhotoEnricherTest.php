@@ -17,17 +17,44 @@ class CarouselPersonPhotoEnricherTest extends TestCase
 {
     use RefreshDatabase;
 
+    /** @var array<int,string> real source dirs created under storage/app for cleanup. */
+    private array $tmpSourceDirs = [];
+
+    protected function tearDown(): void
+    {
+        foreach ($this->tmpSourceDirs as $dir) {
+            if (is_dir($dir)) {
+                array_map('unlink', glob($dir . '/*') ?: []);
+                @rmdir($dir);
+            }
+        }
+
+        parent::tearDown();
+    }
+
     private function manager(): ImageManager
     {
         return new ImageManager(extension_loaded('imagick') ? new ImagickDriver() : new GdDriver());
     }
 
-    /** Write a real source slide image into the fake local disk + return its rel dir. */
+    /**
+     * Write real source slide images into the REAL storage/app/{relDir} location
+     * — exactly where InstagramCaptureService persists them (slides_path is
+     * relative to storage/app, NOT the 'local' disk = storage/app/private). The
+     * old version seeded the faked 'local' disk, which mirrored the production
+     * path bug and let it ship green.
+     */
     private function seedSourceSlides(string $relDir): void
     {
+        $dir = storage_path('app/' . $relDir);
+        if (! is_dir($dir)) {
+            mkdir($dir, 0775, true);
+        }
+        $this->tmpSourceDirs[] = $dir;
+
         $bytes = (string) $this->manager()->create(600, 750)->fill('#4477aa')->toJpeg();
-        Storage::disk('local')->put($relDir . '/slide-01.jpg', $bytes);
-        Storage::disk('local')->put($relDir . '/slide-02.jpg', $bytes);
+        file_put_contents($dir . '/slide-01.jpg', $bytes);
+        file_put_contents($dir . '/slide-02.jpg', $bytes);
     }
 
     /** A profile slide flagged needs_real_faces + a plain concept slide. */
@@ -79,7 +106,6 @@ class CarouselPersonPhotoEnricherTest extends TestCase
 
     public function test_it_attaches_real_photo_refs_and_forces_rerender_on_profile_slide(): void
     {
-        Storage::fake('local');
         Storage::fake('public');
         $this->seedSourceSlides('repurpose/77');
 
@@ -123,7 +149,6 @@ class CarouselPersonPhotoEnricherTest extends TestCase
 
     public function test_it_is_idempotent_and_skips_already_enriched_slides(): void
     {
-        Storage::fake('local');
         Storage::fake('public');
         $this->seedSourceSlides('repurpose/78');
 
@@ -141,7 +166,6 @@ class CarouselPersonPhotoEnricherTest extends TestCase
 
     public function test_it_marks_resolved_without_rerender_when_no_face_located(): void
     {
-        Storage::fake('local');
         Storage::fake('public');
         $this->seedSourceSlides('repurpose/79');
 
@@ -160,7 +184,6 @@ class CarouselPersonPhotoEnricherTest extends TestCase
 
     public function test_it_is_a_noop_for_non_repurpose_drafts(): void
     {
-        Storage::fake('local');
         Storage::fake('public');
 
         // No RepurposeJob → isRepurpose() false.
@@ -229,7 +252,6 @@ class CarouselPersonPhotoEnricherTest extends TestCase
 
     public function test_group_fallback_crops_all_faces_when_people_unlabelled(): void
     {
-        Storage::fake('local');
         Storage::fake('public');
         $this->seedSourceSlides('repurpose/80');
 
@@ -259,7 +281,6 @@ class CarouselPersonPhotoEnricherTest extends TestCase
 
     public function test_group_fallback_not_used_when_name_matches_suffice(): void
     {
-        Storage::fake('local');
         Storage::fake('public');
         $this->seedSourceSlides('repurpose/81');
 

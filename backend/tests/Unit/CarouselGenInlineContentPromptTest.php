@@ -105,7 +105,9 @@ class CarouselGenInlineContentPromptTest extends TestCase
 
         $prompt = $svc->buildCarouselGenPrompt([], 'https://alisadikinma.com/blog/x', null);
 
-        $this->assertStringContainsString('KNOWLEDGE-FIRST INFOGRAPHIC', $prompt);
+        // The sketchnote directive's knowledge-first intent (the block was
+        // reworded to "BLUE-BRAND HYBRID" — assert a stable phrase that survives).
+        $this->assertStringContainsString('Maximize knowledge density', $prompt);
     }
 
     public function test_cinematic_style_omits_knowledge_directive_and_emits_its_flag(): void
@@ -116,5 +118,56 @@ class CarouselGenInlineContentPromptTest extends TestCase
 
         $this->assertStringContainsString('--style=cinematic', $prompt);
         $this->assertStringNotContainsString('KNOWLEDGE-FIRST INFOGRAPHIC', $prompt);
+    }
+
+    // --- Source-mirrored slide count (2026-06-18) ----------------------------
+
+    public function test_non_repurpose_uses_brief_heuristic_target_slides(): void
+    {
+        $svc = $this->makeService();
+
+        // Non-repurpose: ignores any sourceSlideCount, uses the 7-default heuristic.
+        $prompt = $svc->buildCarouselGenPrompt([], 'https://alisadikinma.com/blog/x', null, false, 'sketchnote', 12);
+
+        $this->assertStringContainsString('--target-slides=7', $prompt);
+    }
+
+    public function test_repurpose_mirrors_source_slide_count(): void
+    {
+        $svc = $this->makeService();
+
+        // Cursor case: 5-slide source → 5-slide carousel (not the hard 7).
+        $prompt = $svc->buildCarouselGenPrompt([], 'https://www.instagram.com/p/x/', null, true, 'sketchnote', 5);
+
+        $this->assertStringContainsString('--target-slides=5', $prompt);
+    }
+
+    public function test_repurpose_clamps_to_configured_max(): void
+    {
+        config(['carousel-gen.max_repurpose_slides' => 12]);
+        $svc = $this->makeService();
+
+        // 20-frame source (legacy over-grab / huge carousel) clamps to the ceiling.
+        $prompt = $svc->buildCarouselGenPrompt([], 'https://www.instagram.com/p/x/', null, true, 'sketchnote', 20);
+
+        $this->assertStringContainsString('--target-slides=12', $prompt);
+    }
+
+    public function test_repurpose_floors_at_three(): void
+    {
+        $svc = $this->makeService();
+
+        $prompt = $svc->buildCarouselGenPrompt([], 'https://www.instagram.com/p/x/', null, true, 'sketchnote', 1);
+
+        $this->assertStringContainsString('--target-slides=3', $prompt);
+    }
+
+    public function test_repurpose_without_source_count_falls_back_to_heuristic(): void
+    {
+        $svc = $this->makeService();
+
+        $prompt = $svc->buildCarouselGenPrompt([], 'https://www.instagram.com/p/x/', null, true, 'sketchnote', null);
+
+        $this->assertStringContainsString('--target-slides=7', $prompt);
     }
 }

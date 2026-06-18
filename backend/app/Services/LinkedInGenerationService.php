@@ -6,6 +6,7 @@ use App\Enums\LinkedInPostStatus;
 use App\Exceptions\CarouselGenAdapterException;
 use App\Models\LinkedInPost;
 use App\Models\PostTranslation;
+use App\Models\RepurposeJob;
 use App\Models\Setting;
 use App\Support\LinkedInProgressEmitter;
 use Illuminate\Support\Facades\Log;
@@ -323,6 +324,7 @@ class LinkedInGenerationService
         // avoids two wasted EXISTS queries on text-format drafts.
         $isRepurpose = false;
         $carouselStyle = 'sketchnote';
+        $sourceSlideCount = null;
         if ($detectedFormat === 'carousel' || $isCarouselRoute) {
             $isRepurpose = $this->isRepurposeDraft($draft);
             $carouselStyle = (string) Setting::get('linkedin_carousel_style', 'sketchnote');
@@ -332,9 +334,11 @@ class LinkedInGenerationService
             if (!in_array($carouselStyle, ['sketchnote', 'cinematic'], true)) {
                 $carouselStyle = 'sketchnote';
             }
+            // Mirror the source carousel length for IG-repurpose drafts.
+            $sourceSlideCount = $isRepurpose ? $this->sourceSlideCount($draft) : null;
         }
         try {
-            $parsed = $this->applyCarouselGenAdapter($parsed, $blog['url'], $draft->id, $blog['content'] ?? null, $isRepurpose, $carouselStyle);
+            $parsed = $this->applyCarouselGenAdapter($parsed, $blog['url'], $draft->id, $blog['content'] ?? null, $isRepurpose, $carouselStyle, $sourceSlideCount);
         } catch (CarouselGenAdapterException $e) {
             $this->markFailed($draft, "carousel-gen adapter failed: {$e->getMessage()}");
             return [
@@ -960,6 +964,46 @@ class LinkedInGenerationService
     }
 
     /**
+     * Captured-source slide count for an IG-repurpose draft, or null when it's
+     * not a repurpose draft / no captured slides exist on disk.
+     *
+     * Drives /carousel-gen --target-slides so the output carousel mirrors the
+     * SOURCE carousel length (2026-06-18). The capture now TRAVERSES the IG
+     * carousel and writes exactly the real full-res slides (see
+     * scripts/playwright/ig-capture.cjs — no more profile-grid / avatar / srcset
+     * over-grab), so the on-disk file count IS the true source length. Counts
+     * the same storage/app/{relDir} files CarouselPersonPhotoEnricher reads
+     * (slides_path is relative to storage/app, NOT the 'local' disk).
+     */
+    public function sourceSlideCount(LinkedInPost $draft): ?int
+    {
+        $job = RepurposeJob::query()
+            ->where('linkedin_post_id', $draft->id)
+            ->when($draft->post_id, fn ($q) => $q->orWhere('anchor_post_id', $draft->post_id))
+            ->latest('id')
+            ->first();
+
+        $relDir = $job?->slides_path;
+        if (! is_string($relDir) || $relDir === '') {
+            return null;
+        }
+
+        $absDir = storage_path('app/' . $relDir);
+        if (! is_dir($absDir)) {
+            return null;
+        }
+
+        $n = 0;
+        foreach (glob($absDir . '/*') ?: [] as $f) {
+            if (preg_match('/slide-\d+\.(jpg|jpeg|png)$/i', $f)) {
+                $n++;
+            }
+        }
+
+        return $n > 0 ? $n : null;
+    }
+
+    /**
      * Carousel router — STRICT /carousel-gen enforcement (no legacy fallback).
      *
      * Behavior matrix:
@@ -989,7 +1033,7 @@ class LinkedInGenerationService
      *                                      for carousel format. Caller
      *                                      catches and routes to FSM Failed.
      */
-    public function applyCarouselGenAdapter(array $parsed, string $blogUrl, int $draftId, ?string $blogContent = null, bool $isRepurpose = false, string $style = 'sketchnote'): array
+    public function applyCarouselGenAdapter(array $parsed, string $blogUrl, int $draftId, ?string $blogContent = null, bool $isRepurpose = false, string $style = 'sketchnote', ?int $sourceSlideCount = null): array
     {
         $format = $parsed['format'] ?? null;
         if ($format !== 'carousel') {
@@ -1048,7 +1092,7 @@ class LinkedInGenerationService
             'brief_pillar' => $brief['pillar'] ?? null,
         ]);
 
-        $carouselGenJson = $this->dispatchCarouselGenEngine($brief, $blogUrl, $draftId, $blogContent, $isRepurpose, $style);
+        $carouselGenJson = $this->dispatchCarouselGenEngine($brief, $blogUrl, $draftId, $blogContent, $isRepurpose, $style, $sourceSlideCount);
 
         if ($carouselGenJson === null) {
             throw new CarouselGenAdapterException(
@@ -1098,14 +1142,14 @@ class LinkedInGenerationService
      * Public so it can be Mockery-mocked in unit tests without booting the
      * full SSH stack.
      */
-    public function dispatchCarouselGenEngine(array $brief, string $blogUrl, int $draftId, ?string $blogContent = null, bool $isRepurpose = false, string $style = 'sketchnote'): ?array
+    public function dispatchCarouselGenEngine(array $brief, string $blogUrl, int $draftId, ?string $blogContent = null, bool $isRepurpose = false, string $style = 'sketchnote', ?int $sourceSlideCount = null): ?array
     {
         $driver = (string) config('carousel-gen.driver', 'ssh');
         $model = (string) config('carousel-gen.model', 'sonnet');
         $timeout = (int) config('carousel-gen.timeout_seconds', 600);
         $refsPath = (string) config('carousel-gen.refs_pipeline', '');
 
-        $prompt = $this->buildCarouselGenPrompt($brief, $blogUrl, $blogContent, $isRepurpose, $style);
+        $prompt = $this->buildCarouselGenPrompt($brief, $blogUrl, $blogContent, $isRepurpose, $style, $sourceSlideCount);
 
         $refsFlag = $refsPath !== ''
             ? '--append-system-prompt-file ' . escapeshellarg($refsPath)
@@ -1161,7 +1205,7 @@ class LinkedInGenerationService
      * as the labeled PRIMARY source so the engine builds the 5-act storyline
      * from the real article instead of a thin OG blurb (June 9, 2026).
      */
-    public function buildCarouselGenPrompt(array $brief, string $blogUrl, ?string $blogContent = null, bool $isRepurpose = false, string $style = 'sketchnote'): string
+    public function buildCarouselGenPrompt(array $brief, string $blogUrl, ?string $blogContent = null, bool $isRepurpose = false, string $style = 'sketchnote', ?int $sourceSlideCount = null): string
     {
         // /linkedin-gen carousel briefs default to bilingual ID/EN (LinkedIn
         // pillar) so we mirror that.
@@ -1170,7 +1214,7 @@ class LinkedInGenerationService
         // educational infographic. Drop it for IG-repurpose drafts (free
         // narrative); keep the 5-act spine for normal blog carousels.
         $narrative = $isRepurpose ? 'free' : '5act';
-        $targetSlides = $this->inferTargetSlides($brief);
+        $targetSlides = $this->resolveTargetSlides($brief, $isRepurpose, $sourceSlideCount);
 
         $flags = [
             '--pipeline',
@@ -1241,6 +1285,31 @@ class LinkedInGenerationService
             'contrarian' => 7,
             default => 7,
         };
+    }
+
+    /**
+     * Target slide count for /carousel-gen.
+     *
+     * IG-repurpose carousels MIRROR the source carousel length (2026-06-18) —
+     * the user's "follow the source slide count" requirement. The capture now
+     * traverses to exactly the real slides, so $sourceSlideCount is the true
+     * length. Clamped to a Sonnet-safe ceiling: a single /carousel-gen envelope
+     * truncates past ~9 bilingual slides (the very reason inferTargetSlides
+     * defaults to 7 — see the May 2/4 truncation notes). The ceiling is
+     * configurable (`carousel-gen.max_repurpose_slides`) so it can be raised
+     * once CAROUSEL_GEN_MODEL is switched to a higher-output model. Floor of 3
+     * guards against a degenerate capture. Non-repurpose (blog) carousels keep
+     * the brief-driven heuristic.
+     */
+    private function resolveTargetSlides(array $brief, bool $isRepurpose, ?int $sourceSlideCount): int
+    {
+        if ($isRepurpose && $sourceSlideCount !== null && $sourceSlideCount > 0) {
+            $max = max(3, (int) config('carousel-gen.max_repurpose_slides', 12));
+
+            return max(3, min($sourceSlideCount, $max));
+        }
+
+        return $this->inferTargetSlides($brief);
     }
 
     private function executeCarouselGenLocal(string $prompt, string $model, string $refsFlag, int $timeout): array
