@@ -45,4 +45,12 @@ return [
     // production failure mode. Operators can override per-environment via
     // CAROUSEL_GEN_TIMEOUT_SECONDS env var if measured wall time differs.
     'timeout_seconds' => (int) env('CAROUSEL_GEN_TIMEOUT_SECONDS', 600),
+
+    // Max --target-slides for an IG-repurpose carousel (2026-06-18). The output
+    // carousel mirrors the SOURCE carousel length (capture now traverses to the
+    // real slides), clamped to this Sonnet-safe ceiling — a single /carousel-gen
+    // envelope truncates past ~9 bilingual slides (the reason the legacy default
+    // was a hard 7). Raise once CAROUSEL_GEN_MODEL is switched to a higher-output
+    // model (e.g. opus), or lower if truncation recurs. Floor is fixed at 3.
+    'max_repurpose_slides' => (int) env('CAROUSEL_GEN_MAX_REPURPOSE_SLIDES', 12),
 ];

@@ -6,6 +6,7 @@ use App\Jobs\ComposeVideoCarousel;
 use App\Jobs\FinalizeRepurpose;
 use App\Jobs\GenerateRebrandAssets;
 use App\Jobs\ResearchRepurposeClaims;
+use App\Models\ContentIdea;
 use App\Models\RepurposeJob;
 use App\Models\RepurposeVideoSlide;
 use App\Models\User;
@@ -294,10 +295,11 @@ class RepurposeJobAdminControllerTest extends TestCase
         Queue::fake();
         // A drafted blog job whose ContentIdea still exists should NOT be re-run —
         // the operator just needs to click "Start Research" in Content Engine.
+        $idea = ContentIdea::create(['title' => 'Linked idea', 'status' => 'draft']);
         $job = RepurposeJob::factory()->create([
             'status' => 'drafted',
             'mode' => 'blog',
-            'content_idea_id' => 999, // non-null = idea still exists (or row was orphaned but linked)
+            'content_idea_id' => $idea->id, // non-null = idea still exists (FK must resolve on sqlite)
         ]);
 
         $this->actingAs($this->admin(), 'sanctum')

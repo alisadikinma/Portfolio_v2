@@ -18,9 +18,14 @@
  * is still printed on failure so the caller gets a structured reason.
  *
  * Extraction strategy (ordered, best-effort — IG markup changes often):
- *   1. JSON-LD (<script type="application/ld+json">) → caption + image(s).
- *   2. og:image / og:description meta tags.
- *   3. DOM scan for cdninstagram image URLs (carousel slides), de-duplicated.
+ *   1. JSON-LD (<script type="application/ld+json">) → caption + image[] when it
+ *      carries the full carousel (>= 2 images).
+ *   2. else TRAVERSE the carousel: hover the media, click "Next" through every
+ *      slide, collecting only full-res (naturalWidth >= 600) IG-CDN images. This
+ *      is the normal path now — IG no longer serves JSON-LD carousel images to
+ *      anonymous Chromium, and a flat <img> scrape both over-grabs (avatars +
+ *      srcset thumbs + the "more posts" grid) and under-captures (lazy slides).
+ *   3. else og:image single cover (lone-image post).
  * Image bytes are fetched THROUGH the browser context (same cookies/session) so
  * authenticated storageState works for wall-gated carousels.
  *
@@ -103,15 +108,62 @@ async function fromMeta(page) {
   return { caption, images: image ? [image] : [] };
 }
 
-/** Last resort: scan the DOM for instagram CDN image URLs. */
-async function fromDom(page) {
-  const urls = await page.$$eval('img', (imgs) =>
-    imgs
-      .map((i) => i.getAttribute('src') || i.getAttribute('srcset') || '')
-      .map((s) => (s.includes(' ') ? s.split(',').pop().trim().split(' ')[0] : s))
-      .filter((s) => /cdninstagram\.com|fbcdn\.net/.test(s))
-  );
-  return { caption: '', images: uniq(urls) };
+/**
+ * Authoritative carousel extraction — TRAVERSE the carousel.
+ *
+ * IG lazy-loads carousel slides: at load only ~2 full-res slides exist in the
+ * DOM; the rest load only when the "Next" arrow (hover-gated) is clicked. A flat
+ * `<img>` scrape therefore over-grabs (srcset thumbnails + the profile avatar +
+ * the "more posts" suggested grid) AND under-captures (never sees the lazy
+ * slides). Instead: collect only large (naturalWidth >= 600) IG-CDN images —
+ * which cleanly excludes ~150px avatars and ~480px grid cards — and click
+ * through every slide until the arrow disappears (or no new image appears for
+ * two consecutive steps, the loop-back guard). Insertion order ≈ slide order
+ * (cover first). Returns the clean, ordered, deduped full-res slide URLs.
+ */
+async function collectCarouselImages(page) {
+  const seen = new Map(); // path (query-stripped) -> full url
+  const grab = async () => {
+    const urls = await page.$$eval('img', (imgs) =>
+      imgs
+        .filter((i) => /cdninstagram\.com|fbcdn\.net/.test(i.src || '') && i.naturalWidth >= 600)
+        .map((i) => i.src)
+    );
+    for (const u of urls) {
+      const key = u.split('?')[0];
+      if (!seen.has(key)) seen.set(key, u);
+    }
+  };
+
+  await grab();
+  let stale = 0;
+  for (let k = 0; k < 14; k++) {
+    const before = seen.size;
+    // The Next/Prev arrows only appear while the pointer is over the media.
+    try {
+      await page.mouse.move(640, 760);
+      await page.waitForTimeout(200);
+    } catch {}
+    const next =
+      (await page.$('button[aria-label="Next"]')) ||
+      (await page.$('button[aria-label*="ext"]')) ||
+      (await page.$('[aria-label="Next"]'));
+    if (!next) break;
+    try {
+      await next.click({ timeout: 3000, force: true });
+    } catch {
+      break;
+    }
+    await page.waitForTimeout(1100);
+    await grab();
+    if (seen.size === before) {
+      if (++stale >= 2) break; // looped back to the start / no more slides
+    } else {
+      stale = 0;
+    }
+  }
+
+  return Array.from(seen.values());
 }
 
 async function main() {
@@ -160,12 +212,22 @@ async function main() {
     // Give carousel media a beat to hydrate.
     await page.waitForTimeout(2500);
 
-    let caption = '';
-    let images = [];
-    for (const extractor of [fromJsonLd, fromMeta, fromDom]) {
-      const res = await extractor(page);
-      if (!caption && res.caption) caption = res.caption;
-      if (res.images.length) images.push(...res.images);
+    // Caption: JSON-LD first, then og:description.
+    const ld = await fromJsonLd(page);
+    let caption = ld.caption;
+    if (!caption) {
+      const meta = await fromMeta(page);
+      if (meta.caption) caption = meta.caption;
+    }
+
+    // Images (authoritative → fallback):
+    //   1. JSON-LD image[] when it carries the full carousel (>= 2) — clean + cheap.
+    //   2. else TRAVERSE the carousel (handles IG's lazy-load; the normal path now
+    //      that IG no longer serves JSON-LD carousel images anonymously).
+    //   3. else og:image single cover, so a lone-image post still yields 1 slide.
+    let images = ld.images.length >= 2 ? ld.images : await collectCarouselImages(page);
+    if (images.length === 0) {
+      images = (await fromMeta(page)).images;
     }
     images = uniq(images.filter(Boolean));
 

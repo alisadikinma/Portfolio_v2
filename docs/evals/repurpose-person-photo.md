@@ -48,6 +48,28 @@ which would be wrong). The enricher invokes it whenever name-matching yields few
 > boxes `x≈[0.07,0.27,0.46,0.67]`. The stale-bundle recompile (Cause #1) was necessary but NOT
 > sufficient — without the group fallback the named-but-unlabelled founders never resolve.
 
+### E6 — enricher reaches the captured slides (the real "no faces" blocker, 2026-06-18)
+`CarouselPersonPhotoEnricher::resolveSourceSlidePaths` read `Storage::disk('local')`
+(= `storage/app/private` under Laravel 11/12) but capture writes to
+`storage/app/repurpose/{id}` → it returned `[]` and the enricher no-op'd, so faces
+NEVER composited regardless of the group-crop logic (E5). Fixed to read
+`storage_path('app/'.$relDir)`. **Deterministic** — `CarouselPersonPhotoEnricherTest`
+now seeds the REAL `storage/app` location (the old test seeded the faked `local`
+disk, which mirrored the bug and let it ship green). 6/6 enricher tests green.
+
+### E7 — capture traverses the carousel (clean source slides + true count, 2026-06-18)
+`scripts/playwright/ig-capture.cjs` did a static whole-page `<img>` scrape + a
+union of JSON-LD/og/DOM → over-grabbed (avatars + srcset thumbs + suggested grid)
+AND under-captured (IG lazy-loads slides behind the hover-gated "Next" arrow).
+Rewritten to hover→click "Next" and collect only `naturalWidth≥600` IG-CDN images
+until the arrow disappears. **Live-verified 2026-06-18** on all 4 production source
+URLs (jobs 33/34/35/36): **5 / 8 / 12 / 7 slides, zero non-portrait, zero junk**
+(was 20+ noisy frames on job 33). This clean count feeds
+`LinkedInGenerationService::sourceSlideCount()` → `/carousel-gen --target-slides`
+(repurpose drafts mirror source length, clamped to
+`config('carousel-gen.max_repurpose_slides', 12)`; covered by
+`CarouselGenInlineContentPromptTest` target-slides cases).
+
 ## Regression evals (must not break)
 
 - **R1** — a blog→carousel draft (no RepurposeJob) is a no-op: no slide gains `person_photo_refs`,

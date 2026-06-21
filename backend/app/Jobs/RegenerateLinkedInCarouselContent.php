@@ -162,13 +162,19 @@ class RegenerateLinkedInCarouselContent implements ShouldQueue
             'is_repurpose' => $isRepurpose,
         ]);
 
+        // Mirror the source carousel length for IG-repurpose drafts (the
+        // /carousel-gen fallback when no parseable tool list — e.g. news
+        // roundups). Replaces the hard-7 with the true captured slide count.
+        $sourceSlideCount = $isRepurpose ? $generation->sourceSlideCount($draft) : null;
+
         $envelope = $generation->dispatchCarouselGenEngine(
             $brief,
             $blogUrl,
             $this->draftId,
             null,
             $isRepurpose,
-            $style
+            $style,
+            $sourceSlideCount
         );
         if ($envelope === null) {
             Log::error('[RegenerateCarouselContent] /carousel-gen returned null', ['draft_id' => $this->draftId]);

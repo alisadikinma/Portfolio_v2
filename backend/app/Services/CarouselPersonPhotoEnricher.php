@@ -182,8 +182,14 @@ class CarouselPersonPhotoEnricher
 
     /**
      * Resolve the captured source IG slide image paths for a repurpose draft.
-     * Uses the 'local' disk (root = storage/app) so it's fake-able in tests and
-     * matches where InstagramCaptureService persisted them.
+     *
+     * IMPORTANT: `slides_path` is relative to `storage/app` (that's where
+     * InstagramCaptureService writes — `storage_path('app/'.$relDir)`), NOT the
+     * 'local' disk. Under Laravel 11/12 the 'local' disk root is
+     * `storage/app/private`, so `Storage::disk('local')->files($relDir)` looked in
+     * `storage/app/private/repurpose/{id}` and found nothing → the enricher
+     * silently no-op'd and no faces ever composited. Read the real location with
+     * a native scan, mirroring VideoSlideExtractor's `storage_path('app/'.$rel)`.
      *
      * @return array<int,string> absolute filesystem paths, sorted
      */
@@ -200,11 +206,15 @@ class CarouselPersonPhotoEnricher
             return [];
         }
 
-        $disk = Storage::disk('local');
+        $absDir = storage_path('app/' . $relDir);
+        if (! is_dir($absDir)) {
+            return [];
+        }
+
         $paths = [];
-        foreach ($disk->files($relDir) as $f) {
+        foreach (glob($absDir . '/*') ?: [] as $f) {
             if (preg_match('/slide-\d+\.(jpg|jpeg|png)$/i', $f)) {
-                $paths[] = $disk->path($f);
+                $paths[] = $f;
             }
         }
         sort($paths);

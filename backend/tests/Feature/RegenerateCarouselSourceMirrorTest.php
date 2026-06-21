@@ -112,6 +112,7 @@ class RegenerateCarouselSourceMirrorTest extends TestCase
 
         $gen = Mockery::mock(LinkedInGenerationService::class);
         $gen->shouldReceive('isRepurposeDraft')->once()->andReturn(true);
+        $gen->shouldReceive('sourceSlideCount')->andReturn(null);
         // builder returns empty → must fall through to /carousel-gen
         $gen->shouldReceive('dispatchCarouselGenEngine')->once()->andReturn(null);
 
@@ -136,6 +137,7 @@ class RegenerateCarouselSourceMirrorTest extends TestCase
 
         $gen = Mockery::mock(LinkedInGenerationService::class);
         $gen->shouldReceive('isRepurposeDraft')->once()->andReturn(true);
+        $gen->shouldReceive('sourceSlideCount')->andReturn(null);
         $gen->shouldReceive('dispatchCarouselGenEngine')->once()->andReturn(null);
 
         $builder = $this->mock(RepurposeCarouselBuilder::class);
