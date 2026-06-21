@@ -143,7 +143,7 @@ class PublishRepurposeViaZernio implements ShouldQueue
 
         if ($scheduledFor !== null) {
             $payload['scheduledFor'] = $scheduledFor;
-            $payload['timezone'] = config('app.timezone', 'UTC');
+            $payload['timezone'] = config('social-cross-post.zernio.timezone', 'Asia/Jakarta');
             $payload['publishNow'] = false;
         } else {
             $payload['publishNow'] = true;
@@ -164,7 +164,11 @@ class PublishRepurposeViaZernio implements ShouldQueue
         }
         $when = Carbon::parse($this->scheduledForIso);
 
-        return $when->isFuture() ? $when->toIso8601String() : null;
+        // Emit in WIB (+07:00) — same instant, correct offset. config('app.timezone')
+        // is UTC, which shifted scheduled posts 7h on Zernio.
+        $tz = config('social-cross-post.zernio.timezone', 'Asia/Jakarta');
+
+        return $when->isFuture() ? $when->copy()->setTimezone($tz)->toIso8601String() : null;
     }
 
     private function markPublished(string $postId, ?string $url): void

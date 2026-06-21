@@ -127,6 +127,10 @@ return [
         // When true, a sibling with scheduled_at set publishes via Zernio
         // scheduledFor+timezone instead of publishNow. Off → always publishNow.
         'schedule_enabled' => env('ZERNIO_SCHEDULE_ENABLED', true),
+        // Timezone sent to Zernio for scheduled posts. config('app.timezone')
+        // is UTC, which made Zernio display/fire schedules in UTC instead of
+        // WIB — single-operator project runs on Asia/Jakarta (GMT+7).
+        'timezone' => env('ZERNIO_TIMEZONE', 'Asia/Jakarta'),
     ],
 
 ];

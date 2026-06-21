@@ -167,8 +167,12 @@ class PublishViaZernio implements ShouldQueue
         // which point scheduled_at is in the past. A past scheduledFor would be
         // rejected by Zernio, so treat a non-future schedule as publish-now.
         if ($scheduleEnabled && $sibling->scheduled_at !== null && $sibling->scheduled_at->isFuture()) {
-            $payload['scheduledFor'] = $sibling->scheduled_at->toIso8601String();
-            $payload['timezone'] = config('app.timezone', 'UTC');
+            $tz = config('social-cross-post.zernio.timezone', 'Asia/Jakarta');
+            // Same absolute instant, but emitted with the WIB offset (+07:00) so
+            // Zernio reads it correctly whether it honors the ISO offset or the
+            // timezone field — config('app.timezone') is UTC and shifted by 7h.
+            $payload['scheduledFor'] = $sibling->scheduled_at->copy()->setTimezone($tz)->toIso8601String();
+            $payload['timezone'] = $tz;
             $payload['publishNow'] = false;
         } else {
             $payload['publishNow'] = true;

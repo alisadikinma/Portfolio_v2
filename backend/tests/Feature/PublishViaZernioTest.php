@@ -166,6 +166,20 @@ class PublishViaZernioTest extends TestCase
         Http::assertSent(fn ($r) => isset($r['scheduledFor']) && ! ($r['publishNow'] ?? false));
     }
 
+    public function test_scheduled_sends_wib_timezone_not_utc(): void
+    {
+        // Regression: timezone was config('app.timezone') = UTC, so Zernio fired
+        // schedules 7h off. Must send Asia/Jakarta and a +07:00 scheduledFor.
+        config(['social-cross-post.zernio.schedule_enabled' => true]);
+        Http::fake(['zernio.com/api/v1/posts' => Http::response(['post' => ['_id' => 'z-tz']], 201)]);
+
+        $ig = $this->igSibling(['scheduled_at' => now()->addDay()]);
+        PublishViaZernio::dispatchSync('instagram', $ig->id);
+
+        Http::assertSent(fn ($r) => ($r['timezone'] ?? null) === 'Asia/Jakarta'
+            && str_contains($r['scheduledFor'] ?? '', '+07:00'));
+    }
+
     public function test_past_scheduled_at_publishes_now_not_scheduled(): void
     {
         // Slot-orchestrator model: the local cron holds the post until its slot,
