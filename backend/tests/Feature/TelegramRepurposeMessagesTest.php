@@ -68,7 +68,7 @@ class TelegramRepurposeMessagesTest extends TestCase
         app(TelegramNotificationService::class)->sendRepurposeDrafted($job, 42, 3);
 
         Http::assertSent(fn ($req) => str_contains($req->url(), '/sendMessage')
-            && str_contains($req['text'], '/admin/draft-posts/42')
+            && str_contains($req['text'], '/admin/sosmed-drafts/42')
             && str_contains($req['text'], '3 klaim'));
     }
 
