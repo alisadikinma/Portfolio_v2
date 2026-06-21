@@ -6,7 +6,6 @@ use App\Enums\LinkedInPostStatus;
 use App\Exceptions\InvalidStateTransitionException;
 use App\Http\Controllers\Controller;
 use App\Jobs\GenerateLinkedInPost;
-use App\Models\ContentIdea;
 use App\Models\LinkedInPost;
 use App\Models\RepurposeJob;
 use App\Services\LinkedInCarouselImageService;
@@ -90,19 +89,20 @@ class LinkedInDraftController extends Controller
             $query->whereIn('status', LinkedInPostStatus::queueStatuses());
         }
 
-        // Social Studio union list: when the blog-draft source is paired with
-        // the IG-repurpose source, exclude repurpose-origin drafts so a
-        // finalized repurpose carousel (which IS a LinkedInPost) doesn't appear
-        // in BOTH sources. This mirrors LinkedInGenerationService::isRepurposeDraft
-        // at QUERY level — no per-row predicate call (would be N+1). The three
-        // exclusion arms match the predicate exactly:
+        // Social Studio union list: exclude repurpose-origin drafts that are
+        // ALSO shown in the IG-repurpose column so a draft never appears in
+        // BOTH. Two arms — they match the carousel/video repurpose modes whose
+        // jobs stay visible in the IG column:
         //   1. draft.id referenced by RepurposeJob.linkedin_post_id
         //   2. draft.post_id = some RepurposeJob.anchor_post_id
-        //   3. draft.post_id links a ContentIdea{source:'instagram'}
-        // The whereNull('post_id') guard short-circuits arms 2+3 for null
-        // post_id (defends the NULL-NOT-IN trap; harmless given the NOT NULL
-        // schema, future-proofs it). whereNotNull on each subquery keeps NULLs
-        // out of the IN-lists so NOT IN can't silently drop valid rows.
+        // NO arm for ContentIdea{source:'instagram'}: blog-mode IG-repurpose
+        // hands off to Content Engine and its repurpose job settles immediately
+        // (content_idea_id set → hidden from the IG column by exclude_settled),
+        // so the published carousel draft has NO IG-column twin and MUST show in
+        // the LinkedIn queue. The former arm #3 excluded it → invisible in both
+        // columns (idea 817 / draft 177). Removed June 22, 2026.
+        // The whereNull('post_id') guard defends the NULL-NOT-IN trap (harmless
+        // given the NOT NULL schema).
         if ($request->boolean('exclude_repurpose')) {
             $query
                 ->whereNotIn('id', RepurposeJob::query()
@@ -110,15 +110,9 @@ class LinkedInDraftController extends Controller
                     ->select('linkedin_post_id'))
                 ->where(function ($q) {
                     $q->whereNull('post_id')
-                        ->orWhere(function ($q2) {
-                            $q2->whereNotIn('post_id', RepurposeJob::query()
-                                ->whereNotNull('anchor_post_id')
-                                ->select('anchor_post_id'))
-                                ->whereNotIn('post_id', ContentIdea::query()
-                                    ->where('source', 'instagram')
-                                    ->whereNotNull('result_post_id')
-                                    ->select('result_post_id'));
-                        });
+                        ->orWhereNotIn('post_id', RepurposeJob::query()
+                            ->whereNotNull('anchor_post_id')
+                            ->select('anchor_post_id'));
                 });
         }
 

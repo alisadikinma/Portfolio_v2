@@ -19,8 +19,11 @@ use Tests\TestCase;
  * drafts. The filter mirrors LinkedInGenerationService::isRepurposeDraft() at
  * QUERY level (no per-row predicate / N+1):
  *   - draft.id referenced by RepurposeJob.linkedin_post_id, OR
- *   - draft.post_id = some RepurposeJob.anchor_post_id, OR
- *   - draft.post_id links a ContentIdea{source:'instagram'} via result_post_id.
+ *   - draft.post_id = some RepurposeJob.anchor_post_id.
+ * A blog-mode IG-repurpose draft (ContentIdea{source:'instagram'}) is NOT
+ * excluded: its repurpose job hands off to Content Engine + settles (hidden
+ * from the IG column), so the published carousel must show in the LinkedIn
+ * queue. The former ContentIdea arm hid it from both columns (idea 817).
  *
  * NOTE on the documented "(d) null post_id KEPT" case: `linkedin_posts.post_id`
  * is NOT NULL in schema (foreignId->constrained, never altered nullable), so a
@@ -114,11 +117,14 @@ class LinkedInDraftListExcludeRepurposeTest extends TestCase
         $this->assertNotContains($draftId, $this->listIds('scope=queue&exclude_repurpose=1'));
     }
 
-    public function test_excludes_draft_whose_post_links_instagram_content_idea(): void
+    public function test_keeps_blog_handoff_draft_whose_post_links_instagram_content_idea(): void
     {
+        // Blog-mode IG-repurpose: the repurpose job settled into Content Engine
+        // and is hidden from the IG column, so its published carousel draft MUST
+        // remain visible in the LinkedIn queue (no IG-column twin to dedupe).
         $draftId = $this->seedDraft($this->seedPost(igSource: true));
 
-        $this->assertNotContains($draftId, $this->listIds('scope=queue&exclude_repurpose=1'));
+        $this->assertContains($draftId, $this->listIds('scope=queue&exclude_repurpose=1'));
     }
 
     public function test_keeps_normal_blog_draft(): void
