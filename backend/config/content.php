@@ -41,10 +41,12 @@ return [
             3 => 0,
         ],
         // Max topics to run through AI scoring per Pull Trending call.
-        // Scorer chunks in batches of TopicScoringService::MAX_BATCH_SIZE (20)
-        // so 60 = 3 Sonnet calls. Raise when the admin modal feels too thin;
-        // each extra chunk adds ~3-5s latency + 1 Sonnet invocation.
-        'max_scored' => (int) env('TRENDING_MAX_SCORED', 60),
+        // Clamped to a SINGLE Sonnet batch (1..MAX_BATCH_SIZE=20) in
+        // getScoredTopics() so the interactive modal stays under Cloudflare's
+        // ~100s origin wall. Topics are momentum-sorted first, so this is the
+        // top-N highest-momentum candidates. Raise toward 20 if the modal feels
+        // thin; values >20 are capped (one batch only).
+        'max_scored' => (int) env('TRENDING_MAX_SCORED', 12),
 
         // Hard gate for the daily auto-import (PullTrendingDaily) AND the
         // manual "Pull Trending" modal import. Topics whose AI-scored
