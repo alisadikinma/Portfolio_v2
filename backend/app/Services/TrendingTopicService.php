@@ -696,8 +696,11 @@ class TrendingTopicService
             return [];
         }
 
-        $maxScored = (int) config('content.trending.max_scored', 60);
-        $maxScored = max(TopicScoringService::MAX_BATCH_SIZE, $maxScored);
+        // Single Sonnet batch only — keep interactive scoring under Cloudflare's
+        // ~100s origin wall. $trends is already momentum-sorted, so the slice is
+        // the top-N highest-momentum candidates (the likeliest ≥80 topics anyway).
+        $maxScored = (int) config('content.trending.max_scored', 12);
+        $maxScored = max(1, min(TopicScoringService::MAX_BATCH_SIZE, $maxScored));
 
         $input = array_slice(array_values($trends), 0, $maxScored);
         $chunks = array_chunk($input, TopicScoringService::MAX_BATCH_SIZE);

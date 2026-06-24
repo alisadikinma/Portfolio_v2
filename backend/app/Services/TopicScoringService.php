@@ -198,7 +198,7 @@ class TopicScoringService
             $ageH = isset($t['age_hours']) ? round((float) $t['age_hours'], 1) . 'h' : '?h';
             $pubCount = isset($t['publisher_count']) ? (int) $t['publisher_count'] . ' publishers' : '';
             $desc = trim((string) ($t['description'] ?? ''));
-            $descSnippet = $desc !== '' ? ' | ' . mb_substr($desc, 0, 200) : '';
+            $descSnippet = $desc !== '' ? ' | ' . mb_substr($desc, 0, 120) : '';
             $meta = array_filter([$heat !== 'standard' ? strtoupper($heat) : null, $ageH, $pubCount]);
             $metaStr = $meta ? ' [' . implode(', ', $meta) . ']' : '';
             $lines[] = "{$idx}. [{$source}]{$metaStr} {$title}{$descSnippet}";
@@ -207,63 +207,28 @@ class TopicScoringService
         $count = count($topics);
 
         return <<<PROMPT
-You are a content strategist for Ali Sadikin Ma — an Indonesian AI educator who publishes
-LinkedIn and Instagram/TikTok carousels about AI tools, AI agents, and vibe coding.
+You score trending topics for Ali Sadikin Ma — an Indonesian AI educator who turns each topic
+into a LinkedIn / IG / TikTok carousel for Indonesian AI/tech professionals (22-40, early adopters
+who share content that makes them look ahead of the curve).
 
-== AUDIENCE ==
-Indonesian AI/tech professionals aged 22-40. They work in startups, tech companies, or as
-independent creators in Indonesia. They actively follow AI news in Bahasa Indonesia AND English.
-They consume content on LinkedIn (desktop/mobile) and TikTok Indonesia. They share content that
-makes them look like early adopters who are ahead of the curve.
+ON-NICHE PILLARS (score bonus): A) Vibe Coding (cursor, windsurf, claude code, bolt, v0, lovable,
+replit, devin) · B) AI Agents & MCP (agentic workflows, crewai, n8n, langgraph) · C) AI Automation
+(zapier AI, make.com, prompt engineering) · D) AI Image/Video Gen (veo, seedream, kling, runway,
+flux, sora, luma) · E) LLMs & AI Companies (Claude, ChatGPT, Gemini, DeepSeek, Grok, xAI, OpenAI).
 
-== CONTENT FORMAT ==
-Every imported topic becomes a LinkedIn or IG/TikTok carousel (8-12 slides, educational style).
-Topics that naturally fit a CAROUSEL FORMAT get a format bonus:
-  - Numbered lists ("5 tools for X", "10 AI features you missed")
-  - Comparisons ("A vs B", "Old way vs AI way")
-  - Step-by-step guides ("How to do X with AI")
-  - Ranked collections ("Best AI tools for Y in 2026")
-
-== ALI'S CONTENT PILLARS (on-niche = score bonus) ==
-  A) Vibe Coding tools: cursor, windsurf, claude code, bolt, v0, lovable, replit, devin, trae
-  B) AI Agents & MCP: model context protocol, agentic workflows, crewai, n8n, autogen, langgraph
-  C) AI Automation: workflow automation, zapier AI, make.com, AI pipeline, prompt engineering
-  D) AI Image / Video Gen: veo, seedream, kling, runway, flux, midjourney, sora, wan, luma
-  E) LLMs & AI Companies: Claude, ChatGPT, Gemini, DeepSeek, Grok, Llama, xAI, Anthropic, OpenAI
-
-== SCORING FORMULA ==
-Step 1 — Evaluate 5 STEPPS triggers (true/false):
-  social_currency:   Sharing this makes Ali's audience look smart/ahead-of-the-curve
-  high_arousal:      Provokes strong emotion — awe, anger, excitement, urgency
-  practical_utility: Immediately useful/actionable info that the audience saves and sends
-  identity_signaling:Aligns with their identity as Indonesian AI/tech professionals
-  cognitive_gap:     Creates a curiosity gap that demands resolution ("wait, that's possible?")
-
-Step 2 — Derive virality_score from triggers:
-  Base = 20
-  Add 16 for each trigger that fires (5 triggers max = +80, so max total = 100)
-
-Step 3 — Apply context adjustments (each ±, clamp final to 0-100):
-  +12  if topic is in Content Pillars A-E above (on-niche)
-  +10  if breaking news — age < 12 hours (marked HOT or TRENDING in metadata)
-  +8   if carousel-fit format (numbered list, comparison, step-by-step, ranked collection)
-  -15  if topic is off-niche (politics, sports, non-AI tech, general business news)
-  -12  if topic is generic AI trend reporting with no specific product/feature/event angle
-         (e.g. "AI adoption is growing", "companies investing in AI" — no hook, no carousel angle)
-  -8   if topic is primarily relevant to US/Western audience with no Indonesia angle
-
-Step 4 — Set carousel_fit boolean:
-  true if the topic title or description implies a list, comparison, tutorial, or collection format
-
-== CALIBRATION EXAMPLES (use these to anchor your scale) ==
-  Score 94: "Claude Code sekarang bisa coding mandiri pakai computer" — breaking (<2h),
-    all 5 STEPPS fire, Pillar A+B, carousel-ready (before/after, demo steps), HOT
-  Score 81: "DeepSeek V3 bikin OpenAI panik — benchmark comparison" — Pillar E,
-    high_arousal + social_currency + cognitive_gap, comparison = carousel-native
-  Score 63: "Google rilis AI search update baru" — Pillar E, practical_utility only,
-    generic angle, no list/comparison hook, Western-centric without Indonesia framing
-  Score 38: "Meta AI hiring report" — off-niche, no STEPPS triggers fire strongly,
-    no carousel angle, not actionable for Indonesian AI professionals
+SCORING FORMULA:
+Step 1 — 5 STEPPS triggers (true/false):
+  social_currency:    sharing it makes the audience look smart/ahead-of-the-curve
+  high_arousal:       strong emotion — awe, anger, excitement, urgency
+  practical_utility:  immediately useful/actionable, worth saving and sending
+  identity_signaling: aligns with being an Indonesian AI/tech professional
+  cognitive_gap:      curiosity gap that demands resolution ("wait, that's possible?")
+Step 2 — virality_score = 20 base + 16 per trigger that fires (max 100).
+Step 3 — adjust (clamp 0-100): +12 on-niche (Pillar A-E); +10 breaking (HOT/TRENDING, age <12h);
+  +8 carousel-fit (numbered list / comparison / step-by-step / ranked collection); -15 off-niche
+  (politics, sports, non-AI tech, general business); -12 generic AI trend with no product/event hook;
+  -8 US/Western-only with no Indonesia angle.
+Step 4 — carousel_fit = true if title/description implies a list, comparison, tutorial, or collection.
 
 == TOPICS TO SCORE ==
 {$listed}

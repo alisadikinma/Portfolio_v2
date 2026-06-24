@@ -956,8 +956,8 @@ const selectedTrending = ref([])
 const trendingSourceFilter = ref('')
 const trendingSearch = ref('')
 const trustedOnly = ref(true) // default: hide tier-3 niche blogs
-const highViralityOnly = ref(true) // default: hide ⚡ < 70 so the modal leads with actionable topics only
-const HIGH_VIRALITY_THRESHOLD = 70
+const highViralityOnly = ref(true) // default: hide ⚡ < 80 so the modal leads with actionable topics only
+const HIGH_VIRALITY_THRESHOLD = 80
 const currentPage = ref(1)
 const perPage = 24
 const filteredTrending = computed(() => {
