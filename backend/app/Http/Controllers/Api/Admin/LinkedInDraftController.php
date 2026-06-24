@@ -1110,8 +1110,8 @@ class LinkedInDraftController extends Controller
         // scheduled-path dispatch. Idempotent via PublishViaPubler's
         // publer_post_id guard; siblings still generating are left to the
         // caption-gen completion hook.
-        $draft->load(['instagramPost', 'tiktokPost', 'threadsPost', 'facebookPost']);
-        foreach (['instagram', 'tiktok', 'threads', 'facebook'] as $platform) {
+        $draft->load(['instagramPost', 'tiktokPost', 'threadsPost', 'facebookPost', 'redditPost']);
+        foreach (['instagram', 'tiktok', 'threads', 'facebook', 'reddit'] as $platform) {
             $sibling = $draft->{$platform . 'Post'};
             // Per-platform gate: only publish to platforms the operator has
             // selected a Publer account for (disabled platform = skipped).
@@ -1735,7 +1735,7 @@ class LinkedInDraftController extends Controller
      */
     public function publishCrossPost(int $id, string $platform): JsonResponse
     {
-        $allowed = ['instagram', 'tiktok', 'threads', 'facebook'];
+        $allowed = ['instagram', 'tiktok', 'threads', 'facebook', 'reddit'];
         if (!in_array($platform, $allowed, true)) {
             return response()->json([
                 'success' => false,
