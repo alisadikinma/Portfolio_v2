@@ -103,6 +103,35 @@ Then:
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
+### Phase 3 addition — `/faq` is a NEW server-rendered path
+
+The dedicated FAQ page (`GET /faq` → `SpaPrerenderController::faq`, GEO Pillar 2)
+is server-rendered just like the homepage/blog. It is a single literal path (no
+locale variants), so the asset regex won't match it and it would otherwise fall
+through to the SPA catch-all `location /` and serve the un-enriched `index.html`.
+Add this block **above `location /`** (next to the homepage `location = /` block):
+
+```nginx
+# FAQ — dedicated SSR surface (config/faq.php → FAQPage JSON-LD + crawlable <dl>)
+location = /faq {
+    root /var/www/Portfolio_v2/backend/public;
+    rewrite ^(.*)$ /index.php?$1 break;
+    fastcgi_pass unix:/var/run/php/php8.2-fpm.sock;
+    fastcgi_index index.php;
+    fastcgi_param SCRIPT_FILENAME /var/www/Portfolio_v2/backend/public/index.php;
+    fastcgi_param REQUEST_URI $request_uri;
+    include fastcgi_params;
+    fastcgi_hide_header X-Powered-By;
+    fastcgi_read_timeout 60;
+}
+```
+
+Same one-liner pattern as the existing homepage/blog SSR locations; the repo
+snapshot `scripts/nginx/portfolio-8080.conf` carries this block too. Reload with
+`sudo nginx -t && sudo systemctl reload nginx`. Verify with
+`curl -s https://alisadikinma.com/faq | grep -o '<dl>'` (should print `<dl>`) and
+`curl -s https://alisadikinma.com/faq | grep -c 'FAQPage'` (should print ≥1).
+
 > **Why same HTML for bots and humans?** This is progressive enhancement, not
 > cloaking — Laravel returns the SPA shell with `<head>`/schema/body injected;
 > Vue still hydrates over `#app`. Google explicitly allows this.

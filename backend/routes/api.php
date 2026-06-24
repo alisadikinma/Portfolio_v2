@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\GalleryItemController;
 use App\Http\Controllers\Api\ServiceController;
 use App\Http\Controllers\Api\ChatbotController;
 use App\Http\Controllers\Api\GeoController;
+use App\Http\Controllers\Api\FaqController;
 use App\Http\Controllers\Api\ActivityFeedController;
 use App\Http\Controllers\Api\NewsletterController;
 use App\Http\Controllers\Api\BlogPromoSlotController;
@@ -159,6 +160,10 @@ Route::post('/chatbot/ask', [ChatbotController::class, 'ask'])->middleware('thro
 Route::get('/llms.txt', [GeoController::class, 'llmsTxt']);
 Route::get('/llms-full.txt', [GeoController::class, 'llmsFullTxt']);
 
+// FAQ — curated Q&A (config/faq.php), consumed by the Vue /faq view. The SSR
+// /faq page (SpaPrerenderController::faq) renders the same source server-side.
+Route::get('/faq', [FaqController::class, 'index']);
+
 // Activity Feed
 Route::get('/activity-feed', [ActivityFeedController::class, 'index']);
 
@@ -188,6 +193,11 @@ Route::middleware(['auth:sanctum'])->prefix('admin/dashboard')->group(function (
 // Admin GeminiGen Circuit Breaker Status (read-only, Phase J of geminigen-circuit-breaker plan)
 Route::middleware(['auth:sanctum'])->prefix('admin/geminigen')->group(function () {
     Route::get('/circuit-status', \App\Http\Controllers\Api\Admin\GeminigenStatusController::class);
+});
+
+// Admin GEO crawler-hit stats (read-only) — AI bot crawls GA4 can't see.
+Route::middleware(['auth:sanctum'])->prefix('admin/geo')->group(function () {
+    Route::get('/crawler-hits', [\App\Http\Controllers\Api\Admin\GeoCrawlerStatsController::class, 'index']);
 });
 
 // Admin Awards Routes

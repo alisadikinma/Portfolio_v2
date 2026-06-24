@@ -35,6 +35,11 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\SetCacheHeaders::class,
         ]);
 
+        // Log AI bot crawls (GPTBot, ClaudeBot, PerplexityBot, …) — GA4 can
+        // never see these (no JS, no referrer). Fail-open; recorded daily into
+        // geo_crawler_hits. See GET /api/admin/geo/crawler-hits.
+        $middleware->appendToGroup('web', \App\Http\Middleware\LogAiCrawler::class);
+
         // Middleware aliases for route-level use (`->middleware('set.locale.by.geoip')`).
         // `ability` / `abilities` are Sanctum's per-token capability gates —
         // used by the CV Master Export API (Phase 10) to scope the jobhunter

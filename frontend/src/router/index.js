@@ -149,6 +149,15 @@ const routes = [
     }
   },
   {
+    path: '/faq',
+    name: 'faq',
+    component: () => import('@/views/FaqView.vue'),
+    meta: {
+      title: 'FAQ — Ali Sadikin Ma',
+      requiresAuth: false,
+    }
+  },
+  {
     path: '/admin',
     name: 'admin',
     component: () => import('@/views/admin/Dashboard.vue'),

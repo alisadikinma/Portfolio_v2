@@ -211,6 +211,61 @@ class SchemaGraphBuilder
     }
 
     /**
+     * CreativeWork for a project detail page. Mirrors blogPosting()'s
+     * omit-empty-keys style; @type is CreativeWork (a portfolio case study, not
+     * an article). Author is the canonical Person stub, publisher the
+     * Organization — both consistent with the rest of the entity graph.
+     *
+     * @param array $data name, description, url, image, dateCreated,
+     *                    dateModified, inLanguage, keywords, about
+     */
+    public function creativeWork(array $data): array
+    {
+        $schema = [
+            '@context' => 'https://schema.org',
+            '@type' => 'CreativeWork',
+            'name' => $data['name'] ?? '',
+            'mainEntityOfPage' => [
+                '@type' => 'WebPage',
+                '@id' => $data['url'] ?? self::SITE_URL,
+            ],
+            'author' => [
+                '@type' => 'Person',
+                'name' => self::PERSON_NAME,
+                'url' => self::SITE_URL,
+            ],
+            'publisher' => $this->organization(),
+        ];
+
+        if (!empty($data['url'])) {
+            $schema['url'] = $data['url'];
+        }
+        if (!empty($data['description'])) {
+            $schema['description'] = $data['description'];
+        }
+        if (!empty($data['image'])) {
+            $schema['image'] = $data['image'];
+        }
+        if (!empty($data['dateCreated'])) {
+            $schema['dateCreated'] = $data['dateCreated'];
+        }
+        if (!empty($data['dateModified'])) {
+            $schema['dateModified'] = $data['dateModified'];
+        }
+        if (!empty($data['inLanguage'])) {
+            $schema['inLanguage'] = $data['inLanguage'];
+        }
+        if (!empty($data['keywords'])) {
+            $schema['keywords'] = $data['keywords'];
+        }
+        if (!empty($data['about'])) {
+            $schema['about'] = $data['about'];
+        }
+
+        return $schema;
+    }
+
+    /**
      * @param array $items list of ['name' => string, 'url' => string]
      */
     public function breadcrumbList(array $items): array

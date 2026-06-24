@@ -81,6 +81,26 @@ app.use(i18n)
 app.use(VueQueryPlugin, { queryClient })
 app.mount('#app')
 
+// GA4 (gtag.js) — gated by VITE_GA4_MEASUREMENT_ID. When the id is empty or
+// undefined, NO script loads and NO network request fires (dev-safe). Measures
+// human referrals from AI chats (Pillar 5); AI bot crawls are logged
+// server-side instead (see backend LogAiCrawler middleware).
+;(() => {
+  const ga4Id = import.meta.env.VITE_GA4_MEASUREMENT_ID
+  if (!ga4Id) return
+
+  const s = document.createElement('script')
+  s.async = true
+  s.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(ga4Id)}`
+  document.head.appendChild(s)
+
+  window.dataLayer = window.dataLayer || []
+  function gtag() { window.dataLayer.push(arguments) }
+  window.gtag = gtag
+  gtag('js', new Date())
+  gtag('config', ga4Id)
+})()
+
 // Register Service Worker for media caching (videos + images)
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   navigator.serviceWorker.register('/sw.js')

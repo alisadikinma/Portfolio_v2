@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Category;
 use App\Models\Post;
+use App\Models\Project;
 use App\Models\Testimonial;
 use App\Services\Seo\SchemaGraphBuilder;
 use App\Services\Seo\SeoHtmlComposer;
@@ -144,6 +145,52 @@ class SpaPrerenderController extends Controller
                         ['name' => 'Home', 'url' => $base . '/'],
                         ['name' => 'Blog', 'url' => $url],
                     ]),
+                ])),
+                'bodyHtml' => $body,
+            ]);
+        });
+
+        return $this->respond($html);
+    }
+
+    // ---- FAQ ----------------------------------------------------------------
+
+    /**
+     * Dedicated /faq surface (GEO Pillar 2). Mirrors blogIndex()/home(): static
+     * content sourced from config/faq.php, so the composed HTML is cached under
+     * a single key with NO purge wiring (config can't change at runtime; a deploy
+     * + cache:clear refreshes it). Emits a FAQPage JSON-LD block + WebSite entity
+     * and splices a crawlable <dl> into #app for JS-blind AI crawlers; Vue's
+     * FaqView hydrates over #app for real users. Same single source feeds the
+     * /api/faq endpoint the Vue view fetches — no answer copy is duplicated.
+     */
+    public function faq()
+    {
+        if (!$this->distExists()) {
+            return $this->devFallback('/faq');
+        }
+
+        $html = Cache::remember('seo_html:faq', $this->ttl(), function () {
+            $shell = $this->loadShell();
+            $items = config('faq.items', []);
+
+            $base = $this->baseUrl();
+            $url = $base . '/faq';
+            $title = 'FAQ — ' . self::AUTHOR;
+            $description = 'Answers to common questions about Ali Sadikin Ma — his AI services (AI Agents, Vibe Coding, Generative Video, AI visual inspection), how he works, and how to engage him.';
+
+            $body = View::make('seo.faq', ['items' => $items])->render();
+
+            return $this->composer->compose($shell, [
+                'title' => $title,
+                'description' => $description,
+                'canonical' => $url,
+                'robots' => 'index, follow',
+                'og' => $this->og('website', $url, $title, $description, null, ''),
+                'twitter' => $this->twitter($url, $title, $description, null),
+                'jsonLd' => array_values(array_filter([
+                    $this->schema->faqPage($items),
+                    $this->schema->webSite(),
                 ])),
                 'bodyHtml' => $body,
             ]);
@@ -322,6 +369,111 @@ class SpaPrerenderController extends Controller
         return $this->respond($html);
     }
 
+    // ---- Project detail -----------------------------------------------------
+
+    public function projectDetail(Request $request, string $slug, ?string $lang = null)
+    {
+        // Route params bind positionally in URI order, so for
+        // /{lang}/projects/{slug} the locale lands in $slug. Resolve by name so
+        // both the bare and locale-prefixed routes bind correctly.
+        $slug = $request->route('slug');
+        $lang = $this->normalizeLang($request->route('lang'));
+        if (!$this->distExists()) {
+            return $this->devFallback($this->projectDetailPath($lang, $slug));
+        }
+
+        // Resolve outside the cache so an inactive/missing project 404s.
+        $exists = Project::where('slug', $slug)->where('is_active', true)->exists();
+        if (!$exists) {
+            abort(404);
+        }
+
+        $html = Cache::remember("seo_html:project_detail:{$lang}:{$slug}", $this->ttl(), function () use ($lang, $slug) {
+            $shell = $this->loadShell();
+
+            $project = Project::with('translations')
+                ->where('slug', $slug)
+                ->where('is_active', true)
+                ->first();
+
+            $t = $this->pickProjectTranslation($project, $lang);
+
+            $headline = ($t->title ?? null) ?: ($project->title ?: $slug);
+            $title = ($t->meta_title ?? null) ?: ($project->meta_title ?? null)
+                ?: ($t->og_title ?? null) ?: ($project->og_title ?? null)
+                ?: ($headline . ' | Projects');
+            $description = ($t->meta_description ?? null)
+                ?: ($project->meta_description ?? null)
+                ?: ($t->og_description ?? null)
+                ?: ($project->og_description ?? null)
+                ?: ($t->description ?? null)
+                ?: ($project->description
+                    ? Str::limit(strip_tags($project->description), 160)
+                    : '');
+            $keywords = $project->meta_keywords ?? null;
+
+            $base = $this->baseUrl();
+            $url = $base . $this->projectDetailPath($lang, $slug);
+            $image = $this->resolveImage($project->og_image ?: $project->image, $base);
+            $createdIso = optional($project->created_at)->toAtomString();
+            $modifiedIso = optional($project->updated_at)->toAtomString();
+
+            $creativeWork = $this->schema->creativeWork([
+                'name' => $headline,
+                'description' => $description,
+                'url' => $url,
+                'image' => $image,
+                'dateCreated' => $createdIso,
+                'dateModified' => $modifiedIso,
+                // Reflect the language actually served.
+                'inLanguage' => ($t->language ?? null) ?: ($lang ?: 'en'),
+                'keywords' => $keywords,
+                'about' => $project->domain ?: null,
+            ]);
+
+            $crumbs = [
+                ['name' => 'Home', 'url' => $base . '/'],
+                ['name' => 'Projects', 'url' => $base . '/projects'],
+                ['name' => $headline, 'url' => $url],
+            ];
+
+            // Surface only the case-study meta fields that actually exist.
+            $meta = array_filter([
+                'Client' => $project->client ?? null,
+                'Role' => $project->role ?? null,
+                'Domain' => $project->domain ?? null,
+                'Category' => $project->category ?? null,
+                'Year' => optional($project->end_date ?: $project->completed_at)->format('Y'),
+                'Outcome' => $project->result ?: ($project->impact_statement ?: null),
+            ], fn ($v) => !empty($v));
+
+            $body = View::make('seo.project', [
+                'title' => $headline,
+                'category' => $project->category ?? null,
+                'image' => $image,
+                'imageAlt' => $headline,
+                'summary' => ($t->ai_summary ?? null) ?: ($project->ai_summary ?? null),
+                'meta' => $meta,
+                'content' => ($t->content ?? null) ?: ($project->content ?? ''),
+            ])->render();
+
+            return $this->composer->compose($shell, [
+                'title' => $title,
+                'description' => $description,
+                'keywords' => $keywords,
+                'canonical' => $url,
+                'robots' => 'index, follow',
+                'og' => $this->og('article', $url, $title, $description, $image, $lang),
+                'twitter' => $this->twitter($url, $title, $description, $image),
+                'hreflang' => $this->hreflang($this->projectDetailPath('en', $slug), $this->projectDetailPath('id', $slug), $this->projectDetailPath('', $slug)),
+                'jsonLd' => array_values(array_filter([$creativeWork, $this->schema->breadcrumbList($crumbs)])),
+                'bodyHtml' => $body,
+            ]);
+        });
+
+        return $this->respond($html);
+    }
+
     // ---- Cache purge (called from Post::boot saved/deleted) -----------------
 
     /**
@@ -367,6 +519,26 @@ class SpaPrerenderController extends Controller
         ]));
         foreach ($categorySlugs as $slug) {
             self::purgeCategorySlug($slug);
+        }
+    }
+
+    /**
+     * Forget every SSR HTML cache entry a Project change could invalidate: its
+     * own detail variants under the current AND renamed-from slug, per lang.
+     * Projects aren't on the SSR home/index body, so no home/index purge.
+     * Wired from Project::boot() saved/deleted.
+     */
+    public static function purgeForProject(Project $project): void
+    {
+        $slugs = array_unique(array_filter([
+            $project->slug,
+            $project->getOriginal('slug'),
+        ]));
+
+        foreach (self::LANGS as $lang) {
+            foreach ($slugs as $slug) {
+                Cache::forget("seo_html:project_detail:{$lang}:{$slug}");
+            }
         }
     }
 
@@ -423,6 +595,18 @@ class SpaPrerenderController extends Controller
         return $post->translations->firstWhere('language', $lang ?: 'en')
             ?? $post->translations->firstWhere('language', 'en')
             ?? $post->translations->first();
+    }
+
+    /**
+     * Resolve the best Project translation from the ALREADY-EAGER-LOADED
+     * collection (firstWhere is zero-query). Project translations are also keyed
+     * by `language`. Fallback: requested lang → en → first available → null.
+     */
+    private function pickProjectTranslation(Project $project, string $lang)
+    {
+        return $project->translations->firstWhere('language', $lang ?: 'en')
+            ?? $project->translations->firstWhere('language', 'en')
+            ?? $project->translations->first();
     }
 
     // ---- Helpers ------------------------------------------------------------
@@ -485,6 +669,11 @@ class SpaPrerenderController extends Controller
     private function categoryPath(string $lang, string $slug): string
     {
         return $lang === '' ? "/blog/category/{$slug}" : "/{$lang}/blog/category/{$slug}";
+    }
+
+    private function projectDetailPath(string $lang, string $slug): string
+    {
+        return $lang === '' ? "/projects/{$slug}" : "/{$lang}/projects/{$slug}";
     }
 
     private function hreflang(string $enPath, string $idPath, string $defaultPath): array

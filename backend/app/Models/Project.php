@@ -18,6 +18,22 @@ class Project extends Model
         return 'image';
     }
 
+    /**
+     * Purge the SSR-enrichment HTML cache (project detail surfaces) whenever a
+     * project changes, so crawlers see fresh content before the 1h TTL lapses.
+     * See App\Http\Controllers\SpaPrerenderController::purgeForProject().
+     */
+    public static function boot()
+    {
+        parent::boot();
+
+        $purge = function ($project) {
+            \App\Http\Controllers\SpaPrerenderController::purgeForProject($project);
+        };
+        static::saved($purge);
+        static::deleted($purge);
+    }
+
     protected $fillable = [
         'image_variants',
         'title',
