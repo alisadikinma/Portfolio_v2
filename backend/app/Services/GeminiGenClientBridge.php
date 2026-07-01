@@ -44,11 +44,10 @@ class GeminiGenClientBridge
      */
     public function submit(string $endpoint, array $fields, array $refs, string $model): string
     {
-        $isVideo = str_starts_with($endpoint, 'video-gen/');
         $tempFiles = [];
 
         try {
-            [$module, $args] = $this->buildArgs($isVideo, $fields, $refs, $model, $tempFiles);
+            [$module, $args] = $this->buildArgs($endpoint, $fields, $refs, $model, $tempFiles);
             $result = $this->exec($module, $args);
         } finally {
             foreach ($tempFiles as $tmp) {
@@ -81,10 +80,13 @@ class GeminiGenClientBridge
      * @param  list<string>  $tempFiles  filled with temp files to clean up
      * @return array{0:string,1:list<string>}
      */
-    private function buildArgs(bool $isVideo, array $fields, array $refs, string $model, array &$tempFiles): array
+    private function buildArgs(string $endpoint, array $fields, array $refs, string $model, array &$tempFiles): array
     {
+        $isVideo = str_starts_with($endpoint, 'video-gen/');
         $module = $isVideo ? self::VIDEO_MODULE : self::IMAGE_MODULE;
-        $subcommand = $isVideo ? 'video' : 'image';
+        // Image CLI = single `image` subcommand. Video CLI = per-family
+        // subcommand (veo|grok|seedance|kling) = the path tail of the endpoint.
+        $subcommand = $isVideo ? substr($endpoint, strlen('video-gen/')) : 'image';
 
         $args = [$subcommand, (string) ($fields['prompt'] ?? ''), '--model', $model];
 
@@ -94,9 +96,10 @@ class GeminiGenClientBridge
         }
 
         if ($isVideo) {
-            // Video flag surface (verified against geminigen_video.py in Phase F,
-            // gated OFF by geminigen.use_indusia_video until then).
-            foreach (['resolution' => '--resolution', 'duration' => '--duration', 'mode_image' => '--mode-image'] as $key => $flag) {
+            // geminigen_video.py: --resolution, --duration, and --mode (which the
+            // CLI maps to the mode_image wire field: frame/ingredient for veo,
+            // custom for grok).
+            foreach (['resolution' => '--resolution', 'duration' => '--duration', 'mode_image' => '--mode'] as $key => $flag) {
                 if (! empty($fields[$key])) {
                     $args[] = $flag;
                     $args[] = (string) $fields[$key];
