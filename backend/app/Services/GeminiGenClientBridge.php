@@ -33,6 +33,17 @@ class GeminiGenClientBridge
     /** Models that reject https URL refs — their refs must be local files. */
     private const LOCAL_REF_ONLY_MODELS = ['gpt-image-2'];
 
+    /** The client's strict `--aspect` Choice enum (argparse exit 2 on anything else). */
+    private const VALID_ASPECTS = ['1:1', '16:9', '9:16', '4:3', '3:4', '21:9', '3:2', '2:3'];
+
+    /**
+     * Non-enum ratios the old HTTP path silently accepted (the raw API mapped
+     * 4:5 → 16:9). The CLI is strict, so remap to the nearest valid ratio that
+     * preserves orientation — blog inline images author 4:5, closest portrait
+     * is 3:4. Unlisted ratios fall through to "omit the flag" (client default).
+     */
+    private const ASPECT_REMAP = ['4:5' => '3:4', '5:4' => '4:3'];
+
     /**
      * Submit a generation and return the job uuid (does NOT wait for render).
      *
@@ -90,9 +101,10 @@ class GeminiGenClientBridge
 
         $args = [$subcommand, (string) ($fields['prompt'] ?? ''), '--model', $model];
 
-        if (! empty($fields['aspect_ratio'])) {
+        $aspect = $this->normalizeAspect((string) ($fields['aspect_ratio'] ?? ''));
+        if ($aspect !== null) {
             $args[] = '--aspect';
-            $args[] = (string) $fields['aspect_ratio'];
+            $args[] = $aspect;
         }
 
         if ($isVideo) {
@@ -186,6 +198,23 @@ class GeminiGenClientBridge
             'stdout' => $result->output(),
             'stderr' => $result->errorOutput(),
         ];
+    }
+
+    /**
+     * Coerce an aspect ratio to the client's strict enum. Valid → passthrough;
+     * known non-enum → remapped; unknown → null (omit the flag, use the client
+     * default) so a stray ratio never argparse-exit-2's the whole submit.
+     */
+    private function normalizeAspect(string $aspect): ?string
+    {
+        if ($aspect === '') {
+            return null;
+        }
+        if (in_array($aspect, self::VALID_ASPECTS, true)) {
+            return $aspect;
+        }
+
+        return self::ASPECT_REMAP[$aspect] ?? null;
     }
 
     /** Parse `submitted: uuid=<uuid> status=<n>` from CLI stdout. */

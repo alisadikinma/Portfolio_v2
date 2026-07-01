@@ -60,6 +60,43 @@ class GeminiGenClientBridgeTest extends TestCase
         });
     }
 
+    public function test_non_enum_aspect_4x5_is_remapped_to_3x4(): void
+    {
+        // Blog inline segments author 4:5; the old HTTP path accepted it but the
+        // strict CLI enum argparse-exit-2's on it. Bridge must remap → 3:4.
+        Process::fake(['*' => Process::result(output: 'submitted: uuid=u1 status=1')]);
+
+        app(GeminiGenClientBridge::class)->submit(
+            'generate_image',
+            ['prompt' => 'a cat', 'aspect_ratio' => '4:5', 'style' => 'Photorealistic'],
+            [],
+            'nano-banana-pro'
+        );
+
+        Process::assertRan(function ($process) {
+            $c = $this->cmdString($process);
+
+            return str_contains($c, '--aspect 3:4')
+                && ! str_contains($c, '4:5');
+        });
+    }
+
+    public function test_unknown_aspect_omits_the_flag(): void
+    {
+        // A ratio not in the enum and not remappable → drop --aspect entirely
+        // (client default) rather than blow up the submit.
+        Process::fake(['*' => Process::result(output: 'submitted: uuid=u1 status=1')]);
+
+        app(GeminiGenClientBridge::class)->submit(
+            'generate_image',
+            ['prompt' => 'a cat', 'aspect_ratio' => '7:11'],
+            [],
+            'nano-banana-pro'
+        );
+
+        Process::assertRan(fn ($process) => ! str_contains($this->cmdString($process), '--aspect'));
+    }
+
     public function test_gpt_image_2_uses_mode_and_materializes_url_ref_to_local(): void
     {
         Http::fake(['*' => Http::response('PNGBYTES', 200)]);
