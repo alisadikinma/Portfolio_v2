@@ -43,7 +43,7 @@ class StuckImageJobAgeBasedTimeoutTest extends TestCase
 
         // GeminiGen keeps reporting "still processing" (status=1)
         Http::fake([
-            'api.geminigen.ai/uapi/v1/history/*' => Http::response([
+            'api.snapgen.ai/uapi/v1/history/*' => Http::response([
                 'status' => 1,
             ], 200),
         ]);
@@ -99,7 +99,7 @@ class StuckImageJobAgeBasedTimeoutTest extends TestCase
         Queue::fake();
 
         Http::fake([
-            'api.geminigen.ai/uapi/v1/history/*' => Http::response(['status' => 1], 200),
+            'api.snapgen.ai/uapi/v1/history/*' => Http::response(['status' => 1], 200),
         ]);
 
         $idea = ContentIdea::create([
@@ -146,7 +146,7 @@ class StuckImageJobAgeBasedTimeoutTest extends TestCase
 
         // GeminiGen API returning 502 (persistent outage scenario)
         Http::fake([
-            'api.geminigen.ai/uapi/v1/history/*' => Http::response(null, 502),
+            'api.snapgen.ai/uapi/v1/history/*' => Http::response(null, 502),
         ]);
 
         $idea = ContentIdea::create([

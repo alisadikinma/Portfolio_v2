@@ -498,7 +498,7 @@ class PollRebrandAssets extends Command
         try {
             $resp = Http::timeout(15)
                 ->withHeaders(['x-api-key' => $this->apiKey()])
-                ->get("https://api.geminigen.ai/uapi/v1/history/{$uuid}");
+                ->get(config('geminigen.base_url')."/history/{$uuid}");
         } catch (\Throwable $e) {
             Log::warning('[PollRebrandAssets] poll exception', ['uuid' => $uuid, 'error' => $e->getMessage()]);
 

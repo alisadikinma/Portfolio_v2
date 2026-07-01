@@ -35,7 +35,7 @@ class GeminiGenVideoService
 {
     private string $apiKey;
 
-    private string $baseUrl = 'https://api.geminigen.ai/uapi/v1';
+    private string $baseUrl;
 
     private string $ffmpeg;
 
@@ -58,6 +58,7 @@ class GeminiGenVideoService
     ) {
         $this->apiKey = (string) config('services.geminigen.api_key', '');
         $this->ffmpeg = (string) config('services.geminigen.ffmpeg_path', 'ffmpeg');
+        $this->baseUrl = (string) config('geminigen.base_url');
     }
 
     /**

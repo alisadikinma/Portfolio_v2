@@ -236,3 +236,5 @@ node_modules
 
 # graphify generated output
 graphify-out/
+
+.gaspol/

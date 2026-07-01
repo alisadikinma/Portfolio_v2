@@ -41,13 +41,14 @@ class LinkedInCarouselImageService
     private const MAX_TRANSIENT_RETRIES = 3;
 
     private string $apiKey;
-    private string $baseUrl = 'https://api.geminigen.ai/uapi/v1';
+    private string $baseUrl;
 
     public function __construct(
         private readonly CarouselSlideEnhancer $enhancer,
         private readonly GeminiGenCircuitBreaker $breaker
     ) {
         $this->apiKey = (string) config('services.geminigen.api_key', '');
+        $this->baseUrl = (string) config('geminigen.base_url');
     }
 
     /**

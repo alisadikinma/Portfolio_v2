@@ -22,12 +22,13 @@ class ImageGenerationService
     public const MAX_SEGMENT_ATTEMPTS = 6;
 
     private string $apiKey;
-    private string $baseUrl = 'https://api.geminigen.ai/uapi/v1';
+    private string $baseUrl;
     private GeminiGenCircuitBreaker $breaker;
 
     public function __construct(?GeminiGenCircuitBreaker $breaker = null)
     {
         $this->apiKey = config('services.geminigen.api_key', '');
+        $this->baseUrl = (string) config('geminigen.base_url');
         // Constructor-optional injection so the legacy `new ImageGenerationService()`
         // callers (if any) still work; production code goes through the container.
         $this->breaker = $breaker ?? app(GeminiGenCircuitBreaker::class);

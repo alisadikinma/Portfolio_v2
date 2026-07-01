@@ -43,7 +43,7 @@ class ProcessPendingImages extends Command
             try {
                 $response = Http::timeout(15)
                     ->withHeaders(['x-api-key' => $apiKey])
-                    ->get("https://api.geminigen.ai/uapi/v1/history/{$job->uuid}");
+                    ->get(config('geminigen.base_url')."/history/{$job->uuid}");
 
                 if (!$response->successful()) {
                     // Transient HTTP error: skip this tick BUT still enforce
