@@ -58,6 +58,51 @@ Base URL defaults to snapgen inside the client (`GEMINIGEN_BASE_URL` env overrid
 Paths must match [`config/geminigen.php`](../../backend/config/geminigen.php) defaults
 (`/home/claudesn/indusiagen-api-client` + `.venv/bin/python`) or be overridden via env below.
 
+### Two runtime contexts — the `local` driver runs as TWO different users
+
+Same trap as `ARTICLE_GEN_*` (HTTP/www-data) vs `LINKEDIN_GEN_*` (queue/claudesn) in the root
+CLAUDE.md. The `local` driver `Process`-execs the venv python **as whichever user dispatched
+the submit**, and that differs by surface:
+
+| Surface | Dispatched from | Effective UID |
+| --- | --- | --- |
+| Carousel slides / GROK hook / Veo rebrand | queue worker | **claudesn** |
+| **Blog article images** (`ImageGenerationService::triggerForIdea`, admin "Generate images", `/complete` callback) | **HTTP / php-fpm** | **www-data** |
+
+So www-data must ALSO be able to run the client. Two one-time steps (2026-07-01 incident —
+blog idea #832 died with `cwd "/home/claudesn/indusiagen-api-client" does not exist`, because
+`/home/claudesn` was mode 700 and www-data couldn't traverse it, nor read claudesn's 600 key):
+
+```bash
+# (a) let www-data traverse into the repo (711 = traverse only; ~/.ssh etc. stay 700-protected)
+sudo chmod 711 /home/claudesn
+
+# (b) give www-data its OWN key config in its OWN home (/var/www) — the client resolves
+#     ~/.config/geminigen/config.json of the RUNNING user, so each user needs its own copy.
+sudo install -d -o www-data -g www-data -m 700 /var/www/.config /var/www/.config/geminigen
+KEY=$(grep -E '^GEMINIGEN_API_KEY=' /var/www/Portfolio_v2/backend/.env | cut -d= -f2- | tr -d '\r"' | xargs)
+printf '{"api_key": "%s"}\n' "$KEY" | sudo tee /var/www/.config/geminigen/config.json >/dev/null
+sudo chown www-data:www-data /var/www/.config/geminigen/config.json
+sudo chmod 600 /var/www/.config/geminigen/config.json
+
+# verify www-data can submit (the exact context that 500'd):
+sudo -u www-data /home/claudesn/indusiagen-api-client/.venv/bin/python \
+  -m scripts.geminigen_image image "www-data submit test" --model nano-banana-pro --aspect 3:4 --no-wait
+# → submitted: uuid=… status=0
+```
+
+Driver stays `local` for both — no `ssh` hop; each user runs its own venv with its own home
+config. (OS-level, NOT redone by `deploy.sh` — redo on a VPS rebuild.)
+
+### `--aspect` is a strict enum — the bridge normalizes non-enum ratios
+
+The client's `--aspect` is an argparse `Choice`: `1:1, 16:9, 9:16, 4:3, 3:4, 21:9, 3:2, 2:3`.
+Anything else exits **2** (`Error: Invalid value for '--aspect'`) and fails the submit. The old
+HTTP path silently accepted `4:5` (raw API mapped it to 16:9); blog inline segments author
+`4:5`. `GeminiGenClientBridge::normalizeAspect` remaps `4:5→3:4` / `5:4→4:3` and drops any other
+non-enum ratio (client default) so a stray ratio can't blow up the whole submit. No `4:5` reaches
+the CLI.
+
 ---
 
 ## Step-0 verification checklist (RUN BEFORE FLIPPING ANY FLAG)
