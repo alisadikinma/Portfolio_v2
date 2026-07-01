@@ -16,10 +16,10 @@ class ImageGenerationService
 {
     /**
      * Legacy default cap. The live cap is env-tunable via
-     * services.article_generation.image_segment_max_attempts (default 6) —
+     * services.article_generation.image_segment_max_attempts (default 3) —
      * read through maxSegmentAttempts(). Kept for backward-compatible references.
      */
-    public const MAX_SEGMENT_ATTEMPTS = 6;
+    public const MAX_SEGMENT_ATTEMPTS = 3;
 
     private string $apiKey;
     private string $baseUrl;
@@ -65,7 +65,7 @@ class ImageGenerationService
      */
     public function maxSegmentAttempts(): int
     {
-        return max(1, (int) config('services.article_generation.image_segment_max_attempts', 6));
+        return max(1, (int) config('services.article_generation.image_segment_max_attempts', 3));
     }
 
     /**

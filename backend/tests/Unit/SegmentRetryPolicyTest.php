@@ -61,13 +61,15 @@ class SegmentRetryPolicyTest extends TestCase
         $this->assertSame(900, ImageGenerationService::retryBackoffSeconds(6));
     }
 
-    public function test_max_segment_attempts_reads_config_default_6(): void
+    public function test_max_segment_attempts_reads_config_default_3(): void
     {
+        // Default caps at 3 — align with the admin UI "Attempt N/3" badge so
+        // auto-retry stops at 3 instead of grinding to 6 (the "4/3" bug).
         config(['services.article_generation.image_segment_max_attempts' => null]);
         $svc = app(ImageGenerationService::class);
-        $this->assertSame(6, $svc->maxSegmentAttempts());
-
-        config(['services.article_generation.image_segment_max_attempts' => 3]);
         $this->assertSame(3, $svc->maxSegmentAttempts());
+
+        config(['services.article_generation.image_segment_max_attempts' => 6]);
+        $this->assertSame(6, $svc->maxSegmentAttempts());
     }
 }

@@ -36,19 +36,21 @@ class RetryImageSegmentJob implements ShouldQueue
     public function handle(ImageGenerationService $service): void
     {
         // Phase F gate: if the GeminiGen circuit is open, this is an
-        // outage-class failure — re-queue with a 5-minute delay rather
-        // than burning the operator's auto-retry budget (max 2 auto
-        // attempts per segment per CLAUDE.md April 21 entry). The
-        // retry_count is NOT incremented; it stays reserved for genuine
-        // prompt-class failures.
+        // outage-class / high-traffic failure — re-queue with a HOLD delay
+        // (default 15 min) rather than burning the operator's auto-retry
+        // budget. The retry_count is NOT incremented; it stays reserved for
+        // genuine prompt-class failures, and the job keeps re-parking until
+        // the server recovers (circuit closes).
         $breaker = app(GeminiGenCircuitBreaker::class);
         if ($breaker->state() === 'open') {
+            $holdMinutes = (int) config('geminigen-circuit.open_retry_defer_minutes', 15);
             Log::info('[GeminiGenCircuit] retry job deferred — circuit open', [
                 'idea_id' => $this->contentIdeaId,
                 'segment_index' => $this->segmentIndex,
+                'hold_minutes' => $holdMinutes,
             ]);
             self::dispatch($this->contentIdeaId, $this->segmentIndex)
-                ->delay(now()->addMinutes(5));
+                ->delay(now()->addMinutes($holdMinutes));
             return;
         }
 

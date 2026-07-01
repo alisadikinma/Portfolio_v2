@@ -29,6 +29,11 @@ return [
 
     'probe_interval_seconds' => (int) env('GEMINIGEN_CIRCUIT_PROBE_INTERVAL_SECONDS', 300),
 
+    // While the circuit is OPEN (GeminiGen overloaded / high traffic), a
+    // segment auto-retry parks this many minutes instead of hammering — the
+    // retry_count is NOT burned, it just holds until the server recovers.
+    'open_retry_defer_minutes' => (int) env('GEMINIGEN_CIRCUIT_OPEN_RETRY_DEFER_MINUTES', 15),
+
     'state_ttl_seconds' => (int) env('GEMINIGEN_CIRCUIT_STATE_TTL_SECONDS', 3600),
 
     'canary_prompt' => env('GEMINIGEN_CIRCUIT_CANARY_PROMPT', 'circuit probe — solid color square'),
