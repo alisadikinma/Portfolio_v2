@@ -44,6 +44,21 @@ class GeminiGenClientBridge
      */
     private const ASPECT_REMAP = ['4:5' => '3:4', '5:4' => '4:3'];
 
+    /** The client's strict `--style` Choice enum (argparse exit 2 on anything else). */
+    private const VALID_STYLES = [
+        'None', '3D Render', 'Acrylic', 'Anime General', 'Creative', 'Dynamic',
+        'Fashion', 'Game Concept', 'Graphic Design 3D', 'Illustration',
+        'Photorealistic', 'Portrait', 'Portrait Cinematic', 'Portrait Fashion',
+        'Ray Traced', 'Stock Photo', 'Watercolor',
+    ];
+
+    /**
+     * Non-enum styles the old HTTP path accepted loosely. Blog segments author
+     * "Cinematic" (photoreal cinematic scene) → nearest enum is Photorealistic.
+     * Matched case-insensitively; unlisted non-enum styles drop the flag.
+     */
+    private const STYLE_REMAP = ['cinematic' => 'Photorealistic'];
+
     /**
      * Submit a generation and return the job uuid (does NOT wait for render).
      *
@@ -118,9 +133,10 @@ class GeminiGenClientBridge
                 }
             }
         } else {
-            if (! empty($fields['style'])) {
+            $style = $this->normalizeStyle((string) ($fields['style'] ?? ''));
+            if ($style !== null) {
                 $args[] = '--style';
-                $args[] = (string) $fields['style'];
+                $args[] = $style;
             }
             // gpt-image-2 uses quality `mode` instead of style; harmless on others.
             if ($model === 'gpt-image-2' && ! empty($fields['mode'])) {
@@ -215,6 +231,27 @@ class GeminiGenClientBridge
         }
 
         return self::ASPECT_REMAP[$aspect] ?? null;
+    }
+
+    /**
+     * Coerce a style to the client's strict enum (case-insensitive). Valid →
+     * canonical casing; known non-enum → remapped; unknown → null (omit the
+     * flag) so a stray style never argparse-exit-2's the submit.
+     */
+    private function normalizeStyle(string $style): ?string
+    {
+        if ($style === '') {
+            return null;
+        }
+
+        $lower = strtolower($style);
+        foreach (self::VALID_STYLES as $valid) {
+            if (strtolower($valid) === $lower) {
+                return $valid;
+            }
+        }
+
+        return self::STYLE_REMAP[$lower] ?? null;
     }
 
     /** Parse `submitted: uuid=<uuid> status=<n>` from CLI stdout. */

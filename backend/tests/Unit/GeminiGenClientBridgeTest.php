@@ -97,6 +97,41 @@ class GeminiGenClientBridgeTest extends TestCase
         Process::assertRan(fn ($process) => ! str_contains($this->cmdString($process), '--aspect'));
     }
 
+    public function test_non_enum_style_cinematic_is_remapped_to_photorealistic(): void
+    {
+        // Blog segments author style "Cinematic"; the CLI --style enum has no
+        // Cinematic and argparse-exit-2's. Bridge must remap → Photorealistic.
+        Process::fake(['*' => Process::result(output: 'submitted: uuid=u1 status=1')]);
+
+        app(GeminiGenClientBridge::class)->submit(
+            'generate_image',
+            ['prompt' => 'a cat', 'aspect_ratio' => '16:9', 'style' => 'Cinematic'],
+            [],
+            'nano-banana-pro'
+        );
+
+        Process::assertRan(function ($process) {
+            $c = $this->cmdString($process);
+
+            return str_contains($c, '--style Photorealistic')
+                && ! str_contains($c, 'Cinematic');
+        });
+    }
+
+    public function test_unknown_style_omits_the_flag(): void
+    {
+        Process::fake(['*' => Process::result(output: 'submitted: uuid=u1 status=1')]);
+
+        app(GeminiGenClientBridge::class)->submit(
+            'generate_image',
+            ['prompt' => 'a cat', 'aspect_ratio' => '1:1', 'style' => 'Vaporwave'],
+            [],
+            'nano-banana-pro'
+        );
+
+        Process::assertRan(fn ($process) => ! str_contains($this->cmdString($process), '--style'));
+    }
+
     public function test_gpt_image_2_uses_mode_and_materializes_url_ref_to_local(): void
     {
         Http::fake(['*' => Http::response('PNGBYTES', 200)]);
