@@ -37,10 +37,6 @@ return [
     'client_ssh_key' => env('GEMINIGEN_CLIENT_SSH_KEY', '/home/claudesn/.ssh/id_ed25519'),
     'client_timeout' => (int) env('GEMINIGEN_CLIENT_TIMEOUT', 60),
 
-    // Set false only if the video CLI lacks a `check <uuid>` subcommand — the
-    // bridge then falls back to a `python -c` poll over the same client core.
-    'client_check_supported' => (bool) env('GEMINIGEN_CLIENT_CHECK_SUPPORTED', true),
-
     /*
     |--------------------------------------------------------------------------
     | Rollout flags (default OFF — old PHP HTTP path is the fallback per surface)

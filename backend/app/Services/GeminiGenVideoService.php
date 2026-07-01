@@ -137,7 +137,7 @@ class GeminiGenVideoService
 
                 return $uuid;
             } catch (\App\Exceptions\GeminiGenClientException $e) {
-                $this->breaker->recordFailure(null, null);
+                $this->breaker->recordFailure(502, null); // transport outage → count toward trip
                 Log::error('[GeminiGenVideo] indusia hook submit failed', ['ig' => $ig->id, 'error' => $e->getMessage()]);
 
                 return null;
@@ -252,7 +252,7 @@ class GeminiGenVideoService
 
                 return $uuid;
             } catch (\App\Exceptions\GeminiGenClientException $e) {
-                $this->breaker->recordFailure(null, null);
+                $this->breaker->recordFailure(502, null); // transport outage → count toward trip
                 Log::error('[GeminiGenVideo] indusia keyframe submit failed', ['ctx' => $contextId, 'error' => $e->getMessage()]);
 
                 return null;
@@ -342,7 +342,7 @@ class GeminiGenVideoService
 
                 return $uuid;
             } catch (\App\Exceptions\GeminiGenClientException $e) {
-                $this->breaker->recordFailure(null, null);
+                $this->breaker->recordFailure(502, null); // transport outage → count toward trip
                 Log::error('[GeminiGenVideo] indusia Veo submit failed', ['ctx' => $contextId, 'error' => $e->getMessage()]);
 
                 return null;
@@ -441,7 +441,7 @@ class GeminiGenVideoService
 
                 return $uuid;
             } catch (\App\Exceptions\GeminiGenClientException $e) {
-                $this->breaker->recordFailure(null, null);
+                $this->breaker->recordFailure(502, null); // transport outage → count toward trip
                 Log::error('[GeminiGenVideo] indusia GROK clip submit failed', ['ctx' => $contextId, 'error' => $e->getMessage()]);
 
                 return null;

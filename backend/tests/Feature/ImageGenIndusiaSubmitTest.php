@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Services\GeminiGenCircuitBreaker;
 use App\Services\ImageGenerationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -56,6 +57,26 @@ class ImageGenIndusiaSubmitTest extends TestCase
         ));
         Http::assertNothingSent();
         $this->assertDatabaseHas('image_generation_jobs', ['uuid' => 'indusia-uuid-1', 'status' => 'processing']);
+    }
+
+    public function test_bridge_submit_failures_trip_the_circuit_breaker(): void
+    {
+        // Regression: bridge failures must count toward the breaker trip. A
+        // recordFailure(null,null) classifies as 'ignore' and would never open
+        // the circuit no matter how many CLI submits fail (SSH/venv/GeminiGen down).
+        config(['geminigen.use_indusia_images' => true]);
+        config(['geminigen-circuit.failure_threshold' => 5]);
+        Process::fake(['*' => Process::result(output: '', errorOutput: 'boom', exitCode: 1)]);
+        Http::fake();
+
+        $breaker = app(GeminiGenCircuitBreaker::class);
+        $this->assertSame('closed', $breaker->state());
+
+        for ($i = 0; $i < 5; $i++) {
+            $this->assertNull($this->queue(app(ImageGenerationService::class)));
+        }
+
+        $this->assertSame('open', $breaker->state());
     }
 
     public function test_flag_off_keeps_http_path(): void

@@ -514,7 +514,7 @@ class LinkedInCarouselImageService
                 $status = 1;
                 $data = [];
             } catch (\App\Exceptions\GeminiGenClientException $e) {
-                $this->breaker->recordFailure(null, null);
+                $this->breaker->recordFailure(502, null); // transport outage → count toward trip
                 Log::error('[LinkedInCarouselImage] indusia submit failed', [
                     'draft_id' => $draft->id,
                     'slide_index' => $slideIndex,

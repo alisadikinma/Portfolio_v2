@@ -61,7 +61,6 @@ Note on poll: the client's `check <uuid>` subcommand is an **unimplemented stub*
 version, so the bridge is SUBMIT-only. Completion polling stays in the backend crons
 (`blog:process-images`, `linkedin:poll-hook-videos`, `repurpose:poll-rebrand-assets`) as a plain
 `GET {base_url}/history/{uuid}` — model-agnostic, no drift, already on `config('geminigen.base_url')`.
-Leave `GEMINIGEN_CLIENT_CHECK_SUPPORTED=true` (the value is currently unused by the submit-only bridge).
 
 ---
 

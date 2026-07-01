@@ -173,8 +173,11 @@ class ImageGenerationService
                     );
                     $this->breaker->recordSuccess();
                     $status = 1;
+                    $data = [];
                 } catch (\App\Exceptions\GeminiGenClientException $e) {
-                    $this->breaker->recordFailure(null, null);
+                    // 502 = transport outage signal so the breaker classifier
+                    // counts it toward the trip (null status → 'ignore', never trips).
+                    $this->breaker->recordFailure(502, null);
                     Log::error("[ImageGen] indusia submit failed: {$e->getMessage()}");
                     return null;
                 }

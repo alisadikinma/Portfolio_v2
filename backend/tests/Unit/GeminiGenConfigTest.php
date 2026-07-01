@@ -22,7 +22,6 @@ class GeminiGenConfigTest extends TestCase
         $this->assertSame('local', config('geminigen.client_driver'));
         $this->assertNotEmpty(config('geminigen.client_path'));
         $this->assertNotEmpty(config('geminigen.client_repo'));
-        $this->assertTrue(config('geminigen.client_check_supported'));
     }
 
     public function test_no_service_hardcodes_the_dead_geminigen_domain(): void

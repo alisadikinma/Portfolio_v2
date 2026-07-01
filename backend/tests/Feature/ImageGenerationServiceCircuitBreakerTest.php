@@ -105,7 +105,7 @@ class ImageGenerationServiceCircuitBreakerTest extends TestCase
         $count = $service->triggerForIdea($idea);
 
         $this->assertSame(1, $count);
-        Http::assertSent(fn ($req) => str_contains($req->url(), 'geminigen'));
+        Http::assertSent(fn ($req) => str_contains($req->url(), 'generate_image'));
         // Success should have been recorded — failures stay at zero.
         $this->assertSame(0, $breaker->failureCountInWindow());
         $this->assertSame('closed', $breaker->state());
