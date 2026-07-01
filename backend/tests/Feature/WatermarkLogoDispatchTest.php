@@ -38,7 +38,7 @@ class WatermarkLogoDispatchTest extends TestCase
         Config::set('content.cover_branding.title_max_len', 70);
 
         Http::fake([
-            'api.geminigen.ai/*' => Http::response(['uuid' => 'uuid-watermark', 'status' => 1], 200),
+            'api.snapgen.ai/*' => Http::response(['uuid' => 'uuid-watermark', 'status' => 1], 200),
         ]);
 
         Storage::fake('public');

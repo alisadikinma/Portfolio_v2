@@ -71,7 +71,7 @@ class PollHookVideos extends Command
             try {
                 $resp = Http::timeout(15)
                     ->withHeaders(['x-api-key' => $apiKey])
-                    ->get("https://api.geminigen.ai/uapi/v1/history/{$ig->hook_video_job_uuid}");
+                    ->get(config('geminigen.base_url')."/history/{$ig->hook_video_job_uuid}");
             } catch (\Throwable $e) {
                 $this->markStuckIfElapsed($ig, "poll exception: {$e->getMessage()}", $dry);
 

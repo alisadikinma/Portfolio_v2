@@ -35,7 +35,7 @@ class GeminiGenVideoService
 {
     private string $apiKey;
 
-    private string $baseUrl = 'https://api.geminigen.ai/uapi/v1';
+    private string $baseUrl;
 
     private string $ffmpeg;
 
@@ -54,10 +54,12 @@ class GeminiGenVideoService
         .'photorealistic with natural micro-motion and no morphing';
 
     public function __construct(
-        private readonly GeminiGenCircuitBreaker $breaker
+        private readonly GeminiGenCircuitBreaker $breaker,
+        private readonly GeminiGenClientBridge $bridge
     ) {
         $this->apiKey = (string) config('services.geminigen.api_key', '');
         $this->ffmpeg = (string) config('services.geminigen.ffmpeg_path', 'ffmpeg');
+        $this->baseUrl = (string) config('geminigen.base_url');
     }
 
     /**
@@ -121,6 +123,26 @@ class GeminiGenVideoService
             ['name' => 'resolution', 'contents' => '720p'],
             ['name' => 'file_urls', 'contents' => $frameUrl],
         ];
+
+        if (config('geminigen.use_indusia_video')) {
+            try {
+                $uuid = $this->bridge->submit('video-gen/grok', [
+                    'prompt' => self::HOOK_VIDEO_PROMPT,
+                    'aspect_ratio' => '2:3',
+                    'mode_image' => 'custom',
+                    'duration' => '6',
+                    'resolution' => '720p',
+                ], [$frameUrl], (string) config('services.geminigen.video_model', 'grok-3'));
+                $this->breaker->recordSuccess();
+
+                return $uuid;
+            } catch (\App\Exceptions\GeminiGenClientException $e) {
+                $this->breaker->recordFailure(502, null); // transport outage → count toward trip
+                Log::error('[GeminiGenVideo] indusia hook submit failed', ['ig' => $ig->id, 'error' => $e->getMessage()]);
+
+                return null;
+            }
+        }
 
         try {
             // 90s — this POST uploads the padded JPG frame (binary multipart)
@@ -219,6 +241,24 @@ class GeminiGenVideoService
             $multipart[] = ['name' => 'file_urls', 'contents' => $url];
         }
 
+        if (config('geminigen.use_indusia_video')) {
+            try {
+                $uuid = $this->bridge->submit('generate_image', [
+                    'prompt' => $finalPrompt,
+                    'aspect_ratio' => '9:16',
+                    'style' => 'Photorealistic',
+                ], $refs, (string) (config('content.default_image_model') ?: 'nano-banana-pro'));
+                $this->breaker->recordSuccess();
+
+                return $uuid;
+            } catch (\App\Exceptions\GeminiGenClientException $e) {
+                $this->breaker->recordFailure(502, null); // transport outage → count toward trip
+                Log::error('[GeminiGenVideo] indusia keyframe submit failed', ['ctx' => $contextId, 'error' => $e->getMessage()]);
+
+                return null;
+            }
+        }
+
         try {
             $response = Http::timeout(30)
                 ->withHeaders(['x-api-key' => $this->apiKey])
@@ -288,6 +328,26 @@ class GeminiGenVideoService
             ['name' => 'mode_image', 'contents' => 'frame'],
             ['name' => 'ref_images', 'contents' => $keyframeUrl],
         ];
+
+        if (config('geminigen.use_indusia_video')) {
+            try {
+                $uuid = $this->bridge->submit('video-gen/veo', [
+                    'prompt' => $prompt,
+                    'aspect_ratio' => $aspect,
+                    'duration' => '6',
+                    'resolution' => '720p',
+                    'mode_image' => 'frame',
+                ], [$keyframeUrl], (string) config('services.geminigen.veo_model', 'veo-3.1-fast'));
+                $this->breaker->recordSuccess();
+
+                return $uuid;
+            } catch (\App\Exceptions\GeminiGenClientException $e) {
+                $this->breaker->recordFailure(502, null); // transport outage → count toward trip
+                Log::error('[GeminiGenVideo] indusia Veo submit failed', ['ctx' => $contextId, 'error' => $e->getMessage()]);
+
+                return null;
+            }
+        }
 
         try {
             $response = Http::timeout(90)
@@ -367,6 +427,26 @@ class GeminiGenVideoService
             ['name' => 'resolution', 'contents' => '720p'],
             ['name' => 'file_urls', 'contents' => $keyframeUrl],
         ];
+
+        if (config('geminigen.use_indusia_video')) {
+            try {
+                $uuid = $this->bridge->submit('video-gen/grok', [
+                    'prompt' => $prompt,
+                    'aspect_ratio' => '2:3',
+                    'mode_image' => 'custom',
+                    'duration' => '6',
+                    'resolution' => '720p',
+                ], [$keyframeUrl], (string) config('services.geminigen.video_model', 'grok-3'));
+                $this->breaker->recordSuccess();
+
+                return $uuid;
+            } catch (\App\Exceptions\GeminiGenClientException $e) {
+                $this->breaker->recordFailure(502, null); // transport outage → count toward trip
+                Log::error('[GeminiGenVideo] indusia GROK clip submit failed', ['ctx' => $contextId, 'error' => $e->getMessage()]);
+
+                return null;
+            }
+        }
 
         try {
             $response = Http::timeout(90)

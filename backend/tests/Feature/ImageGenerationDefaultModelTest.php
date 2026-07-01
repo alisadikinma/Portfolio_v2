@@ -18,7 +18,7 @@ class ImageGenerationDefaultModelTest extends TestCase
         Config::set('services.geminigen.api_key', 'test-key');
 
         Http::fake([
-            'api.geminigen.ai/*' => Http::response([
+            'api.snapgen.ai/*' => Http::response([
                 'uuid' => 'fake-uuid-123',
                 'status' => 1,
             ], 200),

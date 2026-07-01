@@ -27,7 +27,7 @@ class SegmentRetryMachineTest extends TestCase
         Config::set('content.cover_branding.enabled', false);
 
         Http::fake([
-            'api.geminigen.ai/*' => Http::sequence()
+            'api.snapgen.ai/*' => Http::sequence()
                 ->push(['uuid' => 'retry-uuid-1', 'status' => 1], 200)
                 ->push(['uuid' => 'retry-uuid-2', 'status' => 1], 200)
                 ->push(['uuid' => 'retry-uuid-3', 'status' => 1], 200),

@@ -41,13 +41,15 @@ class LinkedInCarouselImageService
     private const MAX_TRANSIENT_RETRIES = 3;
 
     private string $apiKey;
-    private string $baseUrl = 'https://api.geminigen.ai/uapi/v1';
+    private string $baseUrl;
 
     public function __construct(
         private readonly CarouselSlideEnhancer $enhancer,
-        private readonly GeminiGenCircuitBreaker $breaker
+        private readonly GeminiGenCircuitBreaker $breaker,
+        private readonly GeminiGenClientBridge $bridge
     ) {
         $this->apiKey = (string) config('services.geminigen.api_key', '');
+        $this->baseUrl = (string) config('geminigen.base_url');
     }
 
     /**
@@ -490,59 +492,91 @@ class LinkedInCarouselImageService
             }
         }
 
-        try {
-            $response = Http::timeout(30)
-                ->withHeaders(['x-api-key' => $this->apiKey])
-                ->asMultipart()
-                ->post("{$this->baseUrl}/generate_image", $multipart);
-        } catch (\Illuminate\Http\Client\ConnectionException $e) {
-            // Network-level failure — counts toward circuit trip.
-            $this->breaker->recordFailure(null, null, $e);
-            Log::error('[LinkedInCarouselImage] HTTP connection exception', [
-                'draft_id' => $draft->id,
-                'slide_index' => $slideIndex,
-                'error' => $e->getMessage(),
-            ]);
-            return null;
-        } catch (\Throwable $e) {
-            Log::error('[LinkedInCarouselImage] HTTP exception', [
-                'draft_id' => $draft->id,
-                'slide_index' => $slideIndex,
-                'error' => $e->getMessage(),
-            ]);
-            return null;
-        }
+        if (config('geminigen.use_indusia_images')) {
+            // SSOT transport: submit via the indusia client CLI. The Python
+            // client owns endpoint routing (gpt-image-2 -> imagen/gpt-image-2)
+            // + local-vs-URL ref mapping. Async (status=1); the
+            // linkedin:reap-stuck-carousel-images + poll path complete it.
+            $model = $this->resolveModel();
+            $refs = array_values(array_filter(
+                array_merge($faceRefs, $fileUrls),
+                fn ($u) => is_string($u) && $u !== '' && ! str_starts_with($u, 'blob:')
+            ));
+            $fields = ['prompt' => $finalPrompt, 'aspect_ratio' => '3:4', 'style' => 'Photorealistic'];
+            if ($model === 'gpt-image-2') {
+                // gpt-image-2 ignores style; medium mode balances typography quality vs credits.
+                $fields['mode'] = 'medium';
+            }
 
-        if (! $response->successful()) {
-            // Classify failure for the breaker — 5xx + 429 count, prompt-class
-            // 4xx (PUBLIC_ERROR_*) are ignored because the April 28 safety
-            // auto-rewrite handles them.
-            $errorCode = $response->json('error_code') ?? null;
-            $this->breaker->recordFailure($response->status(), $errorCode);
+            try {
+                $uuid = $this->bridge->submit('generate_image', $fields, $refs, $model);
+                $this->breaker->recordSuccess();
+                $status = 1;
+                $data = [];
+            } catch (\App\Exceptions\GeminiGenClientException $e) {
+                $this->breaker->recordFailure(502, null); // transport outage → count toward trip
+                Log::error('[LinkedInCarouselImage] indusia submit failed', [
+                    'draft_id' => $draft->id,
+                    'slide_index' => $slideIndex,
+                    'error' => $e->getMessage(),
+                ]);
+                return null;
+            }
+        } else {
+            try {
+                $response = Http::timeout(30)
+                    ->withHeaders(['x-api-key' => $this->apiKey])
+                    ->asMultipart()
+                    ->post("{$this->baseUrl}/generate_image", $multipart);
+            } catch (\Illuminate\Http\Client\ConnectionException $e) {
+                // Network-level failure — counts toward circuit trip.
+                $this->breaker->recordFailure(null, null, $e);
+                Log::error('[LinkedInCarouselImage] HTTP connection exception', [
+                    'draft_id' => $draft->id,
+                    'slide_index' => $slideIndex,
+                    'error' => $e->getMessage(),
+                ]);
+                return null;
+            } catch (\Throwable $e) {
+                Log::error('[LinkedInCarouselImage] HTTP exception', [
+                    'draft_id' => $draft->id,
+                    'slide_index' => $slideIndex,
+                    'error' => $e->getMessage(),
+                ]);
+                return null;
+            }
 
-            Log::error('[LinkedInCarouselImage] GeminiGen non-2xx', [
-                'draft_id' => $draft->id,
-                'slide_index' => $slideIndex,
-                'status' => $response->status(),
-                'body' => Str::limit($response->body(), 500),
-            ]);
-            return null;
-        }
+            if (! $response->successful()) {
+                // Classify failure for the breaker — 5xx + 429 count, prompt-class
+                // 4xx (PUBLIC_ERROR_*) are ignored because the April 28 safety
+                // auto-rewrite handles them.
+                $errorCode = $response->json('error_code') ?? null;
+                $this->breaker->recordFailure($response->status(), $errorCode);
 
-        // 2xx — record success so isolated 5xx don't accumulate.
-        $this->breaker->recordSuccess();
+                Log::error('[LinkedInCarouselImage] GeminiGen non-2xx', [
+                    'draft_id' => $draft->id,
+                    'slide_index' => $slideIndex,
+                    'status' => $response->status(),
+                    'body' => Str::limit($response->body(), 500),
+                ]);
+                return null;
+            }
 
-        $data = $response->json();
-        $uuid = $data['uuid'] ?? null;
-        $status = $data['status'] ?? 0;
+            // 2xx — record success so isolated 5xx don't accumulate.
+            $this->breaker->recordSuccess();
 
-        if (! $uuid) {
-            Log::error('[LinkedInCarouselImage] no UUID in GeminiGen response', [
-                'draft_id' => $draft->id,
-                'slide_index' => $slideIndex,
-                'body' => $data,
-            ]);
-            return null;
+            $data = $response->json();
+            $uuid = $data['uuid'] ?? null;
+            $status = $data['status'] ?? 0;
+
+            if (! $uuid) {
+                Log::error('[LinkedInCarouselImage] no UUID in GeminiGen response', [
+                    'draft_id' => $draft->id,
+                    'slide_index' => $slideIndex,
+                    'body' => $data,
+                ]);
+                return null;
+            }
         }
 
         // Persist job row. type='carousel_slide' lets queries cleanly separate
@@ -1389,9 +1423,17 @@ class LinkedInCarouselImageService
 
     private function resolveModel(): string
     {
-        return (string) (config('services.geminigen.linkedin_carousel_model')
-            ?? config('content.default_image_model')
-            ?? 'nano-banana-pro');
+        // Operator knob (admin setting) wins — set to 'gpt-image-2' for
+        // typography-accurate sketchnote infographic slides. Default keeps
+        // the photorealistic nano-banana-pro path (no behaviour change).
+        $setting = Setting::where('group', 'linkedin')
+            ->where('key', 'linkedin_carousel_image_model')
+            ->value('value');
+
+        return (string) ($setting
+            ?: config('services.geminigen.linkedin_carousel_model')
+            ?: config('content.default_image_model')
+            ?: 'nano-banana-pro');
     }
 
     /**

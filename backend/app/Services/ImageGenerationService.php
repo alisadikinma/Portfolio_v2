@@ -22,15 +22,18 @@ class ImageGenerationService
     public const MAX_SEGMENT_ATTEMPTS = 6;
 
     private string $apiKey;
-    private string $baseUrl = 'https://api.geminigen.ai/uapi/v1';
+    private string $baseUrl;
     private GeminiGenCircuitBreaker $breaker;
+    private GeminiGenClientBridge $bridge;
 
-    public function __construct(?GeminiGenCircuitBreaker $breaker = null)
+    public function __construct(?GeminiGenCircuitBreaker $breaker = null, ?GeminiGenClientBridge $bridge = null)
     {
         $this->apiKey = config('services.geminigen.api_key', '');
+        $this->baseUrl = (string) config('geminigen.base_url');
         // Constructor-optional injection so the legacy `new ImageGenerationService()`
         // callers (if any) still work; production code goes through the container.
         $this->breaker = $breaker ?? app(GeminiGenCircuitBreaker::class);
+        $this->bridge = $bridge ?? app(GeminiGenClientBridge::class);
     }
 
     /**
@@ -156,50 +159,74 @@ class ImageGenerationService
                 );
             }
 
-            // Wrap HTTP in try/catch so ConnectionException (network outage)
-            // is recorded as a failure signal before re-throwing. Without
-            // this the breaker would never see the network-level outage class.
-            try {
-                $response = Http::timeout(30)
-                    ->withHeaders(['x-api-key' => $this->apiKey])
-                    ->asMultipart()
-                    ->post("{$this->baseUrl}/generate_image", $multipart);
-            } catch (\Illuminate\Http\Client\ConnectionException $connEx) {
-                $this->breaker->recordFailure(null, null, $connEx);
-                throw $connEx;
-            }
-
-            // Record outcome with the breaker BEFORE branching on response.
-            // - 2xx → recordSuccess (clears stale failure log)
-            // - 5xx / 429 → recordFailure counts toward trip
-            // - 4xx with PUBLIC_ERROR_* → recordFailure classifies as
-            //   prompt_class and does NOT count (handled by April 28 safety
-            //   auto-rewrite, not an outage signal)
-            // - other 4xx → recordFailure classifies as ignore (auth, bad
-            //   request shape — operator concern, not an outage)
-            if ($response->successful()) {
-                $this->breaker->recordSuccess();
-            } else {
-                $errorCode = null;
-                $jsonError = $response->json('error');
-                if (is_string($jsonError) && $jsonError !== '') {
-                    $errorCode = $jsonError;
+            if (config('geminigen.use_indusia_images')) {
+                // SSOT transport: submit via the indusia client CLI (--no-wait).
+                // The Python client owns endpoint routing + local-vs-URL ref
+                // mapping. Completion is driven by the blog:process-images poll
+                // cron (GeminiGen webhooks don't fire), so status stays 1 here.
+                try {
+                    $uuid = $this->bridge->submit(
+                        'generate_image',
+                        ['prompt' => $finalPrompt, 'aspect_ratio' => $aspectRatio, 'style' => $style],
+                        $allRefs,
+                        $model
+                    );
+                    $this->breaker->recordSuccess();
+                    $status = 1;
+                    $data = [];
+                } catch (\App\Exceptions\GeminiGenClientException $e) {
+                    // 502 = transport outage signal so the breaker classifier
+                    // counts it toward the trip (null status → 'ignore', never trips).
+                    $this->breaker->recordFailure(502, null);
+                    Log::error("[ImageGen] indusia submit failed: {$e->getMessage()}");
+                    return null;
                 }
-                $this->breaker->recordFailure($response->status(), $errorCode);
-            }
+            } else {
+                // Wrap HTTP in try/catch so ConnectionException (network outage)
+                // is recorded as a failure signal before re-throwing. Without
+                // this the breaker would never see the network-level outage class.
+                try {
+                    $response = Http::timeout(30)
+                        ->withHeaders(['x-api-key' => $this->apiKey])
+                        ->asMultipart()
+                        ->post("{$this->baseUrl}/generate_image", $multipart);
+                } catch (\Illuminate\Http\Client\ConnectionException $connEx) {
+                    $this->breaker->recordFailure(null, null, $connEx);
+                    throw $connEx;
+                }
 
-            if (!$response->successful()) {
-                Log::error("[ImageGen] API error: HTTP {$response->status()} — {$response->body()}");
-                return null;
-            }
+                // Record outcome with the breaker BEFORE branching on response.
+                // - 2xx → recordSuccess (clears stale failure log)
+                // - 5xx / 429 → recordFailure counts toward trip
+                // - 4xx with PUBLIC_ERROR_* → recordFailure classifies as
+                //   prompt_class and does NOT count (handled by April 28 safety
+                //   auto-rewrite, not an outage signal)
+                // - other 4xx → recordFailure classifies as ignore (auth, bad
+                //   request shape — operator concern, not an outage)
+                if ($response->successful()) {
+                    $this->breaker->recordSuccess();
+                } else {
+                    $errorCode = null;
+                    $jsonError = $response->json('error');
+                    if (is_string($jsonError) && $jsonError !== '') {
+                        $errorCode = $jsonError;
+                    }
+                    $this->breaker->recordFailure($response->status(), $errorCode);
+                }
 
-            $data = $response->json();
-            $uuid = $data['uuid'] ?? null;
-            $status = $data['status'] ?? 0;
+                if (!$response->successful()) {
+                    Log::error("[ImageGen] API error: HTTP {$response->status()} — {$response->body()}");
+                    return null;
+                }
 
-            if (!$uuid) {
-                Log::error('[ImageGen] No UUID in response: ' . json_encode($data));
-                return null;
+                $data = $response->json();
+                $uuid = $data['uuid'] ?? null;
+                $status = $data['status'] ?? 0;
+
+                if (!$uuid) {
+                    Log::error('[ImageGen] No UUID in response: ' . json_encode($data));
+                    return null;
+                }
             }
 
             // If image is ready immediately (status=2), handle it now

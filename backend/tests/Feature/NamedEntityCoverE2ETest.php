@@ -151,7 +151,7 @@ class NamedEntityCoverE2ETest extends TestCase
 
         // 3. Dispatch GeminiGen — mock Setting + Http for the dispatch pipeline
         Http::fake([
-            'api.geminigen.ai/*' => Http::response(['uuid' => 'e2e-uuid-1', 'status' => 1], 200),
+            'api.snapgen.ai/*' => Http::response(['uuid' => 'e2e-uuid-1', 'status' => 1], 200),
         ]);
 
         Storage::disk('public')->put('about/ali.png', 'fake-creator-bytes');
@@ -190,7 +190,7 @@ class NamedEntityCoverE2ETest extends TestCase
 
         // 4. Assertions: correct file_urls composition
         Http::assertSent(function ($request) {
-            if (!str_contains($request->url(), 'api.geminigen.ai')) return false;
+            if (!str_contains($request->url(), 'api.snapgen.ai')) return false;
             $body = (string) $request->body();
             preg_match_all('/name="file_urls"[\s\S]*?\r\n\r\n([^\r\n]+)/', $body, $matches);
             $fileUrls = $matches[1] ?? [];
@@ -205,7 +205,7 @@ class NamedEntityCoverE2ETest extends TestCase
 
         // 5. Title overlay + model override still intact
         Http::assertSent(function ($request) {
-            if (!str_contains($request->url(), 'api.geminigen.ai')) return false;
+            if (!str_contains($request->url(), 'api.snapgen.ai')) return false;
             $body = (string) $request->body();
             return str_contains($body, 'Anthropic CEO Visits the White House')
                 && str_contains($body, 'thumbnail-style title text')

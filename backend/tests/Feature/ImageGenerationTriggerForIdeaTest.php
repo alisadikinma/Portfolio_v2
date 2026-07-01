@@ -24,7 +24,7 @@ class ImageGenerationTriggerForIdeaTest extends TestCase
         Config::set('content.cover_branding.title_max_len', 70);
 
         Http::fake([
-            'api.geminigen.ai/*' => Http::sequence()
+            'api.snapgen.ai/*' => Http::sequence()
                 ->push(['uuid' => 'uuid-1', 'status' => 1], 200)
                 ->push(['uuid' => 'uuid-2', 'status' => 1], 200)
                 ->push(['uuid' => 'uuid-3', 'status' => 1], 200)

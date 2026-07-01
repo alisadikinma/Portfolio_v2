@@ -94,7 +94,7 @@ class ImageGenerationServiceCircuitBreakerTest extends TestCase
     public function dispatch_proceeds_when_circuit_closed(): void
     {
         Http::fake([
-            'api.geminigen.ai/*' => Http::response(['uuid' => 'uuid-1', 'status' => 1], 200),
+            'api.snapgen.ai/*' => Http::response(['uuid' => 'uuid-1', 'status' => 1], 200),
         ]);
 
         $breaker = app(GeminiGenCircuitBreaker::class);
@@ -105,7 +105,7 @@ class ImageGenerationServiceCircuitBreakerTest extends TestCase
         $count = $service->triggerForIdea($idea);
 
         $this->assertSame(1, $count);
-        Http::assertSent(fn ($req) => str_contains($req->url(), 'geminigen'));
+        Http::assertSent(fn ($req) => str_contains($req->url(), 'generate_image'));
         // Success should have been recorded — failures stay at zero.
         $this->assertSame(0, $breaker->failureCountInWindow());
         $this->assertSame('closed', $breaker->state());
@@ -140,7 +140,7 @@ class ImageGenerationServiceCircuitBreakerTest extends TestCase
     public function records_failure_on_503_response(): void
     {
         Http::fake([
-            'api.geminigen.ai/*' => Http::response('Service Unavailable', 503),
+            'api.snapgen.ai/*' => Http::response('Service Unavailable', 503),
         ]);
 
         $breaker = app(GeminiGenCircuitBreaker::class);
@@ -163,7 +163,7 @@ class ImageGenerationServiceCircuitBreakerTest extends TestCase
         // the prompt names a public figure. Handled by the April 28 safety
         // auto-rewrite — NOT an outage signal, MUST NOT trip the breaker.
         Http::fake([
-            'api.geminigen.ai/*' => Http::response(
+            'api.snapgen.ai/*' => Http::response(
                 ['error' => 'PUBLIC_ERROR_PROMINENT_PEOPLE_UPLOAD'],
                 400
             ),

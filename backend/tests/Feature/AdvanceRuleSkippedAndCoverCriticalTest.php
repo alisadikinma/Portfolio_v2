@@ -30,7 +30,7 @@ class AdvanceRuleSkippedAndCoverCriticalTest extends TestCase
     private function runPollerWithSuccessFor(string $uuid, string $mediaUrl): void
     {
         Http::fake([
-            "api.geminigen.ai/uapi/v1/history/{$uuid}" => Http::response([
+            "api.snapgen.ai/uapi/v1/history/{$uuid}" => Http::response([
                 'uuid' => $uuid,
                 'status' => 2,
                 'generate_result' => $mediaUrl,

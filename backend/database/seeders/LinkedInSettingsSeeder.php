@@ -89,6 +89,12 @@ class LinkedInSettingsSeeder extends Seeder
             //   revert lever read by LinkedInGenerationService::buildCarouselGenPrompt.
             ['key' => 'linkedin_carousel_style',               'value' => 'sketchnote', 'type' => 'text'],
 
+            // - linkedin_carousel_image_model: which GeminiGen model renders the
+            //   carousel slide PNGs. 'nano-banana-pro' (default) = photorealistic;
+            //   'gpt-image-2' = literal typography (best for sketchnote infographic
+            //   text — Premium plan only). Read by LinkedInCarouselImageService::resolveModel.
+            ['key' => 'linkedin_carousel_image_model',         'value' => 'nano-banana-pro', 'type' => 'text'],
+
             // Telegram scheduling conversation (June 12, 2026):
             // When 'true', a draft that becomes genuinely ready (carousel:
             // slides rendered + captions ready; text: validation passed) fires

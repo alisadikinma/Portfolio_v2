@@ -34,7 +34,7 @@ class RetrySegmentEndpointTest extends TestCase
         Config::set('content.cover_branding.enabled', false);
 
         Http::fake([
-            'api.geminigen.ai/*' => Http::response(['uuid' => 'fresh-uuid', 'status' => 1], 200),
+            'api.snapgen.ai/*' => Http::response(['uuid' => 'fresh-uuid', 'status' => 1], 200),
         ]);
 
         $jobMock = Mockery::mock('alias:' . ImageGenerationJob::class);
