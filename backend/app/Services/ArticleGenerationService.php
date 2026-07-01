@@ -490,7 +490,9 @@ class ArticleGenerationService
         $prompt = $this->buildTranslatePrompt($source);
 
         try {
-            $result = $this->executeSyncPrompt($prompt, 'translate-inline', $model);
+            // 600s ceiling: full-article translate measured ~375s on a 19KB
+            // article. Runs in the queued TranslateContentIdea job now.
+            $result = $this->executeSyncPrompt($prompt, 'translate-inline', $model, 600);
         } catch (\Exception $e) {
             Log::error('[ArticleGeneration] Translate failed (sync exec)', ['error' => $e->getMessage()]);
             return ['success' => false, 'translated' => null, 'error' => $e->getMessage()];
@@ -793,16 +795,18 @@ PROMPT;
      *
      * @return array{success: bool, output: string, error: string|null}
      */
-    private function executeSyncPrompt(string $claudePrompt, string $phase, string $model = ''): array
+    private function executeSyncPrompt(string $claudePrompt, string $phase, string $model = '', int $timeoutSeconds = 300): array
     {
         $modelFlag = $model ? "--model {$model}" : '';
         $mcpFlags = $this->buildMcpFlags();
         // Pure translation doesn't need reasoning — skip --effort to save time.
         // VD rewrite also a single-pass transformation; fine without effort too.
         $extraFlags = trim("{$modelFlag} {$mcpFlags}");
-        // 300s matches nginx fastcgi_read_timeout; 180s wasn't enough for
-        // longer articles (~14 KB JSON) under current Claude API latency.
-        $syncTimeout = 300;
+        // Ceiling, not a wait — quick callers (vd-rewrite ~15s) finish early.
+        // Big-article translate genuinely runs ~375s (measured, 19KB JSON), so
+        // the translate caller passes 600. Now runs inside a queued job (worker
+        // --timeout=1260), no longer behind the Cloudflare/nginx ~100s edge cap.
+        $syncTimeout = $timeoutSeconds;
 
         if ($this->driver === 'local') {
             $isWindows = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';

@@ -49,7 +49,7 @@ function stopTranslationTimer() {
 // dispatches a queued job) then POLL generated_article.translation_status
 // instead of holding one long request open (which always 524'd).
 const POLL_MS = 5000
-const MAX_POLLS = 130 // ~650s, past the 600s job timeout
+const MAX_POLLS = 170 // ~850s, past the 600s inner CLI cap + boot (job timeout 900s)
 
 async function runTranslation() {
   if (translating.value) return

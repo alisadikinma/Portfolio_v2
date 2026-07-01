@@ -29,7 +29,7 @@ class TranslateContentIdea implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $timeout = 600; // headroom past the 300s inline Process cap for big articles
+    public int $timeout = 900; // > 600s inner CLI cap; worker runs --timeout=1260
     public int $tries = 1;
 
     public function __construct(public int $ideaId)
