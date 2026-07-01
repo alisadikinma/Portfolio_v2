@@ -177,13 +177,39 @@ class CarouselSlideEnhancerFigureInteractionTest extends TestCase
         );
     }
 
-    public function test_brand_logo_kept_on_single_creator_cover(): void
+    public function test_brand_logo_dropped_on_single_creator_cover(): void
     {
-        $slide = $this->coverSlide(); // no entity_face_ref → single creator
+        // Regression (draft 188 slide 0): a single-creator cover has the creator
+        // face as the hero. The bald-glasses logo icon competes and drags Ali's
+        // likeness toward a generic bald-glasses everyman. The logo must be
+        // dropped here too — not only on the 2-subject cover.
+        $slide = $this->coverSlide(); // no entity_face_ref → single creator, face attached
 
         $result = $this->enhancer()->enhance($slide, 0, 7);
 
+        $this->assertSame([], $result['file_urls'],
+            'single-creator cover must drop the competing bald-glasses brand logo ref');
+        $this->assertSame(['https://cdn.example.com/face.png'], $result['face_refs'],
+            'the real creator face ref is untouched');
+    }
+
+    public function test_brand_logo_kept_on_faceless_body_slide(): void
+    {
+        // No creator/figure face on this slide → the logo can't compete, so it
+        // stays as the watermark anchor.
+        $slide = [
+            'slide_number' => 3,
+            'layout_hint' => 'body',
+            'copy' => 'DATA POINT',
+            'image_prompt' => 'A clean minimalist bar chart on cream paper, no people, flat illustration.',
+            'is_cover' => false,
+            'is_cta' => false,
+        ];
+
+        $result = $this->enhancer()->enhance($slide, 2, 7);
+
+        $this->assertSame([], $result['face_refs'], 'faceless slide has no face ref');
         $this->assertContains('https://cdn.example.com/logo.png', $result['file_urls'],
-            'single-creator cover keeps the brand logo reference (no competing second face)');
+            'faceless slide keeps the brand logo reference (nothing to compete with)');
     }
 }

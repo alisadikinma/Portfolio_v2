@@ -228,13 +228,25 @@ class CarouselSlideEnhancer
             ]);
         }
 
+        // Drop the brand-logo ref whenever the slide carries a REAL face ref
+        // (creator and/or figure). The logo is a bald-with-glasses face icon and
+        // GeminiGen has no "logo, not face" flag, so it lands in the same
+        // file_urls bucket and competes as an extra identity — on a single-creator
+        // cover (face is the hero) it drags Ali's exact likeness toward a generic
+        // bald-glasses everyman (observed on draft 188 slide 0). The 2-subject
+        // cover was only the first symptom; the real rule is "any face-bearing
+        // slide". The brand icon still renders from the appendBrandChrome text
+        // instruction (top bar), so nothing visual is lost. Faceless slides keep
+        // the logo ref (no face to compete with; gives the watermark an anchor).
         $fileUrls = [];
-        if ($brandLogoUrl !== null && ! $isTwoSubjectCover) {
+        $hasRealFace = ! empty($faceRefs);
+        if ($brandLogoUrl !== null && ! $hasRealFace) {
             $fileUrls[] = $brandLogoUrl;
-        } elseif ($brandLogoUrl !== null && $isTwoSubjectCover) {
-            Log::info('[CarouselSlideEnhancer] dropped brand-logo reference on 2-subject cover to protect creator face identity', [
+        } elseif ($brandLogoUrl !== null) {
+            Log::info('[CarouselSlideEnhancer] dropped brand-logo reference on a face-bearing slide to protect creator face identity', [
                 'layout_hint' => $layoutHint,
                 'slide_index' => $slideIndex,
+                'two_subject_cover' => $isTwoSubjectCover,
             ]);
         }
 

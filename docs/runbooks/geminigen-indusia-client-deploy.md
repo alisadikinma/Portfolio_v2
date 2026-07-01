@@ -16,18 +16,44 @@ images first (Wave 1), watch, then video (Wave 2).
 The bridge runs the client as user **claudesn** (queue-worker context, same as `LINKEDIN_GEN_*`).
 Do it once per VPS.
 
+The repo is **private** — claudesn has no account-wide GitHub key (its `deploy_key` /
+`jobhunter_deploy` are per-repo). Add a dedicated read-only deploy key first:
+
 ```bash
-sudo -u claudesn -i
+# on the VPS as claudesn:
+ssh-keygen -t ed25519 -N "" -C "indusiagen-deploy-vps" -f ~/.ssh/indusiagen_deploy
+cat >> ~/.ssh/config <<'EOF'
+
+Host github-indusiagen
+  HostName github.com
+  User git
+  IdentityFile ~/.ssh/indusiagen_deploy
+  IdentitiesOnly yes
+EOF
+chmod 600 ~/.ssh/config ~/.ssh/indusiagen_deploy
+cat ~/.ssh/indusiagen_deploy.pub    # ← add this as a READ-ONLY deploy key on the repo
+# (gh from an authed machine: gh api repos/alisadikinma/indusiagen-api-client/keys -f title=vps -f key="<pubkey>" -F read_only=true)
+
+# then clone via the alias:
 cd /home/claudesn
-git clone https://github.com/alisadikinma/indusiagen-api-client.git
+git clone git@github-indusiagen:alisadikinma/indusiagen-api-client.git
 cd indusiagen-api-client
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt      # or: .venv/bin/pip install -e .
-
-# The client resolves the API key from ITS OWN .env — NEVER passed on argv (visible in `ps`).
-cp .env.example .env
-# edit .env → set the snapgen API key (x-api-key) + base url if non-default
 ```
+
+**API key** — the client has NO dotenv loader, so a repo `.env` is NOT read (`.env.example`
+is misleading). Use the documented config-file fallback (`resolve_api_key` reads
+`GEMINIGEN_API_KEY` env → `~/.config/geminigen/config.json`). Key NEVER on argv (`ps`):
+
+```bash
+mkdir -p ~/.config/geminigen
+KEY=$(grep -E '^GEMINIGEN_API_KEY=' /var/www/Portfolio_v2/backend/.env | cut -d= -f2- | tr -d '"'"'"'"'\r)
+umask 077; printf '{"api_key": "%s"}\n' "$KEY" > ~/.config/geminigen/config.json
+chmod 600 ~/.config/geminigen/config.json
+```
+
+Base URL defaults to snapgen inside the client (`GEMINIGEN_BASE_URL` env overrides) — no config needed.
 
 Paths must match [`config/geminigen.php`](../../backend/config/geminigen.php) defaults
 (`/home/claudesn/indusiagen-api-client` + `.venv/bin/python`) or be overridden via env below.
@@ -37,14 +63,18 @@ Paths must match [`config/geminigen.php`](../../backend/config/geminigen.php) de
 ## Step-0 verification checklist (RUN BEFORE FLIPPING ANY FLAG)
 
 All three as **claudesn**, from the repo root. Each must succeed or the matching surface will fail
-silently to `manual_review` / stuck-poll.
+silently to `manual_review` / stuck-poll. A green submit prints `submitted: uuid=<uuid> …`; an
+`HTTP 402` means the **snapgen account is out of credits** (hits the old HTTP path too — top up first).
+
+The CLI's `--aspect` is a strict enum: `1:1, 16:9, 9:16, 4:3, 3:4, 21:9, 3:2, 2:3` — **`4:5` is
+rejected** (the raw API silently fell it back to 16:9; the carousel path uses `3:4`, valid).
 
 ```bash
 cd /home/claudesn/indusiagen-api-client
 PY=.venv/bin/python
 
 # (1) IMAGE submit reachable — expect: `submitted: uuid=<uuid> status=<n>`
-$PY -m scripts.geminigen_image image "a calm test still" --model nano-banana-pro --aspect 4:5 --no-wait
+$PY -m scripts.geminigen_image image "a calm test still" --model nano-banana-pro --aspect 3:4 --no-wait
 
 # (2) gpt-image-2 is PREMIUM-plan only + LOCAL-ref only. Confirm the account plan allows it.
 #     URL refs are auto-materialized to temp files by the bridge, but the MODEL access must exist:
