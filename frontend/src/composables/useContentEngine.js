@@ -129,14 +129,11 @@ export function useContentEngine() {
       face_ref_url: faceRefUrl,
     })
 
-  // Translation runs SSH → Claude CLI; backend timeout is 300s (matches
-  // nginx fastcgi_read_timeout). Frontend waits 320s for headroom.
+  // Kicks off translation async (backend returns 202 + dispatches a queued job).
+  // Returns instantly; caller polls getIdea for generated_article.translation_status.
   const translateArticle = (id) => request(
     'post',
     `/admin/content-engine/ideas/${id}/translate-article`,
-    null,
-    null,
-    { timeout: 320000 }
   )
 
   const searchStockImages = (query, options = {}) => {

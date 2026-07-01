@@ -7,7 +7,7 @@ This file provides guidance to Claude Code when working with the Laravel backend
 ## Quick Reference
 
 **Framework:** Laravel 10 | **PHP:** 8.2 | **Database:** MySQL 8 (portfolio_v2)
-**Server:** XAMPP Apache (Port 80) - **DO NOT** use `php artisan serve`
+**Server:** `portfolio_backend` Docker container - **DO NOT** use `php artisan serve` — run cmds via `docker exec portfolio_backend php artisan ...`
 **API Base:** `http://localhost/Portfolio_v2/backend/public/api`
 
 ## Architecture Overview
@@ -537,6 +537,6 @@ tests/
 ---
 
 **Last Updated:** April 11, 2026
-**Environment:** Windows 11 + XAMPP (Apache:80, MySQL:3306)
+**Environment:** macOS + Docker Desktop (containers portfolio_backend + portfolio_mysql)
 **Status:** ✅ 100% COMPLETE - PRODUCTION READY
 **See also:** `/CLAUDE.md` (root), `frontend/CLAUDE.md`

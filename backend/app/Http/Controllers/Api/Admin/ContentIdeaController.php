@@ -2035,8 +2035,7 @@ class ContentIdeaController extends Controller
      */
     public function translateArticle($id, Request $request): JsonResponse
     {
-        @set_time_limit(200);
-
+        // Request returns instantly now (dispatch + 202); heavy work runs in a queued job.
         $idea = ContentIdea::find($id);
         if (!$idea) {
             return response()->json(['success' => false, 'message' => 'Content idea not found.'], 404);
@@ -2064,57 +2063,25 @@ class ContentIdeaController extends Controller
             ]);
         }
 
-        // Mark status so polling / subsequent checks see the in-flight state
+        // Mark status so polling / subsequent checks see the in-flight state,
+        // then dispatch async. The translate is an SSH → Claude CLI call that
+        // runs 90-300s+ — far past Cloudflare's ~100s edge timeout, which made
+        // the old synchronous path return 524 on every real translate. Frontend
+        // polls generated_article.translation_status until done/failed.
         $article['translation_status'] = 'translating';
         $article['translation_started_at'] = now()->toIso8601String();
         unset($article['translation_error']);
         $idea->generated_article = $article;
         $idea->save();
 
-        $result = $this->articleGen->translateArticle($primary);
-
-        // Re-fetch to avoid clobbering any concurrent writes (webhooks, etc.)
-        $idea->refresh();
-        $article = $idea->generated_article ?? [];
-
-        if (!$result['success']) {
-            $article['translation_status'] = 'failed';
-            $article['translation_error'] = $result['error'] ?? 'Unknown error';
-            $idea->generated_article = $article;
-            $idea->save();
-            return response()->json([
-                'success' => false,
-                'message' => 'Translation failed: ' . ($result['error'] ?? 'unknown'),
-                'data' => $idea->fresh(),
-            ], 500);
-        }
-
-        $translated = $result['translated'];
-        // Non-translated fields copied from primary (language-agnostic)
-        $article[$targetLang] = array_merge($article[$targetLang] ?? [], [
-            'title' => $translated['title'] ?? '',
-            'content' => $translated['content'] ?? '',
-            'excerpt' => $translated['excerpt'] ?? '',
-            'meta_title' => $translated['meta_title'] ?? '',
-            'meta_description' => $translated['meta_description'] ?? '',
-            'og_title' => $translated['og_title'] ?? '',
-            'og_description' => $translated['og_description'] ?? '',
-            'ai_summary' => $translated['ai_summary'] ?? '',
-            'schema_markup' => $primary['schema_markup'] ?? ($article[$targetLang]['schema_markup'] ?? null),
-            'faq_schema' => $primary['faq_schema'] ?? ($article[$targetLang]['faq_schema'] ?? null),
-            'canonical_url' => $primary['canonical_url'] ?? ($article[$targetLang]['canonical_url'] ?? null),
-        ]);
-        $article['translation_status'] = 'done';
-        $article['translation_completed_at'] = now()->toIso8601String();
-        unset($article['translation_error']);
-        $idea->generated_article = $article;
-        $idea->save();
+        \App\Jobs\TranslateContentIdea::dispatch($idea->id);
 
         return response()->json([
             'success' => true,
             'data' => $idea->fresh(),
-            'message' => 'Article translated.',
-        ]);
+            'message' => 'Translation started.',
+            'translation_status' => 'translating',
+        ], 202);
     }
 
 }

@@ -44,20 +44,67 @@ function stopTranslationTimer() {
   translationStartedAt.value = null
 }
 
+// The translate is an SSH → Claude CLI call that runs 90-300s+ — well past
+// Cloudflare's ~100s edge timeout. So we kick it off (backend returns 202 +
+// dispatches a queued job) then POLL generated_article.translation_status
+// instead of holding one long request open (which always 524'd).
+const POLL_MS = 5000
+const MAX_POLLS = 130 // ~650s, past the 600s job timeout
+
 async function runTranslation() {
   if (translating.value) return
   translating.value = true
   translationError.value = null
   startTranslationTimer()
+
+  const id = idea.value.id
   try {
-    const result = await translateArticle(idea.value.id)
-    if (result.success && result.data) {
-      idea.value = result.data
+    const kickoff = await translateArticle(id)
+    if (!kickoff.success) {
+      translationError.value = kickoff.error || 'Failed to start translation.'
+      translating.value = false
+      stopTranslationTimer()
+      return
+    }
+    if (kickoff.data) idea.value = kickoff.data
+
+    // Already done (e.g. "already translated" short-circuit) — no need to poll.
+    if (kickoff.data?.generated_article?.translation_status === 'done') {
       dirty.value = true
       toast.success('English translation ready.')
-    } else {
-      translationError.value = result.error || 'Translation failed.'
+      translating.value = false
+      stopTranslationTimer()
+      return
     }
+
+    for (let i = 0; i < MAX_POLLS; i++) {
+      await new Promise((r) => setTimeout(r, POLL_MS))
+      // Stop if the user navigated away / started another run.
+      if (!translating.value) return
+
+      const poll = await getIdea(id)
+      if (!poll.success || !poll.data) continue // transient — keep polling
+
+      const status = poll.data?.generated_article?.translation_status
+      if (status === 'done') {
+        idea.value = poll.data
+        dirty.value = true
+        toast.success('English translation ready.')
+        translating.value = false
+        stopTranslationTimer()
+        return
+      }
+      if (status === 'failed') {
+        idea.value = poll.data
+        translationError.value =
+          poll.data?.generated_article?.translation_error || 'Translation failed.'
+        translating.value = false
+        stopTranslationTimer()
+        return
+      }
+      // status === 'translating' → keep waiting
+    }
+    translationError.value = 'Translation timed out. Click Retry to try again.'
   } catch (e) {
     translationError.value = e?.message || 'Translation failed.'
   } finally {

@@ -719,6 +719,6 @@ src/
 ---
 
 **Last Updated:** April 11, 2026
-**Environment:** Windows 11 (Frontend: Vite:5173, Backend: XAMPP:80)
+**Environment:** macOS (Frontend: Vite:5173, Backend: Docker container portfolio_backend)
 **Status:** ✅ 100% COMPLETE - PRODUCTION READY
 **See also:** `/CLAUDE.md` (root), `backend/CLAUDE.md`

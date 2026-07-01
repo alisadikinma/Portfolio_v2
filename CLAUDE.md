@@ -26,7 +26,7 @@ This repo has a knowledge graph at `graphify-out/` (god nodes, community structu
 
 ## Project Overview
 
-Portfolio_v2 is a full-stack portfolio, blog, and CMS platform using Laravel 12 (backend API) and Vue 3 (frontend SPA). Development on Windows 11.
+Portfolio_v2 is a full-stack portfolio, blog, and CMS platform using Laravel 12 (backend API) and Vue 3 (frontend SPA). Development on macOS via Docker Desktop.
 
 **Critical Context Files:**
 - Read `README.md`, `backend/README.md`, `frontend/README.md` at start of every conversation
@@ -49,9 +49,9 @@ phpMyAdmin:    http://localhost/phpmyadmin
 ```
 
 ### Key Constraints
-- **DO NOT** use `php artisan serve` - XAMPP Apache already handles backend on port 80
-- Project path: `D:\Projects\Portfolio_v2\`
-- Backend runs on XAMPP Apache, frontend on Vite dev server
+- **DO NOT** use `php artisan serve` — the `portfolio_backend` Docker container serves the API
+- Project path: `/Users/alisadikin/Drive-D/Projects/Portfolio_v2`
+- Backend + MySQL run in Docker Desktop (containers `portfolio_backend` + `portfolio_mysql`); frontend on Vite dev server. **No host php/composer** — run backend commands via `docker exec portfolio_backend php artisan ...`
 
 ## Architecture & Patterns
 
@@ -658,7 +658,7 @@ POST   /api/admin/content-engine/ideas/{id}/regenerate-image-prompts # Gate 2: R
 PUT    /api/admin/content-engine/ideas/{id}/update-image-concept # Gate 2: Edit per-section image_concept
 POST   /api/admin/content-engine/ideas/{id}/upload-entity-reference # Gate 2: Manual reference upload when Wikidata fails
 POST   /api/admin/content-engine/ideas/{id}/skip-entity-reference   # Gate 2: Drop a manifest-flagged entity
-POST   /api/admin/content-engine/ideas/{id}/translate-article # Pre-publish: translate primary → secondary language (sync, FSM-gated)
+POST   /api/admin/content-engine/ideas/{id}/translate-article # Pre-publish: translate primary → secondary language (async — 202 + queued TranslateContentIdea job; FE polls generated_article.translation_status; FSM-gated)
 POST   /api/admin/content-engine/ideas/{id}/publish           # Gate 2: Approve images & publish
 ```
 
@@ -779,8 +779,8 @@ Store full URLs (`url('/storage/...')`), not relative paths.
 
 ### Backend (Laravel)
 ```bash
-cd D:\Projects\Portfolio_v2\backend
-php artisan migrate                    # Run migrations
+# No host php — prefix each with: docker exec portfolio_backend
+docker exec portfolio_backend php artisan migrate                    # Run migrations
 php artisan migrate:fresh --seed       # Fresh install with data
 php artisan route:list                 # View all routes
 php artisan tinker                     # Interactive console
@@ -793,7 +793,7 @@ php artisan content-engine:resync-stuck-variations [--dry-run] [--idea=N]  # Bac
 
 ### Frontend (Vue)
 ```bash
-cd D:\Projects\Portfolio_v2\frontend
+cd /Users/alisadikin/Drive-D/Projects/Portfolio_v2/frontend
 npm run dev           # Start Vite dev server (port 5173)
 npm run build         # Production build
 npm run preview       # Preview production build
@@ -1025,7 +1025,7 @@ Supports credentials: true
 
 ## Multi-Agent System
 
-Located at `D:\Projects\Portfolio_v2\.claude\agents\`:
+Located at `/Users/alisadikin/Drive-D/Projects/Portfolio_v2/.claude/agents/`:
 - `orchestrator.md` - Multi-agent coordinator
 - `laravel-specialist.md` - Backend expert
 - `vue-expert.md` - Frontend expert
@@ -1561,7 +1561,7 @@ LINKEDIN_FIRST_COMMENT_DELAY_SECONDS=30
 # format; backend ALWAYS dispatches /carousel-gen and assembles slides via
 # CarouselGenOutputAdapter. (Feature flag LINKEDIN_USE_CAROUSEL_GEN_ENGINE
 # was retired in v0.5.0 — no flag-gating now.)
-CAROUSEL_GEN_DRIVER=ssh                                     # 'ssh' (production) or 'local' (XAMPP dev)
+CAROUSEL_GEN_DRIVER=ssh                                     # 'ssh' (production) or 'local' (Docker dev)
 CAROUSEL_GEN_SSH_HOST=localhost
 CAROUSEL_GEN_SSH_USER=claudesn
 CAROUSEL_GEN_SSH_KEY=/var/www/.ssh/id_ed25519
@@ -1816,8 +1816,8 @@ Idempotent via `firstOrCreate(['signature' => ...], $row)` — re-seeding on exi
 ---
 
 **Maintainer:** Ali Sadikin (ali.sadikincom85@gmail.com)
-**Environment:** Windows 11, D:\Projects\Portfolio_v2
-**PHP:** D:\xampp\php\php.exe (8.2.12) — use full path, not in system PATH
+**Environment:** macOS + Docker Desktop, /Users/alisadikin/Drive-D/Projects/Portfolio_v2
+**PHP:** 8.2 inside the `portfolio_backend` container — no host php; run `docker exec portfolio_backend php ...` (e.g. `docker exec portfolio_backend php artisan test`)
 **Backend:** Laravel 12 + PHP 8.2 + MySQL 8 + Sanctum 4 + Filament 4.1
 **Frontend:** Vue 3.5 + Rolldown-Vite 7.1 + Pinia 3 + TanStack Query 5.90 + Tailwind 4
 **Production:** https://alisadikinma.com
