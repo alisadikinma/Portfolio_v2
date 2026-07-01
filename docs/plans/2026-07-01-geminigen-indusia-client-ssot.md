@@ -316,6 +316,23 @@ for `LINKEDIN_GEN`).
 > VPS client isn't deployed yet, the flag stays OFF and the old PHP path runs — never
 > stub the bridge to "fake success". If a seam differs from what's described, STOP and ask.
 
+### Execution deviation (2026-07-01, discovered in Phase B)
+
+The client's `check <uuid>` subcommand is an **unimplemented stub** in the deployed
+version (`raise ClickException("check subcommand will be implemented in Phase 7")`), and
+a history poll is a **model-agnostic `GET /history/{uuid}` → `status`+`generate_result`**
+with no per-model wire logic to drift. So the design is adjusted:
+
+- **Bridge is SUBMIT-only** (`GeminiGenClientBridge::submit()`); the `check()` method is
+  dropped. SSOT still covers the part that actually drifted (endpoint routing, ref
+  local-vs-URL, model param mapping).
+- **Poll-check stays in the backend crons** — already pointed at `config('geminigen.base_url')`
+  = snapgen by **Phase A**. **Phases E and G reduce** to confirming the existing poll parse
+  reads `status`/`generate_result` correctly (it does) — no `bridge->check` wiring.
+- Confirmed CLI shape: group `cli` → subcommand `image`/`video`, **prompt positional**,
+  `--aspect` (not `--aspect_ratio`), `--ref` (multi), `--no-wait` prints
+  `submitted: uuid=<uuid> status=<n>`; relative imports → invoke `python -m scripts.geminigen_image`.
+
 ### Goal
 
 Make the indusia Python client (`geminigen_client.py`) the single source of truth for the
