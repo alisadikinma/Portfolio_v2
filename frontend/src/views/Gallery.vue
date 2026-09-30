@@ -156,26 +156,14 @@
       :items="galleryItems"
       :loading="loadingItems"
       @close="closeGalleryModal"
-      @open-lightbox="openLightbox"
     />
 
-    <!-- Lightbox -->
-    <BaseLightbox
-      :show="showLightbox"
-      :current-image="galleryItems[currentPhotoIndex]?.file_url || getImageUrl(galleryItems[currentPhotoIndex]?.file_path)"
-      :current-title="galleryItems[currentPhotoIndex]?.title"
-      :current-index="currentPhotoIndex"
-      :total-items="galleryItems.length"
-      @close="closeLightbox"
-      @prev="previousPhoto"
-      @next="nextPhoto"
-    />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { BaseButton, BaseLoader, BaseGalleryModal, BaseLightbox, BaseImage } from '@/components/base'
+import { BaseButton, BaseLoader, BaseGalleryModal, BaseImage } from '@/components/base'
 import CTASection from '@/components/CTASection.vue'
 import { useGallery } from '@/composables/useGallery'
 import { usePageSections } from '@/composables/usePageSections'
@@ -202,10 +190,6 @@ const showGalleryModal = ref(false)
 const selectedGallery = ref(null)
 const galleryItems = ref([])
 const loadingItems = ref(false)
-
-// Lightbox state
-const showLightbox = ref(false)
-const currentPhotoIndex = ref(0)
 
 // Bento Grid Layout Logic
 const getBentoClass = (index) => {
@@ -270,27 +254,6 @@ const closeGalleryModal = () => {
   galleryItems.value = []
 }
 
-const openLightbox = (index) => {
-  currentPhotoIndex.value = index
-  showLightbox.value = true
-}
-
-const closeLightbox = () => {
-  showLightbox.value = false
-}
-
-const nextPhoto = () => {
-  if (currentPhotoIndex.value < galleryItems.value.length - 1) {
-    currentPhotoIndex.value++
-  }
-}
-
-const previousPhoto = () => {
-  if (currentPhotoIndex.value > 0) {
-    currentPhotoIndex.value--
-  }
-}
-
 const handleImageError = (event) => {
   console.error('Image failed to load:', event.target.src)
   event.target.style.display = 'none'
@@ -298,11 +261,7 @@ const handleImageError = (event) => {
 
 // Keyboard navigation
 const handleKeydown = (e) => {
-  if (showLightbox.value) {
-    if (e.key === 'ArrowRight') nextPhoto()
-    if (e.key === 'ArrowLeft') previousPhoto()
-    if (e.key === 'Escape') closeLightbox()
-  } else if (showGalleryModal.value && e.key === 'Escape') {
+  if (showGalleryModal.value && e.key === 'Escape') {
     closeGalleryModal()
   }
 }

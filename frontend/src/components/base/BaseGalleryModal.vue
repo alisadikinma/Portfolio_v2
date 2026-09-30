@@ -84,7 +84,7 @@
                 :key="item.id || index"
                 class="relative group cursor-pointer aspect-square rounded-2xl overflow-hidden bg-neutral-100 dark:bg-neutral-800"
                 :style="{ animationDelay: `${index * 30}ms` }"
-                @click="$emit('open-lightbox', index)"
+                @click="openLightbox(index)"
               >
                 <img
                   :src="getItemImageUrl(item)"
@@ -122,10 +122,25 @@
       </div>
     </Transition>
   </Teleport>
+
+  <!-- Built-in lightbox: every consumer (homepage Track Record, About, Gallery)
+       gets click-to-enlarge without wiring its own. Indexes into displayItems so
+       multi-gallery tabs enlarge the photo actually clicked. -->
+  <BaseLightbox
+    :show="lightboxOpen"
+    :current-image="getItemImageUrl(displayItems[lightboxIndex] || {})"
+    :current-title="displayItems[lightboxIndex]?.title || ''"
+    :current-index="lightboxIndex"
+    :total-items="displayItems.length"
+    @close="lightboxOpen = false"
+    @prev="prevPhoto"
+    @next="nextPhoto"
+  />
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import BaseLightbox from './BaseLightbox.vue'
 
 const props = defineProps({
   show: {
@@ -169,7 +184,37 @@ const props = defineProps({
   }
 })
 
-defineEmits(['close', 'open-lightbox'])
+const emit = defineEmits(['close', 'open-lightbox'])
+
+// Lightbox state (internal — see template comment)
+const lightboxOpen = ref(false)
+const lightboxIndex = ref(0)
+
+const openLightbox = (index) => {
+  lightboxIndex.value = index
+  lightboxOpen.value = true
+  emit('open-lightbox', index)
+}
+const prevPhoto = () => {
+  if (lightboxIndex.value > 0) lightboxIndex.value--
+}
+const nextPhoto = () => {
+  if (lightboxIndex.value < displayItems.value.length - 1) lightboxIndex.value++
+}
+
+// Capture phase on window runs before parents' bubble-phase keydown handlers,
+// so Escape closes only the lightbox, not the whole gallery modal behind it.
+const handleKeydown = (e) => {
+  if (!lightboxOpen.value) return
+  if (e.key === 'ArrowRight') nextPhoto()
+  else if (e.key === 'ArrowLeft') prevPhoto()
+  else if (e.key === 'Escape') {
+    lightboxOpen.value = false
+    e.stopImmediatePropagation()
+  }
+}
+onMounted(() => window.addEventListener('keydown', handleKeydown, true))
+onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown, true))
 
 // Tab state (only relevant when galleries[] has 2+ entries)
 const activeTab = ref(0)
@@ -178,6 +223,7 @@ const hasGalleryTabs = computed(() => Array.isArray(props.galleries) && props.ga
 // Reset to first tab whenever the modal opens (and any time galleries change shape)
 watch(() => props.show, (open) => {
   if (open) activeTab.value = 0
+  else lightboxOpen.value = false
 })
 watch(() => props.galleries, () => {
   activeTab.value = 0
