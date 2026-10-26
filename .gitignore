@@ -238,3 +238,6 @@ node_modules
 graphify-out/
 
 .gaspol/
+
+# gaspol worktrees (global standard 2026-08-20)
+.claude/worktrees/
