@@ -104,7 +104,7 @@
           </label>
         </div>
         <div class="sm:col-span-1">
-          <input v-model="newIdea.scheduled_at" type="datetime-local" class="block w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 text-sm px-3 py-2 focus:ring-amber-500 focus:border-amber-500" placeholder="Schedule (optional)" />
+          <input v-model="newIdea.scheduled_at" type="datetime-local" class="block w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 text-sm px-3 py-2 focus:ring-amber-500 focus:border-amber-500" placeholder="Schedule (optional)" title="Schedule time (WIB)" aria-label="Schedule time (WIB)" />
         </div>
         <div class="flex gap-2 sm:col-span-2 justify-end">
           <button @click="handleCreateIdea" :disabled="!newIdea.title || isLoading" class="px-4 py-2 text-sm font-medium rounded-lg bg-amber-600 hover:bg-amber-700 text-white transition-colors disabled:opacity-50 whitespace-nowrap">
@@ -742,6 +742,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
+import { fromWibInput, formatWib } from '@/utils/wibTime'
 import { useRouter, useRoute } from 'vue-router'
 import { useContentEngine } from '@/composables/useContentEngine'
 import { useToast } from '@/composables/useToast'
@@ -774,7 +775,7 @@ const circuitLabel = computed(() => {
   if (data.state === 'closed') return 'GeminiGen OK'
   if (data.state === 'half_open') return 'GeminiGen probing…'
   const openedAt = data.opened_at
-    ? new Date(data.opened_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+    ? new Date(data.opened_at).toLocaleTimeString('en-GB', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit' }) + ' WIB'
     : '—'
   return `GeminiGen down — paused ${openedAt}`
 })
@@ -1289,7 +1290,7 @@ function formatStatus(s) {
 
 function formatDate(d) {
   if (!d) return '-'
-  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  return formatWib(d, { withYear: false })
 }
 
 function formatPubDateRelative(iso) {
@@ -1405,7 +1406,7 @@ async function handleCreateIdea() {
     priority: newIdea.priority,
     auto_mode: newIdea.auto_mode,
   }
-  if (newIdea.scheduled_at) data.scheduled_at = new Date(newIdea.scheduled_at).toISOString()
+  if (newIdea.scheduled_at) data.scheduled_at = fromWibInput(newIdea.scheduled_at)
   const result = await createIdea(data)
   if (result.success) {
     toast.success(newIdea.scheduled_at ? 'Idea scheduled successfully' : 'Idea created successfully')

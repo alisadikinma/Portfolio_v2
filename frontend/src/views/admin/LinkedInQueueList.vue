@@ -46,7 +46,7 @@ const circuitLabel = computed(() => {
   if (data.state === 'closed') return 'GeminiGen OK'
   if (data.state === 'half_open') return 'GeminiGen probing…'
   const openedAt = data.opened_at
-    ? new Date(data.opened_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+    ? new Date(data.opened_at).toLocaleTimeString('en-GB', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit' }) + ' WIB'
     : '—'
   return `GeminiGen down — paused ${openedAt}`
 })

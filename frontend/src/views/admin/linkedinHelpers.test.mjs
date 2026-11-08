@@ -11,6 +11,7 @@ import {
   shouldShowLastError,
   resolveCarouselActivity,
   formatElapsed,
+  formatDateTime,
 } from './linkedinHelpers.js'
 
 let failed = 0
@@ -238,6 +239,13 @@ assertEqual('stale error (>staleHours) → false',
 {
   const a = resolveCarouselActivity({ slides: [], regenerateActive: false, nowMs: NOW })
   assertEqual('empty + inactive → idle phase', a.phase, 'idle')
+}
+
+// formatDateTime always renders WIB, whatever the runtime zone.
+{
+  assertEqual('formatDateTime WIB label', formatDateTime('2026-05-13T05:00:00Z'), 'May 13 \u00b7 12:00 WIB')
+  assertEqual('formatDateTime day rolls over in WIB', formatDateTime('2026-05-12T22:00:00Z'), 'May 13 \u00b7 05:00 WIB')
+  assertEqual('formatDateTime empty', formatDateTime(null), '\u2014')
 }
 
 console.log(`---\nTotal: ${passed} passed, ${failed} failed`)
