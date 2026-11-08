@@ -21,7 +21,7 @@ const c = lang === "id" ? id : en;
 const alts = withAltPaths(alternates(path), altPaths);
 const homePath = `/${lang}`;
 const spy = (hash: string) => (home ? hash : `${homePath}/${hash}`);
-const wa = await waLink(lang);
+const wa = await waLink(lang, c.wa.general);
 // Page links (not in-page anchors) mark the page you are on (Ali 2026-11-09).
 const trainingHref = localizedPath(`/${lang}/pelatihan-ai`, lang);
 const speakerHref = localizedPath(`/${lang}/pembicara-ai`, lang);

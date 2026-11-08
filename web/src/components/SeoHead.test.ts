@@ -88,7 +88,7 @@ describe("BaseLayout", () => {
   it("WhatsApp button uses site.contact_phone digits", async () => {
     settings = { contact_phone: "+62 812-3456-7890" };
     const h = await render();
-    expect(h).toContain('href="https://wa.me/6281234567890"');
+    expect(h).toContain('href="https://wa.me/6281234567890?text=Halo%20Ali%2C%20saya%20menemukan%20Anda%20dari%20alisadikinma.com."');
   });
 
   it("WhatsApp button hidden when contact_phone empty or API fails", async () => {

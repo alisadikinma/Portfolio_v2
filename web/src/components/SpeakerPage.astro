@@ -26,7 +26,7 @@ const bioAnchor = ANCHORS[lang].speakerBio;
 
 const awardIds = [...new Set(SESSIONS.map((s) => s.awardId))];
 const [wa, slugs, photoRes] = await Promise.all([
-  waLink(lang),
+  waLink(lang, copy.wa.speaker),
   loadAwardSlugs(lang),
   Promise.allSettled(awardIds.map((a) => loadAwardPhotos(a, lang))),
 ]);

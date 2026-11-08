@@ -45,7 +45,7 @@ try {
 // The hero is never hidden: it holds the page's only H1 and the LCP image (SEO gate items 4 and 9).
 const on = (type: string) => type === "hero" || !off.has(type);
 
-const wa = await waLink(lang);
+const wa = await waLink(lang, c.wa.consult);
 const url = SITE + path;
 const jsonld = graph(
   personNode(),

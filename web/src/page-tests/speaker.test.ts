@@ -184,7 +184,7 @@ describe("speaker page", () => {
   });
 
   it("WhatsApp invite CTA links wa.me; no number means no link (never fake)", async () => {
-    expect((await load("id", "pembicara-ai")).html).toContain('href="https://wa.me/6281234567890"');
+    expect((await load("id", "pembicara-ai")).html).toContain('href="https://wa.me/6281234567890?text=Halo%20Ali%2C%20saya%20ingin%20mengundang%20Anda%20sebagai%20pembicara%20AI%20di%20acara%20kami."');
     phone = undefined;
     resetApiCache();
     const { status, html } = await load("en", "ai-speaker");

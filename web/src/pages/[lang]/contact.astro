@@ -17,7 +17,7 @@ const c = copy.contact;
 const f = copy.footer;
 const path = `/${lang}/contact`;
 const url = SITE + path;
-const wa = await waLink(lang);
+const wa = await waLink(lang, copy.wa.general);
 // Spam check: backend wants form_timestamp 3s–1h old. Render it here (server clock) and
 // keep the page out of every cache, or a stale copy would carry an expired timestamp.
 const formTs = Math.floor(Date.now() / 1000);

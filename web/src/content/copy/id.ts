@@ -207,6 +207,11 @@ export const id = {
     moreOr: "atau",
     indusiaAnd: " dan ",
   },
+  wa: {
+    general: "Halo Ali, saya menemukan Anda dari alisadikinma.com.",
+    consult: "Halo Ali, saya ingin konsultasi AI untuk perusahaan kami.",
+    speaker: "Halo Ali, saya ingin mengundang Anda sebagai pembicara AI di acara kami.",
+  },
   notFound: {
     title: "Halaman tidak ditemukan — Ali Sadikin Ma",
     description: "Halaman yang Anda cari tidak ada atau sudah dipindah.",

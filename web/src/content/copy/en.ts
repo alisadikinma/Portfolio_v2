@@ -209,6 +209,11 @@ export const en: Copy = {
     moreOr: "or",
     indusiaAnd: " and ",
   },
+  wa: {
+    general: "Hi Ali, I found you on alisadikinma.com.",
+    consult: "Hi Ali, I would like an AI consultation for our company.",
+    speaker: "Hi Ali, I would like to invite you as an AI speaker at our event.",
+  },
   notFound: {
     title: "Page not found — Ali Sadikin Ma",
     description: "The page you are looking for does not exist or has moved.",
