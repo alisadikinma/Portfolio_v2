@@ -64,7 +64,7 @@ describe("Testimonials", () => {
     expect(html).toContain('id="testimoni"');
     expect((html.match(/<figure class="tm">/g) ?? []).length).toBe(2);
     expect(html.indexOf("Person 1")).toBeLessThan(html.indexOf("Person 2"));
-    expect(html).toContain('<blockquote lang="en">');
+    expect(html).toContain('<blockquote lang="en" data-clamp>'); // data-clamp: see-more on phones
     // Relative paths stay same-origin (served by this site's /uploads), so a local or
     // staging stack never pulls testimonial photos from production.
     expect(html).toMatch(/<img[^>]*src="\/uploads\/testimonials\/p1\.jpg"[^>]*alt="Person 1"/);
