@@ -8,10 +8,12 @@ import { BASE_URL, CDP_URL } from "../playwright.config";
 const test = base.extend<object, { cdpPage: Page }>({
   cdpPage: [
     async ({}, use) => {
-      const browser = await chromium.connectOverCDP(CDP_URL);
+      // noDefaults: Chrome 156 rejects Browser.setDownloadBehavior on an attached default context.
+      const browser = await chromium.connectOverCDP(CDP_URL, { noDefaults: true });
+      // Reuse the window's open tab; if every tab was closed, open one in the existing default context.
       const context = browser.contexts()[0];
-      const page = context.pages()[0];
-      if (!page) throw new Error("No open page in the shared Chrome window");
+      if (!context) throw new Error("Shared Chrome has no browser context");
+      const page = browser.contexts().flatMap((c) => c.pages())[0] ?? (await context.newPage());
       await use(page);
       // Deliberately no close(): the window outlives the run.
     },
@@ -95,7 +97,9 @@ it.describe("public site", () => {
     await page.goto(`${BASE_URL}/id`, { waitUntil: "load" });
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.waitForFunction(() => window.scrollY === 0);
-    await expect(page.locator(".nav a[data-spy].is-active")).toHaveCount(0); // hero = no highlight
+    // The hero carries #tentang (it absorbed "Who I am"), so at the top "Tentang" is the active link.
+    await expect(page.locator('.nav a[data-spy][href$="#tentang"]')).toHaveClass(/is-active/);
+    await expect(page.locator(".nav a[data-spy].is-active")).toHaveCount(1);
     for (const id of ["layanan", "tulisan"]) {
       await page.locator(`#${id}`).scrollIntoViewIfNeeded();
       await page.evaluate((sid) => {
@@ -260,7 +264,7 @@ it.describe("public site", () => {
   for (const [from, to] of [["/id", "/en"], ["/id/pelatihan-ai", "/en/ai-training"], ["/id/pembicara-ai", "/en/ai-speaker"], ["/id/contact", "/en/contact"], ["/en/ai-training", "/id/pelatihan-ai"]] as const) {
     it(`language switch ${from} -> ${to} keeps the page`, async ({ page }) => {
       await page.goto(`${BASE_URL}${from}`, { waitUntil: "load" });
-      const sw = page.locator("a.lang");
+      const sw = page.locator(".lang-sw a.lang"); // desktop bar flags (the phone menu holds a second copy)
       await expect(sw).toHaveAttribute("href", to);
       await sw.click();
       await page.waitForURL(`${BASE_URL}${to}`);
