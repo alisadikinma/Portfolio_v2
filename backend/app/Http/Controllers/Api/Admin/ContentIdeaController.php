@@ -1568,10 +1568,10 @@ class ContentIdeaController extends Controller
             return response()->json(['success' => false, 'message' => 'Post not found.'], 404);
         }
 
-        $post->update([
+        Post::withoutTimestamps(fn () => $post->update([
             'translation_pending' => false,
             'last_translation_attempt' => now(),
-        ]);
+        ]));
 
         // Gate Completed transition on translation readiness. The idea stayed
         // at images_ready through publish() when use_translate_phase=true;

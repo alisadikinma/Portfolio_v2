@@ -25,6 +25,10 @@ class PostResource extends JsonResource
             $translation = $translations->firstWhere('language', 'en');
         }
 
+        // Real content freshness: latest of translation edit / operator review,
+        // clamped to [published_at, now]. updated_at stays raw (bookkeeping noise).
+        $contentUpdatedAt = $this->resource->contentUpdatedAt($language);
+
         return [
             'id' => $this->id,
             'category_id' => $this->category_id,
@@ -90,13 +94,17 @@ class PostResource extends JsonResource
             })->toArray(),
 
             // Related posts
-            'related_posts' => $this->whenLoaded('relatedPosts', function () {
-                return $this->relatedPosts->map(function ($rp) {
-                    $t = $rp->translations->first();
+            'related_posts' => $this->whenLoaded('relatedPosts', function () use ($language) {
+                return $this->relatedPosts->filter(fn ($rp) => $rp->published && $rp->published_at && $rp->published_at->lte(now()))->values()->map(function ($rp) use ($language) {
+                    $t = $rp->translations->firstWhere('language', $language)
+                        ?? $rp->translations->firstWhere('language', 'en')
+                        ?? $rp->translations->first();
                     return [
                         'id' => $rp->id,
                         'slug' => $rp->slug,
                         'title' => $t?->title ?? '',
+                        'language' => $t?->language,
+                        'available_translations' => $rp->translations->pluck('language')->values()->toArray(),
                         'featured_image' => $rp->featured_image
                             ? (str_starts_with($rp->featured_image, 'http') ? $rp->featured_image : url($rp->featured_image))
                             : null,
@@ -108,6 +116,7 @@ class PostResource extends JsonResource
             // Timestamps
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
+            'content_updated_at' => $contentUpdatedAt?->toISOString(),
         ];
     }
 }

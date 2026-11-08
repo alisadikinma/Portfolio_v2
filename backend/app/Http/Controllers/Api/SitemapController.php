@@ -73,14 +73,15 @@ class SitemapController extends Controller
 
         // Add published blog posts
         $posts = Post::published()
-            ->select('slug', 'published_at', 'updated_at')
+            ->with('translations:id,post_id,language,updated_at')
+            ->select('id', 'slug', 'published_at', 'content_reviewed_at')
             ->orderByDesc('published_at')
             ->get();
 
         foreach ($posts as $post) {
             $urls[] = [
                 'loc' => $this->frontendUrl("/blog/{$post->slug}"),
-                'lastmod' => $post->updated_at->toAtomString(),
+                'lastmod' => ($post->contentUpdatedAt('en') ?? $post->published_at)->toAtomString(),
                 'changefreq' => 'monthly',
                 'priority' => '0.8',
             ];
@@ -144,8 +145,8 @@ class SitemapController extends Controller
     public function posts()
     {
         $posts = Post::published()
-            ->with('translations:id,post_id,language,slug')
-            ->select('id', 'slug', 'published_at', 'updated_at')
+            ->with('translations:id,post_id,language,slug,updated_at')
+            ->select('id', 'slug', 'published_at', 'content_reviewed_at')
             ->orderByDesc('published_at')
             ->paginate(50000); // Google limit: 50,000 URLs per sitemap
 
@@ -165,7 +166,7 @@ class SitemapController extends Controller
             $enSlug = $alternates->get('en', $post->slug);
             $urls[] = [
                 'loc' => "{$frontendBase}/en/blog/{$enSlug}",
-                'lastmod' => $post->updated_at->toAtomString(),
+                'lastmod' => ($post->contentUpdatedAt('en') ?? $post->published_at)->toAtomString(),
                 'changefreq' => 'monthly',
                 'priority' => '0.8',
                 'alternates' => $alternates->count() > 1 ? $alternates->all() : [],

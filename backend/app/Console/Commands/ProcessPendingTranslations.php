@@ -38,7 +38,7 @@ class ProcessPendingTranslations extends Command
             ));
 
             if (empty($targetLocales)) {
-                $post->update(['translation_pending' => false]);
+                Post::withoutTimestamps(fn () => $post->update(['translation_pending' => false]));
                 $this->line("  Post #{$post->id} has no target locales — marked non-pending");
                 continue;
             }
@@ -46,10 +46,10 @@ class ProcessPendingTranslations extends Command
             $key = (string) Str::uuid();
             $result = $service->triggerTranslate($post->id, $key, $targetLocales[0]);
 
-            $post->update([
+            Post::withoutTimestamps(fn () => $post->update([
                 'translation_attempts' => $post->translation_attempts + 1,
                 'last_translation_attempt' => now(),
-            ]);
+            ]));
 
             $this->line("  Retry translate for post #{$post->id} (attempt {$post->translation_attempts}, pid {$result['pid']})");
         }
@@ -62,7 +62,7 @@ class ProcessPendingTranslations extends Command
         if ($giveUpCount > 0) {
             Post::where('translation_pending', true)
                 ->where('translation_attempts', '>=', 3)
-                ->update(['translation_pending' => false]);
+                ->toBase()->update(['translation_pending' => false]);
             $this->warn("Gave up on {$giveUpCount} post(s) after 3 attempts — needs manual review");
         }
 

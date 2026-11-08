@@ -27,9 +27,7 @@ class PostController extends Controller
         $language = strtolower(substr($language, 0, 2));
 
         $query = Post::with(['category', 'translations', 'relatedPosts.translations'])
-            ->where('published', true)
-            ->whereNotNull('published_at')
-            ->where('published_at', '<=', now());
+            ->published();
 
         // Filter by category
         if ($request->has('category')) {
@@ -192,7 +190,7 @@ class PostController extends Controller
         // the guard explicitly). Everyone else gets normal public behaviour.
         $isAdminPreview = $request->boolean('preview') && \App\Support\AdminViewer::is();
         if (!$isAdminPreview) {
-            $query->where('published', true);
+            $query->published();
         }
 
         $post = $query->first();

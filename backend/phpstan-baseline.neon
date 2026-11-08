@@ -903,7 +903,7 @@ parameters:
 		-
 			message: '#^Relation ''translations'' is not found in App\\Models\\Post model\.$#'
 			identifier: larastan.relationExistence
-			count: 1
+			count: 2
 			path: app/Http/Controllers/Api/SitemapController.php
 
 		-
