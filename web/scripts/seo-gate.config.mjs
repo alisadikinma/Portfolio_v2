@@ -50,6 +50,10 @@ const A = {
     chatbot: { anchor: "chatbot WhatsApp AI", href: `${I}/id/ai-assistant/` },
     speakerBio: { anchor: "founder INDUSIA.ai", href: `${I}/id/` },
     footer: { anchor: "Founder INDUSIA.ai", href: `${I}/id/` },
+    // About varies the product anchors: the home hero carries the exact ones (Ali 2026-11-09, SEO audit).
+    aboutVision: { anchor: "sistem inspeksi visual AI", href: `${I}/id/ai-vision/` },
+    aboutFleet: { anchor: "fleet management untuk logistik", href: `${I}/id/ai-fleet-transportation/` },
+    aboutChatbot: { anchor: "asisten WhatsApp AI", href: `${I}/id/ai-assistant/` },
   },
   en: {
     hero: { anchor: "INDUSIA.ai", href: `${I}/` },
@@ -61,6 +65,9 @@ const A = {
     chatbot: { anchor: "WhatsApp AI chatbot", href: `${I}/ai-assistant/` },
     speakerBio: { anchor: "founder INDUSIA.ai", href: `${I}/` },
     footer: { anchor: "Founder INDUSIA.ai", href: `${I}/` },
+    aboutVision: { anchor: "AI visual inspection systems", href: `${I}/ai-vision/` },
+    aboutFleet: { anchor: "fleet management for logistics", href: `${I}/ai-fleet-transportation/` },
+    aboutChatbot: { anchor: "WhatsApp AI assistants", href: `${I}/ai-assistant/` },
   },
 };
 
@@ -95,7 +102,7 @@ export const ROUTES = {
     ...[["id", "/id/about", ["ahli AI Indonesia"]], ["en", "/en/about", ["AI expert"]]].map(([l, r, k]) =>
       page(l, r, { id: "/id/about", en: "/en/about" }, {
         keywords: k, pageType: "ProfilePage",
-        links: (a) => [a.hero, a.company, ...products(a)],
+        links: (a) => [a.hero, a.company, a.aboutVision, a.aboutFleet, a.aboutChatbot],
       })),
   ],
   training: [

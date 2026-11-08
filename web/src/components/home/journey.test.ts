@@ -192,16 +192,18 @@ describe.each(["id", "en"] as const)("Journey (%s)", (lang) => {
     expect(itemsOf(liOf(html, 'data-career="14"'))).toHaveLength(8);
   });
 
-  it("INDUSIA chapter: dofollow exact backlinks, no nested anchors", async () => {
+  // Ali 2026-11-09 (SEO audit): one link per target per page. The hero links the exact product
+  // anchors; the INDUSIA chapter names the products as plain text and keeps one branded link.
+  it("INDUSIA chapter: product names are plain text (the hero links them), no nested anchors", async () => {
     const html = await render(Journey, lang);
     const page = ROUTES.home.find((r: { lang: string }) => r.lang === lang)!;
+    const li0 = liOf(html, "jr-now");
     for (const key of ["vision", "fleet", "chatbot"]) {
       const want = ({ vision: "machine vision Indonesia", fleet: "fleet management system", chatbot: lang === "id" ? "chatbot WhatsApp AI" : "WhatsApp AI chatbot" })[key]!;
       const b = page.backlinks.find((x: { anchor: string }) => x.anchor === want)!;
       expect(b, key).toBeDefined();
-      const a = anchor(html, b.anchor);
-      expect(a).toContain(`href="${b.href}"`);
-      expect(a).not.toMatch(/\srel=/);
+      expect(li0).toContain(want);
+      expect(li0).not.toContain(`href="${b.href}"`);
     }
     const li = liOf(html, "jr-now");
     expect(li).not.toContain("PLACEHOLDER");

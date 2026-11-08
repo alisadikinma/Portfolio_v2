@@ -86,7 +86,8 @@ const chapters = [
             <span class="jr-yr">{j.indusiaYear}<em class="jr-live">{j.indusiaNow}</em></span>
             <strong>{j.indusiaRole}</strong>
             <span class="jr-org">{j.indusiaOrg}</span>
-            <p class="jr-note"><a href={a.vision.href}>{a.vision.anchor}</a>{j.indusiaNoteMid1}<a href={a.fleet.href}>{a.fleet.anchor}</a>{j.indusiaNoteMid2}<a href={a.chatbot.href}>{a.chatbot.anchor}</a>{j.indusiaNoteEnd}</p>
+            {/* Plain text: the hero above already links these exact anchors (one link per target, SEO audit 2026-11-09). */}
+            <p class="jr-note">{a.vision.anchor}{j.indusiaNoteMid1}{a.fleet.anchor}{j.indusiaNoteMid2}{a.chatbot.anchor}{j.indusiaNoteEnd}</p>
             <a class="jr-cta" href={a.hero.href}>{j.indusiaCta}</a>
           </div>
         </li>
