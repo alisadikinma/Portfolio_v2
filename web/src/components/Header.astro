@@ -1,6 +1,6 @@
 ---
 import { alternates, localizedPath, type Lang } from "../lib/i18n";
-import { apiGet } from "../lib/api";
+import { waLink } from "../lib/whatsapp";
 import { id } from "../content/copy/id";
 import { en } from "../content/copy/en";
 
@@ -15,16 +15,7 @@ const c = lang === "id" ? id : en;
 const alts = alternates(path);
 const homePath = `/${lang}`;
 const spy = (hash: string) => (home ? hash : `${homePath}/${hash}`);
-// WhatsApp number comes from settings site.contact_phone (apiGet unwraps the envelope data).
-let waDigits = "";
-try {
-  const site = await apiGet<{ contact_phone?: unknown }>("/settings/site", { lang });
-  const phone = site?.contact_phone;
-  waDigits = typeof phone === "string" ? phone.replace(/\D/g, "") : "";
-} catch {
-  waDigits = "";
-}
-const wa = waDigits !== "" ? `https://wa.me/${waDigits}` : "";
+const wa = await waLink(lang);
 ---
 <header class="site-head">
   <div class="wrap">

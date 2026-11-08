@@ -1,0 +1,20 @@
+---
+import type { Lang } from "../../lib/i18n";
+import { id } from "../../content/copy/id";
+import { en } from "../../content/copy/en";
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const w = (lang === "id" ? id : en).whoIAm;
+// Dofollow backlinks to INDUSIA.ai: no rel attribute (spec backlink table).
+const base = lang === "id" ? "https://indusia.ai/id/" : "https://indusia.ai/";
+---
+<section class="sec" id="tentang">
+  <div class="wrap split">
+    <h2>{w.h2}</h2>
+    <div class="body">
+      <p><strong>{w.p1Strong}</strong>{w.p1Rest}</p>
+      <p>{w.p2Lead}<a href={`${base}ai-vision/`}>{w.visionLink}</a>, <a href={`${base}ai-fleet-transportation/`}>{w.fleetLink}</a>, <a href={`${base}ai-assistant/`}>{w.chatbotLink}</a>{w.p2Mid}<a href={base}>{w.companyLink}</a>{w.p2End}</p>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,17 @@
+---
+import type { Lang } from "../../lib/i18n";
+import { id } from "../../content/copy/id";
+import { en } from "../../content/copy/en";
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const p = (lang === "id" ? id : en).proof;
+---
+<section class="proof" aria-label={p.ariaLabel}>
+  <div class="wrap">
+    <div><strong>{p.rank}</strong><span>{p.rankLabel}</span></div>
+    <div><strong>{p.products}</strong><span>{p.productsLabel}</span></div>
+    <div><strong>{p.years}</strong><span>{p.yearsLabel}</span></div>
+    <div><strong>{p.awards}</strong><span>{p.awardsLabel}</span></div>
+  </div>
+</section>

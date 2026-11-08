@@ -1,0 +1,40 @@
+---
+import { localizedPath, type Lang } from "../../lib/i18n";
+import { id } from "../../content/copy/id";
+import { en } from "../../content/copy/en";
+
+interface Props {
+  lang: Lang;
+  /** wa.me link from waLink(); empty hides the WhatsApp button. */
+  wa?: string;
+}
+const { lang, wa = "" } = Astro.props;
+const s = (lang === "id" ? id : en).services;
+const devHref = lang === "id" ? "https://indusia.ai/id/ai-development-services/" : "https://indusia.ai/ai-development-services/";
+---
+<section class="sec alt" id="layanan" aria-labelledby="layanan-h">
+  <div class="wrap">
+    <div class="sec-head"><h2 id="layanan-h">{s.h2}</h2></div>
+    <div class="rows">
+      <div class="row">
+        <div><h3>{s.consultTitle}</h3></div>
+        <div>
+          <p>{s.consultBody}</p>
+          <p>{s.consultBuildBefore}<a href={devHref}>{s.consultBuildLink}</a>{s.consultBuildAfter}</p>
+          <p class="for">{s.consultFor}</p>
+        </div>
+        {wa !== "" ? <a class="btn btn-primary" href={wa}>{s.consultCta}</a> : <span></span>}
+      </div>
+      <div class="row">
+        <div><h3>{s.trainingTitle}</h3><span class="state">{s.trainingState}</span></div>
+        <div><p>{s.trainingBody}</p><p class="for">{s.trainingFor}</p></div>
+        <a class="btn btn-ghost" href={localizedPath(`/${lang}/pelatihan-ai`, lang)}>{s.trainingCta}</a>
+      </div>
+      <div class="row">
+        <div><h3>{s.speakerTitle}</h3></div>
+        <div><p>{s.speakerBody}</p><p class="for">{s.speakerFor}</p></div>
+        <a class="btn btn-ghost" href={localizedPath(`/${lang}/pembicara-ai`, lang)}>{s.speakerCta}</a>
+      </div>
+    </div>
+  </div>
+</section>
