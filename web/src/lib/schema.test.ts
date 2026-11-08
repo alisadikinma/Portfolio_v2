@@ -83,6 +83,24 @@ describe("other nodes", () => {
     expect(e.organizer.name).toBe("O");
     expect(e.location.name).toBe("L");
   });
+  it("eventNode omits startDate and location when unknown, never guesses", () => {
+    const e = eventNode({ name: "n", organizer: "O" }) as any;
+    expect(e).not.toHaveProperty("startDate");
+    expect(e).not.toHaveProperty("location");
+    expect(e).not.toHaveProperty("attendee");
+    expect(e.organizer).toEqual({ "@type": "Organization", name: "O" });
+  });
+  it("eventNode carries description, image and an attendee link to the Person", () => {
+    const e = eventNode({ name: "n", organizer: "O", startDate: "2026-01-17", location: "Bengaluru, India", description: "d", image: "https://alisadikinma.com/i.jpg", attendee: true }) as any;
+    expect(e.startDate).toBe("2026-01-17");
+    expect(e.location).toEqual({ "@type": "Place", name: "Bengaluru, India", address: "Bengaluru, India" });
+    expect(e.description).toBe("d");
+    expect(e.image).toBe("https://alisadikinma.com/i.jpg");
+    expect(e.attendee).toEqual({ "@id": PERSON_ID });
+  });
+  it("personNode award can be overridden for an award page", () => {
+    expect((personNode({ award: "Top 8 Finalist" }) as any).award).toBe("Top 8 Finalist");
+  });
   it("graph wraps nodes with single @context", () => {
     const g = graph(websiteNode(), breadcrumb([])) as any;
     expect(g["@context"]).toBe("https://schema.org");

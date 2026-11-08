@@ -329,6 +329,19 @@ describe("coverage specs", () => {
   });
 });
 
+describe("contact route", () => {
+  it("exists for both languages as ContactPage with a title in TITLES", () => {
+    expect(ROUTES.contact.map((r) => r.route)).toEqual(["/id/contact", "/en/contact"]);
+    for (const r of ROUTES.contact) {
+      expect(r.pageType).toBe("ContactPage");
+      expect(ROUTES.all).toContain(r);
+      expect(TITLES[r.route]).toContain("Ali Sadikin Ma");
+      expect(TITLES[r.route].length).toBeLessThanOrEqual(TITLE_MAX);
+    }
+    expect(ROUTES.contact[0].alternates).toEqual({ id: "/id/contact", en: "/en/contact" });
+  });
+});
+
 describe("titles in config", () => {
   it("TITLES covers every route and the length rule lives in config", () => {
     for (const r of ROUTES.all) expect(typeof TITLES[r.route], r.route).toBe("string");
@@ -379,5 +392,35 @@ describe("runCli", () => {
   it("passes when all is healthy", async () => {
     const r = await run((u) => u.endsWith("/robots.txt") ? new Response(okRobots) : u.endsWith("sitemap.xml") ? new Response(sitemap) : page(u));
     expect(r.out).not.toMatch(/robots\.txt|sitemap/);
+  });
+});
+
+describe("award route specs", () => {
+  it("awardSpec builds localized Event specs with matching alternates and the footer backlink", async () => {
+    const { awardSpec } = await import("./seo-gate.config.mjs");
+    const id = awardSpec("id", "top-8-finalist", "IDBYTE");
+    const en = awardSpec("en", "top-8-finalist", "IDBYTE");
+    expect(id.route).toBe("/id/penghargaan/top-8-finalist");
+    expect(en.route).toBe("/en/awards/top-8-finalist");
+    expect(id.alternates).toEqual({ id: "/id/penghargaan/top-8-finalist", en: "/en/awards/top-8-finalist" });
+    expect(en.alternates).toEqual(id.alternates);
+    expect(id.pageType).toBe("Event");
+    expect(id.keywords).toEqual(["IDBYTE"]);
+    expect(id.titleName).not.toBe(false);
+    expect(id.backlinks).toEqual([{ anchor: "Founder INDUSIA.ai", href: "https://indusia.ai/id/" }]);
+    expect(en.backlinks).toEqual([{ anchor: "Founder INDUSIA.ai", href: "https://indusia.ai/" }]);
+  });
+  it("ROUTES.award covers the 6 live awards in both languages (not part of ROUTES.all)", () => {
+    expect(ROUTES.award).toHaveLength(12);
+    expect(ROUTES.award.every((r) => r.pageType === "Event")).toBe(true);
+    for (const r of ROUTES.award) expect(ROUTES.all).not.toContain(r);
+  });
+});
+
+describe("decode: &amp;", () => {
+  it("counts &amp; as one character (title length uses decoded text)", async () => {
+    const { norm } = await import("./seo-gate.mjs");
+    expect(norm("Pelatihan &amp; Workshop AI")).toBe("Pelatihan & Workshop AI");
+    expect(norm("&amp;lt;")).toBe("&lt;"); // single pass, no double decode
   });
 });

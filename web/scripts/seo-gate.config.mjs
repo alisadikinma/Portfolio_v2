@@ -26,6 +26,8 @@ export const TITLES = {
   "/en/projects": "AI Projects — Ali Sadikin Ma",
   "/id/work": "Karya — Ali Sadikin Ma",
   "/en/work": "Work — Ali Sadikin Ma",
+  "/id/contact": "Kontak Ali Sadikin Ma — Konsultasi & Kerja Sama AI",
+  "/en/contact": "Contact Ali Sadikin Ma — AI Consulting & Partnerships",
 };
 
 /** Routes whose configured title exceeds `max` characters. */
@@ -136,6 +138,7 @@ const KW = {
   blog: { id: ["Blog"], en: ["Blog"] },
   projects: { id: ["Proyek"], en: ["Projects"] },
   work: { id: ["Karya"], en: ["Work"] },
+  contact: { id: ["Kontak"], en: ["Contact"] },
 };
 const basicGroup = (name, pageType) =>
   ["id", "en"].map((l) =>
@@ -144,10 +147,11 @@ ROUTES.faq = basicGroup("faq", "FAQPage");
 ROUTES.blog = basicGroup("blog", "WebPage");
 ROUTES.projects = basicGroup("projects", "WebPage");
 ROUTES.work = basicGroup("work", "WebPage");
+ROUTES.contact = basicGroup("contact", "ContactPage");
 
 ROUTES.all = [
   ...ROUTES.home, ...ROUTES.about, ...ROUTES.training, ...ROUTES.speaker,
-  ...ROUTES.faq, ...ROUTES.blog, ...ROUTES.projects, ...ROUTES.work,
+  ...ROUTES.faq, ...ROUTES.blog, ...ROUTES.projects, ...ROUTES.work, ...ROUTES.contact,
 ];
 
 // Blog posts: every post has an author box. Build a spec per post with this.
@@ -160,3 +164,26 @@ export function blogPostSpec(lang, route, alt, keyword) {
     backlinks: [a.speakerBio, a.company, a.footer],
   };
 }
+
+// Award pages (/id/penghargaan/{slug}, /en/awards/{slug}): Event schema, footer backlink only.
+// Keyword = the award's main words; the page title leads with the award name and ends with the person name.
+export function awardSpec(lang, slug, keyword) {
+  return basicSpec(
+    lang,
+    `/${lang}/${lang === "id" ? "penghargaan" : "awards"}/${slug}`,
+    { id: `/id/penghargaan/${slug}`, en: `/en/awards/${slug}` },
+    [keyword],
+    "Event",
+  );
+}
+
+// The 6 awards on the live site (slugs = backfill of the current titles, migration 2026_11_08_000001).
+export const AWARD_PAGES = [
+  ["1st-place-winner-global-ai-demo-day-2026-outskill-ai-generalist-fellowship", "Global AI Demo Day"],
+  ["alibaba-efounders-fellowship-hangzhou-china", "Alibaba efounders"],
+  ["1st-place-winner-nextdev-startup-competition", "Nextdev"],
+  ["1st-place-winner-wild-card-fenox-startup-world-cup-competition", "Fenox Startup"],
+  ["top-8-finalist-idbyte-2017-connected", "IDBYTE"],
+  ["google-startup-grind-silicon-valley-san-fransisco", "Google Startup Grind"],
+];
+ROUTES.award = AWARD_PAGES.flatMap(([slug, kw]) => ["id", "en"].map((l) => awardSpec(l, slug, kw)));

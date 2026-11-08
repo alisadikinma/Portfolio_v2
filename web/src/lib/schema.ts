@@ -25,7 +25,7 @@ export const SAME_AS: string[] = [
   "https://github.com/alisadikinma",
 ];
 
-export function personNode(opts: { sameAs?: string[]; image?: string } = {}): Node {
+export function personNode(opts: { sameAs?: string[]; image?: string; award?: string } = {}): Node {
   return {
     "@type": "Person",
     "@id": PERSON_ID,
@@ -49,7 +49,7 @@ export function personNode(opts: { sameAs?: string[]; image?: string } = {}): No
     image: opts.image ?? PORTRAIT_URL,
     worksFor: { "@id": ORG_ID },
     founder: { "@id": ORG_ID },
-    award: "1st Place, Global AI Demo Day 2026 (Outskill, Bengaluru)",
+    award: opts.award ?? "1st Place, Global AI Demo Day 2026 (Outskill, Bengaluru)",
     knowsAbout: [
       "AI Agents", "AI Agent Operating Systems", "Vibe Coding", "Generative AI Video",
       "AI Automation", "Computer Vision", "Edge AI", "Large Language Model Applications",
@@ -172,18 +172,26 @@ export function profilePage(p: { url: string; dateModified?: string }): Node {
   return n;
 }
 
+/**
+ * Award page Event. startDate and location are optional on purpose: when the data does not state
+ * them the property is omitted rather than guessed. `attendee` links the Event to the Person.
+ */
 export function eventNode(a: {
-  name: string; startDate: string; location: string; organizer: string; url?: string;
+  name: string; organizer: string; startDate?: string; location?: string; url?: string;
+  description?: string; image?: string; attendee?: boolean;
 }): Node {
   const n: Node = {
     "@type": "Event",
     name: a.name,
-    startDate: a.startDate,
     eventStatus: "https://schema.org/EventScheduled",
-    location: { "@type": "Place", name: a.location, address: a.location },
     organizer: { "@type": "Organization", name: a.organizer },
   };
+  if (a.startDate) n.startDate = a.startDate;
+  if (a.location) n.location = { "@type": "Place", name: a.location, address: a.location };
   if (a.url) n.url = a.url;
+  if (a.description) n.description = a.description;
+  if (a.image) n.image = a.image;
+  if (a.attendee) n.attendee = PERSON_REF;
   return n;
 }
 

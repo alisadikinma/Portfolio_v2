@@ -114,14 +114,20 @@ export async function loadGallery(id: number, lang: Lang): Promise<Photos | null
   }
 }
 
+/** All galleries of an award payload merged in order (items + first usable thumbnail). */
+export function photosFromGalleries(galleries: unknown): Photos {
+  const list = (Array.isArray(galleries) ? galleries : []) as RawGallery[];
+  const items = list.flatMap((g) => (Array.isArray(g?.items) ? g.items : []));
+  const thumb = list.map((g) => g?.thumbnail).find((t) => ownMediaUrl(t) !== null);
+  return build(thumb, items);
+}
+
 /** GET /api/awards/{id}/galleries, all galleries of the award merged in order. */
 export async function loadAwardPhotos(id: number, lang: Lang): Promise<Photos | null> {
   try {
     const d = await apiGet<{ galleries?: RawGallery[] }>(apiPath`/awards/${String(id)}/galleries`, { lang });
     if (!d || !Array.isArray(d.galleries)) return warn("award", id, "not found"), null;
-    const items = d.galleries.flatMap((g) => (Array.isArray(g?.items) ? g.items : []));
-    const thumb = d.galleries.map((g) => g?.thumbnail).find((t) => ownMediaUrl(t) !== null);
-    return build(thumb, items);
+    return photosFromGalleries(d.galleries);
   } catch (e) {
     warn("award", id, e);
     return null;

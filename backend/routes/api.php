@@ -86,6 +86,8 @@ Route::middleware(['auth:sanctum', 'ability:cv:read', 'throttle:30,1'])->group(f
 // Public Awards Routes
 Route::prefix('awards')->group(function () {
     Route::get('/', [AwardController::class, 'index']);
+    // Before /{id}: "slug" must not be captured as an id.
+    Route::get('/slug/{slug}', [AwardController::class, 'showBySlug']);
     Route::get('/{id}', [AwardController::class, 'show']);
     Route::get('/{id}/galleries', [AwardController::class, 'getGalleries']);
 });
