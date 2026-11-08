@@ -178,7 +178,7 @@ New in Phase 0E. Without it, contact notifications are skipped with a warning in
 cd /var/www/Portfolio_v2/backend && php artisan config:cache
 ```
 
-Verify: `php artisan tinker --execute="echo config('mail.admin_email') ?? env('ADMIN_EMAIL');"` prints the address (adjust key to the one Phase 0E added); submit the contact form, no `ADMIN_EMAIL` warning in the log.
+Verify: `php artisan tinker --execute="echo config('mail.admin_email');"` prints the address; submit the contact form, no `ADMIN_EMAIL` warning in the log.
 
 Rollback: remove the line, `php artisan config:cache`.
 
