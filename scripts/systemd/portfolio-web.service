@@ -20,14 +20,15 @@ Type=simple
 User=claudesn
 Group=claudesn
 WorkingDirectory=/var/www/Portfolio_v2/web
-# HOST/PORT also live in web/.env; set here so a missing .env line can never expose
-# the server on a public interface. nginx is the only intended client.
+# HOST/PORT: EnvironmentFile entries override Environment=, so a stray HOST=0.0.0.0 in
+# web/.env would expose the server. ExecStart therefore pins them with env(1), which
+# always wins. nginx is the only intended client.
 Environment=HOST=127.0.0.1
 Environment=PORT=4321
 Environment=NODE_ENV=production
 # API_INTERNAL_URL, INTERNAL_API_TOKEN, SITE_URL, GA4_MEASUREMENT_ID. Keep mode 600.
 EnvironmentFile=/var/www/Portfolio_v2/web/.env
-ExecStart=/usr/bin/node dist/server/entry.mjs
+ExecStart=/usr/bin/env HOST=127.0.0.1 PORT=4321 /usr/bin/node dist/server/entry.mjs
 Restart=always
 RestartSec=5
 # Hard memory ceiling: a leak restarts this unit instead of starving PHP-FPM / MySQL.

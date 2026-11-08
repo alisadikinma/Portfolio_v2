@@ -249,3 +249,5 @@ web/node_modules
 web/dist
 web/.astro
 web/.env
+web/dist.next
+web/dist.prev

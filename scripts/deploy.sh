@@ -28,18 +28,27 @@ run() {
   "$@"
 }
 
-# deploy_web — build the Astro public site (web/) and restart its systemd service.
+# deploy_web — build the Astro public site (web/) ATOMICALLY and restart its service.
+#   1. npm ci, then build into web/dist.next (the live web/dist is untouched while building)
+#   2. web/dist -> web/dist.prev (previous build kept), web/dist.next -> web/dist
+#   3. restart portfolio-web + health check
+#   4. health/restart failure: restore web/dist.prev, restart again, return 1
+# Astro's node adapter resolves dist/client relative to dist/server/entry.mjs at runtime,
+# so moving the dist directory is safe.
 # Prints nothing when DEPLOY_SKIP_WEB=1. DEPLOY_DRY_RUN=1 prints without executing.
-# Needs: node >= 22, web/.env, the portfolio-web unit installed, and passwordless
+# Needs: /usr/bin/node >= 22 (the binary the unit runs; WEB_NODE_BIN overrides in tests),
+# web/.env, the portfolio-web unit installed, and passwordless
 # `sudo -n systemctl restart portfolio-web` (see docs/runbooks/pf2-astro-cutover.md).
 deploy_web() {
   if [ "${DEPLOY_SKIP_WEB:-0}" = "1" ]; then return 0; fi
-  local root; root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  local root; root="${DEPLOY_WEB_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+  local dry="${DEPLOY_DRY_RUN:-0}"
+  local node_bin="${WEB_NODE_BIN:-/usr/bin/node}"
   echo "▶ Astro web build + restart (portfolio-web)"
-  if [ "${DEPLOY_DRY_RUN:-0}" != "1" ]; then
-    local major; major="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
+  if [ "$dry" != "1" ]; then
+    local major; major="$("$node_bin" -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
     if [ "$major" -lt 22 ]; then
-      echo "❌ web/ needs node >= 22 (found: $major). Fix the deploy user's node, or DEPLOY_SKIP_WEB=1."
+      echo "❌ web/ needs node >= 22 at $node_bin (found: $major). Fix the system node (the unit runs $node_bin), or DEPLOY_SKIP_WEB=1."
       return 1
     fi
     if [ ! -f "$root/web/.env" ]; then
@@ -47,29 +56,47 @@ deploy_web() {
       return 1
     fi
   fi
+  # `&&` chain on purpose: errexit is off inside a subshell on the left of `||`,
+  # so a failed `npm ci` would otherwise fall through to the build.
   (
     cd "$root/web" || exit 1
-    run npm ci --no-audit --no-fund --prefer-offline
-    run npm run build
-  ) || return 1
-  run sudo -n systemctl restart portfolio-web || {
+    run rm -rf dist.next &&
+    run npm ci --no-audit --no-fund --prefer-offline &&
+    run npm run build -- --outDir dist.next
+  ) || { echo "❌ web build failed — live web/dist untouched."; return 1; }
+  (
+    cd "$root/web" || exit 1
+    run rm -rf dist.prev &&
+    { if [ "$dry" = "1" ] || [ -d dist ]; then run mv dist dist.prev; fi; } &&
+    run mv dist.next dist
+  ) || { echo "❌ could not swap web/dist."; return 1; }
+
+  local retries="${WEB_HEALTH_RETRIES:-10}" pause="${WEB_HEALTH_SLEEP:-2}" healthy=0 i
+  if run sudo -n systemctl restart portfolio-web; then
+    for i in $(seq 1 "$retries"); do
+      if [ "$dry" = "1" ]; then
+        echo "  + curl -fsS http://127.0.0.1:4321/id/faq -o /dev/null (retry up to ${retries}x, ${pause}s apart)"
+        return 0
+      fi
+      if curl -fsS http://127.0.0.1:4321/id/faq -o /dev/null; then healthy=1; break; fi
+      sleep "$pause"
+    done
+  else
     echo "❌ could not restart portfolio-web (unit not installed, or no passwordless sudo)."
-    return 1
-  }
-  # Health check: the service needs a moment to listen. Fail the deploy if it never answers.
-  local i
-  for i in 1 2 3 4 5 6 7 8 9 10; do
-    if [ "${DEPLOY_DRY_RUN:-0}" = "1" ]; then
-      echo "  + curl -fsS http://127.0.0.1:4321/id/faq -o /dev/null (retry up to 10x, 2s apart)"
-      return 0
-    fi
-    if curl -fsS http://127.0.0.1:4321/id/faq -o /dev/null; then
-      echo "  ✓ portfolio-web answers /id/faq"
-      return 0
-    fi
-    sleep 2
-  done
-  echo "❌ portfolio-web did not answer http://127.0.0.1:4321/id/faq — check: journalctl -u portfolio-web -n 50"
+  fi
+  if [ "$healthy" = "1" ]; then
+    echo "  ✓ portfolio-web answers /id/faq"
+    return 0
+  fi
+  echo "❌ portfolio-web unhealthy on the new build — restoring previous web/dist"
+  if [ -d "$root/web/dist.prev" ]; then
+    ( cd "$root/web" && rm -rf dist && mv dist.prev dist ) &&
+      sudo -n systemctl restart portfolio-web &&
+      echo "  ↩ previous build restored and restarted" ||
+      echo "  ‼ restore failed — fix by hand: journalctl -u portfolio-web -n 50"
+  else
+    echo "  (no web/dist.prev — first deploy, nothing to restore)"
+  fi
   return 1
 }
 
@@ -229,7 +256,10 @@ if [ "${DEPLOY_SKIP_FRONTEND:-0}" != "1" ]; then
 fi
 
 # ---- 5b. Astro public site (web/) -------------------------------------------
-deploy_web
+# A web failure must NOT skip chown (6), FPM reload (6b) or queue:restart (7):
+# the backend half of the release still has to land. Record it, fail at the end.
+web_failed=0
+deploy_web || web_failed=1
 
 # ---- 6. Permissions (www-data owns storage + bootstrap/cache) ----------------
 echo "▶ Fix storage permissions"
@@ -249,6 +279,12 @@ bash scripts/reload-php-fpm.sh
 # ---- 7. Queue worker restart (if supervisor/systemd) -------------------------
 echo "▶ Signal queue workers to reload (if any)"
 cd backend && php artisan queue:restart && cd ..
+
+if [ "$web_failed" = "1" ]; then
+  echo "❌ Astro web deploy FAILED (backend steps above completed). See the web errors above;"
+  echo "   public pages may be down or on the previous build. Runbook: docs/runbooks/pf2-astro-cutover.md"
+  exit 1
+fi
 
 echo "✓ Deploy complete @ $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
 echo "  HEAD: $(git rev-parse --short HEAD)"

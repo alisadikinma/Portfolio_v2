@@ -26,6 +26,8 @@ export function resetImageDimsCache(): void {
 
 const PRIVATE_HOST = /^(localhost|.*\.local|.*\.internal|\[.*\]|0\.0\.0\.0|127\.\d+\.\d+\.\d+|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|169\.254\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)$/i;
 
+const UNSAFE_PATH = /%2f|%5c|%2e|\.\./i;
+
 function fetchable(src: string): boolean {
   try {
     const u = new URL(src);
@@ -49,6 +51,8 @@ function fetchUrl(src: string, env: Record<string, string | undefined> = process
     const site = new URL(getConfig(env).siteUrl);
     const own = u.hostname === site.hostname || u.hostname === `www.${site.hostname}`;
     if (!own || !/^\/(storage|uploads)\//.test(u.pathname)) return src;
+    // Encoded separators / dot segments could walk out of /storage on the loopback nginx.
+    if (UNSAFE_PATH.test(u.pathname)) return src;
     return `${origin}${u.pathname}${u.search}`;
   } catch {
     return src;
@@ -83,7 +87,12 @@ async function load(src: string, timeoutMs: number): Promise<Dims | null> {
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), timeoutMs);
   try {
-    const res = await fetch(fetchUrl(src), { headers: { Range: `bytes=0-${RANGE_BYTES - 1}` }, signal: ctl.signal });
+    const res = await fetch(fetchUrl(src), {
+      headers: { Range: `bytes=0-${RANGE_BYTES - 1}` },
+      signal: ctl.signal,
+      // A public URL must not be able to 302 into a private host (PRIVATE_HOST is checked on the first URL only).
+      redirect: "error",
+    });
     if (res.status !== 200 && res.status !== 206) return null;
     const head = await readHead(res);
     const size = imageSize(head);

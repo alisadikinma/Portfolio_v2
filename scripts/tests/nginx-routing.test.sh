@@ -22,8 +22,10 @@ t "/sw.js served from the SPA build root"       '[[ -n "$(ln "location = /sw.js"
 t "SPA assets: ^~ /assets/ from frontend/dist"  'nocomment | sed -n "/location \^~ \/assets\//,/}/p" | grep -q "frontend/dist"'
 t "SPA routes: admin, login, unsubscribe"       'nocomment | grep -qE "location ~ \^/\(admin\|login\|newsletter/unsubscribe\)"'
 t "SPA routes serve index.html in place"        'nocomment | sed -n "/location ~ \^\/(admin/,/}/p" | grep -q "try_files /index.html =404"'
-t "/api/internal/ is 404 on the public server"  'nocomment | sed -n "/location \^~ \/api\/internal\//,/}/p" | grep -q "return 404"'
-t "/api/internal/ block above /api/"            'before "location \^~ /api/internal/" "location \^~ /api/ "'
+t "/api/internal/ is 404 on the public server"  'nocomment | sed -n "/location \^~ \/api\/internal /,/}/p" | grep -q "return 404"'
+t "/api/internal/ block above /api/"            'before "location \^~ /api/internal " "location \^~ /api/ "'
+t "no dead 'fastcgi_param REQUEST_URI /api/\$1' (include fastcgi_params overrides it)" '! nocomment | grep -qF "fastcgi_param REQUEST_URI /api/\$1"'
+t "/_astro/ sends one Cache-Control directive, no expires" 'blk="$(nocomment | sed -n "/location \^~ \/_astro\//,/^    }/p")"; [[ "$(echo "$blk" | grep -c "add_header Cache-Control")" -eq 1 ]] && ! echo "$blk" | grep -q "expires" && echo "$blk" | grep -q "X-Content-Type-Options"'
 t "loopback server on 127.0.0.1:8081"           'nocomment | grep -qE "listen 127\.0\.0\.1:8081;"'
 t "loopback server forces public Host + https"  'nocomment | grep -q "fastcgi_param HTTP_HOST alisadikinma.com;" && nocomment | grep -q "fastcgi_param HTTPS on;"'
 t "location / proxies to astro"                 'nocomment | sed -n "/^    location \/ {/,/}/p" | grep -q "proxy_pass http://portfolio_web"'
@@ -79,6 +81,12 @@ if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
   r "/api/health -> Laravel"   "$(status /api/health)"          "502"
   r "/r/abc1234 -> Laravel"    "$(status /r/abc1234)"           "502"
   r "/api/internal/x public"   "$(status /api/internal/crawler-hit)" "404"
+  r "/api/internal (no slash)" "$(status /api/internal)"        "404"
+  r "/api//internal/x"         "$(status /api//internal/x)"     "404"
+  r "/api/%69nternal/x"        "$(status /api/%69nternal/x)"    "404"
+  r "/api/x/../internal/y"     "$(status /api/x/../internal/y)" "404"
+  cc="$(get /_astro/x.css | grep -ci '^ *cache-control:')"
+  r "/_astro/ one Cache-Control header" "$cc" "1"
   r "/.env denied"             "$(status /.env)"                "403"
   r "8081 /api -> Laravel"     "$(status /api/internal/crawler-hit 8081)" "502"
   r "8081 /storage"            "$(body /storage/f.png 8081)"    "f"

@@ -44,6 +44,12 @@ describe("addImageDimensions", () => {
     expect(init.signal).toBeInstanceOf(AbortSignal);
   });
 
+  it("refuses redirects so a public URL cannot bounce into a private host", async () => {
+    await addImageDimensions(img(URL1));
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.redirect).toBe("error");
+  });
+
   it("respects existing width and height and does not fetch", async () => {
     const html = img(URL1, 'width="10" height="20"');
     expect(await addImageDimensions(html)).toBe(html);
@@ -173,6 +179,17 @@ describe("IMAGE_DIMS_ORIGIN (same-host loopback)", () => {
     resetImageDimsCache();
     await addImageDimensions(img(URL1));
     expect(fetchedUrls()).toEqual([URL1, URL1]);
+  });
+
+  it.each([
+    ["encoded slash", "https://alisadikinma.com/storage/..%2f..%2fapi/internal/x.png"],
+    ["encoded backslash", "https://alisadikinma.com/storage/a%5c..%5cb.png"],
+    ["encoded dot-dot", "https://alisadikinma.com/storage/%2e%2e/api/x.png"],
+    ["upper-case escape", "https://alisadikinma.com/uploads/a%2Fb.png"],
+  ])("does not rewrite to loopback when the path has %s", async (_n, src) => {
+    vi.stubEnv("IMAGE_DIMS_ORIGIN", LOOP);
+    await addImageDimensions(img(src));
+    expect(fetchedUrls().every((u) => !u.startsWith(LOOP))).toBe(true);
   });
 
   it("caches by the public URL, not the loopback URL", async () => {

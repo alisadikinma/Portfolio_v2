@@ -6,7 +6,10 @@ What changes: public pages move from the Vue SPA to Astro (`web/`, node on `127.
 
 ## Read this first
 
-- **Expected duration:** 20 minutes. The public site is degraded between Step 4 (deploy finished) and Step 6 (nginx reload): old nginx then serves the new admin-only SPA shell for public URLs. Keep that gap to a few minutes: have Steps 5-6 ready before you push.
+- **Expected duration:** 20 minutes. **There is a real outage window.** Phase 5C deleted the Laravel prerender routes, and the old nginx still sends `/`, `/blog…`, `/projects/{slug}` and `/faq` to PHP-FPM. From the moment `deploy.sh` runs `git reset --hard` (script step 1) until you reload the new nginx (Step 6), those four path families return **Laravel 404**, and every other public SPA path serves the new admin-only SPA shell (no public routes). The window is the whole deploy (composer, migrate, two `npm` builds: several minutes), not just the part after the Actions run turns green.
+  - Minimise it: run in a low-traffic hour; stage the new nginx file on the VPS before the push (Step 1b); start the push only when Steps 5-6 are one paste away; do not wait to "look around" after the deploy turns green.
+  - It cannot be removed completely: swapping nginx first would send everything to an Astro that is not running yet (502).
+- **Rollback is NOT "restore the old nginx file".** The old nginx alone leaves those four path families on Laravel 404. See the Rollback section: fast stopgap (R-A, minutes) and the real rollback (R-B, revert the merge and redeploy).
 - **STOP and roll back (Rollback section) if:**
   - `nginx -t` fails;
   - `curl -fsS http://127.0.0.1:4321/id/faq` is not 200 after the deploy;
@@ -60,6 +63,18 @@ log "Step 1 backups done"
 
 Verify: both files exist. Rollback of this step: nothing to undo.
 
+### Step 1b: Stage the new nginx file (BEFORE the push)
+
+So Step 5 is a single copy, fetch the file from the pushed branch now (read-only for the live site):
+
+```bash
+git -C /var/www/Portfolio_v2 fetch origin feat/PF-2-portfolio-redesign-seo
+git -C /var/www/Portfolio_v2 show origin/feat/PF-2-portfolio-redesign-seo:scripts/nginx/portfolio-8080.conf | sudo tee /root/pf2-backup/portfolio-8080.astro >/dev/null
+grep -c portfolio_web /root/pf2-backup/portfolio-8080.astro      # 1 or more
+```
+
+(If the branch is already merged, the same file is `scripts/nginx/portfolio-8080.conf` in the tree.)
+
 ## Step 2: Environment files (BEFORE the push)
 
 `web/` does not exist on the VPS until the merge, but untracked files survive `git reset --hard`, so create the env file now:
@@ -88,7 +103,7 @@ sudo -u claudesn grep -q '^INTERNAL_API_TOKEN=' /var/www/Portfolio_v2/backend/.e
 # php artisan config:cache runs in the deploy (Step 4); do not run it by hand now.
 ```
 
-Verify later (Step 4b): `grep -c '^INTERNAL_API_TOKEN=' backend/.env web/.env` prints 1 for each and the values match (compare without printing: `diff <(grep ^INTERNAL_API_TOKEN= backend/.env) <(grep ^INTERNAL_API_TOKEN= web/.env) && echo same`).
+Verify later (Step 4b): `grep -c '^INTERNAL_API_TOKEN=' backend/.env web/.env` prints 1 for each and the values match (compare without printing: `cmp -s <(grep ^INTERNAL_API_TOKEN= backend/.env) <(grep ^INTERNAL_API_TOKEN= web/.env) && echo same || echo DIFFERENT`).
 Rollback: delete the line / file.
 
 ## Step 3: Install the systemd unit and sudoers rule (BEFORE the push)
@@ -114,7 +129,7 @@ Verify: `systemctl cat portfolio-web | grep -E 'User=|MemoryMax=|ExecStart='`. R
 
 ## Step 4: Deploy (merge + push; CI runs `scripts/deploy.sh`)
 
-Order inside the deploy: composer install, `migrate --force` (includes `2026_11_08_000001_add_slug_to_awards_table`: award slugs), `PageSectionSeeder` (deletes the old homepage ghost toggles; idempotent), cache refresh, frontend build (admin-only SPA, previous build saved as `frontend/dist.prev`), `deploy_web` (`npm ci`, `npm run build`, `systemctl restart portfolio-web`, health check on `127.0.0.1:4321/id/faq`), `php8.4-fpm` reload, `queue:restart`.
+Order inside the deploy: composer install, `migrate --force` (includes `2026_11_08_000001_add_slug_to_awards_table`: award slugs), `PageSectionSeeder` (deletes the old homepage ghost toggles; idempotent), cache refresh, frontend build (admin-only SPA, previous build saved as `frontend/dist.prev`), `deploy_web` (checks `/usr/bin/node` >= 22, `npm ci`, builds into `web/dist.next`, keeps the old build as `web/dist.prev`, swaps it into `web/dist`, `systemctl restart portfolio-web`, health check on `127.0.0.1:4321/id/faq`; if the health check fails it restores `web/dist.prev`, restarts again and fails), chown, `php8.4-fpm` reload, `queue:restart`. A `deploy_web` failure no longer aborts the script: chown, FPM reload and `queue:restart` still run, then the script exits non-zero with `Astro web deploy FAILED`.
 
 Watch the GitHub Actions run. After it is green (4b):
 
@@ -126,18 +141,18 @@ sudo -u claudesn php /var/www/Portfolio_v2/backend/artisan tinker --execute="ech
 log "Step 4 deploy green"
 ```
 
-If `deploy_web` failed (the Actions run is red at that step), read `journalctl -u portfolio-web -n 50`; the old nginx still serves the old site except for the SPA shell issue above, so go straight to Step 5 only after the service answers.
+If `deploy_web` failed (the Actions run is red at that step), read `journalctl -u portfolio-web -n 50`; the public site is still in the outage window described under "Read this first". Fix the service (the previous web build is back in `web/dist` if the health check failed) and re-run the workflow; go to Step 5 only after `curl http://127.0.0.1:4321/id/faq` answers 200.
 
 ## Step 5: nginx swap (test before reload)
 
 ```bash
 cd /var/www/Portfolio_v2
-sudo cp scripts/nginx/portfolio-8080.conf /etc/nginx/sites-enabled/portfolio-8080
+sudo cp /root/pf2-backup/portfolio-8080.astro /etc/nginx/sites-enabled/portfolio-8080   # staged in Step 1b
 sudo nginx -t
 log "Step 5 nginx -t ok"
 ```
 
-The template includes `snippets/phpmyadmin.conf` (already on the VPS). If `nginx -t` fails: restore with Rollback step R1 and stop.
+The template includes `snippets/phpmyadmin.conf` (already on the VPS). If `nginx -t` fails: nothing was reloaded, so running nginx still has the old config. Put the old file back (`sudo cp /root/pf2-backup/portfolio-8080.pre-astro /etc/nginx/sites-enabled/portfolio-8080`), fix the staged file, and retry. The outage window is still open: if you cannot fix it in minutes, run R-A.
 
 If you edit the live file instead of copying, keep the live-only lines (phpMyAdmin snippet is already referenced in the template).
 
@@ -182,30 +197,66 @@ The seo-gate reads the live sitemap. Local runs before the release showed "route
 - `php8.2-fpm` stays installed until phpMyAdmin moves (see the PHP 8.4 runbook).
 - Search Console / Bing: Ali submits the sitemap after Step 7.
 
-## Rollback (restores the old site in one reload)
+## Rollback
 
-Use if Step 6/7 fails. The old public SPA is `frontend/dist.pre-pf2`, the old nginx file is `/root/pf2-backup/portfolio-8080.pre-astro`.
+Facts that shape every option:
+- The backend is already the PF-2 backend: `SpaPrerenderController` routes are gone (only `/login` and `/r/{code}` remain in `backend/routes/web.php`). The pre-Astro nginx file sends `/`, `/blog…`, `/projects/{slug}` and `/faq` to those deleted routes, so **restoring that file alone gives Laravel 404 on those paths**.
+- `frontend/dist` is now the admin-only SPA. The old public SPA exists only as `frontend/dist.pre-pf2` (Step 1).
+- Do NOT run `deploy.sh` or push while `dist.pre-pf2` is in place under `dist`: the deploy rebuilds `frontend/dist` as admin-only.
+
+### R-A: fast stopgap (minutes): old public SPA served client-side, no SSR
+
+Result: public pages work again as the old SPA (no server-side HTML, so SEO is degraded until R-B). Needs `frontend/dist.pre-pf2` and the old nginx file.
 
 ```bash
 cd /var/www/Portfolio_v2
-# R1: old nginx + old public SPA build (one reload)
-sudo cp /root/pf2-backup/portfolio-8080.pre-astro /etc/nginx/sites-enabled/portfolio-8080
-sudo mv frontend/dist frontend/dist.pf2-admin 2>/dev/null
-sudo cp -a frontend/dist.pre-pf2 frontend/dist
-sudo nginx -t && sudo systemctl reload nginx
-log "ROLLBACK R1 done"
-# R2: stop Astro
-sudo systemctl disable --now portfolio-web
-log "ROLLBACK R2 done"
+# 1. Old nginx file, edited: DROP the prerender locations so those paths fall to the SPA fallback.
+sudo cp /root/pf2-backup/portfolio-8080.pre-astro /root/pf2-backup/portfolio-8080.stopgap
+sudo grep -n 'index.php' /root/pf2-backup/portfolio-8080.stopgap
 ```
 
-Verify: `curl -H Host:alisadikinma.com http://127.0.0.1:8080/` returns the old SPA shell, `/api/health` OK, `/admin` login works.
+In `/root/pf2-backup/portfolio-8080.stopgap`, delete these whole `location` blocks (they are the ones that `fastcgi_pass` to `index.php` for a page, not for `/api/`; the June 2026 SSR runbook `seo-geo-ssr-deploy.md` lists them): `location = /`, the `/blog` location(s), the `/projects/{slug}` location, `location = /faq`. Keep `/api/`, `/r/`, `/storage/`, `/uploads/`, the SPA `try_files $uri /index.html` fallback and everything else. If the old file has no `location = /` fallback to `index.html`, the `index index.html;` directive plus the SPA `location /` already serves `/`.
+
+```bash
+# 2. Check no prerender block is left, then swap in the old public SPA and reload.
+sudo grep -n 'index.php' /root/pf2-backup/portfolio-8080.stopgap     # only the /api/ and /r/ blocks may remain
+sudo cp /root/pf2-backup/portfolio-8080.stopgap /etc/nginx/sites-enabled/portfolio-8080
+sudo mv frontend/dist frontend/dist.pf2-admin
+sudo cp -a frontend/dist.pre-pf2 frontend/dist
+sudo nginx -t && sudo systemctl reload nginx
+log "ROLLBACK R-A done"
+```
+
+Verify on the origin: `curl -sS -o /dev/null -w '%{http_code}\n' -H 'Host: alisadikinma.com' http://127.0.0.1:8080/` is 200 and the body has the old SPA `<div id="app">`; same for `/blog`, `/projects/<slug>`, `/faq`; `/api/health` OK; `/admin` login works. If nginx -t fails: `sudo cp /root/pf2-backup/portfolio-8080.pre-astro /etc/nginx/sites-enabled/portfolio-8080` does NOT help (404s), fix the edit instead.
+
+### R-B: real rollback: revert the PF-2 merge and redeploy
+
+This restores the backend prerender routes, the public SPA source and the old `deploy.sh`.
+
+```bash
+# on your machine, in the repo
+git checkout main && git pull
+git revert -m 1 <PF-2 merge commit sha>
+git push origin main        # CI runs scripts/deploy.sh (reverted version)
+```
+
+If the Actions runner cannot reach the VPS, run the reverted `scripts/deploy.sh` on the VPS by hand. Then on the VPS:
+
+```bash
+cd /var/www/Portfolio_v2
+sudo cp /root/pf2-backup/portfolio-8080.pre-astro /etc/nginx/sites-enabled/portfolio-8080   # real old file, not the stopgap
+sudo nginx -t && sudo systemctl reload nginx
+sudo systemctl disable --now portfolio-web
+log "ROLLBACK R-B done"
+```
+
+Order: if the site is down, do R-A first (minutes), then R-B, then restore the original nginx file as shown. R-B alone has the same kind of window as the cutover: until the revert deploy has run, the backend still lacks the prerender routes.
 
 Caveats:
-- This restores the OLD front end only. The backend is already the PF-2 backend (migrations, API changes are backward compatible for the old SPA except removed prerender routes). If the old SPA misbehaves, also redeploy the pre-PF-2 commit through CI (`git revert` of the merge, push).
-- Do NOT run `deploy.sh` or push while rolled back with `dist.pre-pf2` in place: the deploy rebuilds `frontend/dist` as admin-only and breaks the old public pages again. Revert the merge first (that restores the full SPA source).
-- Back to PF-2 afterwards: `sudo rm -rf frontend/dist && sudo mv frontend/dist.pf2-admin frontend/dist`, copy `scripts/nginx/portfolio-8080.conf` again, `nginx -t && reload`, `sudo systemctl enable --now portfolio-web`.
+- The revert redeploy rebuilds `frontend/dist` from the restored SPA source, so `frontend/dist.pre-pf2` is only needed for R-A.
+- Back to PF-2 afterwards: revert the revert, push, then Steps 5-6 again.
 - Admin-only rollback (public Astro site fine, only the new admin build is bad): `sudo rm -rf frontend/dist && sudo cp -a frontend/dist.prev frontend/dist` (no nginx change).
+- Astro-only rollback (the new web build is bad, the old one was fine): `deploy_web` already does it on a failed health check. By hand: `cd web && rm -rf dist && mv dist.prev dist && sudo systemctl restart portfolio-web`.
 
 ## Local verification (repo)
 

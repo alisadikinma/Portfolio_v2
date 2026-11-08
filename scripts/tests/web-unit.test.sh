@@ -14,7 +14,7 @@ check "PORT 4321"                 '^Environment=PORT=4321$'
 check "NODE_ENV production"       '^Environment=NODE_ENV=production$'
 check "EnvironmentFile web/.env"  '^EnvironmentFile=/var/www/Portfolio_v2/web/\.env$'
 check "WorkingDirectory web"      '^WorkingDirectory=/var/www/Portfolio_v2/web$'
-check "ExecStart entry.mjs"       '^ExecStart=/usr/bin/node dist/server/entry\.mjs$'
+check "ExecStart pins HOST/PORT after EnvironmentFile" '^ExecStart=/usr/bin/env HOST=127\.0\.0\.1 PORT=4321 /usr/bin/node dist/server/entry\.mjs$'
 check "multi-user target"         '^WantedBy=multi-user\.target$'
 qu="$(grep -E '^User=' "$Q" | head -1)"; qg="$(grep -E '^Group=' "$Q" | head -1)"
 n=$((n+1)); if [[ -n "$qu" ]] && grep -qx "$qu" "$U" && grep -qx "$qg" "$U"; then echo "ok   same User/Group as queue unit ($qu)"; else echo "FAIL same User/Group as queue unit"; fails=$((fails+1)); fi
