@@ -77,6 +77,14 @@ class PageSectionSeeder extends Seeder
                 'is_active' => true,
                 'sequence' => 8,
             ],
+            // PF-2 Astro home: Services (Konsultasi / Pelatihan / Pembicara). Appended (sequence 9) so
+            // existing rows keep their sequence; the Astro page renders in its own fixed order.
+            [
+                'page_type' => 'homepage',
+                'section_type' => 'services',
+                'is_active' => true,
+                'sequence' => 9,
+            ],
 
             // About Page sections (all inactive by default)
             [

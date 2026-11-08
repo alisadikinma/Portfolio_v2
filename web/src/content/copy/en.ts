@@ -135,6 +135,9 @@ export const en: Copy = {
     next: "Next photo",
     alt: "{title}, photo {n}",
   },
+  home: {
+    metaDescription: "Ali Sadikin Ma, AI consultant Indonesia and founder of INDUSIA.ai: AI consulting, AI training and workshops for companies, and AI keynote talks.",
+  },
   site: {
     name: "Ali Sadikin Ma",
     tagline: "AI Consultant Indonesia, Founder of INDUSIA.ai",

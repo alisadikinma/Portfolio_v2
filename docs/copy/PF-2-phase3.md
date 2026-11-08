@@ -149,3 +149,9 @@ Teks EN diterjemahkan. Simbol dolar tidak boleh ada di teks (tes paritas), jadi 
 | `newsletter.required` | Wajib diisi. | This field is required. | BARU |
 | `newsletter.invalidEmail` | Alamat email tidak valid. | Enter a valid email address. | BARU |
 | `newsletter.invalidWa` | Gunakan format internasional tanpa spasi: awali dengan +, lalu kode negara. | Use the international format without spaces: start with +, then the country code. | BARU |
+
+## Fase 3E — Halaman Home
+
+| Kunci | ID | EN | Asal |
+|---|---|---|---|
+| home.metaDescription | Ali Sadikin Ma adalah pakar AI Indonesia dan founder INDUSIA.ai. Konsultasi AI, pelatihan dan workshop AI untuk perusahaan, serta pembicara AI. | Ali Sadikin Ma, AI consultant Indonesia and founder of INDUSIA.ai: AI consulting, AI training and workshops for companies, and AI keynote talks. | ID dari mockup; EN BARU |

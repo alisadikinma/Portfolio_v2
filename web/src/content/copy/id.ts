@@ -133,6 +133,9 @@ export const id = {
     next: "Foto berikutnya",
     alt: "{title}, foto {n}",
   },
+  home: {
+    metaDescription: "Ali Sadikin Ma adalah pakar AI Indonesia dan founder INDUSIA.ai. Konsultasi AI, pelatihan dan workshop AI untuk perusahaan, serta pembicara AI.",
+  },
   site: {
     name: "Ali Sadikin Ma",
     tagline: "Pakar AI Indonesia, Founder INDUSIA.ai",
