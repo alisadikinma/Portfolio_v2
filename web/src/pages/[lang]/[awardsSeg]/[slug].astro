@@ -169,6 +169,8 @@ const jsonld = failed
   .award-facts dt { font: 500 13px/1.6 var(--font-mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent-primary); }
   .award-facts dd { margin: 0; }
   .award-photos { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+  /* phones: two columns instead of one long column (Ali 2026-11-09) */
+  @media (max-width: 760px) { .award-photos { grid-template-columns: 1fr 1fr; gap: 10px; } }
   .award-thumb { all: unset; box-sizing: border-box; display: block; width: 100%; cursor: pointer; border-radius: var(--radius-md); overflow: hidden; border: 1px solid var(--border-subtle); }
   .award-thumb:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 3px; }
   .award-thumb img { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; }

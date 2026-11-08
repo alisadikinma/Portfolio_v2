@@ -85,7 +85,7 @@ T = {
   "h_edu": "Education & certifications",
   "edu": ["BINUS University — Bachelor, Informatics Engineering, cum laude (2019)", "Politeknik Caltex Riau — Diploma, Computer Engineering, cum laude (2007)", "Google Project Management: Professional Certificate", "Outskill AI Generalist Fellowship", "UN-UNCTAD × Alibaba eFounders Fellowship (2019)"],
   "h_lang": "Languages",
-  "langs": ["Indonesian — native", "English — professional (7 years in Singapore)", "Mandarin — basic conversation"],
+  "langs": ["Indonesian — native", "English — professional (7 years in Singapore)", "Mandarin — conversational"],
   "foot": "Ali Sadikin Ma · Resume",
  },
  "id": {
@@ -134,7 +134,7 @@ T = {
   "h_edu": "Pendidikan & sertifikasi",
   "edu": ["BINUS University — Sarjana Teknik Informatika, cum laude (2019)", "Politeknik Caltex Riau — Diploma Teknik Komputer, cum laude (2007)", "Google Project Management: Professional Certificate", "Outskill AI Generalist Fellowship", "UN-UNCTAD × Alibaba eFounders Fellowship (2019)"],
   "h_lang": "Bahasa",
-  "langs": ["Indonesia — bahasa ibu", "Inggris — profesional (7 tahun di Singapura)", "Mandarin — percakapan dasar"],
+  "langs": ["Indonesia — bahasa ibu", "Inggris — profesional (7 tahun di Singapura)", "Mandarin — percakapan"],
   "foot": "Ali Sadikin Ma · Resume",
  },
 }

@@ -33,11 +33,15 @@ describe("language switcher", () => {
     expect(sw).toMatch(/<a class="lang flag" href="\/id\/pembicara-ai" hreflang="id"/);
   });
 
-  it("sits outside the nav, so it stays visible when the nav collapses on small screens", async () => {
+  it("bar flags sit outside the nav; on phones a labelled copy lives inside the menu (Ali 2026-11-09)", async () => {
     const html = await render("id", "/id");
     const nav = html.match(/<nav[\s\S]*?<\/nav>/)?.[0] ?? "";
-    expect(nav).not.toContain("lang-sw");
+    expect(nav).not.toContain('class="lang-sw"');
     expect(html).toContain('class="lang-sw"');
+    const menu = nav.match(/<div class="lang-menu"[\s\S]*?<\/div>/)?.[0] ?? "";
+    expect(menu).toContain(">English</span>");
+    expect(menu).toMatch(/<a class="lang flag" href="\/en"/);
+    expect(menu).toMatch(/is-on[^>]*>[\s\S]*?>Bahasa Indonesia<\/span>/);
   });
 
   it("missing translation: only the current flag, no link", async () => {
@@ -66,5 +70,22 @@ describe("current page in the nav", () => {
   it("home and other pages mark nothing as the current page", async () => {
     expect(current(await nav("id", "/id"))).toEqual([]);
     expect(current(await nav("en", "/en/faq"))).toEqual([]);
+  });
+});
+
+// Ali 2026-11-09: on phones the menu disappeared; it must collapse behind a hamburger button.
+describe("mobile menu", () => {
+  it.each(["id", "en"] as const)("a labelled hamburger button opens the nav as a popover (%s)", async (lang) => {
+    const html = await render(lang, `/${lang}`);
+    const btn = html.match(/<button[^>]*class="nav-toggle"[^>]*>/)?.[0] ?? "";
+    expect(btn).toContain('popovertarget="site-nav"');
+    expect(btn).toContain('type="button"');
+    expect(btn).toMatch(/aria-label="(Menu|Buka menu)"/);
+    expect(html).toMatch(/<nav[^>]*id="site-nav"[^>]*popover/);
+  });
+
+  it("every nav link is still in the nav (one source for desktop and mobile)", async () => {
+    const nav = (await render("id", "/id")).match(/<nav[\s\S]*?<\/nav>/)?.[0] ?? "";
+    expect((nav.match(/<a (?!class="lang)/g) ?? []).length).toBe(6);
   });
 });
