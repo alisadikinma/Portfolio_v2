@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\FacebookPostStatus;
+use App\Models\Concerns\StoresDatesInAppTimezone;
 use App\Traits\HasStatusTransitions;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -32,6 +33,7 @@ class FacebookPost extends Model
     use HasFactory;
     use HasStatusTransitions;
     use SoftDeletes;
+    use StoresDatesInAppTimezone;
 
     protected $table = 'facebook_posts';
 

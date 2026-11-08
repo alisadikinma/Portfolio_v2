@@ -94,7 +94,7 @@ class TelegramScheduleCallbackTest extends TestCase
 
         $draft->refresh();
         $this->assertSame(LinkedInPostStatus::AwaitingPublish->value, $draft->status);
-        $this->assertSame('2026-08-19 12:00', $draft->scheduled_at->format('Y-m-d H:i'));
+        $this->assertSame('2026-08-19 12:00', $draft->scheduled_at->copy()->setTimezone('Asia/Jakarta')->format('Y-m-d H:i'));
         $this->assertNull(Cache::get($this->stateKey()), 'state cleared after schedule');
     }
 
@@ -131,7 +131,7 @@ class TelegramScheduleCallbackTest extends TestCase
 
         $draft->refresh();
         $this->assertSame(LinkedInPostStatus::AwaitingPublish->value, $draft->status);
-        $this->assertSame('2026-08-19 12:00', $draft->scheduled_at->format('Y-m-d H:i'));
+        $this->assertSame('2026-08-19 12:00', $draft->scheduled_at->copy()->setTimezone('Asia/Jakarta')->format('Y-m-d H:i'));
         $this->assertNull(Cache::get($this->stateKey()));
     }
 
