@@ -169,7 +169,6 @@ export const en: Copy = {
     training: "AI Training",
     speaker: "AI Speaker",
     blog: "Blog",
-    langSwitch: "ID",
     ctaWhatsapp: "Consult via WhatsApp",
     ariaMain: "Main menu",
     ariaLang: "Switch language",

@@ -324,13 +324,13 @@ describe("blog detail: single-language posts", () => {
     const { html } = await load("id");
     expect(html).not.toContain('hreflang="en"');
     expect(html).toContain(`hreflang="x-default" href="https://alisadikinma.com/id/blog/${SLUG}"`);
-    expect(html).not.toContain('class="lang"');
+    expect(html).not.toContain('class="lang flag"');
   });
 
   it("both languages: full hreflang + switch", async () => {
     const { html } = await load("id");
     expect(html).toContain('hreflang="en"');
-    expect(html).toContain('class="lang"');
+    expect(html).toContain('class="lang flag"');
   });
 
   it("missing-language redirect: 302, Cache-Control max-age=3600, query kept", async () => {

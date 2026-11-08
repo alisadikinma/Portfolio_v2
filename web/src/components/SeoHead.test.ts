@@ -198,14 +198,14 @@ describe("Header language switch with availableLangs", () => {
   };
 
   it("shows the switch link by default", async () => {
-    expect(await render({})).toMatch(/<a class="lang" href="\/en\/blog\/x"/);
+    expect(await render({})).toMatch(/<a class="lang flag" href="\/en\/blog\/x"/);
   });
   it("hides the switch link to a missing language", async () => {
     const h = await render({ availableLangs: ["id"] });
-    expect(h).not.toContain('class="lang"');
+    expect(h).not.toContain('class="lang flag"');
     expect(h).not.toContain('href="/en/blog/x"');
   });
   it("keeps it when the other language exists", async () => {
-    expect(await render({ availableLangs: ["id", "en"] })).toContain('class="lang"');
+    expect(await render({ availableLangs: ["id", "en"] })).toContain('class="lang flag"');
   });
 });

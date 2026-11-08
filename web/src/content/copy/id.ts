@@ -167,7 +167,6 @@ export const id = {
     training: "Pelatihan AI",
     speaker: "Pembicara AI",
     blog: "Blog",
-    langSwitch: "EN",
     ctaWhatsapp: "Konsultasi via WhatsApp",
     ariaMain: "Menu utama",
     ariaLang: "Ganti bahasa",

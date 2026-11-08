@@ -14,8 +14,15 @@
 .nav a.is-active { color: var(--text-primary); }
 .nav a.is-active::after { content: ""; position: absolute; left: 0; right: 0; bottom: -8px; height: 2px; border-radius: 2px; background: var(--accent-primary); }
 @media (prefers-reduced-motion: no-preference) { .nav a::after { transition: opacity var(--dur-hover) var(--ease-out); } }
-.lang { font-size: 14px; color: var(--text-secondary); text-decoration: none; }
-@media (max-width: 960px) { .nav { display: none; } .site-head .btn { margin-left: auto; } }
+.lang-sw { display: flex; align-items: center; gap: 2px; padding: 3px; margin-left: 16px; border-radius: 999px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); }
+.lang-sw .flag { display: inline-flex; padding: 4px 6px; border-radius: 999px; border: 1px solid transparent; line-height: 0; }
+.lang-sw .flag svg { border-radius: 2px; display: block; }
+.lang-sw a.flag { opacity: .5; transition: opacity var(--dur-hover) var(--ease-out), background var(--dur-hover) var(--ease-out); }
+.lang-sw a.flag:hover, .lang-sw a.flag:focus-visible { opacity: .85; background: rgba(255,255,255,.06); }
+.lang-sw .flag.is-on { background: rgba(212,162,77,.15); border-color: rgba(212,162,77,.35); }
+.site-head .lang-sw + .btn { margin-left: 12px; }
+@media (max-width: 960px) { .nav { display: none; } .lang-sw { margin-left: auto; } .site-head .btn { margin-left: auto; } .site-head .lang-sw + .btn { margin-left: 12px; } }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 @media (max-width: 520px) { .brand span { display: none; } .site-head .btn .long { display: none; } }
 
 /* ---------- buttons ---------- */
