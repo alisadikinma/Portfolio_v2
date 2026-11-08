@@ -23,7 +23,10 @@ Inputs (read first):
 5. **Built route by route, released once.** Phases 1–5 are built and verified locally (Astro and the
    Vue SPA side by side). Production switches once, in phase 6. Visitors never see a mix of the old
    (gold) and new (teal) design. Trade-off accepted: SEO gains only land at the final release.
-6. **Copy:** Claude drafts all page copy (ID + EN) from the keyword map and vault facts, in one
+6. **Infra first (Ali, 2026-11-08).** Before any Astro work: PHP 8.2 → 8.4 everywhere and patch
+   every composer advisory (Laravel v12.32.5 has critical CVE-2026-114509). Software phases start only
+   when infra is green. See "Phase 0" below.
+7. **Copy:** Claude drafts all page copy (ID + EN) from the keyword map and vault facts, in one
    `docs/copy/PF-2-<phase>.md` file per phase. Ali approves or corrects it before that phase counts
    as done.
 
@@ -79,8 +82,9 @@ Inputs (read first):
   the static JSON-LD in `frontend/index.html` (today three sources that must be kept in sync):
   - `Person` "Ali Sadikin Ma" is the primary node: `jobTitle` "AI Consultant", `knowsAbout`,
     `sameAs` = all of Ali's social profiles (moved off Organization).
-  - `worksFor` / `founder` → `{"@id": "https://indusia.ai/#organization"}` — reference only, no second
-    INDUSIA Organization with different data. **Phase 1 must confirm the exact `@id` indusia.ai emits.**
+  - `worksFor` / `founder` → `{"@id": "https://indusia.ai/#org"}` — reference only, no second
+    INDUSIA Organization with different data. (Confirmed 2026-11-08: indusia.ai emits `#org`,
+    `#website`, `#office`, and already references `https://alisadikinma.com/#person`.)
   - Testimonial `aggregateRating` / `review` are **dropped**, not moved (SEO audit 2026-11-08):
     self-written reviews on your own Person/Organization are self-serving and Google ignores or
     penalises them. Testimonials stay as visible quotes only.
@@ -160,6 +164,10 @@ Removed: `awards-debug`. Awards and gallery stay what they are today: tabs insid
 - Proof point wording on pages: "Juara 1 Global AI Demo Day 2026 (Outskill, Bengaluru)" /
   "1st Place, Global AI Demo Day 2026 (Outskill)" — source `Obsidian-Vault/10-Identity/awards.md`.
 
+Header nav highlights the in-page section in view (scrollspy, IntersectionObserver, teal underline,
+`aria-current="location"`; hero = no highlight). Testimonials = the 4 live LinkedIn recommendations
+(`/api/testimonials`) with photo, verbatim English excerpt, role, LinkedIn link.
+
 Home section order (brief §10a): Hero → Who I Am (+INDUSIA link) → Receipts → **Layanan** (new:
 Konsultasi AI → WhatsApp · Pelatihan & Workshop → waitlist · Pembicara AI → WhatsApp) → What I Solve
 → International Stages → Selected Work → Testimonials → Latest Writing → Newsletter.
@@ -181,13 +189,68 @@ Sections stay toggleable from `/admin/page-sections` (Astro reads `/api/page-sec
   `NewsletterSubscribers.vue` / `ContactsList.vue`.
 - Copy is honest: "Segera dibuka — daftar waitlist". No dates, quota, price.
 
-### Backlinks to indusia.ai
+### SEO/GEO acceptance gate (PRIORITY — Ali 2026-11-08: "SEO dan GEO menjadi focus utama")
 
-Brief §6 as written: one contextual sentence in Who I Am / About, one on the training page
-(→ `https://indusia.ai/id/ai-development-services/`, EN `/ai-development-services/`), footer
-"Founder INDUSIA.ai". Dofollow.
+A page phase is NOT done until its routes pass `web/scripts/seo-gate.mjs` (built in phase 1, run with
+JS disabled = what crawlers and LLMs see). Per route, all must hold, ID and EN:
+1. HTTP 200 (or the declared 301), `<html lang>` matches the URL language.
+2. `<title>` ≤ 60 chars, contains the page's primary keyword (brief §3 map) and "Ali Sadikin Ma".
+3. `<meta name="description">` 120–160 chars, contains the keyword.
+4. Exactly one `<h1>`, contains the keyword; home H1 also contains the name.
+5. First paragraph after the H1 answers who/what in plain third person (≥ 25 words) — LLM-quotable.
+6. `<link rel="canonical">` = the language-prefixed absolute URL; hreflang `id`, `en`, `x-default` all
+   present and reciprocal.
+7. JSON-LD parses; contains the `Person` node `https://alisadikinma.com/#person` (or references it) with
+   `worksFor`/`founder` `{"@id":"https://indusia.ai/#org"}`; page-type node present (see SEO layer);
+   no `aggregateRating`/`review` on Person or Organization.
+8. OG: `og:title`, `og:description`, `og:image` (absolute, 1200×630 or the portrait), `og:url` = canonical.
+9. Every `<img>` has non-empty `alt` (decorative ones `alt=""` + `aria-hidden`), width/height set.
+10. The page's required INDUSIA backlinks (table below) are present, dofollow (no `rel="nofollow"`/
+    `sponsored`/`ugc`), with the exact anchor text.
+11. Internal links: ≥ 2 contextual links to other alisadikinma.com pages (not counting nav/footer).
+12. Response has no `noindex`; `robots.txt` allows the route; route is in the sitemap.
 
-### Phases (built locally in order; one production release in phase 6; push only with Ali's permission)
+Lighthouse SEO = 100 and Accessibility ≥ 95 on home, training, speaker, one blog post (phase 5).
+
+### Backlinks to indusia.ai (PRIORITY — every one is checked by the gate, item 10)
+
+Dofollow, contextual, keyword anchors from the INDUSIA keyword table (`~/.claude/CLAUDE.md`). ID pages
+link `https://indusia.ai/id/...`; EN pages link the unprefixed `https://indusia.ai/...` equivalent.
+
+| alisadikinma.com page / spot | Anchor (ID) | Target (ID) |
+|---|---|---|
+| Home hero lead | INDUSIA.ai | https://indusia.ai/id/ |
+| Home "Siapa saya" | perusahaan AI Indonesia | https://indusia.ai/id/ |
+| Home Layanan → Konsultasi AI row | jasa pembuatan AI | https://indusia.ai/id/ai-development-services/ |
+| Home journey, INDUSIA chapter | machine vision Indonesia · fleet management system · chatbot WhatsApp AI | /id/ai-vision/ · /id/ai-fleet-transportation/ · /id/ai-assistant/ |
+| About (entity home) | INDUSIA.ai, perusahaan AI Indonesia + the 3 product anchors above | /id/ + product pages |
+| Pelatihan AI (waitlist + FAQ) | jasa pembuatan AI INDUSIA | https://indusia.ai/id/ai-development-services/ |
+| Pembicara AI (bio line) | founder INDUSIA.ai | https://indusia.ai/id/ |
+| Blog post author box (every post) | founder INDUSIA.ai, perusahaan AI Indonesia | https://indusia.ai/id/ |
+| Footer (site-wide) | Founder INDUSIA.ai | https://indusia.ai/id/ |
+| JSON-LD (every page) | `worksFor` / `founder` | `{"@id":"https://indusia.ai/#org"}` |
+
+The reverse link already exists: indusia.ai references `https://alisadikinma.com/#person`. The two sites
+must keep the same facts (name, role, founding date 2026-01-01, Batam).
+
+### Phases (built locally in order; push only with Ali's permission)
+
+0. **Infra + security (first, own deploy).** Audit 2026-11-08 (Packagist advisories vs `composer.lock`,
+   prod read via ssh):
+   - prod website = `php8.2-fpm` 8.2.29 (candidate 8.2.35; PHP 8.2 EOL 2026-12-31); prod queue worker +
+     cron = `/usr/bin/php` 8.4.12 (candidate 8.4.27) → **two PHP versions for one app**.
+   - `laravel/framework` v12.32.5: CVE-2026-114509 **critical** (TokenGuard auth bypass, fixed 12.68.0),
+     CRLF in email rule, signed-URL path confusion, debug-page XSS.
+   - high/medium: `filament/*` 4.1.0 (MFA bypass, XSS; fixed ≥4.13.3), `guzzlehttp/guzzle` 7.10.0 (<7.15.2),
+     `guzzlehttp/psr7` 2.8.0 (<2.12.3), `league/commonmark` 2.7.1 (≥2.10.2), `symfony/*` 7.3.4
+     (http-foundation, mime, mailer, routing, process, html-sanitizer → 7.4 latest), `livewire/livewire`
+     3.6.4 (>3.8.2), `ueberdosis/tiptap-php` 2.0.0 (≥2.1.1), `psy/psysh`, `league/flysystem`,
+     `symfony/polyfill-intl-idn`.
+   - Target: PHP 8.4 latest for web (fpm), CLI, queue, cron and local Docker (`docker/php/Dockerfile`);
+     `composer update` within current majors (Laravel 12, Filament 4, Sanctum 4); `composer audit` clean
+     or each remaining advisory written down with a reason; full PHPUnit green; manual smoke of admin
+     login, Content Engine, public forms. Deployed on its own after Ali's OK, before phase 1 work is
+     merged. Rollback: re-point nginx to `php8.2-fpm.sock` (kept installed) + previous `composer.lock`.
 
 1. **Astro foundation + SEO.** Scaffold `web/`, tokens/fonts/base components, `BaseLayout` + schema
    builder, API client + cache, systemd unit, nginx block, `deploy.sh` step. Pilot route: `/faq`.
