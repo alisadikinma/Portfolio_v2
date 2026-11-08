@@ -9,7 +9,7 @@ use Tests\TestCase;
 
 /**
  * PF-2 phase 5C: public pages are served by the Astro site (web/). Laravel's
- * web routes keep only /r/{code} (short links), /login and /test-route.
+ * web routes keep only /r/{code} (short links) and /login.
  */
 class WebRoutesAfterCutoverTest extends TestCase
 {
@@ -38,15 +38,28 @@ class WebRoutesAfterCutoverTest extends TestCase
 
         foreach (['/', 'blog', 'blog/{slug}', 'blog/category/{slug}', '{lang}/blog',
             '{lang}/blog/{slug}', '{lang}/blog/category/{slug}', 'faq', 'projects',
-            'projects/{slug}', '{lang}/projects/{slug}', 'about', 'contact'] as $uri) {
+            'projects/{slug}', '{lang}/projects/{slug}', 'about', 'contact', 'test-route'] as $uri) {
             $this->assertNotContains($uri, $uris, "route still registered: {$uri}");
         }
     }
 
-    public function test_no_route_uses_a_prerender_controller(): void
+    public function test_short_link_route_keeps_the_web_group_for_ai_crawler_logging(): void
     {
-        foreach (Route::getRoutes()->getRoutes() as $route) {
-            $this->assertStringNotContainsString('Prerender', $route->getActionName());
-        }
+        $route = collect(Route::getRoutes()->getRoutes())
+            ->first(fn ($r) => $r->uri() === 'r/{code}');
+
+        $this->assertNotNull($route, '/r/{code} route missing');
+        $this->assertContains('web', $route->gatherMiddleware());
+    }
+
+    public function test_only_login_and_short_links_remain_on_web(): void
+    {
+        $web = collect(Route::getRoutes()->getRoutes())
+            ->filter(fn ($r) => in_array('web', $r->gatherMiddleware(), true))
+            ->filter(fn ($r) => ! str_starts_with($r->uri(), 'admin') && ! str_starts_with($r->uri(), 'livewire') && ! str_starts_with($r->uri(), 'filament'))
+            ->map(fn ($r) => $r->uri())
+            ->values()->all();
+
+        $this->assertEqualsCanonicalizing(['login', 'r/{code}'], array_values(array_diff($web, ['up', 'sanctum/csrf-cookie', 'storage/{path}'])), 'unexpected web routes: '.implode(', ', $web));
     }
 }

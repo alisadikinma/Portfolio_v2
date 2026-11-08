@@ -1,3 +1,5 @@
+> **OBSOLETE — do not follow.** The Laravel SSR-enrichment layer this runbook deploys was removed in PF-2 phase 5C (Nov 2026). Public pages, SEO and JSON-LD now come from the Astro site in `web/`; nginx routing for it is in the PF-2 5D runbook. Kept only as history.
+
 # Runbook — SEO + GEO SSR-Enrichment Deploy
 
 **Ships:** server-side `<head>` + JSON-LD graph + crawlable body injection for the

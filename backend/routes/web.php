@@ -8,9 +8,6 @@ Route::get('/login', function () {
     return redirect('/admin/login');
 })->name('login');
 
-Route::get('/test-route', function () {
-    return 'Routes are working! User: ' . (auth()->check() ? auth()->user()->email : 'Not logged in');
-});
 
 // Branded URL shortener — /r/{code} → 301 redirect to short_links.target_url
 // (which already carries UTM params for GA attribution). Used by cross-post

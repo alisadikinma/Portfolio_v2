@@ -22,7 +22,7 @@ This backend implements full internationalization (EN/ID) with:
 4. **Eager loading** - Always load relationships to avoid N+1 queries
 5. **Resource transformation** - All responses via API Resources
 6. **Validation layer** - Form Requests for all input validation
-7. **No public HTML** - Laravel `routes/web.php` only serves `/r/{code}`, `/login`, `/test-route`. Public pages + SEO/JSON-LD live in the Astro SSR site `web/` (the old prerender layer was removed in PF-2 5C).
+7. **No public HTML** - Laravel `routes/web.php` only serves `/r/{code}` and `/login`. Public pages + SEO/JSON-LD live in the Astro SSR site `web/` (the old prerender layer was removed in PF-2 5C).
 
 ### Request Flow
 ```

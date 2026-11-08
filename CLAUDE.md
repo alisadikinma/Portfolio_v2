@@ -1004,7 +1004,7 @@ Match the model to the actual cognitive effort of the work. Don't pay Opus rates
 
 ### Current State (Fixed April 10, 2026)
 
-**Overall Score: 8.5/10** — **PF-2 (Nov 2026): SEO/GEO (JSON-LD, hreflang, sitemaps, llms.txt, crawlable HTML) now lives in the Astro SSR site `web/`.** The old Laravel SSR-enrichment layer (prerender controller, HTML composer, schema-graph builder, `resources/views/seo/*`, 1h `seo_html:*` cache + model purge hooks) was removed in phase 5C; Laravel `web.php` keeps only `/r/{code}`, `/login`, `/test-route`. Still on Laravel: `GET /api/faq` (`config/faq.php`, consumed by Astro), `LogAiCrawler` AI-bot logging → `geo_crawler_hits` → `GET /api/admin/geo/crawler-hits`. History of the retired layer: git log + [docs/runbooks/seo-geo-ssr-deploy.md](docs/runbooks/seo-geo-ssr-deploy.md) (obsolete).
+**Overall Score: 8.5/10** — **PF-2 (Nov 2026): SEO/GEO (JSON-LD, hreflang, sitemaps, llms.txt, crawlable HTML) now lives in the Astro SSR site `web/`.** The old Laravel SSR-enrichment layer (prerender controller, HTML composer, schema-graph builder, `resources/views/seo/*`, 1h `seo_html:*` cache + model purge hooks) was removed in phase 5C; Laravel `web.php` keeps only `/r/{code}` and `/login`. Still on Laravel: `GET /api/faq` (`config/faq.php`, consumed by Astro), `LogAiCrawler` AI-bot logging → `geo_crawler_hits` → `GET /api/admin/geo/crawler-hits`. History of the retired layer: git log + [docs/runbooks/seo-geo-ssr-deploy.md](docs/runbooks/seo-geo-ssr-deploy.md) (obsolete).
 
 ### What's Implemented
 
@@ -1015,16 +1015,12 @@ Match the model to the actual cognitive effort of the work. Don't pay Opus rates
 - `PostResource` / `ProjectResource` → Rich SEO metadata (meta_title, og_image, schema_markup, faq_schema, ai_summary, canonical_url)
 - `robots.txt` (backend) → Crawl rules, AI bot allow-list (GPTBot, ClaudeBot, PerplexityBot), rate limiting
 
-**Frontend SEO Infrastructure:**
-- `useMetaTags.js` → Dynamic meta tags, JSON-LD injection, BreadcrumbList schema, ArticleSchema, ProjectSchema
-- `index.html` → Static OG/Twitter meta tags + `<link rel="alternate" href="/llms.txt">` + `<link rel="sitemap">`
-- `frontend/public/llms.txt` → Static root-level LLM profile (+ link to dynamic API version)
-- `frontend/public/sitemap.xml` → Root sitemap index pointing to API sitemaps
-- `robots.txt` (frontend) → Production URLs, AI crawler allow-list, sitemap references
-- Semantic HTML: `<article>`, `<section>`, `<main>`, `<aside>`, `<header>`, `<footer>`, `<figure>`, `<figcaption>`, `<time>`
-- BreadcrumbList JSON-LD on BlogDetail and ProjectDetail pages
-- BlogPosting JSON-LD on blog posts, CreativeWork JSON-LD on projects
-- Proper H1→H2→H3 hierarchy, alt text on all images, slug-based URLs
+**Public-site SEO infrastructure (Astro `web/`, PF-2):**
+- `web/src/components/SeoHead.astro` + `web/src/lib/schema.ts` → title/description/canonical, hreflang id/en/x-default, OG/Twitter, one JSON-LD `@graph` per page (Person, WebSite, WebPage, BreadcrumbList, BlogPosting, CreativeWork, CollectionPage, Event, Service, FAQPage, ProfilePage)
+- `web/src/pages/robots.txt.ts` (AI crawler allow-list), `sitemap.xml.ts` (index) + `sitemap-{pages,posts,projects}.xml.ts` (proxy Laravel `/api/sitemap*.xml`, 502 when the API fails, never an empty sitemap)
+- `web/public/llms.txt` (static) + Laravel `/api/llms.txt`, `/api/llms-full.txt`
+- `web/scripts/seo-gate.mjs` + `seo-gate.config.mjs` → per-route SEO gate (run against a built Astro server), `parity-diff.mjs` (old vs new SEO), `redirect-map.test.mjs` (every old URL = 200 or one 301)
+- Semantic HTML, H1→H2→H3, alt + width/height on every image, slug-based language-prefixed URLs
 
 ### Remaining Issue
 
