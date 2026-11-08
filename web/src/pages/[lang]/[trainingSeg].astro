@@ -34,20 +34,18 @@ const formats = [1, 2, 3].map((n) => ({
 }));
 const faq = [1, 2, 3, 4, 5].map((n) => ({ q: c[`q${n}` as keyof typeof c], a: c[`a${n}` as keyof typeof c] }));
 // Real photos from the CMS galleries (no stock people). Index = position by gallery sequence.
-// 20 = Global AI Demo Day 2026, 12 = UN-UNCTAD × Alibaba eFounders, 16 = Satnusa team. Any failure = block hidden.
-const PHOTO_PICKS = { hero: [20, 1], p1: [20, 3], p2: [12, 9], p3: [16, 2] } as const;
+// 20 = Global AI Demo Day 2026. Any failure = block hidden. The 3-photo strip below the topics
+// was removed (Ali 2026-11-09: no clear context for a training page).
+const PHOTO_PICKS = { hero: [20, 1] } as const;
 let picked: Partial<Record<keyof typeof PHOTO_PICKS, Photo>> = {};
 if (isTraining) {
-  const [g20, g12, g16] = await Promise.all([20, 12, 16].map((gid) => loadGallery(gid, rawLang as Lang)));
-  const byId: Record<number, Photo[]> = { 20: g20?.photos ?? [], 12: g12?.photos ?? [], 16: g16?.photos ?? [] };
+  const g20 = await loadGallery(20, rawLang as Lang);
+  const byId: Record<number, Photo[]> = { 20: g20?.photos ?? [] };
   for (const [k, [gid, idx]] of Object.entries(PHOTO_PICKS)) {
     const ph = byId[gid][idx];
     if (ph) picked[k as keyof typeof PHOTO_PICKS] = ph;
   }
 }
-const strip = (["p1", "p2", "p3"] as const)
-  .map((k, i) => ({ ph: picked[k], alt: c[`proof${i + 1}Alt` as keyof typeof c], cap: c[`proof${i + 1}Cap` as keyof typeof c] }))
-  .filter((x) => x.ph);
 const topicIcons = ["doc", "agent", "code", "audit"] as const;
 const formatIcons = ["office", "laptop", "class"] as const;
 const flow = [
@@ -111,27 +109,6 @@ const jsonld = graph(
         </ul>
       </div>
     </section>
-
-    {strip.length > 0 && (
-      <section class="sec th-proof" aria-labelledby="proof-h">
-        <div class="wrap">
-          <div class="sec-head"><h2 id="proof-h">{c.proofH2}</h2><p class="lead">{c.proofLead}</p></div>
-          <ul class="th-strip">
-            {strip.map((x) => (
-              <li>
-                <figure>
-                  <div class="th-strip-ph">
-                    <img src={x.ph!.src} srcset={x.ph!.srcset} sizes={x.ph!.srcset ? "(min-width: 900px) 380px, 100vw" : undefined}
-                      width="1280" height="960" alt={x.alt} loading="lazy" decoding="async" />
-                  </div>
-                  <figcaption>{x.cap}</figcaption>
-                </figure>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
-    )}
 
     <section class="sec alt" aria-labelledby="format-h">
       <div class="wrap">

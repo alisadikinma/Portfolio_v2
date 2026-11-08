@@ -79,7 +79,7 @@ describe("training page", () => {
     expect(html).toContain('hreflang="en" href="https://alisadikinma.com/en/ai-training"');
   });
 
-  it.each(CASES)("real photos: hero stage photo + 3-photo proof strip, all with alt/size/caption (%s)", async (lang, seg) => {
+  it.each(CASES)("real photos: hero stage photo only; no out-of-context photo strip (Ali 2026-11-09) (%s)", async (lang, seg) => {
     stubGalleries();
     const { html, headers } = await load(lang, seg);
     const spec = (ROUTES as unknown as { training: { lang: string }[] }).training.find((s) => s.lang === lang);
@@ -87,17 +87,8 @@ describe("training page", () => {
     const hero = html.match(/<figure class="th-photo"[\s\S]*?<\/figure>/)?.[0] ?? "";
     expect(hero).toContain("g20-s1-");
     expect(hero).toMatch(/<figcaption>[^<]*Global AI Demo Day 2026/);
-    const strip = html.match(/<ul class="th-strip"[\s\S]*?<\/ul>/)?.[0] ?? "";
-    const figs = strip.match(/<figure[\s\S]*?<\/figure>/g) ?? [];
-    expect(figs).toHaveLength(3);
-    expect(figs[0]).toContain("g20-s3-");
-    expect(figs[1]).toContain("g12-s9-");
-    expect(figs[2]).toContain("g16-s2-");
-    for (const f of figs) {
-      expect(f).toContain('loading="lazy"');
-      expect(f).toMatch(/alt="[^"]{10,}"/);
-      expect(f).toContain("<figcaption>");
-    }
+    expect(html).not.toContain("th-strip");
+    expect(html).not.toContain("g12-s9-");
     // the lede stays the first paragraph after the H1
     const afterH1 = html.slice(html.indexOf("</h1>"));
     expect(afterH1.match(/<p[^>]*>/)![0]).toContain('class="lead"');

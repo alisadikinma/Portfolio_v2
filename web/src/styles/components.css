@@ -503,7 +503,7 @@ fieldset.field { border: 0; margin: 0; padding: 0; }
 .th-frame { position: relative; aspect-ratio: 4 / 3; border-radius: var(--radius-lg); overflow: hidden; border: 1px solid var(--border-emphasis); box-shadow: var(--shadow-lg); background: var(--bg-elevated); }
 .th-frame img { width: 100%; height: 100%; object-fit: cover; }
 .th-frame .cnr.bl, .th-frame .cnr.br { bottom: 14px; }
-.th-photo figcaption, .th-strip figcaption { margin-top: 12px; font: 500 13px/1.45 var(--font-mono); color: var(--text-secondary); }
+.th-photo figcaption { margin-top: 12px; font: 500 13px/1.45 var(--font-mono); color: var(--text-secondary); }
 .th-photo figcaption::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--accent-gold); vertical-align: 1px; }
 .th-topics { gap: 20px; }
 .th-topics li { display: grid; grid-template-columns: 56px 1fr; gap: 20px; align-items: start; padding: 28px; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); background: var(--bg-surface);
@@ -511,12 +511,6 @@ fieldset.field { border: 0; margin: 0; padding: 0; }
 .th-topics li:hover { border-color: rgba(63,184,197,.4); }
 .th-ic { display: grid; place-items: center; width: 56px; height: 56px; padding: 11px; border-radius: 14px; background: rgba(63,184,197,.08); border: 1px solid rgba(63,184,197,.22); }
 .th-ic.sm { width: 48px; height: 48px; padding: 10px; border-radius: 12px; margin-bottom: 18px; }
-.th-proof { padding-top: 0; }
-.th-strip { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-.th-strip figure { margin: 0; }
-.th-strip-ph { aspect-ratio: 4 / 3; border-radius: var(--radius-lg); overflow: hidden; border: 1px solid var(--border-subtle); background: var(--bg-elevated); }
-.th-strip img { width: 100%; height: 100%; object-fit: cover; transition: transform .6s var(--ease-out); }
-.th-strip li:hover img { transform: scale(1.03); }
 .th-flow { list-style: none; margin: 0 0 40px; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; counter-reset: none; }
 .th-flow li { position: relative; display: grid; grid-template-columns: 52px 1fr; grid-template-rows: auto auto; column-gap: 16px; align-items: center;
   padding: 22px; border-radius: var(--radius-lg); background: var(--bg-elevated); border: 1px solid var(--border-subtle); }
@@ -529,8 +523,6 @@ fieldset.field { border: 0; margin: 0; padding: 0; }
 .th-formats > div { padding: 28px; border-top: 0; border-radius: var(--radius-lg); background: var(--bg-deep); border: 1px solid var(--border-subtle); }
 @media (max-width: 960px) {
   .th-hero-grid { grid-template-columns: 1fr; gap: 40px; }
-  .th-strip { grid-template-columns: 1fr 1fr; }
-  .th-strip li:first-child { grid-column: 1 / -1; }
 }
 @media (max-width: 760px) {
   .th-flow { grid-template-columns: 1fr; gap: 18px; }
@@ -543,7 +535,6 @@ fieldset.field { border: 0; margin: 0; padding: 0; }
   .th-formats .th-ic.sm { grid-column: 1; grid-row: 1 / span 3; margin: 0; }
   .th-formats h3 { margin-top: 6px; }
 }
-@media (max-width: 520px) { .th-strip { grid-template-columns: 1fr; } }
 
 /* ================= speaker page ================= */
 /* Hero: Ali on the Global AI Demo Day stage, the photo bleeds right and fades into the navy. */
