@@ -6,7 +6,7 @@ import { LANGS, type Lang } from "../../../lib/i18n";
 import { ownMediaUrl, photosFromGalleries } from "../../../lib/career";
 import { sanitizeHtml } from "../../../lib/sanitize";
 import { addImageDimensions } from "../../../lib/image-dims";
-import { firstParagraphText, htmlToText, wordCount } from "../../../lib/seo-text";
+import { clipWords, firstParagraphText, htmlToText, wordCount } from "../../../lib/seo-text";
 import {
   awardLocation, awardMetaDescription, awardResultKind, awardShortName, awardStartDate, awardTitleTag, organizerName,
 } from "../../../lib/award";
@@ -72,19 +72,23 @@ const metaDescription = awardMetaDescription(short, descriptionText, c.metaTail)
 const fulls = photos.map((p) => p.full);
 const rotated = (i: number) => JSON.stringify([...fulls.slice(i), ...fulls.slice(0, i)]);
 
+// Event.description = the award's own text only; the meta tail is page marketing, not event data.
+const eventDescription = descriptionText.trim() !== "" ? clipWords(descriptionText, 300) : undefined;
+
 const jsonld = failed
   ? graph(personNode(), websiteNode())
   : graph(
-      personNode({ award: title }),
+      // Person.award only for awards actually won/earned; an attended event is not an award.
+      kind === "attendee" ? personNode() : personNode({ award: title }),
       websiteNode(),
       webPageNode({ url, lang, name: metaTitle, description: metaDescription }),
       eventNode({
         name: title,
-        organizer: organizer || "Ali Sadikin Ma",
+        organizer: organizer || undefined,
         startDate,
         location: place,
         url,
-        description: metaDescription,
+        description: eventDescription,
         image: ogImage,
         attendee: true,
       }),

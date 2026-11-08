@@ -196,10 +196,11 @@ describe("content", () => {
   });
 
   it("result line: Startup Grind is attendance only, never 'tampil' / performed / spoke", async () => {
-    const id = (await load("id", GRIND)).html;
+    const id = (await load("id", GRIND)).html.replace(/<script\b[\s\S]*?<\/script>/g, "");
     expect(id).toContain("Hadir sebagai peserta");
     expect(id).not.toMatch(/tampil|Juara/);
-    const en = (await load("en", GRIND)).html;
+    // Visible text only: the JSON-LD Person keeps Ali's real top award (Demo Day), which is fine.
+    const en = (await load("en", GRIND)).html.replace(/<script\b[\s\S]*?<\/script>/g, "");
     expect(en).toContain("Attended as a participant");
     expect(en).not.toMatch(/performed|spoke|1st place|keynote speaker/i);
   });
@@ -263,11 +264,37 @@ describe("JSON-LD", () => {
     AWARDS[NEXTDEV].award.received_at = "2018";
   });
 
-  it("Person carries this award; BreadcrumbList is Home > Work > Award", async () => {
+  it("Person.award is this award only when it was won, never for an attended event", async () => {
+    const won = nodesOf((await load("id", NEXTDEV)).html).find((n: any) => n["@type"] === "Person") as any;
+    expect(won.award).toBe(AWARDS[NEXTDEV].award.title);
+    const grind = nodesOf((await load("id", GRIND)).html).find((n: any) => n["@type"] === "Person") as any;
+    expect(JSON.stringify(grind.award ?? "")).not.toContain("Startup Grind");
+  });
+
+  it("Event: empty organization -> no organizer (never Ali)", async () => {
+    const org = AWARDS[NEXTDEV].award.organization;
+    AWARDS[NEXTDEV].award.organization = "";
+    const e = eventOf((await load("en", NEXTDEV)).html);
+    AWARDS[NEXTDEV].award.organization = org;
+    expect(e).not.toHaveProperty("organizer");
+    expect(JSON.stringify(e)).not.toContain("Ali Sadikin Ma");
+  });
+
+  it("Event.description is the award's own text (no marketing tail); absent when empty", async () => {
+    const e = eventOf((await load("en", NEXTDEV)).html);
+    expect(e.description).toContain("Achieved first place in prestigious Nextdev Startup Competition");
+    expect(e.description).not.toMatch(/Ali Sadikin Ma/);
+    const d = AWARDS[NEXTDEV].award.description;
+    AWARDS[NEXTDEV].award.description = null;
+    resetApiCache();
+    const e2 = eventOf((await load("en", NEXTDEV)).html);
+    AWARDS[NEXTDEV].award.description = d;
+    expect(e2).not.toHaveProperty("description");
+  });
+
+  it("BreadcrumbList is Home > Work > Award", async () => {
     const { html } = await load("id", GRIND);
     const nodes = nodesOf(html);
-    const person = nodes.find((n: any) => n["@type"] === "Person") as any;
-    expect(person.award).toBe("Google Startup Grind Silicon Valley - San Fransisco");
     const bc = nodes.find((n: any) => n["@type"] === "BreadcrumbList") as any;
     expect(bc.itemListElement.map((i: any) => i.item)).toEqual([
       "https://alisadikinma.com/id",

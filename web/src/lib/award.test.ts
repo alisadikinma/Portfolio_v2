@@ -32,6 +32,11 @@ describe("awardTitleTag", () => {
   });
 });
 
+describe("awardStartDate: month names must be real", () => {
+  it.each(["17 Marching 2026", "3 Junk 2020", "1 Mayday 2019"])("%s -> undefined", (raw) => expect(awardStartDate(raw)).toBeUndefined());
+  it.each([["17 March 2026", "2026-03-17"], ["17 Maret 2026", "2026-03-17"], ["5 Agustus 2019", "2019-08-05"], ["5 Sept 2019", "2019-09-05"], ["1 Mei 2020", "2020-05-01"]])("%s -> %s", (raw, want) => expect(awardStartDate(raw)).toBe(want));
+});
+
 describe("awardStartDate", () => {
   it.each([
     ["17 Jan 2026", "2026-01-17"],

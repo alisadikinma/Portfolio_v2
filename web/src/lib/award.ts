@@ -19,9 +19,15 @@ export function awardTitleTag(title: string): string {
   return full.length <= TITLE_MAX ? full : clipWords(short, TITLE_MAX - suffix.length) + suffix;
 }
 
-const MONTHS: Record<string, number> = {
-  jan: 1, feb: 2, mar: 3, apr: 4, may: 5, mei: 5, jun: 6, jul: 7, aug: 8, agu: 8, sep: 9, oct: 10, okt: 10, nov: 11, dec: 12, des: 12,
-};
+// Full EN/ID month names plus common abbreviations. A word is accepted only if it is one of
+// these exactly, so "Marching" or "Mayday" never parse as a month.
+const MONTH_NAMES: [number, string[]][] = [
+  [1, ["jan", "january", "januari"]], [2, ["feb", "february", "februari"]], [3, ["mar", "march", "maret"]],
+  [4, ["apr", "april"]], [5, ["may", "mei"]], [6, ["jun", "june", "juni"]], [7, ["jul", "july", "juli"]],
+  [8, ["aug", "august", "agu", "agt", "agustus"]], [9, ["sep", "sept", "september"]],
+  [10, ["oct", "october", "okt", "oktober"]], [11, ["nov", "november", "nopember"]], [12, ["dec", "december", "des", "desember"]],
+];
+const MONTHS: Record<string, number> = Object.fromEntries(MONTH_NAMES.flatMap(([n, names]) => names.map((w) => [w, n])));
 const iso = (y: number, m: number, d: number): string | undefined => {
   const dt = new Date(Date.UTC(y, m - 1, d));
   if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return undefined;
@@ -39,7 +45,7 @@ export function awardStartDate(raw: string | null | undefined): string | undefin
   if (m) return iso(Number(m[1]), Number(m[2]), Number(m[3]));
   m = /^(\d{1,2})\s+([A-Za-z]+)\.?\s+(\d{4})$/.exec(s);
   if (m) {
-    const month = MONTHS[m[2].slice(0, 3).toLowerCase()];
+    const month = MONTHS[m[2].toLowerCase()];
     return month ? iso(Number(m[3]), month, Number(m[1])) : undefined;
   }
   return undefined;

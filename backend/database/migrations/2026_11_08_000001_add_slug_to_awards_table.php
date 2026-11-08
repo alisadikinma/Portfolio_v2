@@ -45,7 +45,8 @@ return new class extends Migration
         DB::table('awards')->whereNull('slug')->orderBy('id')->select(['id', 'title'])
             ->chunkById(100, function ($awards) use (&$taken) {
                 foreach ($awards as $award) {
-                    $base = Str::slug((string) $award->title);
+                    // Spatie cuts the source to maximumLength (default 250) before slugging.
+                    $base = Str::slug(substr((string) $award->title, 0, 250));
                     if ($base === '') {
                         $base = 'award-'.$award->id;
                     }

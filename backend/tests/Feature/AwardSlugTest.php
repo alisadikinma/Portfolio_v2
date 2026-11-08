@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Award;
 use App\Models\Gallery;
 use App\Models\GalleryItem;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -33,6 +34,46 @@ class AwardSlugTest extends TestCase
     public function test_slug_column_is_unique_and_indexed(): void
     {
         $this->assertTrue(Schema::hasColumn('awards', 'slug'));
+        $a = $this->award('Unique One');
+        $b = $this->award('Unique Two');
+
+        $this->expectException(QueryException::class);
+        DB::table('awards')->where('id', $b->id)->update(['slug' => $a->slug]);
+    }
+
+    public function test_migration_rolls_back_and_reapplies_with_backfill(): void
+    {
+        $a = $this->award('Rollback Award');
+        $m = $this->migration();
+
+        $m->down();
+        $this->assertFalse(Schema::hasColumn('awards', 'slug'));
+
+        $m->up();
+        $this->assertSame('rollback-award', DB::table('awards')->where('id', $a->id)->value('slug'));
+    }
+
+    public function test_backfill_caps_slug_at_250_chars_like_spatie(): void
+    {
+        $long = str_repeat('Global AI Demo Day ', 20); // ~380 chars
+        $a = $this->award($long);
+        $b = $this->award($long);
+        DB::table('awards')->update(['slug' => null]);
+
+        $this->migration()->backfillSlugs();
+
+        $sa = DB::table('awards')->where('id', $a->id)->value('slug');
+        $sb = DB::table('awards')->where('id', $b->id)->value('slug');
+        $this->assertLessThanOrEqual(250, strlen($sa));
+        $this->assertSame($sa.'-2', $sb);
+        // Same format Spatie would produce on create.
+        $this->assertSame($a->slug, $sa);
+    }
+
+    public function test_slug_is_not_mass_assignable(): void
+    {
+        $award = Award::create(['title' => 'Mass Assign', 'organization' => 'O', 'received_at' => '2020', 'slug' => 'Bad Slug!!']);
+        $this->assertSame('mass-assign', $award->slug);
     }
 
     public function test_new_award_gets_a_slug_on_create(): void

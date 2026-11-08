@@ -13,7 +13,6 @@ class Award extends Model
 
     protected $fillable = [
         'title',
-        'slug',
         'description',
         'organization',
         'credential_id',
