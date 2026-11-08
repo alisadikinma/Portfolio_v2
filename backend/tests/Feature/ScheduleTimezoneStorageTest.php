@@ -88,4 +88,12 @@ class ScheduleTimezoneStorageTest extends TestCase
         $this->assertSame('2026-05-13 12:00:00', $this->raw('linkedin_posts', $draft->id, 'scheduled_at'));
         $this->assertNull($this->raw('linkedin_posts', $draft->id, 'cancel_window_ends_at'));
     }
+
+    public function test_offset_string_is_converted_to_utc(): void
+    {
+        $draft = $this->makeDraft();
+        $draft->update(['scheduled_at' => '2026-05-13T12:00:00+07:00']);
+
+        $this->assertSame('2026-05-13 05:00:00', $this->raw('linkedin_posts', $draft->id, 'scheduled_at'));
+    }
 }

@@ -123,6 +123,10 @@ class ContentIdeaController extends Controller
             'scheduled_at' => 'nullable|date',
         ]);
 
+        if (array_key_exists('scheduled_at', $validated)) {
+            $validated['scheduled_at'] = \App\Support\WibTime::parse($validated['scheduled_at']);
+        }
+
         $validated['status'] = 'draft';
         $idea = ContentIdea::create($validated);
 
@@ -174,6 +178,10 @@ class ContentIdeaController extends Controller
             'auto_mode' => 'sometimes|boolean',
             'scheduled_at' => 'nullable|date',
         ]);
+
+        if (array_key_exists('scheduled_at', $validated)) {
+            $validated['scheduled_at'] = \App\Support\WibTime::parse($validated['scheduled_at']);
+        }
 
         $idea->update($validated);
 

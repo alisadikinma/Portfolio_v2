@@ -28,7 +28,7 @@ class CarouselDraftController extends Controller
                 'target_platform' => $validated['target_platform'] ?? 'instagram',
                 'hook_category' => $validated['hook_category'] ?? null,
                 'captions' => $validated['captions'] ?? null,
-                'scheduled_at' => $validated['scheduled_at'] ?? null,
+                'scheduled_at' => \App\Support\WibTime::parse($validated['scheduled_at'] ?? null),
             ]);
 
             foreach ($validated['slides'] as $slideData) {
@@ -171,7 +171,7 @@ class CarouselDraftController extends Controller
 
             $carouselDraft->update([
                 'status' => 'scheduled',
-                'scheduled_at' => $validated['scheduled_at'],
+                'scheduled_at' => \App\Support\WibTime::parse($validated['scheduled_at']),
             ]);
 
             $carouselDraft->load('slides');

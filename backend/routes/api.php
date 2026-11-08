@@ -972,7 +972,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
     // Carousel endpoints (protected)
     Route::get('/carousel/accounts', [CarouselDraftController::class, 'listAccounts']);
     Route::get('/carousel/drafts', [CarouselDraftController::class, 'index']);
-    Route::get('/carousel/drafts/{id}', [CarouselDraftController::class, 'show']);
+    Route::get('/carousel/drafts/{carouselDraft}', [CarouselDraftController::class, 'show']);
 });
 
 // Admin Automation Management Routes
@@ -991,10 +991,10 @@ Route::middleware(['auth:sanctum'])->prefix('admin/automation')->group(function 
 // Admin Carousel Drafts Routes
 Route::middleware(['auth:sanctum'])->prefix('admin/carousel-drafts')->group(function () {
     Route::get('/', [CarouselDraftController::class, 'index']);
-    Route::get('/{id}', [CarouselDraftController::class, 'show']);
-    Route::post('/{id}/approve', [CarouselDraftController::class, 'approve']);
-    Route::post('/{id}/reject', [CarouselDraftController::class, 'reject']);
-    Route::post('/{id}/schedule', [CarouselDraftController::class, 'schedule']);
+    Route::get('/{carouselDraft}', [CarouselDraftController::class, 'show']);
+    Route::match(['post', 'patch'], '/{carouselDraft}/approve', [CarouselDraftController::class, 'approve']);
+    Route::match(['post', 'patch'], '/{carouselDraft}/reject', [CarouselDraftController::class, 'reject']);
+    Route::match(['post', 'patch'], '/{carouselDraft}/schedule', [CarouselDraftController::class, 'schedule']);
     Route::patch('/{id}/slides/{slideId}/status', [CarouselDraftController::class, 'updateSlideStatus']);
 });
 

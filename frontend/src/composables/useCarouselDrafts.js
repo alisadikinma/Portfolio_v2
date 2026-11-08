@@ -93,7 +93,7 @@ export function useCarouselDrafts() {
     error.value = null
     try {
       const response = await axiosInstance.patch(`/admin/carousel-drafts/${id}/schedule`, {
-        scheduled_at: scheduledAt,
+        scheduled_at: new Date(scheduledAt).toISOString(),
       })
       return response.data
     } catch (e) {

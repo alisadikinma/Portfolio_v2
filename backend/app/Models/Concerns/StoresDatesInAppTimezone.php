@@ -24,8 +24,21 @@ trait StoresDatesInAppTimezone
             // Copy: never mutate the caller's object.
             $value = Carbon::instance($value)
                 ->setTimezone((string) config('app.timezone'));
+        } elseif (is_string($value) && $this->stringCarriesOffset($value)) {
+            // '2026-05-13T12:00:00+07:00' would otherwise keep its +07:00 wall-clock.
+            $value = $this->asDateTime($value)
+                ->setTimezone((string) config('app.timezone'));
         }
 
         return parent::fromDateTime($value);
+    }
+
+    /**
+     * Only strings with an explicit offset/Z are converted; naive strings are
+     * trusted to already be in app.timezone (existing behaviour).
+     */
+    private function stringCarriesOffset(string $value): bool
+    {
+        return (bool) preg_match('/(?:[zZ]|[+-]\d{2}:?\d{2})$/', trim($value));
     }
 }

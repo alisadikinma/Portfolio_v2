@@ -1405,7 +1405,7 @@ async function handleCreateIdea() {
     priority: newIdea.priority,
     auto_mode: newIdea.auto_mode,
   }
-  if (newIdea.scheduled_at) data.scheduled_at = newIdea.scheduled_at
+  if (newIdea.scheduled_at) data.scheduled_at = new Date(newIdea.scheduled_at).toISOString()
   const result = await createIdea(data)
   if (result.success) {
     toast.success(newIdea.scheduled_at ? 'Idea scheduled successfully' : 'Idea created successfully')

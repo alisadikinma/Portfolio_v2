@@ -59,8 +59,8 @@ class LinkedInSchedulingServiceTest extends TestCase
         $slot = Carbon::parse('2026-08-18 12:00:00', 'Asia/Jakarta');
 
         app(LinkedInSchedulingService::class)->scheduleAt($draft, $slot, 'test_reason');
-
-        // Eloquent serializes a WIB Carbon as wall-clock + rehydrates in app
+        // Stored as UTC (StoresDatesInAppTimezone); the test converts back to WIB
+        // to compare the slot wall-clock.
         // tz (existing approve() behaviour) — assert the wall-clock round-trips.
         $wall = $slot->format('Y-m-d H:i');
         $draft->refresh();
