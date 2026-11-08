@@ -16,11 +16,15 @@ export class MissingInternalTokenError extends Error {
 
 const pick = (v: string | undefined, fallback: string): string => (v && v.length > 0 ? v : fallback);
 
+/** Read paths use getConfig() and never need the token. Only the crawler-hit sender calls this. */
+export function requireInternalToken(env: Env = process.env): string {
+  const token = pick(env.INTERNAL_API_TOKEN, "");
+  if (env.NODE_ENV === "production" && token === "") throw new MissingInternalTokenError();
+  return token;
+}
+
 export function getConfig(env: Env = process.env): AppConfig {
   const internalToken = pick(env.INTERNAL_API_TOKEN, "");
-  if (env.NODE_ENV === "production" && internalToken === "") {
-    throw new MissingInternalTokenError();
-  }
   return {
     apiInternalUrl: pick(env.API_INTERNAL_URL, "http://127.0.0.1:8080/api"),
     siteUrl: pick(env.SITE_URL, "https://alisadikinma.com"),

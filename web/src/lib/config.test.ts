@@ -25,15 +25,25 @@ describe("getConfig", () => {
     });
   });
 
-  it("throws named error when token missing in production", () => {
-    expect(() => getConfig({ NODE_ENV: "production" })).toThrow(/MissingInternalTokenError/);
-  });
-
-  it("accepts token in production", () => {
+  it("reads token in production", () => {
     expect(getConfig({ NODE_ENV: "production", INTERNAL_API_TOKEN: "t" }).internalToken).toBe("t");
   });
 
   it("treats empty strings as unset", () => {
     expect(getConfig({ API_INTERNAL_URL: "" }).apiInternalUrl).toBe("http://127.0.0.1:8080/api");
+  });
+});
+
+import { requireInternalToken } from "./config";
+describe("token split", () => {
+  it("getConfig never throws for a missing token, even in production", () => {
+    expect(() => getConfig({ NODE_ENV: "production" })).not.toThrow();
+  });
+  it("requireInternalToken throws in production when missing", () => {
+    expect(() => requireInternalToken({ NODE_ENV: "production" })).toThrow(/MissingInternalTokenError/);
+  });
+  it("requireInternalToken returns token", () => {
+    expect(requireInternalToken({ NODE_ENV: "production", INTERNAL_API_TOKEN: "t" })).toBe("t");
+    expect(requireInternalToken({})).toBe("");
   });
 });

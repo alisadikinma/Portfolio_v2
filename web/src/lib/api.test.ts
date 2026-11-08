@@ -120,3 +120,132 @@ describe("apiGet", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
+
+// ---- 1C review fixes ----
+import { apiGetPage, apiGetText, apiGetPost, apiPath, resetApiCache as _reset, CACHE_MAX_ENTRIES, MAX_STALE_MS } from "./api";
+
+const page = (data: unknown[], extra: Record<string, unknown> = {}) =>
+  new Response(JSON.stringify({ success: true, data, meta: { current_page: 1, last_page: 3 }, links: { next: "n" }, ...extra }), { status: 200 });
+
+describe("apiGetPage", () => {
+  it("returns data, meta and links", async () => {
+    fetchMock.mockResolvedValueOnce(page([1, 2]));
+    const r = await apiGetPage<number>("/posts?page=1", { lang: "id" });
+    expect(r).toEqual({ data: [1, 2], meta: { current_page: 1, last_page: 3 }, links: { next: "n" } });
+  });
+  it("caches the whole body", async () => {
+    fetchMock.mockImplementation(async () => page([1]));
+    await apiGetPage("/posts", { lang: "id" });
+    const r = await apiGetPage("/posts", { lang: "id" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(r?.meta).toBeTruthy();
+  });
+  it("404 returns null", async () => {
+    fetchMock.mockResolvedValueOnce(new Response("{}", { status: 404 }));
+    expect(await apiGetPage("/posts", { lang: "id" })).toBeNull();
+  });
+  it("missing meta/links become null", async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 }));
+    expect(await apiGetPage("/posts", { lang: "id" })).toEqual({ data: [], meta: null, links: null });
+  });
+});
+
+describe("cache policy", () => {
+  it("evicts least recently used beyond the cap", async () => {
+    fetchMock.mockImplementation(async () => ok("x"));
+    for (let i = 0; i < CACHE_MAX_ENTRIES + 5; i++) await apiGet(`/p${i}`, { lang: "id" });
+    fetchMock.mockClear();
+    await apiGet("/p0", { lang: "id" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await apiGet(`/p${CACHE_MAX_ENTRIES + 4}`, { lang: "id" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+  it("does not serve stale older than max-stale", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    fetchMock.mockResolvedValueOnce(ok("old"));
+    await apiGet("/p", { lang: "id", ttl: 1000 });
+    vi.advanceTimersByTime(1000 + MAX_STALE_MS + 1);
+    fetchMock.mockResolvedValueOnce(new Response("boom", { status: 503 }));
+    await expect(apiGet("/p", { lang: "id", ttl: 1000 })).rejects.toBeInstanceOf(ApiError);
+  });
+  it("never uses cached null (404) as stale fallback", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    fetchMock.mockResolvedValueOnce(new Response("{}", { status: 404 }));
+    expect(await apiGet("/p", { lang: "id", ttl: 1000 })).toBeNull();
+    vi.advanceTimersByTime(2000);
+    fetchMock.mockResolvedValueOnce(new Response("boom", { status: 503 }));
+    await expect(apiGet("/p", { lang: "id", ttl: 1000 })).rejects.toBeInstanceOf(ApiError);
+  });
+});
+
+describe("path safety", () => {
+  it("rejects path without leading slash", async () => {
+    await expect(apiGet("posts", { lang: "id" })).rejects.toThrow(/start with "\/"/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it("apiPath encodes each dynamic segment", () => {
+    expect(apiPath`/posts/${"foo?preview=1"}`).toBe("/posts/foo%3Fpreview%3D1");
+    expect(apiPath`/a/${"x/y"}/b/${"é"}`).toBe("/a/x%2Fy/b/%C3%A9");
+  });
+  it("apiPath rejects dot segments and empty", () => {
+    expect(() => apiPath`/posts/${".."}`).toThrow();
+    expect(() => apiPath`/posts/${""}`).toThrow();
+  });
+  it("slug with query chars cannot inject a query param", async () => {
+    fetchMock.mockResolvedValueOnce(ok(1));
+    await apiGet(apiPath`/posts/${"foo?preview=1"}`, { lang: "id" });
+    expect(fetchMock.mock.calls[0][0]).toBe(`${BASE}/posts/foo%3Fpreview%3D1?lang=id`);
+  });
+});
+
+describe("apiGetText", () => {
+  it("returns raw text, caches, 404 null", async () => {
+    fetchMock.mockImplementation(async () => new Response("<urlset/>", { status: 200 }));
+    expect(await apiGetText("/sitemap.xml")).toBe("<urlset/>");
+    await apiGetText("/sitemap.xml");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe(`${BASE}/sitemap.xml`);
+    resetApiCache();
+    fetchMock.mockResolvedValueOnce(new Response("", { status: 404 }));
+    expect(await apiGetText("/llms.txt")).toBeNull();
+  });
+  it("stale text on 5xx", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    fetchMock.mockResolvedValueOnce(new Response("t", { status: 200 }));
+    await apiGetText("/llms.txt", { ttl: 1000 });
+    vi.advanceTimersByTime(2000);
+    fetchMock.mockResolvedValueOnce(new Response("e", { status: 500 }));
+    expect(await apiGetText("/llms.txt", { ttl: 1000 })).toBe("t");
+  });
+  it("times out as status 0", async () => {
+    fetchMock.mockImplementation(
+      (_u: string, init: RequestInit) =>
+        new Promise((_r, rej) => init.signal!.addEventListener("abort", () => rej(new DOMException("a", "AbortError")))),
+    );
+    const a = expect(apiGetText("/llms.txt")).rejects.toMatchObject({ status: 0 });
+    await vi.advanceTimersByTimeAsync(4000);
+    await a;
+  });
+});
+
+describe("post detail tracking", () => {
+  it("apiGetPost sends track=0 and encodes slug", async () => {
+    fetchMock.mockResolvedValueOnce(ok({ id: 1 }));
+    await apiGetPost("a?b", { lang: "en" });
+    expect(fetchMock.mock.calls[0][0]).toBe(`${BASE}/posts/a%3Fb?track=0&lang=en`);
+  });
+});
+
+describe("timeout during body read", () => {
+  it("reports status 0, not malformed JSON", async () => {
+    fetchMock.mockImplementation(async (_u: string, init: RequestInit) => ({
+      status: 200,
+      ok: true,
+      json: () =>
+        new Promise((_r, rej) => init.signal!.addEventListener("abort", () => rej(new SyntaxError("Unexpected end")))),
+    }));
+    const a = expect(apiGet("/p", { lang: "id" })).rejects.toMatchObject({ status: 0 });
+    await vi.advanceTimersByTimeAsync(4000);
+    await a;
+  });
+});
