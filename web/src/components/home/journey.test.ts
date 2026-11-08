@@ -102,6 +102,17 @@ describe.each(["id", "en"] as const)("Journey (%s)", (lang) => {
     expect(html.indexOf("jr-illus")).toBeLessThan(html.indexOf('<ol class="journey"'));
   });
 
+  it("illustration is an animated loop (Ali 2026-11-09): muted, inline, looping video over a still with alt", async () => {
+    const html = await render(Journey, lang);
+    const fig = html.match(/<figure class="jr-illus"[\s\S]*?<\/figure>/)?.[0] ?? "";
+    const video = fig.match(/<video[^>]*>/)?.[0] ?? "";
+    for (const a of ["autoplay", "muted", "loop", "playsinline", 'aria-hidden="true"']) expect(video).toContain(a);
+    expect(video).toMatch(/poster="[^"]+"/);
+    expect(fig).toContain('src="/videos/journey-loop.webm" type="video/webm"');
+    expect(fig).toContain('src="/videos/journey-loop.mp4" type="video/mp4"');
+    expect(fig.match(/<img [^>]*class="jr-still"[^>]*>/)?.[0]).toMatch(/alt="[^"]{30,}"/);
+  });
+
   it("each island in the illustration is clickable: opens that chapter's gallery; INDUSIA.ai links out", async () => {
     // Ali 2026-11-08: "di ilustrasi tiap section bisa diklik untuk buka gallery"
     const html = await render(Journey, lang);

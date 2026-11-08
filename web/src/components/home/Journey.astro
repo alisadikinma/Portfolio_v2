@@ -8,9 +8,10 @@ import {
   GALLERIES_MARLIN, GALLERY_SATNUSA, GALLERY_SINGAPORE, LIGHTBOX_WIDTH, THUMB_MIN_WIDTH, loadGallery, type Photos,
 } from "../../lib/career";
 import marlinCover from "../../assets/career-marlin.jpg"; // first lightbox photo of the Marlin chapter
-// The indusia.ai/founder illustration with its white page removed (transparent), so it sits on
-// the site's dark theme. No text in it, so it works for both languages.
-import journeyIllus from "../../assets/founder-journey-night.webp";
+// The indusia.ai/founder illustration on the site navy, animated as an 8s seamless loop (VEO,
+// first frame = last frame): crane, waves and ferry, robot arms, trophy, flags. The still is the
+// loop's first frame, shown before the video plays and under prefers-reduced-motion.
+import journeyStill from "../../assets/founder-journey-loop-poster.webp";
 
 interface Props { lang: Lang }
 const { lang } = Astro.props;
@@ -27,8 +28,7 @@ const singapore = got.get(GALLERY_SINGAPORE) ?? null;
 const satnusa = got.get(GALLERY_SATNUSA) ?? null;
 const marlinParts = GALLERIES_MARLIN.map((g) => got.get(g) ?? null);
 const marlinFull = (await getImage({ src: marlinCover, width: LIGHTBOX_WIDTH, format: "webp" })).src;
-// Same file as the <img>: the light sweep is masked to the islands' shape.
-const illusMask = (await getImage({ src: journeyIllus, width: 1280, format: "webp" })).src;
+const poster = (await getImage({ src: journeyStill, width: 1280, format: "webp" })).src;
 const marlinThumb = (await getImage({ src: marlinCover, width: THUMB_MIN_WIDTH, format: "webp" })).src;
 const marlinUrls = [marlinFull, ...marlinParts.flatMap((p) => p?.photos.map((x) => x.full) ?? [])];
 const marlinThumbs = [marlinThumb, ...marlinParts.flatMap((p) => p?.photos.map((x) => x.thumb) ?? [])];
@@ -47,11 +47,14 @@ const chapters = [
     {/* One board: the islands on top, each chapter's text right under its island.
         Island and caption open the same gallery; hovering one lights up the other. */}
     <div class="jr-board">
-      <figure class="jr-illus" style={`--jr-mask:url(${illusMask})`}>
+      <figure class="jr-illus">
         <div class="jr-art">
-          <Image src={journeyIllus} widths={[640, 960, 1280, 1580]} sizes="(max-width: 1200px) 100vw, 1200px"
+          <Image class="jr-still" src={journeyStill} widths={[640, 960, 1280, 1600]} sizes="(max-width: 1200px) 100vw, 1200px"
             alt={j.illusAlt} loading="lazy" decoding="async" format="webp" />
-          <span class="jr-sweep" aria-hidden="true"></span>
+          <video class="jr-video" autoplay muted loop playsinline preload="none" poster={poster} aria-hidden="true" tabindex="-1">
+            <source src="/videos/journey-loop.webm" type="video/webm" />
+            <source src="/videos/journey-loop.mp4" type="video/mp4" />
+          </video>
         {chapters.map((c, i) => c.items.length > 0 && (
           <button class={`jr-spot s${i + 1}`} type="button" data-hotspot={c.key} data-lightbox data-lightbox-title={c.title}
             data-lightbox-items={JSON.stringify(c.items)} data-lightbox-thumbs={JSON.stringify(c.thumbs)} aria-label={j.illusOpen.replace("{name}", c.title)}></button>

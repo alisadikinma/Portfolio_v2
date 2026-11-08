@@ -409,39 +409,16 @@ fieldset.field { border: 0; margin: 0; padding: 0; }
 @media (max-width: 960px) { .who { grid-template-columns: 1fr; grid-template-areas: "h" "pic" "body"; grid-template-rows: none; } .who-illus { max-width: 360px; justify-self: center; } }
 
 /* journey illustration (indusia.ai/founder): islands are click targets for their gallery */
-/* Night board: islands float on the theme navy; one slow light sweep runs from the first
-   island to INDUSIA.ai (past -> now). All motion stops under prefers-reduced-motion. */
-.jr-illus { position: relative; margin: 0; padding: clamp(28px, 4vw, 56px) clamp(12px, 2vw, 28px) clamp(20px, 3vw, 40px); overflow: hidden;
-  background:
-    radial-gradient(28% 60% at 14% 60%, rgba(63,184,197,.14), transparent 70%),
-    radial-gradient(22% 55% at 39% 62%, rgba(63,184,197,.10), transparent 70%),
-    radial-gradient(22% 55% at 61% 60%, rgba(63,184,197,.10), transparent 70%),
-    radial-gradient(30% 70% at 86% 55%, rgba(63,184,197,.22), transparent 70%),
-    linear-gradient(180deg, #0b1424, var(--bg-surface)); }
-.jr-illus::before { /* drifting dust */
-  content: ""; position: absolute; inset: -40px 0; pointer-events: none; opacity: .55;
-  background-image:
-    radial-gradient(1.5px 1.5px at 12% 22%, rgba(232,238,248,.7), transparent 60%),
-    radial-gradient(1px 1px at 33% 12%, rgba(63,184,197,.9), transparent 60%),
-    radial-gradient(1.5px 1.5px at 58% 28%, rgba(232,238,248,.6), transparent 60%),
-    radial-gradient(1px 1px at 76% 16%, rgba(63,184,197,.8), transparent 60%),
-    radial-gradient(1.5px 1.5px at 91% 34%, rgba(232,238,248,.5), transparent 60%),
-    radial-gradient(1px 1px at 22% 82%, rgba(63,184,197,.7), transparent 60%),
-    radial-gradient(1.5px 1.5px at 67% 88%, rgba(232,238,248,.5), transparent 60%);
-  animation: jr-dust 18s linear infinite; }
-.jr-art { position: relative; animation: jr-float 7s ease-in-out infinite alternate; }
-.jr-art img { display: block; width: 100%; height: auto; filter: drop-shadow(0 18px 30px rgba(0,0,0,.45)); }
-.jr-sweep { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: screen;
-  background: linear-gradient(100deg, transparent 42%, rgba(63,184,197,.45) 50%, rgba(232,238,248,.18) 52%, transparent 60%) no-repeat;
-  background-size: 260% 100%; background-position: 130% 0;
-  -webkit-mask: var(--jr-mask) center / 100% 100% no-repeat; mask: var(--jr-mask) center / 100% 100% no-repeat;
-  animation: jr-sweep 7s cubic-bezier(.45,0,.25,1) infinite; }
-@keyframes jr-float { from { transform: translateY(0); } to { transform: translateY(-8px); } }
-@keyframes jr-sweep { 0% { background-position: 130% 0; } 60%, 100% { background-position: -30% 0; } }
-@keyframes jr-dust { from { transform: translateY(0); } to { transform: translateY(40px); } }
-@media (prefers-reduced-motion: reduce) { .jr-art, .jr-sweep, .jr-illus::before { animation: none; } .jr-sweep { display: none; } }
-.jr-spot { position: absolute; top: 6%; bottom: 6%; width: 24%; padding: 0; border: 0; border-radius: 18px; background: transparent; cursor: zoom-in; transition: background var(--dur-hover) var(--ease-out), box-shadow var(--dur-hover) var(--ease-out); }
-.jr-spot.s1 { left: 1.3%; width: 26.3%; } .jr-spot.s2 { left: 28.2%; width: 20.9%; } .jr-spot.s3 { left: 50.3%; width: 21.8%; } .jr-spot.s4 { left: 72.8%; width: 26.3%; cursor: pointer; }
+/* Night board: the animated loop (journey-loop.mp4/webm) sits on its own navy (#0d1626),
+   so the board uses the same colour. The video covers the still once it plays; under
+   prefers-reduced-motion only the still is shown. */
+.jr-illus { position: relative; margin: 0; overflow: hidden; background: #0d1626; }
+.jr-art { position: relative; aspect-ratio: 1600 / 634; }
+.jr-still, .jr-video { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; }
+.jr-video { pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .jr-video { display: none; } }
+.jr-spot { position: absolute; z-index: 1; top: 10%; bottom: 8%; width: 24%; padding: 0; border: 0; border-radius: 18px; background: transparent; cursor: zoom-in; transition: background var(--dur-hover) var(--ease-out), box-shadow var(--dur-hover) var(--ease-out); }
+.jr-spot.s1 { left: 4.3%; width: 24.7%; } .jr-spot.s2 { left: 29.6%; width: 19.6%; } .jr-spot.s3 { left: 50.3%; width: 20.4%; } .jr-spot.s4 { left: 71.4%; width: 24.7%; cursor: pointer; }
 .jr-spot:hover, .jr-spot:focus-visible { background: rgba(63,184,197,.10); box-shadow: inset 0 0 0 2px rgba(63,184,197,.6); outline: none; }
 @media (max-width: 560px) { .jr-board { border-radius: 16px; } }
 
