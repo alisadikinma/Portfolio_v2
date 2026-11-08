@@ -54,6 +54,40 @@ describe.each(["id", "en"] as const)("WhoIAm (%s)", (lang) => {
     expect(a).not.toMatch(/\srel=/);
     expect(html).toContain('id="tentang"');
   });
+
+  it("career map: real portrait, 4 chapters in order as an ordered list, decorative SVG", async () => {
+    const html = await render(WhoIAm, lang);
+    const fig = html.match(/<figure[^>]*data-who-map[^>]*>[\s\S]*?<\/figure>/)?.[0] ?? "";
+    expect(fig).not.toBe("");
+    // portrait = the hero photo (already cached), below the fold -> lazy, sized, with alt
+    const img = fig.match(/<img [^>]*>/)![0];
+    expect(img).toContain('src="/images/ali-sadikin-ma-pakar-ai-indonesia.jpg"');
+    expect(img).toMatch(/alt="[^"]+"/);
+    expect(img).toContain('width="');
+    expect(img).toContain('height="');
+    expect(img).toContain('loading="lazy"');
+    // line art is decoration only; the facts live in real HTML text
+    expect(fig).toMatch(/<svg[^>]*aria-hidden="true"/);
+    const items = [...fig.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/g)].map((m) => m[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim());
+    expect(items).toHaveLength(4);
+    expect(items[0]).toContain("2008–2015");
+    expect(items[1]).toContain("Marlin Booking");
+    expect(items[1]).toContain("2016–2019");
+    expect(items[2]).toContain("Satnusa");
+    expect(items[2]).toContain("2021–2025");
+    expect(items[3]).toContain("INDUSIA.ai");
+    expect(fig).toMatch(/<ol[^>]*>/);
+    expect(fig).toContain('aria-current="step"');
+    // seam for a future generated illustration
+    expect(fig).toContain("data-art");
+  });
+
+  it("heading comes before the figure and body text (document order)", async () => {
+    const html = await render(WhoIAm, lang);
+    expect(html.indexOf("<h2")).toBeLessThan(html.indexOf("data-who-map"));
+    expect((html.match(/<h[1-6]/g) ?? []).every((h) => h === "<h2")).toBe(true);
+    expect(html).not.toMatch(/Rp\s?\d|\$\s?\d/);
+  });
 });
 
 describe.each(["id", "en"] as const)("Services (%s)", (lang) => {

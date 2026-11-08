@@ -1,46 +1,54 @@
 ---
 import type { Lang } from "../../lib/i18n";
-import { apiGet } from "../../lib/api";
+import { loadLatestArticles } from "../../lib/latest";
 import { id } from "../../content/copy/id";
 import { en } from "../../content/copy/en";
 
-interface Article { slug?: string | null; title?: string | null; published_at?: string | null }
 interface Props { lang: Lang }
 const { lang } = Astro.props;
 const t = (lang === "id" ? id : en).latestWriting;
-
-let articles: Article[] = [];
-try {
-  const data = await apiGet<{ latest_articles?: Article[] }>("/homepage/featured", { lang });
-  if (data && Array.isArray(data.latest_articles)) articles = data.latest_articles;
-} catch (e) {
-  console.warn("[home] latest articles unavailable", (e as Error).message);
-}
-const fmt = new Intl.DateTimeFormat(lang === "id" ? "id-ID" : "en-US", { dateStyle: "medium", timeZone: "UTC" });
-const items = articles
-  .filter((a) => a.slug && a.title)
-  .slice(0, 3)
-  .map((a) => {
-    const d = a.published_at ? new Date(a.published_at) : null;
-    const ok = d !== null && !Number.isNaN(d.getTime());
-    return {
-      href: `/${lang}/blog/${encodeURIComponent(a.slug as string)}`,
-      title: a.title as string,
-      iso: ok ? d.toISOString() : "",
-      label: ok ? fmt.format(d) : "",
-    };
-  });
+const items = await loadLatestArticles(lang, 3);
 ---
 {items.length > 0 && (
   <section class="sec" id="tulisan" aria-labelledby="tulisan-h">
     <div class="wrap">
-      <div class="sec-head"><h2 id="tulisan-h">{t.h2}</h2></div>
-      <ul class="posts">
-        {items.map((i) => (
-          <li><a href={i.href}><h3>{i.title}</h3>{i.iso && <time datetime={i.iso}>{i.label}</time>}</a></li>
+      <div class="wr-head">
+        <h2 id="tulisan-h">{t.h2}</h2>
+        <a class="wr-all" href={`/${lang}/blog`}>{t.all}<span aria-hidden="true"> →</span></a>
+      </div>
+      <ul class="wr-grid">
+        {items.map((i, n) => (
+          <li class={n === 0 ? "wc wc-lead" : "wc"}>
+            <a href={i.href}>
+              <div class="wc-media">
+                {i.img ? (
+                  <img
+                    src={i.img.src}
+                    srcset={i.img.srcset}
+                    sizes={i.img.srcset ? (n === 0 ? "(min-width: 900px) 640px, 100vw" : "(min-width: 900px) 240px, 100vw") : undefined}
+                    width={n === 0 ? 1200 : 640}
+                    height={n === 0 ? 675 : 360}
+                    alt=""
+                    aria-hidden="true"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                ) : <span class="wc-ph" aria-hidden="true"></span>}
+                {n === 0 && <span class="wc-badge">{t.latest}</span>}
+              </div>
+              <div class="wc-body">
+                <div class="wc-meta">
+                  {n === 0 && i.category && <span class="wc-cat">{i.category}</span>}
+                  {i.iso && <time datetime={i.iso}>{i.dateLabel}</time>}
+                  {i.minutes > 0 && <span>{i.minutes} {t.minRead}</span>}
+                </div>
+                <h3>{i.title}</h3>
+                {n === 0 && i.excerpt && <p class="wc-ex">{i.excerpt}</p>}
+              </div>
+            </a>
+          </li>
         ))}
       </ul>
-      <p style="margin-top:24px"><a href={`/${lang}/blog`}>{t.all}</a></p>
     </div>
   </section>
 )}

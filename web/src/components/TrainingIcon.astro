@@ -1,0 +1,50 @@
+---
+// Line icons for the training page. Decorative only: the meaning is always in the adjacent text.
+export type TrainingIconName = "doc" | "agent" | "code" | "audit" | "office" | "laptop" | "class" | "data" | "run";
+interface Props { name: TrainingIconName }
+const { name } = Astro.props;
+---
+<svg class="t-icon" viewBox="0 0 48 48" width="48" height="48" aria-hidden="true" focusable="false"
+  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  {name === "doc" && (<>
+    <path d="M11 5h17l9 9v13" /><path d="M28 5v9h9" /><path d="M11 5v38h14" />
+    <path d="M17 19h12M17 25h8" />
+    <path class="acc" d="M36 29l8 3v6c0 5-3.5 8-8 9.5-4.5-1.5-8-4.5-8-9.5v-6z" /><path class="acc" d="M32.5 38l2.5 2.5 4.5-5" />
+  </>)}
+  {name === "agent" && (<>
+    <rect x="10" y="14" width="28" height="22" rx="7" /><path d="M24 14V8" /><circle cx="24" cy="6" r="2" />
+    <circle class="acc-f" cx="19" cy="25" r="2.5" /><circle class="acc-f" cx="29" cy="25" r="2.5" /><path d="M20 31h8" />
+    <path class="acc" d="M4 22v6M44 22v6" /><path class="acc" d="M38 40a14 14 0 0 1-24 0" /><path class="acc" d="M14 40l-1 4M14 40l4 1" />
+  </>)}
+  {name === "code" && (<>
+    <rect x="4" y="8" width="40" height="30" rx="4" /><path d="M4 15h40" />
+    <path d="M17 22l-5 5 5 5M27 22l5 5-5 5" />
+    <path class="acc" d="M38 30l1.6 3.4L43 35l-3.4 1.6L38 40l-1.6-3.4L33 35l3.4-1.6z" />
+  </>)}
+  {name === "audit" && (<>
+    <rect x="7" y="6" width="26" height="36" rx="3" /><path d="M14 15l2 2 4-4M14 25l2 2 4-4M24 16h4M24 26h4" />
+    <circle class="acc" cx="33" cy="33" r="7" /><path class="acc" d="M38 38l6 6" />
+  </>)}
+  {name === "office" && (<>
+    <path d="M6 42h36" /><rect x="10" y="10" width="20" height="32" /><path d="M30 20h10v22" />
+    <path d="M15 16h3M22 16h3M15 23h3M22 23h3M15 30h3M22 30h3" /><path class="acc" d="M17 42v-6h6v6" />
+  </>)}
+  {name === "laptop" && (<>
+    <rect x="9" y="10" width="30" height="21" rx="2" /><path d="M4 37h40l-3 4H7z" />
+    <path class="acc" d="M17 21l4 4 9-9" />
+  </>)}
+  {name === "class" && (<>
+    <rect x="8" y="6" width="32" height="20" rx="2" /><path class="acc" d="M14 19l6-6 5 4 7-7" />
+    <circle cx="12" cy="34" r="3" /><circle cx="24" cy="34" r="3" /><circle cx="36" cy="34" r="3" />
+    <path d="M7 44c0-3 2-5 5-5s5 2 5 5M19 44c0-3 2-5 5-5s5 2 5 5M31 44c0-3 2-5 5-5s5 2 5 5" />
+  </>)}
+  {name === "data" && (<>
+    <ellipse cx="17" cy="11" rx="10" ry="4" /><path d="M7 11v20c0 2.2 4.5 4 10 4s10-1.8 10-4V11" /><path d="M7 21c0 2.2 4.5 4 10 4s10-1.8 10-4" />
+    <path class="acc" d="M31 17h7a4 4 0 0 1 4 4v4M31 37h7a4 4 0 0 0 4-4v-2" /><circle class="acc-f" cx="42" cy="28" r="2.5" />
+  </>)}
+  {name === "run" && (<>
+    <circle cx="9" cy="24" r="5" /><circle cx="39" cy="12" r="5" /><circle cx="39" cy="36" r="5" />
+    <path d="M14 24h8M22 24l12-10M22 24l12 10" />
+    <path class="acc" d="M36 36l2 2 4-4" /><path class="acc" d="M37 9.5l4 2.5-4 2.5z" />
+  </>)}
+</svg>
