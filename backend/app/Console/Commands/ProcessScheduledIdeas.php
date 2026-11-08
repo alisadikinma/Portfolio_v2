@@ -44,8 +44,26 @@ class ProcessScheduledIdeas extends Command
 
                 // Trigger article generation via SSH/local CLI
                 // Default primary language is Indonesian (matches AutoPipelineOrchestrator + ContentPublishService fallback)
-                $languages = $idea->languages ?? ['id'];
-                $articleGen->trigger($idea->id, $idea->title, implode(',', $languages), $idea->instructions ?? '');
+                $config = [
+                    'topic' => $idea->title,
+                    'languages' => $idea->languages ?? ['id'],
+                    'instructions' => $idea->instructions ?? '',
+                ];
+
+                // Same pipeline selection as ContentIdeaController::startResearch.
+                if ((bool) config('services.article_generation.skill_split_enabled', false)) {
+                    $result = $articleGen->triggerResearch($idea->id, $config, $articleGen->resolveResearchTier($idea->fresh()));
+                } elseif (! empty(config('services.article_generation.refs_prep'))) {
+                    $result = $articleGen->triggerPrep($idea->id, $config);
+                } else {
+                    $result = $articleGen->triggerGeneration($idea->id, $config);
+                }
+
+                if (! $result['success']) {
+                    throw new \RuntimeException('Article generation trigger failed: ' . ($result['error'] ?? 'unknown error'));
+                }
+
+                $idea->update(['process_pid' => $result['pid']]);
 
                 $this->info("  Started research for idea #{$idea->id}");
                 Log::info("[Scheduler] Started research for scheduled idea #{$idea->id}: {$idea->title}");
