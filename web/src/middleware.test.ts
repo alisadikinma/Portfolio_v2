@@ -276,3 +276,26 @@ describe("crawler logging", () => {
     expect(f).not.toHaveBeenCalled();
   });
 });
+
+// SEO audit 2026-11-09: old /blog/<slug> goes straight to the language's own slug (one hop).
+describe("unprefixed blog -> localized slug", () => {
+  it("uses the EN slug when the post has one", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: { available_translations: ["id", "en"], slugs: { id: "halo", en: "hello" } } }), { status: 200 })));
+    const res = (await onRequest(ctx("/blog/halo?utm=1"), ok)) as Response;
+    expect(res.status).toBe(301);
+    expect(res.headers.get("location")).toBe("/en/blog/hello?utm=1");
+  });
+});
+
+describe("security headers on pages", () => {
+  it("adds Referrer-Policy and Permissions-Policy to page responses", async () => {
+    const res = (await onRequest(ctx("/id/about"), ok)) as Response;
+    expect(res.headers.get("referrer-policy")).toBe("strict-origin-when-cross-origin");
+    expect(res.headers.get("permissions-policy")).toBe("camera=(), microphone=(), geolocation=(), payment=()");
+  });
+  it("keeps a header a page already set", async () => {
+    const own = () => Promise.resolve(new Response("p", { status: 200, headers: { "Referrer-Policy": "no-referrer" } }));
+    const res = (await onRequest(ctx("/id/about"), own)) as Response;
+    expect(res.headers.get("referrer-policy")).toBe("no-referrer");
+  });
+});

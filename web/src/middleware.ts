@@ -37,16 +37,35 @@ function cookieLang(cookie: string | null): Lang | null {
   return m ? (m[1] as Lang) : null;
 }
 
-/** Language for an unprefixed blog URL: en if translated, else first other, else en. */
-async function blogLang(slug: string): Promise<Lang> {
+/** Target for an unprefixed blog URL: en if translated, else first other, else en; with that language's own slug. */
+async function blogTarget(slug: string): Promise<{ lang: Lang; slug: string }> {
   try {
-    const post = await apiGetPost<{ available_translations?: unknown }>(slug, { lang: "en" });
+    const post = await apiGetPost<{ available_translations?: unknown; slugs?: Record<string, unknown> | null }>(slug, { lang: "en" });
     const langs = Array.isArray(post?.available_translations) ? (post.available_translations as unknown[]) : [];
-    if (langs.includes("en")) return "en";
-    const other = langs.find((l): l is Lang => l === "id");
-    return other ?? "en";
+    const lang: Lang = langs.includes("en") ? "en" : (langs.find((l): l is Lang => l === "id") ?? "en");
+    const own = post?.slugs?.[lang];
+    return { lang, slug: typeof own === "string" && own !== "" ? own : slug };
   } catch {
-    return "en";
+    return { lang: "en", slug };
+  }
+}
+
+const SECURITY_HEADERS: Record<string, string> = {
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
+};
+
+/** Adds the security headers a page did not set itself. Immutable headers get a copied Response. */
+function withSecurityHeaders(res: Response): Response {
+  const missing = Object.entries(SECURITY_HEADERS).filter(([k]) => !res.headers.has(k));
+  if (missing.length === 0) return res;
+  try {
+    for (const [k, v] of missing) res.headers.set(k, v);
+    return res;
+  } catch {
+    const headers = new Headers(res.headers);
+    for (const [k, v] of missing) headers.set(k, v);
+    return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
   }
 }
 
@@ -122,10 +141,9 @@ export async function onRequest(context: Ctx, next: Next): Promise<Response> {
     const fixed = prefixed[1].toLowerCase() + norm.slice(prefixed[0].length);
     const target = "/" + fixed + search;
     if (path !== "/" + fixed) return redirect(target, 301);
-    return next();
+    return withSecurityHeaders(await next());
   }
 
-  let lang: Lang = "en";
   const blog = norm.match(/^\/blog\/([^/]+)$/);
   if (blog) {
     let slug = blog[1];
@@ -134,7 +152,8 @@ export async function onRequest(context: Ctx, next: Next): Promise<Response> {
     } catch {
       /* keep raw */
     }
-    lang = await blogLang(slug);
+    const t = await blogTarget(slug);
+    return redirect(`/${t.lang}/blog/${encodeURIComponent(t.slug)}${search}`, 301);
   }
-  return redirect(localizedPath(norm, lang) + search, 301);
+  return redirect(localizedPath(norm, "en") + search, 301);
 }
