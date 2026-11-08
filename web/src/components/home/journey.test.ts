@@ -88,6 +88,38 @@ describe.each(["id", "en"] as const)("Journey (%s)", (lang) => {
     expect((html.match(/<li/g) ?? []).length).toBe(4);
   });
 
+  it("journey illustration (from indusia.ai/founder) sits between the lead and the cards: sized, lazy, alt", async () => {
+    const html = await render(Journey, lang);
+    const fig = html.match(/<figure class="jr-illus"[\s\S]*?<\/figure>/)?.[0] ?? "";
+    expect(fig).not.toBe("");
+    const img = fig.match(/<img [^>]*>/)![0];
+    expect(img).toMatch(/founder-journey/);
+    expect(img).toMatch(/alt="[^"]{30,}"/);
+    expect(img).toContain('width="');
+    expect(img).toContain('height="');
+    expect(img).toContain('loading="lazy"');
+    expect(html.indexOf('class="lead"')).toBeLessThan(html.indexOf("jr-illus"));
+    expect(html.indexOf("jr-illus")).toBeLessThan(html.indexOf('<ol class="journey"'));
+  });
+
+  it("each island in the illustration is clickable: opens that chapter's gallery; INDUSIA.ai links out", async () => {
+    // Ali 2026-11-08: "di ilustrasi tiap section bisa diklik untuk buka gallery"
+    const html = await render(Journey, lang);
+    const fig = html.match(/<figure class="jr-illus"[\s\S]*?<\/figure>/)?.[0] ?? "";
+    const spots = [...fig.matchAll(/<button[^>]*data-hotspot="([^"]+)"[^>]*>/g)];
+    expect(spots.map((m) => m[1])).toEqual(["singapore", "marlin", "satnusa"]);
+    const itemsOfTag = (t: string) => JSON.parse((t.match(/data-lightbox-items="([^"]*)"/)?.[1] ?? "[]").replace(/&quot;/g, '"').replace(/&amp;/g, "&"));
+    for (const [tag, key] of spots.map((m) => [m[0], m[1]] as const)) {
+      expect(tag).toContain("data-lightbox");
+      expect(tag).toMatch(/aria-label="[^"]+"/);
+      const card = html.match(new RegExp(`<button[^>]*class="jr-card"[^>]*data-career="${key === "singapore" ? "14" : key === "satnusa" ? "16" : "marlin"}"[^>]*>`))![0];
+      expect(itemsOfTag(tag)).toEqual(itemsOfTag(card));
+    }
+    const out = fig.match(/<a [^>]*data-hotspot="indusia"[^>]*>/)?.[0] ?? "";
+    expect(out).toMatch(/href="https:\/\/indusia\.ai\//);
+    expect(out).toMatch(/aria-label="[^"]+"/);
+  });
+
   it("career covers use the gallery's curated thumbnail (as on the old site), object-position 50% 15%", async () => {
     // Ali 2026-11-08: the career cards must show the curated composite thumbnail
     // (portrait at Marina Bay / Satnusa), not the first gallery photo.

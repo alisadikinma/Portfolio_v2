@@ -8,6 +8,8 @@ import {
   GALLERIES_MARLIN, GALLERY_SATNUSA, GALLERY_SINGAPORE, LIGHTBOX_WIDTH, loadGallery, type Photos,
 } from "../../lib/career";
 import marlinCover from "../../assets/career-marlin.jpg";
+// Same illustration as indusia.ai/founder (no text in it, so it works for both languages).
+import journeyIllus from "../../assets/founder-journey.webp";
 
 interface Props { lang: Lang }
 const { lang } = Astro.props;
@@ -41,6 +43,16 @@ const chapters = [
 <section class="sec" id="perjalanan" aria-labelledby="journey-h">
   <div class="wrap">
     <div class="sec-head"><h2 id="journey-h">{j.h2}</h2><p class="lead">{j.lead}</p></div>
+    <figure class="jr-illus">
+      <Image src={journeyIllus} widths={[640, 960, 1280, 1600]} sizes="(max-width: 1200px) 100vw, 1200px"
+        alt={j.illusAlt} loading="lazy" decoding="async" format="webp" />
+      {/* One hotspot per island (left to right): opens the same gallery as that chapter's card. */}
+      {chapters.map((c, i) => c.items.length > 0 && (
+        <button class={`jr-spot s${i + 1}`} type="button" data-hotspot={c.key} data-lightbox data-lightbox-title={c.title}
+          data-lightbox-items={JSON.stringify(c.items)} aria-label={j.illusOpen.replace("{name}", c.title)}></button>
+      ))}
+      <a class="jr-spot s4" data-hotspot="indusia" href={a.hero.href} aria-label={j.illusIndusia}></a>
+    </figure>
     <ol class="journey">
       {chapters.map((c) => {
         const Tag = c.items.length > 0 ? "button" : "div";

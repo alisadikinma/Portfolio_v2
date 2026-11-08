@@ -1,7 +1,5 @@
 ---
-import { Image, getImage } from "astro:assets";
 import type { Lang } from "../../lib/i18n";
-import infographic from "../../assets/who-infographic-id.jpg";
 import { id } from "../../content/copy/id";
 import { en } from "../../content/copy/en";
 
@@ -10,15 +8,7 @@ const { lang } = Astro.props;
 const w = (lang === "id" ? id : en).whoIAm;
 // Dofollow backlinks to INDUSIA.ai: no rel attribute (spec backlink table).
 const base = lang === "id" ? "https://indusia.ai/id/" : "https://indusia.ai/";
-// Ali's career infographic (2026-11-08). Text inside the image is not crawlable, so the
-// four chapters below repeat it as HTML.
-const infoFull = (await getImage({ src: infographic, width: 2752, format: "webp", quality: 85 })).src;
-const chapters = [
-  { pos: "c1", y: w.ch1Year, n: w.ch1Name, d: w.ch1Desc },
-  { pos: "c2", y: w.ch2Year, n: w.ch2Name, d: w.ch2Desc },
-  { pos: "c3", y: w.ch3Year, n: w.ch3Name, d: w.ch3Desc },
-  { pos: "c4", y: w.ch4Year, n: w.ch4Name, d: w.ch4Desc, now: true },
-];
+// Same file as the hero LCP image, so the browser already has it cached.
 ---
 <section class="sec" id="tentang">
   <div class="wrap who">
@@ -27,24 +17,8 @@ const chapters = [
       <p><strong>{w.p1Strong}</strong>{w.p1Rest}</p>
       <p>{w.p2Lead}<a href={`${base}ai-vision/`}>{w.visionLink}</a>, <a href={`${base}ai-fleet-transportation/`}>{w.fleetLink}</a>, <a href={`${base}ai-assistant/`}>{w.chatbotLink}</a>{w.p2Mid}<a href={base}>{w.companyLink}</a>{w.p2End}</p>
     </div>
-    <figure class="who-map who-info" data-who-map>
-      <button class="wi-open" type="button" data-lightbox data-lightbox-title={w.mapLabel} data-lightbox-items={JSON.stringify([infoFull])}>
-        <Image src={infographic} widths={[640, 960, 1280, 1920, 2752]} sizes="(max-width: 1200px) 100vw, 1200px"
-          alt={w.mapLabel} loading="lazy" decoding="async" format="webp" quality={82} />
-        <span class="wi-hint" aria-hidden="true">{w.mapOpen}</span>
-      </button>
-      <figcaption class="wi-cap">
-        <ol class="wm-list">
-          {chapters.map((c) => (
-            <li class="wm-ch" aria-current={c.now ? "step" : undefined}>
-              <span class="wm-yr">{c.y}</span>
-              <strong>{c.n}</strong>
-              <span class="wm-d">{c.d}</span>
-            </li>
-          ))}
-        </ol>
-      </figcaption>
-    </figure>
+    <img class="who-portrait" src="/images/ali-sadikin-ma-pakar-ai-indonesia.jpg" alt={w.portraitAlt}
+      width="1200" height="1200" loading="lazy" decoding="async" />
   </div>
 </section>
 

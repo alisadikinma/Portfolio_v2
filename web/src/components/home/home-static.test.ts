@@ -55,33 +55,20 @@ describe.each(["id", "en"] as const)("WhoIAm (%s)", (lang) => {
     expect(html).toContain('id="tentang"');
   });
 
-  it("career infographic (Ali 2026-11-08): sized lazy image, opens full size, chapters stay real HTML text", async () => {
+  it("text + real portrait only (Ali 2026-11-08: the career illustration lives in the journey section)", async () => {
     const html = await render(WhoIAm, lang);
-    const fig = html.match(/<figure[^>]*data-who-map[^>]*>[\s\S]*?<\/figure>/)?.[0] ?? "";
-    expect(fig).not.toBe("");
-    const img = fig.match(/<img [^>]*>/)![0];
-    expect(img).toMatch(/src="\/_image\?href=[^"]*who-infographic/);
-    expect(img).toMatch(/srcset="[^"]+ 640w[^"]+ 1280w/);
-    expect(img).toMatch(/alt="[^"]{40,}"/);
+    expect(html).not.toContain("data-who-map");
+    expect(html).not.toContain("who-infographic");
+    const img = html.match(/<img [^>]*class="who-portrait"[^>]*>/)?.[0] ?? html.match(/<img [^>]*>/)![0];
+    expect(img).toContain('src="/images/ali-sadikin-ma-pakar-ai-indonesia.jpg"');
+    expect(img).toMatch(/alt="[^"]+"/);
     expect(img).toContain('width="');
-    expect(img).toContain('height="');
     expect(img).toContain('loading="lazy"');
-    // click/tap opens the full-size image in the site lightbox
-    expect(fig).toMatch(/<button[^>]*data-lightbox[^>]*data-lightbox-items="\[[^"]*who-infographic/);
-    // the text inside the image is not crawlable: chapters are repeated as HTML
-    const items = [...fig.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/g)].map((m) => m[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim());
-    expect(items).toHaveLength(4);
-    expect(items[0]).toContain("2008–2015");
-    expect(items[1]).toContain("Marlin Booking");
-    expect(items[2]).toContain("Satnusa");
-    expect(items[3]).toContain("INDUSIA.ai");
-    expect(fig).toContain('aria-current="step"');
-    expect(fig).not.toContain("<svg");
   });
 
   it("heading comes before the figure and body text (document order)", async () => {
     const html = await render(WhoIAm, lang);
-    expect(html.indexOf("<h2")).toBeLessThan(html.indexOf("data-who-map"));
+    expect(html.indexOf("<h2")).toBeLessThan(html.indexOf("who-portrait"));
     expect((html.match(/<h[1-6]/g) ?? []).every((h) => h === "<h2")).toBe(true);
     expect(html).not.toMatch(/Rp\s?\d|\$\s?\d/);
   });
