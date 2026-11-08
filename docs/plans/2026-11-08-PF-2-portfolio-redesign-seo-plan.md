@@ -212,9 +212,9 @@ incl. IDBYTE; cover `career-marlin.jpg`), gap 2019–2021 left empty, Satnusa 20
 - Modify: `backend/app/Models/TiktokPost.php`
 - Modify: `backend/app/Models/ThreadsPost.php`
 - Modify: `backend/app/Models/RedditPost.php`
-- Create: `backend/app/Console/Commands/RepairWibScheduleTimes.php`
+- ~~Create: `backend/app/Console/Commands/RepairWibScheduleTimes.php`~~ (CANCELLED 2026-11-08 — no production rows to repair)
 - Test: `backend/tests/Feature/ScheduleTimezoneStorageTest.php`
-- Test: `backend/tests/Feature/RepairWibScheduleTimesTest.php`
+- ~~Test: `backend/tests/Feature/RepairWibScheduleTimesTest.php`~~ (CANCELLED with the command)
 
 Found 2026-11-08 by the Carbon 3.10→3.15 update (3 `LinkedInDraftApproveSlotAssignmentTest` cases only
 passed through a Carbon mock-timezone quirk). `app.timezone` = UTC and the publish cron compares
