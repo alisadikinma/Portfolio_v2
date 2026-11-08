@@ -200,4 +200,10 @@ return [
         'empty_mcp_config' => env('ARTICLE_GEN_EMPTY_MCP_CONFIG', '/home/claudesn/empty-mcp.json'),
     ],
 
+    // Shared secret for server-to-server calls from the Astro frontend
+    // (POST /api/internal/*). Empty = endpoints answer 503.
+    'internal' => [
+        'token' => env('INTERNAL_API_TOKEN'),
+    ],
+
 ];

@@ -4,8 +4,7 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
+use App\Services\CrawlerHitRecorder;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -21,26 +20,12 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class LogAiCrawler
 {
-    /**
-     * User-Agent substring => canonical bot name. Matching is case-insensitive.
-     */
-    private const BOT_MAP = [
-        'GPTBot' => 'GPTBot',
-        'OAI-SearchBot' => 'OAI-SearchBot',
-        'ChatGPT-User' => 'ChatGPT-User',
-        'ClaudeBot' => 'ClaudeBot',
-        'Claude-Web' => 'Claude-Web',
-        'PerplexityBot' => 'PerplexityBot',
-        'Google-Extended' => 'Google-Extended',
-        'Applebot-Extended' => 'Applebot-Extended',
-    ];
-
     public function handle(Request $request, Closure $next): Response
     {
         $bot = $this->matchBot($request->userAgent());
 
         if ($bot !== null) {
-            $this->record($bot);
+            app(CrawlerHitRecorder::class)->record($bot);
         }
 
         return $next($request);
@@ -55,46 +40,12 @@ class LogAiCrawler
             return null;
         }
 
-        foreach (self::BOT_MAP as $needle => $canonical) {
+        foreach ((array) config('ai_bots.map', []) as $needle => $canonical) {
             if (stripos($userAgent, $needle) !== false) {
                 return $canonical;
             }
         }
 
         return null;
-    }
-
-    /**
-     * Atomic daily upsert increment for (today, bot). Fully fail-open.
-     */
-    private function record(string $bot): void
-    {
-        try {
-            $date = now()->toDateString();
-
-            // Single atomic upsert keyed on unique(date,bot): inserts the row
-            // with hits=1, or `hits = hits + 1` on conflict. Race-free even for
-            // two concurrent first-of-day crawls (the increment+insert pattern
-            // could drop one hit in that window).
-            DB::table('geo_crawler_hits')->upsert(
-                [
-                    'date' => $date,
-                    'bot' => $bot,
-                    'hits' => 1,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ],
-                ['date', 'bot'],
-                ['hits' => DB::raw('hits + 1'), 'updated_at' => now()],
-            );
-        } catch (\Throwable $e) {
-            // ponytail: daily granularity is enough for "are AI crawlers
-            // hitting us" measurement. If per-path attribution is ever needed,
-            // upgrade the table+key to (date,bot,path) and key the increment on it.
-            Log::warning('LogAiCrawler failed to record crawler hit', [
-                'bot' => $bot,
-                'error' => $e->getMessage(),
-            ]);
-        }
     }
 }
