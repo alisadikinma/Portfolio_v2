@@ -1,0 +1,139 @@
+---
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import ProjectCard, { type ProjectCardData } from "../../../components/ProjectCard.astro";
+import { apiGet, apiPath } from "../../../lib/api";
+import { LANGS, type Lang } from "../../../lib/i18n";
+import { sanitizeHtml } from "../../../lib/sanitize";
+import { SITE, breadcrumb, creativeWork, graph, personNode, webPageNode, websiteNode } from "../../../lib/schema";
+import { id } from "../../../content/copy/id";
+import { en } from "../../../content/copy/en";
+
+const rawLang = Astro.params.lang;
+if (!(LANGS as readonly string[]).includes(rawLang ?? "")) {
+  return new Response(null, { status: 404 });
+}
+const lang = rawLang as Lang;
+const slug = Astro.params.slug ?? "";
+const c = (lang === "id" ? id : en).projectDetail;
+const idxPath = `/${lang}/projects`;
+const path = `${idxPath}/${encodeURIComponent(slug)}`;
+
+const str = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
+const strList = (v: unknown): string[] => (Array.isArray(v) ? v.map(str).filter((x) => x !== "") : []);
+
+let project: Record<string, unknown> | null = null;
+let failed = false;
+try {
+  project = await apiGet<Record<string, unknown>>(apiPath`/projects/${slug}`, { lang });
+} catch {
+  failed = true;
+}
+if (!failed && !project) {
+  return new Response(null, { status: 404 });
+}
+if (failed) {
+  Astro.response.status = 503;
+}
+
+const title = str(project?.title);
+const description = str(project?.description);
+const category = str(project?.category);
+const hero = str(project?.featured_image);
+const gallery = strList(project?.images).filter((u) => u !== hero);
+const technologies = strList(project?.technologies);
+const bodyHtml = sanitizeHtml(str(project?.content));
+const related: ProjectCardData[] = (Array.isArray(project?.related_projects) ? (project?.related_projects as Record<string, unknown>[]) : [])
+  .filter((r) => r && str(r.slug) !== "" && str(r.title) !== "" && str(r.slug) !== slug)
+  .map((r) => ({
+    slug: str(r.slug),
+    title: str(r.title),
+    description: str(r.description),
+    category: "",
+    image: str(r.featured_image) || null,
+  }));
+
+const clamp = (s: string, max: number): string => {
+  if (s.length <= max) return s;
+  const cut = s.slice(0, max - 1);
+  return cut.slice(0, cut.lastIndexOf(" ") > 0 ? cut.lastIndexOf(" ") : cut.length).trimEnd() + "…";
+};
+const metaTitle = `${title} — ${c.titleSuffix}`;
+const metaDescription = clamp(str(project?.meta_description) || description, 160);
+const ogImage = str(project?.og_image) || hero || undefined;
+
+const url = SITE + path;
+const jsonld = failed
+  ? graph(personNode(), websiteNode())
+  : graph(
+      personNode(),
+      websiteNode(),
+      webPageNode({ url, lang, name: metaTitle, description: metaDescription }),
+      creativeWork({ name: title, url, description: metaDescription || undefined, image: ogImage }),
+      breadcrumb([
+        { name: c.breadcrumbHome, url: `${SITE}/${lang}` },
+        { name: c.breadcrumbProjects, url: SITE + idxPath },
+        { name: title, url },
+      ]),
+    );
+---
+<BaseLayout title={failed ? c.titleSuffix : metaTitle} description={failed ? c.unavailable : metaDescription} path={path} lang={lang} jsonld={jsonld} image={ogImage} type="article">
+  <main class="wrap project-detail">
+    {failed ? (
+      <p class="project-unavailable" role="status">{c.unavailable}</p>
+    ) : (
+      <>
+        <nav class="project-crumbs" aria-label="Breadcrumb">
+          <a href={`/${lang}`}>{c.breadcrumbHome}</a> / <a href={idxPath}>{c.breadcrumbProjects}</a>
+        </nav>
+        <article>
+          <header>
+            {category && <p class="project-cat">{category}</p>}
+            <h1>{title}</h1>
+            {description && <p class="project-lede">{description}</p>}
+          </header>
+          {hero && <img class="project-hero" src={hero} alt={title} width="1200" height="750" decoding="async" fetchpriority="high" />}
+          {technologies.length > 0 && (
+            <section aria-labelledby="project-tech">
+              <h2 id="project-tech">{c.technologiesHeading}</h2>
+              <ul class="project-tech">
+                {technologies.map((t) => <li>{t}</li>)}
+              </ul>
+            </section>
+          )}
+          {bodyHtml !== "" && <div class="project-body" set:html={bodyHtml} />}
+          {gallery.length > 0 && (
+            <section aria-labelledby="project-gallery">
+              <h2 id="project-gallery">{c.galleryHeading}</h2>
+              <div class="project-gallery">
+                {gallery.map((g) => <img src={g} alt={title} width="800" height="500" loading="lazy" decoding="async" />)}
+              </div>
+            </section>
+          )}
+        </article>
+        {related.length > 0 && (
+          <section aria-labelledby="project-related">
+            <h2 id="project-related">{c.relatedHeading}</h2>
+            <div class="projects-grid">
+              {related.map((p) => <ProjectCard project={p} lang={lang} readMore={c.readMore} />)}
+            </div>
+          </section>
+        )}
+      </>
+    )}
+  </main>
+</BaseLayout>
+<style>
+  .project-detail { padding-block: 64px; }
+  .project-crumbs { color: var(--text-secondary); margin-bottom: 24px; }
+  .project-cat { font: 500 13px/1 var(--font-mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent-primary); }
+  .project-lede { color: var(--text-secondary); font-size: 1.15rem; max-width: 70ch; }
+  .project-hero { width: 100%; height: auto; aspect-ratio: 16 / 10; object-fit: cover; border-radius: var(--radius-lg); margin-block: 32px; }
+  .project-tech { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; padding: 0; }
+  .project-tech li { padding: 6px 14px; border: 1px solid var(--border-emphasis); border-radius: var(--radius-md); }
+  .project-body { max-width: 72ch; margin-block: 32px; }
+  .project-body :global(img) { max-width: 100%; height: auto; }
+  .project-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  .project-gallery img { width: 100%; height: auto; border-radius: var(--radius-md); }
+  .projects-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px; }
+  .project-unavailable { color: var(--text-secondary); }
+</style>

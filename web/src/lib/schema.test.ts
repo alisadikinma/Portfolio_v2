@@ -176,3 +176,11 @@ describe("1D review fixes", () => {
     expect(bare.mainEntity).toBeUndefined();
   });
 });
+
+describe("creativeWork creator", () => {
+  it("references the Person node as creator and keeps author", () => {
+    const c = creativeWork({ name: "P", url: "https://alisadikinma.com/en/projects/p" }) as any;
+    expect(c.creator).toEqual({ "@id": PERSON_ID });
+    expect(c.author).toEqual({ "@id": PERSON_ID });
+  });
+});

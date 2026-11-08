@@ -149,7 +149,7 @@ export function blogPosting(p: {
 }
 
 export function creativeWork(p: { name: string; url: string; description?: string; image?: string }): Node {
-  const n: Node = { "@type": "CreativeWork", name: p.name, url: p.url, author: PERSON_REF };
+  const n: Node = { "@type": "CreativeWork", name: p.name, url: p.url, creator: PERSON_REF, author: PERSON_REF };
   if (p.description) n.description = p.description;
   if (p.image) n.image = p.image;
   return n;
