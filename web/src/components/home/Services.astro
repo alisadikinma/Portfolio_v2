@@ -18,7 +18,7 @@ const devHref = lang === "id" ? "https://indusia.ai/id/ai-development-services/"
     <div class="rows">
       <div class="row">
         <div><h3>{s.consultTitle}</h3></div>
-        <div>
+        <div data-clamp>
           <p>{s.consultBody}</p>
           <p>{s.consultBuildBefore}<a href={devHref}>{s.consultBuildLink}</a>{s.consultBuildAfter}</p>
           <p class="for">{s.consultFor}</p>
@@ -27,12 +27,12 @@ const devHref = lang === "id" ? "https://indusia.ai/id/ai-development-services/"
       </div>
       <div class="row">
         <div><h3>{s.trainingTitle}</h3><span class="state">{s.trainingState}</span></div>
-        <div><p>{s.trainingBody}</p><p class="for">{s.trainingFor}</p></div>
+        <div data-clamp><p>{s.trainingBody}</p><p class="for">{s.trainingFor}</p></div>
         <a class="btn btn-ghost" href={localizedPath(`/${lang}/pelatihan-ai`, lang)}>{s.trainingCta}</a>
       </div>
       <div class="row">
         <div><h3>{s.speakerTitle}</h3></div>
-        <div><p>{s.speakerBody}</p><p class="for">{s.speakerFor}</p></div>
+        <div data-clamp><p>{s.speakerBody}</p><p class="for">{s.speakerFor}</p></div>
         <a class="btn btn-ghost" href={localizedPath(`/${lang}/pembicara-ai`, lang)}>{s.speakerCta}</a>
       </div>
     </div>

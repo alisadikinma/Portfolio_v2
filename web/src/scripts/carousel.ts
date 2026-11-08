@@ -22,7 +22,34 @@ export function positionLabel(lefts: number[], scrollLeft: number): string {
   return `${best + 1} / ${lefts.length}`;
 }
 
-function enhance(list: HTMLElement, labels: { prev: string; next: string }): void {
+/** A clamped block needs "see more" only if it hides more than rounding. */
+export function needsClamp(scrollHeight: number, clientHeight: number): boolean {
+  return scrollHeight - clientHeight > 2;
+}
+
+type Labels = { prev: string; next: string; more: string; less: string };
+
+/** Long card text on phones: clamp it ([data-clamp], CSS .is-clamped) with a toggle. Text stays in the HTML. */
+function clampCards(list: HTMLElement, labels: Labels): void {
+  for (const el of list.querySelectorAll<HTMLElement>("[data-clamp]")) {
+    const full = el.scrollHeight; // natural height, every paragraph shown
+    el.classList.add("is-clamped");
+    if (!needsClamp(full, el.clientHeight)) { el.classList.remove("is-clamped"); continue; }
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "clamp-more";
+    b.textContent = labels.more;
+    b.setAttribute("aria-expanded", "false");
+    el.after(b);
+    b.addEventListener("click", () => {
+      const open = el.classList.toggle("is-clamped") === false;
+      b.textContent = open ? labels.less : labels.more;
+      b.setAttribute("aria-expanded", String(open));
+    });
+  }
+}
+
+function enhance(list: HTMLElement, labels: Labels): void {
   const cards = () => Array.from(list.children) as HTMLElement[];
   const lefts = () => { const c = cards(); return c.map((el) => el.offsetLeft - c[0].offsetLeft); };
   const max = () => list.scrollWidth - list.clientWidth;
@@ -57,6 +84,7 @@ function enhance(list: HTMLElement, labels: { prev: string; next: string }): voi
   if (typeof ResizeObserver !== "undefined") new ResizeObserver(sync).observe(list);
   else window.addEventListener("resize", sync);
   sync();
+  if (max() > EPS) clampCards(list, labels); // phones only: on desktop the list does not scroll
 
   // Mouse drag. Touch and pen keep the native swipe. A drag that moved never fires the card's click.
   let startX = 0, startLeft = 0, moved = false, dragging = false;
@@ -86,6 +114,8 @@ function enhance(list: HTMLElement, labels: { prev: string; next: string }): voi
 
 export function initCarousels(doc: Document = document): void {
   const en = doc.documentElement.lang === "en";
-  const labels = en ? { prev: "Previous", next: "Next" } : { prev: "Sebelumnya", next: "Berikutnya" };
+  const labels: Labels = en
+    ? { prev: "Previous", next: "Next", more: "See more", less: "See less" }
+    : { prev: "Sebelumnya", next: "Berikutnya", more: "Selengkapnya", less: "Tutup" };
   doc.querySelectorAll<HTMLElement>(CAROUSELS).forEach((l) => enhance(l, labels));
 }

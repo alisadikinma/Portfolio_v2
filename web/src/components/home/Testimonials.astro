@@ -45,7 +45,7 @@ const items = rows
       <ul class="tms">
         {items.map((i) => (
           <li><figure class="tm">
-            <blockquote lang="en"><p>“{i.quote}”</p></blockquote>
+            <blockquote lang="en" data-clamp><p>“{i.quote}”</p></blockquote>
             <figcaption>
               {i.photo && <img src={i.photo} alt={i.name} width="56" height="56" loading="lazy" decoding="async" />}
               <span>

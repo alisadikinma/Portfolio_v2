@@ -700,6 +700,13 @@ fieldset.field { border: 0; margin: 0; padding: 0; }
   .jr-board .car-ctl { padding: 0 16px 12px; }
 }
 
+/* "see more" on long phone-carousel card text (carousel.ts adds .is-clamped only when it hides text) */
+.is-clamped { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; line-clamp: 4; overflow: hidden; }
+.is-clamped > p + p { display: none; } /* first paragraph only while clamped */
+.clamp-more { align-self: flex-start; display: inline-flex; align-items: center; min-height: 44px; padding: 0; margin-top: -6px; background: none; border: 0;
+  font: 500 15px/1 var(--font-body); color: var(--accent-primary); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.clamp-more:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+
 /* ================= journey: one chapter at a time (Ali 2026-11-09) =================
    .is-cycling is set by journey-cycle.ts (never under reduced motion, never without JS).
    The still turns grey; the colour video shows only through the active island's window;

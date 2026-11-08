@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { stepTarget, positionLabel } from "./carousel";
+import { needsClamp, stepTarget, positionLabel } from "./carousel";
 
 // Ali 2026-11-09: "ini bentuk slider tapi saya gak bisa geser ke card berikutnya" — mouse users
 // need buttons; the buttons move exactly one card.
@@ -30,5 +30,14 @@ describe("positionLabel", () => {
     expect(positionLabel([0, 300, 600], 0)).toBe("1 / 3");
     expect(positionLabel([0, 300, 600], 310)).toBe("2 / 3");
     expect(positionLabel([0, 300, 600], 600)).toBe("3 / 3");
+  });
+});
+
+// Ali 2026-11-09: "card jangan penuh sampai memanjang, dibuat see more baru muncul semua text".
+describe("needsClamp", () => {
+  it("only when the clamped text actually hides something", () => {
+    expect(needsClamp(300, 120)).toBe(true);
+    expect(needsClamp(121, 120)).toBe(false); // within rounding
+    expect(needsClamp(120, 120)).toBe(false);
   });
 });
