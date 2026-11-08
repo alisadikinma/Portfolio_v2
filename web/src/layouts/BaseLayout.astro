@@ -52,5 +52,9 @@ const { lang, path, home = false, ga4Id = getConfig().ga4Id, availableLangs, ...
     <Header lang={lang} path={path} home={home} availableLangs={availableLangs} />
     <slot />
     <Footer lang={lang} />
+    <script>
+      import { initCarousels } from "../scripts/carousel";
+      initCarousels();
+    </script>
   </body>
 </html>

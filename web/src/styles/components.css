@@ -675,6 +675,29 @@ fieldset.field { border: 0; margin: 0; padding: 0; }
   .journey::before { left: 16px; right: 0; top: 10px; bottom: auto; width: auto; height: 2px; background: linear-gradient(90deg, rgba(63,184,197,.2), var(--accent-primary)); }
   .journey li::before { top: -21px; left: 18px; margin-left: 0; }
   .journey button, .journey .jr-card { border: 1px solid var(--border-subtle); border-radius: 16px; background: var(--bg-elevated); padding: 16px; }
+  /* The timeline is drawn per card (a segment to the next dot), so it scrolls with the cards. */
+  .journey::before, .jr-board.is-cycling .journey::after { display: none; }
+  .journey li:not(:last-child)::after { content: ""; position: absolute; top: -16px; left: 32px; right: -14px; height: 2px;
+    background: rgba(63,184,197,.25); }
+  .jr-board.is-cycling[data-step="2"] .journey .c1::after,
+  .jr-board.is-cycling[data-step="3"] .journey :is(.c1, .c2)::after,
+  .jr-board.is-cycling[data-step="4"] .journey :is(.c1, .c2, .c3)::after { background: var(--accent-primary); }
+}
+
+/* carousel controls (carousel.ts): only rendered/visible while the list scrolls */
+.car-ctl { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 4px; }
+.car-ctl[hidden] { display: none; }
+.car-btn { display: inline-grid; place-items: center; width: 44px; height: 44px; border-radius: 50%;
+  border: 1px solid var(--border-emphasis); background: var(--bg-elevated); color: var(--text-primary);
+  font: 500 24px/1 var(--font-display); cursor: pointer; }
+.car-btn:hover:not(:disabled) { border-color: var(--accent-primary); color: var(--accent-primary); }
+.car-btn:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+.car-btn:disabled { opacity: .35; cursor: default; }
+.car-pos { font: 500 13px/1 var(--font-mono); color: var(--text-secondary); min-width: 4ch; text-align: center; }
+@media (max-width: 760px) {
+  .tms, .th-topics, .sp-topics, ul.stages:has(> .sp-ev), .rows, .journey { cursor: grab; }
+  .is-dragging { scroll-snap-type: none !important; cursor: grabbing; user-select: none; }
+  .jr-board .car-ctl { padding: 0 16px 12px; }
 }
 
 /* ================= journey: one chapter at a time (Ali 2026-11-09) =================
