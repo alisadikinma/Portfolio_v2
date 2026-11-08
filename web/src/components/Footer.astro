@@ -1,0 +1,24 @@
+---
+import type { Lang } from "../lib/i18n";
+import { SAME_AS } from "../lib/schema";
+import { id } from "../content/copy/id";
+import { en } from "../content/copy/en";
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const c = lang === "id" ? id : en;
+const founderHref = lang === "id" ? "https://indusia.ai/id/" : "https://indusia.ai/";
+const social = (host: string) => SAME_AS.find((u) => u.includes(host)) ?? "";
+---
+<footer class="foot">
+  <div class="wrap">
+    <span>{c.footer.copyright} · <a href={founderHref}>Founder INDUSIA.ai</a></span>
+    <nav aria-label={c.footer.ariaSocial}>
+      {social("linkedin") !== "" && <a href={social("linkedin")} rel="noopener">{c.footer.linkedin}</a>}
+      {social("instagram") !== "" && <a href={social("instagram")} rel="noopener">{c.footer.instagram}</a>}
+      {social("youtube") !== "" && <a href={social("youtube")} rel="noopener">{c.footer.youtube}</a>}
+      {social("tiktok") !== "" && <a href={social("tiktok")} rel="noopener">{c.footer.tiktok}</a>}
+      <a href={`/${lang}/faq`}>{c.footer.faq}</a>
+    </nav>
+  </div>
+</footer>

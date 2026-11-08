@@ -1,0 +1,47 @@
+---
+import { alternates, localizedPath, type Lang } from "../lib/i18n";
+import { apiGet } from "../lib/api";
+import { id } from "../content/copy/id";
+import { en } from "../content/copy/en";
+
+interface Props {
+  lang: Lang;
+  path: string;
+  /** Home page: nav anchors stay in-page. Elsewhere they point to /{lang}/#id. */
+  home?: boolean;
+}
+const { lang, path, home = false } = Astro.props;
+const c = lang === "id" ? id : en;
+const alts = alternates(path);
+const homePath = `/${lang}`;
+const spy = (hash: string) => (home ? hash : `${homePath}/${hash}`);
+// WhatsApp number comes from settings site.contact_phone (apiGet unwraps the envelope data).
+let waDigits = "";
+try {
+  const site = await apiGet<{ contact_phone?: unknown }>("/settings/site", { lang });
+  const phone = site?.contact_phone;
+  waDigits = typeof phone === "string" ? phone.replace(/\D/g, "") : "";
+} catch {
+  waDigits = "";
+}
+const wa = waDigits !== "" ? `https://wa.me/${waDigits}` : "";
+---
+<header class="site-head">
+  <div class="wrap">
+    <a class="brand" href={homePath}>Ali Sadikin Ma <span>/ AI</span></a>
+    <nav class="nav" aria-label={c.nav.ariaMain}>
+      <a href={spy("#tentang")} data-spy>{c.nav.about}</a>
+      <a href={spy("#perjalanan")} data-spy>{c.nav.journey}</a>
+      <a href={spy("#layanan")} data-spy>{c.nav.services}</a>
+      <a href={localizedPath(`/${lang}/pelatihan-ai`, lang)}>{c.nav.training}</a>
+      <a href={localizedPath(`/${lang}/pembicara-ai`, lang)}>{c.nav.speaker}</a>
+      <a href={spy("#tulisan")} data-spy>{c.nav.blog}</a>
+      <a class="lang" href={lang === "id" ? alts.en : alts.id} hreflang={lang === "id" ? "en" : "id"} aria-label={c.nav.ariaLang}>{c.nav.langSwitch}</a>
+    </nav>
+    {wa !== "" && <a class="btn btn-primary" href={wa}>{c.nav.ctaWhatsapp}</a>}
+  </div>
+</header>
+<script>
+  import { initScrollspy } from "../scripts/scrollspy";
+  initScrollspy();
+</script>
