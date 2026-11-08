@@ -164,3 +164,9 @@ export async function addImageDimensions(html: string, opts: { timeoutMs?: numbe
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, todo.length) }, worker));
   return html.replace(IMG_TAG, (tag) => replaced.get(tag) ?? tag);
 }
+
+/** Real pixel size of one remote image (cached), or null. Never guessed. */
+export async function imageDimensions(src: string, opts: { timeoutMs?: number } = {}): Promise<{ w: number; h: number } | null> {
+  if (!fetchable(src)) return null;
+  return dimsFor(src, opts.timeoutMs ?? FETCH_TIMEOUT_MS);
+}

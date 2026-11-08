@@ -1,0 +1,93 @@
+---
+import type { Lang } from "../../lib/i18n";
+import { id } from "../../content/copy/id";
+import { en } from "../../content/copy/en";
+import { imageDimensions } from "../../lib/image-dims";
+import {
+  GALLERIES_MARLIN, GALLERY_SATNUSA, GALLERY_SINGAPORE, loadGallery, type Photos,
+} from "../../lib/career";
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const j = (lang === "id" ? id : en).journey;
+const base = lang === "id" ? "https://indusia.ai/id/" : "https://indusia.ai/";
+const MARLIN_COVER = "/images/career-marlin.jpg";
+const MARLIN_DIMS = { w: 2752, h: 1536 };
+const n = (count: number) => j.photos.replace("{n}", String(count));
+
+const ids = [GALLERY_SINGAPORE, ...GALLERIES_MARLIN, GALLERY_SATNUSA];
+const settled = await Promise.allSettled(ids.map((g) => loadGallery(g, lang)));
+const got = new Map<number, Photos | null>(
+  ids.map((g, i) => [g, settled[i].status === "fulfilled" ? settled[i].value : null]),
+);
+const singapore = got.get(GALLERY_SINGAPORE) ?? null;
+const satnusa = got.get(GALLERY_SATNUSA) ?? null;
+const marlinParts = GALLERIES_MARLIN.map((g) => got.get(g) ?? null);
+const marlinUrls = [MARLIN_COVER, ...marlinParts.flatMap((p) => p?.urls ?? [])];
+// A count is only honest when every source gallery loaded.
+const marlinComplete = marlinParts.every((p) => p !== null);
+
+const dims = async (src: string | null) => (src ? await imageDimensions(src) : null);
+const [singaporeDims, satnusaDims] = await Promise.all([dims(singapore?.cover ?? null), dims(satnusa?.cover ?? null)]);
+
+const chapters = [
+  { key: "singapore", gallery: "14", photos: singapore, cover: singapore?.cover ?? null, coverDims: singaporeDims, items: singapore?.urls ?? [], count: singapore ? singapore.urls.length : 0, pos: true, yr: j.singaporeYear, role: j.singaporeRole, org: j.singaporeOrg, note: j.singaporeNote, aria: j.singaporeAria, alt: j.singaporeAlt },
+  { key: "marlin", gallery: "marlin", photos: null, cover: MARLIN_COVER, coverDims: MARLIN_DIMS, items: marlinUrls, count: marlinComplete ? marlinUrls.length : 0, pos: false, yr: j.marlinYear, role: j.marlinRole, org: j.marlinOrg, note: j.marlinNote, aria: j.marlinAria, alt: j.marlinAlt },
+  { key: "satnusa", gallery: "16", photos: satnusa, cover: satnusa?.cover ?? null, coverDims: satnusaDims, items: satnusa?.urls ?? [], count: satnusa ? satnusa.urls.length : 0, pos: true, yr: j.satnusaYear, role: j.satnusaRole, org: j.satnusaOrg, note: j.satnusaNote, aria: j.satnusaAria, alt: j.satnusaAlt },
+];
+---
+<section class="sec" id="perjalanan" aria-labelledby="journey-h">
+  <div class="wrap">
+    <div class="sec-head"><h2 id="journey-h">{j.h2}</h2><p class="lead">{j.lead}</p></div>
+    <ol class="journey">
+      {chapters.map((c) => {
+        const Tag = c.items.length > 0 ? "button" : "div";
+        const attrs = c.items.length > 0
+          ? { type: "button" as const, "data-career": c.gallery, "data-lightbox": "", "data-lightbox-title": c.org, "data-lightbox-items": JSON.stringify(c.items), "aria-label": c.aria }
+          : {};
+        return (
+          <li>
+            <Tag class="jr-card" {...attrs}>
+              <span class="jr-ph">
+                {c.cover && (
+                  <img src={c.cover} alt={c.alt} loading="lazy" decoding="async"
+                    width={c.coverDims?.w} height={c.coverDims?.h}
+                    style={c.pos ? "object-position:50% 15%" : undefined} />
+                )}
+                {c.count > 0 && <em>{n(c.count)}</em>}
+              </span>
+              <span class="jr-yr">{c.yr}</span>
+              <strong>{c.role}</strong>
+              <span class="jr-org">{c.org}</span>
+              <span class="jr-note">{c.note}</span>
+            </Tag>
+          </li>
+        );
+      })}
+      <li class="jr-now">
+        <a class="jr-link" href={base}>
+          <span class="jr-ph jr-indusia">
+            <img src="/images/indusia-avi.webp" alt={j.indusiaImgAlt} width="1600" height="894" loading="lazy" decoding="async" />
+            <img class="jr-logo" src="/images/indusia-wordmark.svg" alt={j.indusiaLogoAlt} width="168" height="24" loading="lazy" decoding="async" />
+            <em>{j.indusiaNow}</em>
+          </span>
+          <span class="jr-yr">{j.indusiaYear}</span>
+          <strong>{j.indusiaRole}</strong>
+          <span class="jr-org">{j.indusiaOrg}</span>
+        </a>
+        <p class="jr-note"><a href={`${base}ai-vision/`}>machine vision Indonesia</a>{j.indusiaNoteMid1}<a href={`${base}ai-fleet-transportation/`}>fleet management system</a>{j.indusiaNoteMid2}<a href={`${base}ai-assistant/`}>{lang === "id" ? "chatbot WhatsApp AI" : "WhatsApp AI chatbot"}</a>{j.indusiaNoteEnd}</p>
+        <a class="jr-cta" href={base}>{j.indusiaCta}</a>
+      </li>
+    </ol>
+  </div>
+</section>
+<style>
+  /* div variant (gallery failed): same box as the button card */
+  div.jr-card { box-sizing: border-box; display: grid; gap: 6px; width: 100%; height: 100%; align-content: start; }
+  .jr-ph:empty, .jr-ph:not(:has(img)) { background: var(--bg-elevated); }
+  .jr-now { display: grid; align-content: start; gap: 6px; }
+  .jr-now > .jr-link { height: auto; }
+  /* the global .journey a rule resets anchors to grid blocks; inline links in the note stay inline */
+  .jr-now .jr-note a { display: inline; width: auto; height: auto; color: var(--accent-primary); text-decoration: underline; text-underline-offset: 3px; }
+  .jr-now .jr-cta { display: inline; width: auto; height: auto; margin-top: 6px; font-weight: 600; color: var(--accent-primary); text-decoration: underline; text-underline-offset: 3px; }
+</style>
