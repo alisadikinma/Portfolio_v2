@@ -360,6 +360,13 @@ export const en: Copy = {
     latest: "Latest",
   },
   speaker: {
+    heroAlt: "Ali Sadikin Ma at the podium of Global AI Demo Day 2026 in Bengaluru, presenting Sparkfluence on the stage screen",
+    cred1: "1st place among 26 AI startups, 16 countries",
+    cred2: "Indonesian and English",
+    cred3: "On site or online",
+    topicsLead: "Every topic comes with examples I built myself.",
+    photosOpen: "See {n} photos",
+    awardPage: "Award page",
     metaDescription: "AI speaker Indonesia and seminar guest: Ali Sadikin Ma, 1st place at Global AI Demo Day 2026. Invite him to your event through WhatsApp.",
     breadcrumb: "AI speaker",
     h1: "AI speaker Indonesia for seminars and panels",

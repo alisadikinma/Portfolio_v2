@@ -1,6 +1,6 @@
 ---
-// Line icons for the training page. Decorative only: the meaning is always in the adjacent text.
-export type TrainingIconName = "doc" | "agent" | "code" | "audit" | "office" | "laptop" | "class" | "data" | "run";
+// Line icons for the training and speaker pages. Decorative only: the meaning is always in the adjacent text.
+export type TrainingIconName = "doc" | "agent" | "code" | "audit" | "office" | "laptop" | "class" | "data" | "run" | "globe";
 interface Props { name: TrainingIconName }
 const { name } = Astro.props;
 ---
@@ -46,5 +46,9 @@ const { name } = Astro.props;
     <circle cx="9" cy="24" r="5" /><circle cx="39" cy="12" r="5" /><circle cx="39" cy="36" r="5" />
     <path d="M14 24h8M22 24l12-10M22 24l12 10" />
     <path class="acc" d="M36 36l2 2 4-4" /><path class="acc" d="M37 9.5l4 2.5-4 2.5z" />
+  </>)}
+  {name === "globe" && (<>
+    <circle cx="22" cy="24" r="16" /><path d="M6 24h32M22 8c-5 5-5 27 0 32M22 8c5 5 5 27 0 32" />
+    <path class="acc" d="M36 6l1.8 3.7L42 11l-4.2 1.3L36 16l-1.8-3.7L30 11l4.2-1.3z" />
   </>)}
 </svg>

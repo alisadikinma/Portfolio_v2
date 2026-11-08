@@ -19,17 +19,31 @@ const SLUGS = [
   { id: 8, slug: "1st-place-winner-wild-card-fenox-startup-world-cup-competition" },
 ];
 let awardsDown = false;
+let galleries = false;
+// award id -> file names in its gallery (only the ones the page picks matter)
+const FILES: Record<number, string[]> = {
+  13: ["1777871190_item_20_3.jpg", "1777871190_item_20_0.png", "1777871190_item_20_4.jpg"],
+  10: ["1761931433_item_12_0.jpg", "1761931433_item_12_9.jpg"],
+  7: ["1761930891_item_9_1.jpg", "1761930891_item_9_2.jpg"],
+  8: ["1761931360_item_10_1.jpg"],
+};
 let phone: string | undefined = "+62 812-3456 7890";
 const ok = (data: unknown) => new Response(JSON.stringify({ success: true, data }), { status: 200 });
 
 beforeEach(() => {
   resetApiCache();
   awardsDown = false;
+  galleries = false;
   phone = "+62 812-3456 7890";
   vi.stubGlobal("fetch", vi.fn(async (url: string) => {
     const u = String(url);
     if (/\/settings\/site/.test(u)) return ok(phone ? { contact_phone: phone } : {});
     if (/\/awards(\?|$)/.test(u)) return awardsDown ? new Response("x", { status: 500 }) : ok(SLUGS);
+    const g = u.match(/\/awards\/(\d+)\/galleries/);
+    if (g && galleries) {
+      const files = FILES[Number(g[1])] ?? [];
+      return ok({ galleries: [{ id: 1, items: files.map((f, i) => ({ type: "image", file_url: `https://alisadikinma.com/storage/gallery/items/${f}`, sequence: i })) }] });
+    }
     return ok({});
   }));
 });
@@ -91,6 +105,33 @@ describe("speaker page", () => {
     const list = presented(html);
     expect(list).toContain("Telkomsel NextDev");
     expect(list).not.toContain("<a ");
+  });
+
+  it("hero shows Ali on stage at Global AI Demo Day (real gallery photo), not the studio portrait", async () => {
+    galleries = true;
+    const { html } = await load("id", "pembicara-ai");
+    const hero = html.match(/<section class="sp-hero[\s\S]*?<\/section>/)![0];
+    expect(hero).toContain("item_20_0");
+    expect(hero).not.toContain("ali-sadikin-ma-pakar-ai-indonesia.jpg");
+    expect(hero).toMatch(/<img [^>]*alt="[^"]{40,}"/);
+    expect(hero).toContain(id.stages.demoDayLock);
+    for (const k of ["cred1", "cred2", "cred3"] as const) expect(hero).toContain(id.speaker[k]);
+  });
+
+  it("hero without gallery data: no broken image, page still complete", async () => {
+    const { html } = await load("en", "ai-speaker");
+    const hero = html.match(/<section class="sp-hero[\s\S]*?<\/section>/)![0];
+    expect(hero).not.toMatch(/<img/);
+    expect(hero).toContain(en.speaker.h1);
+  });
+
+  it("each event card shows a real photo and opens that event's gallery", async () => {
+    galleries = true;
+    const list = presented((await load("id", "pembicara-ai")).html);
+    expect((list.match(/<img /g) ?? []).length).toBe(4);
+    for (const f of ["item_20_3", "item_12_9", "item_9_1", "item_10_1"]) expect(list).toContain(f);
+    expect((list.match(/data-lightbox-items=/g) ?? []).length).toBe(4);
+    expect(list).toContain("data-lightbox-thumbs=");
   });
 
   it("no video section and no claim of keynote / formats not in the source facts", async () => {

@@ -358,6 +358,13 @@ export const id = {
     latest: "Terbaru",
   },
   speaker: {
+    heroAlt: "Ali Sadikin Ma di podium Global AI Demo Day 2026 di Bengaluru, mempresentasikan Sparkfluence di layar panggung",
+    cred1: "Juara 1 dari 26 startup AI, 16 negara",
+    cred2: "Bahasa Indonesia dan Inggris",
+    cred3: "Di lokasi atau online",
+    topicsLead: "Setiap topik dibawakan dengan contoh yang saya bangun sendiri.",
+    photosOpen: "Lihat {n} foto",
+    awardPage: "Halaman penghargaan",
     metaDescription: "Pembicara AI dan narasumber seminar AI Indonesia: Ali Sadikin Ma, juara 1 Global AI Demo Day 2026. Undang lewat WhatsApp untuk acara Anda.",
     breadcrumb: "Pembicara AI",
     h1: "Pembicara AI dan narasumber seminar AI",

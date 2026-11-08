@@ -1,10 +1,13 @@
 ---
 // Speaker page body (/id/pembicara-ai, /en/ai-speaker). Rendered by pages/[lang]/[trainingSeg].astro,
 // which owns routing for both single-segment pages (two sibling dynamic files would conflict).
+// Every photo is a real one from the award galleries in the CMS; when a gallery does not load,
+// the block falls back to text (never a stock or placeholder image).
 import BaseLayout from "../layouts/BaseLayout.astro";
+import TrainingIcon from "./TrainingIcon.astro";
 import type { Lang } from "../lib/i18n";
-import { SITE, breadcrumb, faqPage, graph, personNode, serviceNode, webPageNode, websiteNode, PORTRAIT_URL } from "../lib/schema";
-import { awardHref, loadAwardSlugs } from "../lib/career";
+import { SITE, breadcrumb, faqPage, graph, personNode, serviceNode, webPageNode, websiteNode } from "../lib/schema";
+import { STAGE_AWARDS, awardHref, loadAwardPhotos, loadAwardSlugs, type Photo, type Photos } from "../lib/career";
 import { SESSIONS } from "../lib/speaking";
 import { waLink } from "../lib/whatsapp";
 import { id } from "../content/copy/id";
@@ -13,18 +16,49 @@ import { ANCHORS, TITLES } from "../../scripts/seo-gate.config.mjs";
 
 interface Props { lang: Lang; path: string }
 const { lang, path } = Astro.props;
-const c = (lang === "id" ? id : en).speaker;
+const copy = lang === "id" ? id : en;
+const c = copy.speaker;
 const title = (TITLES as Record<string, string>)[path];
 const url = SITE + path;
 const bioAnchor = ANCHORS[lang].speakerBio;
-const [wa, slugs] = await Promise.all([waLink(lang), loadAwardSlugs(lang)]);
 
-const topics = [1, 2, 3, 4].map((n) => ({ h: c[`t${n}h` as keyof typeof c], p: c[`t${n}p` as keyof typeof c] }));
+const awardIds = [...new Set(SESSIONS.map((s) => s.awardId))];
+const [wa, slugs, photoRes] = await Promise.all([
+  waLink(lang),
+  loadAwardSlugs(lang),
+  Promise.allSettled(awardIds.map((a) => loadAwardPhotos(a, lang))),
+]);
+const photos = new Map<number, Photos | null>(
+  awardIds.map((a, i) => [a, photoRes[i].status === "fulfilled" ? photoRes[i].value : null]),
+);
+/** The photo whose file name contains `file`, else the first one (curated picks, robust to reordering). */
+const pick = (award: number, file: string): Photo | null => {
+  const list = photos.get(award)?.photos ?? [];
+  return list.find((p) => p.src.includes(file)) ?? list[0] ?? null;
+};
+// Hero: Ali at the Global AI Demo Day podium, presenting Sparkfluence.
+const hero = (photos.get(STAGE_AWARDS.demoDay)?.photos ?? []).find((p) => p.src.includes("item_20_0")) ?? null;
+// Card covers, chosen by eye from each award gallery.
+const COVER: Record<number, string> = {
+  [STAGE_AWARDS.demoDay]: "item_20_3",
+  [STAGE_AWARDS.unctad]: "item_12_9",
+  [STAGE_AWARDS.nextdev]: "item_9_1",
+  [STAGE_AWARDS.fenox]: "item_10_1",
+};
+
+const topicIcons = ["data", "agent", "code", "globe"] as const;
+const topics = [1, 2, 3, 4].map((n, i) => ({ h: c[`t${n}h` as keyof typeof c], p: c[`t${n}p` as keyof typeof c], icon: topicIcons[i] }));
 const faq = [1, 2, 3, 4].map((n) => ({ q: c[`q${n}` as keyof typeof c], a: c[`a${n}` as keyof typeof c] }));
-const sessions = SESSIONS.map((s) => ({
-  ...s,
-  href: awardHref({ slug: slugs.get(s.awardId) }, lang),
-}));
+const sessions = SESSIONS.map((s) => {
+  const all = photos.get(s.awardId)?.photos ?? [];
+  return {
+    ...s,
+    href: awardHref({ slug: slugs.get(s.awardId) }, lang),
+    cover: all.length ? pick(s.awardId, COVER[s.awardId] ?? "") : null,
+    items: all.map((p) => p.full),
+    thumbs: all.map((p) => p.thumb),
+  };
+});
 
 const jsonld = graph(
   personNode(),
@@ -40,25 +74,42 @@ const jsonld = graph(
 ---
 <BaseLayout title={title} description={c.metaDescription} path={path} lang={lang} jsonld={jsonld}>
   <main>
-    <section class="page-hero">
-      <div class="wrap speaker-hero">
-        <div>
+    <section class:list={["sp-hero", { "has-photo": hero }]}>
+      {hero && (
+        <figure class="sp-hero-ph">
+          <img src={hero.src} srcset={hero.srcset} sizes={hero.srcset ? "(min-width: 900px) 62vw, 100vw" : undefined}
+            alt={c.heroAlt} width="1600" height="1067" fetchpriority="high" decoding="async" />
+        </figure>
+      )}
+      <div class="wrap sp-hero-in">
+        <div class="sp-hero-copy">
+          <p class="sp-badge"><span aria-hidden="true">★</span> {copy.stages.demoDayLock}</p>
           <h1>{c.h1}</h1>
           <p class="lead">{c.lead}</p>
           <div class="hero-ctas">
             {wa !== "" && <a class="btn btn-primary" href={wa}>{c.ctaInvite}</a>}
             <a class="btn btn-ghost" href="#topik">{c.ctaTopics}</a>
           </div>
+          <ul class="sp-creds">
+            <li>{c.cred1}</li>
+            <li>{c.cred2}</li>
+            <li>{c.cred3}</li>
+          </ul>
         </div>
-        <div class="ph"><img src="/images/ali-sadikin-ma-pakar-ai-indonesia.jpg" alt={c.portraitAlt} width="1200" height="1200" decoding="async" /></div>
       </div>
     </section>
 
     <section class="sec" id="topik" aria-labelledby="topik-h">
       <div class="wrap">
-        <div class="sec-head"><h2 id="topik-h">{c.topicsH2}</h2></div>
-        <ul class="topics">
-          {topics.map((t) => <li><h3>{t.h}</h3><p>{t.p}</p></li>)}
+        <div class="sec-head"><h2 id="topik-h">{c.topicsH2}</h2><p class="lead">{c.topicsLead}</p></div>
+        <ul class="sp-topics">
+          {topics.map((t) => (
+            <li>
+              <span class="th-ic"><TrainingIcon name={t.icon} /></span>
+              <h3>{t.h}</h3>
+              <p>{t.p}</p>
+            </li>
+          ))}
         </ul>
       </div>
     </section>
@@ -68,10 +119,22 @@ const jsonld = graph(
         <div class="sec-head"><h2 id="stages-h">{c.stagesH2}</h2><p class="lead">{c.stagesLead}</p></div>
         <ul class="stages">
           {sessions.map((s) => (
-            <li>
-              <span class="yr">{s.when[lang]}</span>
-              <h3>{s.href ? <a href={s.href}>{s.event}</a> : s.event}</h3>
-              <p>{s.place[lang]} · {s.result[lang]}{s.topic && <> · {c.topicLabel}: {s.topic[lang]}</>}</p>
+            <li class:list={["sp-ev", { "has-photo": s.cover }]}>
+              {s.cover && (
+                <button type="button" class="sp-ev-ph" data-lightbox data-lightbox-title={s.event}
+                  data-lightbox-items={JSON.stringify(s.items)} data-lightbox-thumbs={JSON.stringify(s.thumbs)}
+                  aria-label={`${s.event}: ${c.photosOpen.replace("{n}", String(s.items.length))}`}>
+                  <img src={s.cover.thumb} alt={`${s.event}, ${s.place[lang]}`} width="640" height="480" loading="lazy" decoding="async" />
+                  <span class="sp-ev-n">{c.photosOpen.replace("{n}", String(s.items.length))}</span>
+                </button>
+              )}
+              <div class="sp-ev-body">
+                <span class="yr">{s.when[lang]}</span>
+                <h3>{s.event}</h3>
+                <p><span class="sp-res">{s.result[lang]}</span> · {s.place[lang]}</p>
+                {s.topic && <p class="sp-topic">{c.topicLabel}: {s.topic[lang]}</p>}
+                {s.href && <a class="sp-ev-link" href={s.href}>{c.awardPage}</a>}
+              </div>
             </li>
           ))}
         </ul>
@@ -81,29 +144,32 @@ const jsonld = graph(
     <section class="sec" id="press" aria-labelledby="press-h">
       <div class="wrap">
         <div class="sec-head"><h2 id="press-h">{c.pressH2}</h2><p class="lead">{c.pressLead}</p></div>
-        <div class="split">
-          <div>
+        <div class="sp-kit">
+          <aside class="sp-kit-side">
+            <img src="/images/ali-sadikin-ma-pakar-ai-indonesia.jpg" alt={c.portraitAlt} width="1200" height="1200" loading="lazy" decoding="async" />
+            <a class="btn btn-primary" href="/images/ali-sadikin-ma-pakar-ai-indonesia.jpg" download>{c.downloadPortrait}</a>
+            <a class="btn btn-ghost" href="/press/ali-sadikin-ma-bio.txt" download>{c.downloadBio}</a>
+          </aside>
+          <div class="sp-kit-bio">
             <h3>{c.shortBioH}</h3>
-            <p>{c.shortBioPre}<a href={bioAnchor.href}>{bioAnchor.anchor}</a>{c.shortBioPost}</p>
-            <h3 style="margin-top:24px">{c.longBioH}</h3>
+            <p class="sp-short">{c.shortBioPre}<a href={bioAnchor.href}>{bioAnchor.anchor}</a>{c.shortBioPost}</p>
+            <h3>{c.longBioH}</h3>
             <p>{c.longBio1}</p>
             <p>{c.longBio2}</p>
             <p>{c.longBio3}</p>
-          </div>
-          <div>
-            <p><a class="btn btn-ghost" href="/images/ali-sadikin-ma-pakar-ai-indonesia.jpg" download>{c.downloadPortrait}</a></p>
-            <p style="margin-top:12px"><a class="btn btn-ghost" href="/press/ali-sadikin-ma-bio.txt" download>{c.downloadBio}</a></p>
-            <p class="muted" style="margin-top:24px">{c.relatedLead} <a href={`/${lang}/about`}>{c.relatedAbout}</a> {c.relatedAnd} <a href={lang === "id" ? "/id/pelatihan-ai" : "/en/ai-training"}>{c.relatedTraining}</a>.</p>
+            <p class="muted sp-rel">{c.relatedLead} <a href={`/${lang}/about`}>{c.relatedAbout}</a> {c.relatedAnd} <a href={lang === "id" ? "/id/pelatihan-ai" : "/en/ai-training"}>{c.relatedTraining}</a>.</p>
           </div>
         </div>
       </div>
     </section>
 
     {wa !== "" && (
-      <section class="sec alt" id="wa">
-        <div class="wrap ask">
-          <div><h2>{c.askH2}</h2><p class="muted" style="margin-top:12px">{c.askP}</p></div>
-          <a class="btn btn-primary" href={wa}>{c.ctaInvite}</a>
+      <section class="sec" id="wa">
+        <div class="wrap">
+          <div class="sp-ask">
+            <div><h2>{c.askH2}</h2><p>{c.askP}</p></div>
+            <a class="btn btn-primary" href={wa}>{c.ctaInvite}</a>
+          </div>
         </div>
       </section>
     )}
