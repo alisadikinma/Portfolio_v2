@@ -12,6 +12,7 @@ use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
@@ -45,8 +46,24 @@ class AppServiceProvider extends ServiceProvider
             ->by('internal-crawler|'.$request->ip()));
 
         // Public waitlist write: own bucket, 5 submits per hour per client IP.
-        RateLimiter::for('training-waitlist', fn (Request $request) => Limit::perHour(5)
-            ->by('training-waitlist|'.$request->ip()));
+        // Idempotent replays of an already-stored client_key are free (no limit).
+        RateLimiter::for('training-waitlist', function (Request $request) {
+            $key = $request->input('client_key');
+            if (is_string($key) && Str::isUuid($key)
+                && \App\Models\TrainingWaitlist::where('client_key', $key)->exists()) {
+                return Limit::none();
+            }
+
+            return Limit::perHour(5)
+                ->by('training-waitlist|'.$request->ip())
+                ->response(fn () => response()->json([
+                    'success' => false,
+                    'error' => [
+                        'code' => 'RATE_LIMITED',
+                        'message' => 'Too many submissions. Please try again later.',
+                    ],
+                ], 429));
+        });
 
         $this->registerScheduledCommandAuditHooks();
     }

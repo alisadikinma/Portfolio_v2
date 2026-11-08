@@ -18,7 +18,7 @@ class StoreTrainingWaitlistRequest extends FormRequest
         $this->merge([
             'name' => $trim($this->input('name')),
             'company' => $trim($this->input('company')),
-            'email' => $trim($this->input('email')),
+            'email' => is_string($this->input('email')) ? strtolower(trim($this->input('email'))) : $this->input('email'),
             'whatsapp_number' => $trim($this->input('whatsapp_number')),
             'note' => $trim($this->input('note')),
             'source_page' => $trim($this->input('source_page')),
@@ -34,7 +34,7 @@ class StoreTrainingWaitlistRequest extends FormRequest
             'whatsapp_number' => ['nullable', 'string', 'regex:/^\+[1-9]\d{6,14}$/', 'required_if:newsletter_opt_in,true,1'],
             'interest' => ['required', 'in:inhouse,workshop,public_class'],
             'note' => ['nullable', 'string', 'max:1000'],
-            'source_page' => ['required', 'string', 'max:120'],
+            'source_page' => ['required', 'string', 'in:/id/pelatihan-ai,/en/ai-training'],
             'locale' => ['required', 'in:id,en'],
             'newsletter_opt_in' => ['nullable', 'boolean'],
             'client_key' => ['required', 'uuid'],
