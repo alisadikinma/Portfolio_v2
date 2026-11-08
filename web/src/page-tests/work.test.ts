@@ -150,3 +150,15 @@ describe("/{lang}/work", () => {
     expect((await load("fr")).status).toBe(404);
   });
 });
+
+// Ali 2026-11-09 (SEO audit): /work and /projects listed the same 56 projects. /work now previews 6;
+// the full list lives on /projects only.
+describe("/work projects tab is a preview", () => {
+  it("asks the API for 6 projects, one page, and links to /projects", async () => {
+    const { html } = await load("id", "?tab=projects");
+    const req = calls.filter((u) => u.includes("/projects?"));
+    expect(req).toHaveLength(1);
+    expect(new URL(req[0]).searchParams.get("per_page")).toBe("6");
+    expect(html).toContain('href="/id/projects"');
+  });
+});

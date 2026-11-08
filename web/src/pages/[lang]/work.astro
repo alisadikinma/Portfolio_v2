@@ -36,17 +36,15 @@ const projects: ProjectCardData[] = [];
 const awards: AwardCard[] = [];
 const galleries: GalleryCard[] = [];
 let failed = false;
+const PREVIEW = 6;
 
 // Only the active tab's source is fetched; a failing source never takes the tab navigation down.
 try {
   if (tab === "projects") {
-    const PER_PAGE = 50;
-    for (let page = 1; page <= 10; page++) {
-      const res = await apiGetPage<Record<string, unknown>>(`/projects?per_page=${PER_PAGE}&page=${page}`, { lang });
-      if (!res || !Array.isArray(res.data)) {
-        failed = page === 1;
-        break;
-      }
+    // A preview only: the full list lives on /projects (Ali 2026-11-09, SEO audit: no duplicate listing).
+    const res = await apiGetPage<Record<string, unknown>>(`/projects?per_page=${PREVIEW}&page=1`, { lang });
+    if (!res || !Array.isArray(res.data)) failed = true;
+    else {
       for (const p of res.data) {
         if (!p || typeof p.slug !== "string" || p.slug === "" || typeof p.title !== "string" || p.title.trim() === "") continue;
         projects.push({
@@ -58,8 +56,6 @@ try {
           variants: p.image_variants && typeof p.image_variants === "object" ? (p.image_variants as Record<string, string>) : null,
         });
       }
-      const last = Number((res.meta as { last_page?: unknown } | null)?.last_page ?? 1);
-      if (!(last > page)) break;
     }
   } else if (tab === "awards") {
     const list = await apiGet<Record<string, unknown>[]>("/awards?limit=50", { lang });
