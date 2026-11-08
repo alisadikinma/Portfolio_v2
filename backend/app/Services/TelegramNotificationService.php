@@ -164,6 +164,25 @@ class TelegramNotificationService
     }
 
     /**
+     * content:process-scheduled gave up on a scheduled idea after repeated
+     * trigger failures. Shares the generation_failed toggle.
+     */
+    public function sendScheduledTriggerFailed(ContentIdea $idea): bool
+    {
+        if (!$this->isEnabledFor('generation_failed')) {
+            return false;
+        }
+
+        $text = "❌ *Scheduled start failed* — Content Engine\n\n"
+            . 'Idea: _' . $this->escapeMarkdown($idea->title ?? 'Untitled') . "_\n\n"
+            . "The scheduler could not start research after 3 attempts and stopped retrying. "
+            . "Fix the cause, then start it manually.\n\n"
+            . "[Open Admin](" . $this->buildAdminUrl($idea) . ")";
+
+        return $this->send($text);
+    }
+
+    /**
      * Daily heartbeat after content:pull-trending-daily completes. Without this,
      * a silent cron failure (queue worker crash, schedule:run cron removed, VPS
      * reboot without systemd auto-start) only surfaces when the operator

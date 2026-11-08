@@ -59,6 +59,7 @@ class DispatchTelegramNotification implements ShouldQueue
                 $idea,
                 (int) ($this->payload['segment_idx'] ?? $this->firstTerminalSegmentIndex($idea))
             ),
+            'scheduled_trigger_failed' => $service->sendScheduledTriggerFailed($idea),
             'cover_critical' => $service->sendCoverCriticalAlert($idea),
             'auto_translate_exhausted' => $service->sendAutoTranslateExhausted($idea),
             default => false,
