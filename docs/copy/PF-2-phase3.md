@@ -257,3 +257,27 @@ Judul tab dan H1 memakai judul penghargaan dari API apa adanya. Baris "Hasil" di
 | `award.moreLink` | halaman Karya | Work page | BARU |
 | `award.aboutLead` | atau kenali | or get to know | BARU |
 | `award.aboutLink` | Ali Sadikin Ma lebih jauh | Ali Sadikin Ma | BARU |
+
+## Fase 3H — halaman Karya (/id/work, /en/work)
+
+Semua teks EN di bawah BARU, menunggu persetujuan Ali.
+
+| Key | ID | EN | Status |
+|---|---|---|---|
+| `work.metaDescription` | Karya Ali Sadikin Ma, pakar AI Indonesia dan founder INDUSIA.ai: proyek AI, penghargaan internasional, dan galeri foto dari panggung serta perjalanan kerjanya. | Work by Ali Sadikin Ma, AI consultant Indonesia and founder of INDUSIA.ai: AI projects, international awards, and photo galleries from his stages and career. | BARU |
+| `work.h1` | Karya Ali Sadikin Ma | Work by Ali Sadikin Ma | BARU |
+| `work.intro` | Halaman ini mengumpulkan karya Ali Sadikin Ma, pakar AI Indonesia dan founder INDUSIA.ai: proyek AI yang pernah dikerjakan, penghargaan dari panggung internasional, dan foto-foto perjalanan kariernya. Pilih satu tab untuk melihat isinya. | This page collects the work of Ali Sadikin Ma, AI consultant Indonesia and founder of INDUSIA.ai: the AI projects he has delivered, awards from international stages, and photos from his career. Pick a tab to see what is inside. | BARU |
+| `work.tabsLabel` | Bagian karya | Work sections | BARU |
+| `work.tabProjects` / `tabAwards` / `tabGallery` | Proyek / Penghargaan / Galeri | Projects / Awards / Gallery | BARU |
+| `work.empty` / `emptyAwards` / `emptyGallery` | Belum ada proyek / penghargaan / galeri yang bisa ditampilkan. | No projects / awards / galleries to show yet. | BARU |
+| `work.unavailable` | Bagian ini sedang tidak bisa dimuat. Silakan coba lagi sebentar lagi. | This section cannot be loaded right now. Please try again in a moment. | BARU |
+| `work.readMore` | Baca proyek | Read project | BARU |
+| `work.allProjects` | Lihat halaman proyek lengkap | See the full projects page | BARU |
+| `work.awardOpen` | Lihat penghargaan | View award | BARU |
+| `work.photosCount` | {n} foto | {n} photos | BARU |
+| `work.photoAlt` | {title}, foto {n} | {title}, photo {n} | BARU |
+| `work.photoOpen` | Lihat foto {n} dari {title} | View photo {n} of {title} | BARU |
+| `work.morePhotos` | dan {n} foto lainnya | and {n} more photos | BARU |
+| `work.closingLead` / `aboutLink` / `closingMid` / `contactLink` | Ingin tahu lebih jauh? Kenali Ali Sadikin Ma atau hubungi langsung untuk kerja sama. | Want to know more? Get to know Ali Sadikin Ma or get in touch about working together. | BARU |
+| `work.breadcrumbHome` / `breadcrumbWork` | Ali Sadikin Ma / Karya | Ali Sadikin Ma / Work | BARU |
+| `stages.all` | Lihat semua penghargaan dan galeri | See all awards and galleries | BARU (tautan di bawah bento beranda ke /work?tab=awards) |

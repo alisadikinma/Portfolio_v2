@@ -79,6 +79,14 @@ describe("/{lang} home", () => {
     expect([...order].sort((a, b) => a - b)).toEqual(order);
   });
 
+  it("stages section links to the Work page awards tab", async () => {
+    const id = await load("id");
+    expect(id.html).toContain('href="/id/work?tab=awards"');
+    expect(id.html).toContain("Lihat semua penghargaan dan galeri");
+    const en = await load("en");
+    expect(en.html).toContain('href="/en/work?tab=awards"');
+  });
+
   it("a section turned off in page-sections is not rendered; absent rows stay on", async () => {
     sections = [row("services", false), row("testimonials", false), row("hero", true)];
     const { html } = await load("id");

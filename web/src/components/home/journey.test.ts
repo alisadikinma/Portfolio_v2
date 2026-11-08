@@ -231,7 +231,7 @@ describe.each(["id", "en"] as const)("Stages (%s)", (lang) => {
   it("without slugs every card is a lightbox-only <button> with the real gallery photos", async () => {
     const html = await render(Stages, lang);
     expect(html).not.toMatch(/\/penghargaan\/|\/awards\//);
-    const lis = html.split("<li").slice(1);
+    const lis = html.split("</ul>")[0].split("<li").slice(1); // bento only, not the "see all" link after it
     for (const [idx, id] of [13, 10, 11, 7, 8].entries()) {
       expect(lis[idx]).toMatch(/<button[^>]*data-lightbox/);
       expect(lis[idx]).not.toMatch(/<a /);
