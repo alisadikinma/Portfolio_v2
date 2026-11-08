@@ -140,7 +140,7 @@ export function blogPosting(p: {
     mainEntityOfPage: p.url,
     datePublished: p.datePublished,
     dateModified: p.dateModified ?? p.datePublished,
-    author: { "@type": "Person", "@id": PERSON_ID, name: "Ali Sadikin Ma", url: SITE },
+    author: PERSON_REF,
     publisher: PERSON_REF,
     inLanguage: p.lang,
   };
@@ -156,18 +156,27 @@ export function creativeWork(p: { name: string; url: string; description?: strin
   return n;
 }
 
-export function serviceNode(s: { name: string; url: string; lang: string }): Node {
-  return {
+export function serviceNode(s: { name: string; url: string; lang: string; description?: string }): Node {
+  const n: Node = {
     "@type": "Service",
+    "@id": `${s.url}#service`,
     name: s.name,
     url: s.url,
     provider: PERSON_REF,
     areaServed: "Indonesia",
   };
+  if (s.description) n.description = s.description;
+  return n;
 }
 
-export function profilePage(p: { url: string; dateModified?: string }): Node {
+export function profilePage(p: { url: string; dateModified?: string; name?: string; description?: string; lang?: string }): Node {
   const n: Node = { "@type": "ProfilePage", "@id": `${p.url}#profilepage`, url: p.url, mainEntity: PERSON_REF };
+  if (p.name) n.name = p.name;
+  if (p.description) n.description = p.description;
+  if (p.lang) {
+    n.inLanguage = p.lang;
+    n.isPartOf = { "@id": `${SITE}/#website` };
+  }
   if (p.dateModified) n.dateModified = p.dateModified;
   return n;
 }
@@ -196,13 +205,34 @@ export function eventNode(a: {
   return n;
 }
 
-/** INDUSIA.ai, the company Ali founded. Its canonical node lives on indusia.ai; this copy makes #org resolvable here. */
+/**
+ * INDUSIA.ai, the company Ali founded. Its canonical node lives on indusia.ai; this copy makes #org
+ * resolvable here and repeats only facts indusia.ai publishes in its own JSON-LD (checked 2026-11-09).
+ */
 export function orgNode(): Node {
   return {
     "@type": "Organization",
     "@id": ORG_ID,
     name: "INDUSIA.ai",
+    legalName: "PT Indusia Kecerdasan Digital",
     url: "https://indusia.ai",
+    logo: "https://indusia.ai/assets/logo-indusia-wordmark.png",
+    description:
+      "Industrial AI company in Batam: AI visual inspection, machine automation, fleet and retail systems with AI assistants for Indonesian factories and firms.",
+    foundingDate: "2026-01-01",
+    address: {
+      "@type": "PostalAddress",
+      streetAddress: "Jl. Ahmad Yani, Tlk. Tering, Kec. Batam Kota",
+      addressLocality: "Kota Batam",
+      addressRegion: "Kepulauan Riau",
+      postalCode: "29444",
+      addressCountry: "ID",
+    },
+    sameAs: [
+      "https://www.linkedin.com/company/116164317/",
+      "https://www.wikidata.org/wiki/Q142076284",
+      "https://maps.google.com/?cid=117773708054125943",
+    ],
     founder: PERSON_REF,
   };
 }

@@ -61,7 +61,7 @@ const jsonld = graph(
   personNode(),
   websiteNode(),
   webPageNode({ url, lang, name: title, description: c.metaDescription }),
-  serviceNode({ name: c.h1, url, lang }),
+  serviceNode({ name: c.h1, url, lang, description: c.metaDescription }),
   breadcrumb([
     { name: "Ali Sadikin Ma", url: `${SITE}/${lang}` },
     { name: c.breadcrumb, url },

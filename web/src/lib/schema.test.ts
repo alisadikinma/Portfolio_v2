@@ -170,7 +170,8 @@ describe("1D review fixes", () => {
     const b = blogPosting({ title: "T", url: "https://alisadikinma.com/en/blog/t", datePublished: "2026-01-01", lang: "en", description: "desc" }) as any;
     expect(b["@id"]).toBe("https://alisadikinma.com/en/blog/t#article");
     expect(b.description).toBe("desc");
-    expect(b.author).toEqual({ "@type": "Person", "@id": PERSON_ID, name: "Ali Sadikin Ma", url: "https://alisadikinma.com" });
+    // SEO audit 2026-11-09: reference the one Person node, no inline copy.
+    expect(b.author).toEqual({ "@id": PERSON_ID });
   });
   it("profilePage: url, @id, optional dateModified", () => {
     const p = profilePage({ url: "https://alisadikinma.com/id/about", dateModified: "2026-02-01" }) as any;
@@ -218,5 +219,37 @@ describe("graph: INDUSIA.ai organization + nationality", () => {
   });
   it("Person carries nationality Indonesia as a Country", () => {
     expect(personNode().nationality).toEqual({ "@type": "Country", name: "Indonesia" });
+  });
+});
+
+
+// SEO audit 2026-11-09: the INDUSIA.ai node mirrors the facts indusia.ai publishes about itself.
+describe("orgNode (INDUSIA.ai)", () => {
+  const o = orgNode() as any;
+  it("carries logo, legal name, description, founding date, address and sameAs from indusia.ai", () => {
+    expect(o["@id"]).toBe(ORG_ID);
+    expect(o.name).toBe("INDUSIA.ai");
+    expect(o.legalName).toBe("PT Indusia Kecerdasan Digital");
+    expect(o.logo).toBe("https://indusia.ai/assets/logo-indusia-wordmark.png");
+    expect(o.foundingDate).toBe("2026-01-01");
+    expect(o.address.addressLocality).toBe("Kota Batam");
+    expect(o.sameAs).toContain("https://www.linkedin.com/company/116164317/");
+    expect(o.sameAs).toContain("https://www.wikidata.org/wiki/Q142076284");
+    expect(o.description).toMatch(/AI/);
+  });
+});
+
+describe("serviceNode / profilePage enrichment", () => {
+  it("service gets an @id and an optional description", () => {
+    const s = serviceNode({ name: "AI Training", url: "https://alisadikinma.com/en/ai-training", lang: "en", description: "d" }) as any;
+    expect(s["@id"]).toBe("https://alisadikinma.com/en/ai-training#service");
+    expect(s.description).toBe("d");
+  });
+  it("profile page gets name, description, language and isPartOf when given", () => {
+    const p = profilePage({ url: "https://alisadikinma.com/id/about", name: "N", description: "D", lang: "id" }) as any;
+    expect(p.name).toBe("N");
+    expect(p.description).toBe("D");
+    expect(p.inLanguage).toBe("id");
+    expect(p.isPartOf).toEqual({ "@id": "https://alisadikinma.com/#website" });
   });
 });
