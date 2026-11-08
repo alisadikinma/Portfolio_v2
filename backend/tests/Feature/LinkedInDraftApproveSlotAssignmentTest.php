@@ -167,4 +167,24 @@ class LinkedInDraftApproveSlotAssignmentTest extends TestCase
         $this->assertSame('2026-05-14 05:00:00', \Illuminate\Support\Facades\DB::table('linkedin_posts')->where('id', $draft->id)->value('scheduled_at'));
         Carbon::setTestNow();
     }
+
+    public function test_approve_rejects_a_naive_publish_at_that_is_past_in_wib(): void
+    {
+        Sanctum::actingAs($this->admin);
+        // Now = 2026-05-13 10:00 WIB = 03:00 UTC. Naive 08:00 is past in WIB
+        // but would look "future" if read as UTC.
+        Carbon::setTestNow(Carbon::parse('2026-05-13 10:00:00', 'Asia/Jakarta'));
+
+        $draft = LinkedInPost::factory()->create([
+            'post_id' => $this->post->id,
+            'status' => LinkedInPostStatus::ManualReview->value,
+            'format' => 'text',
+        ]);
+
+        $this->postJson("/api/admin/linkedin-drafts/{$draft->id}/approve", ['publish_at' => '2026-05-13T08:00'])
+            ->assertStatus(422);
+
+        $this->assertSame(LinkedInPostStatus::ManualReview->value, $draft->fresh()->status);
+        Carbon::setTestNow();
+    }
 }

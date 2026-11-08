@@ -796,8 +796,19 @@ class LinkedInDraftController extends Controller
         // hours (Tuesday 9am, etc.). When omitted, fall back to the
         // legacy "now + cancel_window_minutes" behaviour.
         $validated = $request->validate([
-            'publish_at' => ['nullable', 'date', 'after:now'],
+            'publish_at' => ['nullable', 'date'],
         ]);
+
+        // A naive publish_at is WIB wall-clock; validate the future check on the
+        // WIB-parsed instant (Laravel's `after:now` would read it as UTC).
+        if (! empty($validated['publish_at'])
+            && ! WibTime::parse($validated['publish_at'])->isFuture()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The publish at field must be a future time.',
+                'errors' => ['publish_at' => ['The publish at field must be a future time (WIB).']],
+            ], 422);
+        }
 
         // Server-side carousel readiness gate. UI disables the approve
         // button when slides aren't all rendered (carouselReadyForApprove
@@ -1609,7 +1620,7 @@ class LinkedInDraftController extends Controller
         // to an empty array (frontend shows the existing static hint).
         $suggestedAlternatives = [];
         if (Schema::hasTable('posting_time_rules')) {
-            $dow = $proposed->dayOfWeek; // Carbon: 0=Sun..6=Sat (matches schema)
+            $dow = $proposed->copy()->setTimezone(WibTime::ZONE)->dayOfWeek; // Carbon: 0=Sun..6=Sat (matches schema)
             $suggestedAlternatives = DB::table('posting_time_rules')
                 ->where('platform', 'linkedin')
                 ->where('audience', 'b2b_tech')

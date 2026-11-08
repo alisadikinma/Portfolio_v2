@@ -337,4 +337,30 @@ class LinkedInDraftCheckConflictTest extends TestCase
 
         $response->assertStatus(200)->assertJsonPath('data.has_conflict', true);
     }
+
+    /** @test */
+    public function suggestions_use_the_wib_day_of_week_not_utc(): void
+    {
+        if (! Schema::hasTable('posting_time_rules')) {
+            $this->markTestSkipped('posting_time_rules table not present.');
+        }
+
+        $this->authenticate();
+        $draft = LinkedInPost::factory()->manualReview()->create();
+
+        // 2030-01-07 is a Monday. 22:00Z = Tuesday 05:00 WIB -> dow 2.
+        \DB::table('posting_time_rules')->insert([
+            ['platform' => 'linkedin', 'audience' => 'b2b_tech', 'day_of_week' => 2, 'hour' => 9, 'score' => 90,
+             'timezone' => 'Asia/Jakarta', 'last_researched_at' => now(), 'created_at' => now(), 'updated_at' => now()],
+            ['platform' => 'linkedin', 'audience' => 'b2b_tech', 'day_of_week' => 1, 'hour' => 15, 'score' => 90,
+             'timezone' => 'Asia/Jakarta', 'last_researched_at' => now(), 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        $response = $this->postJson("/api/admin/linkedin-drafts/{$draft->id}/check-conflict", [
+            'at' => '2030-01-07T22:00:00Z',
+        ]);
+
+        $response->assertOk();
+        $this->assertSame(['09:00'], $response->json('data.suggested_alternatives'));
+    }
 }
