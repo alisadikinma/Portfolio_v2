@@ -50,4 +50,26 @@ class FaqApiTest extends TestCase
         // No Sanctum actingAs — must still 200.
         $this->getJson('/api/faq')->assertStatus(200);
     }
+
+    public function test_lang_id_returns_the_indonesian_set_same_order_and_count(): void
+    {
+        $en = config('faq.items', []);
+        $id = config('faq.items_id', []);
+        $this->assertCount(count($en), $id, 'ID set must mirror the EN set one-to-one.');
+
+        $res = $this->getJson('/api/faq?lang=id')->assertOk();
+        $res->assertJsonCount(count($id), 'data');
+        $res->assertJsonPath('data.0.question', $id[0]['question']);
+        $this->assertNotSame($en[0]['question'], $res->json('data.0.question'));
+        foreach ($res->json('data') as $row) {
+            $this->assertStringContainsString('Ali Sadikin Ma', $row['answer'].$row['question']);
+        }
+    }
+
+    public function test_other_or_missing_lang_returns_english(): void
+    {
+        $en = config('faq.items', []);
+        $this->getJson('/api/faq?lang=en')->assertJsonPath('data.0.question', $en[0]['question']);
+        $this->getJson('/api/faq?lang=fr')->assertJsonPath('data.0.question', $en[0]['question']);
+    }
 }

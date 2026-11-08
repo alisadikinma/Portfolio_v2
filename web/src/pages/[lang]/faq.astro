@@ -15,7 +15,7 @@ const lang = raw as Lang;
 const c = (lang === "id" ? id : en).faq;
 const path = `/${lang}/faq`;
 
-// /api/faq is not localized by `lang`: it returns the same curated list for both languages.
+// /api/faq?lang=id returns the Indonesian mirror of the curated list; other languages get English.
 let items: FaqItem[] = [];
 try {
   const data = await apiGet<unknown>("/faq", { lang });

@@ -57,3 +57,22 @@ Isi tanya-jawab FAQ sendiri datang dari backend (`config/faq.php`), bukan dari b
 1. Nomor WhatsApp: belum ada di berkas mana pun. Isi di konfigurasi (env) sebelum tombol WhatsApp aktif.
 2. Tautan sosial (LinkedIn, Instagram, YouTube, TikTok): alamat akun belum dicek di fase ini.
 3. Mockup halaman pelatihan hanya punya 3 sosial (tanpa TikTok); beranda punya 4. Saya pakai 4.
+
+
+## FAQ versi Indonesia (BARU, 2026-11-08 — keputusan Ali: terjemahkan)
+
+Sumber: `backend/config/faq.php` `items_id` (dilayani `/api/faq?lang=id`). Terjemahan setia dari set EN, tanpa klaim baru. Jawaban lengkap ada di file config. Catatan: set EN memuat klaim "16 negara"; bio pers 4F tidak memakainya karena tidak ada sumbernya — mohon Ali konfirmasi.
+
+| # | Pertanyaan EN | Pertanyaan ID |
+|---|---|---|
+| 1 | Who is Ali Sadikin Ma? | Siapa Ali Sadikin Ma? |
+| 2 | What services does Ali Sadikin Ma offer? | Layanan apa saja yang ditawarkan Ali Sadikin Ma? |
+| 3 | What makes Ali Sadikin Ma's approach different? | Apa yang membedakan pendekatan Ali Sadikin Ma? |
+| 4 | Who does Ali Sadikin Ma work with? | Dengan siapa saja Ali Sadikin Ma bekerja? |
+| 5 | What is AI visual inspection and does Ali Sadikin Ma build it? | Apa itu inspeksi visual berbasis AI dan apakah Ali Sadikin Ma membangunnya? |
+| 6 | What is Vibe Coding and does Ali Sadikin Ma teach it? | Apa itu Vibe Coding dan apakah Ali Sadikin Ma mengajarkannya? |
+| 7 | What technology stack does Ali Sadikin Ma use? | Teknologi apa yang dipakai Ali Sadikin Ma? |
+| 8 | What results has Ali Sadikin Ma delivered? | Hasil apa yang sudah diberikan Ali Sadikin Ma? |
+| 9 | Does Ali Sadikin Ma teach or speak about AI? | Apakah Ali Sadikin Ma mengajar atau menjadi pembicara tentang AI? |
+| 10 | How can I contact or work with Ali Sadikin Ma? | Bagaimana cara menghubungi atau bekerja sama dengan Ali Sadikin Ma? |
+| 11 | In which languages does Ali Sadikin Ma work? | Dalam bahasa apa saja Ali Sadikin Ma bekerja? |

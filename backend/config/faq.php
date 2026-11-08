@@ -65,4 +65,52 @@ return [
             'answer' => 'Ali Sadikin Ma works in Indonesian and English, and also knows Mandarin. His content and case studies are published in both English and Indonesian.',
         ],
     ],
+    // Indonesian mirror of 'items' — same order, same facts, one-to-one (served for ?lang=id).
+    // Translation of the EN set; awaiting Ali's copy approval (docs/copy/PF-2-phase1.md).
+    'items_id' => [
+        [
+            'question' => 'Siapa Ali Sadikin Ma?',
+            'answer' => 'Ali Sadikin Ma adalah AI Generalist yang mengubah model AI terbaru menjadi produk yang benar-benar dipakai, bukan sekadar slide presentasi. Ia punya pengalaman membangun produk selama 17 tahun di 16 negara dan meraih peringkat 1 di Global AI Demo Day 2026. Ia berbasis di Indonesia, membangun sekaligus mengajarkan AI terapan.',
+        ],
+        [
+            'question' => 'Layanan apa saja yang ditawarkan Ali Sadikin Ma?',
+            'answer' => 'Ali Sadikin Ma membangun AI Agent dan sistem operasi AI agent, pipeline Generative AI Video, alur kerja otomasi AI, dan sistem Computer Vision untuk inspeksi visual berbasis AI. Ia juga mengajarkan Vibe Coding, yaitu cara membuat software sungguhan dengan cepat memakai AI sebagai alat utama.',
+        ],
+        [
+            'question' => 'Apa yang membedakan pendekatan Ali Sadikin Ma?',
+            'answer' => 'Ali Sadikin Ma mengutamakan produk yang jadi dan berjalan, bukan demo atau slide. Ia bekerja langsung sebagai generalist yang menangani strategi, engineering, dan delivery, sehingga proyek bergerak dari ide ke produksi tanpa dioper ke banyak spesialis yang terpisah.',
+        ],
+        [
+            'question' => 'Dengan siapa saja Ali Sadikin Ma bekerja?',
+            'answer' => 'Ali Sadikin Ma bekerja dengan founder, tim produk, dan pabrik yang ingin menjalankan AI di produksi, mulai dari startup yang menambah AI agent dan media generatif sampai pabrik elektronik yang memasang inspeksi visual berbasis AI di lini produksinya. Ia juga membimbing tim dan perorangan yang sedang belajar membangun dengan AI.',
+        ],
+        [
+            'question' => 'Apa itu inspeksi visual berbasis AI dan apakah Ali Sadikin Ma membangunnya?',
+            'answer' => 'Inspeksi visual berbasis AI memakai computer vision untuk mendeteksi cacat produksi, misalnya cacat PCB dan PCBA di lini elektronik, secara otomatis dan dalam skala besar. Ali Sadikin Ma merancang dan memasang sistem ini, memilih model deteksi yang tepat untuk tiap jenis cacat, lalu menyetelnya sesuai standar mutu pabrik.',
+        ],
+        [
+            'question' => 'Apa itu Vibe Coding dan apakah Ali Sadikin Ma mengajarkannya?',
+            'answer' => 'Vibe Coding adalah cara membuat software yang benar-benar berjalan dengan mengarahkan alat coding AI, bukan menulis setiap baris kode sendiri. Ali Sadikin Ma mengajarkan Vibe Coding dan memakainya setiap hari untuk merilis produk lebih cepat daripada pengembangan cara lama.',
+        ],
+        [
+            'question' => 'Teknologi apa yang dipakai Ali Sadikin Ma?',
+            'answer' => 'Ali Sadikin Ma membangun aplikasi large language model dan AI agent, model generatif gambar dan video, serta stack computer vision dan edge AI untuk inspeksi. Di sisi engineering, pekerjaan produksinya mencakup stack web modern seperti Laravel dan Vue, ditambah pipeline otomasi dan orkestrasi AI.',
+        ],
+        [
+            'question' => 'Hasil apa yang sudah diberikan Ali Sadikin Ma?',
+            'answer' => 'Ali Sadikin Ma meraih peringkat 1 di Global AI Demo Day 2026 dan sudah menyelesaikan proyek AI dan software di 16 negara selama 17 tahun. Portofolionya mencakup AI agent di produksi, pipeline video generatif, dan sistem inspeksi computer vision yang berjalan di operasi nyata.',
+        ],
+        [
+            'question' => 'Apakah Ali Sadikin Ma mengajar atau menjadi pembicara tentang AI?',
+            'answer' => 'Ya. Ali Sadikin Ma rutin mengajar dan menerbitkan materi tentang AI Agent, Vibe Coding, dan Generative AI Video, dan pernah tampil di panggung internasional. Materinya praktis dan berbasis membangun, bukan teori abstrak.',
+        ],
+        [
+            'question' => 'Bagaimana cara menghubungi atau bekerja sama dengan Ali Sadikin Ma?',
+            'answer' => 'Anda bisa menghubungi Ali Sadikin Ma lewat halaman kontak di alisadikinma.com atau lewat LinkedIn, Instagram, TikTok, dan YouTube di @alisadikinma. Ia menanggapi permintaan proyek, kolaborasi, serta undangan pembicara atau pelatihan.',
+        ],
+        [
+            'question' => 'Dalam bahasa apa saja Ali Sadikin Ma bekerja?',
+            'answer' => 'Ali Sadikin Ma bekerja dalam bahasa Indonesia dan Inggris, dan juga menguasai bahasa Mandarin. Konten dan studi kasusnya terbit dalam bahasa Inggris dan Indonesia.',
+        ],
+    ],
 ];
