@@ -398,7 +398,7 @@ class RepurposeJobController extends Controller
 
         $scheduledForIso = null;
         if (! empty($data['scheduled_at'])) {
-            $when = Carbon::parse($data['scheduled_at']);
+            $when = \App\Support\WibTime::parse($data['scheduled_at']);
             if (! $when->isFuture()) {
                 return response()->json([
                     'success' => false,

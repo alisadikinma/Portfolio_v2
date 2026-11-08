@@ -157,4 +157,20 @@ class VideoFullZernioPublishTest extends TestCase
             ->assertJsonPath('skipped', ['tiktok']);
         Queue::assertPushed(PublishRepurposeViaZernio::class, 2);
     }
+
+    public function test_naive_scheduled_at_is_read_as_wib(): void
+    {
+        Queue::fake();
+        config()->set('social-cross-post.zernio.enabled', true);
+        Setting::create(['group' => 'zernio', 'key' => 'zernio_instagram_account_id', 'value' => 'acc_ig', 'type' => 'text']);
+        Sanctum::actingAs(User::factory()->create());
+        $job = $this->job();
+        $naive = now('Asia/Jakarta')->addDay()->format('Y-m-d\TH:i');
+
+        $this->postJson("/api/admin/video-full/{$job->id}/publish-zernio", [
+            'platforms' => ['instagram'], 'scheduled_at' => $naive,
+        ])->assertStatus(202);
+
+        Queue::assertPushed(PublishRepurposeViaZernio::class, fn ($j) => str_starts_with((string) $j->scheduledForIso, $naive) && str_ends_with((string) $j->scheduledForIso, '+07:00'));
+    }
 }

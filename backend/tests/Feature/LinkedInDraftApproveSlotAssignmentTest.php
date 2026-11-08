@@ -150,4 +150,21 @@ class LinkedInDraftApproveSlotAssignmentTest extends TestCase
             $draft->scheduled_at->copy()->setTimezone('Asia/Jakarta')->format('Y-m-d H:i:s')
         );
     }
+
+    public function test_approve_with_naive_publish_at_reads_it_as_wib(): void
+    {
+        Sanctum::actingAs($this->admin);
+        Carbon::setTestNow(Carbon::parse('2026-05-13 04:00:00', 'Asia/Jakarta'));
+
+        $draft = LinkedInPost::factory()->create([
+            'post_id' => $this->post->id,
+            'status' => LinkedInPostStatus::ManualReview->value,
+            'format' => 'text',
+        ]);
+
+        $this->postJson("/api/admin/linkedin-drafts/{$draft->id}/approve", ['publish_at' => '2026-05-14T12:00'])->assertOk();
+
+        $this->assertSame('2026-05-14 05:00:00', \Illuminate\Support\Facades\DB::table('linkedin_posts')->where('id', $draft->id)->value('scheduled_at'));
+        Carbon::setTestNow();
+    }
 }

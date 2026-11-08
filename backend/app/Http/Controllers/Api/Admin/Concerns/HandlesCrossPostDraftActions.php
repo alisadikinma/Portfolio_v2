@@ -6,6 +6,7 @@ use App\Exceptions\InvalidStateTransitionException;
 use App\Jobs\PublishViaPubler;
 use App\Services\PipelineGuard;
 use BackedEnum;
+use App\Support\WibTime;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -357,11 +358,11 @@ trait HandlesCrossPostDraftActions
         ]);
 
         $from = isset($validated['from'])
-            ? Carbon::parse($validated['from'])->startOfDay()
-            : now()->startOfMonth();
+            ? Carbon::parse($validated['from'], WibTime::ZONE)->startOfDay()->utc()
+            : now(WibTime::ZONE)->startOfMonth()->utc();
         $to = isset($validated['to'])
-            ? Carbon::parse($validated['to'])->endOfDay()
-            : now()->endOfMonth()->copy()->addMonth();
+            ? Carbon::parse($validated['to'], WibTime::ZONE)->endOfDay()->utc()
+            : now(WibTime::ZONE)->endOfMonth()->addMonth()->utc();
 
         $modelClass = $this->modelClass();
         $query = $modelClass::query()

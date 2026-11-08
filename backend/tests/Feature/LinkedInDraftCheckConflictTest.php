@@ -319,4 +319,22 @@ class LinkedInDraftCheckConflictTest extends TestCase
         ]);
         $badResponse->assertStatus(422)->assertJsonValidationErrors(['at']);
     }
+
+    /** @test */
+    public function naive_at_is_read_as_wib_so_conflict_matches_utc_storage(): void
+    {
+        $this->authenticate();
+        $draft = LinkedInPost::factory()->manualReview()->create();
+        // 10:00 WIB tomorrow == 03:00 UTC
+        $day = now('Asia/Jakarta')->addDay()->format('Y-m-d');
+        LinkedInPost::factory()->awaitingPublish()->create([
+            'scheduled_at' => \Carbon\Carbon::parse("{$day} 03:10:00", 'UTC'),
+        ]);
+
+        $response = $this->postJson("/api/admin/linkedin-drafts/{$draft->id}/check-conflict", [
+            'at' => "{$day}T10:00",
+        ]);
+
+        $response->assertStatus(200)->assertJsonPath('data.has_conflict', true);
+    }
 }

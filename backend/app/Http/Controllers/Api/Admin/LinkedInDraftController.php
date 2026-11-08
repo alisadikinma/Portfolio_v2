@@ -16,6 +16,7 @@ use App\Services\PipelineGuard;
 use App\Services\TelegramNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Support\WibTime;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
@@ -884,7 +885,7 @@ class LinkedInDraftController extends Controller
             //
             // Operator-provided publish_at still honoured (manual override).
             if (! empty($validated['publish_at'])) {
-                $publishAt = \Carbon\Carbon::parse($validated['publish_at']);
+                $publishAt = WibTime::parse($validated['publish_at']);
             } else {
                 $publishAt = app(\App\Services\LinkedInFixedSlotScheduler::class)
                     ->nextAvailableSlot();
@@ -1518,8 +1519,9 @@ class LinkedInDraftController extends Controller
             'status' => ['nullable', 'string'], // optional client-side filter pill
         ]);
 
-        $from = Carbon::parse($validated['from'])->startOfDay();
-        $to = Carbon::parse($validated['to'])->endOfDay();
+        // Calendar days are WIB days; query in UTC (storage zone).
+        $from = Carbon::parse($validated['from'], WibTime::ZONE)->startOfDay()->utc();
+        $to = Carbon::parse($validated['to'], WibTime::ZONE)->endOfDay()->utc();
 
         $query = LinkedInPost::query()
             ->with(['post.translations', 'repurposeJob:id,linkedin_post_id'])
@@ -1596,7 +1598,7 @@ class LinkedInDraftController extends Controller
             'at' => ['required', 'date'],
         ]);
 
-        $proposed = Carbon::parse($validated['at']);
+        $proposed = WibTime::parse($validated['at']);
         $windowMinutes = LinkedInScheduleConflictService::DEFAULT_WINDOW_MINUTES;
 
         $conflicts = $this->conflictService->findConflicts($proposed, $id, $windowMinutes);
