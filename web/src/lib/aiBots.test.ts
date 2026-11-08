@@ -5,8 +5,14 @@ import { AI_BOTS, matchAiBot } from "./aiBots";
 
 function parsePhp(): Array<[string, string]> {
   const src = readFileSync(resolve(__dirname, "../../../backend/config/ai_bots.php"), "utf8");
-  const body = src.slice(src.indexOf("'map'"));
-  return [...body.matchAll(/'([^'\n]+)'\s*=>\s*'([^'\n]+)'/g)].map((m) => [m[1], m[2]]);
+  const stripped = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:'"])\/\/.*$/gm, "$1");
+  const body = stripped.slice(stripped.indexOf("'map'"));
+  const pairs = [...body.matchAll(/(['"])([^'"\n]+)\1\s*=>\s*(['"])([^'"\n]+)\3/g)].map(
+    (m): [string, string] => [m[2], m[4]],
+  );
+  const arrowLines = body.split("\n").filter((l) => l.includes("=>") && !/=>\s*\[/.test(l)).length;
+  expect(pairs.length).toBe(arrowLines);
+  return pairs;
 }
 
 describe("AI_BOTS parity with backend/config/ai_bots.php", () => {

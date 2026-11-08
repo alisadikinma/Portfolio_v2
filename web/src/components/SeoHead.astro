@@ -12,12 +12,14 @@ interface Props {
   imageWidth?: number;
   imageHeight?: number;
   preloadImage?: string;
+  type?: "website" | "article";
 }
 
-const { title, description, path, lang, jsonld, image, imageWidth, imageHeight, preloadImage } = Astro.props;
+const { title, description, path, lang, jsonld, image, imageWidth, imageHeight, preloadImage, type = "website" } = Astro.props;
 const abs = (p: string) => SITE + p;
 const alts = alternates(path);
-const canonical = abs(path);
+// Canonical must equal the self-referencing hreflang (normalized path).
+const canonical = abs(alts[lang]);
 const ogImage = image ?? PORTRAIT_URL;
 // Portrait is 1200x1200; declare size only for it or when the caller states it.
 const w = imageWidth ?? (image ? undefined : 1200);
@@ -34,7 +36,7 @@ const altLocale = lang === "id" ? "en_US" : "id_ID";
 <link rel="alternate" hreflang="id" href={abs(alts.id)} />
 <link rel="alternate" hreflang="en" href={abs(alts.en)} />
 <link rel="alternate" hreflang="x-default" href={abs(alts["x-default"])} />
-<meta property="og:type" content="website" />
+<meta property="og:type" content={type} />
 <meta property="og:site_name" content="Ali Sadikin Ma" />
 <meta property="og:url" content={canonical} />
 <meta property="og:title" content={title} />

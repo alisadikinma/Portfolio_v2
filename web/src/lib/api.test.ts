@@ -249,3 +249,14 @@ describe("timeout during body read", () => {
     await a;
   });
 });
+
+describe("request headers", () => {
+  it("only sends Accept and Cookie: lang_preference; never Authorization or session cookies", async () => {
+    fetchMock.mockResolvedValue(ok(1));
+    await apiGet("/p", { lang: "id" });
+    const init = fetchMock.mock.calls[0][1];
+    expect(Object.keys(init.headers).sort()).toEqual(["Accept", "Cookie"]);
+    expect(init.headers.Cookie).toBe("lang_preference=id");
+    expect(init.credentials).toBeUndefined();
+  });
+});

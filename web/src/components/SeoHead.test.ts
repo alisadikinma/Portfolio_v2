@@ -1,4 +1,5 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { resetApiCache } from "../lib/api";
 import { experimental_AstroContainer as AstroContainer } from "astro/container";
 import SeoHead from "./SeoHead.astro";
 import BaseLayout from "../layouts/BaseLayout.astro";
@@ -55,12 +56,59 @@ describe("SeoHead", () => {
     expect(h).toContain("\\u003c/script\\u003e");
   });
 
+  it("canonical equals self hreflang, even for /id/ input", async () => {
+    const h = await head({ ...props, path: "/id/" });
+    expect(h).toContain('rel="canonical" href="https://alisadikinma.com/id"');
+    expect(h).toContain('hreflang="id" href="https://alisadikinma.com/id"');
+    expect(h).toContain('property="og:url" content="https://alisadikinma.com/id"');
+  });
+
+  it("og:type defaults to website, article when asked", async () => {
+    expect(await head()).toContain('property="og:type" content="website"');
+    expect(await head({ ...props, type: "article" })).toContain('property="og:type" content="article"');
+  });
+
   it("robots index,follow", async () => {
     expect(await head()).toContain('name="robots" content="index,follow"');
   });
 });
 
 describe("BaseLayout", () => {
+  let settings: Record<string, unknown> = {};
+  beforeEach(() => {
+    resetApiCache();
+    settings = {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ success: true, data: settings }), { status: 200 })),
+    );
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("WhatsApp button uses site.contact_phone digits", async () => {
+    settings = { contact_phone: "+62 812-3456-7890" };
+    const h = await render();
+    expect(h).toContain('href="https://wa.me/6281234567890"');
+  });
+
+  it("WhatsApp button hidden when contact_phone empty or API fails", async () => {
+    settings = { contact_phone: "" };
+    expect(await render()).not.toContain("wa.me");
+    expect(await render()).not.toContain('href="#wa"');
+    resetApiCache();
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("down")));
+    expect(await render()).not.toContain("wa.me");
+  });
+
+  it("brand/home link has no trailing slash", async () => {
+    expect(await render()).toContain('class="brand" href="/id"');
+  });
+
+  it("no social link falls back to #", async () => {
+    const h = await render();
+    expect(h).not.toContain('href="#"');
+  });
+
   const render = async (p: Record<string, unknown> = {}) => {
     const c = await AstroContainer.create();
     return c.renderToString(BaseLayout, {

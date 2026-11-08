@@ -86,6 +86,8 @@ async function fetchBody(
   const timeout = (e: unknown) =>
     new ApiError(0, url, `ApiError network/timeout ${url}: ${(e as Error).message}`);
   try {
+    // SECURITY: this client is anonymous. Never forward the visitor's Authorization header or
+    // session cookies to the API. Only Accept and Cookie: lang_preference=... are allowed.
     const headers: Record<string, string> = {
       Accept: kind === "text" ? "text/plain, application/xml, */*" : "application/json",
     };
