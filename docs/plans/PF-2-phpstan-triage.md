@@ -6,7 +6,7 @@ Phase 0E. Source: `backend/phpstan-baseline.neon` (level 5), analysed with the b
 
 - Baseline before Phase 0E: 582 entries / 826 occurrences.
 - Baseline after: 576 entries / 817 occurrences (only shrinks).
-- **BUG: 3 groups fixed** (variable.undefined x6 in ContentIdeaController, env() outside config x2, undefined `ArticleGenerationService::trigger()` in ProcessScheduledIdeas). Each has a failing-first test and its baseline entry is removed.
+- **BUG: 4 groups fixed** (variable.undefined x6 in ContentIdeaController, env() outside config x2, undefined `ArticleGenerationService::trigger()` in ProcessScheduledIdeas). Each has a failing-first test and its baseline entry is removed.
 - **NOISE: every remaining non-`property.notFound` entry** (listed below). `property.notFound` (336 entries / 476 occurrences) are Eloquent magic attributes and `Post::$translations`-style relation properties: NOISE, one summary line, not listed.
 
 ## Fixed (BUG)
@@ -16,7 +16,7 @@ Phase 0E. Source: `backend/phpstan-baseline.neon` (level 5), analysed with the b
 | app/Http/Controllers/Api/Admin/ContentIdeaController.php (generateSegmentImage) | variable.undefined x6 | BUG | Unknown `segment_index` left `$variationIndex`/`$reuseIndex`/`$priorSlot` unset: paid GeminiGen job queued, then 500 "Undefined variable". Now 422 before any work. Test: GenerateSegmentImageUnknownSegmentTest | 4de3666c |
 | app/Http/Controllers/Api/ContactController.php:217 | larastan.noEnvCallsOutsideOfConfig | BUG | env() returns null under config:cache; fell back to admin@example.com. Now config('mail.admin_email'), skip + warning when unset. Test: ContactAdminEmailTest | 5c334a28 |
 | app/Http/Controllers/Api/LinkedInOAuthController.php:82 | larastan.noEnvCallsOutsideOfConfig | BUG | env() null under config:cache: OAuth callback redirected to http://localhost:5173. Now config('app.frontend_url'). Test: LinkedInOAuthCallbackRedirectTest | 5c334a28 |
-| app/Console/Commands/ProcessScheduledIdeas.php:48 | method.notFound | BUG | Called nonexistent ArticleGenerationService::trigger(); every due scheduled idea went researching -> exception -> back to draft each tick, so scheduled ideas never started. Now uses the same pipeline selection as startResearch. Test: ProcessScheduledIdeasTriggerTest | commit "fix(PF-2): ProcessScheduledIdeas called a nonexistent method" |
+| app/Console/Commands/ProcessScheduledIdeas.php:48 | method.notFound | BUG | Called nonexistent ArticleGenerationService::trigger(); every due scheduled idea went researching -> exception -> back to draft each tick, so scheduled ideas never started. Now uses the same pipeline selection as startResearch. Test: ProcessScheduledIdeasTriggerTest | 1cef2b2a |
 
 ## Remaining (NOISE) by identifier
 
@@ -63,7 +63,6 @@ Phase 0E. Source: `backend/phpstan-baseline.neon` (level 5), analysed with the b
 | app/Console/Commands/ProcessPendingImages.php:134 | identical.alwaysFalse | NOISE | Larastan derives type enum from the first migration; later migration widened it to include carousel_slide. | - |
 | app/Console/Commands/ProcessPendingImages.php:167 | identical.alwaysFalse | NOISE | Larastan derives type enum from the first migration; later migration widened it to include carousel_slide. | - |
 | app/Console/Commands/ProcessPendingTranslations.php:36 | nullsafe.neverNull | NOISE | Nullsafe on an Eloquent relation/attribute PHPStan believes non-null; DB can hold null, guard is correct. | - |
-| app/Console/Commands/ProcessScheduledIdeas.php:48 | method.notFound | NOISE | Type widening only. | - |
 | app/Console/Commands/PromptScheduleReadyDrafts.php:148 | nullCoalesce.offset | NOISE | Defensive ?? on a result array whose shape is documented; harmless. | - |
 | app/Console/Commands/PurgeLowViralityLinkedInDrafts.php:82 | nullsafe.neverNull | NOISE | Nullsafe on an Eloquent relation/attribute PHPStan believes non-null; DB can hold null, guard is correct. | - |
 | app/Console/Commands/ReapUnclaimedPostizJobs.php:95 | nullsafe.neverNull | NOISE | Nullsafe on an Eloquent relation/attribute PHPStan believes non-null; DB can hold null, guard is correct. | - |
