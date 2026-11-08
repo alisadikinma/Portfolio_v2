@@ -176,6 +176,8 @@ $RECYCLE.BIN/
 *.jpg
 # Exception: README documentation images must ship (override global *.jpg)
 !docs/assets/readme/*.jpg
+# Exception: web/ site images (portrait for Person.image) must ship
+!web/public/images/*.jpg
 
 # Archives
 *.7z

@@ -15,7 +15,7 @@ const all = () => [
   blogPosting({ title: "T", url: "https://alisadikinma.com/en/blog/t", datePublished: "2026-01-01", dateModified: "2026-02-01", image: "https://alisadikinma.com/i.jpg", lang: "en" }),
   creativeWork({ name: "P", url: "https://alisadikinma.com/en/projects/p", description: "d", image: "https://alisadikinma.com/p.jpg" }),
   serviceNode({ name: "AI Training", url: "https://alisadikinma.com/en/ai-training", lang: "en" }),
-  profilePage(),
+  profilePage({ url: "https://alisadikinma.com/en/about" }),
   eventNode({ name: "Global AI Demo Day 2026", startDate: "2026-01-01", location: "Bengaluru", organizer: "Outskill", url: "https://alisadikinma.com/en/awards/x" }),
 ];
 
@@ -54,7 +54,7 @@ describe("other nodes", () => {
     const b = all()[4] as any;
     expect(b["@type"]).toBe("BlogPosting");
     expect(b.headline).toBe("T");
-    expect(b.author).toEqual({ "@id": PERSON_ID });
+    expect(b.author["@id"]).toBe(PERSON_ID);
     expect(b.inLanguage).toBe("en");
     expect(b.datePublished).toBe("2026-01-01");
     expect(b.dateModified).toBe("2026-02-01");
@@ -75,7 +75,7 @@ describe("other nodes", () => {
     expect(s.offers).toBeUndefined();
   });
   it("profilePage mainEntity", () => {
-    expect((profilePage() as any).mainEntity).toEqual({ "@id": PERSON_ID });
+    expect((profilePage({ url: "u" }) as any).mainEntity).toEqual({ "@id": PERSON_ID });
   });
   it("eventNode", () => {
     const e = eventNode({ name: "n", startDate: "2026-01-01", location: "L", organizer: "O", url: "u" }) as any;
@@ -97,5 +97,69 @@ describe("invariants", () => {
     expect(() => JSON.parse(s)).not.toThrow();
     expect(s).not.toContain("aggregateRating");
     expect(s).not.toContain('"review"');
+  });
+});
+
+// ---- 1D review fixes ----
+import { PORTRAIT_URL, jsonLdString, webPageNode } from "./schema";
+
+describe("1D review fixes", () => {
+  it("portrait url is the person image", () => {
+    expect(PORTRAIT_URL).toBe("https://alisadikinma.com/images/ali-sadikin-ma-pakar-ai-indonesia.jpg");
+    expect((personNode() as any).image).toBe(PORTRAIT_URL);
+  });
+  it("jsonLdString escapes script-breaking chars", () => {
+    const s = jsonLdString(graph(blogPosting({ title: "</script><!-- & > \u2028\u2029", url: "u", datePublished: "2026-01-01", lang: "en" })));
+    expect(s).not.toContain("</script>");
+    expect(s).not.toContain("<!--");
+    expect(s).not.toMatch(/[<>&\u2028\u2029]/);
+    expect(JSON.parse(s)["@graph"][0].headline).toBe("</script><!-- & > \u2028\u2029");
+  });
+  it("webPageNode", () => {
+    const w = webPageNode({ url: "https://alisadikinma.com/id", lang: "id", name: "N", description: "D" }) as any;
+    expect(w["@type"]).toBe("WebPage");
+    expect(w["@id"]).toBe("https://alisadikinma.com/id#webpage");
+    expect(w.about).toEqual({ "@id": PERSON_ID });
+    expect(w.mainEntity).toEqual({ "@id": PERSON_ID });
+    expect(w.isPartOf).toEqual({ "@id": "https://alisadikinma.com/#website" });
+    expect(w.inLanguage).toBe("id");
+    expect(w.description).toBe("D");
+    expect((webPageNode({ url: "u", lang: "en", name: "N" }) as any).description).toBeUndefined();
+  });
+  it("person: no alternateName, has spec fields", () => {
+    const p = personNode() as any;
+    expect(p.alternateName).toBeUndefined();
+    expect(typeof p.description).toBe("string");
+    expect(p.homeLocation).toEqual({
+      "@type": "Place",
+      address: { "@type": "PostalAddress", addressLocality: "Batam", addressRegion: "Kepulauan Riau", addressCountry: "ID" },
+    });
+    expect(p.hasOccupation["@type"]).toBe("Occupation");
+    expect(p.hasOccupation.name).toBe("AI Consultant");
+    expect(p.alumniOf.map((a: any) => a.name)).toEqual(["BINUS University", "Politeknik Caltex Riau"]);
+    expect(p.alumniOf[0]["@type"]).toBe("CollegeOrUniversity");
+  });
+  it("service has no inLanguage", () => {
+    expect((serviceNode({ name: "n", url: "u", lang: "id" }) as any).inLanguage).toBeUndefined();
+  });
+  it("event: address, eventStatus, no performer", () => {
+    const e = eventNode({ name: "n", startDate: "2026-01-01", location: "Bengaluru", organizer: "O" }) as any;
+    expect(e.performer).toBeUndefined();
+    expect(e.eventStatus).toBe("https://schema.org/EventScheduled");
+    expect(e.location.address).toBe("Bengaluru");
+  });
+  it("blogPosting: @id, description, author person node", () => {
+    const b = blogPosting({ title: "T", url: "https://alisadikinma.com/en/blog/t", datePublished: "2026-01-01", lang: "en", description: "desc" }) as any;
+    expect(b["@id"]).toBe("https://alisadikinma.com/en/blog/t#article");
+    expect(b.description).toBe("desc");
+    expect(b.author).toEqual({ "@type": "Person", "@id": PERSON_ID, name: "Ali Sadikin Ma", url: "https://alisadikinma.com" });
+  });
+  it("profilePage: url, @id, optional dateModified", () => {
+    const p = profilePage({ url: "https://alisadikinma.com/id/about", dateModified: "2026-02-01" }) as any;
+    expect(p.url).toBe("https://alisadikinma.com/id/about");
+    expect(p["@id"]).toBe("https://alisadikinma.com/id/about#profilepage");
+    expect(p.dateModified).toBe("2026-02-01");
+    expect((profilePage({ url: "u" }) as any).dateModified).toBeUndefined();
+    expect(p.mainEntity).toEqual({ "@id": PERSON_ID });
   });
 });

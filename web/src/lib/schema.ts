@@ -1,9 +1,20 @@
 export type Node = Record<string, unknown>;
 
-const SITE = "https://alisadikinma.com";
+export const SITE = "https://alisadikinma.com";
 export const PERSON_ID = `${SITE}/#person`;
 export const ORG_ID = "https://indusia.ai/#org";
 const PERSON_REF = { "@id": PERSON_ID };
+export const PORTRAIT_URL = `${SITE}/images/ali-sadikin-ma-pakar-ai-indonesia.jpg`;
+
+/** JSON for inline <script type="application/ld+json">: escapes chars that can end the script element. */
+export function jsonLdString(node: Node): string {
+  return JSON.stringify(node)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
+}
 
 export const SAME_AS: string[] = [
   "https://www.instagram.com/alisadikinma",
@@ -19,12 +30,22 @@ export function personNode(opts: { sameAs?: string[]; image?: string } = {}): No
     "@type": "Person",
     "@id": PERSON_ID,
     name: "Ali Sadikin Ma",
-    alternateName: "Ali Sadikin",
     url: SITE,
     jobTitle: "AI Consultant",
     disambiguatingDescription:
       "Indonesian AI consultant and founder of INDUSIA.ai, based in Batam. Not the former Governor of Jakarta Ali Sadikin.",
-    image: opts.image ?? `${SITE}/images/ali-sadikin-ma.jpg`,
+    description:
+      "Ali Sadikin Ma is an Indonesian AI consultant based in Batam and founder of INDUSIA.ai, building production AI for industry.",
+    homeLocation: {
+      "@type": "Place",
+      address: { "@type": "PostalAddress", addressLocality: "Batam", addressRegion: "Kepulauan Riau", addressCountry: "ID" },
+    },
+    hasOccupation: { "@type": "Occupation", name: "AI Consultant" },
+    alumniOf: [
+      { "@type": "CollegeOrUniversity", name: "BINUS University" },
+      { "@type": "CollegeOrUniversity", name: "Politeknik Caltex Riau" },
+    ],
+    image: opts.image ?? PORTRAIT_URL,
     worksFor: { "@id": ORG_ID },
     founder: { "@id": ORG_ID },
     award: "1st Place, Global AI Demo Day 2026 (Outskill, Bengaluru)",
@@ -46,6 +67,21 @@ export function websiteNode(): Node {
     inLanguage: ["id", "en"],
     publisher: PERSON_REF,
   };
+}
+
+export function webPageNode(p: { url: string; lang: string; name: string; description?: string }): Node {
+  const n: Node = {
+    "@type": "WebPage",
+    "@id": `${p.url}#webpage`,
+    url: p.url,
+    name: p.name,
+    inLanguage: p.lang,
+    isPartOf: { "@id": `${SITE}/#website` },
+    about: PERSON_REF,
+    mainEntity: PERSON_REF,
+  };
+  if (p.description) n.description = p.description;
+  return n;
 }
 
 export function breadcrumb(items: { name: string; url: string }[]): Node {
@@ -72,18 +108,20 @@ export function faqPage(qas: { q: string; a: string }[]): Node {
 }
 
 export function blogPosting(p: {
-  title: string; url: string; datePublished: string; dateModified?: string; image?: string; lang: string;
+  title: string; url: string; datePublished: string; dateModified?: string; image?: string; lang: string; description?: string;
 }): Node {
   const n: Node = {
     "@type": "BlogPosting",
+    "@id": `${p.url}#article`,
     headline: p.title,
     mainEntityOfPage: p.url,
     datePublished: p.datePublished,
     dateModified: p.dateModified ?? p.datePublished,
-    author: PERSON_REF,
+    author: { "@type": "Person", "@id": PERSON_ID, name: "Ali Sadikin Ma", url: SITE },
     publisher: PERSON_REF,
     inLanguage: p.lang,
   };
+  if (p.description) n.description = p.description;
   if (p.image) n.image = p.image;
   return n;
 }
@@ -100,14 +138,15 @@ export function serviceNode(s: { name: string; url: string; lang: string }): Nod
     "@type": "Service",
     name: s.name,
     url: s.url,
-    inLanguage: s.lang,
     provider: PERSON_REF,
     areaServed: "Indonesia",
   };
 }
 
-export function profilePage(): Node {
-  return { "@type": "ProfilePage", mainEntity: PERSON_REF };
+export function profilePage(p: { url: string; dateModified?: string }): Node {
+  const n: Node = { "@type": "ProfilePage", "@id": `${p.url}#profilepage`, url: p.url, mainEntity: PERSON_REF };
+  if (p.dateModified) n.dateModified = p.dateModified;
+  return n;
 }
 
 export function eventNode(a: {
@@ -117,9 +156,9 @@ export function eventNode(a: {
     "@type": "Event",
     name: a.name,
     startDate: a.startDate,
-    location: { "@type": "Place", name: a.location },
+    eventStatus: "https://schema.org/EventScheduled",
+    location: { "@type": "Place", name: a.location, address: a.location },
     organizer: { "@type": "Organization", name: a.organizer },
-    performer: PERSON_REF,
   };
   if (a.url) n.url = a.url;
   return n;
