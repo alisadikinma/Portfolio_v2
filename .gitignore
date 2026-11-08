@@ -241,3 +241,9 @@ graphify-out/
 
 # gaspol worktrees (global standard 2026-08-20)
 .claude/worktrees/
+
+# PF-2 Astro app
+web/node_modules
+web/dist
+web/.astro
+web/.env
