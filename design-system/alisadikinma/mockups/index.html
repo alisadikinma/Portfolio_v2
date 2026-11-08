@@ -97,16 +97,42 @@
 
   <section class="sec" aria-labelledby="stages-h">
     <div class="wrap">
-      <div class="sec-head"><h2 id="stages-h">Panggung internasional</h2><p class="lead">Produk yang saya bangun pernah dinilai juri di India, Tiongkok, Amerika Serikat, dan Indonesia.</p></div>
-      <ul class="stages">
-        <li><span class="yr">2026</span><h3>Global AI Demo Day</h3><p>Juara 1 dari 26 startup, Bengaluru, India.</p></li>
-        <li><span class="yr">2019</span><h3>UN-UNCTAD × Alibaba eFounders</h3><p>Fellowship, Hangzhou, Tiongkok.</p></li>
-        <li><span class="yr">2018</span><h3>Google Startup Grind</h3><p>Silicon Valley, San Francisco.</p></li>
-        <li><span class="yr">2018</span><h3>Telkomsel NextDev</h3><p>Juara 1 Startup Competition.</p></li>
-        <li><span class="yr">2017</span><h3>Fenox Startup World Cup</h3><p>Juara 1 Wild Card, bersama BEKRAF.</p></li>
+      <div class="sec-head"><h2 id="stages-h">Panggung internasional</h2><p class="lead">Produk yang saya bangun pernah dinilai juri di India, Tiongkok, Amerika Serikat, dan Indonesia. Klik foto untuk melihat galerinya.</p></div>
+      <ul class="bento">
+        <li class="bt-main"><button type="button" data-stage="13" aria-label="Buka galeri Global AI Demo Day 2026">
+          <img src="https://alisadikinma.com/storage/gallery/items/1777871190_item_20_3.jpg" alt="Ali Sadikin Ma menerima juara 1 di Global AI Demo Day 2026, Bengaluru" loading="lazy">
+          <span class="bt-lock" aria-hidden="true"><b>Juara 1 · Bengaluru 2026</b></span>
+          <span class="bt-cap"><span class="yr">2026 · India</span><strong>Global AI Demo Day</strong><span>Juara 1 dari 26 startup AI. Sparkfluence, platform konten AI.</span><em data-count-for="13"></em></span>
+        </button></li>
+        <li><button type="button" data-stage="10" aria-label="Buka galeri UN-UNCTAD Alibaba eFounders">
+          <img src="https://alisadikinma.com/storage/gallery/items/1761931433_item_12_0.jpg" alt="Ali Sadikin Ma di UN-UNCTAD Alibaba eFounders Fellowship, Hangzhou" loading="lazy">
+          <span class="bt-cap"><span class="yr">2019 · Tiongkok</span><strong>UN-UNCTAD × Alibaba eFounders</strong><em data-count-for="10"></em></span>
+        </button></li>
+        <li><button type="button" data-stage="11" aria-label="Buka galeri Google Startup Grind">
+          <img src="https://alisadikinma.com/storage/gallery/items/1761931470_item_13_3.jpg" alt="Ali Sadikin Ma di Google Startup Grind, Silicon Valley" loading="lazy">
+          <span class="bt-cap"><span class="yr">2018 · Amerika Serikat</span><strong>Google Startup Grind</strong><em data-count-for="11"></em></span>
+        </button></li>
+        <li><button type="button" data-stage="7" aria-label="Buka galeri Telkomsel NextDev">
+          <img src="https://alisadikinma.com/storage/gallery/items/1761930891_item_9_1.jpg" alt="Ali Sadikin Ma juara 1 Telkomsel NextDev" loading="lazy">
+          <span class="bt-lock gold-sm" aria-hidden="true"><b>Juara 1</b></span>
+          <span class="bt-cap"><span class="yr">2018 · Indonesia</span><strong>Telkomsel NextDev</strong><em data-count-for="7"></em></span>
+        </button></li>
+        <li><button type="button" data-stage="8" aria-label="Buka galeri Fenox Startup World Cup">
+          <img src="https://alisadikinma.com/storage/gallery/items/1761931360_item_10_1.jpg" alt="Ali Sadikin Ma juara 1 Wild Card Fenox Startup World Cup" loading="lazy">
+          <span class="bt-lock gold-sm" aria-hidden="true"><b>Juara 1 Wild Card</b></span>
+          <span class="bt-cap"><span class="yr">2017 · Indonesia</span><strong>Fenox Startup World Cup</strong><em data-count-for="8"></em></span>
+        </button></li>
       </ul>
+      <p class="bt-more"><a href="#">Lihat semua galeri dan penghargaan</a></p>
     </div>
   </section>
+
+  <dialog class="lb" id="lb" aria-label="Galeri foto">
+    <button type="button" class="lb-x" data-lb="close" aria-label="Tutup galeri">✕</button>
+    <button type="button" class="lb-nav prev" data-lb="prev" aria-label="Foto sebelumnya">‹</button>
+    <figure><img id="lb-img" alt=""><figcaption id="lb-cap" class="mono"></figcaption></figure>
+    <button type="button" class="lb-nav next" data-lb="next" aria-label="Foto berikutnya">›</button>
+  </dialog>
 
   <section class="sec alt quote">
     <div class="wrap">
@@ -148,6 +174,8 @@
 </footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="stages-data.js"></script>
+<script src="gallery.js"></script>
 <script type="module" src="hero-particles.js"></script>
 </body>
 </html>
