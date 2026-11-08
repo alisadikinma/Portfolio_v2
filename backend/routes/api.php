@@ -164,8 +164,7 @@ Route::post('/chatbot/ask', [ChatbotController::class, 'ask'])->middleware('thro
 Route::get('/llms.txt', [GeoController::class, 'llmsTxt']);
 Route::get('/llms-full.txt', [GeoController::class, 'llmsFullTxt']);
 
-// FAQ — curated Q&A (config/faq.php), consumed by the Vue /faq view. The SSR
-// /faq page (SpaPrerenderController::faq) renders the same source server-side.
+// FAQ — curated Q&A (config/faq.php), consumed by the Astro /faq page (web/).
 Route::get('/faq', [FaqController::class, 'index']);
 
 // Activity Feed

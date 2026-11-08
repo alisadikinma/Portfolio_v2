@@ -101,7 +101,7 @@ class InternalCrawlerHitTest extends TestCase
     {
         $this->setServerToken();
 
-        $this->withHeaders(['User-Agent' => 'Mozilla/5.0 (compatible; GPTBot/1.2)'])->get('/');
+        $this->withHeaders(['User-Agent' => 'Mozilla/5.0 (compatible; GPTBot/1.2)'])->get('/r/nocode1');
         $this->postJson(self::URL, ['bot' => 'GPTBot'], ['X-Internal-Token' => 'secret-token'])
             ->assertStatus(202);
 

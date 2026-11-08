@@ -895,42 +895,6 @@ parameters:
 			path: app/Http/Controllers/Api/SitemapController.php
 
 		-
-			message: '#^Access to an undefined property App\\Models\\Post\:\:\$category\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/SpaPrerenderController.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Post\:\:\$translations\.$#'
-			identifier: property.notFound
-			count: 3
-			path: app/Http/Controllers/SpaPrerenderController.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Project\:\:\$translations\.$#'
-			identifier: property.notFound
-			count: 3
-			path: app/Http/Controllers/SpaPrerenderController.php
-
-		-
-			message: '#^Relation ''category'' is not found in App\\Models\\Post model\.$#'
-			identifier: larastan.relationExistence
-			count: 2
-			path: app/Http/Controllers/SpaPrerenderController.php
-
-		-
-			message: '#^Relation ''translations'' is not found in App\\Models\\Post model\.$#'
-			identifier: larastan.relationExistence
-			count: 3
-			path: app/Http/Controllers/SpaPrerenderController.php
-
-		-
-			message: '#^Relation ''translations'' is not found in App\\Models\\Project model\.$#'
-			identifier: larastan.relationExistence
-			count: 1
-			path: app/Http/Controllers/SpaPrerenderController.php
-
-		-
 			message: '#^Cannot access property \$headers on class\-string\|object\.$#'
 			identifier: property.nonObject
 			count: 4
@@ -2147,16 +2111,6 @@ parameters:
 			identifier: property.notFound
 			count: 1
 			path: app/Http/Resources/ScheduledCommandResource.php
-
-
-
-
-
-
-
-
-
-
 
 		-
 			message: '#^Access to an undefined property App\\Http\\Resources\\SettingResource\:\:\$created_at\.$#'

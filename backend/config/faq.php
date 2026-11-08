@@ -5,10 +5,8 @@
 | FAQ — single source of truth (GEO Pillar 2)
 |--------------------------------------------------------------------------
 |
-| One curated Q&A set feeding THREE surfaces from this one place:
-|   - SSR /faq    → SpaPrerenderController::faq (crawlable <dl> + FAQPage JSON-LD)
-|   - GET /api/faq → FaqController (the Vue view fetches this)
-|   - Vue /faq    → FaqView.vue (real humans)
+| One curated Q&A set served by GET /api/faq (FaqController); the Astro
+| /faq page (web/) fetches it and emits the crawlable <dl> + FAQPage JSON-LD
 |
 | GEO requirement: every answer is ANSWER-FIRST and STANDALONE — it must make
 | sense pulled out of context (an AI engine may quote a single answer with no
