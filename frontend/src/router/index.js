@@ -177,6 +177,16 @@ const routes = [
       layout: 'admin'
     }
   },
+  {
+    path: '/admin/training-waitlist',
+    name: 'admin-training-waitlist',
+    component: () => import('@/views/admin/TrainingWaitlist.vue'),
+    meta: {
+      title: 'Waitlist Pelatihan — Admin',
+      requiresAuth: true,
+      layout: 'admin'
+    }
+  },
   // ============================================
   // BLOG POSTS ROUTES
   // ============================================
