@@ -109,7 +109,12 @@ export async function onRequest(context: Ctx, next: Next): Promise<Response> {
   if (legacy) {
     if (legacy[2].toLowerCase() === "awards-debug") return new Response("Not found", { status: 404 });
     const lang = (legacy[1]?.toLowerCase() ?? "en") as Lang;
-    return redirect(`/${lang}/work?tab=${legacy[2].toLowerCase() === "gallery" ? "gallery" : "awards"}`, 301);
+    // Keep the visitor's query (UTM etc.); the mapped tab always wins over an old ?tab=.
+    const q = new URLSearchParams(search);
+    q.delete("tab");
+    const rest = q.toString();
+    const tab = legacy[2].toLowerCase() === "gallery" ? "gallery" : "awards";
+    return redirect(`/${lang}/work?tab=${tab}${rest ? `&${rest}` : ""}`, 301);
   }
 
   const prefixed = norm.match(/^\/(id|en)(?=\/|$)/i);
