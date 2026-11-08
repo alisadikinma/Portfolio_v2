@@ -26,23 +26,26 @@ This repo has a knowledge graph at `graphify-out/` (god nodes, community structu
 
 ## Project Overview
 
-Portfolio_v2 is a full-stack portfolio, blog, and CMS platform using Laravel 12 (backend API) and Vue 3 (frontend SPA). Development on macOS via Docker Desktop.
+Portfolio_v2 is a portfolio, blog, and CMS platform: Laravel 12 (backend API) + **Astro 7 SSR public site (`web/`, node adapter)** + Vue 3 SPA (`frontend/`, **admin/login/unsubscribe only** since PF-2). Development on macOS via Docker Desktop.
 
 **Critical Context Files:**
-- Read `README.md`, `backend/README.md`, `frontend/README.md` at start of every conversation
+- Read `README.md`, `backend/README.md`, `frontend/README.md` (admin SPA) at start of every conversation; public site code lives in `web/` (`web/src/pages`, `web/src/lib/api.ts`)
 - Check `PROJECT_STATUS.md` for current development state and progress tracking
 
 ## Environment Architecture
 
 ### Tech Stack
 **Backend:** Laravel 12 + MySQL 8 + Laravel Sanctum 4 (JWT auth) + Filament 4.1 (admin panels)
-**Frontend:** Vue 3.5 + Rolldown-Vite 7.1 + Pinia 3 + Vue Router 4.5 + Tailwind CSS 4
+**Public site (`web/`):** Astro 7 SSR (`@astrojs/node` standalone, node >= 22) + GSAP + OGL hero; vitest + Playwright e2e (`web/e2e`, one headed Chrome over CDP)
+**Admin SPA (`frontend/`):** Vue 3.5 + Rolldown-Vite 7.1 + Pinia 3 + Vue Router 4.5 + Tailwind CSS 4 (admin only)
+**PHP:** 8.4 (VPS fpm + CLI, Docker container)
 **Packages:** Intervention Image 3.11, Spatie Sluggable 3.7, Resend (email), SortableJS, TanStack Vue Query 5.90
 
 ### Critical URLs
 ```
 Backend API:   http://localhost/Portfolio_v2/backend/public/api
-Frontend Dev:  http://localhost:5173 (Vite)
+Admin SPA Dev: http://localhost:5173 (Vite, `/` redirects to `/admin`)
+Public site:   http://127.0.0.1:4321 (Astro; `/id`, `/en`)
 Production:    https://alisadikinma.com
 Database:      localhost:3306 (user: ali, db: portfolio_v2)
 phpMyAdmin:    http://localhost/phpmyadmin
@@ -51,7 +54,7 @@ phpMyAdmin:    http://localhost/phpmyadmin
 ### Key Constraints
 - **DO NOT** use `php artisan serve` — the `portfolio_backend` Docker container serves the API
 - Project path: `/Users/alisadikin/Drive-D/Projects/Portfolio_v2`
-- Backend + MySQL run in Docker Desktop (containers `portfolio_backend` + `portfolio_mysql`); frontend on Vite dev server. **No host php/composer** — run backend commands via `docker exec portfolio_backend php artisan ...`
+- Backend + MySQL run in Docker Desktop (containers `portfolio_backend` + `portfolio_mysql`); admin SPA on Vite dev server, public site via `npm run dev` / built `node dist/server/entry.mjs` in `web/`. **No host php/composer** — run backend commands via `docker exec portfolio_backend php artisan ...`
 
 ## Architecture & Patterns
 
@@ -157,6 +160,27 @@ return response()->json(['success' => false, 'error' => ['code' => '...', 'messa
 4. **Controller Pattern:** Form Requests → API Resources → Eager Loading → Proper HTTP codes
 5. **SEO:** All content models have HasSeoFields trait (meta_title, meta_description, og_image, schema_markup, canonical_url, seo_score)
 6. **Translations:** Posts and Projects support i18n via translation tables
+
+### Public Site (Astro SSR, `web/`, PF-2)
+
+Every public page is server-rendered by Astro (`web/src/pages/[lang]/…`, lang = `id`|`en`, localized segments in `web/src/lib/i18n.ts`: `pelatihan-ai`/`ai-training`, `pembicara-ai`/`ai-speaker`, `penghargaan`/`awards`). It reads the Laravel API **server-side only** (`web/src/lib/api.ts`, 4s timeout, falls back to degraded sections instead of failing). Client JS is limited to small islands (`web/src/scripts/`: lightbox, scrollspy, hero cloud, waitlist/newsletter/contact forms). The browser never talks to Astro for data; forms POST straight to Laravel `/api/*`.
+
+**Routing (nginx, `scripts/nginx/portfolio-8080.conf`):** Laravel = `/api/*`, `/r/{code}`, `/storage/*`, `/uploads/*`; Vue SPA = `/admin*`, `/login`, `/newsletter/unsubscribe`, `/assets/*`, `/sw.js`; Astro (`127.0.0.1:4321`, unit `portfolio-web.service`) = everything else. See the "nginx routing split" section below.
+
+**`web/.env` (see `web/.env.example`):**
+
+| var | purpose |
+|---|---|
+| `API_INTERNAL_URL` | Laravel API base for SSR reads. Prod: loopback listener `http://127.0.0.1:8081/api` (nginx serves `/api/internal/*` there; public :8080 answers 404). Local e2e/gate: `https://alisadikinma.com/api` read-only |
+| `INTERNAL_API_TOKEN` | Required when `NODE_ENV=production` (server throws at boot otherwise). Must equal `backend/.env` `INTERNAL_API_TOKEN`; sent as `X-Internal-Token` on `POST /api/internal/crawler-hit` |
+| `GA4_MEASUREMENT_ID` | GA4 tag; empty = no tag, no network |
+| `SITE_URL` | Canonical origin for canonical/hreflang/sitemap/JSON-LD (`https://alisadikinma.com`) |
+| `IMAGE_DIMS_ORIGIN` | Optional same-host origin used to read inline image width/height (skips Cloudflare; rejects encoded paths) |
+| `HOST` / `PORT` | `127.0.0.1` / `4321` (pinned again in the systemd `ExecStart`) |
+
+**Commands (in `web/`):** `npm run build` then `API_INTERNAL_URL=… SITE_URL=… HOST=127.0.0.1 PORT=4321 node dist/server/entry.mjs`; `npx vitest run` (unit), `npm run check` (astro check), `npm run e2e` (Playwright, needs the shared Chrome below), `node scripts/seo-gate.mjs --routes all [--base URL]` (per-route SEO gate; `scripts/seo-gate.config.mjs` holds route specs).
+
+**e2e rule:** ONE headed Chrome started once with `--remote-debugging-port=9222`; specs attach with `chromium.connectOverCDP` (worker-scoped fixture reuses the window's page; never `newContext()`/`close()`), `workers: 1`, `retries: 0`. Every form POST is mocked with `page.route` using the real controller's response shape; the suite never writes to production. Pages that need `GET /api/awards/slug/{slug}` (not on prod until backend deploy) cannot be mocked (SSR fetch), so award pages are 404 against prod data.
 
 ### Frontend Architecture (Vue 3, admin only since PF-2 phase 5B)
 
@@ -503,6 +527,8 @@ GET    /api/llms.txt, /api/llms-full.txt
 GET    /api/health
 GET    /api/activity-feed
 POST   /api/contact (throttle: 3/15min)
+POST   /api/training-waitlist (PF-2; dedicated limiter, honeypot `website`, idempotent on `client_key` UUID: 201 new / 200 replay; 422 body `{success:false,error:{code:"VALIDATION",message}}`)
+GET    /api/awards/slug/{slug} (PF-2; Astro award pages; registered before `/awards/{id}`)
 POST   /api/chatbot/ask (throttle: 10/min)
 POST   /api/newsletter/subscribe (throttle: 5/60min)
 DELETE /api/newsletter/unsubscribe
@@ -530,6 +556,13 @@ DELETE /api/newsletter/unsubscribe
 /api/admin/linkedin-drafts/* (see LinkedIn Admin Routes section below)
 /api/admin/linkedin/* (OAuth: connect, callback, account list, test, disconnect)
 /api/admin/settings/linkedin (GET, PUT — operator-facing publishing flags)
+/api/admin/training-waitlist (GET list, GET /export CSV, PATCH /{id} status/notes) — PF-2
+/api/admin/geo/crawler-hits (GET) — AI-bot crawl counts logged via the internal endpoint
+```
+
+### Internal Routes (server-to-server, PF-2)
+```
+POST   /api/internal/crawler-hit   # Astro middleware reports AI-bot crawls; X-Internal-Token (hash_equals vs services.internal.token), throttle internal-crawler 6000/min, 503 when token unset. Public nginx :8080 answers 404; only the loopback :8081 listener reaches it
 ```
 
 ### CV Export Routes (Sanctum bearer + ability:cv:read + throttle:30,1)
@@ -711,7 +744,17 @@ php artisan article:simulate {ideaId}  # Simulate article generation progress (l
 php artisan content-engine:resync-stuck-variations [--dry-run] [--idea=N]  # Backfill drifted UI variation status from authoritative ImageGenerationJob rows
 ```
 
-### Frontend (Vue)
+### Public site (Astro)
+```bash
+cd /Users/alisadikin/Drive-D/Projects/Portfolio_v2/web
+npm run dev           # Astro dev server (127.0.0.1:4321)
+npm run build && node dist/server/entry.mjs   # production-like (see Public Site section for env)
+npx vitest run        # unit tests
+npm run check         # astro check
+npm run e2e           # Playwright over CDP (shared headed Chrome)
+```
+
+### Admin SPA (Vue)
 ```bash
 cd /Users/alisadikin/Drive-D/Projects/Portfolio_v2/frontend
 npm run dev           # Start Vite dev server (port 5173)
@@ -1034,23 +1077,12 @@ Match the model to the actual cognitive effort of the work. Don't pay Opus rates
 |----------|-------|--------|
 | ~~**P0**~~ | ~~**SPA without SSR**~~ — public pages now rendered by Astro SSR (`web/`); Laravel prerender layer removed (PF-2 5C). | ✅ FIXED (PF-2) |
 | ~~**P2**~~ | ~~**FAQ only on blog**~~ — dedicated `/faq` page now emits `FAQPage` JSON-LD + crawlable `<dl>` (`config/faq.php` single source). | ✅ FIXED June 25, 2026 — per-project/about FAQ deferred |
-| **P5** | **No AI-traffic measurement** — GA4 tag + AI-bot crawl logger now shipped; GA4 "AI Traffic" channel group is a manual dashboard step. | ✅ code shipped June 25, 2026 (operator: set `VITE_GA4_MEASUREMENT_ID` + GA4 channel group) |
+| **P5** | **No AI-traffic measurement** — GA4 tag + AI-bot crawl logger now shipped; GA4 "AI Traffic" channel group is a manual dashboard step. | ✅ code shipped June 25, 2026 (operator: set `GA4_MEASUREMENT_ID` in `web/.env` + GA4 channel group) |
 | **P3** | No `.well-known/ai-plugin.json` | Optional |
 
-### Fixed Issues (April 10, 2026)
+### Fixed Issues
 
-- **robots.txt** — Both frontend/backend now use `https://alisadikinma.com/api/sitemap*.xml`
-- **Root /llms.txt** — Static file in `frontend/public/llms.txt` with profile + API links
-- **Root /sitemap.xml** — Static sitemap index in `frontend/public/sitemap.xml`
-- **sitemap-index.xml** — Fixed `http://` → `https://` via `apiUrl()` helper
-- **Per-page meta tags** — BlogDetail + ProjectDetail inject dynamic OG/Twitter/canonical
-- **`<time datetime>`** — Blog.vue, BlogDetail.vue use semantic `<time>` elements
-- **`<figure>/<figcaption>`** — BlogDetail featured image + ProjectDetail hero image
-- **BreadcrumbList** — JSON-LD on BlogDetail (Home→Blog→Category→Post) and ProjectDetail (Home→Projects→Project)
-- **Article schema** — BlogPosting JSON-LD injected on blog post pages
-- **Project schema** — CreativeWork JSON-LD injected on project detail pages
-- **AI crawler allow-list** — GPTBot, ClaudeBot, PerplexityBot, GoogleOther explicitly allowed in robots.txt
-- **index.html** — Added `<link rel="alternate">` for llms.txt and `<link rel="sitemap">` for sitemap
+The April 2026 SPA-era fixes (per-page meta via `useMetaTags`, static `frontend/public/llms.txt` + `sitemap.xml`, Vue-injected JSON-LD) are obsolete: all of it is replaced by the Astro site (see *Public-site SEO infrastructure* above). `frontend/public/robots.txt` + `sitemap.xml` are removed at cutover.
 
 ### llms.txt Specification
 
@@ -1634,6 +1666,7 @@ Idempotent via `firstOrCreate(['signature' => ...], $row)` — re-seeding on exi
 
 > Condensed log — one line per change. Deep detail lives in the linked `docs/plans/` + `docs/runbooks/` docs and git history. Commits are local until the operator authorizes a push.
 
+- **2026-11-08** — **PF-2 5E: release gate.** Playwright e2e in `web/e2e/public.spec.ts` (14 tests: hero fits 4 viewports, scrollspy, lightbox, waitlist/newsletter/contact submit with mocked POSTs, language switch) over ONE headed Chrome via CDP; full SEO gate (`--routes all` + live posts/projects/awards) and Lighthouse (SEO 100 / A11y 100 on home, training, speaker, blog post; home LCP element = hero img) recorded in `.gaspol/progress/PF-2/`. Docs refreshed (Astro `web/`, env vars, new endpoints, PHP 8.4). Not pushed.
 - **2026-11-08** — **PF-2 5B: public Vue SPA code removed (admin stays).** Router now only `/login`, `/newsletter/unsubscribe`, `/admin…`, 404 catch-all, `/`→`/admin`; deleted public views, `components/home|blog (public)`, public composables/utils/data, i18n, hero media, GA4 + SW registration; deps removed: three, @tresjs/core, gsap, vue-i18n, @heroicons/vue, query-sync-storage-persister. `PageSectionSeeder` now deletes every homepage row the Astro home does not read (incl. `what-i-solve`, `selected-work`). `public/sw.js` is a kill-switch. Not pushed. [plan](docs/plans/2026-11-08-PF-2-portfolio-redesign-seo-plan.md)
 - **2026-07-01** — **GeminiGen → indusia client SSOT (submit via CLI bridge, flagged OFF).** Stops the backend hand-rolling GeminiGen/snapgen HTTP submits in two drifted spots — image + video now shell the `indusiagen-api-client` CLI ([geminigen_image.py / geminigen_video.py](https://github.com/alisadikinma/indusiagen-api-client), the SSOT for the wire protocol) via new [`GeminiGenClientBridge`](backend/app/Services/GeminiGenClientBridge.php) (SUBMIT-only: `submit($endpoint,$fields,$refs,$model)` → uuid; `local` driver = Illuminate Process **argv array, no shell**, `ssh` = `escapeshellarg` per token; **API key NEVER on argv** — client reads its own VPS `.env`; gpt-image-2 URL-refs auto-materialized to temp local files). Wave 1 (images): [`ImageGenerationService::queue`](backend/app/Services/ImageGenerationService.php) + [`LinkedInCarouselImageService::dispatchOne`](backend/app/Services/LinkedInCarouselImageService.php) branch to the bridge behind `geminigen.use_indusia_images`; carousel model now operator-set via `linkedin_carousel_image_model` setting (default `nano-banana-pro`; `gpt-image-2` = literal-typography, Premium-plan only, gets `--mode medium`). Wave 2 (video): all 4 [`GeminiGenVideoService`](backend/app/Services/GeminiGenVideoService.php) dispatchers (hook/keyframe/veo/grok) branch behind `geminigen.use_indusia_video` — per-family CLI subcommand (grok `2:3`/`--mode custom`, veo `--mode frame`, keyframe → image CLI). **Both flags default OFF** — old PHP HTTP path is the fallback, deploy = no-op until env flip. Vendor rebrand `api.geminigen.ai → api.snapgen.ai` centralized in new [`config/geminigen.php`](backend/config/geminigen.php) `base_url` (6 seams: 3 services + 3 poll crons off the dead domain). **Poll stays backend GET** (`{base_url}/history/{uuid}` — model-agnostic, no drift; the client's `check` subcommand is a documented stub → bridge is submit-only). Env: `GEMINIGEN_BASE_URL`, `GEMINIGEN_CLIENT_{DRIVER,PATH,REPO,TIMEOUT,SSH_*}`, `GEMINIGEN_USE_INDUSIA_{IMAGES,VIDEO}`. Tests: config 4 + bridge 6 + ImageGenIndusiaSubmit 2 + CarouselIndusiaSubmit 3 + VideoIndusiaSubmit 4 + touched-suite regression (video svc 2, polls 17) all green (11 batched fails are the pre-existing `alias:Setting` Mockery leak, proven identical at base `88479ec7`). **SHIPPED + LIVE (2026-07-01):** pushed, deployed, VPS client installed (read-only deploy key + `~/.config/geminigen/config.json` key — client has no dotenv loader), all step-0 probes green (image / gpt-image-2 Premium / grok+ref 2:3 / veo frame), **both flags flipped ON** — Wave 1 verified prod-green end-to-end (draft 188 slide 0 `failed → done`: service → CLI bridge → job row → poll `GET /history` → downloaded), Wave 2 (video) ON, organic-verify on next hook/veo run. Key rotated to a fresh snapgen key (old one hit `HTTP 402` out-of-credits, which had also broken the live HTTP image path since ~09:30 — rotation fixed both). CLI `--aspect` enum has NO `4:5` (carousel uses `3:4`). → [runbook](docs/runbooks/geminigen-indusia-client-deploy.md). [plan](docs/plans/2026-07-01-geminigen-indusia-client-ssot.md)
 - **2026-06-25** — GEO hardening (3 gaps: projects SSR, `/faq`, measurement). SSR parts since superseded by Astro `web/` (PF-2, Nov 2026) and the Laravel prerender code deleted; surviving pieces: `config/faq.php` + `GET /api/faq`, `LogAiCrawler` + `GET /api/admin/geo/crawler-hits`, GA4 gating. [plan](docs/plans/2026-06-25-geo-hardening-three-gaps.md)
@@ -1724,6 +1757,7 @@ Idempotent via `firstOrCreate(['signature' => ...], $row)` — re-seeding on exi
 
 ---
 
+**Last Updated:** 2026-11-08 (PF-2 Phase 5E)
 **Maintainer:** Ali Sadikin (ali.sadikincom85@gmail.com)
 **Environment:** macOS + Docker Desktop, /Users/alisadikin/Drive-D/Projects/Portfolio_v2
 **PHP:** 8.4 everywhere (VPS fpm + CLI, Docker `portfolio_backend` container; runbook: [docs/runbooks/pf2-php84-upgrade.md](docs/runbooks/pf2-php84-upgrade.md)). **Exception: phpMyAdmin (Ubuntu 5.2.1) stays on `php8.2-fpm` until it is upgraded to 5.2.2+ or dropped**, so `php8.2-fpm` stays installed (debt: remove after that + 7 days green). Reload `php8.4-fpm` after deploys (`scripts/deploy.sh` does it) — no host php; run `docker exec portfolio_backend php ...` (e.g. `docker exec portfolio_backend php artisan test`)

@@ -251,3 +251,7 @@ web/.astro
 web/.env
 web/dist.next
 web/dist.prev
+
+# Playwright (PF-2 5E)
+web/test-results/
+web/playwright-report/
