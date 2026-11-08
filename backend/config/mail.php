@@ -115,4 +115,9 @@ return [
         'name' => env('MAIL_FROM_NAME', 'Example'),
     ],
 
+    /*
+    | Recipient of contact-form notifications. Null = notification skipped (logged).
+    */
+    'admin_email' => env('ADMIN_EMAIL'),
+
 ];

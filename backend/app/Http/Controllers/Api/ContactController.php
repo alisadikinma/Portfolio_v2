@@ -214,7 +214,15 @@ class ContactController extends Controller
     {
         try {
             // Get admin email from config
-            $adminEmail = config('mail.admin_email', env('ADMIN_EMAIL', 'admin@example.com'));
+            $adminEmail = config('mail.admin_email');
+
+            if (empty($adminEmail)) {
+                Log::warning('Contact notification skipped: no admin email configured (set ADMIN_EMAIL)', [
+                    'contact_id' => $contact->id,
+                ]);
+
+                return;
+            }
 
             // Send email using Laravel Mail
             Mail::send('emails.contact-notification', ['contact' => $contact], function ($message) use ($adminEmail, $contact) {
