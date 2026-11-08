@@ -33,14 +33,19 @@ describe("copy parity id/en", () => {
     expect(keyPaths(id as Tree).length).toBeGreaterThanOrEqual(20);
   });
 
-  it("FAQ H1 contains the language keyword", () => {
-    expect(id.faq.h1.toLowerCase()).toContain("pakar ai indonesia");
-    expect(en.faq.h1.toLowerCase()).toContain("ai consultant indonesia");
+  // Ali 2026-11-09 (SEO audit): "pakar AI Indonesia" belongs to the home page; FAQ names Ali + INDUSIA.ai.
+  it("FAQ H1 names Ali Sadikin Ma and INDUSIA.ai, not the home keyword", () => {
+    for (const h of [id.faq.h1, en.faq.h1]) {
+      expect(h).toContain("Ali Sadikin Ma");
+      expect(h).toContain("INDUSIA.ai");
+    }
+    expect(id.faq.h1.toLowerCase()).not.toContain("pakar ai indonesia");
   });
 
   it("uses the full name and never the bare name or banned claims", () => {
     for (const tree of [id, en]) {
-      const all = strings(tree as Tree).map(([, v]) => v).join("\n");
+      // about.disambig names the former governor on purpose (GEO disambiguation, Ali 2026-11-09).
+      const all = strings(tree as Tree).filter(([k]) => !String(k).endsWith("disambig")).map(([, v]) => v).join("\n");
       expect(all).not.toMatch(/Ali Sadikin(?! Ma)/);
       expect(all).not.toMatch(/terbaik|nomor 1|\bbest\b|number one/i);
       expect(all).not.toMatch(/Rp\s?\d|\$\s?\d/);

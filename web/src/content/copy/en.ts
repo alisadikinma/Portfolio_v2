@@ -184,6 +184,7 @@ export const en: Copy = {
     metaDescription: "Ali Sadikin Ma, AI expert from Batam, Indonesia and founder of INDUSIA.ai: 17-year career timeline, international awards, and all of his official profiles.",
     h1: "Ali Sadikin Ma, AI expert from Batam, Indonesia",
     lead: "Ali Sadikin Ma is an AI expert based in Batam, Indonesia. He is the founder of INDUSIA.ai and has spent 17 years building systems for industry.",
+    disambig: "Ali Sadikin Ma (with \"Ma\") is not Ali Sadikin, the Governor of Jakarta from 1966 to 1977.",
     portraitAlt: "Portrait of Ali Sadikin Ma, AI expert from Indonesia and founder of INDUSIA.ai",
     updated: "Updated",
     unavailable: "This page cannot be loaded right now. Please try again shortly.",
@@ -225,10 +226,10 @@ export const en: Copy = {
     contact: "Contact",
   },
   faq: {
-    metaTitle: "FAQ AI Consultant Indonesia — Ali Sadikin Ma",
+    metaTitle: "FAQ Ali Sadikin Ma — Services & Working Together on AI",
     metaDescription:
       "FAQ with short answers about Ali Sadikin Ma, AI consultant in Indonesia and founder of INDUSIA.ai: who he is, what he does, and how to work with him.",
-    h1: "FAQ: common questions about Ali Sadikin Ma, AI consultant Indonesia",
+    h1: "FAQ: questions about Ali Sadikin Ma and INDUSIA.ai",
     intro:
       "Ali Sadikin Ma is an AI consultant in Indonesia and the founder of INDUSIA.ai in Batam. This page answers the questions people ask most about him, his services, and how to reach him.",
     unavailable: "The question list cannot be loaded right now. Please try again shortly.",

@@ -102,6 +102,7 @@ const jsonld = graph(
     ) : (
       <>
         <p class="about-lead">{c.lead}</p>
+        <p class="about-disambig">{c.disambig}</p>
         {modifiedIso && <p class="about-updated">{c.updated} <time datetime={modifiedIso}>{modifiedText}</time></p>}
         <img class="about-portrait" src="/images/ali-sadikin-ma-pakar-ai-indonesia.jpg" width="400" height="400" alt={c.portraitAlt} loading="eager" decoding="async" />
 

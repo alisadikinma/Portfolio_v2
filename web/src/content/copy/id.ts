@@ -182,6 +182,7 @@ export const id = {
     metaDescription: "Ali Sadikin Ma, ahli AI Indonesia dari Batam dan founder INDUSIA.ai: riwayat karier 17 tahun, penghargaan internasional, dan semua profil resminya.",
     h1: "Ali Sadikin Ma, ahli AI Indonesia dari Batam",
     lead: "Ali Sadikin Ma adalah ahli AI Indonesia yang tinggal di Batam. Ia founder INDUSIA.ai dan sudah 17 tahun membangun sistem untuk industri, dari perusahaan multinasional di Singapura sampai pabrik di Batam.",
+    disambig: "Ali Sadikin Ma (dengan \"Ma\") bukan Ali Sadikin, Gubernur DKI Jakarta 1966–1977.",
     portraitAlt: "Potret Ali Sadikin Ma, ahli AI Indonesia dan founder INDUSIA.ai",
     updated: "Diperbarui",
     unavailable: "Halaman ini sedang tidak bisa dimuat. Silakan coba lagi sebentar lagi.",
@@ -223,10 +224,10 @@ export const id = {
     contact: "Kontak",
   },
   faq: {
-    metaTitle: "FAQ Pakar AI Indonesia — Ali Sadikin Ma",
+    metaTitle: "FAQ Ali Sadikin Ma — Tanya Jawab Layanan & Kerja Sama AI",
     metaDescription:
       "FAQ singkat tentang Ali Sadikin Ma, pakar AI Indonesia dan founder INDUSIA.ai: siapa dia, apa yang dikerjakan, dan cara bekerja sama.",
-    h1: "FAQ: pertanyaan umum tentang pakar AI Indonesia, Ali Sadikin Ma",
+    h1: "FAQ: tanya jawab tentang Ali Sadikin Ma dan INDUSIA.ai",
     intro:
       "Ali Sadikin Ma adalah pakar AI Indonesia dan founder INDUSIA.ai di Batam. Halaman ini menjawab pertanyaan yang paling sering diajukan tentang dirinya, layanannya, dan cara menghubunginya.",
     unavailable: "Daftar pertanyaan sedang tidak bisa dimuat. Silakan coba lagi sebentar lagi.",

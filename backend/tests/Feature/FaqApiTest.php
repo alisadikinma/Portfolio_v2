@@ -72,4 +72,15 @@ class FaqApiTest extends TestCase
         $this->getJson('/api/faq?lang=en')->assertJsonPath('data.0.question', $en[0]['question']);
         $this->getJson('/api/faq?lang=fr')->assertJsonPath('data.0.question', $en[0]['question']);
     }
+
+    // PF-2 GEO audit 2026-11-09: AI engines quote visible Q&A, not JSON-LD. The governor
+    // disambiguation and "what is INDUSIA.ai" must exist as answers in both languages.
+    public function test_faq_answers_the_governor_disambiguation_and_what_indusia_is(): void
+    {
+        foreach (['items' => ['Governor', 'What is INDUSIA.ai'], 'items_id' => ['Gubernur', 'Apa itu INDUSIA.ai']] as $key => [$gov, $indusia]) {
+            $qs = collect(config("faq.$key"))->pluck('question')->implode(' | ');
+            $this->assertStringContainsString($gov, $qs, "$key: governor question missing");
+            $this->assertStringContainsString($indusia, $qs, "$key: INDUSIA question missing");
+        }
+    }
 }

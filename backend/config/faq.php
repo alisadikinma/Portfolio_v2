@@ -23,8 +23,16 @@ return [
             'answer' => 'Ali Sadikin Ma is an Indonesian AI expert who turns frontier AI models into shipped products rather than slide decks. He has 17 years of building experience and ranked #1 at the Global AI Demo Day 2026. He is based in Indonesia and both builds and teaches applied AI.',
         ],
         [
+            'question' => 'Is Ali Sadikin Ma the same person as Ali Sadikin, the former Governor of Jakarta?',
+            'answer' => 'No. Ali Sadikin Ma (with "Ma") is an AI expert based in Batam and the founder of INDUSIA.ai. He is not Ali Sadikin, who was Governor of Jakarta from 1966 to 1977.',
+        ],
+        [
             'question' => 'What services does Ali Sadikin Ma offer?',
             'answer' => 'Ali Sadikin Ma builds AI Agents and AI agent operating systems, Generative AI Video pipelines, AI automation workflows, and Computer Vision systems for AI visual inspection. He also teaches Vibe Coding — shipping real software fast with AI as the primary tool.',
+        ],
+        [
+            'question' => 'What is INDUSIA.ai?',
+            'answer' => 'INDUSIA.ai is an Indonesian AI company in Batam founded by Ali Sadikin Ma. It builds AI for companies: AI development services, machine vision for factory quality control, fleet management systems, CCTV AI, and WhatsApp AI assistants (https://indusia.ai).',
         ],
         [
             'question' => 'What makes Ali Sadikin Ma\'s approach different?',
@@ -52,7 +60,7 @@ return [
         ],
         [
             'question' => 'Does Ali Sadikin Ma teach or speak about AI?',
-            'answer' => 'Yes. Ali Sadikin Ma teaches and publishes regularly on AI Agents, Vibe Coding, and Generative AI Video, and has spoken on international stages. He shares applied, build-first material rather than abstract theory.',
+            'answer' => 'Yes. Ali Sadikin Ma runs in-house AI training and workshops for companies, publishes on AI Agents, Vibe Coding, and Generative AI Video, and has spoken on international stages. He shares applied, build-first material rather than abstract theory.',
         ],
         [
             'question' => 'How can I contact or work with Ali Sadikin Ma?',
@@ -71,8 +79,16 @@ return [
             'answer' => 'Ali Sadikin Ma adalah pakar AI Indonesia yang mengubah model AI terbaru menjadi produk yang benar-benar dipakai, bukan sekadar slide presentasi. Ia punya pengalaman membangun produk selama 17 tahun dan meraih peringkat 1 di Global AI Demo Day 2026. Ia berbasis di Indonesia, membangun sekaligus mengajarkan AI terapan.',
         ],
         [
+            'question' => 'Apakah Ali Sadikin Ma sama dengan Ali Sadikin, mantan Gubernur DKI Jakarta?',
+            'answer' => 'Bukan. Ali Sadikin Ma (dengan "Ma") adalah pakar AI asal Batam dan founder INDUSIA.ai. Ia bukan Ali Sadikin, Gubernur DKI Jakarta periode 1966–1977.',
+        ],
+        [
             'question' => 'Layanan apa saja yang ditawarkan Ali Sadikin Ma?',
             'answer' => 'Ali Sadikin Ma membangun AI Agent dan sistem operasi AI agent, pipeline Generative AI Video, alur kerja otomasi AI, dan sistem Computer Vision untuk inspeksi visual berbasis AI. Ia juga mengajarkan Vibe Coding, yaitu cara membuat software sungguhan dengan cepat memakai AI sebagai alat utama.',
+        ],
+        [
+            'question' => 'Apa itu INDUSIA.ai?',
+            'answer' => 'INDUSIA.ai adalah perusahaan AI Indonesia di Batam yang didirikan Ali Sadikin Ma. Layanannya: jasa pembuatan AI, machine vision untuk quality control pabrik, fleet management system, CCTV AI, dan chatbot WhatsApp AI (https://indusia.ai/id/).',
         ],
         [
             'question' => 'Apa yang membedakan pendekatan Ali Sadikin Ma?',
@@ -100,7 +116,7 @@ return [
         ],
         [
             'question' => 'Apakah Ali Sadikin Ma mengajar atau menjadi pembicara tentang AI?',
-            'answer' => 'Ya. Ali Sadikin Ma rutin mengajar dan menerbitkan materi tentang AI Agent, Vibe Coding, dan Generative AI Video, dan pernah tampil di panggung internasional. Materinya praktis dan berbasis membangun, bukan teori abstrak.',
+            'answer' => 'Ya. Ali Sadikin Ma memberi pelatihan inhouse dan workshop AI untuk perusahaan, menerbitkan materi tentang AI Agent, Vibe Coding, dan Generative AI Video, dan pernah tampil di panggung internasional. Materinya praktis dan berbasis membangun, bukan teori abstrak.',
         ],
         [
             'question' => 'Bagaimana cara menghubungi atau bekerja sama dengan Ali Sadikin Ma?',
