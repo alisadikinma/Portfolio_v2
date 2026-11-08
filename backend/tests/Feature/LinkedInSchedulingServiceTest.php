@@ -61,7 +61,6 @@ class LinkedInSchedulingServiceTest extends TestCase
         app(LinkedInSchedulingService::class)->scheduleAt($draft, $slot, 'test_reason');
         // Stored as UTC (StoresDatesInAppTimezone); the test converts back to WIB
         // to compare the slot wall-clock.
-        // tz (existing approve() behaviour) — assert the wall-clock round-trips.
         $wall = $slot->format('Y-m-d H:i');
         $draft->refresh();
         $this->assertSame(LinkedInPostStatus::AwaitingPublish->value, $draft->status);

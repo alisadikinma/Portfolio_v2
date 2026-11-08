@@ -362,7 +362,7 @@ trait HandlesCrossPostDraftActions
             : now(WibTime::ZONE)->startOfMonth()->utc();
         $to = isset($validated['to'])
             ? Carbon::parse($validated['to'], WibTime::ZONE)->endOfDay()->utc()
-            : now(WibTime::ZONE)->endOfMonth()->addMonth()->utc();
+            : now(WibTime::ZONE)->addMonthNoOverflow()->endOfMonth()->utc();
 
         $modelClass = $this->modelClass();
         $query = $modelClass::query()

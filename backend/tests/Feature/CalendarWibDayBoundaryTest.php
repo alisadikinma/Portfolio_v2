@@ -99,4 +99,23 @@ class CalendarWibDayBoundaryTest extends TestCase
         $this->assertMatchesRegularExpression('/(Z|[+-]\d{2}:\d{2})$/', $item['scheduled_at']);
         $this->assertMatchesRegularExpression('/(Z|[+-]\d{2}:\d{2})$/', $item['pin_at']);
     }
+
+    public function test_cross_post_default_range_ends_at_end_of_next_month_on_a_31st(): void
+    {
+        Sanctum::actingAs(User::factory()->create());
+        \Carbon\Carbon::setTestNow(\Carbon\Carbon::parse('2026-01-31 12:00:00', 'Asia/Jakarta'));
+        $parent = $this->linkedIn('2026-01-31 00:00:00');
+        $make = fn (string $utc) => InstagramPost::create([
+            'linkedin_post_id' => $parent->id, 'post_id' => $parent->post_id,
+            'status' => 'awaiting_review', 'format' => 'text', 'scheduled_at' => $utc,
+        ]);
+        $inFeb = $make('2026-02-27 05:00:00');
+        $inMarch = $make('2026-03-02 05:00:00'); // old code overflowed Jan 31 + 1 month into 3 Mar
+
+        $ids = collect($this->getJson('/api/admin/instagram-drafts/calendar')->assertOk()->json('data'))->pluck('id');
+
+        $this->assertTrue($ids->contains($inFeb->id));
+        $this->assertFalse($ids->contains($inMarch->id), 'range must stop at end of February');
+        \Carbon\Carbon::setTestNow();
+    }
 }
