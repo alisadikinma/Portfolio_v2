@@ -33,7 +33,7 @@ export const en: Copy = {
     awardsLabel: "startup awards and fellowships",
   },
   whoIAm: {
-    portraitAlt: "Portrait of Ali Sadikin Ma, AI consultant Indonesia and founder of INDUSIA.ai",
+    illusAlt: "Illustration of Ali Sadikin Ma at the centre of the four things he does: AI visual inspection in factories, fleet and logistics systems, an AI WhatsApp assistant, and a speaker stage with a winner trophy",
     h2: "Who I am",
     p1Strong: "Ali Sadikin Ma is an Indonesian AI consultant and the founder of INDUSIA.ai.",
     p1Rest:

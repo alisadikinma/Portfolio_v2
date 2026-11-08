@@ -55,20 +55,19 @@ describe.each(["id", "en"] as const)("WhoIAm (%s)", (lang) => {
     expect(html).toContain('id="tentang"');
   });
 
-  it("text + real portrait only (Ali 2026-11-08: the career illustration lives in the journey section)", async () => {
+  it("shows an illustration of what Ali does, not the hero photo again (Ali 2026-11-09)", async () => {
     const html = await render(WhoIAm, lang);
-    expect(html).not.toContain("data-who-map");
-    expect(html).not.toContain("who-infographic");
-    const img = html.match(/<img [^>]*class="who-portrait"[^>]*>/)?.[0] ?? html.match(/<img [^>]*>/)![0];
-    expect(img).toContain('src="/images/ali-sadikin-ma-pakar-ai-indonesia.jpg"');
-    expect(img).toMatch(/alt="[^"]+"/);
+    expect(html).not.toContain("ali-sadikin-ma-pakar-ai-indonesia.jpg");
+    const img = html.match(/<img [^>]*class="who-illus"[^>]*>/)?.[0] ?? "";
+    expect(img).toMatch(/who-ali-sadikin-ma/);
+    expect(img).toMatch(/alt="[^"]{60,}"/);
     expect(img).toContain('width="');
     expect(img).toContain('loading="lazy"');
   });
 
   it("heading comes before the figure and body text (document order)", async () => {
     const html = await render(WhoIAm, lang);
-    expect(html.indexOf("<h2")).toBeLessThan(html.indexOf("who-portrait"));
+    expect(html.indexOf("<h2")).toBeLessThan(html.indexOf("who-illus"));
     expect((html.match(/<h[1-6]/g) ?? []).every((h) => h === "<h2")).toBe(true);
     expect(html).not.toMatch(/Rp\s?\d|\$\s?\d/);
   });

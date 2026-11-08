@@ -31,7 +31,7 @@ export const id = {
     awardsLabel: "penghargaan dan fellowship startup",
   },
   whoIAm: {
-    portraitAlt: "Potret Ali Sadikin Ma, pakar AI Indonesia dan founder INDUSIA.ai",
+    illusAlt: "Ilustrasi Ali Sadikin Ma di tengah empat hal yang ia kerjakan: AI inspeksi visual di pabrik, sistem armada dan logistik, asisten WhatsApp berbasis AI, serta panggung pembicara dengan trofi juara",
     h2: "Siapa saya",
     p1Strong: "Ali Sadikin Ma adalah pakar AI Indonesia dan founder INDUSIA.ai.",
     p1Rest:

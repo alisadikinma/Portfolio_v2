@@ -1,14 +1,16 @@
 ---
+import { Image } from "astro:assets";
 import type { Lang } from "../../lib/i18n";
 import { id } from "../../content/copy/id";
 import { en } from "../../content/copy/en";
+// Ali at the centre of the four things he builds and does (same clay style as the journey islands).
+import whoIllus from "../../assets/who-ali-sadikin-ma.webp";
 
 interface Props { lang: Lang }
 const { lang } = Astro.props;
 const w = (lang === "id" ? id : en).whoIAm;
 // Dofollow backlinks to INDUSIA.ai: no rel attribute (spec backlink table).
 const base = lang === "id" ? "https://indusia.ai/id/" : "https://indusia.ai/";
-// Same file as the hero LCP image, so the browser already has it cached.
 ---
 <section class="sec" id="tentang">
   <div class="wrap who">
@@ -17,8 +19,8 @@ const base = lang === "id" ? "https://indusia.ai/id/" : "https://indusia.ai/";
       <p><strong>{w.p1Strong}</strong>{w.p1Rest}</p>
       <p>{w.p2Lead}<a href={`${base}ai-vision/`}>{w.visionLink}</a>, <a href={`${base}ai-fleet-transportation/`}>{w.fleetLink}</a>, <a href={`${base}ai-assistant/`}>{w.chatbotLink}</a>{w.p2Mid}<a href={base}>{w.companyLink}</a>{w.p2End}</p>
     </div>
-    <img class="who-portrait" src="/images/ali-sadikin-ma-pakar-ai-indonesia.jpg" alt={w.portraitAlt}
-      width="1200" height="1200" loading="lazy" decoding="async" />
+    <Image class="who-illus" src={whoIllus} alt={w.illusAlt} widths={[400, 640, 880]}
+      sizes="(min-width: 960px) 420px, 80vw" loading="lazy" decoding="async" format="webp" />
   </div>
 </section>
 
