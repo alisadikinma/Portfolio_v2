@@ -187,8 +187,11 @@ class PostController extends Controller
         $query = Post::with(['category', 'translations', 'relatedPosts.translations'])
             ->where('slug', $slug);
 
-        // Allow preview of unpublished posts with ?preview=1
-        if (!$request->boolean('preview')) {
+        // ?preview=1 exposes unpublished posts ONLY to an authenticated admin
+        // (sanctum bearer; this route sits outside auth middleware, so resolve
+        // the guard explicitly). Everyone else gets normal public behaviour.
+        $isAdminPreview = $request->boolean('preview') && auth('sanctum')->check();
+        if (!$isAdminPreview) {
             $query->where('published', true);
         }
 
@@ -201,14 +204,33 @@ class PostController extends Controller
             ], 404);
         }
 
-        // Only increment views for published posts (not previews)
-        if ($post->published) {
+        // Count only real reader views of published posts: skip previews,
+        // SSR/internal fetches (?track=0) and known AI crawlers.
+        if ($post->published && $this->shouldTrackView($request)) {
             $post->incrementViews();
         }
 
         return response()->json([
             'data' => (new PostResource($post))->additional(['lang' => $language]),
         ]);
+    }
+
+    private function shouldTrackView(Request $request): bool
+    {
+        if ($request->query('track') !== null && !$request->boolean('track')) {
+            return false;
+        }
+
+        $ua = strtolower((string) $request->userAgent());
+        if ($ua !== '') {
+            foreach (array_keys(config('ai_bots.map', [])) as $needle) {
+                if (str_contains($ua, strtolower((string) $needle))) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
     /**

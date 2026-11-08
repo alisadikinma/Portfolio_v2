@@ -157,9 +157,14 @@ class ProjectController extends Controller
         $language = $request->query('lang', $request->header('Accept-Language', 'en'));
         $language = strtolower(substr($language, 0, 2));
 
-        $project = Project::with(['translations'])
-            ->where('slug', $slug)
-            ->first();
+        $query = Project::with(['translations'])->where('slug', $slug);
+
+        // Unpublished/inactive projects are visible only to an authenticated admin.
+        if (!auth('sanctum')->check()) {
+            $query->where('published', true)->where('is_active', true);
+        }
+
+        $project = $query->first();
 
         if (!$project) {
             return response()->json([
