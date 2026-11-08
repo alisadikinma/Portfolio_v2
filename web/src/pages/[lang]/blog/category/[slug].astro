@@ -87,7 +87,7 @@ if (!failed) {
       lang,
       name: title,
       description,
-      items: items.map((p) => ({ name: p.title, url: `${SITE}/${lang}/blog/${encodeURIComponent(p.slug)}` })),
+      items: items.map((p) => ({ name: p.title, url: `${SITE}/${lang}/blog/${encodeURIComponent(p.localized_slug || p.slug)}` })),
     }),
   );
 }

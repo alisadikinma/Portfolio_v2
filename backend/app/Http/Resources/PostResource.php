@@ -29,10 +29,17 @@ class PostResource extends JsonResource
         // clamped to [published_at, now]. updated_at stays raw (bookkeeping noise).
         $contentUpdatedAt = $this->resource->contentUpdatedAt($language);
 
+        // Each translation has its own public slug (the sitemap lists them). Empty falls back to posts.slug.
+        $slugs = $this->translations
+            ->mapWithKeys(fn ($t) => [$t->language => ($t->slug ?: $this->slug)])
+            ->toArray();
+
         return [
             'id' => $this->id,
             'category_id' => $this->category_id,
             'slug' => $this->slug,
+            'slugs' => $slugs,
+            'localized_slug' => $slugs[$language] ?? $this->slug,
             'featured_image' => $this->featured_image
                 ? (str_starts_with($this->featured_image, 'http') ? $this->featured_image : url($this->featured_image))
                 : null,
@@ -102,6 +109,7 @@ class PostResource extends JsonResource
                     return [
                         'id' => $rp->id,
                         'slug' => $rp->slug,
+                        'localized_slug' => $t?->slug ?: $rp->slug,
                         'title' => $t?->title ?? '',
                         'language' => $t?->language,
                         'available_translations' => $rp->translations->pluck('language')->values()->toArray(),

@@ -1,5 +1,5 @@
 ---
-import { alternates, type Lang } from "../lib/i18n";
+import { alternates, withAltPaths, type Lang } from "../lib/i18n";
 import { SITE, PORTRAIT_URL, jsonLdString, type Node } from "../lib/schema";
 
 interface Props {
@@ -20,11 +20,13 @@ interface Props {
   noindex?: boolean;
   /** Languages this page exists in (default both). A missing one gets no hreflang alternate. */
   availableLangs?: Lang[];
+  /** Per-language paths when they differ by more than the prefix (e.g. blog posts with a slug per language). */
+  altPaths?: Partial<Record<Lang, string>>;
 }
 
-const { title, description, path, lang, jsonld, image, imageWidth, imageHeight, preloadImage, type = "website", prev, next, noindex = false, availableLangs } = Astro.props;
+const { title, description, path, lang, jsonld, image, imageWidth, imageHeight, preloadImage, type = "website", prev, next, noindex = false, availableLangs, altPaths } = Astro.props;
 const abs = (p: string) => SITE + p;
-const alts = alternates(path);
+const alts = withAltPaths(alternates(path), altPaths);
 // Canonical must equal the self-referencing hreflang (normalized path).
 const canonical = abs(alts[lang]);
 const ogImage = image ?? PORTRAIT_URL;

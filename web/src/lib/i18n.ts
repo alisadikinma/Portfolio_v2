@@ -38,6 +38,14 @@ export function alternates(path: string): Alternates {
   return { id: localizedPath(path, "id"), en, "x-default": en };
 }
 
+/** Overrides the prefix-swapped alternates with explicit per-language paths; x-default follows EN. */
+export function withAltPaths(alts: Alternates, over?: Partial<Record<Lang, string>>): Alternates {
+  if (!over) return alts;
+  const id = over.id ?? alts.id;
+  const en = over.en ?? alts.en;
+  return { id, en, "x-default": en };
+}
+
 export function pickLang(acceptLanguage: string | null | undefined): Lang {
   if (!acceptLanguage) return "en";
   const tags = acceptLanguage

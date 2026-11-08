@@ -182,18 +182,22 @@ class PostController extends Controller
         $language = $request->query('lang', $request->header('Accept-Language', 'en'));
         $language = strtolower(substr($language, 0, 2));
 
-        $query = Post::with(['category', 'translations', 'relatedPosts.translations'])
-            ->where('slug', $slug);
-
         // ?preview=1 exposes unpublished posts ONLY to an authenticated admin
         // (sanctum bearer; this route sits outside auth middleware, so resolve
         // the guard explicitly). Everyone else gets normal public behaviour.
         $isAdminPreview = $request->boolean('preview') && \App\Support\AdminViewer::is();
-        if (!$isAdminPreview) {
-            $query->published();
-        }
+        $find = function (callable $match) use ($isAdminPreview) {
+            $query = Post::with(['category', 'translations', 'relatedPosts.translations'])->where($match);
+            if (!$isAdminPreview) {
+                $query->published();
+            }
+            return $query->first();
+        };
 
-        $post = $query->first();
+        // posts.slug first; else a translation's own slug (e.g. the EN slug of an ID-primary post),
+        // which is what the sitemap and the localized links publish.
+        $post = $find(fn ($q) => $q->where('slug', $slug))
+            ?? $find(fn ($q) => $q->whereHas('translations', fn ($t) => $t->where('slug', $slug)));
 
         if (!$post) {
             return response()->json([

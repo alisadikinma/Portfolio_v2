@@ -416,3 +416,47 @@ describe("blog detail: related posts language", () => {
     expect(html).not.toContain('href="/id/blog/only-en"');
   });
 });
+
+// SEO audit 2026-11-09: each language has its own slug (the sitemap publishes them). The page must
+// serve the localized slug, 301 the other one to it, and point hreflang/lang-switch at each language's slug.
+describe("/{lang}/blog/{slug} per-language slugs", () => {
+  const EN = "vibe-coding-for-factories";
+  beforeEach(() => {
+    post.available_translations = ["id", "en"];
+    post.slugs = { id: SLUG, en: EN };
+  });
+
+  it("serves the EN slug with 200 and a self canonical", async () => {
+    const { status, html } = await load("en", EN);
+    expect(status).toBe(200);
+    expect(html).toContain(`rel="canonical" href="https://alisadikinma.com/en/blog/${EN}"`);
+  });
+
+  it("hreflang id/en and the language switch use each language's own slug", async () => {
+    const { html } = await load("en", EN);
+    expect(html).toContain(`hreflang="id" href="https://alisadikinma.com/id/blog/${SLUG}"`);
+    expect(html).toContain(`hreflang="en" href="https://alisadikinma.com/en/blog/${EN}"`);
+    expect(html).toContain(`hreflang="x-default" href="https://alisadikinma.com/en/blog/${EN}"`);
+    expect(html).toMatch(new RegExp(`class="lang flag" href="/id/blog/${SLUG}"`));
+  });
+
+  it("the other language's slug under /en 301s to the EN slug (query kept)", async () => {
+    const { status, headers } = await load("en", SLUG, "?utm_source=x");
+    expect(status).toBe(301);
+    expect(headers.get("location")).toBe(`/en/blog/${EN}?utm_source=x`);
+  });
+
+  it("missing-language 302 goes to that language's own slug", async () => {
+    post.available_translations = ["en"];
+    post.slugs = { en: EN };
+    const { status, headers } = await load("id", SLUG);
+    expect(status).toBe(302);
+    expect(headers.get("location")).toBe(`/en/blog/${EN}`);
+  });
+
+  it("without slugs in the payload, behaves as before (no redirect)", async () => {
+    delete post.slugs;
+    const { status } = await load("en", SLUG);
+    expect(status).toBe(200);
+  });
+});
