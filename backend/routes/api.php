@@ -995,7 +995,7 @@ Route::middleware(['auth:sanctum'])->prefix('admin/carousel-drafts')->group(func
     Route::match(['post', 'patch'], '/{carouselDraft}/approve', [CarouselDraftController::class, 'approve']);
     Route::match(['post', 'patch'], '/{carouselDraft}/reject', [CarouselDraftController::class, 'reject']);
     Route::match(['post', 'patch'], '/{carouselDraft}/schedule', [CarouselDraftController::class, 'schedule']);
-    Route::patch('/{id}/slides/{slideId}/status', [CarouselDraftController::class, 'updateSlideStatus']);
+    Route::patch('/{carouselDraft}/slides/{slideId}/status', [CarouselDraftController::class, 'updateSlideStatus']);
 });
 
 // Admin Content Engine Routes

@@ -134,9 +134,9 @@ class CarouselDraftController extends Controller
 
     public function reject(Request $request, CarouselDraft $carouselDraft): JsonResponse
     {
-        try {
-            $request->validate(['rejection_reason' => 'required|string']);
+        $request->validate(['rejection_reason' => 'required|string']);
 
+        try {
             $carouselDraft->update([
                 'status' => 'draft',
                 'rejection_reason' => $request->get('rejection_reason'),
@@ -159,9 +159,10 @@ class CarouselDraftController extends Controller
 
     public function schedule(Request $request, CarouselDraft $carouselDraft): JsonResponse
     {
-        try {
-            $validated = $request->validate(['scheduled_at' => 'required|date']);
+        // Validate outside the try so a ValidationException stays a 422.
+        $validated = $request->validate(['scheduled_at' => 'required|date']);
 
+        try {
             if ($carouselDraft->status !== 'approved') {
                 return response()->json([
                     'success' => false,
@@ -189,17 +190,27 @@ class CarouselDraftController extends Controller
         }
     }
 
-    public function updateSlideStatus(Request $request, $uuid): JsonResponse
+    /**
+     * PATCH /admin/carousel-drafts/{carouselDraft}/slides/{slideId}/status
+     * {slideId} is the slide's generation_uuid, scoped to the draft.
+     */
+    public function updateSlideStatus(Request $request, CarouselDraft $carouselDraft, string $slideId): JsonResponse
     {
-        try {
-            $validated = $request->validate([
-                'generation_status' => 'required|in:pending,processing,completed,failed',
-                'generated_image_url' => 'nullable|url',
-                'error_message' => 'nullable|string',
-                'wow_score' => 'nullable|array',
-            ]);
+        $validated = $request->validate([
+            'generation_status' => 'required|in:pending,processing,completed,failed',
+            'generated_image_url' => 'nullable|url',
+            'error_message' => 'nullable|string',
+            'wow_score' => 'nullable|array',
+        ]);
 
-            $slide = CarouselSlide::where('generation_uuid', $uuid)->firstOrFail();
+        $slide = CarouselSlide::where('carousel_draft_id', $carouselDraft->id)
+            ->where('generation_uuid', $slideId)
+            ->first();
+        if ($slide === null) {
+            return response()->json(['success' => false, 'message' => 'Slide not found'], 404);
+        }
+
+        try {
 
             $slide->update([
                 'generation_status' => $validated['generation_status'],

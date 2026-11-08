@@ -116,4 +116,39 @@ class ContentIdeaCarouselScheduleTimezoneTest extends TestCase
 
         $this->assertSame('2026-05-13 05:00:00', $this->raw('carousel_drafts', $draft->id));
     }
+
+    public function test_carousel_schedule_missing_field_is_422_not_400(): void
+    {
+        Sanctum::actingAs(User::factory()->create());
+        $draft = CarouselDraft::create(['title' => 'T', 'status' => 'approved', 'target_platform' => 'instagram']);
+
+        $this->postJson("/api/admin/carousel-drafts/{$draft->id}/schedule", [])->assertStatus(422);
+    }
+
+    public function test_carousel_reject_without_reason_is_422_not_400(): void
+    {
+        Sanctum::actingAs(User::factory()->create());
+        $draft = CarouselDraft::create(['title' => 'T', 'status' => 'draft', 'target_platform' => 'instagram']);
+
+        $this->postJson("/api/admin/carousel-drafts/{$draft->id}/reject", [])->assertStatus(422);
+    }
+
+    public function test_slide_status_route_binds_draft_and_slide_uuid(): void
+    {
+        Sanctum::actingAs(User::factory()->create());
+        $draft = CarouselDraft::create(['title' => 'T', 'status' => 'draft', 'target_platform' => 'instagram']);
+        $other = CarouselDraft::create(['title' => 'O', 'status' => 'draft', 'target_platform' => 'instagram']);
+        $slide = \App\Models\CarouselSlide::create([
+            'carousel_draft_id' => $draft->id, 'slide_index' => 0, 'slide_type' => 'hook',
+            'prompt' => 'p', 'generation_uuid' => 'uuid-abc', 'generation_status' => 'pending',
+        ]);
+
+        $this->patchJson("/api/admin/carousel-drafts/{$draft->id}/slides/uuid-abc/status", ['generation_status' => 'completed'])
+            ->assertOk();
+        $this->assertSame('completed', $slide->fresh()->generation_status);
+
+        // Slide uuid scoped to its draft; unknown -> 404; bad payload -> 422.
+        $this->patchJson("/api/admin/carousel-drafts/{$other->id}/slides/uuid-abc/status", ['generation_status' => 'failed'])->assertNotFound();
+        $this->patchJson("/api/admin/carousel-drafts/{$draft->id}/slides/uuid-abc/status", ['generation_status' => 'bogus'])->assertStatus(422);
+    }
 }
