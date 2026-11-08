@@ -11,12 +11,12 @@
 **Format:** waves-v1
 
 **Verification commands:**
-- php/static: UNKNOWN — ask user before Verification can run
+- php/static: ./vendor/bin/phpstan analyse --memory-limit=1G
 - php/lint: ./vendor/bin/pint --test
 - php/unit: ./vendor/bin/phpunit
-- node/lint: UNKNOWN — ask user before Verification can run
-- node/unit: UNKNOWN — ask user before Verification can run
-- node/build: UNKNOWN — ask user before Verification can run
+- node/lint: cd web && npm run check
+- node/unit: cd web && npm test
+- node/build: cd web && npm run build
 
 ## Goal
 
@@ -176,6 +176,8 @@ incl. IDBYTE; cover `career-marlin.jpg`), gap 2019–2021 left empty, Satnusa 20
 **Files:**
 - Modify: `backend/composer.json`
 - Modify: `backend/composer.lock`
+- Create: `backend/phpstan.neon`
+- Create: `backend/phpstan-baseline.neon`
 - Create: `backend/tests/Feature/Security/TokenGuardNonStringCredentialTest.php`
 - Test: `backend/tests/Feature/Security/TokenGuardNonStringCredentialTest.php`
 
@@ -186,13 +188,15 @@ incl. IDBYTE; cover `career-marlin.jpg`), gap 2019–2021 left empty, Satnusa 20
 4. `PF2 composer audit` — must report no advisories; any that remain need a written reason in ledger `## Utang terbuka` (e.g. fixed only in a new major)
 5. `PF2 php artisan test` — failures must not exceed the 0A baseline; every NEW failure is investigated and fixed (use gaspol-debug), not skipped
 6. `PF2 php artisan route:list >/dev/null` and `PF2 php artisan filament:upgrade` (if Filament asks) — both exit 0
-7. Commit: "fix(PF-2): patch composer security advisories (Laravel CVE-2026-114509 et al.)"
+7. Add PHPStan (Ali, 2026-11-08): `PF2 composer require --dev larastan/larastan`, `backend/phpstan.neon` (include larastan extension, `level: 5`, paths `app`, `routes`, `database`), generate `phpstan-baseline.neon` for the legacy errors so only NEW errors fail; `PF2 ./vendor/bin/phpstan analyse --memory-limit=1G` exits 0. From here every phase that touches PHP runs it
+8. Commit: "fix(PF-2): patch composer security advisories (Laravel CVE-2026-114509 et al.)"
 
 **Verification:**
 - [ ] `composer audit` clean, or each remaining advisory listed with a reason in the ledger
 - [ ] `composer.lock` has `laravel/framework` ≥ v12.68.0 and `filament/filament` ≥ v4.13.3
 - [ ] Test failures ≤ 0A baseline; no new failure
 - [ ] Security: non-string credential test returns 401
+- [ ] `phpstan analyse` exits 0 with the baseline in place
 
 ### Phase 0C: Production PHP 8.4 runbook + one-runtime check
 
