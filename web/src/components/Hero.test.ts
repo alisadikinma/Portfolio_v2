@@ -24,9 +24,9 @@ describe.each(["id", "en"] as const)("Hero (%s)", (lang) => {
     expect(tag).toContain(`alt="${alt}"`);
   });
 
-  it("has the H1 with name span + keyword", async () => {
+  it("has the H1 with name span + keyword, last word on its own line (Ali 2026-11-09)", async () => {
     const html = await render(lang);
-    const kw = lang === "id" ? "Pakar AI Indonesia" : "AI Consultant Indonesia";
+    const kw = lang === "id" ? "Pakar AI <span class=\"hx-h1-l2\">Indonesia</span>" : "AI Consultant <span class=\"hx-h1-l2\">Indonesia</span>";
     expect(html).toMatch(new RegExp(`<h1[^>]*id="hero-h1"[^>]*><span class="hx-h1-name">Ali Sadikin Ma</span> ${kw}</h1>`));
   });
 

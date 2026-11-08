@@ -74,7 +74,7 @@ export const en: Copy = {
     singaporeNote: "Eight years building Java and Oracle enterprise systems for multinational clients across Asia Pacific.",
     marlinYear: "2016–2019 · Indonesia",
     marlinRole: "Co-Founder & CEO",
-    marlinOrg: "Marlin Booking",
+    marlinOrg: "Startup Transportation",
     marlinNote: "Digitized port ticketing with the Ministry of Transportation, reached a 5 million US dollar valuation, then was selected for UN-UNCTAD × Alibaba eFounders.",
     satnusaYear: "2021–2025 · Batam",
     satnusaRole: "Head of Digital Transformation 4.0",

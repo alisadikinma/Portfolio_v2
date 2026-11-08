@@ -11,6 +11,10 @@ interface Props {
 const { lang, wa = "" } = Astro.props;
 const h = (lang === "id" ? id : en).hero;
 const PHOTO = "/images/ali-sadikin-ma-pakar-ai-indonesia.jpg";
+// "AI Consultant" / "Indonesia": the last word gets its own line (Ali 2026-11-09).
+const cut = h.h1Title.lastIndexOf(" ");
+const h1Head = h.h1Title.slice(0, cut);
+const h1Last = h.h1Title.slice(cut + 1);
 const founderHref = lang === "id" ? "https://indusia.ai/id/" : "https://indusia.ai/";
 ---
 <section class="hx" id="tentang" data-hero data-photo={PHOTO} aria-labelledby="hero-h1">
@@ -20,7 +24,7 @@ const founderHref = lang === "id" ? "https://indusia.ai/id/" : "https://indusia.
     <span class="det" data-box="0.33,0.12,0.34,0.40"><b>{h.det1}</b></span>
   </div>
   <div class="wrap hx-text">
-    <h1 id="hero-h1"><span class="hx-h1-name">{h.h1Name}</span> {h.h1Title}</h1>
+    <h1 id="hero-h1"><span class="hx-h1-name">{h.h1Name}</span> {h1Head} <span class="hx-h1-l2">{h1Last}</span></h1>
     <p class="hx-lead" id="hero-lead">{h.leadBefore}<a href={founderHref}>{h.leadLinkText}</a>{h.leadAfter}</p>
     <p class="hx-build">{h.buildLead}<a href={`${founderHref}ai-vision/`}>{h.visionLink}</a>, <a href={`${founderHref}ai-fleet-transportation/`}>{h.fleetLink}</a>{lang === "id" ? ", dan " : ", and "}<a href={`${founderHref}ai-assistant/`}>{h.chatbotLink}</a>{h.buildMid}<a href={founderHref}>{h.companyLink}</a>{h.buildEnd}</p>
     <button type="button" class="hx-more" hidden aria-expanded="false" aria-controls="hero-lead" data-more={h.more} data-less={h.less}>{h.more}</button>

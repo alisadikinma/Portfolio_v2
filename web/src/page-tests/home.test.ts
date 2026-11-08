@@ -65,7 +65,7 @@ describe("/{lang} home", () => {
     const { html } = await load("id");
     const types = jsonld(html)["@graph"].map((n: { "@type": string }) => n["@type"]);
     expect(types).toEqual(expect.arrayContaining(["Person", "WebSite"]));
-    const h1 = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)![1].replace(/<[^>]+>/g, " ");
+    const h1 = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)![1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
     expect(h1).toContain("Ali Sadikin Ma");
     expect(h1).toContain("Pakar AI Indonesia");
     expect((html.match(/<h1/g) ?? []).length).toBe(1);

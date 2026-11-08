@@ -239,7 +239,8 @@ describe.each(["id", "en"] as const)("Journey (%s)", (lang) => {
     for (const id of Object.keys(COUNTS)) failing.add(`/api/galleries/${id}`);
     const html = await render(Journey, lang);
     expect((html.match(/<li/g) ?? []).length).toBe(4);
-    expect(html).toContain("Marlin Booking");
+    expect(html).toContain(lang === "id" ? "Startup Transportasi" : "Startup Transportation"); // Ali 2026-11-09
+    expect(html).not.toContain("Marlin Booking");
     expect(html).not.toMatch(/\d+ (foto|photos)/);
   });
 });
