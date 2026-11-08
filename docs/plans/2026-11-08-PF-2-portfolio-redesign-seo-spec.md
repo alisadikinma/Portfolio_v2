@@ -235,7 +235,7 @@ must keep the same facts (name, role, founding date 2026-01-01, Batam).
 
 ### Phases (built locally in order; push only with Ali's permission)
 
-0. **Infra + security (first, own deploy).** Audit 2026-11-08 (Packagist advisories vs `composer.lock`,
+0. **Infra + security (first; ships with the phase-6 release).** Audit 2026-11-08 (Packagist advisories vs `composer.lock`,
    prod read via ssh):
    - prod website = `php8.2-fpm` 8.2.29 (candidate 8.2.35; PHP 8.2 EOL 2026-12-31); prod queue worker +
      cron = `/usr/bin/php` 8.4.12 (candidate 8.4.27) → **two PHP versions for one app**.
@@ -249,8 +249,8 @@ must keep the same facts (name, role, founding date 2026-01-01, Batam).
    - Target: PHP 8.4 latest for web (fpm), CLI, queue, cron and local Docker (`docker/php/Dockerfile`);
      `composer update` within current majors (Laravel 12, Filament 4, Sanctum 4); `composer audit` clean
      or each remaining advisory written down with a reason; full PHPUnit green; manual smoke of admin
-     login, Content Engine, public forms. Deployed on its own after Ali's OK, before phase 1 work is
-     merged. Rollback: re-point nginx to `php8.2-fpm.sock` (kept installed) + previous `composer.lock`.
+     login, Content Engine, public forms. Built and verified locally first; shipped to production together with
+     the web release in phase 6 (Ali, 2026-11-08), PHP runbook executed before the Astro cutover. Rollback: re-point nginx to `php8.2-fpm.sock` (kept installed) + previous `composer.lock`.
 
 1. **Astro foundation + SEO.** Scaffold `web/`, tokens/fonts/base components, `BaseLayout` + schema
    builder, API client + cache, systemd unit, nginx block, `deploy.sh` step. Pilot route: `/faq`.

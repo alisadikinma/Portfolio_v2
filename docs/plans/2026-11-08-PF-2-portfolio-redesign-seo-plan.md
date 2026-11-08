@@ -224,12 +224,12 @@ incl. IDBYTE; cover `career-marlin.jpg`), gap 2019–2021 left empty, Satnusa 20
    h. Upgrade php8.2 to 8.2.35 is unnecessary once off it; remove php8.2-fpm only after 7 days green (separate, noted in Utang terbuka).
 4. Update root `CLAUDE.md`: PHP 8.4 everywhere (VPS fpm + CLI + Docker), runbook link, "Common Issues" FPM path `/etc/php/8.4/fpm/…`
 5. Commit: "ops(PF-2): PHP 8.4 production runbook + runtime check"
-6. STOP. Ask Ali for explicit OK to (a) push phases 0A–0C to `main` (deploys the composer update) and (b) run the runbook on the VPS. Record the decision in ledger `## Keputusan saat jalan`. Do not start phase 1 work until infra is green in production (Ali: "infra beres baru focus ke software").
+6. No production action here (Ali, 2026-11-08: production PHP 8.4 + the composer patch ship together with the web release in Phase 6A). Infra is "done" for software work once 0A–0C are green locally.
 
 **Verification:**
 - [ ] `check-php-runtime.sh --compare` passes on the repo nginx template
 - [ ] Runbook has a verify and a rollback line for every change step
-- [ ] Security: production upgrade executed only after Ali's recorded OK; post-change `/api/health` 200 and admin login OK on 8.4
+- [ ] Runbook is referenced from Phase 6A and lists the PHP 8.4 steps before the Astro cutover steps
 
 ### Phase 1A: Scaffold `web/` (Astro server mode)
 
@@ -1139,7 +1139,7 @@ incl. IDBYTE; cover `career-marlin.jpg`), gap 2019–2021 left empty, Satnusa 20
 **Steps:**
 1. Write failing test for `scripts/smoke-prod.sh https://alisadikinma.com` asserts `/id/` response contains `hx-h1-name` and the `#person` JSON-LD, `/id/pelatihan-ai` is 200, `/admin` serves the SPA, `/api/health` 200, `/r/<known code>` 301. Expected error: `smoke-prod: /id/ missing hx-h1-name` (run before cutover = proves the script detects the old site)
 2. STOP and ask Ali for explicit OK to merge `feat/PF-2-portfolio-redesign-seo` into `main` and push (push = production deploy). Record in ledger
-3. After OK: `git merge --no-ff`, push, watch the GitHub Actions run; on the VPS follow the runbook (install `portfolio-web.service`, `.env`, nginx swap, `nginx -t`, reload)
+3. After OK, in this order: (a) on the VPS run `docs/runbooks/pf2-php84-upgrade.md` (php8.4-fpm + CLI 8.4.27, nginx socket → 8.4, verify `/api/health` + admin login on the OLD site first); (b) `git merge --no-ff`, push (deploys composer update + Astro build), watch the GitHub Actions run; (c) follow `docs/runbooks/pf2-astro-cutover.md` (install `portfolio-web.service`, `.env`, nginx swap, `nginx -t`, reload). Rollback for (a) and (c) are independent
 4. Run `smoke-prod.sh` → exit 0; run `seo-gate --base https://alisadikinma.com --routes all`; submit sitemap in Google Search Console + Bing Webmaster (Ali); on any failure execute the runbook rollback immediately
 5. Commit: "docs(PF-2): release notes + smoke results"
 
