@@ -9,25 +9,19 @@
     "preview": "vite preview",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:unit:node": "node src/utils/newsletterState.test.mjs && node src/utils/stripFaqSection.test.mjs && node src/utils/extractFaqFromHtml.test.mjs && node src/utils/imagePositioning.test.mjs && node src/utils/wibTime.test.mjs",
+    "test:unit:node": "node src/utils/newsletterState.test.mjs && node src/utils/imagePositioning.test.mjs && node src/utils/wibTime.test.mjs",
     "test:unit:vitest": "vitest run",
     "test:unit:vitest:watch": "vitest",
     "test:unit": "npm run test:unit:node && npm run test:unit:vitest"
   },
   "dependencies": {
     "@headlessui/vue": "^1.7.23",
-    "@heroicons/vue": "^2.2.0",
     "@tailwindcss/typography": "^0.5.19",
-    "@tanstack/query-sync-storage-persister": "^5.90.8",
     "@tanstack/vue-query": "^5.90.5",
-    "@tresjs/core": "^5.7.0",
     "axios": "^1.12.2",
-    "gsap": "^3.14.2",
     "pinia": "^3.0.3",
     "sortablejs": "^1.15.6",
-    "three": "^0.183.2",
     "vue": "^3.5.22",
-    "vue-i18n": "^11.3.0",
     "vue-router": "^4.5.1"
   },
   "devDependencies": {

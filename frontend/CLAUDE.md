@@ -1,8 +1,10 @@
-# CLAUDE.md - Frontend SPA
+# CLAUDE.md - Frontend SPA (admin only)
 
 This file provides guidance to Claude Code when working with the Vue 3 frontend application.
 
 **Context:** Read root `/CLAUDE.md` first for general project architecture.
+
+> **PF-2 phase 5B (2026-11-08):** every public page (home, about, work, projects, blog, awards, gallery, contact, FAQ, SEO, hero 3D/video, i18n) now lives in the Astro SSR site in `web/`. This SPA keeps ONLY the admin panel (`/admin…`), `/login`, `/newsletter/unsubscribe` and a 404 catch-all. In production nginx sends everything else to Astro; locally `/` redirects to `/admin`. Anything below that mentions public views (Home, Blog, Projects…), `DefaultLayout`, or public composables (`usePosts`, `useProjects`…) is only an illustration of the pattern; those files are gone. Removed deps: three, @tresjs/core, gsap, vue-i18n, @heroicons/vue, query-sync-storage-persister.
 
 ## Quick Reference
 
@@ -18,7 +20,7 @@ This frontend implements a **modern Vue 3 SPA** with:
 
 1. **Composition API** - All components use `<script setup>` syntax
 2. **Composables** - Reusable logic in `composables/` (usePosts, useProjects, etc.)
-3. **Layout system** - Route-based layouts (DefaultLayout, AdminLayout, AuthLayout)
+3. **Layout system** - Route-based layouts (`meta.layout`: `admin` → AdminLayout, `auth` → AuthLayout, `bare`/none → plain div)
 4. **API abstraction** - Axios instance with interceptors in `services/api.js`
 5. **State management** - Pinia stores for global state (auth, ui, theme)
 6. **Utility-first CSS** - Tailwind CSS, minimal custom CSS
@@ -26,8 +28,8 @@ This frontend implements a **modern Vue 3 SPA** with:
 ### Component Hierarchy
 ```
 App.vue
-└── Layout (DefaultLayout | AdminLayout | AuthLayout)
-    └── View (Home, Blog, Projects, etc.)
+└── Layout (AdminLayout | AuthLayout | bare div)
+    └── View (admin/*, auth/Login, NewsletterUnsubscribe, NotFound)
         └── Components (Base + Feature-specific)
 ```
 
@@ -397,31 +399,14 @@ Located in `src/router/index.js`.
 1. **Lazy loading** - Components loaded on demand
 2. **Meta fields** - Page titles, auth requirements, layouts
 3. **Navigation guards** - Auth checks, page titles
-4. **Slug-based routes** - `/blog/:slug`, `/projects/:slug`
+4. **Admin-only route table** - `/login`, `/newsletter/unsubscribe`, `/admin…`, catch-all `not-found`, `/` → `/admin` (guarded by `src/router/router-public.spec.js`)
 
 ```javascript
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const routes = [
-  {
-    path: '/',
-    name: 'home',
-    component: () => import('@/views/Home.vue'),
-    meta: {
-      title: 'Home - Portfolio',
-      requiresAuth: false
-    }
-  },
-  {
-    path: '/blog/:slug',
-    name: 'blog-detail',
-    component: () => import('@/views/BlogDetail.vue'),
-    meta: {
-      title: 'Blog Post - Portfolio',
-      requiresAuth: false
-    }
-  },
+  { path: '/', redirect: '/admin' }, // local dev only; nginx serves / from Astro
   {
     path: '/admin',
     name: 'admin',
@@ -636,14 +621,13 @@ if (import.meta.env.DEV) {
 
 ```
 src/
-├── views/              # Page components
-│   ├── Home.vue
-│   ├── Blog.vue
-│   ├── BlogDetail.vue
+├── views/              # Page components (admin only)
+│   ├── NewsletterUnsubscribe.vue
+│   ├── NotFound.vue
+│   ├── auth/Login.vue
 │   └── admin/
 │       └── Dashboard.vue
 ├── layouts/            # Layout wrappers
-│   ├── DefaultLayout.vue
 │   ├── AdminLayout.vue
 │   └── AuthLayout.vue
 ├── components/
@@ -652,12 +636,11 @@ src/
 │   │   ├── BaseCard.vue
 │   │   ├── BaseInput.vue
 │   │   └── BaseLoader.vue
-│   ├── TheNavigation.vue
-│   └── TheFooter.vue
+│   ├── admin/ blog/ awards/ projects/ testimonials/   # admin forms/editors only
 ├── composables/        # Reusable logic
-│   ├── usePosts.js
-│   ├── useProjects.js
-│   └── useAuth.js
+│   ├── useLinkedInDrafts.js
+│   ├── useContentEngine.js
+│   └── useNewsletter.js
 ├── stores/             # Pinia stores
 │   ├── auth.js
 │   ├── ui.js
@@ -713,12 +696,12 @@ src/
 - `useApi.get()` returns `response.data` (already unwrapped). Do NOT access `response.data.data` — that double-unwraps to undefined
 - TanStack Query caches `null` from failed fetches. Call `queryClient.invalidateQueries()` before refetching after errors
 - Admin layout sidebar: `lg:ml-64` must be dynamic via `uiStore.isSidebarOpen` — not hardcoded
-- Blog preview: add `?preview=1` to URL to view unpublished/draft posts
-- Language switcher: flags only (🇺🇸/🇮🇩), no text labels
+- Links from SPA pages to public pages (`/blog`, `/`) must be plain `<a href>` (full page load): they are Astro routes, not SPA routes, so `router-link` would hit the 404 catch-all
+- `public/sw.js` is a kill-switch worker (clears `media-cache-*`, unregisters). nginx must keep serving `/sw.js` from the SPA root, not Astro
 
 ---
 
-**Last Updated:** April 11, 2026
+**Last Updated:** November 8, 2026 (PF-2 5B: admin only)
 **Environment:** macOS (Frontend: Vite:5173, Backend: Docker container portfolio_backend)
 **Status:** ✅ 100% COMPLETE - PRODUCTION READY
 **See also:** `/CLAUDE.md` (root), `backend/CLAUDE.md`

@@ -158,110 +158,30 @@ return response()->json(['success' => false, 'error' => ['code' => '...', 'messa
 5. **SEO:** All content models have HasSeoFields trait (meta_title, meta_description, og_image, schema_markup, canonical_url, seo_score)
 6. **Translations:** Posts and Projects support i18n via translation tables
 
-### Frontend Architecture (Vue 3)
+### Frontend Architecture (Vue 3, admin only since PF-2 phase 5B)
 
-**Views (13 public + 25 admin + 1 auth = 39 total):**
+**Public pages live in the Astro SSR site `web/`** (home, about, work/awards, projects, blog, FAQ, contact, training, speaker, sitemaps, robots, llms.txt). The Vue SPA in `frontend/` keeps ONLY: the admin panel (`/admin…`), `/login`, `/newsletter/unsubscribe`, and a 404 catch-all. nginx routes those paths to the SPA and everything else to Astro; locally `/` redirects to `/admin`. Removed with 5B: all public views, `components/home|blog (public)|…`, hero 3D/video, i18n (`vue-i18n`), GSAP, Three.js/TresJS, GA4 tag, Font Awesome CDN, static JSON-LD, hero/proof/career images and videos. `src/router/router-public.spec.js` fails if a public route comes back.
+
+**Views:**
 ```
 src/views/
-├── Home.vue              # Hero, stats, projects, blog, testimonials, CTA
-├── About.vue             # Skills, experience, education, social
-├── Work.vue              # Work/portfolio page
-├── Projects.vue          # Grid with filters, pagination
-├── ProjectDetail.vue     # Full project case study
-├── Awards.vue            # Awards cards with gallery modal
-├── Awards-DEBUG.vue      # Debug version (remove in prod)
-├── Blog.vue              # List with search, categories, pagination
-├── BlogDetail.vue        # Post content, share, author, related
-├── BlogCategory.vue      # Posts filtered by category
-├── Gallery.vue           # Image grid with lightbox
-├── Contact.vue           # Form with validation
-├── NotFound.vue          # 404 page
+├── NewsletterUnsubscribe.vue  # token-based public unsubscribe (layout: bare)
+├── NotFound.vue               # 404 catch-all (layout: bare)
 ├── auth/Login.vue
-└── admin/
-    ├── Dashboard.vue
-    ├── PostsList.vue / PostCreate.vue / PostEdit.vue
-    ├── ProjectsList.vue / ProjectCreate.vue / ProjectEdit.vue
-    ├── AwardsList.vue / AwardCreate.vue / AwardEdit.vue
-    ├── GalleriesList.vue
-    ├── TestimonialsList.vue / TestimonialCreate.vue / TestimonialEdit.vue
-    ├── ContactsList.vue
-    ├── AboutSettings.vue / SettingsForm.vue
-    ├── MenuItemsList.vue          # Dynamic menu management
-    ├── PageSectionsManager.vue    # Homepage section editor
-    ├── AutomationTokens.vue       # API token management
-    ├── AutomationLogs.vue         # Automation activity logs
-    ├── AutomationDocs.vue         # API documentation page
-    ├── CarouselDraftsList.vue     # Carousel drafts management
-    ├── CarouselDraftDetail.vue    # Carousel draft review/approve
-    └── ContentEngine.vue          # Content idea pipeline (spreadsheet UI, 4 modals)
+└── admin/                     # Dashboard, Posts*, Projects*, Awards*, Galleries, Testimonials*, Contacts,
+                               # AboutSettings, SettingsForm, MenuItems, PageSectionsManager, Automation*,
+                               # CarouselDrafts*, ContentEngine + ArticlePreview/ImageGeneration/ArticleFinalize,
+                               # SocialStudio, LinkedInDraftDetail, LinkedInPostsCalendar, CrossPost*, Repurpose*,
+                               # VideoFull*, NewsletterSubscribers, TrainingWaitlist, SchedulerSettings
 ```
 
-**Stores (15 Pinia stores):**
-```
-src/stores/
-├── auth.js / auth-fixed.js  # Authentication & token management
-├── automation.js             # Automation API state
-├── awards.js / categories.js / contacts.js / galleries.js
-├── carouselDrafts.js         # Carousel draft state
-├── posts.js / projects.js / settings.js / testimonials.js
-├── theme.js                  # Light/dark theme
-├── ui.js                     # Loading states, modals, toasts
-└── index.js                  # Store exports
-```
+**Layouts:** `AdminLayout` (`meta.layout='admin'`), `AuthLayout` (`'auth'`), none/`'bare'` → plain div. `DefaultLayout` (public nav/footer) is gone.
 
-**Composables (29 composables):**
-```
-src/composables/
-├── useAboutSettings.js    # About page data + prefetch
-├── useActivityFeed.js     # Activity feed data
-├── useApi.js              # Base API wrapper
-├── useAuth.js             # Auth composable
-├── useAutomation.js       # Automation API
-├── useAwards.js           # TanStack Query cached
-├── useCarouselDrafts.js   # Carousel draft management
-├── useCategories.js
-├── useChatbot.js          # AI chatbot interaction
-├── useContact.js
-├── useContentEngine.js    # Content Engine pipeline (15+ API methods)
-├── useCursorSparks.js     # Cursor spark effects
-├── useGallery.js          # TanStack Query cached
-├── useGlobe.js            # 3D globe visualization
-├── useLocalCache.js       # Local storage caching
-├── useMenuItems.js        # Dynamic menu
-├── useMetaTags.js         # Dynamic SEO meta from CMS
-├── useModal.js
-├── useNewsletter.js       # Newsletter subscribe/unsubscribe
-├── usePageSections.js     # Dynamic page sections
-├── usePosts.js            # TanStack Query cached
-├── useProjects.js         # TanStack Query cached
-├── useScrollReveal.js     # Scroll-triggered reveal animations
-├── useSettings.js / useSiteSettings.js
-├── useStageGalleries.js   # Award gallery photos for International Stages cards (parallel, 60min cache)
-├── useTestimonials.js     # TanStack Query cached
-├── useToast.js
-├── useVideoReveal.js      # Video reveal animations
-└── index.js
-```
+**Stores:** `auth`, `automation`, `awards`, `categories`, `contacts`, `galleries`, `carouselDrafts`, `posts`, `projects`, `settings`, `testimonials`, `theme`, `ui`.
 
-**Components:**
-```
-src/components/
-├── admin/
-│   ├── DragDropList.vue     # SortableJS drag-drop
-│   ├── IconDisplay.vue      # Icon renderer
-│   └── IconPicker.vue       # Icon selector
-├── awards/ / blog/ / projects/ / testimonials/
-├── base/ (17 components)
-│   ├── BaseButton / BaseCard / BaseInput / BaseModal / BaseBadge
-│   ├── BaseLoader / BaseToast / BaseLightbox / BaseGalleryModal
-│   ├── BlogSkeleton / ProjectSkeleton / AwardSkeleton / ContentSkeleton
-│   ├── MobileCarousel / ScrollToTop
-│   └── index.js / README.md
-├── CTASection.vue
-├── HeroSectionWOW.vue
-├── TheNavigation.vue
-└── TheFooter.vue
-```
+**Composables:** admin-facing only (`useApi`, `useLinkedInDrafts`, `useContentEngine`, `useCrossPostDrafts`, `useRepurposeJobs`, `useVideoFull`, `useScheduler`, `useSocialCalendar`, `useSocialQueueList`, `useNewsletter` + `useNewsletterAdmin`, `usePageSections`, `useSettings`, `useSiteSettings`, `useCarouselDrafts`, `useCategories`, `useGallery`, `useMenuItems`, `useLocalCache`, `useToast`, `useTrainingWaitlistAdmin`, `useStalePosts`, `useGeminigenCircuit`). The public composables (`usePosts`, `useProjects`, `useAwards`, `useTestimonials`, `useMetaTags`, `useAboutSettings`, `useStageGalleries`, …) and the `composables/index.js` barrel were deleted.
+
+**Components:** `admin/` (DragDropList, IconDisplay/Picker, ImageConfigModal, EntityUploadSlot, PipelineStepBar, SocialPlatformTabs…), `awards/`, `projects/`, `testimonials/`, `blog/` (admin editors only: BlogPostForm, CategorySelect, ImageUploader, RichTextEditor), `base/` (Base* UI kit).
 
 ## Database Schema (48 migrations, 30+ tables)
 
@@ -963,37 +883,22 @@ After updating `.env`, run `php artisan config:cache && systemctl restart portfo
 - Foreign keys: `category_id` (singular + _id)
 - Always include timestamps
 
-## Page Sections Mapping (admin ↔ view)
+## Page Sections Mapping (admin ↔ Astro home)
 
-`/admin/page-sections` rows are keyed by `(page_type, section_type)`. The table below lists which view reads which `section_type` — if a row exists in DB but isn't listed here, toggling it is a **ghost toggle** (no render effect). Always keep this in sync when adding/removing sections from views.
+`/admin/page-sections` rows are keyed by `(page_type, section_type)`. Since PF-2 only the **Astro home** ([web/src/pages/[lang]/index.astro](web/src/pages/[lang]/index.astro)) reads them (`GET /api/page-sections?page=homepage`); a missing row means "on", an `is_active=false` row hides the section, and `hero` can never be hidden (holds the H1 + LCP image). A row that is not listed below is a **ghost toggle** — `PageSectionSeeder` deletes every `homepage` row outside this list on seed (`HOMEPAGE_SECTIONS` constant; covers `what-i-solve`, `selected-work`, `skills-reel`, `featured-projects`, `latest-blog`, `stats-cta`, `skill-*`, and the old snake_case rows). Keep the seeder and `index.astro` in sync when adding/removing a section. Guarded by `PageSectionSeederTest`.
 
-**The Operator redesign (June 8, 2026):** homepage recomposed into a fixed 9-section identity-led spine. All homepage `section_type`s are kebab-case; `PageSectionSeeder` deletes the obsolete snake_case homepage ghosts (`featured_projects`, `latest_blog`, `awards`, `gallery`, `cta`) on seed. `Home.vue::isSectionActive` is **default-on for rows absent from DB** (so the spine renders before the seeder runs), and respects `is_active` for rows that exist.
+| page_type | section_type | Astro component |
+|---|---|---|
+| `homepage` | `hero` | `Hero` (always rendered) |
+| `homepage` | `who-i-am` | `home/WhoIAm` |
+| `homepage` | `receipts` | `home/ProofBand` |
+| `homepage` | `international-stages` | `home/Journey` + `home/Stages` (one toggle, two blocks) |
+| `homepage` | `services` | `home/Services` |
+| `homepage` | `testimonials` | `home/Testimonials` |
+| `homepage` | `latest-writing` | `home/LatestWriting` |
+| `homepage` | `join-the-build` | `NewsletterForm` |
 
-| page_type | section_type | Rendered by | Component |
-|---|---|---|---|
-| `homepage` | `hero` | [Home.vue](frontend/src/views/Home.vue) | `HeroOperator` (cinematic "JARVIS operator" hero video + ALI SADIKIN MA wordmark + manifesto + 3 CTAs + stat triad; **`public/videos/hero-loop.webm` (2.92MB) + `.mp4` (3.40MB) 8s loop** — keyframe via indusia-image-gen (face ref) → VEO image-to-video via indusia-video-gen, Veo watermark stripped w/ ffmpeg `delogo`; central JARVIS arc-reactor HUD orchestrating 3 labeled live screens VIBE CODING · AI AGENT OS · VIDEO GEN, operator in trendy blazer+tee; **`hero-poster.jpg` (keyframe) wired as `posterSrc`** = immediate render + reduced-motion/slow-conn fallback; `sw.js` pre-caches loop+poster (cache v2). Replaced `CinematicHero` June 8.) |
-| `homepage` | `who-i-am` | Home.vue | `WhoIAm` (answer-shaped LLM-quotable about block + real portrait from `settings.about.profile_photo` + identity chips; **live `settings.about.bio` rendered via sanitized `v-html`** — `cleanBio` allowlist `p/strong/em/br`, strips attrs+script — fixed raw-tag leak) |
-| `homepage` | `what-i-solve` | Home.vue | `WhatISolveTabs` (3-discipline tabbed switcher: Vibe Coding · AI Agent OS **MANDOR AI** `Introducing` · Generative Video; right panel renders `active.imageSrc` `<img>` when set — **AI Agent OS tab shows a branded MANDOR kanban-board mockup `public/images/whatisolve/mandor-board.jpg`** (indusia-image-gen), else autoplay muted `videoSrc` per tab; all 3 CTAs scroll to `#join-the-build`) |
-| `homepage` | `receipts` | Home.vue | `ReceiptsBento` (6-tile proof bento, gold lead = #1 Global AI Demo Day 2026; live 56+/17yr from stats, static $318K+/16/≥95%; **each tile has a geminigen background `public/images/proof/*.jpg` + dark legibility overlay** — demoday from face ref) |
-| `homepage` | `international-stages` | Home.vue | `InternationalStages` — **reframed to "Track Record"** (two bands): a **17-year CAREER band** (3 curated chapters from vault `experience.md`: Singapore MNC IT 2008–2015 · Marlin 2016–2019 · Sat Nusapersada 2021–2025, accent gold) ABOVE the **5 STAGE cards** (Bengaluru/Hangzhou-UNCTAD/Silicon Valley/NextDev/Fenox — **IDBYTE dropped**, accent cyan). Stage photos via [`useStageGalleries`](frontend/src/composables/useStageGalleries.js) (`/api/awards/{id}/galleries`); **career photos via new [`useExperienceGalleries`](frontend/src/composables/useExperienceGalleries.js)** (gallery_id based: Singapore→14, Marlin→9-13, Satnusa→16; `/api/galleries/{id}` `file_url`). Shared `BaseGalleryModal` driven by both; text-only fallback per card. Section `id` stays `international-stages` (nav anchor intact) |
-| `homepage` | `selected-work` | Home.vue | `SelectedWork` (live `featured.featured_projects` cards → `/projects/{slug}`; footer "All N projects") |
-| `homepage` | `testimonials` | Home.vue | `TestimonialsCarousel` (LinkedIn-sourced quotes, 8s auto-rotate, pause-on-hover, dots nav, keyboard ←/→) |
-| `homepage` | `latest-writing` | Home.vue | `LatestWriting` (live `featured.latest_articles` feed + Content Engine meta-flex "this blog writes itself") |
-| `homepage` | `join-the-build` | Home.vue | `JoinTheBuild` (follow @alisadikinma IG·TikTok·LI·YT + live newsletter signup name/email/WA E.164 + soft WhatsApp CTA) |
-| ~~`homepage` `skills-reel`~~ | ~~Home.vue~~ | ~~`SkillsReel`~~ | RETIRED June 8 — dropped from The Operator spine |
-| ~~`homepage` `featured-projects`~~ | ~~Home.vue~~ | ~~`ProjectsBento`~~ | RETIRED June 8 — superseded by `selected-work` / `SelectedWork` |
-| ~~`homepage` `latest-blog`~~ | ~~Home.vue~~ | ~~`LatestBlog`~~ | RETIRED June 8 — superseded by `latest-writing` / `LatestWriting` |
-| ~~`homepage` `stats-cta`~~ | ~~Home.vue~~ | ~~`StatsBar`+`CTASection`~~ | RETIRED June 8 — superseded by `receipts` + `join-the-build` |
-| `about` | `cta` | [About.vue](frontend/src/views/About.vue) | `CTASection` (root variant, WhatsApp + social) |
-| `projects` | `cta` | [Projects.vue](frontend/src/views/Projects.vue) | `CTASection` (root variant) |
-| `gallery` | `cta` | [Gallery.vue](frontend/src/views/Gallery.vue) | `CTASection` (root variant) |
-| `blog` | `cta` | [BlogDetail.vue](frontend/src/views/BlogDetail.vue) | `CTASection` (root variant) — **article detail, NOT list** |
-
-**Naming convention:** `section_type` is kebab-case. The retired homepage components (`SkillsReel`, `SkillShowcase`, `ProjectsBento`, `LatestBlog`, `StatsBar`, `CTASection` home-variant, `CinematicHero`) still exist on disk until the Phase J cleanup. Don't revive snake_case; always use kebab-case for new sections and keep `PageSectionSeeder` in sync.
-
-**Home.vue snap-section gotcha:** `.snap-section` wrapper has `min-height: 100dvh` — putting `v-if="isSectionActive(...)"` on the inner component while keeping the wrapper always-rendered leaves a full-viewport blank space when the section is toggled off. Always put the `v-if` on the `<div class="snap-section">` wrapper itself so the whole section collapses.
-
-**Header nav = section anchors (June 8, 2026):** [TheNavigation.vue](frontend/src/components/TheNavigation.vue) no longer renders DB `menu_items` route-links — it renders a static `sectionLinks` set (Who I Am · What I Solve · Receipts · Awards · My Projects · Blogs · Contact) mapped to the homepage section `id`s (`who-i-am`/`what-i-solve`/`receipts`/`international-stages`/`selected-work`/`latest-writing`/`join-the-build`). Each `.snap-section` wrapper in `Home.vue` carries a matching `id` + `scroll-mt-24`. Click → on homepage `scrollIntoView` (reduced-motion aware), off-homepage `router.push({name:'home', hash})` (router `scrollBehavior` resolves the hash). IntersectionObserver drives an active-link highlight (cosmetic, graceful no-op). When adding/removing a homepage section, keep `sectionLinks` ↔ the section `id`s in sync.
+The `about` / `projects` / `blog` `cta` + `featured_projects` + `latest_blog` rows still seeded below are NOT read by Astro (inactive, harmless) — candidates for a later cleanup.
 
 ## Performance & Caching
 
@@ -1571,8 +1476,8 @@ CAROUSEL_GEN_REFS_PIPELINE=/home/claudesn/refs-carousel-gen-pipeline.md  # ~169K
 CAROUSEL_GEN_TIMEOUT_SECONDS=900                            # Matches LINKEDIN_GEN_TIMEOUT_SECONDS
 ```
 
-### Service Worker (Media Caching)
-`frontend/public/sw.js` — Caches videos and images via Cache API. Pre-caches hero videos on install, cache-first strategy for all media.
+### Service Worker (retired)
+`frontend/public/sw.js` is a kill-switch worker (PF-2 5B): it clears `media-cache-*` and unregisters itself so browsers that cached the old SPA's media stop intercepting the Astro site's images. nginx must keep serving `/sw.js` from the SPA build root.
 
 ## Newsletter System (May 5, 2026)
 
@@ -1727,6 +1632,7 @@ Idempotent via `firstOrCreate(['signature' => ...], $row)` — re-seeding on exi
 
 > Condensed log — one line per change. Deep detail lives in the linked `docs/plans/` + `docs/runbooks/` docs and git history. Commits are local until the operator authorizes a push.
 
+- **2026-11-08** — **PF-2 5B: public Vue SPA code removed (admin stays).** Router now only `/login`, `/newsletter/unsubscribe`, `/admin…`, 404 catch-all, `/`→`/admin`; deleted public views, `components/home|blog (public)`, public composables/utils/data, i18n, hero media, GA4 + SW registration; deps removed: three, @tresjs/core, gsap, vue-i18n, @heroicons/vue, query-sync-storage-persister. `PageSectionSeeder` now deletes every homepage row the Astro home does not read (incl. `what-i-solve`, `selected-work`). `public/sw.js` is a kill-switch. Not pushed. [plan](docs/plans/2026-11-08-PF-2-portfolio-redesign-seo-plan.md)
 - **2026-07-01** — **GeminiGen → indusia client SSOT (submit via CLI bridge, flagged OFF).** Stops the backend hand-rolling GeminiGen/snapgen HTTP submits in two drifted spots — image + video now shell the `indusiagen-api-client` CLI ([geminigen_image.py / geminigen_video.py](https://github.com/alisadikinma/indusiagen-api-client), the SSOT for the wire protocol) via new [`GeminiGenClientBridge`](backend/app/Services/GeminiGenClientBridge.php) (SUBMIT-only: `submit($endpoint,$fields,$refs,$model)` → uuid; `local` driver = Illuminate Process **argv array, no shell**, `ssh` = `escapeshellarg` per token; **API key NEVER on argv** — client reads its own VPS `.env`; gpt-image-2 URL-refs auto-materialized to temp local files). Wave 1 (images): [`ImageGenerationService::queue`](backend/app/Services/ImageGenerationService.php) + [`LinkedInCarouselImageService::dispatchOne`](backend/app/Services/LinkedInCarouselImageService.php) branch to the bridge behind `geminigen.use_indusia_images`; carousel model now operator-set via `linkedin_carousel_image_model` setting (default `nano-banana-pro`; `gpt-image-2` = literal-typography, Premium-plan only, gets `--mode medium`). Wave 2 (video): all 4 [`GeminiGenVideoService`](backend/app/Services/GeminiGenVideoService.php) dispatchers (hook/keyframe/veo/grok) branch behind `geminigen.use_indusia_video` — per-family CLI subcommand (grok `2:3`/`--mode custom`, veo `--mode frame`, keyframe → image CLI). **Both flags default OFF** — old PHP HTTP path is the fallback, deploy = no-op until env flip. Vendor rebrand `api.geminigen.ai → api.snapgen.ai` centralized in new [`config/geminigen.php`](backend/config/geminigen.php) `base_url` (6 seams: 3 services + 3 poll crons off the dead domain). **Poll stays backend GET** (`{base_url}/history/{uuid}` — model-agnostic, no drift; the client's `check` subcommand is a documented stub → bridge is submit-only). Env: `GEMINIGEN_BASE_URL`, `GEMINIGEN_CLIENT_{DRIVER,PATH,REPO,TIMEOUT,SSH_*}`, `GEMINIGEN_USE_INDUSIA_{IMAGES,VIDEO}`. Tests: config 4 + bridge 6 + ImageGenIndusiaSubmit 2 + CarouselIndusiaSubmit 3 + VideoIndusiaSubmit 4 + touched-suite regression (video svc 2, polls 17) all green (11 batched fails are the pre-existing `alias:Setting` Mockery leak, proven identical at base `88479ec7`). **SHIPPED + LIVE (2026-07-01):** pushed, deployed, VPS client installed (read-only deploy key + `~/.config/geminigen/config.json` key — client has no dotenv loader), all step-0 probes green (image / gpt-image-2 Premium / grok+ref 2:3 / veo frame), **both flags flipped ON** — Wave 1 verified prod-green end-to-end (draft 188 slide 0 `failed → done`: service → CLI bridge → job row → poll `GET /history` → downloaded), Wave 2 (video) ON, organic-verify on next hook/veo run. Key rotated to a fresh snapgen key (old one hit `HTTP 402` out-of-credits, which had also broken the live HTTP image path since ~09:30 — rotation fixed both). CLI `--aspect` enum has NO `4:5` (carousel uses `3:4`). → [runbook](docs/runbooks/geminigen-indusia-client-deploy.md). [plan](docs/plans/2026-07-01-geminigen-indusia-client-ssot.md)
 - **2026-06-25** — **GEO hardening vs Helena Liu's 5-Pillar GEO Toolkit — closed the 3 real gaps.** Audit found Pillars 1/3-signal/4 essentially done (9 AI-bot robots allow-list, static+dynamic llms.txt, 10 schema types, blog/home SSR, 7-platform cross-post); gaps were projects-invisible-to-JS-crawlers (P1), FAQ-only-on-blog (P2), zero measurement (P5). **(P1) Projects detail SSR** — [`SpaPrerenderController::projectDetail`](backend/app/Http/Controllers/SpaPrerenderController.php) clones `blogDetail`: `CreativeWork` JSON-LD ([`SchemaGraphBuilder::creativeWork`](backend/app/Services/Seo/SchemaGraphBuilder.php)) + crawlable `<article>` body ([`seo/project.blade.php`](backend/resources/views/seo/project.blade.php)) + breadcrumbs + hreflang, 1h cache purged via `Project::boot` → `purgeForProject`; web.php OG-only closures replaced (no nginx change — `/projects/*` already routes to PHP-FPM). **(P2) Dedicated `/faq`** — single source [`config/faq.php`](backend/config/faq.php) (11 curated answer-first Q&A) feeds SSR `FAQPage`+crawlable `<dl>` ([`SpaPrerenderController::faq`](backend/app/Http/Controllers/SpaPrerenderController.php) + [`seo/faq.blade.php`](backend/resources/views/seo/faq.blade.php)), public `GET /api/faq` ([`FaqController`](backend/app/Http/Controllers/Api/FaqController.php)), and Vue [`FaqView.vue`](frontend/src/views/FaqView.vue) — **needs one-time nginx widening for `/faq`** ([runbook](docs/runbooks/seo-geo-ssr-deploy.md)). **(P5) Measurement** — GA4 gtag in [`main.js`](frontend/src/main.js) gated by `VITE_GA4_MEASUREMENT_ID` (empty → no tag/network) + [`LogAiCrawler`](backend/app/Http/Middleware/LogAiCrawler.php) middleware (atomic `upsert` into `geo_crawler_hits`, fail-open) logging the AI-bot crawls GA4 can't see, read via `GET /api/admin/geo/crawler-hits` ([`GeoCrawlerStatsController`](backend/app/Http/Controllers/Api/Admin/GeoCrawlerStatsController.php)); GA4 "AI Traffic" channel group is a manual dashboard step ([runbook](docs/runbooks/geo-ai-traffic-ga4.md)). Per-project/about FAQ deferred (YAGNI). 5 test files added (LogAiCrawler, ProjectDetailSsr, FaqSsr, FaqApi, SchemaGraphBuilderCreativeWork); code-reviewed (noscript-FAQ + upsert-race + MariaDB-orderBy fixes applied). NOT pushed — operator: run migrate + `php artisan test`, set `VITE_GA4_MEASUREMENT_ID`, widen nginx for `/faq`. [plan](docs/plans/2026-06-25-geo-hardening-three-gaps.md)
 - **2026-06-22** — **Fix: IG-repurpose BLOG-mode carousel draft invisible in Social Studio (stale `exclude_repurpose` arm #3).** A `source='instagram'` ContentIdea finalized via Content Engine → published → `linkedin:scan-blog` correctly created a `manual_review` carousel draft, but it showed in NEITHER Social Studio column (idea 817 → post 125 → draft 177). IG column (`exclude_settled=1`) hides the blog-mode repurpose job the moment it hands off (`content_idea_id` set); LinkedIn column (`exclude_repurpose=1`) arm #3 in [LinkedInDraftController::index](backend/app/Http/Controllers/Api/Admin/LinkedInDraftController.php) dropped any draft whose `post_id` linked a `ContentIdea{source:'instagram'}`. Arm #3 was added 2026-06-11 to keep sources disjoint, but the 2026-06-13 blog→Content-Engine handoff made blog-mode jobs settle (hidden from IG) immediately — so arm #3 only ever hid blog-handoff drafts that have NO IG-column twin (carousel/video modes never create a `source=instagram` ContentIdea; they're caught by arms #1 `linkedin_post_id` / #2 `anchor_post_id`). **Removed arm #3** → blog-handoff carousel drafts now appear in the Social Studio LinkedIn queue for triage. Test `LinkedInDraftListExcludeRepurposeTest` inverted (now asserts KEEP); unused `ContentIdea` import dropped. 261 LinkedIn/Repurpose tests green. NOT pushed.

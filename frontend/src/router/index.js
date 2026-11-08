@@ -1,134 +1,11 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { useAboutSettings } from '@/composables/useAboutSettings'
-import i18n from '@/i18n'
-import { resolveLocale } from '@/utils/resolveLocale'
-
-const SUPPORTED_LANGS = ['en', 'id']
 
 const routes = [
-  // ============================================
-  // LOCALE-AWARE PUBLIC ROUTES (/:lang prefix)
-  // ============================================
-  {
-    path: '/:lang',
-    name: 'home',
-    component: () => import('@/views/Home.vue'),
-    meta: {
-      title: 'Ali Sadikin Ma - AI Generalist Expert',
-      requiresAuth: false
-    }
-  },
-  {
-    path: '/:lang/about',
-    name: 'about',
-    component: () => import('@/views/About.vue'),
-    meta: {
-      title: 'About - Ali Sadikin Ma',
-      requiresAuth: false
-    }
-  },
-  {
-    path: '/:lang/projects',
-    name: 'projects',
-    component: () => import('@/views/Projects.vue'),
-    meta: {
-      title: 'Projects - Ali Sadikin Ma',
-      requiresAuth: false
-    }
-  },
-  {
-    path: '/:lang/projects/:slug',
-    name: 'project-detail',
-    component: () => import('@/views/ProjectDetail.vue'),
-    meta: {
-      title: 'Project - Ali Sadikin Ma',
-      requiresAuth: false
-    }
-  },
-  {
-    path: '/:lang/work',
-    name: 'work',
-    component: () => import('@/views/Work.vue'),
-    meta: {
-      title: 'My Work - Ali Sadikin Ma',
-      requiresAuth: false
-    }
-  },
-  {
-    path: '/:lang/awards',
-    name: 'awards',
-    redirect: to => `/${to.params.lang}/work?tab=awards`
-  },
-  {
-    path: '/:lang/awards-debug',
-    name: 'awards-debug',
-    component: () => import('@/views/Awards-DEBUG.vue'),
-    meta: {
-      title: 'Awards Debug',
-      requiresAuth: false
-    }
-  },
-  {
-    path: '/:lang/blog',
-    name: 'blog',
-    component: () => import('@/views/Blog.vue'),
-    meta: {
-      title: 'Blog - Ali Sadikin Ma',
-      requiresAuth: false
-    }
-  },
-  {
-    path: '/:lang/blog/:slug',
-    name: 'blog-detail',
-    component: () => import('@/views/BlogDetail.vue'),
-    meta: {
-      title: 'Blog - Ali Sadikin Ma',
-      requiresAuth: false
-    }
-  },
-  {
-    path: '/:lang/blog/category/:slug',
-    name: 'blog-category',
-    component: () => import('@/views/BlogCategory.vue'),
-    meta: {
-      title: 'Category - Ali Sadikin Ma',
-      requiresAuth: false
-    }
-  },
-  {
-    path: '/:lang/gallery',
-    name: 'gallery',
-    redirect: to => `/${to.params.lang}/work?tab=awards`
-  },
-  {
-    path: '/:lang/contact',
-    name: 'contact',
-    component: () => import('@/views/Contact.vue'),
-    meta: {
-      title: 'Contact - Ali Sadikin Ma',
-      requiresAuth: false
-    }
-  },
-
-  // ============================================
-  // LEGACY URL REDIRECTS (no lang prefix → add it)
-  // ============================================
-  {
-    path: '/',
-    // Uses resolveLocale so a first-time visitor in Indonesia lands on
-    // /id, not /en. Falls through to saved preference or browser-timezone
-    // detection. See frontend/src/utils/resolveLocale.js for the full rules.
-    redirect: () => `/${resolveLocale()}`
-  },
-  { path: '/about', redirect: '/en/about' },
-  { path: '/projects', redirect: '/en/projects' },
-  { path: '/projects/:slug', redirect: to => `/en/projects/${to.params.slug}` },
-  { path: '/work', redirect: '/en/work' },
-  { path: '/blog', redirect: '/en/blog' },
-  { path: '/blog/:slug', redirect: to => `/en/blog/${to.params.slug}` },
-  { path: '/blog/category/:slug', redirect: to => `/en/blog/category/${to.params.slug}` },
-  { path: '/contact', redirect: '/en/contact' },
+  // Public pages live in the Astro site (web/), served by nginx. The SPA keeps only
+  // login, newsletter unsubscribe, the admin panel and the catch-all (PF-2 phase 5B).
+  // "/" only matters for local dev (nginx sends it to Astro in production).
+  { path: '/', redirect: '/admin' },
   {
     path: '/login',
     name: 'login',
@@ -146,15 +23,7 @@ const routes = [
     meta: {
       title: 'Unsubscribe — Ali Sadikin Ma',
       requiresAuth: false,
-    }
-  },
-  {
-    path: '/faq',
-    name: 'faq',
-    component: () => import('@/views/FaqView.vue'),
-    meta: {
-      title: 'FAQ — Ali Sadikin Ma',
-      requiresAuth: false,
+      layout: 'bare'
     }
   },
   {
@@ -618,7 +487,8 @@ const routes = [
     component: () => import('@/views/NotFound.vue'),
     meta: {
       title: '404 - Page Not Found',
-      requiresAuth: false
+      requiresAuth: false,
+      layout: 'bare'
     }
   }
 ]
@@ -655,31 +525,8 @@ router.beforeResolve(async (to, from) => {
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
 
-  // Sync locale from route lang param (public routes only)
-  const lang = to.params.lang
-  if (lang) {
-    if (!SUPPORTED_LANGS.includes(lang)) {
-      // Unsupported language → redirect to English version
-      const pathWithoutLang = to.fullPath.replace(`/${lang}`, '/en')
-      return next(pathWithoutLang)
-    }
-    // Sync i18n locale with route
-    if (i18n.global.locale.value !== lang) {
-      i18n.global.locale.value = lang
-      localStorage.setItem('locale', lang)
-    }
-  }
-
-  // Prefetch critical data for homepage BEFORE navigation
-  if (to.name === 'home') {
-    const { prefetchAboutSettings } = useAboutSettings()
-    await prefetchAboutSettings()
-  }
-
-  // Set page title ONLY for admin/auth pages (not public pages)
-  if (to.meta.layout === 'admin' || to.meta.layout === 'auth') {
-    document.title = to.meta.title || 'Admin - Portfolio'
-  }
+  // Set the tab title (every SPA route is admin/auth/utility; none is indexable)
+  document.title = to.meta.title || 'Admin - Portfolio'
 
   // Check authentication
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {

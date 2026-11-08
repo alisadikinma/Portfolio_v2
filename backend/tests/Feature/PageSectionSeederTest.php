@@ -8,28 +8,30 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * The Operator redesign (Phase E). Verifies the homepage page-section rows match
- * the 9-section spine rendered by Home.vue — so there are no ghost toggles and no
- * missing rows. Runs on CI/VPS (local Mac has no PHP/MySQL).
+ * PF-2 phase 5B. Verifies the homepage page-section rows match the sections the Astro home
+ * (web/src/pages/[lang]/index.astro) actually toggles — no ghost toggles, no missing rows.
+ * The Vue-only rows `what-i-solve` and `selected-work` are deleted on seed.
  */
 class PageSectionSeederTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** The canonical homepage spine, in render order (kebab-case). */
+    /** Section types the Astro home reads (kebab-case). */
     private array $spine = [
         'hero',
         'who-i-am',
-        'what-i-solve',
         'receipts',
         'international-stages',
-        'selected-work',
+        'services',
         'testimonials',
         'latest-writing',
         'join-the-build',
     ];
 
-    public function test_seeds_all_nine_operator_homepage_sections(): void
+    /** Rows only the retired Vue home rendered. */
+    private array $vueOnlyGhosts = ['what-i-solve', 'selected-work'];
+
+    public function test_seeds_every_astro_homepage_section(): void
     {
         $this->seed(PageSectionSeeder::class);
 
@@ -62,6 +64,64 @@ class PageSectionSeederTest extends TestCase
                 'section_type' => $ghost,
             ]);
         }
+    }
+
+    public function test_does_not_seed_vue_only_homepage_sections(): void
+    {
+        $this->seed(PageSectionSeeder::class);
+
+        foreach ($this->vueOnlyGhosts as $ghost) {
+            $this->assertDatabaseMissing('page_sections', [
+                'page_type' => 'homepage',
+                'section_type' => $ghost,
+            ]);
+        }
+    }
+
+    public function test_deletes_existing_vue_only_homepage_rows_on_seed(): void
+    {
+        // Old migrations may already have created these rows; make sure they exist before seeding.
+        foreach ($this->vueOnlyGhosts as $i => $ghost) {
+            PageSection::firstOrCreate(
+                ['page_type' => 'homepage', 'section_type' => $ghost],
+                ['is_active' => true, 'sequence' => $i],
+            );
+        }
+
+        $this->seed(PageSectionSeeder::class);
+        $this->seed(PageSectionSeeder::class); // idempotent re-run
+
+        foreach ($this->vueOnlyGhosts as $ghost) {
+            $this->assertDatabaseMissing('page_sections', [
+                'page_type' => 'homepage',
+                'section_type' => $ghost,
+            ]);
+        }
+        // Only homepage rows are touched: a same-named row on another page stays.
+        PageSection::firstOrCreate(
+            ['page_type' => 'about', 'section_type' => 'selected-work'],
+            ['is_active' => false, 'sequence' => 9],
+        );
+        $this->seed(PageSectionSeeder::class);
+        $this->assertDatabaseHas('page_sections', ['page_type' => 'about', 'section_type' => 'selected-work']);
+    }
+
+    public function test_deletes_every_retired_homepage_row_the_astro_home_never_reads(): void
+    {
+        $retired = ['skills-reel', 'skill-vibe-coding', 'featured-projects', 'latest-blog', 'stats-cta'];
+        foreach ($retired as $i => $type) {
+            PageSection::firstOrCreate(
+                ['page_type' => 'homepage', 'section_type' => $type],
+                ['is_active' => true, 'sequence' => $i],
+            );
+        }
+
+        $this->seed(PageSectionSeeder::class);
+
+        $this->assertEqualsCanonicalizing(
+            $this->spine,
+            PageSection::where('page_type', 'homepage')->pluck('section_type')->all(),
+        );
     }
 
     public function test_is_idempotent_and_preserves_admin_toggles(): void
