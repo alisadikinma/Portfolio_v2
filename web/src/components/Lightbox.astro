@@ -7,22 +7,27 @@ interface Props { lang: Lang }
 const { lang } = Astro.props;
 const l = (lang === "id" ? id : en).lightbox;
 ---
-<dialog class="lb" id="lb" aria-label={l.label} data-alt={l.alt}>
-  <button type="button" class="lb-x" data-lb="close" aria-label={l.close}>✕</button>
-  <button type="button" class="lb-nav prev" data-lb="prev" aria-label={l.prev}>‹</button>
-  <!-- the photo element is created by lightbox.ts on first open -->
-  <figure>
-    <p class="lb-error" data-lb-error hidden>{l.error}</p>
-    <figcaption class="mono" aria-live="polite"><span data-lb-title></span> · <span data-lb-count></span></figcaption>
-  </figure>
-  <button type="button" class="lb-nav next" data-lb="next" aria-label={l.next}>›</button>
+<dialog class="lb" id="lb" aria-label={l.label} data-alt={l.alt} data-photos={l.photos}>
+  <header class="lb-head">
+    <div>
+      <p class="lb-h" data-lb-heading></p>
+      <p class="lb-total" data-lb-total></p>
+    </div>
+    <button type="button" class="lb-x" data-lb="close" aria-label={l.close}>✕</button>
+  </header>
+  <!-- grid of every photo (built by lightbox.ts on open); a click shows that photo large -->
+  <ul class="lb-grid" data-lb-grid hidden></ul>
+  <div class="lb-stage">
+    <button type="button" class="lb-back" data-lb="grid" hidden>{l.all}</button>
+    <button type="button" class="lb-nav prev" data-lb="prev" aria-label={l.prev}>‹</button>
+    <figure hidden>
+      <p class="lb-error" data-lb-error hidden>{l.error}</p>
+      <figcaption class="mono" aria-live="polite"><span data-lb-title></span> · <span data-lb-count></span></figcaption>
+    </figure>
+    <button type="button" class="lb-nav next" data-lb="next" aria-label={l.next}>›</button>
+  </div>
 </dialog>
 <script>
   import { initLightbox } from "../scripts/lightbox";
   initLightbox();
 </script>
-<style>
-  .lb figure { min-height: min(60vh, 520px); display: grid; align-content: center; justify-items: center; }
-  .lb-error { padding: 24px; text-align: center; color: var(--text-secondary); }
-  .lb figcaption { margin: 0; padding-top: 12px; }
-</style>

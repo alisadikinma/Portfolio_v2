@@ -36,10 +36,11 @@ const cards = [
       {cards.map((c) => {
         const p = photos.get(c.award) ?? null;
         const items = p?.photos.map((x) => x.full) ?? [];
+        const thumbs = p?.photos.map((x) => x.thumb) ?? [];
         const cover = p?.cover ?? null;
         const href = awardHref({ slug: slugRes.get(c.award) }, lang);
         const gallery = items.length > 0;
-        const trigger = { "data-lightbox": "", "data-lightbox-title": c.title, "data-lightbox-items": JSON.stringify(items) };
+        const trigger = { "data-lightbox": "", "data-lightbox-title": c.title, "data-lightbox-items": JSON.stringify(items), "data-lightbox-thumbs": JSON.stringify(thumbs) };
         const Tag = href ? "a" : gallery ? "button" : "div";
         const tagAttrs = href ? { href } : gallery ? { type: "button" as const, ...trigger } : {};
         const w = c.main ? 800 : 640;

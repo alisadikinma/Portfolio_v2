@@ -5,9 +5,9 @@ import { id } from "../../content/copy/id";
 import { en } from "../../content/copy/en";
 import { ANCHORS } from "../../../scripts/seo-gate.config.mjs";
 import {
-  GALLERIES_MARLIN, GALLERY_SATNUSA, GALLERY_SINGAPORE, LIGHTBOX_WIDTH, loadGallery, type Photos,
+  GALLERIES_MARLIN, GALLERY_SATNUSA, GALLERY_SINGAPORE, LIGHTBOX_WIDTH, THUMB_MIN_WIDTH, loadGallery, type Photos,
 } from "../../lib/career";
-import marlinCover from "../../assets/career-marlin.jpg";
+import marlinCover from "../../assets/career-marlin.jpg"; // first lightbox photo of the Marlin chapter
 // Same illustration as indusia.ai/founder (no text in it, so it works for both languages).
 import journeyIllus from "../../assets/founder-journey.webp";
 
@@ -16,10 +16,6 @@ const { lang } = Astro.props;
 const j = (lang === "id" ? id : en).journey;
 const a = ANCHORS[lang];
 const n = (count: number) => j.photos.replace("{n}", String(count));
-// Slot is ~4:3; width/height are the box ratio (object-fit: cover), not the source size.
-const W = 640;
-const H = 480;
-const SIZES = "(min-width: 1000px) 25vw, (min-width: 560px) 50vw, 100vw";
 
 const ids = [GALLERY_SINGAPORE, ...GALLERIES_MARLIN, GALLERY_SATNUSA];
 const settled = await Promise.allSettled(ids.map((g) => loadGallery(g, lang)));
@@ -30,89 +26,62 @@ const singapore = got.get(GALLERY_SINGAPORE) ?? null;
 const satnusa = got.get(GALLERY_SATNUSA) ?? null;
 const marlinParts = GALLERIES_MARLIN.map((g) => got.get(g) ?? null);
 const marlinFull = (await getImage({ src: marlinCover, width: LIGHTBOX_WIDTH, format: "webp" })).src;
+const marlinThumb = (await getImage({ src: marlinCover, width: THUMB_MIN_WIDTH, format: "webp" })).src;
 const marlinUrls = [marlinFull, ...marlinParts.flatMap((p) => p?.photos.map((x) => x.full) ?? [])];
+const marlinThumbs = [marlinThumb, ...marlinParts.flatMap((p) => p?.photos.map((x) => x.thumb) ?? [])];
 // A count is only honest when every source gallery loaded.
 const marlinComplete = marlinParts.every((p) => p !== null);
 
 const chapters = [
-  { key: "singapore", gallery: String(GALLERY_SINGAPORE), photos: singapore, items: singapore?.photos.map((x) => x.full) ?? [], count: singapore?.photos.length ?? 0, pos: true, yr: j.singaporeYear, role: j.singaporeRole, org: j.singaporeOrg, title: j.singaporeRole, note: j.singaporeNote, alt: j.singaporeAlt },
-  { key: "marlin", gallery: "marlin", photos: null, items: marlinUrls, count: marlinComplete ? marlinUrls.length : 0, pos: false, yr: j.marlinYear, role: j.marlinRole, org: j.marlinOrg, title: j.marlinOrg, note: j.marlinNote, alt: j.marlinAlt },
-  { key: "satnusa", gallery: String(GALLERY_SATNUSA), photos: satnusa, items: satnusa?.photos.map((x) => x.full) ?? [], count: satnusa?.photos.length ?? 0, pos: true, yr: j.satnusaYear, role: j.satnusaRole, org: j.satnusaOrg, title: j.satnusaOrg, note: j.satnusaNote, alt: j.satnusaAlt },
+  { key: "singapore", gallery: String(GALLERY_SINGAPORE), items: singapore?.photos.map((x) => x.full) ?? [], thumbs: singapore?.photos.map((x) => x.thumb) ?? [], count: singapore?.photos.length ?? 0, yr: j.singaporeYear, role: j.singaporeRole, org: j.singaporeOrg, title: j.singaporeRole, note: j.singaporeNote },
+  { key: "marlin", gallery: "marlin", items: marlinUrls, thumbs: marlinThumbs, count: marlinComplete ? marlinUrls.length : 0, yr: j.marlinYear, role: j.marlinRole, org: j.marlinOrg, title: j.marlinOrg, note: j.marlinNote },
+  { key: "satnusa", gallery: String(GALLERY_SATNUSA), items: satnusa?.photos.map((x) => x.full) ?? [], thumbs: satnusa?.photos.map((x) => x.thumb) ?? [], count: satnusa?.photos.length ?? 0, yr: j.satnusaYear, role: j.satnusaRole, org: j.satnusaOrg, title: j.satnusaOrg, note: j.satnusaNote },
 ];
 ---
 <section class="sec" id="perjalanan" aria-labelledby="journey-h">
   <div class="wrap">
     <div class="sec-head"><h2 id="journey-h">{j.h2}</h2><p class="lead">{j.lead}</p></div>
-    <figure class="jr-illus">
-      <Image src={journeyIllus} widths={[640, 960, 1280, 1600]} sizes="(max-width: 1200px) 100vw, 1200px"
-        alt={j.illusAlt} loading="lazy" decoding="async" format="webp" />
-      {/* One hotspot per island (left to right): opens the same gallery as that chapter's card. */}
-      {chapters.map((c, i) => c.items.length > 0 && (
-        <button class={`jr-spot s${i + 1}`} type="button" data-hotspot={c.key} data-lightbox data-lightbox-title={c.title}
-          data-lightbox-items={JSON.stringify(c.items)} aria-label={j.illusOpen.replace("{name}", c.title)}></button>
-      ))}
-      <a class="jr-spot s4" data-hotspot="indusia" href={a.hero.href} aria-label={j.illusIndusia}></a>
-    </figure>
-    <ol class="journey">
-      {chapters.map((c) => {
-        const Tag = c.items.length > 0 ? "button" : "div";
-        const attrs = c.items.length > 0
-          ? { type: "button" as const, "data-career": c.gallery, "data-lightbox": "", "data-lightbox-title": c.title, "data-lightbox-items": JSON.stringify(c.items) }
-          : {};
-        const cover = c.photos?.cover ?? null;
-        return (
-          <li>
-            <Tag class="jr-card" {...attrs}>
-              <span class="jr-ph">
-                {c.key === "marlin" && (
-                  <Image src={marlinCover} alt={c.alt} widths={[320, 480, 640, 960]} sizes={SIZES} format="webp" loading="lazy" decoding="async" />
-                )}
-                {c.key !== "marlin" && cover && (
-                  <img src={cover.src} srcset={cover.srcset} sizes={cover.srcset ? SIZES : undefined} alt={c.alt}
-                    width={W} height={H} loading="lazy" decoding="async"
-                    style={c.pos ? "object-position:50% 15%" : undefined} />
-                )}
-                {c.count > 0 && <em>{n(c.count)}</em>}
-              </span>
-              <span class="jr-yr">{c.yr}</span>
-              <strong>{c.role}</strong>
-              <span class="jr-org">{c.org}</span>
-              <span class="jr-note">{c.note}</span>
-              {c.items.length > 0 && <span class="sr"> · {j.openHint}</span>}
-            </Tag>
-          </li>
-        );
-      })}
-      <li class="jr-now">
-        <div class="jr-card">
-          <span class="jr-ph jr-indusia">
-            <img src="/images/indusia-avi.webp" alt={j.indusiaImgAlt} width="1600" height="894" loading="lazy" decoding="async" />
-            <svg class="jr-logo" xmlns="http://www.w3.org/2000/svg" width="168" height="24" viewBox="0 0 168 24" role="img" aria-label={j.indusiaLogoAlt}>
-              <rect x="0" y="4" width="16" height="16" rx="4" fill="none" stroke="#3FB8C5" stroke-width="1.4" />
-              <path d="M4 15V9L8 12.5L12 9V15" fill="none" stroke="#3FB8C5" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
-              <text x="22" y="18" font-weight="600" font-size="17" letter-spacing="0.2" fill="#E8EEF8" style="font-family: var(--font-display)">INDUSIA<tspan fill="#3FB8C5">.ai</tspan></text>
-            </svg>
-            <em>{j.indusiaNow}</em>
-          </span>
-          <span class="jr-yr">{j.indusiaYear}</span>
-          <strong>{j.indusiaRole}</strong>
-          <span class="jr-org">{j.indusiaOrg}</span>
-          <p class="jr-note"><a href={ANCHORS[lang].vision.href}>{a.vision.anchor}</a>{j.indusiaNoteMid1}<a href={a.fleet.href}>{a.fleet.anchor}</a>{j.indusiaNoteMid2}<a href={a.chatbot.href}>{a.chatbot.anchor}</a>{j.indusiaNoteEnd}</p>
-          <a class="jr-cta" href={a.hero.href}>{j.indusiaCta}</a>
-        </div>
-      </li>
-    </ol>
+    {/* One board: the islands on top, each chapter's text right under its island.
+        Island and caption open the same gallery; hovering one lights up the other. */}
+    <div class="jr-board">
+      <figure class="jr-illus">
+        <Image src={journeyIllus} widths={[640, 960, 1280, 1600]} sizes="(max-width: 1200px) 100vw, 1200px"
+          alt={j.illusAlt} loading="lazy" decoding="async" format="webp" />
+        {chapters.map((c, i) => c.items.length > 0 && (
+          <button class={`jr-spot s${i + 1}`} type="button" data-hotspot={c.key} data-lightbox data-lightbox-title={c.title}
+            data-lightbox-items={JSON.stringify(c.items)} data-lightbox-thumbs={JSON.stringify(c.thumbs)} aria-label={j.illusOpen.replace("{name}", c.title)}></button>
+        ))}
+        <a class="jr-spot s4" data-hotspot="indusia" href={a.hero.href} aria-label={j.illusIndusia}></a>
+      </figure>
+      <ol class="journey">
+        {chapters.map((c, i) => {
+          const Tag = c.items.length > 0 ? "button" : "div";
+          const attrs = c.items.length > 0
+            ? { type: "button" as const, "data-career": c.gallery, "data-lightbox": "", "data-lightbox-title": c.title, "data-lightbox-items": JSON.stringify(c.items), "data-lightbox-thumbs": JSON.stringify(c.thumbs) }
+            : {};
+          return (
+            <li class={`c${i + 1}`}>
+              <Tag class="jr-card" {...attrs}>
+                <span class="jr-yr">{c.yr}</span>
+                <strong>{c.role}</strong>
+                <span class="jr-org">{c.org}</span>
+                <span class="jr-note">{c.note}</span>
+                {c.count > 0 && <em class="jr-count">{n(c.count)}</em>}
+                {c.items.length > 0 && <span class="sr"> · {j.openHint}</span>}
+              </Tag>
+            </li>
+          );
+        })}
+        <li class="c4 jr-now">
+          <div class="jr-card">
+            <span class="jr-yr">{j.indusiaYear}<em class="jr-live">{j.indusiaNow}</em></span>
+            <strong>{j.indusiaRole}</strong>
+            <span class="jr-org">{j.indusiaOrg}</span>
+            <p class="jr-note"><a href={a.vision.href}>{a.vision.anchor}</a>{j.indusiaNoteMid1}<a href={a.fleet.href}>{a.fleet.anchor}</a>{j.indusiaNoteMid2}<a href={a.chatbot.href}>{a.chatbot.anchor}</a>{j.indusiaNoteEnd}</p>
+            <a class="jr-cta" href={a.hero.href}>{j.indusiaCta}</a>
+          </div>
+        </li>
+      </ol>
+    </div>
   </div>
 </section>
-<style>
-  div.jr-card { box-sizing: border-box; display: grid; gap: 6px; width: 100%; height: 100%; align-content: start; }
-  .jr-ph:not(:has(img)) { background: var(--bg-elevated); }
-  .jr-ph :global(img) { width: 100%; height: 100%; object-fit: cover; }
-  .jr-now { position: relative; }
-  .jr-logo { position: absolute; left: 14px; bottom: 14px; width: 46%; height: auto; z-index: 2; }
-  /* the global .journey a rule resets anchors to grid blocks; keep the links inline */
-  .jr-now .jr-note a { position: relative; z-index: 1; display: inline; width: auto; height: auto; color: var(--accent-primary); text-decoration: underline; text-underline-offset: 3px; }
-  .jr-now .jr-cta { display: inline; width: auto; height: auto; margin-top: 6px; font-weight: 600; color: var(--accent-primary); text-decoration: underline; text-underline-offset: 3px; }
-  /* one link for the whole card: the CTA stretches over it; product links sit above */
-  .jr-now .jr-cta::after { content: ""; position: absolute; inset: 0; }
-</style>

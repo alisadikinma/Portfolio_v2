@@ -98,7 +98,6 @@ if (failed) {
 }
 
 const THUMBS = 12;
-const rotated = (all: Photo[], i: number) => JSON.stringify([...all.slice(i), ...all.slice(0, i)].map((p) => p.full));
 const tabHref = (t: Tab) => `${path}?tab=${t}`;
 const tabLabel: Record<Tab, string> = { projects: c.tabProjects, awards: c.tabAwards, gallery: c.tabGallery };
 const hasPhotos = tab === "gallery" && galleries.length > 0;
@@ -171,7 +170,9 @@ const jsonld = graph(
                     class="work-thumb"
                     data-lightbox=""
                     data-lightbox-title={g.title}
-                    data-lightbox-items={rotated(g.photos, i)}
+                    data-lightbox-items={JSON.stringify(g.photos.map((p) => p.full))}
+                    data-lightbox-thumbs={JSON.stringify(g.photos.map((p) => p.thumb))}
+                    data-lightbox-start={i}
                     aria-label={c.photoOpen.replace("{n}", String(i + 1)).replace("{title}", g.title)}
                   >
                     <img

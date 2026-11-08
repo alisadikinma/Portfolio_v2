@@ -88,7 +88,7 @@ describe.each(["id", "en"] as const)("Journey (%s)", (lang) => {
     expect((html.match(/<li/g) ?? []).length).toBe(4);
   });
 
-  it("journey illustration (from indusia.ai/founder) sits between the lead and the cards: sized, lazy, alt", async () => {
+  it("journey illustration (from indusia.ai/founder) sits between the lead and the chapter list: sized, lazy, alt", async () => {
     const html = await render(Journey, lang);
     const fig = html.match(/<figure class="jr-illus"[\s\S]*?<\/figure>/)?.[0] ?? "";
     expect(fig).not.toBe("");
@@ -120,19 +120,14 @@ describe.each(["id", "en"] as const)("Journey (%s)", (lang) => {
     expect(out).toMatch(/aria-label="[^"]+"/);
   });
 
-  it("career covers use the gallery's curated thumbnail (as on the old site), object-position 50% 15%", async () => {
-    // Ali 2026-11-08: the career cards must show the curated composite thumbnail
-    // (portrait at Marina Bay / Satnusa), not the first gallery photo.
+  it("one board: chapter text sits under the islands, no duplicate photo cards (Ali 2026-11-08)", async () => {
     const html = await render(Journey, lang);
-    const sg = liOf(html, 'data-career="14"').match(/<img[^>]*>/)![0];
-    expect(sg).toContain(`src="${thumb(14)}"`);
-    expect(sg).toContain("object-position:50% 15%");
-    expect(sg).toContain('loading="lazy"');
-    expect(sg).toMatch(/width="\d+" height="\d+"/);
-    expect(sg).not.toContain("g14-0-320.webp");
-    const st = liOf(html, 'data-career="16"').match(/<img[^>]*>/)![0];
-    expect(st).toContain(`src="${thumb(16)}"`);
-    expect(st).toContain("object-position:50% 15%");
+    const board = html.match(/<div class="jr-board"[\s\S]*<\/ol>/)?.[0] ?? "";
+    expect(board).toContain('class="jr-illus"');
+    expect(board).toContain('<ol class="journey"');
+    const list = html.match(/<ol class="journey"[\s\S]*?<\/ol>/)![0];
+    expect(list).not.toMatch(/<img|<svg/);
+    expect([...list.matchAll(/<li class="(c\d)/g)].map((m) => m[1])).toEqual(["c1", "c2", "c3", "c4"]);
   });
 
   it("lightbox items use the 1920w variant when present, the original otherwise", async () => {
@@ -170,12 +165,6 @@ describe.each(["id", "en"] as const)("Journey (%s)", (lang) => {
   it("Marlin: static cover first + 33 gallery photos = 34, galleries in order", async () => {
     const html = await render(Journey, lang);
     const li = liOf(html, 'data-career="marlin"');
-    const img = li.match(/<img[^>]*>/)![0];
-    expect(img).toContain("career-marlin");
-    expect(img).not.toContain("/images/career-marlin.jpg");
-    expect(img).toMatch(/width="\d+"/);
-    expect(img).toMatch(/height="\d+"/);
-    expect(img).toContain("srcset=");
     const items = itemsOf(li);
     expect(items).toHaveLength(34);
     expect(items[0]).toContain("career-marlin");
@@ -204,10 +193,8 @@ describe.each(["id", "en"] as const)("Journey (%s)", (lang) => {
       expect(a).not.toMatch(/\srel=/);
     }
     const li = liOf(html, "jr-now");
-    expect(li).toContain("indusia-avi.webp");
-    expect(li).toContain("<svg");
     expect(li).not.toContain("PLACEHOLDER");
-    // one link to the INDUSIA home for the whole card
+    // one link to the INDUSIA home in the chapter text
     expect((li.match(new RegExp(`href="${page.backlinks[0].href.replace(/[/.]/g, "\\$&")}"`, "g")) ?? []).length).toBe(1);
     expect(li).toContain(lang === "id" ? "2026–sekarang" : "2026–present");
     expect(li).not.toMatch(/<a[^>]*>(?:(?!<\/a>)[\s\S])*<a /);

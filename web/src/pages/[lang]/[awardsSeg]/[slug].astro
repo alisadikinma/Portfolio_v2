@@ -68,9 +68,8 @@ const photos = photosFromGalleries(payload?.galleries).photos;
 const ogImage = photos[0]?.src ?? ownMediaUrl(award.image) ?? undefined;
 const metaTitle = awardTitleTag(title);
 const metaDescription = awardMetaDescription(short, descriptionText, c.metaTail);
-// Each thumbnail opens the lightbox on its own photo: the list is rotated so the clicked one comes first.
+// Each thumbnail opens the lightbox on its own photo (data-lightbox-start).
 const fulls = photos.map((p) => p.full);
-const rotated = (i: number) => JSON.stringify([...fulls.slice(i), ...fulls.slice(0, i)]);
 
 // Event.description = the award's own text only; the meta tail is page marketing, not event data.
 const eventDescription = descriptionText.trim() !== "" ? clipWords(descriptionText, 300) : undefined;
@@ -131,7 +130,9 @@ const jsonld = failed
                       class="award-thumb"
                       data-lightbox=""
                       data-lightbox-title={short}
-                      data-lightbox-items={rotated(i)}
+                      data-lightbox-items={JSON.stringify(fulls)}
+                      data-lightbox-thumbs={JSON.stringify(photos.map((p) => p.thumb))}
+                      data-lightbox-start={i}
                       aria-label={c.photoOpen.replace("{n}", String(i + 1)).replace("{title}", short)}
                     >
                       <img

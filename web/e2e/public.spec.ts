@@ -109,7 +109,7 @@ it.describe("public site", () => {
     }
   });
 
-  it("lightbox opens from a trigger and closes (button, Escape) returning focus", async ({ page }) => {
+  it("lightbox opens on a grid of every photo; a click shows it large; closes returning focus", async ({ page }) => {
     await page.goto(`${BASE_URL}/id`, { waitUntil: "load" });
     const trigger = page.locator("[data-lightbox][data-lightbox-items]:not([data-lightbox-items='[]'])").first();
     await expect(trigger, "home needs >=1 gallery item: the API under test (API_INTERNAL_URL) must return gallery data and the gallery section must render").toHaveCount(1);
@@ -118,8 +118,15 @@ it.describe("public site", () => {
     await expect(dialog).not.toHaveAttribute("open", "");
     await trigger.click();
     await expect(dialog).toHaveAttribute("open", "");
+    const thumbs = dialog.locator("[data-lb-grid] button");
+    expect(await thumbs.count()).toBeGreaterThan(1);
+    await expect(thumbs.first().locator("img")).toHaveAttribute("src", /.+/);
+    await thumbs.nth(1).click();
     await expect(dialog.locator("figure img")).toHaveAttribute("src", /.+/);
-    await expect(dialog.locator("[data-lb-count]")).toContainText(/^1 \/ \d+$/);
+    await expect(dialog.locator("[data-lb-count]")).toContainText(/^2 \/ \d+$/);
+    await page.keyboard.press("Escape"); // back to the grid
+    await expect(dialog).toHaveAttribute("open", "");
+    await expect(thumbs.nth(1)).toBeFocused();
     await dialog.locator('[data-lb="close"]').click();
     await expect(dialog).not.toHaveAttribute("open", "");
     await expect(trigger).toBeFocused();

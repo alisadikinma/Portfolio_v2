@@ -217,7 +217,7 @@ describe("content", () => {
     expect(html).not.toContain("evil.example");
   });
 
-  it("lightbox: each photo is a data-lightbox trigger carrying every 1920w URL, clicked photo first", async () => {
+  it("lightbox: each photo is a data-lightbox trigger carrying every 1920w URL in order + its own start index", async () => {
     const { html } = await load("id", DEMO);
     const triggers = [...html.matchAll(/<button\b[^>]*data-lightbox[^>]*>/g)].map((m) => m[0]);
     expect(triggers).toHaveLength(2);
@@ -226,7 +226,9 @@ describe("content", () => {
       "https://alisadikinma.com/storage/award/p1-1920.webp",
       "https://alisadikinma.com/storage/award/p2-1920.webp",
     ]);
-    expect(items(triggers[1])[0]).toBe("https://alisadikinma.com/storage/award/p2-1920.webp");
+    expect(items(triggers[1])).toEqual(items(triggers[0]));
+    expect(triggers.map((t) => /data-lightbox-start="(\d+)"/.exec(t)?.[1])).toEqual(["0", "1"]);
+    expect(triggers[0]).toMatch(/data-lightbox-thumbs="[^"]+"/);
     expect(html).toContain('id="lb"');
   });
 
