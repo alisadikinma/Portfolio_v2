@@ -26,12 +26,12 @@ Tanpa harga. CTA = konsultasi via WhatsApp / form kontak.
 | URL | Title | Keyword utama |
 |---|---|---|
 | /id | Ali Sadikin Ma — Pakar AI Indonesia, Founder INDUSIA.ai | pakar AI Indonesia |
-| /en | Ali Sadikin Ma — AI Consultant Indonesia, Founder of INDUSIA.ai | AI consultant Indonesia |
+| /en | Ali Sadikin Ma — AI Consultant Indonesia, INDUSIA.ai | AI consultant Indonesia |
 | /id/pelatihan-ai (baru) | Pelatihan AI & Workshop AI untuk Perusahaan — Ali Sadikin Ma | pelatihan AI, workshop AI, training AI |
-| /en/ai-training (baru) | AI Training & Workshops for Companies in Indonesia — Ali Sadikin Ma | AI training Indonesia |
+| /en/ai-training (baru) | AI Training Indonesia for Companies — Ali Sadikin Ma | AI training Indonesia |
 | /id/pembicara-ai (baru) | Pembicara AI & Narasumber Seminar AI — Ali Sadikin Ma | pembicara AI, seminar AI |
 | /en/ai-speaker (baru) | AI Speaker Indonesia — Ali Sadikin Ma | AI speaker Indonesia |
-| /id/about, /en/about | Tentang Ali Sadikin Ma — Ahli AI dari Batam / About … AI Expert from Batam | ahli AI Indonesia |
+| /id/about, /en/about | Tentang Ali Sadikin Ma — Ahli AI Indonesia dari Batam / About … AI Expert from Batam | ahli AI Indonesia |
 | /work, /projects, /blog | tetap, title diberi pola "… — Ali Sadikin Ma" | – |
 
 **Pelatihan/workshop belum buka (keputusan Ali 2026-11-08):** halaman /pelatihan-ai dan

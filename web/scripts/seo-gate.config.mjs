@@ -5,6 +5,33 @@ export const PERSON_ID = `${SITE}/#person`;
 // Spec gate item 7 uses "#org" (brief section 5 says "#organization"). Spec wins; one place to change.
 export const ORG_ID = "https://indusia.ai/#org";
 export const NAME = "Ali Sadikin Ma";
+export const TITLE_MAX = 60;
+
+// Single place for page titles (brief section 3). The title-length check and the
+// config tests read from here; edit a title here when the owner decides.
+export const TITLES = {
+  "/id": "Ali Sadikin Ma — Pakar AI Indonesia, Founder INDUSIA.ai",
+  "/en": "Ali Sadikin Ma — AI Consultant Indonesia, INDUSIA.ai",
+  "/id/about": "Tentang Ali Sadikin Ma — Ahli AI Indonesia dari Batam",
+  "/en/about": "About Ali Sadikin Ma — AI Expert from Batam",
+  "/id/pelatihan-ai": "Pelatihan AI & Workshop AI untuk Perusahaan — Ali Sadikin Ma",
+  "/en/ai-training": "AI Training Indonesia for Companies — Ali Sadikin Ma",
+  "/id/pembicara-ai": "Pembicara AI & Narasumber Seminar AI — Ali Sadikin Ma",
+  "/en/ai-speaker": "AI Speaker Indonesia — Ali Sadikin Ma",
+  "/id/faq": "FAQ Ali Sadikin Ma — Pertanyaan Umum",
+  "/en/faq": "FAQ — Ali Sadikin Ma",
+  "/id/blog": "Blog AI — Ali Sadikin Ma",
+  "/en/blog": "AI Blog — Ali Sadikin Ma",
+  "/id/projects": "Proyek AI — Ali Sadikin Ma",
+  "/en/projects": "AI Projects — Ali Sadikin Ma",
+  "/id/work": "Karya — Ali Sadikin Ma",
+  "/en/work": "Work — Ali Sadikin Ma",
+};
+
+/** Routes whose configured title exceeds `max` characters. */
+export function overlongTitles(titles = TITLES, max = TITLE_MAX) {
+  return Object.keys(titles).filter((r) => titles[r].length > max);
+}
 
 const I = "https://indusia.ai";
 
@@ -25,8 +52,8 @@ const A = {
   en: {
     hero: { anchor: "INDUSIA.ai", href: `${I}/` },
     company: { anchor: "AI company Indonesia", href: `${I}/` },
-    devServices: { anchor: "AI development services", href: `${I}/ai-development-services/` },
-    devServicesTraining: { anchor: "INDUSIA AI development services", href: `${I}/ai-development-services/` },
+    devServices: { anchor: "AI development services Indonesia", href: `${I}/ai-development-services/` },
+    devServicesTraining: { anchor: "INDUSIA AI development services Indonesia", href: `${I}/ai-development-services/` },
     vision: { anchor: "machine vision Indonesia", href: `${I}/ai-vision/` },
     fleet: { anchor: "fleet management system", href: `${I}/ai-fleet-transportation/` },
     chatbot: { anchor: "WhatsApp AI chatbot", href: `${I}/ai-assistant/` },
@@ -87,7 +114,35 @@ export const ROUTES = {
     }),
   ],
 };
-ROUTES.all = [...ROUTES.home, ...ROUTES.about, ...ROUTES.training, ...ROUTES.speaker];
+
+/** Minimal spec for pages without a backlink table: only the footer backlink "Founder INDUSIA.ai". */
+export function basicSpec(lang, route, alternates, keywords, pageType) {
+  return {
+    route, lang, alternates: { id: alternates.id, en: alternates.en }, keywords, pageType,
+    isHome: false, faq: false,
+    backlinks: [A[lang].footer],
+  };
+}
+
+// Keywords are the page name (brief section 3 gives no keyword for these pages).
+const KW = {
+  faq: { id: ["FAQ"], en: ["FAQ"] },
+  blog: { id: ["Blog"], en: ["Blog"] },
+  projects: { id: ["Proyek"], en: ["Projects"] },
+  work: { id: ["Karya"], en: ["Work"] },
+};
+const basicGroup = (name, pageType) =>
+  ["id", "en"].map((l) =>
+    basicSpec(l, `/${l}/${name}`, { id: `/id/${name}`, en: `/en/${name}` }, KW[name][l], pageType));
+ROUTES.faq = basicGroup("faq", "FAQPage");
+ROUTES.blog = basicGroup("blog", "WebPage");
+ROUTES.projects = basicGroup("projects", "WebPage");
+ROUTES.work = basicGroup("work", "WebPage");
+
+ROUTES.all = [
+  ...ROUTES.home, ...ROUTES.about, ...ROUTES.training, ...ROUTES.speaker,
+  ...ROUTES.faq, ...ROUTES.blog, ...ROUTES.projects, ...ROUTES.work,
+];
 
 // Blog posts: every post has an author box. Build a spec per post with this.
 export function blogPostSpec(lang, route, alt, keyword) {
