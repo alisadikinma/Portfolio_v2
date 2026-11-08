@@ -1,0 +1,112 @@
+---
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import ProjectCard, { type ProjectCardData } from "../../../components/ProjectCard.astro";
+import { apiGetPage } from "../../../lib/api";
+import { LANGS, type Lang } from "../../../lib/i18n";
+import { SITE, breadcrumb, collectionPage, graph, personNode, webPageNode, websiteNode } from "../../../lib/schema";
+import { id } from "../../../content/copy/id";
+import { en } from "../../../content/copy/en";
+
+const raw = Astro.params.lang;
+if (!(LANGS as readonly string[]).includes(raw ?? "")) {
+  return new Response(null, { status: 404 });
+}
+const lang = raw as Lang;
+const c = (lang === "id" ? id : en).projectsIndex;
+const path = `/${lang}/projects`;
+
+// GET /api/projects has no category param: fetch all pages (<= 50 per page) and filter here.
+const PER_PAGE = 50;
+const MAX_PAGES = 10;
+const all: ProjectCardData[] = [];
+let failed = false;
+try {
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const res = await apiGetPage<Record<string, unknown>>(`/projects?per_page=${PER_PAGE}&page=${page}`, { lang });
+    if (!res || !Array.isArray(res.data)) {
+      failed = page === 1;
+      break;
+    }
+    for (const p of res.data) {
+      if (!p || typeof p.slug !== "string" || p.slug === "" || typeof p.title !== "string" || p.title.trim() === "") continue;
+      all.push({
+        slug: p.slug,
+        title: p.title,
+        description: typeof p.description === "string" ? p.description : "",
+        category: typeof p.category === "string" ? p.category.trim() : "",
+        image: typeof p.featured_image === "string" && p.featured_image !== "" ? p.featured_image : null,
+      });
+    }
+    const last = Number((res.meta as { last_page?: unknown } | null)?.last_page ?? 1);
+    if (!(last > page)) break;
+  }
+} catch {
+  failed = true;
+}
+if (failed && all.length === 0) {
+  Astro.response.status = 503;
+}
+
+const categories = [...new Set(all.map((p) => p.category).filter((x) => x !== ""))].sort((a, b) => a.localeCompare(b));
+const requested = (Astro.url.searchParams.get("category") ?? "").trim();
+const active = categories.includes(requested) ? requested : "";
+const filtering = requested !== "";
+const shown = filtering ? all.filter((p) => p.category === requested) : all;
+
+const url = SITE + path;
+const cards = all;
+const jsonld = graph(
+  personNode(),
+  websiteNode(),
+  webPageNode({ url, lang, name: c.metaTitle, description: c.metaDescription }),
+  collectionPage({
+    url,
+    lang,
+    name: c.metaTitle,
+    description: c.metaDescription,
+    items: cards.map((p) => ({ name: p.title, url: `${SITE}/${lang}/projects/${encodeURIComponent(p.slug)}` })),
+  }),
+  breadcrumb([
+    { name: c.breadcrumbHome, url: `${SITE}/${lang}` },
+    { name: c.breadcrumbProjects, url },
+  ]),
+);
+---
+<BaseLayout title={c.metaTitle} description={c.metaDescription} path={path} lang={lang} jsonld={jsonld}>
+  <main class="wrap projects-page">
+    <h1>{c.h1}</h1>
+    <p>{c.intro}</p>
+    {failed && all.length === 0 ? (
+      <p class="projects-unavailable" role="status">{c.unavailable}</p>
+    ) : (
+      <>
+        {categories.length > 0 && (
+          <nav class="projects-filter" aria-label={c.filterLabel}>
+            <a href={path} aria-current={active === "" && !filtering ? "page" : undefined}>{c.filterAll}</a>
+            {categories.map((cat) => (
+              <a href={`${path}?category=${encodeURIComponent(cat)}`} aria-current={active === cat ? "page" : undefined}>{cat}</a>
+            ))}
+          </nav>
+        )}
+        {shown.length > 0 ? (
+          <div class="projects-grid">
+            {shown.map((p) => <ProjectCard project={p} lang={lang} readMore={c.readMore} />)}
+          </div>
+        ) : (
+          <p class="projects-empty" role="status">
+            {filtering ? c.emptyCategory : c.empty}
+            {filtering && <>{" "}<a href={path}>{c.showAll}</a></>}
+          </p>
+        )}
+      </>
+    )}
+  </main>
+</BaseLayout>
+<style>
+  .projects-page { padding-block: 64px; }
+  .projects-filter { display: flex; flex-wrap: wrap; gap: 10px; margin: 28px 0; }
+  .projects-filter a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border: 1px solid var(--border-emphasis); border-radius: var(--radius-md); text-decoration: none; color: var(--text-primary); }
+  .projects-filter a[aria-current="page"] { background: var(--accent-primary); color: var(--bg-deep); border-color: transparent; }
+  .projects-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px; }
+  .projects-empty, .projects-unavailable { color: var(--text-secondary); }
+</style>
