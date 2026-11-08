@@ -69,7 +69,8 @@ describe.each(["id", "en"] as const)("Hero (%s)", (lang) => {
     const html = await render(lang);
     // Ali 2026-11-08: one box pointing at the face only; the other three were removed.
     const boxes = [...html.matchAll(/<span class="det[^"]*"[^>]*><b>([^<]+)<\/b><\/span>/g)].map((m) => m[1]);
-    expect(boxes).toEqual(lang === "id" ? ["Ali Sadikin Ma · pakar AI"] : ["Ali Sadikin Ma · AI consultant"]);
+    // Ali 2026-11-09: the name already sits in the H1 right below, so the tag does not repeat it.
+    expect(boxes).toEqual(["AI Consultant · Batam"]);
     expect(html).toContain('data-count="56"');
     expect(html).toContain('data-count="17"');
   });
