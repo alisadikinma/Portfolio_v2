@@ -209,3 +209,18 @@ describe("Header language switch with availableLangs", () => {
     expect(await render({ availableLangs: ["id", "en"] })).toContain('class="lang flag"');
   });
 });
+
+// Ali 2026-11-09: favicon = the clay Ali head; every icon file it points to exists.
+describe("favicon", () => {
+  it("links favicon.ico, a 32px png, the apple touch icon and the manifest", async () => {
+    const h = await head();
+    expect(h).toContain('<link rel="icon" href="/favicon.ico" sizes="48x48">');
+    expect(h).toContain('<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">');
+    expect(h).toContain('<link rel="apple-touch-icon" href="/apple-touch-icon.png">');
+    expect(h).toContain('<link rel="manifest" href="/site.webmanifest">');
+    const { existsSync } = await import("node:fs");
+    for (const f of ["favicon.ico", "favicon-32.png", "apple-touch-icon.png", "site.webmanifest", "icon-192.png", "icon-512.png"]) {
+      expect(existsSync(new URL(`../../public/${f}`, import.meta.url)), f).toBe(true);
+    }
+  });
+});

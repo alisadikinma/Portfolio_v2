@@ -49,6 +49,10 @@ const showAltLocale = have.includes(lang === "id" ? "en" : "id");
 <link rel="alternate" hreflang="x-default" href={abs(xDefault)} />
 {prev && <link rel="prev" href={abs(prev)} />}
 {next && <link rel="next" href={abs(next)} />}
+<link rel="icon" href="/favicon.ico" sizes="48x48" />
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<link rel="manifest" href="/site.webmanifest" />
 <meta property="og:type" content={type} />
 <meta property="og:site_name" content="Ali Sadikin Ma" />
 <meta property="og:url" content={canonical} />
