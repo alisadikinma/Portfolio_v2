@@ -197,10 +197,10 @@ describe("/{lang}/blog/{slug}", () => {
     expect((await load("fr")).status).toBe(404);
   });
 
-  it("post without the requested language -> 301 to the available language", async () => {
+  it("post without the requested language -> 302 (temporary, translation may follow) to the available language", async () => {
     post.available_translations = ["en"];
     const { status, headers } = await load("id");
-    expect(status).toBe(301);
+    expect(status).toBe(302);
     expect(headers.get("location")).toBe(`/en/blog/${SLUG}`);
   });
 
@@ -333,10 +333,10 @@ describe("blog detail: single-language posts", () => {
     expect(html).toContain('class="lang"');
   });
 
-  it("missing-language redirect: 301, Cache-Control max-age=3600, query kept", async () => {
+  it("missing-language redirect: 302, Cache-Control max-age=3600, query kept", async () => {
     post.available_translations = ["en"];
     const { status, headers } = await load("id", SLUG, "?utm_source=x&a=1");
-    expect(status).toBe(301);
+    expect(status).toBe(302);
     expect(headers.get("location")).toBe(`/en/blog/${SLUG}?utm_source=x&a=1`);
     expect(headers.get("cache-control")).toBe("max-age=3600");
   });
