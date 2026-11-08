@@ -22,7 +22,7 @@ return [
     'items' => [
         [
             'question' => 'Who is Ali Sadikin Ma?',
-            'answer' => 'Ali Sadikin Ma is an AI Generalist who turns frontier AI models into shipped products rather than slide decks. He has 17 years of building experience across 16 countries and ranked #1 at the Global AI Demo Day 2026. He is based in Indonesia and both builds and teaches applied AI.',
+            'answer' => 'Ali Sadikin Ma is an Indonesian AI expert who turns frontier AI models into shipped products rather than slide decks. He has 17 years of building experience and ranked #1 at the Global AI Demo Day 2026. He is based in Indonesia and both builds and teaches applied AI.',
         ],
         [
             'question' => 'What services does Ali Sadikin Ma offer?',
@@ -50,7 +50,7 @@ return [
         ],
         [
             'question' => 'What results has Ali Sadikin Ma delivered?',
-            'answer' => 'Ali Sadikin Ma ranked #1 at the Global AI Demo Day 2026 and has delivered AI and software projects across 16 countries over 17 years. His portfolio includes production AI agents, generative video pipelines, and computer-vision inspection systems running in real operations.',
+            'answer' => 'Ali Sadikin Ma ranked #1 at the Global AI Demo Day 2026 and has delivered AI and software projects over 17 years. His portfolio includes production AI agents, generative video pipelines, and computer-vision inspection systems running in real operations.',
         ],
         [
             'question' => 'Does Ali Sadikin Ma teach or speak about AI?',
@@ -70,7 +70,7 @@ return [
     'items_id' => [
         [
             'question' => 'Siapa Ali Sadikin Ma?',
-            'answer' => 'Ali Sadikin Ma adalah AI Generalist yang mengubah model AI terbaru menjadi produk yang benar-benar dipakai, bukan sekadar slide presentasi. Ia punya pengalaman membangun produk selama 17 tahun di 16 negara dan meraih peringkat 1 di Global AI Demo Day 2026. Ia berbasis di Indonesia, membangun sekaligus mengajarkan AI terapan.',
+            'answer' => 'Ali Sadikin Ma adalah pakar AI Indonesia yang mengubah model AI terbaru menjadi produk yang benar-benar dipakai, bukan sekadar slide presentasi. Ia punya pengalaman membangun produk selama 17 tahun dan meraih peringkat 1 di Global AI Demo Day 2026. Ia berbasis di Indonesia, membangun sekaligus mengajarkan AI terapan.',
         ],
         [
             'question' => 'Layanan apa saja yang ditawarkan Ali Sadikin Ma?',
@@ -98,7 +98,7 @@ return [
         ],
         [
             'question' => 'Hasil apa yang sudah diberikan Ali Sadikin Ma?',
-            'answer' => 'Ali Sadikin Ma meraih peringkat 1 di Global AI Demo Day 2026 dan sudah menyelesaikan proyek AI dan software di 16 negara selama 17 tahun. Portofolionya mencakup AI agent di produksi, pipeline video generatif, dan sistem inspeksi computer vision yang berjalan di operasi nyata.',
+            'answer' => 'Ali Sadikin Ma meraih peringkat 1 di Global AI Demo Day 2026 dan sudah menyelesaikan proyek AI dan software selama 17 tahun. Portofolionya mencakup AI agent di produksi, pipeline video generatif, dan sistem inspeksi computer vision yang berjalan di operasi nyata.',
         ],
         [
             'question' => 'Apakah Ali Sadikin Ma mengajar atau menjadi pembicara tentang AI?',

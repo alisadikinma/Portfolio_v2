@@ -209,7 +209,7 @@ class PostFreshnessAndVisibilityTest extends TestCase
         // Stub the XML view: its `<?xml` prolog trips short_open_tag in the test PHP.
         $dir = sys_get_temp_dir() . '/pf2-views-' . uniqid();
         mkdir($dir);
-        file_put_contents($dir . '/sitemap-posts.blade.php', '{!! json_encode($urls) !!}');
+        file_put_contents($dir . '/sitemap-hreflang.blade.php', '{!! json_encode($urls) !!}');
         app('view')->getFinder()->prependLocation($dir);
 
         $urls = json_decode($this->get('/api/sitemap-posts.xml')->assertOk()->getContent(), true);

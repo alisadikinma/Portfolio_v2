@@ -435,3 +435,12 @@ describe("projectSpec (Ali 2026-11-08: project <title> follows the blog rule)", 
     expect(s.keywords).toEqual(["X"]);
   });
 });
+
+describe("collection routes (blog/projects index) are CollectionPage, price-exempt", () => {
+  it("ROUTES.blog and ROUTES.projects use CollectionPage and skip the price check", () => {
+    for (const s of [...ROUTES.blog, ...ROUTES.projects]) {
+      expect(s.pageType).toBe("CollectionPage");
+      expect(s.checkPrice).toBe(false);
+    }
+  });
+});

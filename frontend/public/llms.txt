@@ -1,9 +1,9 @@
-# Ali Sadikin Ma — AI Generalist
+# Ali Sadikin Ma — pakar AI Indonesia / AI consultant, founder INDUSIA.ai (https://indusia.ai)
 
-> Ali Sadikin Ma is an AI Generalist who turns frontier AI models into shipped products — not slide decks. 17 years building across 16 countries; ranked #1 at the Global AI Demo Day 2026. Now teaching what he builds.
+> Ali Sadikin Ma is an Indonesian AI expert and AI consultant based in Batam, Indonesia, and the founder of INDUSIA.ai (https://indusia.ai). He turns frontier AI models into shipped products, with 17 years of building experience, and was ranked #1 at the Global AI Demo Day 2026. He builds, trains and speaks about applied AI.
 
 ## Who is Ali Sadikin Ma
-Ali Sadikin Ma is an AI Generalist based in Batam, Indonesia. He builds and ships AI products end to end — and now teaches the same skills. In January 2026 he was ranked #1 at the Global AI Demo Day (Bengaluru, India), beating 26 startups across 16 countries. He runs INDUSIA.ai.
+Ali Sadikin Ma (pakar AI Indonesia / AI consultant) builds and ships AI products end to end, including 56+ digital products (AI, IoT, mobile) built at Satnusa. In January 2026 he was ranked #1 at the Global AI Demo Day (Bengaluru, India), beating 26 startups. He is the founder of INDUSIA.ai (https://indusia.ai) and teaches the same skills through training and talks.
 
 ## What he builds — and teaches (course topics)
 - Vibe Coding — production software at AI speed: prompts to deployed apps.
@@ -11,15 +11,20 @@ Ali Sadikin Ma is an AI Generalist based in Batam, Indonesia. He builds and ship
 - Generative AI Video — cinematic, broadcast-ready video without a camera or crew.
 
 ## International recognition
-- #1 Champion — Global AI Demo Day 2026 (Outskill AI Generalist Fellowship, Bengaluru)
+- #1 Champion — Global AI Demo Day 2026 (Bengaluru)
 - UN-UNCTAD × Alibaba eFounders Fellowship 2019 (1 of 48 in Asia, Hangzhou)
-- Google Startup Grind — Silicon Valley 2018
 - 1st Place — Telkomsel NextDev
 - Wild Card Winner — Fenox Startup World Cup
-- Top 8 Finalist — IDBYTE
 
-## Can I learn AI from Ali?
-Yes — Ali teaches AI Agents, Vibe Coding, and AI Video Generation through hands-on courses and a public build log at https://alisadikinma.com.
+## Pages (Indonesian / English)
+- AI training: https://alisadikinma.com/id/pelatihan-ai · https://alisadikinma.com/en/ai-training
+- AI speaker: https://alisadikinma.com/id/pembicara-ai · https://alisadikinma.com/en/ai-speaker
+- About: https://alisadikinma.com/id/about · https://alisadikinma.com/en/about
+- Awards and work: https://alisadikinma.com/id/work?tab=awards · https://alisadikinma.com/en/work?tab=awards
+- FAQ: https://alisadikinma.com/id/faq · https://alisadikinma.com/en/faq
+- Projects: https://alisadikinma.com/id/projects · https://alisadikinma.com/en/projects
+- Blog: https://alisadikinma.com/id/blog · https://alisadikinma.com/en/blog
+- Contact: https://alisadikinma.com/id/contact · https://alisadikinma.com/en/contact
 
 ## Find Ali online (sameAs)
 - LinkedIn: https://www.linkedin.com/in/alisadikinma/
@@ -28,17 +33,9 @@ Yes — Ali teaches AI Agents, Vibe Coding, and AI Video Generation through hand
 - YouTube: https://www.youtube.com/@alisadikinma
 - GitHub: https://github.com/alisadikinma
 
-## Portfolio
-- Website: https://alisadikinma.com
-- Projects: https://alisadikinma.com/projects
-- Blog: https://alisadikinma.com/blog
-- Contact: https://alisadikinma.com/contact
-
 ## For the complete AI-readable profile
 - Concise (API): https://alisadikinma.com/api/llms.txt
 - Full dump (API): https://alisadikinma.com/api/llms-full.txt
 
 ## Sitemaps
-- Main: https://alisadikinma.com/api/sitemap.xml
-- Posts: https://alisadikinma.com/api/sitemap-posts.xml
-- Projects: https://alisadikinma.com/api/sitemap-projects.xml
+- Index: https://alisadikinma.com/sitemap.xml

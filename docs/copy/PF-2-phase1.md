@@ -76,3 +76,21 @@ Sumber: `backend/config/faq.php` `items_id` (dilayani `/api/faq?lang=id`). Terje
 | 9 | Does Ali Sadikin Ma teach or speak about AI? | Apakah Ali Sadikin Ma mengajar atau menjadi pembicara tentang AI? |
 | 10 | How can I contact or work with Ali Sadikin Ma? | Bagaimana cara menghubungi atau bekerja sama dengan Ali Sadikin Ma? |
 | 11 | In which languages does Ali Sadikin Ma work? | Dalam bahasa apa saja Ali Sadikin Ma bekerja? |
+
+### Perubahan klaim FAQ — Phase 4G (BARU, menunggu persetujuan Ali)
+
+Klaim "AI Generalist" (sebagai gelar) dan "16 negara" dihapus dari kedua set (`items` EN dan `items_id` ID). Fakta lain (17 tahun, peringkat 1 Global AI Demo Day 2026, berbasis di Indonesia) tetap.
+
+| # | Set | Lama | Baru |
+|---|---|---|---|
+| 1 | EN | Ali Sadikin Ma is an AI Generalist who turns frontier AI models into shipped products rather than slide decks. He has 17 years of building experience across 16 countries and ranked #1 at the Global AI Demo Day 2026. | Ali Sadikin Ma is an Indonesian AI expert who turns frontier AI models into shipped products rather than slide decks. He has 17 years of building experience and ranked #1 at the Global AI Demo Day 2026. |
+| 8 | EN | …and has delivered AI and software projects across 16 countries over 17 years. | …and has delivered AI and software projects over 17 years. |
+| 1 | ID | Ali Sadikin Ma adalah AI Generalist yang mengubah model AI terbaru menjadi produk yang benar-benar dipakai, bukan sekadar slide presentasi. Ia punya pengalaman membangun produk selama 17 tahun di 16 negara dan meraih peringkat 1 … | Ali Sadikin Ma adalah pakar AI Indonesia yang mengubah model AI terbaru menjadi produk yang benar-benar dipakai, bukan sekadar slide presentasi. Ia punya pengalaman membangun produk selama 17 tahun dan meraih peringkat 1 … |
+| 8 | ID | …dan sudah menyelesaikan proyek AI dan software di 16 negara selama 17 tahun. | …dan sudah menyelesaikan proyek AI dan software selama 17 tahun. |
+
+### llms.txt — Phase 4G (BARU, menunggu persetujuan Ali)
+
+- Judul: "Ali Sadikin Ma — pakar AI Indonesia / AI consultant, founder INDUSIA.ai (https://indusia.ai)" (menggantikan "AI Generalist Expert").
+- Dihapus: "AI Generalist", "17 years building across 16 countries", "Google Startup Grind — Silicon Valley 2018", "IDBYTE" (konsisten dengan keputusan 4F).
+- Ditambah: "56+ digital products (AI, IoT, mobile) built at Satnusa", daftar halaman berawalan bahasa (pelatihan-ai/ai-training, pembicara-ai/ai-speaker, about, work?tab=awards, faq, projects, blog, contact).
+

@@ -144,8 +144,8 @@ const basicGroup = (name, pageType) =>
   ["id", "en"].map((l) =>
     basicSpec(l, `/${l}/${name}`, { id: `/id/${name}`, en: `/en/${name}` }, KW[name][l], pageType));
 ROUTES.faq = basicGroup("faq", "FAQPage");
-ROUTES.blog = basicGroup("blog", "WebPage");
-ROUTES.projects = basicGroup("projects", "WebPage");
+ROUTES.blog = basicGroup("blog", "CollectionPage");
+ROUTES.projects = basicGroup("projects", "CollectionPage");
 ROUTES.work = basicGroup("work", "WebPage");
 ROUTES.contact = basicGroup("contact", "ContactPage");
 

@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Models\Award;
+use App\Models\Category;
 use App\Models\Post;
 use App\Models\Project;
-use App\Models\Category;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Carbon;
 
@@ -16,7 +17,8 @@ class SitemapController extends Controller
     protected function frontendUrl($path = '')
     {
         $baseUrl = config('app.frontend_url', 'http://localhost:5173');
-        return $baseUrl . $path;
+
+        return $baseUrl.$path;
     }
 
     /**
@@ -28,103 +30,135 @@ class SitemapController extends Controller
         if (app()->isProduction()) {
             $base = str_replace('http://', 'https://', $base);
         }
+
         return $base;
     }
 
-    /**
-     * Generate XML sitemap
-     * Response: application/xml
-     */
-    public function index()
+    private const LANGS = ['id', 'en'];
+
+    /** Pages whose first path segment differs per language: [id, en]. */
+    private const SEGMENT_PAIRS = [
+        'training' => ['pelatihan-ai', 'ai-training'],
+        'speaker' => ['pembicara-ai', 'ai-speaker'],
+    ];
+
+    private function siteBase(): string
     {
-        $urls = [
-            // Static pages with highest priority
-            [
-                'loc' => $this->frontendUrl('/'),
-                'lastmod' => Carbon::now()->toAtomString(),
-                'changefreq' => 'weekly',
-                'priority' => '1.0',
-            ],
-            [
-                'loc' => $this->frontendUrl('/blog'),
-                'lastmod' => Post::published()->latest('published_at')->first()?->published_at?->toAtomString() ?? Carbon::now()->toAtomString(),
-                'changefreq' => 'daily',
-                'priority' => '0.9',
-            ],
-            [
-                'loc' => $this->frontendUrl('/projects'),
-                'lastmod' => Project::latest('updated_at')->first()?->updated_at?->toAtomString() ?? Carbon::now()->toAtomString(),
-                'changefreq' => 'weekly',
-                'priority' => '0.9',
-            ],
-            [
-                'loc' => $this->frontendUrl('/about'),
-                'lastmod' => Carbon::now()->toAtomString(),
-                'changefreq' => 'monthly',
-                'priority' => '0.8',
-            ],
-            [
-                'loc' => $this->frontendUrl('/contact'),
-                'lastmod' => Carbon::now()->toAtomString(),
-                'changefreq' => 'monthly',
-                'priority' => '0.7',
-            ],
-        ];
+        return rtrim((string) config('app.frontend_url', 'https://alisadikinma.com'), '/');
+    }
 
-        // Add published blog posts
-        $posts = Post::published()
-            ->with('translations:id,post_id,language,updated_at')
-            ->select('id', 'slug', 'published_at', 'content_reviewed_at')
-            ->orderByDesc('published_at')
-            ->get();
+    /**
+     * One <url> per language version; every entry lists all given alternates plus
+     * x-default (English when present, else the first language that exists).
+     *
+     * @param  array<string,string>  $paths  lang => path (no host), only languages that exist
+     * @param  array<string,?string>  $lastmod  lang => ISO date or null (null = omitted, never faked)
+     * @return array<int,array<string,mixed>>
+     */
+    private function localizedEntries(array $paths, string $changefreq, string $priority, array $lastmod = []): array
+    {
+        if ($paths === []) {
+            return [];
+        }
+        $base = $this->siteBase();
+        $alternates = [];
+        foreach (self::LANGS as $lang) {
+            if (isset($paths[$lang])) {
+                $alternates[$lang] = $base.$paths[$lang];
+            }
+        }
+        $alternates['x-default'] = $alternates['en'] ?? reset($alternates);
 
-        foreach ($posts as $post) {
-            $urls[] = [
-                'loc' => $this->frontendUrl("/blog/{$post->slug}"),
-                'lastmod' => ($post->contentUpdatedAt('en') ?? $post->published_at)->toAtomString(),
-                'changefreq' => 'monthly',
-                'priority' => '0.8',
+        $entries = [];
+        foreach (self::LANGS as $lang) {
+            if (! isset($paths[$lang])) {
+                continue;
+            }
+            $entries[] = [
+                'loc' => $base.$paths[$lang],
+                'alternates' => $alternates,
+                'lastmod' => $lastmod[$lang] ?? null,
+                'changefreq' => $changefreq,
+                'priority' => $priority,
             ];
         }
 
-        // Add projects
-        $projects = Project::select('slug', 'updated_at')->get();
+        return $entries;
+    }
 
-        foreach ($projects as $project) {
-            $urls[] = [
-                'loc' => $this->frontendUrl("/projects/{$project->slug}"),
-                'lastmod' => $project->updated_at->toAtomString(),
-                'changefreq' => 'monthly',
-                'priority' => '0.7',
-            ];
-        }
+    /** Same path in both languages. */
+    private function bothLangs(string $suffix): array
+    {
+        return ['id' => "/id{$suffix}", 'en' => "/en{$suffix}"];
+    }
 
-        // Add categories
-        $categories = Category::select('slug', 'updated_at')
-            ->whereHas('posts', function ($q) {
-                $q->published();
-            })
-            ->get();
-
-        foreach ($categories as $category) {
-            $urls[] = [
-                'loc' => $this->frontendUrl("/blog/category/{$category->slug}"),
-                'lastmod' => $category->updated_at->toAtomString(),
-                'changefreq' => 'weekly',
-                'priority' => '0.6',
-            ];
-        }
-
-        return response()->view('sitemap', ['urls' => $urls], 200)
+    private function render(array $urls)
+    {
+        return response()->view('sitemap-hreflang', ['urls' => $urls], 200)
             ->header('Content-Type', 'application/xml; charset=utf-8');
     }
 
     /**
-     * Generate sitemap index (for large sites with multiple sitemaps)
+     * Pages sitemap: static pages, training/speaker, blog categories, awards.
+     * Response: application/xml
+     */
+    public function index()
+    {
+        $urls = [];
+        $add = function (array $paths, string $freq, string $prio, array $lastmod = []) use (&$urls) {
+            array_push($urls, ...$this->localizedEntries($paths, $freq, $prio, $lastmod));
+        };
+
+        $add($this->bothLangs(''), 'weekly', '1.0');
+        $add($this->bothLangs('/blog'), 'daily', '0.9');
+        $add($this->bothLangs('/projects'), 'weekly', '0.9');
+        $add($this->bothLangs('/work'), 'weekly', '0.8');
+        $add($this->bothLangs('/about'), 'monthly', '0.8');
+        $add($this->bothLangs('/faq'), 'monthly', '0.7');
+        $add($this->bothLangs('/contact'), 'monthly', '0.7');
+        foreach (self::SEGMENT_PAIRS as [$idSeg, $enSeg]) {
+            $add(['id' => "/id/{$idSeg}", 'en' => "/en/{$enSeg}"], 'monthly', '0.9');
+        }
+
+        // Categories: a language is listed only if a published post in it exists.
+        $categoryLangs = [];
+        $slugById = Category::query()->pluck('slug', 'id');
+        $posts = Post::published()->with('translations:id,post_id,language')->get(['id', 'category_id']);
+        foreach ($posts as $post) {
+            $slug = $slugById[$post->category_id] ?? null;
+            if (! $slug) {
+                continue;
+            }
+            foreach ($post->translations as $t) {
+                if (in_array($t->language, self::LANGS, true)) {
+                    $categoryLangs[$slug][$t->language] = "/{$t->language}/blog/category/".rawurlencode($slug);
+                }
+            }
+        }
+        ksort($categoryLangs);
+        foreach ($categoryLangs as $paths) {
+            $add($paths, 'weekly', '0.6');
+        }
+
+        $awardSlugs = Award::query()->whereNotNull('slug')->where('slug', '!=', '')->orderBy('id')->pluck('slug');
+        foreach ($awardSlugs as $slug) {
+            $enc = rawurlencode($slug);
+            $add(['id' => "/id/penghargaan/{$enc}", 'en' => "/en/awards/{$enc}"], 'monthly', '0.6');
+        }
+
+        return $this->render($urls);
+    }
+
+    /**
+     * Sitemap index: pages, posts, projects.
      */
     public function sitemapIndex()
     {
         $sitemaps = [
+            [
+                'loc' => $this->apiUrl('/api/sitemap.xml'),
+                'lastmod' => Post::published()->latest('published_at')->first()?->published_at?->toAtomString() ?? Carbon::now()->toAtomString(),
+            ],
             [
                 'loc' => $this->apiUrl('/api/sitemap-posts.xml'),
                 'lastmod' => Post::published()->latest('published_at')->first()?->published_at?->toAtomString() ?? Carbon::now()->toAtomString(),
@@ -140,7 +174,8 @@ class SitemapController extends Controller
     }
 
     /**
-     * Posts-only sitemap
+     * Posts sitemap: each post only in the languages it exists in (a missing
+     * language 302-redirects on the site, so it is never listed).
      */
     public function posts()
     {
@@ -148,55 +183,54 @@ class SitemapController extends Controller
             ->with('translations:id,post_id,language,slug,updated_at')
             ->select('id', 'slug', 'published_at', 'content_reviewed_at')
             ->orderByDesc('published_at')
-            ->paginate(50000); // Google limit: 50,000 URLs per sitemap
-
-        $frontendBase = rtrim(config('app.frontend_url', 'https://alisadikinma.com'), '/');
+            ->limit(50000) // Google limit: 50,000 URLs per sitemap
+            ->get();
 
         $urls = [];
-        foreach ($posts->items() as $post) {
-            $alternates = collect(['en' => $post->slug]);
-
-            if ($post->relationLoaded('translations')) {
-                foreach ($post->translations as $translation) {
-                    $slug = !empty($translation->slug) ? $translation->slug : $post->slug;
-                    $alternates->put($translation->language, $slug);
+        foreach ($posts as $post) {
+            $paths = [];
+            $lastmod = [];
+            foreach ($post->translations as $t) {
+                if (! in_array($t->language, self::LANGS, true) || isset($paths[$t->language])) {
+                    continue;
                 }
+                $slug = ! empty($t->slug) ? $t->slug : $post->slug;
+                $paths[$t->language] = "/{$t->language}/blog/".rawurlencode($slug);
+                $lastmod[$t->language] = ($post->contentUpdatedAt($t->language) ?? $post->published_at)?->toAtomString();
             }
-
-            $enSlug = $alternates->get('en', $post->slug);
-            $urls[] = [
-                'loc' => "{$frontendBase}/en/blog/{$enSlug}",
-                'lastmod' => ($post->contentUpdatedAt('en') ?? $post->published_at)->toAtomString(),
-                'changefreq' => 'monthly',
-                'priority' => '0.8',
-                'alternates' => $alternates->count() > 1 ? $alternates->all() : [],
-                'x_default' => "{$frontendBase}/en/blog/{$enSlug}",
-                'frontend_base' => $frontendBase,
-            ];
+            array_push($urls, ...$this->localizedEntries($paths, 'monthly', '0.8', $lastmod));
         }
 
-        return response()->view('sitemap-posts', ['urls' => $urls], 200)
-            ->header('Content-Type', 'application/xml; charset=utf-8');
+        return $this->render($urls);
     }
 
     /**
-     * Projects-only sitemap
+     * Projects sitemap: published + active projects, both languages.
      */
     public function projects()
     {
-        $projects = Project::select('slug', 'updated_at')
-            ->paginate(50000);
+        $projects = Project::query()
+            ->where('published', true)
+            ->where('is_active', true)
+            ->select('slug', 'updated_at')
+            ->limit(50000)
+            ->get();
 
-        $urls = array_map(function ($project) {
-            return [
-                'loc' => $this->frontendUrl("/projects/{$project->slug}"),
-                'lastmod' => $project->updated_at->toAtomString(),
-                'changefreq' => 'monthly',
-                'priority' => '0.7',
-            ];
-        }, $projects->items());
+        $urls = [];
+        foreach ($projects as $project) {
+            if (empty($project->slug)) {
+                continue;
+            }
+            $enc = rawurlencode($project->slug);
+            $at = $project->updated_at?->toAtomString();
+            array_push($urls, ...$this->localizedEntries(
+                $this->bothLangs("/projects/{$enc}"),
+                'monthly',
+                '0.7',
+                ['id' => $at, 'en' => $at],
+            ));
+        }
 
-        return response()->view('sitemap', ['urls' => $urls], 200)
-            ->header('Content-Type', 'application/xml; charset=utf-8');
+        return $this->render($urls);
     }
 }
