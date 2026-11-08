@@ -71,6 +71,11 @@ class SettingsController extends Controller
                 $aboutData['experience'] = $this->hydrateExperienceGalleries($aboutData['experience']);
             }
 
+            // Newest edit across the about rows: feeds the public about page's
+            // "updated" date and ProfilePage.dateModified (never the render clock).
+            $newest = $settings->max('updated_at');
+            $aboutData['updated_at'] = $newest ? \Illuminate\Support\Carbon::parse($newest)->toIso8601String() : null;
+
             return response()->json([
                 'success' => true,
                 'data' => $aboutData

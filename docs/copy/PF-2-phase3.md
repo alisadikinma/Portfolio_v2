@@ -155,3 +155,105 @@ Teks EN diterjemahkan. Simbol dolar tidak boleh ada di teks (tes paritas), jadi 
 | Kunci | ID | EN | Asal |
 |---|---|---|---|
 | home.metaDescription | Ali Sadikin Ma adalah pakar AI Indonesia dan founder INDUSIA.ai. Konsultasi AI, pelatihan dan workshop AI untuk perusahaan, serta pembicara AI. | Ali Sadikin Ma, AI consultant Indonesia and founder of INDUSIA.ai: AI consulting, AI training and workshops for companies, and AI keynote talks. | ID dari mockup; EN BARU |
+
+## Fase 3I — Halaman Kontak
+
+Semua kunci di bawah `contact.*` (BARU). Tanpa harga. Aturan formulir mengikuti backend `StoreContactRequest` (nama min 2, subjek min 3, pesan 10 sampai 5000, WhatsApp 8 sampai 15 angka).
+
+| Kunci | ID | EN | Asal |
+|---|---|---|---|
+| contact.metaTitle | Kontak Ali Sadikin Ma — Konsultasi & Kerja Sama AI | Contact Ali Sadikin Ma — AI Consulting & Partnerships | BARU |
+| contact.metaDescription | Kontak Ali Sadikin Ma, pakar AI Indonesia. Kirim pesan untuk konsultasi AI, pelatihan, workshop AI, atau undangan pembicara. Dibalas lewat email atau WhatsApp. | Contact Ali Sadikin Ma, AI consultant Indonesia. Message me about AI consulting, AI training, workshops, or speaking. Replies by email or WhatsApp. | BARU |
+| contact.crumb | Kontak | Contact | BARU |
+| contact.h1 | Kontak Ali Sadikin Ma | Contact Ali Sadikin Ma | BARU |
+| contact.intro | Punya pertanyaan tentang konsultasi AI, pelatihan untuk tim, atau ingin mengundang saya sebagai pembicara? Isi formulir di bawah ini. Setiap pesan saya baca sendiri, lalu saya balas lewat email atau WhatsApp secepat yang saya bisa. | Have a question about AI consulting, training for your team, or inviting me to speak? Fill in the form below. I read every message myself and reply by email or WhatsApp as soon as I can. | BARU |
+| contact.formTitle | Kirim pesan | Send a message | BARU |
+| contact.nameLabel | Nama | Name | BARU |
+| contact.emailLabel | Email | Email | BARU |
+| contact.waLabel | Nomor WhatsApp | WhatsApp number | BARU |
+| contact.waHelp | Contoh: 0812 3456 7890 atau +62 812 3456 7890 | Example: 0812 3456 7890 or +62 812 3456 7890 | BARU |
+| contact.subjectLabel | Subjek | Subject | BARU |
+| contact.messageLabel | Pesan | Message | BARU |
+| contact.cta | Kirim pesan | Send message | BARU |
+| contact.sending | Mengirim… | Sending… | BARU |
+| contact.doneTitle | Pesan Anda sudah terkirim | Your message has been sent | BARU |
+| contact.doneText | Terima kasih. Saya akan membalas lewat email atau WhatsApp. | Thank you. I will reply by email or WhatsApp. | BARU |
+| contact.rate | Terlalu banyak pesan dari jaringan ini. Coba lagi nanti, sekitar 15 menit lagi. | Too many messages from this network. Please try again later, in about 15 minutes. | BARU |
+| contact.network | Koneksi gagal. Periksa jaringan Anda lalu coba lagi. | Connection failed. Check your network and try again. | BARU |
+| contact.server | Terjadi kesalahan. Coba lagi sebentar lagi. | Something went wrong. Please try again shortly. | BARU |
+| contact.fast | Mohon tunggu beberapa detik, lalu kirim lagi. | Please wait a few seconds, then send again. | BARU |
+| contact.required | Wajib diisi. | This field is required. | BARU |
+| contact.invalidEmail | Alamat email tidak valid. | Enter a valid email address. | BARU |
+| contact.invalidWa | Nomor WhatsApp tidak valid. Gunakan 8 sampai 15 angka. | Enter a valid WhatsApp number with 8 to 15 digits. | BARU |
+| contact.shortName | Nama minimal 2 huruf. | Name must be at least 2 characters. | BARU |
+| contact.shortSubject | Subjek minimal 3 huruf. | Subject must be at least 3 characters. | BARU |
+| contact.shortMessage | Pesan minimal 10 huruf. | Message must be at least 10 characters. | BARU |
+| contact.longMessage | Pesan maksimal 5000 huruf. | Message must be 5000 characters or fewer. | BARU |
+| contact.summaryTitle | Periksa isian berikut | Please check the following | BARU |
+| contact.waTitle | Lebih cepat lewat WhatsApp | Faster on WhatsApp | BARU |
+| contact.waLead | Untuk pertanyaan singkat, kirim pesan langsung. | For a short question, message me directly. | BARU |
+| contact.waCta | Chat lewat WhatsApp | Chat on WhatsApp | BARU |
+| contact.socialTitle | Atau temui saya di sini | Or find me here | BARU |
+| contact.linkTrainingLead | Ingin pelatihan untuk tim Anda? | Want training for your team? | BARU |
+| contact.linkTraining | Lihat Pelatihan AI | See AI Training | BARU |
+| contact.linkAboutLead | Ingin kenal lebih dulu? | Want to know me first? | BARU |
+| contact.linkAbout | Baca tentang Ali Sadikin Ma | Read about Ali Sadikin Ma | BARU |
+
+## Fase 3F — Halaman About
+
+| Kunci | ID | EN | Asal |
+|---|---|---|---|
+| about.metaDescription | Ali Sadikin Ma, ahli AI Indonesia dari Batam dan founder INDUSIA.ai: riwayat karier 17 tahun, penghargaan internasional, dan semua profil resminya. | Ali Sadikin Ma, AI expert from Batam, Indonesia and founder of INDUSIA.ai: 17-year career timeline, international awards, and all of his official profiles. | BARU |
+| about.h1 | Ali Sadikin Ma, ahli AI Indonesia dari Batam | Ali Sadikin Ma, AI expert from Batam, Indonesia | BARU |
+| about.lead | Ali Sadikin Ma adalah ahli AI Indonesia yang tinggal di Batam. Ia founder INDUSIA.ai dan sudah 17 tahun membangun sistem untuk industri, dari perusahaan multinasional di Singapura sampai pabrik di Batam. | Ali Sadikin Ma is an AI expert based in Batam, Indonesia. He is the founder of INDUSIA.ai and has spent 17 years building systems for industry. | BARU |
+| about.portraitAlt | Potret Ali Sadikin Ma, ahli AI Indonesia dan founder INDUSIA.ai | Portrait of Ali Sadikin Ma, AI expert from Indonesia and founder of INDUSIA.ai | BARU |
+| about.updated | Diperbarui | Updated | BARU |
+| about.unavailable | Halaman ini sedang tidak bisa dimuat. Silakan coba lagi sebentar lagi. | This page cannot be loaded right now. Please try again shortly. | BARU |
+| about.storyH2 | Profil singkat | Short profile | BARU |
+| about.timelineH2 | Perjalanan karier | Career timeline | BARU |
+| about.placeSingapore | Singapura | Singapore | BARU |
+| about.placeIndonesia | Indonesia | Indonesia | BARU |
+| about.placeBatam | Batam | Batam | BARU |
+| about.now | sekarang | present | BARU |
+| about.indusiaTimelineNote | Membangun AI visual inspection, manajemen armada, dan asisten WhatsApp untuk perusahaan Indonesia. | Building AI visual inspection, fleet management, and WhatsApp assistants for Indonesian companies. | BARU |
+| about.awardsH2 | Penghargaan dan panggung internasional | Awards and international stages | BARU |
+| about.awardAttended | Hadir sebagai peserta | Attended as a participant | BARU |
+| about.awardWinner | Juara 1 | 1st place | BARU |
+| about.awardOpen | Lihat detail | See details | BARU |
+| about.profilesH2 | Profil resmi | Official profiles | BARU |
+| about.profilesLead | Semua akun di bawah ini milik Ali Sadikin Ma yang sama. | Every account below belongs to the same Ali Sadikin Ma. | BARU |
+| about.indusiaH2 | INDUSIA.ai | INDUSIA.ai | BARU |
+| about.indusiaLead | Sejak 2026 Ali memimpin  | Since 2026 Ali has led  | BARU |
+| about.indusiaMid | ,  | ,  | BARU |
+| about.indusiaProducts |  Produknya:  |  Its products:  | BARU |
+| about.indusiaEnd | . | . | BARU |
+| about.moreLead | Ingin bekerja sama dengan Ali? Lihat | Want to work with Ali? See | BARU |
+| about.moreOr | atau | or | BARU |
+| about.indusiaAnd |  dan  |  and  | BARU |
+
+## Fase 3G — Halaman penghargaan
+
+Judul tab dan H1 memakai judul penghargaan dari API apa adanya. Baris "Hasil" dibuat dari judul: "1st Place" = Juara 1, "Finalist" = finalis, "Fellowship" = fellow, Google Startup Grind = peserta (bukan "tampil"). Tanggal dan lokasi hanya ditulis bila API menyebutnya; kalau tidak, dihilangkan.
+
+| Kunci | ID | EN | Asal |
+|---|---|---|---|
+| `award.breadcrumbHome` | Ali Sadikin Ma | Ali Sadikin Ma | BARU |
+| `award.breadcrumbWork` | Karya | Work | BARU |
+| `award.unavailable` | Halaman penghargaan ini sedang tidak bisa dimuat. Silakan coba lagi sebentar lagi. | This award page cannot be loaded right now. Please try again in a moment. | BARU |
+| `award.organizerLabel` | Penyelenggara | Organizer | BARU |
+| `award.whenLabel` | Waktu | When | BARU |
+| `award.whereLabel` | Lokasi | Location | BARU |
+| `award.resultLabel` | Hasil | Result | BARU |
+| `award.resultFirst` | Juara 1 | 1st place | BARU |
+| `award.resultFinalist` | Finalis, masuk 8 besar | Finalist, top 8 | BARU |
+| `award.resultFellow` | Terpilih sebagai peserta fellowship | Selected as a fellowship participant | BARU |
+| `award.resultAttendee` | Hadir sebagai peserta | Attended as a participant | BARU (Startup Grind 2018: hanya hadir) |
+| `award.ledeFallback` | Halaman ini merangkum {title} dalam perjalanan Ali Sadikin Ma, pakar AI Indonesia dan founder INDUSIA.ai: siapa penyelenggaranya, kapan acaranya, apa hasilnya, dan foto-foto dari acara tersebut. | This page covers {title} in the journey of Ali Sadikin Ma, AI consultant Indonesia and founder of INDUSIA.ai: who organized it, when it took place, what the result was, and photos from the event. | BARU (dipakai bila deskripsi penghargaan kurang dari 25 kata) |
+| `award.metaTail` | Penghargaan dan panggung internasional Ali Sadikin Ma, pakar AI Indonesia. | Award and international stage of Ali Sadikin Ma, AI consultant Indonesia. | BARU (ditambahkan bila deskripsi pendek, agar meta 120-160 karakter) |
+| `award.photosHeading` | Foto acara | Event photos | BARU |
+| `award.photoAlt` | {title}, foto {n} | {title}, photo {n} | BARU |
+| `award.photoOpen` | Lihat foto {n} dari {title} | View photo {n} of {title} | BARU |
+| `award.moreLead` | Lihat penghargaan dan karya lain di | See more awards and work on the | BARU |
+| `award.moreLink` | halaman Karya | Work page | BARU |
+| `award.aboutLead` | atau kenali | or get to know | BARU |
+| `award.aboutLink` | Ali Sadikin Ma lebih jauh | Ali Sadikin Ma | BARU |
