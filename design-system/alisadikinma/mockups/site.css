@@ -65,6 +65,10 @@ p { margin: 0; max-width: 68ch; }
 .nav { display: flex; gap: 24px; margin-left: auto; }
 .nav a { color: var(--text-secondary); text-decoration: none; font-size: 15px; transition: color var(--dur-hover) var(--ease-out); }
 .nav a:hover, .nav a[aria-current="page"] { color: var(--text-primary); }
+.nav a[data-spy] { position: relative; }
+.nav a.is-active { color: var(--text-primary); }
+.nav a.is-active::after { content: ""; position: absolute; left: 0; right: 0; bottom: -8px; height: 2px; border-radius: 2px; background: var(--accent-primary); }
+@media (prefers-reduced-motion: no-preference) { .nav a::after { transition: opacity var(--dur-hover) var(--ease-out); } }
 .lang { font-size: 14px; color: var(--text-secondary); text-decoration: none; }
 @media (max-width: 960px) { .nav { display: none; } .site-head .btn { margin-left: auto; } }
 @media (max-width: 520px) { .brand span { display: none; } .site-head .btn .long { display: none; } }

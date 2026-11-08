@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&family=Space+Grotesk:wght@500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="site.css?v=6">
+<link rel="stylesheet" href="site.css?v=7">
 <link rel="canonical" href="https://alisadikinma.com/id/">
 <meta property="og:title" content="Ali Sadikin Ma — Pakar AI Indonesia">
 <meta property="og:image" content="https://alisadikinma.com/images/ali-sadikin-ma-pakar-ai-indonesia.jpg">
@@ -17,7 +17,7 @@
  "name":"Ali Sadikin Ma","jobTitle":"AI Consultant",
  "disambiguatingDescription":"Indonesian AI consultant and founder of INDUSIA.ai, based in Batam. Not the former Governor of Jakarta Ali Sadikin.",
  "image":"https://alisadikinma.com/images/ali-sadikin-ma-pakar-ai-indonesia.jpg",
- "founder":{"@id":"https://indusia.ai/#organization"},"worksFor":{"@id":"https://indusia.ai/#organization"},
+ "founder":{"@id":"https://indusia.ai/#org"},"worksFor":{"@id":"https://indusia.ai/#org"},
  "award":"1st Place, Global AI Demo Day 2026 (Outskill, Bengaluru)",
  "sameAs":["https://www.linkedin.com/in/alisadikinma"]}
 </script>
@@ -28,11 +28,12 @@
   <div class="wrap">
     <a class="brand" href="index.html">Ali Sadikin Ma <span>/ AI</span></a>
     <nav class="nav" aria-label="Utama">
-      <a href="#tentang">Tentang</a>
-      <a href="#layanan">Layanan</a>
+      <a href="#tentang" data-spy>Tentang</a>
+      <a href="#perjalanan" data-spy>Perjalanan</a>
+      <a href="#layanan" data-spy>Layanan</a>
       <a href="pelatihan-ai.html">Pelatihan AI</a>
       <a href="pembicara-ai.html">Pembicara AI</a>
-      <a href="#tulisan">Blog</a>
+      <a href="#tulisan" data-spy>Blog</a>
       <a class="lang" href="#" hreflang="en">EN</a>
     </nav>
     <a class="btn btn-primary" href="#wa"><span class="long">Konsultasi via&nbsp;</span>WhatsApp</a>
@@ -260,6 +261,30 @@ document.querySelector(".hx-more").addEventListener("click", function () {
   this.setAttribute("aria-expanded", String(open));
   this.textContent = open ? "Tutup" : "Selengkapnya";
 });
+</script>
+<script>
+// Scrollspy: highlight the header link of the section crossing the middle of the screen.
+(function () {
+  var links = [...document.querySelectorAll(".nav a[data-spy]")];
+  var byId = {};
+  links.forEach(function (a) { byId[a.hash.slice(1)] = a; });
+  var sections = Object.keys(byId).map(function (id) { return document.getElementById(id); }).filter(Boolean);
+  function setActive(id) {
+    links.forEach(function (a) {
+      var on = a.hash.slice(1) === id;
+      a.classList.toggle("is-active", on);
+      if (on) a.setAttribute("aria-current", "location"); else a.removeAttribute("aria-current");
+    });
+  }
+  var visible = new Set();
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) { if (e.isIntersecting) visible.add(e.target.id); else visible.delete(e.target.id); });
+    // last section in document order that crosses the middle band wins; none in band (hero) = no highlight
+    var active = sections.filter(function (s) { return visible.has(s.id); }).pop();
+    setActive(active ? active.id : null);
+  }, { rootMargin: "-45% 0px -50% 0px" });
+  sections.forEach(function (s) { io.observe(s); });
+})();
 </script>
 </body>
 </html>
