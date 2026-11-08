@@ -23,7 +23,7 @@ class TopicScoringServiceBatchTest extends TestCase
         parent::tearDown();
     }
 
-    private function bindArticleGenMock(int $expectCalls, array $aiScores = null): \Mockery\MockInterface
+    private function bindArticleGenMock(int $expectCalls, ?array $aiScores = null): \Mockery\MockInterface
     {
         $aiScores ??= [
             ['title' => 'alpha', 'virality_score' => 90, 'triggers' => [
