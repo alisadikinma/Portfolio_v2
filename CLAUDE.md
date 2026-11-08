@@ -43,12 +43,11 @@ Portfolio_v2 is a portfolio, blog, and CMS platform: Laravel 12 (backend API) + 
 
 ### Critical URLs
 ```
-Backend API:   http://localhost/Portfolio_v2/backend/public/api
+Backend API:   Docker `portfolio_backend` container (no XAMPP/`localhost/Portfolio_v2`); prod API `https://alisadikinma.com/api`
 Admin SPA Dev: http://localhost:5173 (Vite, `/` redirects to `/admin`)
 Public site:   http://127.0.0.1:4321 (Astro; `/id`, `/en`)
 Production:    https://alisadikinma.com
 Database:      localhost:3306 (user: ali, db: portfolio_v2)
-phpMyAdmin:    http://localhost/phpmyadmin
 ```
 
 ### Key Constraints
@@ -163,7 +162,7 @@ return response()->json(['success' => false, 'error' => ['code' => '...', 'messa
 
 ### Public Site (Astro SSR, `web/`, PF-2)
 
-Every public page is server-rendered by Astro (`web/src/pages/[lang]/…`, lang = `id`|`en`, localized segments in `web/src/lib/i18n.ts`: `pelatihan-ai`/`ai-training`, `pembicara-ai`/`ai-speaker`, `penghargaan`/`awards`). It reads the Laravel API **server-side only** (`web/src/lib/api.ts`, 4s timeout, falls back to degraded sections instead of failing). Client JS is limited to small islands (`web/src/scripts/`: lightbox, scrollspy, hero cloud, waitlist/newsletter/contact forms). The browser never talks to Astro for data; forms POST straight to Laravel `/api/*`.
+Every public page is server-rendered by Astro (`web/src/pages/[lang]/…`, lang = `id`|`en`, localized segments in `web/src/lib/i18n.ts`: `pelatihan-ai`/`ai-training`, `pembicara-ai`/`ai-speaker`, `penghargaan`/`awards`). It reads the Laravel API **server-side only** (`web/src/lib/api.ts`, 4s timeout, falls back to degraded sections instead of failing). Client JS is limited to small islands (`web/src/scripts/`: lightbox, scrollspy, hero cloud, waitlist/newsletter/contact forms). The browser never talks to Astro for data; forms POST to same-origin `/api/*`, which only reaches Laravel behind nginx. On `:4321` alone (local/e2e) an unmocked POST hits Astro 404, so e2e mocks every form POST.
 
 **Routing (nginx, `scripts/nginx/portfolio-8080.conf`):** Laravel = `/api/*`, `/r/{code}`, `/storage/*`, `/uploads/*`; Vue SPA = `/admin*`, `/login`, `/newsletter/unsubscribe`, `/assets/*`, `/sw.js`; Astro (`127.0.0.1:4321`, unit `portfolio-web.service`) = everything else. See the "nginx routing split" section below.
 
@@ -171,7 +170,7 @@ Every public page is server-rendered by Astro (`web/src/pages/[lang]/…`, lang 
 
 | var | purpose |
 |---|---|
-| `API_INTERNAL_URL` | Laravel API base for SSR reads. Prod: loopback listener `http://127.0.0.1:8081/api` (nginx serves `/api/internal/*` there; public :8080 answers 404). Local e2e/gate: `https://alisadikinma.com/api` read-only |
+| `API_INTERNAL_URL` | Laravel API base for SSR reads. Prod: loopback listener `http://127.0.0.1:8081/api` (nginx serves `/api/internal/*` there; public :8080 answers 404). Local e2e/gate: `https://alisadikinma.com/api` read-only. `web/src/lib/config.ts` falls back to `http://127.0.0.1:8080/api` when unset: prod MUST set the :8081 loopback, else `/api/internal/*` 404s and AI-crawler hits are silently dropped |
 | `INTERNAL_API_TOKEN` | Required when `NODE_ENV=production` (server throws at boot otherwise). Must equal `backend/.env` `INTERNAL_API_TOKEN`; sent as `X-Internal-Token` on `POST /api/internal/crawler-hit` |
 | `GA4_MEASUREMENT_ID` | GA4 tag; empty = no tag, no network |
 | `SITE_URL` | Canonical origin for canonical/hreflang/sitemap/JSON-LD (`https://alisadikinma.com`) |
@@ -951,16 +950,7 @@ The `about` / `projects` / `blog` `cta` + `featured_projects` + `latest_blog` ro
 
 ## Performance & Caching
 
-**TanStack Query Cache Strategy:**
-- Posts: 5min stale time (frequent updates)
-- Projects: 60min stale time
-- Awards: 60min stale time
-- Testimonials: 30min stale time
-- Gallery: 60min + smart invalidation on mutations
-- About Settings: prefetched on router navigation
-- Page Sections: **30s staleTime + `refetchOnMount: 'always'`** — operators toggle visibility in `/admin/page-sections` and expect effect within next navigation, not 10 minutes. Override of global default (`refetchOnMount: false`).
-
-**Results:** 83% faster repeat visits, 70% fewer API calls, all pages < 500ms cached
+Public pages are Astro SSR (no client data layer, no TanStack on the public site). TanStack Query remains in the **admin SPA only** (`frontend/`): lists cached 5-60 min by resource; Page Sections use 30s `staleTime` + `refetchOnMount: 'always'` so operator toggles show on next navigation. Public caching is HTTP-level (Cloudflare edge, ETag/304 via `ApiETag`).
 
 ## CORS Configuration
 ```
@@ -1053,7 +1043,7 @@ Match the model to the actual cognitive effort of the work. Don't pay Opus rates
 
 ### Current State (Fixed April 10, 2026)
 
-**Overall Score: 8.5/10** — **PF-2 (Nov 2026): SEO/GEO (JSON-LD, hreflang, sitemaps, llms.txt, crawlable HTML) now lives in the Astro SSR site `web/`.** The old Laravel SSR-enrichment layer (prerender controller, HTML composer, schema-graph builder, `resources/views/seo/*`, 1h `seo_html:*` cache + model purge hooks) was removed in phase 5C; Laravel `web.php` keeps only `/r/{code}` and `/login`. Still on Laravel: `GET /api/faq` (`config/faq.php`, consumed by Astro), `LogAiCrawler` AI-bot logging → `geo_crawler_hits` → `GET /api/admin/geo/crawler-hits`. History of the retired layer: git log + [docs/runbooks/seo-geo-ssr-deploy.md](docs/runbooks/seo-geo-ssr-deploy.md) (obsolete).
+**Overall Score: 8.5/10 (state as of Nov 2026; the April 2026 fix list below is historical)** — **PF-2 (Nov 2026): SEO/GEO (JSON-LD, hreflang, sitemaps, llms.txt, crawlable HTML) now lives in the Astro SSR site `web/`.** The old Laravel SSR-enrichment layer (prerender controller, HTML composer, schema-graph builder, `resources/views/seo/*`, 1h `seo_html:*` cache + model purge hooks) was removed in phase 5C; Laravel `web.php` keeps only `/r/{code}` and `/login`. Still on Laravel: `GET /api/faq` (`config/faq.php`, consumed by Astro), `LogAiCrawler` AI-bot logging → `geo_crawler_hits` → `GET /api/admin/geo/crawler-hits`. History of the retired layer: git log + [docs/runbooks/seo-geo-ssr-deploy.md](docs/runbooks/seo-geo-ssr-deploy.md) (obsolete).
 
 ### What's Implemented
 

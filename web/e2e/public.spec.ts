@@ -20,7 +20,19 @@ const test = base.extend<object, { cdpPage: Page }>({
 });
 const it = test.extend<{ page: Page }>({
   page: async ({ cdpPage }, use) => {
+    // Structural prod-write guard. Playwright runs the most recently registered matching route first,
+    // so per-test mockPost() routes (registered later) win; anything unmocked that writes is aborted.
+    await cdpPage.route("**/api/**", (r) => (r.request().method() === "GET" ? r.continue() : r.abort()));
+    // Never send analytics beacons from tests.
+    await cdpPage.route("**/*googletagmanager.com/**", (r) => r.abort());
+    await cdpPage.route("**/*google-analytics.com/**", (r) => r.abort());
+    // Deterministic desktop layout (the shared window can be < 960px, which hides the nav).
+    await cdpPage.setViewportSize({ width: 1280, height: 800 });
     await use(cdpPage);
+    // Clear the CDP device-metrics override so the shared window returns to its real size.
+    const cdp = await cdpPage.context().newCDPSession(cdpPage);
+    await cdp.send("Emulation.clearDeviceMetricsOverride").catch(() => {});
+    await cdp.detach().catch(() => {});
     await cdpPage.unrouteAll({ behavior: "ignoreErrors" });
   },
 });
@@ -40,9 +52,20 @@ async function mockPost(page: Page, pattern: string, status: number, body: unkno
 }
 
 it.describe("public site", () => {
+  it("safety guards: unmocked writes and analytics beacons never leave the browser", async ({ page }) => {
+    await page.goto(`${BASE_URL}/id`, { waitUntil: "load" });
+    const r = await page.evaluate(async () => {
+      const post = await fetch("/api/__guard_probe", { method: "POST", body: "{}" }).then(() => "sent", () => "blocked");
+      const ga = await fetch("https://www.googletagmanager.com/gtag/js?id=G-GUARD", { mode: "no-cors" }).then(() => "sent", () => "blocked");
+      const ga2 = await fetch("https://www.google-analytics.com/g/collect", { method: "POST", mode: "no-cors" }).then(() => "sent", () => "blocked");
+      return { post, ga, ga2 };
+    });
+    expect(r).toEqual({ post: "blocked", ga: "blocked", ga2: "blocked" });
+  });
+
   it("home hero fits the viewport at several sizes", async ({ page }) => {
-    const natural = await page.evaluate(() => ({ width: window.innerWidth, height: window.innerHeight }));
-    try {
+    // 390x844 is a narrow-desktop layout check via a CDP size override, NOT mobile emulation (no touch/UA/DPR).
+    {
       for (const vp of [{ width: 1440, height: 900 }, { width: 1280, height: 720 }, { width: 1024, height: 768 }, { width: 390, height: 844 }]) {
         await page.setViewportSize(vp);
         await page.goto(`${BASE_URL}/id`, { waitUntil: "load" });
@@ -65,13 +88,13 @@ it.describe("public site", () => {
         expect(m.ctaLeft, `${tag} CTA left`).toBeGreaterThanOrEqual(0);
         expect(m.ctaRight, `${tag} CTA right`).toBeLessThanOrEqual(m.vw + 1);
       }
-    } finally {
-      await page.setViewportSize(natural);
     }
   });
 
   it("home scrollspy highlights the section in view", async ({ page }) => {
     await page.goto(`${BASE_URL}/id`, { waitUntil: "load" });
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.waitForFunction(() => window.scrollY === 0);
     await expect(page.locator(".nav a[data-spy].is-active")).toHaveCount(0); // hero = no highlight
     for (const id of ["layanan", "tulisan"]) {
       await page.locator(`#${id}`).scrollIntoViewIfNeeded();
@@ -89,7 +112,7 @@ it.describe("public site", () => {
   it("lightbox opens from a trigger and closes (button, Escape) returning focus", async ({ page }) => {
     await page.goto(`${BASE_URL}/id`, { waitUntil: "load" });
     const trigger = page.locator("[data-lightbox][data-lightbox-items]:not([data-lightbox-items='[]'])").first();
-    await expect(trigger, "home has a gallery trigger with items (needs prod gallery API)").toHaveCount(1);
+    await expect(trigger, "home needs >=1 gallery item: the API under test (API_INTERNAL_URL) must return gallery data and the gallery section must render").toHaveCount(1);
     await trigger.scrollIntoViewIfNeeded();
     const dialog = page.locator("dialog#lb");
     await expect(dialog).not.toHaveAttribute("open", "");
@@ -144,6 +167,7 @@ it.describe("public site", () => {
     const seen = await mockPost(page, "**/api/newsletter/subscribe", 201, { success: true, message: "Successfully subscribed to the newsletter!" });
     await page.goto(`${BASE_URL}/id`, { waitUntil: "load" });
     const form = page.locator("form[data-newsletter]").first();
+    await expect(form, "newsletter form missing: the `join-the-build` homepage section must be enabled in the API under test").toHaveCount(1);
     await form.scrollIntoViewIfNeeded();
     await form.locator('[name="name"]').fill("Siti Aminah");
     await form.locator('[name="email"]').fill("siti@contoh.co.id");
@@ -157,15 +181,18 @@ it.describe("public site", () => {
   });
 
   it("newsletter shows the duplicate message on 409", async ({ page }) => {
-    await mockPost(page, "**/api/newsletter/subscribe", 409, { success: false, error: { code: "DUPLICATE", message: "This email or WhatsApp number is already subscribed." } });
+    const seen = await mockPost(page, "**/api/newsletter/subscribe", 409, { success: false, error: { code: "DUPLICATE", message: "This email or WhatsApp number is already subscribed." } });
     await page.goto(`${BASE_URL}/id`, { waitUntil: "load" });
     const form = page.locator("form[data-newsletter]").first();
+    await expect(form, "newsletter form missing: the `join-the-build` homepage section must be enabled in the API under test").toHaveCount(1);
     await form.scrollIntoViewIfNeeded();
     await form.locator('[name="name"]').fill("Siti Aminah");
     await form.locator('[name="email"]').fill("siti@contoh.co.id");
     await form.locator('[name="whatsapp"]').fill("+6281298765432");
     await form.locator("button").first().click();
     await expect(form.locator("[data-status]")).toHaveText((await form.getAttribute("data-dup"))!);
+    expect(seen).toHaveLength(1);
+    expect(seen[0].body).toEqual({ name: "Siti Aminah", email: "siti@contoh.co.id", whatsapp_number: "+6281298765432", source: "homepage_join" });
   });
 
   it("contact submit posts the message and shows the done panel", async ({ page }) => {
@@ -191,7 +218,7 @@ it.describe("public site", () => {
   });
 
   it("contact surfaces backend field errors on 422", async ({ page }) => {
-    await mockPost(page, "**/api/contact", 422, { message: "The given data was invalid.", errors: { email: ["The email field must be a valid email address."] } });
+    const seen = await mockPost(page, "**/api/contact", 422, { message: "The given data was invalid.", errors: { email: ["The email field must be a valid email address."] } });
     await page.goto(`${BASE_URL}/id/contact`, { waitUntil: "load" });
     const form = page.locator("form[data-contact]");
     await form.locator('[name="name"]').fill("Rina Wijaya");
@@ -202,6 +229,25 @@ it.describe("public site", () => {
     await form.locator("button").last().click();
     await expect(form.locator('[name="email"]')).toHaveAttribute("aria-invalid", "true");
     await expect(form.locator("[data-summary]")).toBeVisible();
+    expect(seen).toHaveLength(1);
+    expect(seen[0].body).toMatchObject({
+      name: "Rina Wijaya", email: "rina@contoh.co.id", whatsapp_number: "+6281234567890",
+      subject: "Kerja sama pelatihan", message: "Halo, kami ingin workshop AI untuk tim.", website: "",
+    });
+  });
+
+  it("training waitlist surfaces the real 422 shape (error.message only)", async ({ page }) => {
+    const seen = await mockPost(page, "**/api/training-waitlist", 422, { success: false, error: { code: "VALIDATION", message: "The email field must be a valid email address." } });
+    await page.goto(`${BASE_URL}/id/pelatihan-ai`, { waitUntil: "load" });
+    const form = page.locator("form[data-waitlist]");
+    await form.locator("#f-name").fill("Budi Santoso");
+    await form.locator("#f-email").fill("budi@contoh.co.id"); // passes client check; server rejects
+    await form.locator('button[type="submit"]').click();
+    await expect(form.locator("#f-email")).toHaveAttribute("aria-invalid", "true");
+    await expect(form.locator("[data-summary]")).toBeVisible();
+    await expect(form.locator("[data-summary]")).toContainText("The email field must be a valid email address.");
+    expect(seen).toHaveLength(1);
+    expect(seen[0].body).toMatchObject({ name: "Budi Santoso", email: "budi@contoh.co.id" });
   });
 
   for (const [from, to] of [["/id", "/en"], ["/id/pelatihan-ai", "/en/ai-training"], ["/id/pembicara-ai", "/en/ai-speaker"], ["/id/contact", "/en/contact"], ["/en/ai-training", "/id/pelatihan-ai"]] as const) {
