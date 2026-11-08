@@ -231,14 +231,14 @@ PF-2 and repair pending rows at release; published rows are not touched.
 2. Run, confirm failure
 3. Implement trait `StoresDatesInAppTimezone` overriding `fromDateTime($value)`: a `DateTimeInterface` value is converted (`copy()->setTimezone(config('app.timezone'))`) before formatting; strings/null keep today's behaviour. Use it on the 6 post models. Do NOT change any writer's call site — one fix point
 4. Run the new test + `LinkedInDraftApproveSlotAssignmentTest` (the 3 cases must now pass on Carbon 3.15 for the right reason) + every LinkedIn/cross-post/scheduler test; full suite: failures back to the 167 baseline, 0 new
-5. Write failing test for the repair command, then implement `linkedin:repair-wib-schedules {--dry-run}`: for `awaiting_publish` LinkedIn drafts with `scheduled_at` in the future, read the LAST `pipeline_state_log` entry carrying `publish_at` (ISO-8601 with offset); if `publish_at` as UTC ≠ raw `scheduled_at` by exactly 7 h, set `scheduled_at` + `cancel_window_ends_at` (and siblings) to the UTC instant; rows without a logged `publish_at`, or differing by any other amount, are only listed (never changed). `--dry-run` prints `id | raw | intended WIB | action` and writes nothing; non-dry-run prints the same and a total. Tests: 7 h row fixed, correct row untouched, no-log row listed only, published row ignored, dry-run writes nothing
+5. [CANCELLED 2026-11-08 — Ali: no future `awaiting_publish` rows exist in production (only stale 167/168 from June, left as is), and `publish_at` is not persisted in `pipeline_state_log`, so the command was removed in the follow-up commit] Write failing test for the repair command, then implement `linkedin:repair-wib-schedules {--dry-run}`: for `awaiting_publish` LinkedIn drafts with `scheduled_at` in the future, read the LAST `pipeline_state_log` entry carrying `publish_at` (ISO-8601 with offset); if `publish_at` as UTC ≠ raw `scheduled_at` by exactly 7 h, set `scheduled_at` + `cancel_window_ends_at` (and siblings) to the UTC instant; rows without a logged `publish_at`, or differing by any other amount, are only listed (never changed). `--dry-run` prints `id | raw | intended WIB | action` and writes nothing; non-dry-run prints the same and a total. Tests: 7 h row fixed, correct row untouched, no-log row listed only, published row ignored, dry-run writes nothing
 6. PHPStan + pint on touched files; commit: "fix(PF-2): store schedule timestamps in UTC (posts were publishing 7 h late)"
-7. Add the repair command (dry-run first, then real run, Ali watching) to `docs/runbooks/pf2-php84-upgrade.md` release steps (Phase 0C) — production is NOT touched in this phase
+7. [CANCELLED with step 5] Add the repair command (dry-run first, then real run, Ali watching) to `docs/runbooks/pf2-php84-upgrade.md` release steps (Phase 0C) — production is NOT touched in this phase
 
 **Verification:**
 - [ ] Raw DB value for a 12:00 WIB slot is `05:00:00` (test)
 - [ ] `LinkedInDraftApproveSlotAssignmentTest` green on Carbon 3.15 without changing its assertions
-- [ ] Repair command dry-run writes nothing; real run only changes rows whose logged `publish_at` proves the 7 h shift
+- [ ] Repair command removed (no affected rows in production) and no reference to it remains in `backend/`
 
 ### Phase 0E: Fix bugs hidden in the PHPStan baseline + review leftovers
 
