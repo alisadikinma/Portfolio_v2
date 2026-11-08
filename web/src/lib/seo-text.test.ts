@@ -96,3 +96,19 @@ describe("postDescription as project description", () => {
     expect(postDescription({ meta, excerpt: desc, content: "" })).toBe(clipWords(desc, 160));
   });
 });
+
+// SEO audit 2026-11-09: some DB meta fields were cut mid-word with "..." by the old pipeline.
+describe("pipeline-truncated meta fields", () => {
+  it("a meta_title ending in ... falls back to the full title", () => {
+    const t = postTitle("Self-Hosting Chinese AI Models: Prediksi yang Sudah Terbukti", "Self-Hosting Chinese AI Models: Prediksi yang Sudah Terbu...");
+    expect(t).not.toMatch(/Terbu\.\.\.|\.\.\.$/);
+    expect(t.startsWith("Self-Hosting Chinese AI Models")).toBe(true);
+  });
+  it("same for a meta_title ending in …", () => {
+    expect(postTitle("Judul Lengkap", "Judul Leng…")).toBe("Judul Lengkap | Ali Sadikin Ma");
+  });
+  it("a meta_description ending in ... yields to the excerpt", () => {
+    const ex = "Model AI China seperti DeepSeek dan Qwen naik dari 1% ke 15% pangsa pasar global dalam 12 bulan; ini alasan self-hosting yang patuh GDPR.";
+    expect(postDescription({ meta: "Model AI China tumbuh d...", excerpt: ex })).toBe(ex);
+  });
+});

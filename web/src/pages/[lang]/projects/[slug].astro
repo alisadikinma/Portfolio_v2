@@ -5,7 +5,7 @@ import { apiGet, apiPath } from "../../../lib/api";
 import { LANGS, type Lang } from "../../../lib/i18n";
 import { sanitizeHtml } from "../../../lib/sanitize";
 import { addImageDimensions } from "../../../lib/image-dims";
-import { clipWords, postDescription, TITLE_MAX } from "../../../lib/seo-text";
+import { clipWords, postDescription, TITLE_MAX, isCut } from "../../../lib/seo-text";
 import { SITE, breadcrumb, creativeWork, graph, personNode, webPageNode, websiteNode } from "../../../lib/schema";
 import { id } from "../../../content/copy/id";
 import { en } from "../../../content/copy/en";
@@ -62,7 +62,7 @@ const related: ProjectCardData[] = (Array.isArray(project?.related_projects) ? (
 // Same rule as blog posts (Ali 2026-11-08): meta_title as-is when set; else title + name if it fits.
 const metaTitleRaw = str(project?.meta_title).trim();
 const withName = `${title} — ${c.titleSuffix}`;
-const metaTitle = metaTitleRaw !== ""
+const metaTitle = metaTitleRaw !== "" && !isCut(metaTitleRaw)
   ? clipWords(metaTitleRaw, TITLE_MAX)
   : withName.length <= TITLE_MAX ? withName : clipWords(title, TITLE_MAX);
 // meta_description -> project description -> content first <p>; a source under 120 chars yields to the next.

@@ -48,9 +48,12 @@ export const wordCount = (s: string): number => s.split(/\s+/).filter(Boolean).l
  * Blog <title>: meta_title wins as-is (clipped only past 60). Without it: "{title} | name" when it fits,
  * else the clipped title alone. The author name never appears twice.
  */
+/** The old pipeline cut some meta fields mid-word and appended "..." / "…": not usable as-is. */
+export const isCut = (s: string) => /(\.\.\.|…)\s*$/.test(s);
+
 export function postTitle(title: string, metaTitle?: string | null): string {
   const meta = (metaTitle ?? "").trim();
-  if (meta !== "") return clipWords(meta, TITLE_MAX);
+  if (meta !== "" && !isCut(meta)) return clipWords(meta, TITLE_MAX);
   const t = title.trim();
   if (t.includes(NAME)) return clipWords(t, TITLE_MAX);
   const withName = `${t} | ${NAME}`;
@@ -59,7 +62,8 @@ export function postTitle(title: string, metaTitle?: string | null): string {
 
 /** meta_description -> excerpt -> first <p>; a source under 120 chars yields to the next; never empty. */
 export function postDescription(o: { meta?: string | null; excerpt?: string | null; content?: string | null; fallback?: string }): string {
-  const sources = [o.meta ?? "", o.excerpt ?? "", firstParagraphText(o.content ?? "")].map((s) => htmlToText(s));
+  const meta = isCut(o.meta ?? "") ? "" : o.meta ?? "";
+  const sources = [meta, o.excerpt ?? "", firstParagraphText(o.content ?? "")].map((s) => htmlToText(s));
   const pick = sources.find((s) => s.length >= DESC_MIN) ?? sources.find((s) => s !== "") ?? (o.fallback ?? "").trim();
   return clipWords(pick, DESC_MAX);
 }
