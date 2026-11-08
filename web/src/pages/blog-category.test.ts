@@ -137,3 +137,29 @@ describe("/{lang}/blog/category/{slug}", () => {
     expect((await load("en")).status).toBe(503);
   });
 });
+
+describe("category: SEO fixes", () => {
+  it("long category name: description clipped to <= 160 at a word boundary with a single ellipsis", async () => {
+    category = { ...category!, name: "Kecerdasan Buatan untuk Manufaktur, Logistik, dan Operasional Pabrik Skala Besar di Indonesia" };
+    const { html } = await load("id");
+    const d = /<meta name="description" content="([^"]*)"/.exec(html)![1];
+    expect(d.length).toBeLessThanOrEqual(160);
+    expect(d.endsWith("…")).toBe(true);
+    expect(d).not.toContain("...");
+  });
+
+  it("503 carries Retry-After: 120", async () => {
+    postsResponse = () => new Response("boom", { status: 500 });
+    const { status, headers } = await load("id");
+    expect(status).toBe(503);
+    expect(headers.get("retry-after")).toBe("120");
+  });
+
+  it("long category name: title clipped to <= 60 incl. page suffix", async () => {
+    category = { ...category!, name: "Kecerdasan Buatan untuk Manufaktur, Logistik, dan Operasional Pabrik Skala Besar" };
+    const t = /<title>([^<]*)<\/title>/.exec((await load("id", "ai-agents", "?page=2")).html)![1];
+    expect(t.length).toBeLessThanOrEqual(60);
+    expect(t.endsWith("(Halaman 2)")).toBe(true);
+    expect(t).toContain("…");
+  });
+});

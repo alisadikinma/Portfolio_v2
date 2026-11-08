@@ -9,8 +9,12 @@ interface Props {
   path: string;
   /** Home page: nav anchors stay in-page. Elsewhere they point to /{lang}/#id. */
   home?: boolean;
+  /** Languages this page exists in (default both): the switch link to a missing one is hidden. */
+  availableLangs?: Lang[];
 }
-const { lang, path, home = false } = Astro.props;
+const { lang, path, home = false, availableLangs } = Astro.props;
+const otherLang: Lang = lang === "id" ? "en" : "id";
+const canSwitch = !availableLangs || availableLangs.includes(otherLang);
 const c = lang === "id" ? id : en;
 const alts = alternates(path);
 const homePath = `/${lang}`;
@@ -27,7 +31,7 @@ const wa = await waLink(lang);
       <a href={localizedPath(`/${lang}/pelatihan-ai`, lang)}>{c.nav.training}</a>
       <a href={localizedPath(`/${lang}/pembicara-ai`, lang)}>{c.nav.speaker}</a>
       <a href={spy("#tulisan")} data-spy>{c.nav.blog}</a>
-      <a class="lang" href={lang === "id" ? alts.en : alts.id} hreflang={lang === "id" ? "en" : "id"} aria-label={c.nav.ariaLang}>{c.nav.langSwitch}</a>
+      {canSwitch && <a class="lang" href={alts[otherLang]} hreflang={otherLang} aria-label={c.nav.ariaLang}>{c.nav.langSwitch}</a>}
     </nav>
     {wa !== "" && <a class="btn btn-primary" href={wa}>{c.nav.ctaWhatsapp}</a>}
   </div>

@@ -79,3 +79,82 @@ describe("sanitizeHtml: keeps article HTML", () => {
     expect(sanitizeHtml("<p>1 < 2 & 3</p>")).toBe("<p>1 &lt; 2 &amp; 3</p>");
   });
 });
+
+describe("sanitizeHtml: hardening", () => {
+  it("prefixes CMS ids with uc- so they cannot hijack site ids", () => {
+    const out = sanitizeHtml('<h2 id="layanan">x</h2><p id="tentang">y</p><div id="related-title">z</div>');
+    expect(out).toContain('id="uc-layanan"');
+    expect(out).toContain('id="uc-tentang"');
+    expect(out).toContain('id="uc-related-title"');
+    expect(out).not.toMatch(/\sid="(layanan|tentang|related-title)"/);
+  });
+
+  it("drops empty ids", () => {
+    expect(sanitizeHtml('<p id="">x</p>')).toBe("<p>x</p>");
+  });
+
+  it("strips class except language-* on code/pre", () => {
+    const out = sanitizeHtml(
+      '<p class="hidden fixed inset-0">a</p><pre class="language-js evil"><code class="language-js foo">x</code></pre><div class="x">d</div>',
+    );
+    expect(out).not.toMatch(/hidden|fixed|inset|evil|foo|class="x"/);
+    expect(out).toContain('<pre class="language-js">');
+    expect(out).toContain('<code class="language-js">');
+    expect(out).toContain("<p>a</p>");
+    expect(out).toContain("<div>d</div>");
+  });
+
+  it('forces rel noopener noreferrer on target="_blank", keeping nofollow/ugc', () => {
+    const plain = sanitizeHtml('<a href="https://a.test" target="_blank">a</a>');
+    expect(plain).toMatch(/rel="[^"]*noopener[^"]*"/);
+    expect(plain).toMatch(/rel="[^"]*noreferrer[^"]*"/);
+    const kept = sanitizeHtml('<a href="https://a.test" target="_blank" rel="nofollow ugc">a</a>');
+    for (const t of ["nofollow", "ugc", "noopener", "noreferrer"]) expect(kept).toMatch(new RegExp(`rel="[^"]*\\b${t}\\b[^"]*"`));
+  });
+
+  it("leaves rel alone when there is no target=_blank", () => {
+    expect(sanitizeHtml('<a href="https://a.test">a</a>')).toBe('<a href="https://a.test">a</a>');
+  });
+
+  it("img gets loading=lazy, decoding=async and alt=\"\" when missing", () => {
+    const out = sanitizeHtml('<img src="https://a.test/x.jpg">');
+    expect(out).toContain('loading="lazy"');
+    expect(out).toContain('decoding="async"');
+    expect(out).toContain('alt=""');
+  });
+
+  it("img keeps an existing alt", () => {
+    expect(sanitizeHtml('<img src="https://a.test/x.jpg" alt="foto">')).toContain('alt="foto"');
+  });
+
+  it("blocks entity-encoded javascript: in href", () => {
+    const out = sanitizeHtml('<a href="&#106;avascript:alert(1)">a</a><a href="jav&#x09;ascript:alert(2)">b</a><a href="&#x6A;avascript&colon;alert(3)">c</a>');
+    expect(out).not.toMatch(/javascript|href=/i);
+  });
+
+  it("blocks javascript: in srcset", () => {
+    const out = sanitizeHtml('<img src="https://a.test/x.jpg" alt="" srcset="javascript:alert(1) 1x, https://a.test/y.jpg 2x">');
+    expect(out).not.toMatch(/javascript/i);
+  });
+
+  it("blocks data:image/svg+xml and protocol-relative img src", () => {
+    const out = sanitizeHtml(
+      '<img src="data:image/svg+xml;base64,PHN2Zz4=" alt="a"><img src="//evil.test/x.png" alt="b">',
+    );
+    expect(out).not.toMatch(/data:|evil\.test/);
+  });
+
+  it("drops <svg><script> and <math> with content", () => {
+    const out = sanitizeHtml('<p>ok</p><svg><script>alert(1)</script><a xlink:href="javascript:1">x</a></svg><math><mi>y</mi></math>');
+    expect(out).toBe("<p>ok</p>");
+  });
+
+  it("strips style attributes", () => {
+    const out = sanitizeHtml('<p style="position:fixed;inset:0">a</p><img src="https://a.test/x.jpg" alt="" style="width:9999px">');
+    expect(out).not.toMatch(/style/i);
+  });
+
+  it("keeps tel: links", () => {
+    expect(sanitizeHtml('<a href="tel:+6281234">call</a>')).toContain('href="tel:+6281234"');
+  });
+});

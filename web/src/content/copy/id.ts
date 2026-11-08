@@ -134,6 +134,10 @@ export const id = {
     relatedHeading: "Proyek terkait",
     readMore: "Baca proyek",
     unavailable: "Proyek ini sedang tidak bisa dimuat. Silakan coba lagi sebentar lagi.",
+    moreLead: "Ingin melihat karya lainnya? Buka",
+    moreLink: "semua proyek AI",
+    aboutLead: "atau kenali penulisnya di",
+    aboutLink: "halaman Tentang",
   },
   blogDetail: {
     unavailable: "Artikel ini sedang tidak bisa dimuat. Silakan coba lagi sebentar lagi.",

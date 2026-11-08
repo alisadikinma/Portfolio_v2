@@ -116,10 +116,13 @@ export const ROUTES = {
 };
 
 /** Minimal spec for pages without a backlink table: only the footer backlink "Founder INDUSIA.ai". */
+// Content pages (posts, projects, post collections) legitimately quote prices.
+const PRICE_EXEMPT_TYPES = new Set(["BlogPosting", "CreativeWork", "CollectionPage"]);
+
 export function basicSpec(lang, route, alternates, keywords, pageType) {
   return {
     route, lang, alternates: { id: alternates.id, en: alternates.en }, keywords, pageType,
-    isHome: false, faq: false,
+    isHome: false, faq: false, checkPrice: !PRICE_EXEMPT_TYPES.has(pageType),
     backlinks: [A[lang].footer],
   };
 }
@@ -145,10 +148,12 @@ ROUTES.all = [
 ];
 
 // Blog posts: every post has an author box. Build a spec per post with this.
+// titleName:false — Ali 2026-11-08: post <title> = meta_title as-is (keyword first, as on the old site);
+// the name is carried by the author box, byline and BlogPosting.author instead.
 export function blogPostSpec(lang, route, alt, keyword) {
   const a = A[lang];
   return {
-    route, lang, alternates: alt, keywords: [keyword], pageType: "BlogPosting", isHome: false, faq: false,
+    route, lang, alternates: alt, keywords: [keyword], pageType: "BlogPosting", isHome: false, faq: false, checkPrice: false, titleName: false,
     backlinks: [a.speakerBio, a.company, a.footer],
   };
 }

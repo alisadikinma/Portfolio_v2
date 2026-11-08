@@ -157,3 +157,55 @@ describe("SeoHead noindex", () => {
     expect(await head()).toContain('<meta name="robots" content="index,follow"');
   });
 });
+
+describe("availableLangs", () => {
+  const blogProps = { ...props, path: "/id/blog/x", title: "Post" };
+
+  it("only id exists: self alternate + x-default to id, no en alternate", async () => {
+    const h = await head({ ...blogProps, availableLangs: ["id"] });
+    expect(h).toContain('hreflang="id" href="https://alisadikinma.com/id/blog/x"');
+    expect(h).toContain('hreflang="x-default" href="https://alisadikinma.com/id/blog/x"');
+    expect(h).not.toContain('hreflang="en"');
+    expect(h).toContain('rel="canonical" href="https://alisadikinma.com/id/blog/x"');
+  });
+
+  it("only en exists: x-default to en, no id alternate", async () => {
+    const h = await head({ ...blogProps, path: "/en/blog/x", lang: "en", availableLangs: ["en"] });
+    expect(h).toContain('hreflang="en" href="https://alisadikinma.com/en/blog/x"');
+    expect(h).toContain('hreflang="x-default" href="https://alisadikinma.com/en/blog/x"');
+    expect(h).not.toContain('hreflang="id"');
+  });
+
+  it("both exist (and default) keep all three", async () => {
+    for (const a of [["id", "en"], undefined]) {
+      const h = await head({ ...blogProps, availableLangs: a });
+      expect(h).toContain('hreflang="id"');
+      expect(h).toContain('hreflang="en" href="https://alisadikinma.com/en/blog/x"');
+      expect(h).toContain('hreflang="x-default" href="https://alisadikinma.com/en/blog/x"');
+    }
+  });
+});
+
+describe("Header language switch with availableLangs", () => {
+  beforeEach(() => {
+    resetApiCache();
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ success: true, data: {} }), { status: 200 })));
+  });
+  afterEach(() => vi.unstubAllGlobals());
+  const render = async (p: Record<string, unknown>) => {
+    const c = await AstroContainer.create();
+    return c.renderToString(BaseLayout, { props: { ...props, path: "/id/blog/x", ...p }, slots: { default: "<main>b</main>" } });
+  };
+
+  it("shows the switch link by default", async () => {
+    expect(await render({})).toMatch(/<a class="lang" href="\/en\/blog\/x"/);
+  });
+  it("hides the switch link to a missing language", async () => {
+    const h = await render({ availableLangs: ["id"] });
+    expect(h).not.toContain('class="lang"');
+    expect(h).not.toContain('href="/en/blog/x"');
+  });
+  it("keeps it when the other language exists", async () => {
+    expect(await render({ availableLangs: ["id", "en"] })).toContain('class="lang"');
+  });
+});

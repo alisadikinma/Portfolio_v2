@@ -13,9 +13,18 @@ const CLOSES_P = new Set([
 ]);
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+const NAMED = {
+  nbsp: " ", quot: '"', apos: "'", lt: "<", gt: ">", rsquo: "\u2019", lsquo: "\u2018", ldquo: "\u201C", rdquo: "\u201D",
+  ndash: "\u2013", mdash: "\u2014", hellip: "\u2026",
+};
+// Single pass, so "&amp;lt;" stays "&lt;" (no double decoding).
 const decode = (s) =>
-  s.replace(/&nbsp;/g, " ").replace(/&quot;/g, '"').replace(/&#0?39;|&apos;/g, "'")
-    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+  s.replace(/&(?:#(\d{1,7})|#[xX]([0-9a-fA-F]{1,6})|([a-zA-Z]+)|(amp));/g, (m, dec, hex, name, amp) => {
+    if (amp) return "&";
+    if (name) return NAMED[name.toLowerCase()] ?? m;
+    const n = dec !== undefined ? parseInt(dec, 10) : parseInt(hex, 16);
+    return n > 0 && n < 0x110000 ? String.fromCodePoint(n) : m;
+  });
 
 function parseAttrs(src) {
   const attrs = {};
@@ -67,7 +76,7 @@ export function parseHtml(html) {
 }
 
 const within = (el, tags) => { for (let n = el.parent; n; n = n.parent) if (tags.includes(n.tag)) return true; return false; };
-const norm = (s) => s.replace(/\s+/g, " ").trim();
+const norm = (s) => decode(s).replace(/\s+/g, " ").trim();
 const words = (s) => norm(s).split(" ").filter(Boolean).length;
 const hasKw = (text, kws) => kws.some((k) => text.toLowerCase().includes(k.toLowerCase()));
 const nodesOf = (v) => (Array.isArray(v) ? v : v ? [v] : []);
@@ -116,7 +125,7 @@ export function checkHtml(html, spec, headers = {}) {
   else {
     if (title.length > TITLE_MAX) fail("title", `${title.length} chars, max ${TITLE_MAX}`);
     if (!hasKw(title, kws.slice(0, 1))) fail("title", `missing primary keyword "${kws[0]}"`);
-    if (!title.includes(NAME)) fail("title", `missing "${NAME}"`);
+    if (spec.titleName !== false && !title.includes(NAME)) fail("title", `missing "${NAME}"`);
   }
 
   // 3 description
@@ -239,8 +248,9 @@ export function checkHtml(html, spec, headers = {}) {
     if (!first) fail("faq", "no FAQPage JSON-LD with a first question");
     else if (!hasKw(first, kws)) fail("faq", `first question lacks keyword: "${first}"`);
   }
-  const body = q("body")[0]?.text ?? "";
-  const price = body.match(/\b(?:Rp\.?|IDR|USD|US\$)\s?\d[\d.,]*|\$\s?\d[\d.,]*/i);
+  // News articles and case studies quote prices ("$10", "Rp 67"); the rule is about Ali's own services.
+  const body = decode(q("body")[0]?.text ?? "");
+  const price = spec.checkPrice === false ? null : body.match(/\b(?:Rp\.?|IDR|USD|US\$)\s?\d[\d.,]*|\$\s?\d[\d.,]*/i);
   if (price) fail("no-price", `price-like text "${price[0]}"`);
 
   return fails;

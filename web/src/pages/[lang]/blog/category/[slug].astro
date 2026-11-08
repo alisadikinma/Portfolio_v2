@@ -4,6 +4,7 @@ import PostCard, { type PostItem } from "../../../../components/PostCard.astro";
 import Pagination from "../../../../components/Pagination.astro";
 import { apiGet, apiGetPage, apiPath } from "../../../../lib/api";
 import { LANGS, type Lang } from "../../../../lib/i18n";
+import { clipWords, TITLE_MAX } from "../../../../lib/seo-text";
 import { SITE, breadcrumb, collectionPage, graph, personNode, webPageNode, websiteNode } from "../../../../lib/schema";
 import { id } from "../../../../content/copy/id";
 import { en } from "../../../../content/copy/en";
@@ -16,7 +17,7 @@ if (!(LANGS as readonly string[]).includes(raw ?? "")) {
 }
 const lang = raw as Lang;
 const slug = Astro.params.slug ?? "";
-if (slug === "" || slug === "." || slug === "..") return new Response(null, { status: 404 });
+if (slug === "" || slug === "." || slug === ".." || /[\\/]/.test(slug)) return new Response(null, { status: 404 });
 const c = (lang === "id" ? id : en).blogCategory;
 const fill = (s: string, name: string) => s.replaceAll("{name}", name);
 const base = `/${lang}/blog/category/${encodeURIComponent(slug)}`;
@@ -54,15 +55,19 @@ try {
 }
 if (!failed && category === null) return new Response(null, { status: 404 });
 if (!failed && page > lastPage) return new Response(null, { status: 404 });
-if (failed) Astro.response.status = 503;
+if (failed) {
+  Astro.response.status = 503;
+  Astro.response.headers.set("Retry-After", "120");
+}
 
 const name = category?.name ?? slug;
 const pathFor = (p: number) => (p > 1 ? `${base}?page=${p}` : base);
 const path = pathFor(page);
 const url = SITE + path;
 const baseTitle = fill(c.metaTitle, name);
-const title = page > 1 ? `${baseTitle} (${c.pageLabel} ${page})` : baseTitle;
-const description = fill(c.metaDescription, name);
+const pageSuffix = page > 1 ? ` (${c.pageLabel} ${page})` : "";
+const title = clipWords(baseTitle, TITLE_MAX - pageSuffix.length) + pageSuffix;
+const description = clipWords(fill(c.metaDescription, name), 160);
 const noindex = failed || items.length === 0;
 
 const nodes = [

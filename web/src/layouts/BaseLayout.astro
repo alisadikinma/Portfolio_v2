@@ -26,14 +26,16 @@ interface Props {
   prev?: string;
   next?: string;
   noindex?: boolean;
+  /** Languages the page exists in (default both): drives hreflang and the header language switch. */
+  availableLangs?: Lang[];
 }
 
-const { lang, path, home = false, ga4Id = getConfig().ga4Id, ...seo } = Astro.props;
+const { lang, path, home = false, ga4Id = getConfig().ga4Id, availableLangs, ...seo } = Astro.props;
 ---
 <!doctype html>
 <html lang={lang}>
   <head>
-    <SeoHead {...seo} path={path} lang={lang} />
+    <SeoHead {...seo} path={path} lang={lang} availableLangs={availableLangs} />
     {ga4Id !== "" && (
       <>
         <script is:inline async src={`https://www.googletagmanager.com/gtag/js?id=${ga4Id}`}></script>
@@ -47,7 +49,7 @@ const { lang, path, home = false, ga4Id = getConfig().ga4Id, ...seo } = Astro.pr
     )}
   </head>
   <body>
-    <Header lang={lang} path={path} home={home} />
+    <Header lang={lang} path={path} home={home} availableLangs={availableLangs} />
     <slot />
     <Footer lang={lang} />
   </body>

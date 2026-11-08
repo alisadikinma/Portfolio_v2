@@ -1,5 +1,28 @@
 import sanitize from "sanitize-html";
 
+const ID_PREFIX = "uc-";
+
+// CMS ids are namespaced: scrollspy (#layanan, #tentang) and aria-labelledby ids belong to the site.
+function transform(tagName: string, attribs: sanitize.Attributes): sanitize.Tag {
+  const a = { ...attribs };
+  if (typeof a.id === "string") {
+    if (a.id.trim() === "") delete a.id;
+    else a.id = ID_PREFIX + a.id;
+  }
+  if (tagName === "a" && (a.target ?? "").toLowerCase() === "_blank") {
+    const rel = new Set((a.rel ?? "").toLowerCase().split(/\s+/).filter(Boolean));
+    rel.add("noopener");
+    rel.add("noreferrer");
+    a.rel = [...rel].join(" ");
+  }
+  if (tagName === "img") {
+    if (a.alt === undefined) a.alt = "";
+    if (a.loading === undefined) a.loading = "lazy";
+    if (a.decoding === undefined) a.decoding = "async";
+  }
+  return { tagName, attribs: a };
+}
+
 // Allowlist for admin / Content-Engine article HTML. Anything not listed is dropped.
 const OPTIONS: sanitize.IOptions = {
   allowedTags: [
@@ -12,12 +35,17 @@ const OPTIONS: sanitize.IOptions = {
     img: ["src", "alt", "title", "width", "height", "srcset", "sizes", "loading", "decoding"],
     th: ["colspan", "rowspan", "scope"],
     td: ["colspan", "rowspan"],
-    "*": ["id", "class"],
+    code: ["class"],
+    pre: ["class"],
+    "*": ["id"],
   },
+  // Only syntax-highlight classes survive; CMS classes could collide with site CSS.
+  allowedClasses: { code: ["language-*"], pre: ["language-*"] },
   allowedSchemes: ["http", "https", "mailto", "tel"],
   allowedSchemesByTag: { img: ["http", "https"] },
   allowProtocolRelative: false,
   // Drop the content of these, not just the tag.
+  transformTags: { "*": transform },
   nonTextTags: ["script", "style", "textarea", "option", "noscript", "iframe", "object", "embed", "form", "svg", "math"],
 };
 

@@ -18,9 +18,11 @@ interface Props {
   next?: string;
   /** Thin pages (e.g. empty category): robots noindex, follow instead of index,follow. */
   noindex?: boolean;
+  /** Languages this page exists in (default both). A missing one gets no hreflang alternate. */
+  availableLangs?: Lang[];
 }
 
-const { title, description, path, lang, jsonld, image, imageWidth, imageHeight, preloadImage, type = "website", prev, next, noindex = false } = Astro.props;
+const { title, description, path, lang, jsonld, image, imageWidth, imageHeight, preloadImage, type = "website", prev, next, noindex = false, availableLangs } = Astro.props;
 const abs = (p: string) => SITE + p;
 const alts = alternates(path);
 // Canonical must equal the self-referencing hreflang (normalized path).
@@ -29,8 +31,12 @@ const ogImage = image ?? PORTRAIT_URL;
 // Portrait is 1200x1200; declare size only for it or when the caller states it.
 const w = imageWidth ?? (image ? undefined : 1200);
 const h = imageHeight ?? (image ? undefined : 1200);
+const have: Lang[] = availableLangs && availableLangs.length > 0 ? availableLangs : ["id", "en"];
+// x-default: English when it exists, else the language that does.
+const xDefault = have.includes("en") ? alts["x-default"] : alts[have[0]];
 const locale = lang === "id" ? "id_ID" : "en_US";
 const altLocale = lang === "id" ? "en_US" : "id_ID";
+const showAltLocale = have.includes(lang === "id" ? "en" : "id");
 ---
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -38,9 +44,9 @@ const altLocale = lang === "id" ? "en_US" : "id_ID";
 <meta name="description" content={description} />
 <meta name="robots" content={noindex ? "noindex, follow" : "index,follow"} />
 <link rel="canonical" href={canonical} />
-<link rel="alternate" hreflang="id" href={abs(alts.id)} />
-<link rel="alternate" hreflang="en" href={abs(alts.en)} />
-<link rel="alternate" hreflang="x-default" href={abs(alts["x-default"])} />
+{have.includes("id") && <link rel="alternate" hreflang="id" href={abs(alts.id)} />}
+{have.includes("en") && <link rel="alternate" hreflang="en" href={abs(alts.en)} />}
+<link rel="alternate" hreflang="x-default" href={abs(xDefault)} />
 {prev && <link rel="prev" href={abs(prev)} />}
 {next && <link rel="next" href={abs(next)} />}
 <meta property="og:type" content={type} />
@@ -52,7 +58,7 @@ const altLocale = lang === "id" ? "en_US" : "id_ID";
 {w && <meta property="og:image:width" content={String(w)} />}
 {h && <meta property="og:image:height" content={String(h)} />}
 <meta property="og:locale" content={locale} />
-<meta property="og:locale:alternate" content={altLocale} />
+{showAltLocale && <meta property="og:locale:alternate" content={altLocale} />}
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content={title} />
 <meta name="twitter:description" content={description} />

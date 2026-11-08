@@ -4,6 +4,8 @@ import ProjectCard, { type ProjectCardData } from "../../../components/ProjectCa
 import { apiGet, apiPath } from "../../../lib/api";
 import { LANGS, type Lang } from "../../../lib/i18n";
 import { sanitizeHtml } from "../../../lib/sanitize";
+import { addImageDimensions } from "../../../lib/image-dims";
+import { clipWords, postDescription, TITLE_MAX } from "../../../lib/seo-text";
 import { SITE, breadcrumb, creativeWork, graph, personNode, webPageNode, websiteNode } from "../../../lib/schema";
 import { id } from "../../../content/copy/id";
 import { en } from "../../../content/copy/en";
@@ -14,6 +16,10 @@ if (!(LANGS as readonly string[]).includes(rawLang ?? "")) {
 }
 const lang = rawLang as Lang;
 const slug = Astro.params.slug ?? "";
+// Never forward path-like slugs to the API (would address another endpoint).
+if (slug === "" || slug === "." || slug === ".." || /[\\/]/.test(slug)) {
+  return new Response(null, { status: 404 });
+}
 const c = (lang === "id" ? id : en).projectDetail;
 const idxPath = `/${lang}/projects`;
 const path = `${idxPath}/${encodeURIComponent(slug)}`;
@@ -33,6 +39,7 @@ if (!failed && !project) {
 }
 if (failed) {
   Astro.response.status = 503;
+  Astro.response.headers.set("Retry-After", "120");
 }
 
 const title = str(project?.title);
@@ -41,7 +48,7 @@ const category = str(project?.category);
 const hero = str(project?.featured_image);
 const gallery = strList(project?.images).filter((u) => u !== hero);
 const technologies = strList(project?.technologies);
-const bodyHtml = sanitizeHtml(str(project?.content));
+const bodyHtml = await addImageDimensions(sanitizeHtml(str(project?.content)));
 const related: ProjectCardData[] = (Array.isArray(project?.related_projects) ? (project?.related_projects as Record<string, unknown>[]) : [])
   .filter((r) => r && str(r.slug) !== "" && str(r.title) !== "" && str(r.slug) !== slug)
   .map((r) => ({
@@ -52,13 +59,10 @@ const related: ProjectCardData[] = (Array.isArray(project?.related_projects) ? (
     image: str(r.featured_image) || null,
   }));
 
-const clamp = (s: string, max: number): string => {
-  if (s.length <= max) return s;
-  const cut = s.slice(0, max - 1);
-  return cut.slice(0, cut.lastIndexOf(" ") > 0 ? cut.lastIndexOf(" ") : cut.length).trimEnd() + "…";
-};
-const metaTitle = `${title} — ${c.titleSuffix}`;
-const metaDescription = clamp(str(project?.meta_description) || description, 160);
+const withName = `${title} — ${c.titleSuffix}`;
+const metaTitle = withName.length <= TITLE_MAX ? withName : clipWords(title, TITLE_MAX);
+// meta_description -> project description -> content first <p>; a source under 120 chars yields to the next.
+const metaDescription = postDescription({ meta: str(project?.meta_description), excerpt: description, content: str(project?.content), fallback: title });
 const ogImage = str(project?.og_image) || hero || undefined;
 
 const url = SITE + path;
@@ -110,6 +114,9 @@ const jsonld = failed
             </section>
           )}
         </article>
+        <p class="project-more">
+          {c.moreLead} <a href={idxPath}>{c.moreLink}</a>, {c.aboutLead} <a href={`/${lang}/about`}>{c.aboutLink}</a>.
+        </p>
         {related.length > 0 && (
           <section aria-labelledby="project-related">
             <h2 id="project-related">{c.relatedHeading}</h2>
@@ -135,5 +142,6 @@ const jsonld = failed
   .project-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
   .project-gallery img { width: 100%; height: auto; border-radius: var(--radius-md); }
   .projects-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px; }
+  .project-more { margin-block: 32px; color: var(--text-secondary); }
   .project-unavailable { color: var(--text-secondary); }
 </style>

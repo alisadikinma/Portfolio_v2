@@ -136,6 +136,10 @@ export const en: Copy = {
     relatedHeading: "Related projects",
     readMore: "Read project",
     unavailable: "This project cannot be loaded right now. Please try again shortly.",
+    moreLead: "Want to see more work? Browse",
+    moreLink: "all AI projects",
+    aboutLead: "or get to know the author on the",
+    aboutLink: "About page",
   },
   blogDetail: {
     unavailable: "This article cannot be loaded right now. Please try again in a moment.",

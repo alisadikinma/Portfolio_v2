@@ -5,7 +5,10 @@ import AuthorBox from "../../../components/AuthorBox.astro";
 import { apiGetPost } from "../../../lib/api";
 import { LANGS, type Lang } from "../../../lib/i18n";
 import { sanitizeHtml } from "../../../lib/sanitize";
-import { SITE, blogPosting, breadcrumb, graph, personNode, webPageNode, websiteNode } from "../../../lib/schema";
+import { addImageDimensions } from "../../../lib/image-dims";
+import { imageOrigin } from "../../../lib/post-images";
+import { pickLede, postDescription, postTitle } from "../../../lib/seo-text";
+import { PORTRAIT_URL, SITE, blogPosting, breadcrumb, graph, personNode, webPageNode, websiteNode } from "../../../lib/schema";
 import { id } from "../../../content/copy/id";
 import { en } from "../../../content/copy/en";
 
@@ -19,9 +22,11 @@ interface PostDetail {
   published_at?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
+  /** Last real content edit (views/housekeeping do not touch it). Preferred over updated_at. */
+  content_updated_at?: string | null;
   reading_time?: number | null;
   category?: { name?: string; slug?: string } | null;
-  seo?: { meta_title?: string | null; meta_description?: string | null; og_image?: string | null } | null;
+  seo?: { meta_title?: string | null; meta_description?: string | null; og_image?: string | null; ai_summary?: string | null } | null;
   available_translations?: string[] | null;
   related_posts?: PostItem[] | null;
 }
@@ -32,9 +37,11 @@ if (!(LANGS as readonly string[]).includes(raw ?? "")) {
 }
 const lang = raw as Lang;
 const slug = Astro.params.slug ?? "";
-if (slug === "") return new Response(null, { status: 404 });
+// Never forward path-like slugs to the API (would address another endpoint).
+if (slug === "" || slug === "." || slug === ".." || /[\\/]/.test(slug)) return new Response(null, { status: 404 });
 const c = (lang === "id" ? id : en).blogDetail;
 const NAME = "Ali Sadikin Ma";
+const isLang = (l: string): l is Lang => (LANGS as readonly string[]).includes(l);
 
 let post: PostDetail | null = null;
 let failed = false;
@@ -49,30 +56,32 @@ if (!failed && !post) return new Response(null, { status: 404 });
 
 // The API falls back to the English text when the requested language is missing, so
 // available_translations is the truth: send the visitor to the language that exists.
+let have: Lang[] = [];
 if (post) {
-  const have = (post.available_translations ?? []).filter((l): l is Lang => (LANGS as readonly string[]).includes(l));
+  have = (post.available_translations ?? []).filter(isLang);
   if (have.length === 0) return new Response(null, { status: 404 });
-  if (!have.includes(lang)) return Astro.redirect(`/${have[0]}/blog/${encodeURIComponent(slug)}`, 301);
+  if (!have.includes(lang)) {
+    return new Response(null, {
+      status: 301,
+      headers: {
+        Location: `/${have[0]}/blog/${encodeURIComponent(slug)}${Astro.url.search}`,
+        "Cache-Control": "max-age=3600",
+      },
+    });
+  }
 }
-if (failed) Astro.response.status = 503;
+if (failed) {
+  Astro.response.status = 503;
+  Astro.response.headers.set("Retry-After", "120");
+}
 
 const path = `/${lang}/blog/${encodeURIComponent(slug)}`;
 const url = SITE + path;
 
-const clip = (s: string, max: number) => {
-  if (s.length <= max) return s;
-  const cut = s.slice(0, max - 3);
-  return cut.slice(0, cut.lastIndexOf(" ") > max / 2 ? cut.lastIndexOf(" ") : cut.length).trimEnd() + "...";
-};
-// Title: max 60 chars and must carry the author name.
-const fitTitle = (t: string) => {
-  const tail = ` | ${NAME}`;
-  const base = t.replace(new RegExp(`\\s*[—|-]\\s*${NAME}\\s*$`), "").trim();
-  return clip(base, 60 - tail.length) + tail;
-};
-
-const title = post ? fitTitle(post.seo?.meta_title || post.title) : `${NAME}`;
-const description = post ? clip((post.seo?.meta_description || post.excerpt || "").trim(), 160) : c.unavailable;
+const title = post ? postTitle(post.title, post.seo?.meta_title) : NAME;
+const description = post
+  ? postDescription({ meta: post.seo?.meta_description, excerpt: post.excerpt, content: post.content, fallback: post.title })
+  : c.unavailable;
 
 const toIso = (v?: string | null) => {
   if (!v) return null;
@@ -80,25 +89,21 @@ const toIso = (v?: string | null) => {
   return Number.isNaN(d.getTime()) ? null : d;
 };
 const published = post ? toIso(post.published_at) ?? toIso(post.created_at) : null;
-const modified = post ? toIso(post.updated_at) ?? published : null;
+const modified = post ? toIso(post.content_updated_at) ?? toIso(post.updated_at) ?? published : null;
 const fmt = (d: Date) =>
   new Intl.DateTimeFormat(lang === "id" ? "id-ID" : "en-US", { dateStyle: "long", timeZone: "UTC" }).format(d);
 
 // Images: image_variants are relative to the API origin (same logic as PostCard).
-let origin = "";
-try {
-  if (post?.featured_image) origin = new URL(post.featured_image).origin;
-} catch {
-  origin = "";
-}
-const absUrl = (u: string) => (/^https?:\/\//.test(u) ? u : origin ? origin + u : u);
+const origin = imageOrigin(post?.featured_image);
+const absUrl = (u: string) => (/^https?:\/\//.test(u) ? u : origin + u);
 const variants = Object.entries(post?.image_variants ?? {})
   .map(([k, v]) => ({ w: /^(\d+)w$/.exec(k)?.[1], url: v }))
   .filter((x): x is { w: string; url: string } => !!x.w && typeof x.url === "string" && x.url !== "")
   .sort((a, b) => Number(a.w) - Number(b.w));
 const srcset = variants.length > 0 ? variants.map((v) => `${absUrl(v.url)} ${v.w}w`).join(", ") : undefined;
 const heroSrc = post?.featured_image ?? (variants.length > 0 ? absUrl(variants[variants.length - 1].url) : "");
-const ogImage = post?.seo?.og_image || (heroSrc && /^https:\/\//.test(heroSrc) ? heroSrc : undefined);
+const httpsOnly = (u?: string | null) => (u && /^https:\/\//.test(u) ? u : undefined);
+const ogImage = httpsOnly(post?.seo?.og_image) ?? httpsOnly(heroSrc);
 
 const cat = post?.category?.name && post.category.slug ? { name: post.category.name, slug: post.category.slug } : null;
 const crumbs = [
@@ -116,7 +121,7 @@ if (post && published) {
       url,
       datePublished: published.toISOString(),
       dateModified: (modified ?? published).toISOString(),
-      image: ogImage,
+      image: ogImage ?? PORTRAIT_URL,
       lang,
       description,
     }),
@@ -127,12 +132,18 @@ if (post && published) {
 }
 const jsonld = graph(...nodes);
 
-const body = post ? sanitizeHtml(post.content ?? "") : "";
+const body = post ? await addImageDimensions(sanitizeHtml(post.content ?? "")) : "";
 const related = (post?.related_posts ?? [])
   .filter((p) => p && typeof p.slug === "string" && p.slug !== "" && typeof p.title === "string" && p.title.trim() !== "")
-  .slice(0, 3);
+  .slice(0, 3)
+  .map((p) => {
+    const langs = (p.available_translations ?? []).filter(isLang);
+    return { post: p, hrefLang: langs.length === 0 || langs.includes(lang) ? lang : langs[0] };
+  });
+// ai_summary -> excerpt -> meta_description: the first with >= 25 words (answer-first lede for GEO).
+const lede = post ? pickLede([post.seo?.ai_summary, post.excerpt, post.seo?.meta_description]) : "";
 ---
-<BaseLayout title={title} description={description} path={path} lang={lang} jsonld={jsonld} image={ogImage} type="article">
+<BaseLayout title={title} description={description} path={path} lang={lang} jsonld={jsonld} image={ogImage} type="article" availableLangs={have.length > 0 ? have : undefined}>
   {failed || !post
     ? (
       <main class="wrap post-detail">
@@ -153,7 +164,7 @@ const related = (post?.related_posts ?? [])
               )}
               {post.reading_time ? <span>{post.reading_time} {c.minRead}</span> : null}
             </div>
-            {post.excerpt && <p class="post-lede">{post.excerpt}</p>}
+            {lede !== "" && <p class="post-lede">{lede}</p>}
           </header>
           {heroSrc && (
             <img
@@ -165,7 +176,7 @@ const related = (post?.related_posts ?? [])
               height="675"
               alt={`${c.heroAltPrefix} ${post.title}`}
               loading="eager"
-              decoding="async"
+              fetchpriority="high"
             />
           )}
           <div class="post-body" set:html={body} />
@@ -175,7 +186,7 @@ const related = (post?.related_posts ?? [])
           <section class="post-related" aria-labelledby="related-title">
             <h2 id="related-title">{c.relatedHeading}</h2>
             <div class="related-grid">
-              {related.map((p) => <PostCard post={p} lang={lang} minRead={c.minRead} />)}
+              {related.map((r) => <PostCard post={r.post} lang={lang} hrefLang={r.hrefLang} minRead={c.minRead} />)}
             </div>
           </section>
         )}

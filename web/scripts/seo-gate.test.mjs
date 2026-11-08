@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { checkHtml, GATE_ITEMS } from "./seo-gate.mjs";
-import { ROUTES } from "./seo-gate.config.mjs";
+import { ROUTES, blogPostSpec } from "./seo-gate.config.mjs";
 
 const read = (f) => readFileSync(new URL(`./fixtures/${f}`, import.meta.url), "utf8");
 const good = read("good.html");
@@ -93,6 +93,51 @@ describe("seo-gate checkHtml", () => {
     const faqSpec = { ...spec, faq: true };
     expect(checkHtml(good, faqSpec)).toEqual([]);
     expect(items(mutate("Siapa pakar AI Indonesia ini?", "Siapa dia?"), faqSpec)).toContain("faq");
+  });
+});
+
+describe("seo-gate: name in title", () => {
+  // Ali 2026-11-08: blog posts keep meta_title as-is (keyword first); the name lives in the author box + JSON-LD.
+  it("blogPostSpec does not require the name in <title>", () => {
+    expect(blogPostSpec("id", "/id/blog/x", { id: "/id/blog/x", en: "/en/blog/x" }, "x").titleName).toBe(false);
+  });
+  it("titleName:false skips only the name check", () => {
+    const html = '<html lang="id"><head><title>AI agent untuk pabrik</title></head><body></body></html>';
+    const base = { route: "/id/x", lang: "id", alternates: { id: "/id/x", en: "/en/x" }, keywords: ["AI agent"], pageType: "WebPage", backlinks: [] };
+    const named = checkHtml(html, base).filter((f) => f.item === "title").map((f) => f.detail);
+    expect(named.some((d) => d.includes("Ali Sadikin Ma"))).toBe(true);
+    const off = checkHtml(html, { ...base, titleName: false }).filter((f) => f.item === "title");
+    expect(off).toEqual([]);
+  });
+});
+
+describe("seo-gate: price check scope", () => {
+  const priced = mutate("<h1>", "<p>Harga naik dari $10 ke Rp 67</p><h1>");
+  it("flags prices by default", () => expect(items(priced)).toContain("no-price"));
+  it("checkPrice:false skips the price check (articles quote prices)", () => {
+    expect(items(priced, { ...spec, checkPrice: false })).not.toContain("no-price");
+  });
+  it("blog post, project and collection specs do not check prices; plain pages do", () => {
+    expect(blogPostSpec("id", "/id/blog/x", { id: "/id/blog/x", en: "/en/blog/x" }, "x").checkPrice).toBe(false);
+    expect(basicSpec("id", "/id/projects/x", { id: "/id/projects/x", en: "/en/projects/x" }, ["x"], "CreativeWork").checkPrice).toBe(false);
+    expect(basicSpec("id", "/id/blog/category/x", { id: "/id/blog/category/x", en: "/en/blog/category/x" }, ["x"], "CollectionPage").checkPrice).toBe(false);
+    expect(basicSpec("id", "/id/faq", { id: "/id/faq", en: "/en/faq" }, ["FAQ"], "FAQPage").checkPrice).toBe(true);
+    expect(ROUTES.home[0].checkPrice).not.toBe(false);
+  });
+});
+
+describe("seo-gate: entities in text are decoded before keyword matching", () => {
+  it("numeric and hex entities in H1 and title", () => {
+    expect(items(mutate("<h1>Ali Sadikin Ma — Pakar AI Indonesia</h1>", "<h1>Ali Sadikin Ma — Pakar&#32;AI&#x20;Indonesia</h1>"))).not.toContain("h1");
+    expect(items(mutate("Pakar AI Indonesia, Founder", "Pakar &#65;I Indonesia, Founder"))).not.toContain("title");
+  });
+  it("named and numeric apostrophes/dashes", () => {
+    const s = { ...spec, keywords: ["Ali’s AI"] };
+    const html = mutate("<h1>Ali Sadikin Ma — Pakar AI Indonesia</h1>", "<h1>Ali&rsquo;s AI &#8211; Ali Sadikin Ma</h1>");
+    expect(items(html, s)).not.toContain("h1");
+  });
+  it("entities do not hide a price", () => {
+    expect(items(mutate("<h1>", "<p>Mulai &#36;10</p><h1>"))).toContain("no-price");
   });
 });
 

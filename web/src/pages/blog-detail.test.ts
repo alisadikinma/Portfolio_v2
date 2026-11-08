@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { experimental_AstroContainer as AstroContainer } from "astro/container";
 import { resetApiCache } from "../lib/api";
+import { resetImageDimsCache } from "../lib/image-dims";
+import { PORTRAIT_URL } from "../lib/schema";
 import { checkHtml } from "../../scripts/seo-gate.mjs";
 import { blogPostSpec } from "../../scripts/seo-gate.config.mjs";
 import BlogDetail from "./[lang]/blog/[slug].astro";
@@ -40,8 +42,21 @@ const basePost = () => ({
   ],
 });
 
+// Valid PNG header (IHDR 800x450): all image-size needs.
+const PNG = (() => {
+  const b = new Uint8Array(33);
+  b.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 0);
+  const v = new DataView(b.buffer);
+  v.setUint32(8, 13);
+  b.set([0x49, 0x48, 0x44, 0x52], 12);
+  v.setUint32(16, 800);
+  v.setUint32(20, 450);
+  return b;
+})();
+
 beforeEach(() => {
   resetApiCache();
+  resetImageDimsCache();
   seenUrls = [];
   post = basePost();
   apiResponse = () => new Response(JSON.stringify({ success: true, data: post }), { status: 200 });
@@ -50,17 +65,18 @@ beforeEach(() => {
     vi.fn(async (url: string) => {
       seenUrls.push(String(url));
       if (String(url).includes("/posts/")) return apiResponse(String(url));
+      if (String(url).includes("/storage/blog-images/")) return new Response(PNG, { status: 206 });
       return new Response(JSON.stringify({ success: true, data: {} }), { status: 200 });
     }),
   );
 });
 afterEach(() => vi.unstubAllGlobals());
 
-async function load(lang: string, slug = SLUG) {
+async function load(lang: string, slug = SLUG, search = "") {
   const c = await AstroContainer.create();
   const res = await c.renderToResponse(BlogDetail, {
     params: { lang, slug },
-    request: new Request(`https://alisadikinma.com/${lang}/blog/${slug}`),
+    request: new Request(`https://alisadikinma.com/${lang}/blog/${slug}${search}`),
   });
   return { status: res.status, html: await res.text(), headers: res.headers };
 }
@@ -210,5 +226,193 @@ describe("/{lang}/blog/{slug}", () => {
   it("malformed payload (no title) -> 503", async () => {
     post = { slug: SLUG, available_translations: ["id"] };
     expect((await load("id")).status).toBe(503);
+  });
+});
+
+const titleOf = (html: string) => /<title>([^<]*)<\/title>/.exec(html)![1];
+const descOf = (html: string) => /<meta name="description" content="([^"]*)"/.exec(html)![1];
+const LONG = "Kata ".repeat(40).trim();
+
+describe("blog detail: title and description", () => {
+  it("uses meta_title as-is when it fits in 60 chars", async () => {
+    (post.seo as Record<string, unknown>).meta_title = "Self-Hosting Chinese AI Models: The Proven Prediction";
+    expect(titleOf((await load("en")).html)).toBe("Self-Hosting Chinese AI Models: The Proven Prediction");
+  });
+
+  it("clips an over-long meta_title at a word boundary with a single ellipsis", async () => {
+    (post.seo as Record<string, unknown>).meta_title =
+      "Panduan lengkap vibe coding untuk pabrik dan logistik di Indonesia tahun ini";
+    const t = titleOf((await load("id")).html);
+    expect(t.length).toBeLessThanOrEqual(60);
+    expect(t.endsWith("…")).toBe(true);
+    expect(t).not.toContain("...");
+  });
+
+  it("without meta_title: '{title} | Ali Sadikin Ma' when it fits", async () => {
+    (post.seo as Record<string, unknown>).meta_title = null;
+    post.title = "Vibe coding pabrik";
+    expect(titleOf((await load("id")).html)).toBe("Vibe coding pabrik | Ali Sadikin Ma");
+  });
+
+  it("without meta_title and a long title: clipped title alone, name not twice", async () => {
+    (post.seo as Record<string, unknown>).meta_title = null;
+    post.title = "Judul artikel yang panjang sekali tentang vibe coding untuk pabrik";
+    const t = titleOf((await load("id")).html);
+    expect(t.length).toBeLessThanOrEqual(60);
+    expect(t.match(/Ali Sadikin Ma/g) ?? []).toHaveLength(0);
+  });
+
+  it("description: short meta_description yields to excerpt", async () => {
+    (post.seo as Record<string, unknown>).meta_description = "Terlalu pendek.";
+    const d = descOf((await load("id")).html);
+    expect(d.startsWith("Vibe coding membantu tim pabrik")).toBe(true);
+    expect(d.length).toBeGreaterThanOrEqual(120);
+  });
+
+  it("description: falls back to the first paragraph of the content", async () => {
+    (post.seo as Record<string, unknown>).meta_description = null;
+    post.excerpt = null;
+    post.content = `<h2>H</h2><p>${"Paragraf pertama yang cukup panjang untuk deskripsi. ".repeat(4).trim()}</p>`;
+    const d = descOf((await load("id")).html);
+    expect(d.length).toBeGreaterThanOrEqual(120);
+    expect(d.startsWith("Paragraf pertama")).toBe(true);
+  });
+
+  it("description: clipped to 160 with a single ellipsis, never empty", async () => {
+    (post.seo as Record<string, unknown>).meta_description = LONG;
+    const d = descOf((await load("id")).html);
+    expect(d.length).toBeLessThanOrEqual(160);
+    expect(d.endsWith("…")).toBe(true);
+    resetApiCache();
+    post.excerpt = null;
+    post.content = "";
+    (post.seo as Record<string, unknown>).meta_description = null;
+    expect(descOf((await load("id")).html).length).toBeGreaterThan(0);
+  });
+});
+
+describe("blog detail: lede", () => {
+  it("renders the excerpt as post-lede only with >= 25 words", async () => {
+    expect((await load("id")).html).toMatch(/class="post-lede"/);
+    resetApiCache();
+    post.excerpt = "Ringkasan yang terlalu pendek.";
+    const { html } = await load("id");
+    expect(html).not.toMatch(/class="post-lede"/);
+    expect(html).not.toContain("Ringkasan yang terlalu pendek.</p>");
+  });
+});
+
+describe("blog detail: dateModified", () => {
+  it("prefers content_updated_at over updated_at (JSON-LD and visible label)", async () => {
+    post.content_updated_at = "2026-10-25T01:00:00.000000Z";
+    const { html } = await load("en");
+    const bp = ld(html).find((n) => n["@type"] === "BlogPosting")!;
+    expect(bp.dateModified).toBe("2026-10-25T01:00:00.000Z");
+    expect(html).toContain('<time datetime="2026-10-25T01:00:00.000Z"');
+    expect(html).not.toContain('<time datetime="2026-10-20T08:30:00.000Z"');
+  });
+
+  it("falls back to updated_at when content_updated_at is absent", async () => {
+    const bp = ld((await load("en")).html).find((n) => n["@type"] === "BlogPosting")!;
+    expect(bp.dateModified).toBe("2026-10-20T08:30:00.000Z");
+  });
+});
+
+describe("blog detail: single-language posts", () => {
+  it("only id: no en hreflang, x-default -> id, language switch hidden", async () => {
+    post.available_translations = ["id"];
+    const { html } = await load("id");
+    expect(html).not.toContain('hreflang="en"');
+    expect(html).toContain(`hreflang="x-default" href="https://alisadikinma.com/id/blog/${SLUG}"`);
+    expect(html).not.toContain('class="lang"');
+  });
+
+  it("both languages: full hreflang + switch", async () => {
+    const { html } = await load("id");
+    expect(html).toContain('hreflang="en"');
+    expect(html).toContain('class="lang"');
+  });
+
+  it("missing-language redirect: 301, Cache-Control max-age=3600, query kept", async () => {
+    post.available_translations = ["en"];
+    const { status, headers } = await load("id", SLUG, "?utm_source=x&a=1");
+    expect(status).toBe(301);
+    expect(headers.get("location")).toBe(`/en/blog/${SLUG}?utm_source=x&a=1`);
+    expect(headers.get("cache-control")).toBe("max-age=3600");
+  });
+});
+
+describe("blog detail: slug validation and errors", () => {
+  it.each([".", "..", "a/b", "a\\b"])("slug %j -> 404 without calling the API", async (slug) => {
+    expect((await load("id", slug)).status).toBe(404);
+    expect(seenUrls).toHaveLength(0);
+  });
+
+  it("503 carries Retry-After: 120", async () => {
+    apiResponse = () => new Response("boom", { status: 500 });
+    const { status, headers } = await load("id");
+    expect(status).toBe(503);
+    expect(headers.get("retry-after")).toBe("120");
+  });
+});
+
+describe("blog detail: images", () => {
+  it("hero is the LCP image: fetchpriority=high, eager, no decoding=async", async () => {
+    const hero = /<img class="post-hero"(?:"[^"]*"|[^>"])*>/.exec((await load("id")).html)![0];
+    expect(hero).toContain('fetchpriority="high"');
+    expect(hero).toContain('loading="eager"');
+    expect(hero).not.toContain("decoding");
+  });
+
+  it("featured_image null: relative variants use the site origin", async () => {
+    post.featured_image = null;
+    const hero = /<img class="post-hero"(?:"[^"]*"|[^>"])*>/.exec((await load("id")).html)![0];
+    expect(hero).toContain("https://alisadikinma.com/storage/posts/vibe-640w.webp 640w");
+    expect(hero).toMatch(/src="https:\/\/alisadikinma\.com\/storage\/posts\/vibe-640w\.webp"/);
+  });
+
+  it("og_image over http is ignored in favour of the https featured image", async () => {
+    (post.seo as Record<string, unknown>).og_image = "http://api.alisadikinma.com/o.png";
+    expect((await load("id")).html).toContain(
+      '<meta property="og:image" content="https://api.alisadikinma.com/storage/posts/vibe.png"',
+    );
+  });
+
+  it("BlogPosting image falls back to the portrait when there is no image", async () => {
+    post.featured_image = null;
+    post.image_variants = null;
+    (post.seo as Record<string, unknown>).og_image = null;
+    const bp = ld((await load("id")).html).find((n) => n["@type"] === "BlogPosting")!;
+    expect(bp.image).toBe(PORTRAIT_URL);
+  });
+
+  it("inline CMS images get real width/height and pass the gate", async () => {
+    post.content = `<h2>H</h2><p>Teks.</p><img src="https://alisadikinma.com/storage/blog-images/a.jpg" alt="Diagram">`;
+    const { html, headers } = await load("id");
+    expect(html).toMatch(/<img [^>]*src="https:\/\/alisadikinma\.com\/storage\/blog-images\/a\.jpg"[^>]*width="800"[^>]*height="450"/);
+    expect(checkHtml(html, specFor("id"), headers)).toEqual([]);
+  });
+
+  it("CMS ids cannot hijack site ids", async () => {
+    post.content = '<h2 id="layanan">x</h2><h2 id="related-title">y</h2><p>t</p>';
+    const { html } = await load("id");
+    expect(html).toContain('id="uc-layanan"');
+    expect(html.match(/id="related-title"/g)).toHaveLength(1);
+    expect(html).not.toMatch(/id="layanan"/);
+  });
+});
+
+describe("blog detail: related posts language", () => {
+  it("links each related post in a language it exists in; assumes the page language otherwise", async () => {
+    post.related_posts = [
+      { id: 8, slug: "only-en", title: "Only English", featured_image: null, available_translations: ["en"] },
+      { id: 9, slug: "both", title: "Both langs", featured_image: null, available_translations: ["id", "en"] },
+      { id: 10, slug: "unknown", title: "No info", featured_image: null },
+    ];
+    const { html } = await load("id");
+    expect(html).toContain('href="/en/blog/only-en"');
+    expect(html).toContain('href="/id/blog/both"');
+    expect(html).toContain('href="/id/blog/unknown"');
+    expect(html).not.toContain('href="/id/blog/only-en"');
   });
 });
