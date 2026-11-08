@@ -49,14 +49,11 @@ describe.each(["id", "en"] as const)("Hero (%s)", (lang) => {
     expect(btn).toMatch(/\shidden[\s>=]/); // inert without JS; the script unhides it
   });
 
-  it("renders 4 detection boxes and the HUD counters", async () => {
+  it("renders exactly one detection box, on the face, and the HUD counters", async () => {
     const html = await render(lang);
+    // Ali 2026-11-08: one box pointing at the face only; the other three were removed.
     const boxes = [...html.matchAll(/<span class="det[^"]*"[^>]*><b>([^<]+)<\/b><\/span>/g)].map((m) => m[1]);
-    expect(boxes).toEqual(
-      lang === "id"
-        ? ["Ali Sadikin Ma · pakar AI", "Juara 1 · Global AI Demo Day 2026", "56+ produk digital", "17 tahun membangun software"]
-        : ["Ali Sadikin Ma · AI consultant", "1st place · Global AI Demo Day 2026", "56+ digital products", "17 years building software"],
-    );
+    expect(boxes).toEqual(lang === "id" ? ["Ali Sadikin Ma · pakar AI"] : ["Ali Sadikin Ma · AI consultant"]);
     expect(html).toContain('data-count="56"');
     expect(html).toContain('data-count="17"');
   });
