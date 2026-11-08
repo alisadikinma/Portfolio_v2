@@ -82,7 +82,7 @@ p { margin: 0; max-width: 68ch; }
 .btn-ghost:hover { border-color: var(--accent-primary); color: var(--text-primary); }
 .btn[disabled] { opacity: 0.6; cursor: progress; box-shadow: none; }
 .btn svg { width: 18px; height: 18px; }
-.site-head .btn { min-height: 40px; font-size: 15px; padding: 0 16px; }
+.site-head .btn { gap: 0; min-height: 40px; font-size: 15px; padding: 0 16px; }
 
 /* ---------- sections ---------- */
 .sec { padding: 112px 0; }
@@ -161,9 +161,9 @@ p { margin: 0; max-width: 68ch; }
 .rows { border-top: 1px solid var(--border-subtle); }
 .row {
   display: grid; grid-template-columns: 4fr 5fr 250px; gap: 40px; align-items: center;
+  padding: 36px 0; border-bottom: 1px solid var(--border-subtle);
 }
 .row > .btn { justify-self: end;
-  padding: 36px 0; border-bottom: 1px solid var(--border-subtle);
 }
 .row h3 { font-size: 26px; }
 .row .for { font-size: 15px; color: var(--text-secondary); margin-top: 8px; }
@@ -273,3 +273,55 @@ fieldset.field { border: 0; margin: 0; padding: 0; }
 
 /* mockup-only banner */
 .mock-note { background: #3a2a0c; color: #f3d89c; font-size: 14px; text-align: center; padding: 8px 16px; }
+
+/* ================= hero v2: AI point-cloud portrait ================= */
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.hx {
+  position: relative; overflow: hidden; isolation: isolate;
+  min-height: calc(100svh - var(--header-h)); display: flex; align-items: flex-end;
+  background:
+    radial-gradient(60% 70% at 72% 45%, rgba(63,184,197,.10), transparent 70%),
+    linear-gradient(rgba(232,238,248,.035) 1px, transparent 1px) 0 0 / 100% 48px,
+    var(--bg-deep);
+}
+.hx-cloud, .hx-cloud canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; }
+.hx-fallback { /* shown only when WebGL is unavailable */
+  position: absolute; right: 4%; bottom: 0; width: min(46vw, 640px); z-index: 0;
+  filter: grayscale(1) contrast(1.1); mix-blend-mode: luminosity; opacity: .5;
+  -webkit-mask-image: radial-gradient(closest-side, #000 60%, transparent);
+          mask-image: radial-gradient(closest-side, #000 60%, transparent);
+}
+.has-cloud .hx-fallback { display: none; }
+.hx .det { z-index: 2; }
+.hx .det { visibility: hidden; }
+.hx-text { position: relative; z-index: 3; width: 100%; padding-bottom: 104px; padding-top: 48px; }
+.hx-name { font: 500 17px/1.4 var(--font-body); color: var(--text-secondary); margin-bottom: 8px; }
+.hx-name span { color: var(--text-secondary); }
+.hx h1 {
+  font-size: clamp(64px, 11.5vw, 188px); line-height: .88; letter-spacing: -0.045em; font-weight: 600;
+  max-width: 7ch; text-wrap: balance;
+  text-shadow: 0 2px 30px rgba(10,18,32,.6);
+}
+.hx-lead { margin-top: 28px; font-size: 19px; line-height: 1.55; color: var(--text-secondary); max-width: 46ch; }
+.hx .hero-ctas { margin-top: 28px; }
+.hx-hud {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 4; height: 52px;
+  display: flex; align-items: center; justify-content: space-between; padding: 0 max(24px, calc((100vw - 1152px) / 2));
+  border-top: 1px solid var(--border-subtle); background: var(--bg-glass); backdrop-filter: blur(10px);
+  font: 500 13px/1 var(--font-mono); color: var(--text-secondary);
+}
+.hx-hud .live { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent-primary); margin-right: 10px; box-shadow: 0 0 10px var(--accent-primary); }
+.hx-hud .r { display: flex; gap: 20px; }
+.hx-hud .r b { color: var(--text-primary); font-weight: 500; }
+@media (max-width: 760px) {
+  .hx { align-items: flex-end; min-height: 100svh; }
+  .hx-text { padding-top: 58vh; padding-bottom: 84px; }
+  .hx h1 { font-size: clamp(54px, 17vw, 84px); }
+  .hx-lead { font-size: 17px; }
+  .hx-fallback { width: 80vw; right: 10vw; top: 6vh; bottom: auto; }
+  .hx-hud { padding: 0 16px; font-size: 11px; }
+  .hx .det.side { display: none; }
+  .hx-text { background: linear-gradient(180deg, transparent 52vh, rgba(10,18,32,.92) 60vh); }
+  .hx-hud .r { gap: 10px; }
+  .hx-hud .hide-sm { display: none; }
+}

@@ -20,14 +20,23 @@ error summary, focus-not-obscured, reduced motion, one hero animation, Astro isl
 - Job: make "who is this and why trust him" answerable in five seconds, then route to one of three
   actions: consultation (WhatsApp), training (waitlist), speaker (WhatsApp).
 
-## The one memorable thing
+## The one memorable thing (v2 — v1 rejected by Ali 2026-11-08: "terlalu biasa, gak ada wow")
 
-**The hero scans Ali the way INDUSIA's machine-vision hero scans a PCB.** Ali's portrait sits in a
-camera viewport (corner brackets, live HUD strip). On load a scan line sweeps once and detection
-boxes lock onto proof, each with a small label:
-`Juara 1 · Global AI Demo Day 2026`, `56+ produk dibangun`, `17 tahun`, `16 negara`.
-Same visual language as indusia.ai (family), but the subject is the person (personal brand).
-Everything else on the page is quiet.
+v1 (split hero, photo in a small camera box) was too safe. v2:
+
+**Full-viewport hero where Ali's portrait is an AI point cloud.** ~20k teal/white points sampled
+from the photo (background removed by flood fill, luminance contrast-stretched) fly in from
+scatter and assemble into his face, like a machine-vision reconstruction. Points shimmer and ripple
+away from the cursor. Once assembled, detection boxes lock onto proof
+(`Ali Sadikin Ma · pakar AI`, `Juara 1 · Global AI Demo Day 2026`, `56+ produk dibangun`,
+`17 tahun · 16 negara`) and a HUD strip counts up. The H1 "Pakar AI Indonesia" is set giant
+(up to 188px, line-height .88) and overlaps the cloud for depth.
+
+- WebGL via `ogl` (same lib as indusia.ai), GSAP timeline drives `uProgress` + boxes + counters.
+- Renders only while the hero is on screen (IntersectionObserver). Mobile: fewer points, 2 boxes.
+- Reduced motion: cloud drawn once in final state, no cursor ripple. No WebGL: duotone photo.
+- Same machine-vision vocabulary as indusia.ai (family), subject = the person (personal brand).
+  Everything below the hero stays quiet.
 
 ## Colour (locked by brand — `tokens.css` from Indusia-ai-web)
 

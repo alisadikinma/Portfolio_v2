@@ -24,38 +24,32 @@
       <a href="#tulisan">Blog</a>
       <a class="lang" href="#" hreflang="en">EN</a>
     </nav>
-    <a class="btn btn-primary" href="#wa"><span class="long">Konsultasi via</span>WhatsApp</a>
+    <a class="btn btn-primary" href="#wa"><span class="long">Konsultasi via&nbsp;</span>WhatsApp</a>
   </div>
 </header>
 
 <main>
-  <section class="hero" aria-labelledby="hero-h1">
-    <div class="wrap hero-grid">
-      <div>
-        <h1 id="hero-h1"><span class="name">Ali Sadikin Ma</span>Pakar AI Indonesia yang membangun, bukan cuma bicara.</h1>
-        <p class="lead">Saya membantu perusahaan di Indonesia memakai AI di pekerjaan nyata: dari inspeksi visual di pabrik sampai asisten WhatsApp untuk tim penjualan. 56 lebih produk sudah saya bangun dan jalankan.</p>
-        <div class="hero-ctas">
-          <a class="btn btn-primary" href="#wa">Konsultasi via WhatsApp</a>
-          <a class="btn btn-ghost" href="#layanan">Lihat layanan</a>
-        </div>
-        <p class="hero-note">Founder <a href="https://indusia.ai/id/">INDUSIA.ai</a>, perusahaan AI di Batam.</p>
+  <section class="hx" data-hero data-photo="ali.jpg" aria-labelledby="hero-h1">
+    <div class="hx-cloud" data-cloud aria-hidden="true"></div>
+    <img class="hx-fallback" src="ali.jpg" alt="" aria-hidden="true" width="1200" height="1200">
+    <div aria-hidden="true">
+      <span class="det" data-box="0.33,0.12,0.34,0.40"><b>Ali Sadikin Ma · pakar AI</b></span>
+      <span class="det win r" data-box="0.53,0.66,0.18,0.09"><b>Juara 1 · Global AI Demo Day 2026</b></span>
+      <span class="det side" data-box="0.10,0.74,0.28,0.13"><b>56+ produk dibangun</b></span>
+      <span class="det r side" data-box="0.66,0.50,0.24,0.12"><b>17 tahun · 16 negara</b></span>
+    </div>
+    <div class="wrap hx-text">
+      <p class="hx-name">Ali Sadikin Ma <span>— founder <a href="https://indusia.ai/id/">INDUSIA.ai</a></span></p>
+      <h1 id="hero-h1"><span class="sr">Ali Sadikin Ma, </span>Pakar AI Indonesia</h1>
+      <p class="hx-lead">Saya membantu perusahaan di Indonesia memakai AI di pekerjaan nyata, dari inspeksi visual di pabrik sampai asisten WhatsApp untuk tim penjualan.</p>
+      <div class="hero-ctas">
+        <a class="btn btn-primary" href="#wa">Konsultasi via WhatsApp</a>
+        <a class="btn btn-ghost" href="#layanan">Lihat layanan</a>
       </div>
-
-      <figure class="cam" data-cam aria-label="Foto Ali Sadikin Ma dengan sorotan pencapaian">
-        <img src="ali.jpg" alt="Ali Sadikin Ma, pakar AI Indonesia, mengenakan jas biru tua dan kemeja putih" width="1200" height="1200" fetchpriority="high">
-        <div class="scan" aria-hidden="true"></div>
-        <span class="cnr tl"></span><span class="cnr tr"></span><span class="cnr bl"></span><span class="cnr br"></span>
-        <div aria-hidden="true">
-          <span class="det" style="left:33%;top:13%;width:34%;height:39%"><b>Ali Sadikin Ma · pakar AI · 99,4%</b></span>
-          <span class="det win below r" style="left:52%;top:62%;width:20%;height:11%"><b>Juara 1 · Global AI Demo Day 2026</b></span>
-          <span class="det below" style="left:8%;top:62%;width:24%;height:12%"><b>56+ produk dibangun</b></span>
-          <span class="det r" style="left:70%;top:46%;width:22%;height:12%"><b>17 tahun · 16 negara</b></span>
-        </div>
-        <figcaption class="hud">
-          <span><span class="live"></span><span data-status data-done="Profil terverifikasi">Memindai profil…</span></span>
-          <span class="r"><span>produk <b data-count="56">56</b></span><span>negara <b data-count="16">16</b></span><span class="hide-sm">tahun <b data-count="17">17</b></span></span>
-        </figcaption>
-      </figure>
+    </div>
+    <div class="hx-hud" aria-hidden="true">
+      <span><span class="live"></span><span data-status data-done="Profil terverifikasi">Merekonstruksi profil…</span></span>
+      <span class="r"><span>produk <b data-count="56">56</b></span><span>negara <b data-count="16">16</b></span><span class="hide-sm">tahun <b data-count="17">17</b></span></span>
     </div>
   </section>
 
@@ -154,6 +148,6 @@
 </footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
-<script src="hero-scan.js"></script>
+<script type="module" src="hero-particles.js"></script>
 </body>
 </html>
