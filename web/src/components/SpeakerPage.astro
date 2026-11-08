@@ -6,6 +6,7 @@
 import BaseLayout from "../layouts/BaseLayout.astro";
 import TrainingIcon from "./TrainingIcon.astro";
 import Lightbox from "./Lightbox.astro";
+import FaqSide from "./FaqSide.astro";
 import type { Lang } from "../lib/i18n";
 import { SITE, breadcrumb, faqPage, graph, personNode, serviceNode, webPageNode, websiteNode } from "../lib/schema";
 import { STAGE_AWARDS, awardHref, loadAwardPhotos, loadAwardSlugs, type Photo, type Photos } from "../lib/career";
@@ -177,7 +178,7 @@ const jsonld = graph(
 
     <section class="sec faq" aria-labelledby="faq-h">
       <div class="wrap split">
-        <h2 id="faq-h">{c.faqH2}</h2>
+        <FaqSide lang={lang} heading={c.faqH2} />
         <div>
           {faq.map((f, i) => <details open={i === 0}><summary>{f.q}</summary><p>{f.a}</p></details>)}
         </div>

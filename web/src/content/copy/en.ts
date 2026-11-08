@@ -353,6 +353,9 @@ export const en: Copy = {
     minRead: "min read",
     latest: "Latest",
   },
+  faqArt: {
+    alt: "Illustration of Ali Sadikin Ma answering questions: a question mark, an idea and a checkmark in speech bubbles",
+  },
   speaker: {
     heroAlt: "Ali Sadikin Ma at the podium of Global AI Demo Day 2026 in Bengaluru, presenting Sparkfluence on the stage screen",
     cred1: "1st place among 26 AI startups, 16 countries",

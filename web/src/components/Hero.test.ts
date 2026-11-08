@@ -74,6 +74,14 @@ describe.each(["id", "en"] as const)("Hero (%s)", (lang) => {
     expect(html).toContain('data-count="17"');
   });
 
+  it("INDUSIA.ai logo sits on the left chest over the point cloud (Ali 2026-11-09: must stand out)", async () => {
+    const html = await render(lang);
+    const logo = html.match(/<span class="hx-logo"[^>]*>[\s\S]*?<\/span>/)?.[0] ?? "";
+    expect(logo).toMatch(/data-box="[\d.]+,[\d.]+,[\d.]+,[\d.]+"/);
+    expect(logo).toContain('src="/images/indusia-logo-light.png"');
+    expect(logo).toContain('alt=""');
+  });
+
   it("never states forbidden facts", async () => {
     const html = await render(lang);
     expect(html).not.toMatch(/16 negara/i);

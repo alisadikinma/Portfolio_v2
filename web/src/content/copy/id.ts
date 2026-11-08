@@ -351,6 +351,9 @@ export const id = {
     minRead: "menit baca",
     latest: "Terbaru",
   },
+  faqArt: {
+    alt: "Ilustrasi Ali Sadikin Ma menjawab pertanyaan: gelembung tanda tanya, ide, dan tanda centang",
+  },
   speaker: {
     heroAlt: "Ali Sadikin Ma di podium Global AI Demo Day 2026 di Bengaluru, mempresentasikan Sparkfluence di layar panggung",
     cred1: "Juara 1 dari 26 startup AI, 16 negara",

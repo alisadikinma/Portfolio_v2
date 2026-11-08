@@ -4,6 +4,7 @@ import { LANGS, type Lang } from "../../lib/i18n";
 import { SITE, breadcrumb, faqPage, graph, personNode, serviceNode, webPageNode, websiteNode } from "../../lib/schema";
 import { id } from "../../content/copy/id";
 import { en } from "../../content/copy/en";
+import FaqSide from "../../components/FaqSide.astro";
 import SpeakerPage from "../../components/SpeakerPage.astro";
 import { ANCHORS, TITLES } from "../../../scripts/seo-gate.config.mjs";
 import { loadGallery, type Photo } from "../../lib/career";
@@ -196,7 +197,7 @@ const jsonld = graph(
 
     <section class="sec alt faq" aria-labelledby="faq-h">
       <div class="wrap split">
-        <h2 id="faq-h">{c.faqH2}</h2>
+        <FaqSide lang={lang} heading={c.faqH2} />
         <div>
           {faq.map((f, i) => (
             <details open={i === 0}>

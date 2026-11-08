@@ -226,3 +226,15 @@ describe("speaking sessions data", () => {
     }
   });
 });
+
+describe("FAQ illustration (Ali 2026-11-09)", () => {
+  it.each([["id", "pembicara-ai"], ["en", "ai-speaker"], ["id", "pelatihan-ai"], ["en", "ai-training"]])("%s/%s: clay illustration next to the questions", async (lang, seg) => {
+    const { html } = await load(lang, seg);
+    const faq = html.match(/<section[^>]*aria-labelledby="faq-h"[\s\S]*?<\/section>/)![0];
+    const img = faq.match(/<img [^>]*class="faq-illus"[^>]*>/)?.[0] ?? "";
+    expect(img).toMatch(/faq-ali-sadikin-ma/);
+    expect(img).toMatch(/alt="[^"]{40,}"/);
+    expect(img).toContain('loading="lazy"');
+    expect(faq.indexOf('id="faq-h"')).toBeLessThan(faq.indexOf("faq-illus"));
+  });
+});

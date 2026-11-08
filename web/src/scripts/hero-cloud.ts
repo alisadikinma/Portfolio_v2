@@ -132,7 +132,7 @@ async function startCloud(hero: HTMLElement, d: Disposer): Promise<void> {
   const photo = hero.querySelector<HTMLImageElement>(".hx-fallback");
   if (!host || !photo || !hasWebGL()) return; // duotone image stays
 
-  const dets = [...hero.querySelectorAll<HTMLElement>(".det")];
+  const dets = [...hero.querySelectorAll<HTMLElement>(".det, .hx-logo")];
   const status = hero.querySelector<HTMLElement>("[data-status]");
   const counters = [...hero.querySelectorAll<HTMLElement>("[data-count]")];
 
