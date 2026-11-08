@@ -1021,7 +1021,7 @@ Supports credentials: true
 - **CORS errors** → Check `backend/config/cors.php` origins
 - **FormData PUT** → Use `POST` with `_method=PUT` field
 - **Migration fail** → `php artisan migrate:fresh --seed`
-- **Gallery bulk-upload silently 422 / "Uploading…" stuck** → check **PHP-FPM `upload_max_filesize`** on VPS (NOT CLI). PHP silently truncates files >limit, validator then sees empty/corrupt `images[]` and returns 422 with no specific message. Production VPS uses `php8.2-fpm` with override at [/etc/php/8.2/fpm/conf.d/99-portfolio.ini](scripts/systemd/) (50M per file / 200M post / 120s execution / 256M memory). Laravel validator capped at 30MB per file (gallery + items + bulk endpoints), frontend hint says "Max 30MB". **Don't trust `php -i` from CLI** — CLI defaults differ from FPM (e.g., CLI showed 2M while FPM was 10M before fix). Always check `/etc/php/8.2/fpm/php.ini` + conf.d overrides.
+- **Gallery bulk-upload silently 422 / "Uploading…" stuck** → check **PHP-FPM `upload_max_filesize`** on VPS (NOT CLI). PHP silently truncates files >limit, validator then sees empty/corrupt `images[]` and returns 422 with no specific message. Production VPS uses `php8.4-fpm` (since PF-2, see [pf2-php84-upgrade.md](docs/runbooks/pf2-php84-upgrade.md)) with override at `/etc/php/8.4/fpm/conf.d/99-portfolio.ini` (50M per file / 200M post / 120s execution / 256M memory). Laravel validator capped at 30MB per file (gallery + items + bulk endpoints), frontend hint says "Max 30MB". **Don't trust `php -i` from CLI** — CLI defaults differ from FPM (e.g., CLI showed 2M while FPM was 10M before fix). Always check `/etc/php/8.4/fpm/php.ini` + conf.d overrides.
 
 ## Multi-Agent System
 
@@ -1818,8 +1818,8 @@ Idempotent via `firstOrCreate(['signature' => ...], $row)` — re-seeding on exi
 
 **Maintainer:** Ali Sadikin (ali.sadikincom85@gmail.com)
 **Environment:** macOS + Docker Desktop, /Users/alisadikin/Drive-D/Projects/Portfolio_v2
-**PHP:** 8.2 inside the `portfolio_backend` container — no host php; run `docker exec portfolio_backend php ...` (e.g. `docker exec portfolio_backend php artisan test`)
-**Backend:** Laravel 12 + PHP 8.2 + MySQL 8 + Sanctum 4 + Filament 4.1
+**PHP:** 8.4 everywhere (VPS fpm + CLI, Docker `portfolio_backend` container; runbook: [docs/runbooks/pf2-php84-upgrade.md](docs/runbooks/pf2-php84-upgrade.md)) — no host php; run `docker exec portfolio_backend php ...` (e.g. `docker exec portfolio_backend php artisan test`)
+**Backend:** Laravel 12 + PHP 8.4 + MySQL 8 + Sanctum 4 + Filament 4.1
 **Frontend:** Vue 3.5 + Rolldown-Vite 7.1 + Pinia 3 + TanStack Query 5.90 + Tailwind 4
 **Production:** https://alisadikinma.com
 
