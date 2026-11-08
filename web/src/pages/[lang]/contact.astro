@@ -1,0 +1,135 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { localizedPath, LANGS, type Lang } from "../../lib/i18n";
+import { SITE, SAME_AS, breadcrumb, graph, personNode, webPageNode, websiteNode } from "../../lib/schema";
+import { waLink } from "../../lib/whatsapp";
+import { id } from "../../content/copy/id";
+import { en } from "../../content/copy/en";
+
+const raw = Astro.params.lang;
+if (!(LANGS as readonly string[]).includes(raw ?? "")) {
+  return new Response(null, { status: 404 });
+}
+const lang = raw as Lang;
+const copy = lang === "id" ? id : en;
+const c = copy.contact;
+const f = copy.footer;
+const path = `/${lang}/contact`;
+const url = SITE + path;
+const wa = await waLink(lang);
+// Spam check: backend wants form_timestamp 3s–1h old. Render it here (server clock) and
+// keep the page out of every cache, or a stale copy would carry an expired timestamp.
+const formTs = Math.floor(Date.now() / 1000);
+Astro.response.headers.set("Cache-Control", "private, no-store");
+
+const social = [
+  { host: "linkedin", label: f.linkedin },
+  { host: "instagram", label: f.instagram },
+  { host: "youtube", label: f.youtube },
+  { host: "tiktok", label: f.tiktok },
+]
+  .map((s) => ({ label: s.label, href: SAME_AS.find((u) => u.includes(s.host)) ?? "" }))
+  .filter((s) => s.href !== "");
+
+const page = webPageNode({ url, lang, name: c.metaTitle, description: c.metaDescription });
+page["@type"] = ["WebPage", "ContactPage"];
+const jsonld = graph(
+  personNode(),
+  websiteNode(),
+  page,
+  breadcrumb([
+    { name: "Ali Sadikin Ma", url: `${SITE}/${lang}` },
+    { name: c.crumb, url },
+  ]),
+);
+---
+<BaseLayout title={c.metaTitle} description={c.metaDescription} path={path} lang={lang} jsonld={jsonld}>
+  <main class="wrap contact-page">
+    <h1>{c.h1}</h1>
+    <p>{c.intro}</p>
+    <section class="sec" aria-labelledby="contact-form-h">
+      <h2 id="contact-form-h">{c.formTitle}</h2>
+      <form
+        class="form"
+        novalidate
+        data-contact
+        data-endpoint="/api/contact"
+        data-ts={formTs}
+        data-sending={c.sending}
+        data-rate={c.rate}
+        data-network={c.network}
+        data-server={c.server}
+        data-fast={c.fast}
+        data-required={c.required}
+        data-invalid-email={c.invalidEmail}
+        data-invalid-wa={c.invalidWa}
+        data-short-name={c.shortName}
+        data-short-subject={c.shortSubject}
+        data-short-message={c.shortMessage}
+        data-long-message={c.longMessage}
+        data-summary-title={c.summaryTitle}
+      >
+        <div class="err-summary" data-summary tabindex="-1" role="alert"></div>
+        <div class="form" data-fields>
+          <div class="field">
+            <label for="ct-name">{c.nameLabel}</label>
+            <input id="ct-name" name="name" type="text" autocomplete="name" maxlength="255" required aria-describedby="ct-name-err" />
+            <span class="err" id="ct-name-err" data-err="name"></span>
+          </div>
+          <div class="field">
+            <label for="ct-email">{c.emailLabel}</label>
+            <input id="ct-email" name="email" type="email" autocomplete="email" maxlength="254" required aria-describedby="ct-email-err" />
+            <span class="err" id="ct-email-err" data-err="email"></span>
+          </div>
+          <div class="field">
+            <label for="ct-wa">{c.waLabel}</label>
+            <input id="ct-wa" name="whatsapp" type="tel" autocomplete="tel" inputmode="tel" placeholder="0812 3456 7890" required aria-describedby="ct-wa-help ct-wa-err" />
+            <span class="help" id="ct-wa-help">{c.waHelp}</span>
+            <span class="err" id="ct-wa-err" data-err="whatsapp"></span>
+          </div>
+          <div class="field">
+            <label for="ct-subject">{c.subjectLabel}</label>
+            <input id="ct-subject" name="subject" type="text" maxlength="255" required aria-describedby="ct-subject-err" />
+            <span class="err" id="ct-subject-err" data-err="subject"></span>
+          </div>
+          <div class="field">
+            <label for="ct-message">{c.messageLabel}</label>
+            <textarea id="ct-message" name="message" rows="6" maxlength="5000" required aria-describedby="ct-message-err"></textarea>
+            <span class="err" id="ct-message-err" data-err="message"></span>
+          </div>
+          <div class="hp" aria-hidden="true"><input name="website" type="text" tabindex="-1" autocomplete="off" /></div>
+          <button class="btn btn-primary" type="submit">{c.cta}</button>
+          <p data-status role="status" aria-live="polite"></p>
+        </div>
+        <div class="done" data-done tabindex="-1">
+          <h3>{c.doneTitle}</h3>
+          <p>{c.doneText}</p>
+        </div>
+      </form>
+    </section>
+    {(wa !== "" || social.length > 0) && (
+      <section class="sec" aria-labelledby="contact-other-h">
+        <h2 id="contact-other-h">{wa !== "" ? c.waTitle : c.socialTitle}</h2>
+        {wa !== "" && (
+          <p>{c.waLead} <a class="btn btn-primary" href={wa} rel="noopener">{c.waCta}</a></p>
+        )}
+        {social.length > 0 && (
+          <>
+            {wa !== "" && <h3>{c.socialTitle}</h3>}
+            <ul class="contact-social">
+              {social.map((s) => <li><a href={s.href} rel="noopener">{s.label}</a></li>)}
+            </ul>
+          </>
+        )}
+      </section>
+    )}
+    <p class="contact-links">
+      {c.linkTrainingLead} <a href={localizedPath(`/${lang}/pelatihan-ai`, lang)}>{c.linkTraining}</a>.
+      {" "}{c.linkAboutLead} <a href={`/${lang}/about`}>{c.linkAbout}</a>.
+    </p>
+  </main>
+</BaseLayout>
+<script>
+  import { initAllContactForms } from "../../scripts/contact-form";
+  initAllContactForms();
+</script>
