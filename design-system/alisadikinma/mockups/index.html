@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&family=Space+Grotesk:wght@500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="site.css">
+<link rel="stylesheet" href="site.css?v=5">
 <link rel="canonical" href="https://alisadikinma.com/id/">
 <meta property="og:title" content="Ali Sadikin Ma — Pakar AI Indonesia">
 <meta property="og:image" content="https://alisadikinma.com/images/ali-sadikin-ma-pakar-ai-indonesia.jpg">
@@ -23,7 +23,6 @@
 </script>
 </head>
 <body>
-<div class="mock-note">Mockup PF-2 — bukan halaman live. Nomor WhatsApp, artikel, dan testimoni masih contoh.</div>
 
 <header class="site-head">
   <div class="wrap">
@@ -52,7 +51,8 @@
     </div>
     <div class="wrap hx-text">
       <h1 id="hero-h1"><span class="hx-h1-name">Ali Sadikin Ma</span> Pakar AI Indonesia</h1>
-      <p class="hx-lead">Ali Sadikin Ma adalah pakar AI Indonesia dan founder <a href="https://indusia.ai/id/">INDUSIA.ai</a> di Batam. Ia membantu perusahaan memakai AI di pekerjaan nyata, dari inspeksi visual di pabrik sampai asisten WhatsApp untuk tim penjualan. Ia juara 1 Global AI Demo Day 2026 di Bengaluru dan sudah membangun lebih dari 56 produk AI.</p>
+      <p class="hx-lead" id="hero-lead">Ali Sadikin Ma adalah pakar AI Indonesia dan founder <a href="https://indusia.ai/id/">INDUSIA.ai</a> di Batam. Ia membantu perusahaan memakai AI di pekerjaan nyata, dari inspeksi visual di pabrik sampai asisten WhatsApp untuk tim penjualan. Ia juara 1 Global AI Demo Day 2026 di Bengaluru dan sudah membangun lebih dari 56 produk AI.</p>
+      <button type="button" class="hx-more" aria-expanded="false" aria-controls="hero-lead">Selengkapnya</button>
       <div class="hero-ctas">
         <a class="btn btn-primary" href="#wa">Konsultasi via WhatsApp</a>
         <a class="btn btn-ghost" href="#layanan">Lihat layanan</a>
@@ -225,5 +225,14 @@
 <script src="stages-data.js?v=2"></script>
 <script src="gallery.js"></script>
 <script type="module" src="hero-particles.js"></script>
+<script>
+// Mobile: hero lead clamps to 2 lines; full text stays in the DOM for crawlers.
+document.querySelector(".hx-more").addEventListener("click", function () {
+  var lead = document.getElementById("hero-lead");
+  var open = lead.classList.toggle("open");
+  this.setAttribute("aria-expanded", String(open));
+  this.textContent = open ? "Tutup" : "Selengkapnya";
+});
+</script>
 </body>
 </html>

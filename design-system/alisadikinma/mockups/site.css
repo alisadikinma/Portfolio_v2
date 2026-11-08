@@ -278,7 +278,7 @@ fieldset.field { border: 0; margin: 0; padding: 0; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .hx {
   position: relative; overflow: hidden; isolation: isolate;
-  min-height: calc(100svh - var(--header-h)); display: flex; align-items: flex-end;
+  height: calc(100svh - var(--header-h)); min-height: 540px; display: flex; align-items: flex-end;
   background:
     radial-gradient(60% 70% at 72% 45%, rgba(63,184,197,.10), transparent 70%),
     linear-gradient(rgba(232,238,248,.035) 1px, transparent 1px) 0 0 / 100% 48px,
@@ -294,15 +294,17 @@ fieldset.field { border: 0; margin: 0; padding: 0; }
 .has-cloud .hx-fallback { opacity: 0; transition: opacity .6s; } /* stays in DOM for crawlers + LCP */
 .hx .det { z-index: 2; }
 .hx .det { visibility: hidden; }
-.hx-text { position: relative; z-index: 3; width: 100%; padding-bottom: 104px; padding-top: 48px; }
-.hx-h1-name { display: block; font: 500 clamp(22px, 2.4vw, 34px)/1.2 var(--font-display); letter-spacing: -0.01em; color: var(--text-primary); margin-bottom: 14px; }
+/* every hero size follows viewport HEIGHT too, so name + H1 + lead + CTAs + HUD fit one screen */
+.hx-text { position: relative; z-index: 3; width: 100%; padding-top: clamp(16px, 4svh, 48px); padding-bottom: calc(52px + clamp(20px, 5svh, 52px)); }
+.hx-h1-name { display: block; font: 500 clamp(20px, min(2.4vw, 3.6svh), 34px)/1.2 var(--font-display); letter-spacing: -0.01em; color: var(--text-primary); margin-bottom: clamp(6px, 1.4svh, 14px); }
 .hx h1 {
-  font-size: clamp(64px, 11.5vw, 188px); line-height: .88; letter-spacing: -0.045em; font-weight: 600;
+  font-size: clamp(48px, min(11.5vw, 15svh), 188px); line-height: .88; letter-spacing: -0.045em; font-weight: 600;
   max-width: 7ch; text-wrap: balance;
   text-shadow: 0 2px 30px rgba(10,18,32,.6);
 }
-.hx-lead { margin-top: 28px; font-size: 19px; line-height: 1.55; color: var(--text-secondary); max-width: 46ch; }
-.hx .hero-ctas { margin-top: 28px; }
+.hx-lead { margin-top: clamp(14px, 3svh, 28px); font-size: clamp(16px, 2.2svh, 19px); line-height: 1.55; color: var(--text-secondary); max-width: 46ch; }
+.hx .hero-ctas { margin-top: clamp(14px, 3svh, 28px); }
+.hx-more { display: none; }
 .hx-hud {
   position: absolute; left: 0; right: 0; bottom: 0; z-index: 4; height: 52px;
   display: flex; align-items: center; justify-content: space-between; padding: 0 max(24px, calc((100vw - 1152px) / 2));
@@ -313,16 +315,28 @@ fieldset.field { border: 0; margin: 0; padding: 0; }
 .hx-hud .r { display: flex; gap: 20px; }
 .hx-hud .r b { color: var(--text-primary); font-weight: 500; }
 @media (max-width: 760px) {
-  .hx { align-items: flex-end; min-height: 100svh; }
-  .hx-text { padding-top: 58vh; padding-bottom: 84px; }
-  .hx h1 { font-size: clamp(54px, 17vw, 84px); }
-  .hx-lead { font-size: 17px; }
+  .hx { height: calc(100svh - var(--header-h)); min-height: 520px; }
+  .hx-text { padding-top: 56px; padding-bottom: calc(44px + 16px); }
+  .hx h1 { font-size: clamp(40px, min(15vw, 8svh), 84px); }
+  .hx-lead { font-size: clamp(14.5px, 2.2svh, 17px); line-height: 1.5; margin-top: 12px; }
+  .hx .hero-ctas { margin-top: 14px; gap: 10px; flex-wrap: nowrap; }
+  .hx .hero-ctas .btn { font-size: 15px; padding-left: 14px; padding-right: 14px; min-height: 44px; white-space: nowrap; }
+  .hx-hud { height: 44px; }
+  .hx-lead:not(.open) { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+  .hx-more { display: inline-flex; align-items: center; min-height: 44px; margin-top: -4px; padding: 0; background: none; border: 0;
+    font: 500 15px/1 var(--font-body); color: var(--accent-primary); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+  .hx-more:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+  .hx .hero-ctas { margin-top: 4px; }
   .hx-fallback { width: 80vw; right: 10vw; top: 6vh; bottom: auto; }
   .hx-hud { padding: 0 16px; font-size: 11px; }
   .hx .det.side { display: none; }
-  .hx-text { background: linear-gradient(180deg, transparent 52vh, rgba(10,18,32,.92) 60vh); }
+  .hx-text { background: linear-gradient(180deg, transparent, rgba(10,18,32,.9) 56px); }
   .hx-hud .r { gap: 10px; }
   .hx-hud .hide-sm { display: none; }
+}
+@media (max-width: 380px) {
+  .hx .hero-ctas { gap: 8px; }
+  .hx .hero-ctas .btn { font-size: 14px; padding-left: 12px; padding-right: 12px; }
 }
 
 /* ================= stages bento (gallery proof) ================= */
