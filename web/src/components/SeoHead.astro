@@ -16,9 +16,11 @@ interface Props {
   /** Paginated lists: site paths (may carry ?page=N) for rel=prev / rel=next. */
   prev?: string;
   next?: string;
+  /** Thin pages (e.g. empty category): robots noindex, follow instead of index,follow. */
+  noindex?: boolean;
 }
 
-const { title, description, path, lang, jsonld, image, imageWidth, imageHeight, preloadImage, type = "website", prev, next } = Astro.props;
+const { title, description, path, lang, jsonld, image, imageWidth, imageHeight, preloadImage, type = "website", prev, next, noindex = false } = Astro.props;
 const abs = (p: string) => SITE + p;
 const alts = alternates(path);
 // Canonical must equal the self-referencing hreflang (normalized path).
@@ -34,7 +36,7 @@ const altLocale = lang === "id" ? "en_US" : "id_ID";
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>{title}</title>
 <meta name="description" content={description} />
-<meta name="robots" content="index,follow" />
+<meta name="robots" content={noindex ? "noindex, follow" : "index,follow"} />
 <link rel="canonical" href={canonical} />
 <link rel="alternate" hreflang="id" href={abs(alts.id)} />
 <link rel="alternate" hreflang="en" href={abs(alts.en)} />

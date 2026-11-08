@@ -25,6 +25,7 @@ interface Props {
   type?: "website" | "article";
   prev?: string;
   next?: string;
+  noindex?: boolean;
 }
 
 const { lang, path, home = false, ga4Id = getConfig().ga4Id, ...seo } = Astro.props;

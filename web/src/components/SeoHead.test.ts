@@ -146,3 +146,14 @@ describe("BaseLayout", () => {
     expect(await render({ preloadImage: "/images/hero.webp" })).toContain('rel="preload" as="image" href="/images/hero.webp"');
   });
 });
+
+describe("SeoHead noindex", () => {
+  it("renders noindex, follow when noindex is set", async () => {
+    const h = await head({ ...props, noindex: true });
+    expect(h).toContain('<meta name="robots" content="noindex, follow"');
+    expect(h).not.toContain("index,follow");
+  });
+  it("defaults to index,follow", async () => {
+    expect(await head()).toContain('<meta name="robots" content="index,follow"');
+  });
+});
