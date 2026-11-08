@@ -88,11 +88,35 @@ class InternalCrawlerHitTest extends TestCase
         $this->assertNotSame(429, $this->postJson('/api/contact', [])->getStatusCode());
     }
 
-    public function test_bot_config_matches_middleware_list(): void
+    public function test_bot_config_shape(): void
     {
         $map = config('ai_bots.map');
         $this->assertIsArray($map);
-        $this->assertArrayHasKey('GPTBot', $map);
-        $this->assertCount(8, $map);
+
+        $expected = [
+            'GPTBot', 'OAI-SearchBot', 'ChatGPT-User', 'ClaudeBot', 'Claude-Web',
+            'Claude-User', 'Claude-SearchBot', 'PerplexityBot', 'Perplexity-User',
+            'Meta-ExternalAgent', 'Amazonbot', 'Bytespider', 'CCBot',
+            'DuckAssistBot', 'MistralAI-User', 'GoogleOther',
+        ];
+        $this->assertSame($expected, array_keys($map));
+        $this->assertSame($expected, array_values($map));
+
+        // robots.txt-only tokens never appear in a User-Agent.
+        $this->assertArrayNotHasKey('Google-Extended', $map);
+        $this->assertArrayNotHasKey('Applebot-Extended', $map);
+    }
+
+    public function test_no_bot_key_is_substring_of_an_earlier_key(): void
+    {
+        $keys = array_keys(config('ai_bots.map'));
+        foreach ($keys as $i => $key) {
+            foreach (array_slice($keys, 0, $i) as $earlier) {
+                $this->assertFalse(
+                    stripos($key, $earlier) !== false || stripos($earlier, $key) !== false,
+                    "{$key} and {$earlier} overlap"
+                );
+            }
+        }
     }
 }
