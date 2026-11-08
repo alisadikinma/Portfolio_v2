@@ -108,5 +108,6 @@ const jsonld = graph(
   .projects-filter a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border: 1px solid var(--border-emphasis); border-radius: var(--radius-md); text-decoration: none; color: var(--text-primary); }
   .projects-filter a[aria-current="page"] { background: var(--accent-primary); color: var(--bg-deep); border-color: transparent; }
   .projects-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px; }
+  @media (max-width: 760px) { .projects-grid { grid-template-columns: 1fr; gap: 12px; } }
   .projects-empty, .projects-unavailable { color: var(--text-secondary); }
 </style>

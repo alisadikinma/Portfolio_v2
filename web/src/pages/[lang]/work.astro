@@ -206,6 +206,7 @@ const jsonld = graph(
   .work-tabs a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border: 1px solid var(--border-emphasis); border-radius: var(--radius-md); text-decoration: none; color: var(--text-primary); }
   .work-tabs a[aria-current="page"] { background: var(--accent-primary); color: var(--bg-deep); border-color: transparent; }
   .work-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px; }
+  @media (max-width: 760px) { .work-grid { grid-template-columns: 1fr; gap: 12px; } }
   .work-more { margin-block: 24px; }
   .work-note { color: var(--text-secondary); }
   .work-awards { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
