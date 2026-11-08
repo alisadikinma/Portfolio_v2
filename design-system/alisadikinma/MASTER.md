@@ -29,7 +29,7 @@ from the photo (background removed by flood fill, luminance contrast-stretched) 
 scatter and assemble into his face, like a machine-vision reconstruction. Points shimmer and ripple
 away from the cursor. Once assembled, detection boxes lock onto proof
 (`Ali Sadikin Ma · pakar AI`, `Juara 1 · Global AI Demo Day 2026`, `56+ produk dibangun`,
-`17 tahun · 16 negara`) and a HUD strip counts up. The H1 "Pakar AI Indonesia" is set giant
+`17 tahun membangun software`) and a HUD strip counts up. The H1 "Pakar AI Indonesia" is set giant
 (up to 188px, line-height .88) and overlaps the cloud for depth.
 
 - WebGL via `ogl` (same lib as indusia.ai), GSAP timeline drives `uProgress` + boxes + counters.
