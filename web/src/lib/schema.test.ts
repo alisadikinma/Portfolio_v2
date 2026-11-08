@@ -101,7 +101,7 @@ describe("invariants", () => {
 });
 
 // ---- 1D review fixes ----
-import { PORTRAIT_URL, jsonLdString, webPageNode } from "./schema";
+import { PORTRAIT_URL, jsonLdString, webPageNode, collectionPage } from "./schema";
 
 describe("1D review fixes", () => {
   it("portrait url is the person image", () => {
@@ -161,5 +161,18 @@ describe("1D review fixes", () => {
     expect(p.dateModified).toBe("2026-02-01");
     expect((profilePage({ url: "u" }) as any).dateModified).toBeUndefined();
     expect(p.mainEntity).toEqual({ "@id": PERSON_ID });
+  });
+  it("collectionPage: type, @id, isPartOf website, ItemList positions, optional parts", () => {
+    const c = collectionPage({
+      url: "https://alisadikinma.com/id/blog", lang: "id", name: "Blog", description: "d",
+      items: [{ name: "A", url: "https://alisadikinma.com/id/blog/a" }, { name: "B", url: "https://alisadikinma.com/id/blog/b" }],
+    }) as any;
+    expect(c["@type"]).toBe("CollectionPage");
+    expect(c["@id"]).toBe("https://alisadikinma.com/id/blog#collection");
+    expect(c.isPartOf).toEqual({ "@id": "https://alisadikinma.com/#website" });
+    expect(c.mainEntity.itemListElement.map((x: any) => x.position)).toEqual([1, 2]);
+    const bare = collectionPage({ url: "u", lang: "en", name: "n" }) as any;
+    expect(bare.description).toBeUndefined();
+    expect(bare.mainEntity).toBeUndefined();
   });
 });

@@ -1,0 +1,38 @@
+---
+interface Props {
+  current: number;
+  last: number;
+  /** Builds the href for a page number (page 1 has no ?page param). */
+  hrefFor: (page: number) => string;
+  labels: { aria: string; prev: string; next: string; page: string };
+}
+const { current, last, hrefFor, labels } = Astro.props;
+// Compact window: first, last, and 2 around current.
+const pages: number[] = [];
+for (let p = 1; p <= last; p++) if (p === 1 || p === last || Math.abs(p - current) <= 2) pages.push(p);
+---
+{last > 1 && (
+  <nav class="pagination" aria-label={labels.aria}>
+    {current > 1 ? <a href={hrefFor(current - 1)} rel="prev">{labels.prev}</a> : <span class="pagination-off" aria-hidden="true">{labels.prev}</span>}
+    <ol>
+      {pages.map((p, i) => (
+        <>
+          {i > 0 && p - pages[i - 1] > 1 && <li class="pagination-gap" aria-hidden="true">…</li>}
+          <li>
+            {p === current
+              ? <span aria-current="page" aria-label={`${labels.page} ${p}`}>{p}</span>
+              : <a href={hrefFor(p)} aria-label={`${labels.page} ${p}`}>{p}</a>}
+          </li>
+        </>
+      ))}
+    </ol>
+    {current < last ? <a href={hrefFor(current + 1)} rel="next">{labels.next}</a> : <span class="pagination-off" aria-hidden="true">{labels.next}</span>}
+  </nav>
+)}
+<style>
+  .pagination { display: flex; align-items: center; justify-content: center; gap: 1rem; margin: 2.5rem 0; flex-wrap: wrap; }
+  .pagination ol { display: flex; gap: 0.5rem; list-style: none; margin: 0; padding: 0; }
+  .pagination a, .pagination span[aria-current] { display: inline-block; min-width: 2.75rem; min-height: 2.75rem; line-height: 2.75rem; text-align: center; padding: 0 0.5rem; }
+  .pagination span[aria-current] { font-weight: 700; text-decoration: underline; }
+  .pagination-off { opacity: 0.4; }
+</style>

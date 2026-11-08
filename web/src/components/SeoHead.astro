@@ -13,9 +13,12 @@ interface Props {
   imageHeight?: number;
   preloadImage?: string;
   type?: "website" | "article";
+  /** Paginated lists: site paths (may carry ?page=N) for rel=prev / rel=next. */
+  prev?: string;
+  next?: string;
 }
 
-const { title, description, path, lang, jsonld, image, imageWidth, imageHeight, preloadImage, type = "website" } = Astro.props;
+const { title, description, path, lang, jsonld, image, imageWidth, imageHeight, preloadImage, type = "website", prev, next } = Astro.props;
 const abs = (p: string) => SITE + p;
 const alts = alternates(path);
 // Canonical must equal the self-referencing hreflang (normalized path).
@@ -36,6 +39,8 @@ const altLocale = lang === "id" ? "en_US" : "id_ID";
 <link rel="alternate" hreflang="id" href={abs(alts.id)} />
 <link rel="alternate" hreflang="en" href={abs(alts.en)} />
 <link rel="alternate" hreflang="x-default" href={abs(alts["x-default"])} />
+{prev && <link rel="prev" href={abs(prev)} />}
+{next && <link rel="next" href={abs(next)} />}
 <meta property="og:type" content={type} />
 <meta property="og:site_name" content="Ali Sadikin Ma" />
 <meta property="og:url" content={canonical} />

@@ -23,6 +23,8 @@ interface Props {
   /** Home page: nav anchors stay in-page. Elsewhere they point to /{lang}/#id. */
   home?: boolean;
   type?: "website" | "article";
+  prev?: string;
+  next?: string;
 }
 
 const { lang, path, home = false, ga4Id = getConfig().ga4Id, ...seo } = Astro.props;

@@ -3,6 +3,27 @@
 import type { Copy } from "./id";
 
 export const en: Copy = {
+  hero: {
+    imgAlt: "Ali Sadikin Ma, AI consultant Indonesia and founder of INDUSIA.ai",
+    h1Name: "Ali Sadikin Ma",
+    h1Title: "AI Consultant Indonesia",
+    leadBefore: "Ali Sadikin Ma is an Indonesian AI consultant and the founder of ",
+    leadLinkText: "INDUSIA.ai",
+    leadAfter:
+      " in Batam. He helps companies put AI to work, from visual inspection on the factory floor to WhatsApp assistants for sales teams. He won 1st place at Global AI Demo Day 2026 in Bengaluru and, while leading digital transformation at Satnusa, built more than 56 digital products: AI, IoT, and mobile apps.",
+    more: "Read more",
+    less: "Show less",
+    ctaWhatsapp: "Consult via WhatsApp",
+    ctaServices: "See services",
+    det1: "Ali Sadikin Ma · AI consultant",
+    det2: "1st place · Global AI Demo Day 2026",
+    det3: "56+ digital products",
+    det4: "17 years building software",
+    statusBusy: "Reconstructing profile…",
+    statusDone: "Profile verified",
+    hudProducts: "products",
+    hudYears: "years",
+  },
   site: {
     name: "Ali Sadikin Ma",
     tagline: "AI Consultant Indonesia, Founder of INDUSIA.ai",
@@ -42,5 +63,43 @@ export const en: Copy = {
     linkTraining: "See AI Training",
     linkAboutLead: "Want to know more?",
     linkAbout: "Read about Ali Sadikin Ma",
+  },
+  projectsIndex: {
+    metaTitle: "AI Projects — Ali Sadikin Ma",
+    metaDescription:
+      "AI projects by Ali Sadikin Ma, AI consultant in Indonesia and founder of INDUSIA.ai: machine vision, fleet management, and business process automation.",
+    h1: "AI projects by Ali Sadikin Ma",
+    intro:
+      "These are projects Ali Sadikin Ma has delivered with the INDUSIA.ai team, from AI visual inspection and fleet management to automating how companies work. Pick a project to read the details.",
+    filterLabel: "Filter by category",
+    filterAll: "All",
+    empty: "No projects to show yet.",
+    emptyCategory: "No projects in this category yet.",
+    showAll: "See all projects",
+    unavailable: "The project list cannot be loaded right now. Please try again shortly.",
+    readMore: "Read project",
+    breadcrumbHome: "Ali Sadikin Ma",
+    breadcrumbProjects: "Projects",
+  },
+  blogIndex: {
+    metaTitle: "AI Blog — Ali Sadikin Ma",
+    metaDescription:
+      "Blog by Ali Sadikin Ma on AI agents, vibe coding, and AI automation for industry: practical writing from building production AI in the field.",
+    h1: "AI Blog: Ali Sadikin Ma on AI agents and automation",
+    intro:
+      "On this blog Ali Sadikin Ma shares practical lessons from building AI for industry: AI agents, vibe coding, generative video, and automation. Every post starts from real work, not theory.",
+    empty: "No articles yet. New posts will appear here.",
+    unavailable: "Articles cannot be loaded right now. Please try again shortly.",
+    minRead: "min read",
+    pageLabel: "Page",
+    paginationAria: "Article pagination",
+    prev: "Previous",
+    next: "Next",
+    breadcrumbHome: "Ali Sadikin Ma",
+    breadcrumbBlog: "Blog",
+    linkFaqLead: "Have a question?",
+    linkFaq: "Read the FAQ",
+    linkAboutLead: "Want to meet the author?",
+    linkAbout: "About Ali Sadikin Ma",
   },
 };

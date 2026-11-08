@@ -1,6 +1,27 @@
 // Phase 1 copy (ID). Mirror: docs/copy/PF-2-phase1.md. Status: menunggu persetujuan Ali.
 // The WhatsApp number is NOT here: it lives in config (env), never in copy.
 export const id = {
+  hero: {
+    imgAlt: "Ali Sadikin Ma, pakar AI Indonesia dan founder INDUSIA.ai",
+    h1Name: "Ali Sadikin Ma",
+    h1Title: "Pakar AI Indonesia",
+    leadBefore: "Ali Sadikin Ma adalah pakar AI Indonesia dan founder ",
+    leadLinkText: "INDUSIA.ai",
+    leadAfter:
+      " di Batam. Ia membantu perusahaan memakai AI di pekerjaan nyata, dari inspeksi visual di pabrik sampai asisten WhatsApp untuk tim penjualan. Ia juara 1 Global AI Demo Day 2026 di Bengaluru dan, saat memimpin transformasi digital di Satnusa, membangun lebih dari 56 produk digital: AI, IoT, dan aplikasi mobile.",
+    more: "Selengkapnya",
+    less: "Lebih sedikit",
+    ctaWhatsapp: "Konsultasi via WhatsApp",
+    ctaServices: "Lihat layanan",
+    det1: "Ali Sadikin Ma · pakar AI",
+    det2: "Juara 1 · Global AI Demo Day 2026",
+    det3: "56+ produk digital",
+    det4: "17 tahun membangun software",
+    statusBusy: "Merekonstruksi profil…",
+    statusDone: "Profil terverifikasi",
+    hudProducts: "produk",
+    hudYears: "tahun",
+  },
   site: {
     name: "Ali Sadikin Ma",
     tagline: "Pakar AI Indonesia, Founder INDUSIA.ai",
@@ -40,6 +61,44 @@ export const id = {
     linkTraining: "Lihat Pelatihan AI",
     linkAboutLead: "Ingin tahu lebih jauh?",
     linkAbout: "Baca tentang Ali Sadikin Ma",
+  },
+  projectsIndex: {
+    metaTitle: "Proyek AI — Ali Sadikin Ma",
+    metaDescription:
+      "Daftar proyek AI karya Ali Sadikin Ma, pakar AI Indonesia dan founder INDUSIA.ai: dari machine vision, fleet management, sampai otomasi untuk perusahaan.",
+    h1: "Proyek AI karya Ali Sadikin Ma",
+    intro:
+      "Berikut proyek-proyek yang pernah dikerjakan Ali Sadikin Ma bersama tim INDUSIA.ai, mulai dari inspeksi visual berbasis AI, manajemen armada, sampai otomasi proses kerja di perusahaan. Pilih satu proyek untuk membaca detailnya.",
+    filterLabel: "Filter kategori",
+    filterAll: "Semua",
+    empty: "Belum ada proyek yang bisa ditampilkan.",
+    emptyCategory: "Belum ada proyek di kategori ini.",
+    showAll: "Lihat semua proyek",
+    unavailable: "Daftar proyek sedang tidak bisa dimuat. Silakan coba lagi sebentar lagi.",
+    readMore: "Baca proyek",
+    breadcrumbHome: "Ali Sadikin Ma",
+    breadcrumbProjects: "Proyek",
+  },
+  blogIndex: {
+    metaTitle: "Blog AI — Ali Sadikin Ma",
+    metaDescription:
+      "Blog Ali Sadikin Ma tentang AI agent, vibe coding, dan otomasi AI untuk industri: tulisan praktis dari pengalaman membangun AI di lapangan.",
+    h1: "Blog AI: tulisan Ali Sadikin Ma tentang AI agent dan otomasi",
+    intro:
+      "Di blog ini Ali Sadikin Ma menulis pelajaran praktis dari membangun AI untuk industri: AI agent, vibe coding, video generatif, dan otomasi. Setiap tulisan berangkat dari pekerjaan nyata, bukan teori.",
+    empty: "Belum ada artikel. Tulisan baru akan muncul di sini.",
+    unavailable: "Artikel sedang tidak bisa dimuat. Silakan coba lagi sebentar lagi.",
+    minRead: "menit baca",
+    pageLabel: "Halaman",
+    paginationAria: "Navigasi halaman artikel",
+    prev: "Sebelumnya",
+    next: "Berikutnya",
+    breadcrumbHome: "Ali Sadikin Ma",
+    breadcrumbBlog: "Blog",
+    linkFaqLead: "Punya pertanyaan?",
+    linkFaq: "Baca FAQ",
+    linkAboutLead: "Ingin kenal penulisnya?",
+    linkAbout: "Tentang Ali Sadikin Ma",
   },
 };
 

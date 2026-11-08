@@ -1,0 +1,99 @@
+---
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import PostCard, { type PostItem } from "../../../components/PostCard.astro";
+import Pagination from "../../../components/Pagination.astro";
+import { apiGetPage } from "../../../lib/api";
+import { LANGS, type Lang } from "../../../lib/i18n";
+import { SITE, breadcrumb, collectionPage, graph, personNode, webPageNode, websiteNode } from "../../../lib/schema";
+import { id } from "../../../content/copy/id";
+import { en } from "../../../content/copy/en";
+
+const PER_PAGE = 12;
+
+const raw = Astro.params.lang;
+if (!(LANGS as readonly string[]).includes(raw ?? "")) {
+  return new Response(null, { status: 404 });
+}
+const lang = raw as Lang;
+const c = (lang === "id" ? id : en).blogIndex;
+const base = `/${lang}/blog`;
+
+// Page 1 has one URL only (no ?page): anything that is not a plain integer >= 2 redirects there.
+const rawPage = Astro.url.searchParams.get("page");
+let page = 1;
+if (rawPage !== null) {
+  if (!/^[1-9]\d*$/.test(rawPage) || rawPage === "1" || !Number.isSafeInteger(Number(rawPage))) {
+    return Astro.redirect(base, 301);
+  }
+  page = Number(rawPage);
+}
+
+let items: PostItem[] = [];
+let lastPage = 1;
+let failed = false;
+try {
+  const res = await apiGetPage<PostItem>(`/posts?per_page=${PER_PAGE}&page=${page}`, { lang });
+  if (!res || !Array.isArray(res.data)) throw new Error("no data");
+  items = res.data.filter((p) => p && typeof p.slug === "string" && p.slug !== "" && typeof p.title === "string");
+  const lp = Number((res.meta as { last_page?: unknown } | null)?.last_page);
+  lastPage = Number.isInteger(lp) && lp >= 1 ? lp : 1;
+} catch {
+  failed = true;
+}
+if (!failed && page > lastPage) {
+  return new Response(null, { status: 404 });
+}
+if (failed) Astro.response.status = 503;
+
+const pathFor = (p: number) => (p > 1 ? `${base}?page=${p}` : base);
+const path = pathFor(page);
+const url = SITE + path;
+const title = page > 1 ? `${c.metaTitle} (${c.pageLabel} ${page})` : c.metaTitle;
+
+const nodes = [
+  personNode(),
+  websiteNode(),
+  webPageNode({ url, lang, name: title, description: c.metaDescription }),
+  breadcrumb([
+    { name: c.breadcrumbHome, url: `${SITE}/${lang}` },
+    { name: c.breadcrumbBlog, url: SITE + base },
+  ]),
+];
+if (!failed) {
+  nodes.push(
+    collectionPage({
+      url,
+      lang,
+      name: title,
+      description: c.metaDescription,
+      items: items.map((p) => ({ name: p.title, url: `${SITE}/${lang}/blog/${encodeURIComponent(p.slug)}` })),
+    }),
+  );
+}
+const jsonld = graph(...nodes);
+const prev = !failed && page > 1 ? pathFor(page - 1) : undefined;
+const next = !failed && page < lastPage ? pathFor(page + 1) : undefined;
+---
+<BaseLayout title={title} description={c.metaDescription} path={path} lang={lang} jsonld={jsonld} prev={prev} next={next}>
+  <main class="wrap blog-index">
+    <h1>{c.h1}</h1>
+    <p>{c.intro}</p>
+    {failed
+      ? <p class="blog-unavailable" role="status">{c.unavailable}</p>
+      : items.length === 0
+        ? <p class="blog-empty" role="status">{c.empty}</p>
+        : (
+          <div class="blog-grid">
+            {items.map((p, i) => <PostCard post={p} lang={lang} minRead={c.minRead} eager={page === 1 && i === 0} />)}
+          </div>
+        )}
+    {!failed && <Pagination current={page} last={lastPage} hrefFor={pathFor} labels={{ aria: c.paginationAria, prev: c.prev, next: c.next, page: c.pageLabel }} />}
+    <p class="blog-links">
+      {c.linkFaqLead} <a href={`/${lang}/faq`}>{c.linkFaq}</a>.
+      {" "}{c.linkAboutLead} <a href={`/${lang}/about`}>{c.linkAbout}</a>.
+    </p>
+  </main>
+</BaseLayout>
+<style>
+  .blog-grid { display: grid; gap: 2rem; grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); margin: 2rem 0; }
+</style>

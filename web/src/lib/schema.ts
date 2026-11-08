@@ -107,6 +107,28 @@ export function faqPage(qas: { q: string; a: string }[]): Node {
   };
 }
 
+export function collectionPage(p: {
+  url: string; lang: string; name: string; description?: string; items?: { name: string; url: string }[];
+}): Node {
+  const n: Node = {
+    "@type": "CollectionPage",
+    "@id": `${p.url}#collection`,
+    url: p.url,
+    name: p.name,
+    inLanguage: p.lang,
+    isPartOf: { "@id": `${SITE}/#website` },
+    about: PERSON_REF,
+  };
+  if (p.description) n.description = p.description;
+  if (p.items && p.items.length > 0) {
+    n.mainEntity = {
+      "@type": "ItemList",
+      itemListElement: p.items.map((it, i) => ({ "@type": "ListItem", position: i + 1, name: it.name, url: it.url })),
+    };
+  }
+  return n;
+}
+
 export function blogPosting(p: {
   title: string; url: string; datePublished: string; dateModified?: string; image?: string; lang: string; description?: string;
 }): Node {
