@@ -1822,3 +1822,8 @@ Idempotent via `firstOrCreate(['signature' => ...], $row)` — re-seeding on exi
 **Backend:** Laravel 12 + PHP 8.2 + MySQL 8 + Sanctum 4 + Filament 4.1
 **Frontend:** Vue 3.5 + Rolldown-Vite 7.1 + Pinia 3 + TanStack Query 5.90 + Tailwind 4
 **Production:** https://alisadikinma.com
+
+## gaspol Ticket Counter
+
+Prefix: PF
+Last ticket: PF-2
