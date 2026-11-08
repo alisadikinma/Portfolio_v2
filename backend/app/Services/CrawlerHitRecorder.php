@@ -13,9 +13,9 @@ use Illuminate\Support\Facades\Log;
 class CrawlerHitRecorder
 {
     /**
-     * Atomic daily upsert increment for (today, bot). Returns false on DB failure.
+     * Atomic daily upsert increment for (today, bot). Swallows DB failure.
      */
-    public function record(string $bot): bool
+    public function record(string $bot): void
     {
         try {
             $date = now()->toDateString();
@@ -34,8 +34,6 @@ class CrawlerHitRecorder
                 ['date', 'bot'],
                 ['hits' => DB::raw('hits + 1'), 'updated_at' => now()],
             );
-
-            return true;
         } catch (\Throwable $e) {
             // ponytail: daily granularity is enough for "are AI crawlers
             // hitting us" measurement. Upgrade to (date,bot,path) if needed.
@@ -43,8 +41,6 @@ class CrawlerHitRecorder
                 'bot' => $bot,
                 'error' => $e->getMessage(),
             ]);
-
-            return false;
         }
     }
 }

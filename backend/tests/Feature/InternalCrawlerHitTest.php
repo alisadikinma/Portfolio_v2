@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
@@ -57,6 +59,20 @@ class InternalCrawlerHitTest extends TestCase
         $this->postJson(self::URL, ['bot' => 'GPTBot'], ['X-Internal-Token' => 'x'])->assertStatus(503);
     }
 
+    public function test_missing_token_config_logs_warning_at_most_once_per_hour(): void
+    {
+        Cache::flush();
+        config(['services.internal.token' => '']);
+        Log::spy();
+
+        $this->postJson(self::URL, ['bot' => 'GPTBot'])->assertStatus(503);
+        $this->postJson(self::URL, ['bot' => 'GPTBot'])->assertStatus(503);
+
+        Log::shouldHaveReceived('warning')
+            ->withArgs(fn ($msg) => str_contains($msg, 'INTERNAL_API_TOKEN'))
+            ->once();
+    }
+
     public function test_unknown_bot_is_422(): void
     {
         $this->setServerToken();
@@ -71,8 +87,28 @@ class InternalCrawlerHitTest extends TestCase
     {
         $this->setServerToken();
         Schema::dropIfExists('geo_crawler_hits');
+        Log::spy();
+
         $this->postJson(self::URL, ['bot' => 'GPTBot'], ['X-Internal-Token' => 'secret-token'])
             ->assertStatus(202);
+
+        Log::shouldHaveReceived('warning')
+            ->withArgs(fn ($msg) => $msg === 'Failed to record crawler hit')
+            ->once();
+    }
+
+    public function test_middleware_and_endpoint_increment_the_same_row(): void
+    {
+        $this->setServerToken();
+
+        $this->withHeaders(['User-Agent' => 'Mozilla/5.0 (compatible; GPTBot/1.2)'])->get('/');
+        $this->postJson(self::URL, ['bot' => 'GPTBot'], ['X-Internal-Token' => 'secret-token'])
+            ->assertStatus(202);
+
+        $this->assertSame(1, DB::table('geo_crawler_hits')->count());
+        $this->assertDatabaseHas('geo_crawler_hits', [
+            'date' => now()->toDateString(), 'bot' => 'GPTBot', 'hits' => 2,
+        ]);
     }
 
     public function test_crawler_hits_do_not_consume_contact_throttle(): void
