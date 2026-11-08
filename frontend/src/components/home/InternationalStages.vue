@@ -319,8 +319,8 @@ const careerChapters = [
     id: 'career-satnusa',
     flag: '🇮🇩',
     location: 'Indonesia — Manufacturing',
-    years: '2023–2025',
-    role: 'Head of Digital Transformation 4.0',
+    years: '2021–2025',
+    role: 'Process Engineering Manager → Head of Digital Transformation 4.0',
     org: 'PT Sat Nusapersada (Satnusa), Batam',
     note: 'Led a team of 31 shipping 56+ enterprise AI/IoT products and the MySatnusa Super App — $318K+ documented impact, which seeded INDUSIA.ai.',
     // "Digital Transformation Leadership — Building AI-Driven Efficiency" gallery
