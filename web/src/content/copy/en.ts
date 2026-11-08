@@ -177,6 +177,7 @@ export const en: Copy = {
     instagram: "Instagram",
     youtube: "YouTube",
     tiktok: "TikTok",
+    github: "GitHub",
     ariaSocial: "Ali Sadikin Ma on social media",
   },
   about: {
@@ -207,6 +208,16 @@ export const en: Copy = {
     moreLead: "Want to work with Ali? See",
     moreOr: "or",
     indusiaAnd: " and ",
+  },
+  notFound: {
+    title: "Page not found — Ali Sadikin Ma",
+    description: "The page you are looking for does not exist or has moved.",
+    h1: "Page not found",
+    lead: "The address may be mistyped or the page has moved. Try one of these:",
+    home: "Home",
+    blog: "Blog",
+    projects: "Projects",
+    contact: "Contact",
   },
   faq: {
     metaTitle: "FAQ AI Consultant Indonesia — Ali Sadikin Ma",

@@ -19,6 +19,7 @@ const social = (host: string) => SAME_AS.find((u) => u.includes(host)) ?? "";
       {social("instagram") !== "" && <SocialLink href={social("instagram")} label={c.footer.instagram} />}
       {social("youtube") !== "" && <SocialLink href={social("youtube")} label={c.footer.youtube} />}
       {social("tiktok") !== "" && <SocialLink href={social("tiktok")} label={c.footer.tiktok} />}
+      {social("github") !== "" && <SocialLink href={social("github")} label={c.footer.github} />}
       <a href={`/${lang}/faq`}>{c.footer.faq}</a>
     </nav>
   </div>

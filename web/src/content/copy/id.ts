@@ -175,6 +175,7 @@ export const id = {
     instagram: "Instagram",
     youtube: "YouTube",
     tiktok: "TikTok",
+    github: "GitHub",
     ariaSocial: "Media sosial Ali Sadikin Ma",
   },
   about: {
@@ -205,6 +206,16 @@ export const id = {
     moreLead: "Ingin bekerja sama dengan Ali? Lihat",
     moreOr: "atau",
     indusiaAnd: " dan ",
+  },
+  notFound: {
+    title: "Halaman tidak ditemukan — Ali Sadikin Ma",
+    description: "Halaman yang Anda cari tidak ada atau sudah dipindah.",
+    h1: "Halaman tidak ditemukan",
+    lead: "Alamatnya mungkin salah ketik atau halamannya sudah dipindah. Coba salah satu halaman ini:",
+    home: "Beranda",
+    blog: "Blog",
+    projects: "Proyek",
+    contact: "Kontak",
   },
   faq: {
     metaTitle: "FAQ Pakar AI Indonesia — Ali Sadikin Ma",

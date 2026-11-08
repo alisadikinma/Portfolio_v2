@@ -149,6 +149,8 @@ describe("BaseLayout", () => {
       expect(inner).toContain("<svg");
     }
     expect(nav).toMatch(/<a href="\/id\/faq">/);
+    // Ali 2026-11-09: GitHub joins the footer icons.
+    expect(nav).toMatch(/<a class="soc"[^>]*href="https:\/\/github\.com\/alisadikinma"/);
   });
 
   it("EN footer points to unprefixed indusia.ai", async () => {

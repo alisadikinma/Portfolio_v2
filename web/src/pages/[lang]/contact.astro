@@ -28,6 +28,7 @@ const social = [
   { host: "instagram", label: f.instagram },
   { host: "youtube", label: f.youtube },
   { host: "tiktok", label: f.tiktok },
+  { host: "github", label: f.github },
 ]
   .map((s) => ({ label: s.label, href: SAME_AS.find((u) => u.includes(s.host)) ?? "" }))
   .filter((s) => s.href !== "");
