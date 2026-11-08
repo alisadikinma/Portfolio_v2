@@ -1,0 +1,120 @@
+---
+// Speaker page body (/id/pembicara-ai, /en/ai-speaker). Rendered by pages/[lang]/[trainingSeg].astro,
+// which owns routing for both single-segment pages (two sibling dynamic files would conflict).
+import BaseLayout from "../layouts/BaseLayout.astro";
+import type { Lang } from "../lib/i18n";
+import { SITE, breadcrumb, faqPage, graph, personNode, serviceNode, webPageNode, websiteNode, PORTRAIT_URL } from "../lib/schema";
+import { awardHref, loadAwardSlugs } from "../lib/career";
+import { SESSIONS } from "../lib/speaking";
+import { waLink } from "../lib/whatsapp";
+import { id } from "../content/copy/id";
+import { en } from "../content/copy/en";
+import { ANCHORS, TITLES } from "../../scripts/seo-gate.config.mjs";
+
+interface Props { lang: Lang; path: string }
+const { lang, path } = Astro.props;
+const c = (lang === "id" ? id : en).speaker;
+const title = (TITLES as Record<string, string>)[path];
+const url = SITE + path;
+const bioAnchor = ANCHORS[lang].speakerBio;
+const [wa, slugs] = await Promise.all([waLink(lang), loadAwardSlugs(lang)]);
+
+const topics = [1, 2, 3, 4].map((n) => ({ h: c[`t${n}h` as keyof typeof c], p: c[`t${n}p` as keyof typeof c] }));
+const faq = [1, 2, 3, 4].map((n) => ({ q: c[`q${n}` as keyof typeof c], a: c[`a${n}` as keyof typeof c] }));
+const sessions = SESSIONS.map((s) => ({
+  ...s,
+  href: awardHref({ slug: slugs.get(s.awardId) }, lang),
+}));
+
+const jsonld = graph(
+  personNode(),
+  websiteNode(),
+  webPageNode({ url, lang, name: title, description: c.metaDescription }),
+  serviceNode({ name: c.h1, url, lang }),
+  breadcrumb([
+    { name: "Ali Sadikin Ma", url: `${SITE}/${lang}` },
+    { name: c.breadcrumb, url },
+  ]),
+  faqPage(faq),
+);
+---
+<BaseLayout title={title} description={c.metaDescription} path={path} lang={lang} jsonld={jsonld}>
+  <main>
+    <section class="page-hero">
+      <div class="wrap speaker-hero">
+        <div>
+          <h1>{c.h1}</h1>
+          <p class="lead">{c.lead}</p>
+          <div class="hero-ctas">
+            {wa !== "" && <a class="btn btn-primary" href={wa}>{c.ctaInvite}</a>}
+            <a class="btn btn-ghost" href="#topik">{c.ctaTopics}</a>
+          </div>
+        </div>
+        <div class="ph"><img src="/images/ali-sadikin-ma-pakar-ai-indonesia.jpg" alt={c.portraitAlt} width="1200" height="1200" decoding="async" /></div>
+      </div>
+    </section>
+
+    <section class="sec" id="topik" aria-labelledby="topik-h">
+      <div class="wrap">
+        <div class="sec-head"><h2 id="topik-h">{c.topicsH2}</h2></div>
+        <ul class="topics">
+          {topics.map((t) => <li><h3>{t.h}</h3><p>{t.p}</p></li>)}
+        </ul>
+      </div>
+    </section>
+
+    <section class="sec alt" aria-labelledby="stages-h">
+      <div class="wrap">
+        <div class="sec-head"><h2 id="stages-h">{c.stagesH2}</h2><p class="lead">{c.stagesLead}</p></div>
+        <ul class="stages">
+          {sessions.map((s) => (
+            <li>
+              <span class="yr">{s.when[lang]}</span>
+              <h3>{s.href ? <a href={s.href}>{s.event}</a> : s.event}</h3>
+              <p>{s.place[lang]} · {s.result[lang]}{s.topic && <> · {c.topicLabel}: {s.topic[lang]}</>}</p>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+
+    <section class="sec" id="press" aria-labelledby="press-h">
+      <div class="wrap">
+        <div class="sec-head"><h2 id="press-h">{c.pressH2}</h2><p class="lead">{c.pressLead}</p></div>
+        <div class="split">
+          <div>
+            <h3>{c.shortBioH}</h3>
+            <p>{c.shortBioPre}<a href={bioAnchor.href}>{bioAnchor.anchor}</a>{c.shortBioPost}</p>
+            <h3 style="margin-top:24px">{c.longBioH}</h3>
+            <p>{c.longBio1}</p>
+            <p>{c.longBio2}</p>
+            <p>{c.longBio3}</p>
+          </div>
+          <div>
+            <p><a class="btn btn-ghost" href="/images/ali-sadikin-ma-pakar-ai-indonesia.jpg" download>{c.downloadPortrait}</a></p>
+            <p style="margin-top:12px"><a class="btn btn-ghost" href="/press/ali-sadikin-ma-bio.txt" download>{c.downloadBio}</a></p>
+            <p class="muted" style="margin-top:24px">{c.relatedLead} <a href={`/${lang}/about`}>{c.relatedAbout}</a> {c.relatedAnd} <a href={lang === "id" ? "/id/pelatihan-ai" : "/en/ai-training"}>{c.relatedTraining}</a>.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    {wa !== "" && (
+      <section class="sec alt" id="wa">
+        <div class="wrap ask">
+          <div><h2>{c.askH2}</h2><p class="muted" style="margin-top:12px">{c.askP}</p></div>
+          <a class="btn btn-primary" href={wa}>{c.ctaInvite}</a>
+        </div>
+      </section>
+    )}
+
+    <section class="sec faq" aria-labelledby="faq-h">
+      <div class="wrap split">
+        <h2 id="faq-h">{c.faqH2}</h2>
+        <div>
+          {faq.map((f, i) => <details open={i === 0}><summary>{f.q}</summary><p>{f.a}</p></details>)}
+        </div>
+      </div>
+    </section>
+  </main>
+</BaseLayout>
