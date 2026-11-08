@@ -31,3 +31,18 @@ describe("waLink", () => {
     expect(await waLink("id")).toBe("");
   });
 });
+
+// Ali 2026-11-09: WhatsApp buttons open with a page-specific message, so a lead shows where it came from.
+describe("waLink prefilled text", () => {
+  beforeEach(() => apiGet.mockReset());
+  it("is URL-encoded after ?text=", async () => {
+    apiGet.mockResolvedValue({ contact_phone: "+62 813-8016-3758" });
+    expect(await waLink("id", "Halo, saya ingin pelatihan AI & workshop?")).toBe(
+      "https://wa.me/6281380163758?text=Halo%2C%20saya%20ingin%20pelatihan%20AI%20%26%20workshop%3F",
+    );
+  });
+  it("stays empty when the phone is missing, even with text", async () => {
+    apiGet.mockResolvedValue({});
+    expect(await waLink("id", "x")).toBe("");
+  });
+});

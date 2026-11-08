@@ -56,7 +56,7 @@ describe("training page", () => {
   it("one H1, status badge, form wired to the waitlist endpoint with page path + locale", async () => {
     const { html } = await load("id", "pelatihan-ai");
     expect((html.match(/<h1/g) ?? []).length).toBe(1);
-    expect(html).toContain("Segera dibuka");
+    expect(html).toContain("Tersedia untuk perusahaan");
     expect(html).toContain('data-endpoint="/api/training-waitlist"');
     expect(html).toContain('data-source-page="/id/pelatihan-ai"');
     expect(html).toContain('data-locale="id"');

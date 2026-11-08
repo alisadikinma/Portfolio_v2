@@ -74,7 +74,7 @@ describe("speaker page", () => {
   });
 
   it("training routes still resolve to the training page", async () => {
-    expect((await load("id", "pelatihan-ai")).html).toContain("Segera dibuka");
+    expect((await load("id", "pelatihan-ai")).html).toContain("Tersedia untuk perusahaan");
     expect((await load("en", "ai-training")).status).toBe(200);
     expect((await load("id", "pelatihan-ai")).html).not.toContain('class="stages"');
   });
