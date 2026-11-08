@@ -23,7 +23,7 @@ let galleries = false;
 // award id -> file names in its gallery (only the ones the page picks matter)
 const FILES: Record<number, string[]> = {
   13: ["1777871190_item_20_3.jpg", "1777871190_item_20_0.png", "1777871190_item_20_4.jpg"],
-  10: ["1761931433_item_12_0.jpg", "1761931433_item_12_9.jpg"],
+  10: ["1761931433_item_12_0.jpg", "1761931433_item_12_3.jpg", "1761931433_item_12_9.jpg"],
   7: ["1761930891_item_9_1.jpg", "1761930891_item_9_2.jpg"],
   8: ["1761931360_item_10_1.jpg"],
 };
@@ -129,9 +129,22 @@ describe("speaker page", () => {
     galleries = true;
     const list = presented((await load("id", "pembicara-ai")).html);
     expect((list.match(/<img /g) ?? []).length).toBe(4);
-    for (const f of ["item_20_3", "item_12_9", "item_9_1", "item_10_1"]) expect(list).toContain(f);
+    // UNCTAD: Ali speaking with a mic, face visible (Ali 2026-11-09), not the 12_9 stranger
+    for (const f of ["item_20_3", "item_12_3", "item_9_1", "item_10_1"]) expect(list).toContain(f);
     expect((list.match(/data-lightbox-items=/g) ?? []).length).toBe(4);
     expect(list).toContain("data-lightbox-thumbs=");
+    expect(list).not.toContain("item_12_9.jpg\" alt");
+  });
+
+  it("the photo cards open: the page ships the lightbox dialog (Ali 2026-11-09: click did nothing)", async () => {
+    galleries = true;
+    const { html } = await load("id", "pembicara-ai");
+    expect(html).toMatch(/<dialog class="lb" id="lb"/);
+  });
+
+  it("no gallery data: no lightbox dialog either", async () => {
+    const { html } = await load("en", "ai-speaker");
+    expect(html).not.toContain('id="lb"');
   });
 
   it("no video section and no claim of keynote / formats not in the source facts", async () => {

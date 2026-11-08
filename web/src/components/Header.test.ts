@@ -46,3 +46,25 @@ describe("language switcher", () => {
     expect(sw).not.toContain("<a ");
   });
 });
+
+// Ali 2026-11-09: on the AI Speaker page the "AI Speaker" nav item was not highlighted.
+describe("current page in the nav", () => {
+  const nav = async (lang: "id" | "en", path: string) => (await render(lang, path)).match(/<nav[\s\S]*?<\/nav>/)?.[0] ?? "";
+  const current = (html: string) => [...html.matchAll(/<a [^>]*aria-current="page"[^>]*>([^<]*)<\/a>/g)].map((m) => m[1]);
+
+  it.each([
+    ["id", "/id/pembicara-ai", "Pembicara AI"],
+    ["en", "/en/ai-speaker", "AI Speaker"],
+    ["id", "/id/pelatihan-ai", "Pelatihan AI"],
+    ["en", "/en/ai-training", "AI Training"],
+    ["id", "/id/blog/judul-artikel", "Blog"],
+    ["en", "/en/blog", "Blog"],
+  ] as const)("%s %s marks %s", async (lang, path, label) => {
+    expect(current(await nav(lang, path))).toEqual([label]);
+  });
+
+  it("home and other pages mark nothing as the current page", async () => {
+    expect(current(await nav("id", "/id"))).toEqual([]);
+    expect(current(await nav("en", "/en/faq"))).toEqual([]);
+  });
+});

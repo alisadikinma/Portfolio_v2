@@ -10,7 +10,6 @@ class PageSectionSeeder extends Seeder
     /** Homepage section_types the Astro home reads (kebab-case). Keep in sync with index.astro. */
     private const HOMEPAGE_SECTIONS = [
         'hero',
-        'who-i-am',
         'receipts',
         'international-stages',
         'services',
@@ -41,12 +40,6 @@ class PageSectionSeeder extends Seeder
                 'section_type' => 'hero',
                 'is_active' => true,
                 'sequence' => 0,
-            ],
-            [
-                'page_type' => 'homepage',
-                'section_type' => 'who-i-am',
-                'is_active' => true,
-                'sequence' => 1,
             ],
             [
                 'page_type' => 'homepage',

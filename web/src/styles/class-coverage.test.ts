@@ -18,7 +18,7 @@ function files(dir: string): string[] {
   });
 }
 
-const targets = ["components/home/LatestWriting.astro", "components/NewsletterForm.astro", "components/home/Journey.astro", "components/home/WhoIAm.astro", "pages/[lang]/[trainingSeg].astro"];
+const targets = ["components/home/LatestWriting.astro", "components/NewsletterForm.astro", "components/home/Journey.astro", "components/Hero.astro", "pages/[lang]/[trainingSeg].astro"];
 
 describe("every static class used by key sections has CSS", () => {
   it.each(targets)("%s", (rel) => {

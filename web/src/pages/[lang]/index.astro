@@ -1,7 +1,6 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import Hero from "../../components/Hero.astro";
-import WhoIAm from "../../components/home/WhoIAm.astro";
 import ProofBand from "../../components/home/ProofBand.astro";
 import Journey from "../../components/home/Journey.astro";
 import Services from "../../components/home/Services.astro";
@@ -68,7 +67,6 @@ const jsonld = graph(
 >
   <main>
     <Hero lang={lang} wa={wa} />
-    {on("who-i-am") && <WhoIAm lang={lang} />}
     {on("receipts") && <ProofBand lang={lang} />}
     {on("international-stages") && <Journey lang={lang} />}
     {on("services") && <Services lang={lang} wa={wa} />}

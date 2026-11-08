@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import { experimental_AstroContainer as AstroContainer } from "astro/container";
 import { ROUTES } from "../../../scripts/seo-gate.config.mjs";
 import ProofBand from "./ProofBand.astro";
-import WhoIAm from "./WhoIAm.astro";
 import Services from "./Services.astro";
 
 type Lang = "id" | "en";
@@ -42,34 +41,6 @@ describe("ProofBand", () => {
   it("en: states 26 startups / 16 countries as event context", async () => {
     const html = await render(ProofBand, "en");
     expect(html).toContain("26 AI startups from 16 countries, Global AI Demo Day 2026");
-  });
-});
-
-describe.each(["id", "en"] as const)("WhoIAm (%s)", (lang) => {
-  it("has exact dofollow company anchor", async () => {
-    const html = await render(WhoIAm, lang);
-    const l = link(lang, "company");
-    const a = anchorTag(html, l.anchor);
-    expect(a).toContain(`href="${l.href}"`);
-    expect(a).not.toMatch(/\srel=/);
-    expect(html).toContain('id="tentang"');
-  });
-
-  it("shows an illustration of what Ali does, not the hero photo again (Ali 2026-11-09)", async () => {
-    const html = await render(WhoIAm, lang);
-    expect(html).not.toContain("ali-sadikin-ma-pakar-ai-indonesia.jpg");
-    const img = html.match(/<img [^>]*class="who-illus"[^>]*>/)?.[0] ?? "";
-    expect(img).toMatch(/who-ali-sadikin-ma/);
-    expect(img).toMatch(/alt="[^"]{60,}"/);
-    expect(img).toContain('width="');
-    expect(img).toContain('loading="lazy"');
-  });
-
-  it("heading comes before the figure and body text (document order)", async () => {
-    const html = await render(WhoIAm, lang);
-    expect(html.indexOf("<h2")).toBeLessThan(html.indexOf("who-illus"));
-    expect((html.match(/<h[1-6]/g) ?? []).every((h) => h === "<h2")).toBe(true);
-    expect(html).not.toMatch(/Rp\s?\d|\$\s?\d/);
   });
 });
 

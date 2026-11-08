@@ -10,9 +10,9 @@
 .nav { display: flex; gap: 24px; margin-left: auto; }
 .nav a { color: var(--text-secondary); text-decoration: none; font-size: 15px; transition: color var(--dur-hover) var(--ease-out); }
 .nav a:hover, .nav a[aria-current="page"] { color: var(--text-primary); }
-.nav a[data-spy] { position: relative; }
+.nav a[data-spy], .nav a[aria-current="page"] { position: relative; }
 .nav a.is-active { color: var(--text-primary); }
-.nav a.is-active::after { content: ""; position: absolute; left: 0; right: 0; bottom: -8px; height: 2px; border-radius: 2px; background: var(--accent-primary); }
+.nav a.is-active::after, .nav a[aria-current="page"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: -8px; height: 2px; border-radius: 2px; background: var(--accent-primary); }
 @media (prefers-reduced-motion: no-preference) { .nav a::after { transition: opacity var(--dur-hover) var(--ease-out); } }
 .lang-sw { display: flex; align-items: center; gap: 2px; padding: 3px; margin-left: 16px; border-radius: 999px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); }
 .lang-sw .flag { display: inline-flex; padding: 4px 6px; border-radius: 999px; border: 1px solid transparent; line-height: 0; }
@@ -231,7 +231,9 @@ fieldset.field { border: 0; margin: 0; padding: 0; }
 
 .hx {
   position: relative; overflow: hidden; isolation: isolate;
-  height: calc(100svh - var(--header-h)); min-height: 540px; display: flex; align-items: flex-end;
+  /* min-height, not height: on short or narrow screens the copy grows the hero instead of
+     being pushed up under the header (Ali 2026-11-09: "AI" and the name were cut off). */
+  min-height: max(540px, calc(100svh - var(--header-h))); display: flex; align-items: flex-end;
   background:
     radial-gradient(60% 70% at 72% 45%, rgba(63,184,197,.10), transparent 70%),
     linear-gradient(rgba(232,238,248,.035) 1px, transparent 1px) 0 0 / 100% 48px,
@@ -249,13 +251,15 @@ fieldset.field { border: 0; margin: 0; padding: 0; }
 .hx .det { visibility: hidden; }
 /* every hero size follows viewport HEIGHT too, so name + H1 + lead + CTAs + HUD fit one screen */
 .hx-text { position: relative; z-index: 3; width: 100%; padding-top: clamp(16px, 4svh, 48px); padding-bottom: calc(52px + clamp(20px, 5svh, 52px)); }
-.hx-h1-name { display: block; font: 500 clamp(20px, min(2.4vw, 3.6svh), 34px)/1.2 var(--font-display); letter-spacing: -0.01em; color: var(--text-primary); margin-bottom: clamp(6px, 1.4svh, 14px); }
+.hx-h1-name { display: block; font: 600 clamp(22px, min(2.8vw, 4.2svh), 40px)/1.2 var(--font-display); letter-spacing: -0.01em; color: var(--accent-primary); margin-bottom: clamp(6px, 1.4svh, 14px); }
 .hx h1 {
-  font-size: clamp(48px, min(11.5vw, 15svh), 188px); line-height: .88; letter-spacing: -0.045em; font-weight: 600;
+  font-size: clamp(48px, min(9.5vw, 12svh), 150px); line-height: .9; letter-spacing: -0.045em; font-weight: 600;
   max-width: 7ch; text-wrap: balance;
   text-shadow: 0 2px 30px rgba(10,18,32,.6);
 }
 .hx-lead { margin-top: clamp(14px, 3svh, 28px); font-size: clamp(16px, 2.2svh, 19px); line-height: 1.55; color: var(--text-secondary); max-width: 46ch; }
+.hx-build { margin-top: clamp(10px, 2svh, 16px); font-size: clamp(14.5px, 1.9svh, 16.5px); line-height: 1.55; color: var(--text-secondary); max-width: 52ch; }
+.hx-build a, .hx-lead a { color: var(--accent-primary); text-underline-offset: 3px; }
 .hx .hero-ctas { margin-top: clamp(14px, 3svh, 28px); }
 .hx-more { display: none; }
 .hx-hud {
@@ -268,7 +272,8 @@ fieldset.field { border: 0; margin: 0; padding: 0; }
 .hx-hud .r { display: flex; gap: 20px; }
 .hx-hud .r b { color: var(--text-primary); font-weight: 500; }
 @media (max-width: 760px) {
-  .hx { height: calc(100svh - var(--header-h)); min-height: 520px; }
+  .hx { min-height: max(520px, calc(100svh - var(--header-h))); }
+  .hx.js .hx-lead:not(.open) ~ .hx-build { display: none; } /* opens with "Selengkapnya" */
   .hx-text { padding-top: 56px; padding-bottom: calc(44px + 16px); }
   .hx h1 { font-size: clamp(40px, min(15vw, 8svh), 84px); }
   .hx-lead { font-size: clamp(14.5px, 2.2svh, 17px); line-height: 1.5; margin-top: 12px; }
@@ -399,14 +404,6 @@ fieldset.field { border: 0; margin: 0; padding: 0; }
 }
 @media (max-width: 400px) { .site-head .btn { padding: 0 12px; font-size: 14px; } .lang-sw { padding: 2px; } .lang-sw .flag { padding: 3px 4px; } .lang-sw .flag svg { width: 18px; height: 12px; } .brand { font-size: 17px; } }
 
-/* ================= who I am ================= */
-.who { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); grid-template-areas: "pic ." "pic h" "pic body" "pic ."; grid-template-rows: 1fr auto auto 1fr; column-gap: clamp(32px, 6vw, 88px); row-gap: 24px; align-items: center; }
-.who-h { grid-area: h; margin: 0; }
-.who-body { grid-area: body; display: grid; gap: 20px; color: var(--text-secondary); align-self: start; font-size: 18px; line-height: 1.7; max-width: 62ch; }
-.who-body strong { color: var(--text-primary); font-weight: 600; }
-.who-illus { grid-area: pic; width: 100%; max-width: 460px; height: auto; aspect-ratio: 1 / 1; border-radius: 28px; justify-self: start;
-  box-shadow: 0 0 0 1px var(--border-subtle), 0 30px 80px -30px rgba(63,184,197,.35); }
-@media (max-width: 960px) { .who { grid-template-columns: 1fr; grid-template-areas: "h" "pic" "body"; grid-template-rows: none; } .who-illus { max-width: 360px; justify-self: center; } }
 
 /* journey illustration (indusia.ai/founder): islands are click targets for their gallery */
 /* Night board: the animated loop (journey-loop.mp4/webm) sits on its own navy (#0d1626),
@@ -550,24 +547,28 @@ fieldset.field { border: 0; margin: 0; padding: 0; }
 
 /* ================= speaker page ================= */
 /* Hero: Ali on the Global AI Demo Day stage, the photo bleeds right and fades into the navy. */
-.sp-hero { position: relative; overflow: hidden; padding: clamp(56px, 9vw, 120px) 0 clamp(48px, 7vw, 96px); background: var(--bg-deep); }
+/* one screen on desktop (Ali 2026-11-09): sizes follow viewport height so badge, H1, lead, CTAs and creds fit */
+.sp-hero { position: relative; overflow: hidden; min-height: calc(100svh - var(--header-h)); display: flex; align-items: center;
+  padding: clamp(24px, 5svh, 64px) 0; background: var(--bg-deep); }
+.sp-hero-in { width: 100%; }
 .sp-hero-ph { position: absolute; inset: 0 0 0 auto; width: 58%; margin: 0; }
 /* object-position 0: keeps Ali at the podium (left of the photo) in view next to the copy */
 .sp-hero-ph img { width: 100%; height: 100%; object-fit: cover; object-position: 0 35%;
   -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 16%); mask-image: linear-gradient(90deg, transparent 0, #000 16%); }
 .sp-hero-ph::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 55%, var(--bg-deep)), radial-gradient(60% 80% at 80% 40%, transparent 40%, rgba(10,18,32,.55)); }
 .sp-hero-in { position: relative; z-index: 1; }
-.sp-hero-copy { max-width: 600px; }
-.sp-hero h1 { font-size: clamp(38px, 5.4vw, 68px); line-height: 1.04; letter-spacing: -0.03em; text-wrap: balance; margin-top: 18px; }
-.sp-hero .lead { margin-top: 20px; max-width: 46ch; }
-.sp-hero .hero-ctas { margin-top: 32px; }
+.sp-hero-copy { max-width: min(620px, 44vw); }
+.sp-hero h1 { font-size: clamp(34px, min(4.4vw, 7svh), 64px); line-height: 1.04; letter-spacing: -0.03em; text-wrap: balance; margin-top: clamp(12px, 2svh, 18px); }
+.sp-hero .lead { margin-top: clamp(12px, 2.2svh, 20px); max-width: 46ch; font-size: clamp(16px, 2.1svh, 19px); }
+.sp-hero .hero-ctas { margin-top: clamp(16px, 3svh, 32px); }
 .sp-badge { display: inline-flex; align-items: center; gap: 8px; margin: 0; padding: 8px 14px; border-radius: 999px; font: 600 13px/1 var(--font-mono);
   color: #1b1204; background: var(--accent-gold); box-shadow: 0 0 28px rgba(212,162,77,.35); }
-.sp-creds { list-style: none; margin: 36px 0 0; padding: 20px 0 0; display: flex; flex-wrap: wrap; gap: 10px 28px; border-top: 1px solid var(--border-subtle); color: var(--text-secondary); font-size: 15px; }
+.sp-creds { list-style: none; margin: clamp(18px, 3.4svh, 36px) 0 0; padding: clamp(12px, 2svh, 20px) 0 0; display: flex; flex-wrap: wrap; gap: 10px 28px; border-top: 1px solid var(--border-subtle); color: var(--text-secondary); font-size: 15px; }
 .sp-creds li { display: flex; align-items: center; gap: 10px; }
 .sp-creds li::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--accent-primary); box-shadow: 0 0 10px var(--accent-primary); }
 @media (max-width: 900px) {
-  .sp-hero { padding-top: 0; }
+  .sp-hero { padding-top: 0; display: block; min-height: 0; }
+  .sp-hero-copy { max-width: 600px; }
   .sp-hero-ph { position: relative; width: 100%; aspect-ratio: 4 / 3; }
   .sp-hero-ph img { -webkit-mask-image: none; mask-image: none; }
   .sp-hero-ph::after { background: linear-gradient(180deg, transparent 50%, var(--bg-deep)); }

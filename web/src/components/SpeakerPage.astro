@@ -5,6 +5,7 @@
 // the block falls back to text (never a stock or placeholder image).
 import BaseLayout from "../layouts/BaseLayout.astro";
 import TrainingIcon from "./TrainingIcon.astro";
+import Lightbox from "./Lightbox.astro";
 import type { Lang } from "../lib/i18n";
 import { SITE, breadcrumb, faqPage, graph, personNode, serviceNode, webPageNode, websiteNode } from "../lib/schema";
 import { STAGE_AWARDS, awardHref, loadAwardPhotos, loadAwardSlugs, type Photo, type Photos } from "../lib/career";
@@ -41,7 +42,7 @@ const hero = (photos.get(STAGE_AWARDS.demoDay)?.photos ?? []).find((p) => p.src.
 // Card covers, chosen by eye from each award gallery.
 const COVER: Record<number, string> = {
   [STAGE_AWARDS.demoDay]: "item_20_3",
-  [STAGE_AWARDS.unctad]: "item_12_9",
+  [STAGE_AWARDS.unctad]: "item_12_3", // Ali speaking with a mic, face visible
   [STAGE_AWARDS.nextdev]: "item_9_1",
   [STAGE_AWARDS.fenox]: "item_10_1",
 };
@@ -183,4 +184,5 @@ const jsonld = graph(
       </div>
     </section>
   </main>
+  {sessions.some((s) => s.cover) && <Lightbox lang={lang} />}
 </BaseLayout>

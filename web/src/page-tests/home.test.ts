@@ -71,9 +71,9 @@ describe("/{lang} home", () => {
     expect((html.match(/<h1/g) ?? []).length).toBe(1);
   });
 
-  it("renders sections in order: hero, who, proof, journey, services, stages, testimonials, writing, newsletter", async () => {
+  it("renders sections in order: hero (incl. who, Ali 2026-11-09), proof, journey, services, stages, testimonials, writing, newsletter", async () => {
     const { html } = await load("id");
-    const order = ['class="hx', 'id="tentang"', 'class="proof"', 'id="perjalanan"', 'id="layanan"', 'id="panggung"', 'id="testimoni"', 'id="tulisan"', "data-newsletter"]
+    const order = ['class="hx', 'class="proof"', 'id="perjalanan"', 'id="layanan"', 'id="panggung"', 'id="testimoni"', 'id="tulisan"', "data-newsletter"]
       .map((m) => pos(html, m));
     expect(order.every((p) => p > 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
@@ -92,7 +92,8 @@ describe("/{lang} home", () => {
     const { html } = await load("id");
     expect(html).not.toContain('id="layanan"');
     expect(html).not.toContain('id="testimoni"');
-    expect(html).toContain('id="tentang"'); // no row -> on
+    expect(html).toContain('id="tentang"'); // the hero carries #tentang
+    expect(html).not.toContain("who-illus"); // standalone Who I am section is gone
     expect(html).toContain('class="hx');
   });
 

@@ -19,7 +19,6 @@ class PageSectionSeederTest extends TestCase
     /** Section types the Astro home reads (kebab-case). */
     private array $spine = [
         'hero',
-        'who-i-am',
         'receipts',
         'international-stages',
         'services',

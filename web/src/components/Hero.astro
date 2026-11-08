@@ -13,7 +13,7 @@ const h = (lang === "id" ? id : en).hero;
 const PHOTO = "/images/ali-sadikin-ma-pakar-ai-indonesia.jpg";
 const founderHref = lang === "id" ? "https://indusia.ai/id/" : "https://indusia.ai/";
 ---
-<section class="hx" data-hero data-photo={PHOTO} aria-labelledby="hero-h1">
+<section class="hx" id="tentang" data-hero data-photo={PHOTO} aria-labelledby="hero-h1">
   <div class="hx-cloud" data-cloud aria-hidden="true"></div>
   <img class="hx-fallback" src={PHOTO} alt={h.imgAlt} width="1200" height="1200" fetchpriority="high" decoding="async" />
   <div aria-hidden="true">
@@ -22,6 +22,7 @@ const founderHref = lang === "id" ? "https://indusia.ai/id/" : "https://indusia.
   <div class="wrap hx-text">
     <h1 id="hero-h1"><span class="hx-h1-name">{h.h1Name}</span> {h.h1Title}</h1>
     <p class="hx-lead" id="hero-lead">{h.leadBefore}<a href={founderHref}>{h.leadLinkText}</a>{h.leadAfter}</p>
+    <p class="hx-build">{h.buildLead}<a href={`${founderHref}ai-vision/`}>{h.visionLink}</a>, <a href={`${founderHref}ai-fleet-transportation/`}>{h.fleetLink}</a>{lang === "id" ? ", dan " : ", and "}<a href={`${founderHref}ai-assistant/`}>{h.chatbotLink}</a>{h.buildMid}<a href={founderHref}>{h.companyLink}</a>{h.buildEnd}</p>
     <button type="button" class="hx-more" hidden aria-expanded="false" aria-controls="hero-lead" data-more={h.more} data-less={h.less}>{h.more}</button>
     <div class="hero-ctas">
       {wa !== "" && <a class="btn btn-primary" href={wa}>{h.ctaWhatsapp}</a>}

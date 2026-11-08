@@ -20,6 +20,11 @@ const alts = alternates(path);
 const homePath = `/${lang}`;
 const spy = (hash: string) => (home ? hash : `${homePath}/${hash}`);
 const wa = await waLink(lang);
+// Page links (not in-page anchors) mark the page you are on (Ali 2026-11-09).
+const trainingHref = localizedPath(`/${lang}/pelatihan-ai`, lang);
+const speakerHref = localizedPath(`/${lang}/pembicara-ai`, lang);
+const blogPrefix = `/${lang}/blog`;
+const cur = (on: boolean) => (on ? "page" : undefined);
 // Native names, the same on both language versions (a reader looks for their own language).
 const LANG_NAME: Record<Lang, string> = { id: "Bahasa Indonesia", en: "English" };
 const order: Lang[] = ["en", "id"]; // same order as the live site: US, then ID
@@ -36,9 +41,9 @@ const ctaLast = cut > 0 ? cta.slice(cut + 1) : cta;
       <a href={spy("#tentang")} data-spy>{c.nav.about}</a>
       <a href={spy("#perjalanan")} data-spy>{c.nav.journey}</a>
       <a href={spy("#layanan")} data-spy>{c.nav.services}</a>
-      <a href={localizedPath(`/${lang}/pelatihan-ai`, lang)}>{c.nav.training}</a>
-      <a href={localizedPath(`/${lang}/pembicara-ai`, lang)}>{c.nav.speaker}</a>
-      <a href={spy("#tulisan")} data-spy>{c.nav.blog}</a>
+      <a href={trainingHref} aria-current={cur(path === trainingHref)}>{c.nav.training}</a>
+      <a href={speakerHref} aria-current={cur(path === speakerHref)}>{c.nav.speaker}</a>
+      <a href={spy("#tulisan")} data-spy aria-current={cur(path === blogPrefix || path.startsWith(`${blogPrefix}/`))}>{c.nav.blog}</a>
     </nav>
     <div class="lang-sw" role="group" aria-label={c.nav.ariaLang}>
       {order.map((l) => {

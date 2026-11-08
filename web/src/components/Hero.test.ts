@@ -30,6 +30,22 @@ describe.each(["id", "en"] as const)("Hero (%s)", (lang) => {
     expect(html).toMatch(new RegExp(`<h1[^>]*id="hero-h1"[^>]*><span class="hx-h1-name">Ali Sadikin Ma</span> ${kw}</h1>`));
   });
 
+  it("hero absorbs 'Who I am' (Ali 2026-11-09): #tentang anchor + dofollow product/company backlinks", async () => {
+    const html = await render(lang);
+    expect(html).toMatch(/<section[^>]*class="hx"[^>]*id="tentang"/);
+    const base = lang === "id" ? "https://indusia.ai/id/" : "https://indusia.ai/";
+    const want: [string, string][] = lang === "id"
+      ? [["machine vision Indonesia", "ai-vision/"], ["fleet management system", "ai-fleet-transportation/"], ["chatbot WhatsApp AI", "ai-assistant/"], ["perusahaan AI Indonesia", ""]]
+      : [["machine vision Indonesia", "ai-vision/"], ["fleet management system", "ai-fleet-transportation/"], ["WhatsApp AI chatbot", "ai-assistant/"], ["AI company Indonesia", ""]];
+    const build = html.match(/<p[^>]*class="hx-build"[^>]*>[\s\S]*?<\/p>/)?.[0] ?? "";
+    for (const [text, path] of want) {
+      const a = [...build.matchAll(/<a ([^>]*)>([^<]*)<\/a>/g)].find((m) => m[2] === text);
+      expect(a, text).toBeTruthy();
+      expect(a![1]).toContain(`href="${base}${path}"`);
+      expect(a![1]).not.toMatch(/\brel=/);
+    }
+  });
+
   it("lead has exact dofollow INDUSIA.ai anchor", async () => {
     const html = await render(lang);
     const href = lang === "id" ? "https://indusia.ai/id/" : "https://indusia.ai/";
