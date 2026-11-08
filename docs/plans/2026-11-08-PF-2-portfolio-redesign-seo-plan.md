@@ -198,9 +198,51 @@ incl. IDBYTE; cover `career-marlin.jpg`), gap 2019–2021 left empty, Satnusa 20
 - [ ] Security: non-string credential test returns 401
 - [ ] `phpstan analyse` exits 0 with the baseline in place
 
-### Phase 0C: Production PHP 8.4 runbook + one-runtime check
+### Phase 0D: Fix LinkedIn schedule timezone (posts publish 7 h late)
 
 **Deps:** 0B
+**Complexity:** complex — production data semantics for every scheduled social post + a data repair.
+**Estimated time:** 30 minutes
+
+**Files:**
+- Create: `backend/app/Models/Concerns/StoresDatesInAppTimezone.php`
+- Modify: `backend/app/Models/LinkedInPost.php`
+- Modify: `backend/app/Models/FacebookPost.php`
+- Modify: `backend/app/Models/InstagramPost.php`
+- Modify: `backend/app/Models/TiktokPost.php`
+- Modify: `backend/app/Models/ThreadsPost.php`
+- Modify: `backend/app/Models/RedditPost.php`
+- Create: `backend/app/Console/Commands/RepairWibScheduleTimes.php`
+- Test: `backend/tests/Feature/ScheduleTimezoneStorageTest.php`
+- Test: `backend/tests/Feature/RepairWibScheduleTimesTest.php`
+
+Found 2026-11-08 by the Carbon 3.10→3.15 update (3 `LinkedInDraftApproveSlotAssignmentTest` cases only
+passed through a Carbon mock-timezone quirk). `app.timezone` = UTC and the publish cron compares
+`cancel_window_ends_at <= now()` in UTC, but `LinkedInSchedulingService::scheduleAt` (and other writers
+passing an `Asia/Jakarta` Carbon: `PublishSlotOrchestrator` `$nextSlot`,
+`AutoScheduleManualReviewLinkedInPosts` `$slot`, `RepurposeJob` `$when`) store the WIB wall-clock
+because Eloquent's `fromDateTime()` formats without converting the zone. Production proof (read-only):
+post 190 raw `scheduled_at 2026-07-06 12:00:00`, `published_at 12:00:19` UTC = 19:00 WIB for a 12:00 WIB
+slot; post 186 raw 22:00 = 05:00 WIB was correct (UTC writer). Ali chose (2026-11-08): fix the code in
+PF-2 and repair pending rows at release; published rows are not touched.
+
+**Steps:**
+1. Write failing test for storage zone: `scheduleAt($draft, Carbon::parse('2026-05-13 12:00', 'Asia/Jakarta'), 'test')` stores raw `scheduled_at` and `cancel_window_ends_at` = `2026-05-13 05:00:00` and the IG/FB/TikTok/Threads siblings the same; a UTC Carbon is stored unchanged. Expected error: `Failed asserting that '2026-05-13 12:00:00' matches expected '2026-05-13 05:00:00'`
+2. Run, confirm failure
+3. Implement trait `StoresDatesInAppTimezone` overriding `fromDateTime($value)`: a `DateTimeInterface` value is converted (`copy()->setTimezone(config('app.timezone'))`) before formatting; strings/null keep today's behaviour. Use it on the 6 post models. Do NOT change any writer's call site — one fix point
+4. Run the new test + `LinkedInDraftApproveSlotAssignmentTest` (the 3 cases must now pass on Carbon 3.15 for the right reason) + every LinkedIn/cross-post/scheduler test; full suite: failures back to the 167 baseline, 0 new
+5. Write failing test for the repair command, then implement `linkedin:repair-wib-schedules {--dry-run}`: for `awaiting_publish` LinkedIn drafts with `scheduled_at` in the future, read the LAST `pipeline_state_log` entry carrying `publish_at` (ISO-8601 with offset); if `publish_at` as UTC ≠ raw `scheduled_at` by exactly 7 h, set `scheduled_at` + `cancel_window_ends_at` (and siblings) to the UTC instant; rows without a logged `publish_at`, or differing by any other amount, are only listed (never changed). `--dry-run` prints `id | raw | intended WIB | action` and writes nothing; non-dry-run prints the same and a total. Tests: 7 h row fixed, correct row untouched, no-log row listed only, published row ignored, dry-run writes nothing
+6. PHPStan + pint on touched files; commit: "fix(PF-2): store schedule timestamps in UTC (posts were publishing 7 h late)"
+7. Add the repair command (dry-run first, then real run, Ali watching) to `docs/runbooks/pf2-php84-upgrade.md` release steps (Phase 0C) — production is NOT touched in this phase
+
+**Verification:**
+- [ ] Raw DB value for a 12:00 WIB slot is `05:00:00` (test)
+- [ ] `LinkedInDraftApproveSlotAssignmentTest` green on Carbon 3.15 without changing its assertions
+- [ ] Repair command dry-run writes nothing; real run only changes rows whose logged `publish_at` proves the 7 h shift
+
+### Phase 0C: Production PHP 8.4 runbook + one-runtime check
+
+**Deps:** 0B, 0D
 **Complexity:** complex — production infrastructure change; wrong step takes the site down.
 **Estimated time:** 20 minutes (writing); execution only with Ali's OK
 
@@ -1152,47 +1194,48 @@ incl. IDBYTE; cover `career-marlin.jpg`), gap 2019–2021 left empty, Satnusa 20
 ```
 wave 1 lane 1: 0A
 wave 2 lane 1: 0B
-wave 3 lane 1: 0C
-wave 4 lane 1: 1A
-wave 4 lane 2: 1I
-wave 4 lane 3: 4A
-wave 5 lane 1: 1B
-wave 5 lane 2: 1C
-wave 5 lane 3: 1D
-wave 5 lane 4: 1E
-wave 5 lane 5: 1F
-wave 5 lane 6: 1K
-wave 5 lane 7: 4B
-wave 6 lane 1: 1G
-wave 6 lane 2: 1J
-wave 6 lane 3: 4C
-wave 7 lane 1: 1H
-wave 7 lane 2: 4D
-wave 8 lane 1: 1L
-wave 9 lane 1: 2A
-wave 9 lane 2: 2D
-wave 9 lane 3: 3A
-wave 10 lane 1: 2B
-wave 10 lane 2: 2C
-wave 10 lane 3: 2E
-wave 10 lane 4: 3B
-wave 11 lane 1: 2F
-wave 11 lane 2: 3C
-wave 11 lane 3: 3D
-wave 12 lane 1: 3E
-wave 13 lane 1: 3F
-wave 13 lane 2: 3G
-wave 13 lane 3: 3I
-wave 13 lane 4: 4E
-wave 14 lane 1: 3H
-wave 14 lane 2: 4F
-wave 15 lane 1: 4G
-wave 16 lane 1: 5A
-wave 17 lane 1: 5B
-wave 18 lane 1: 5C
-wave 19 lane 1: 5D
-wave 20 lane 1: 5E
-wave 21 lane 1: 6A
+wave 3 lane 1: 0D
+wave 4 lane 1: 0C
+wave 5 lane 1: 1A
+wave 5 lane 2: 1I
+wave 5 lane 3: 4A
+wave 6 lane 1: 1B
+wave 6 lane 2: 1C
+wave 6 lane 3: 1D
+wave 6 lane 4: 1E
+wave 6 lane 5: 1F
+wave 6 lane 6: 1K
+wave 6 lane 7: 4B
+wave 7 lane 1: 1G
+wave 7 lane 2: 1J
+wave 7 lane 3: 4C
+wave 8 lane 1: 1H
+wave 8 lane 2: 4D
+wave 9 lane 1: 1L
+wave 10 lane 1: 2A
+wave 10 lane 2: 2D
+wave 10 lane 3: 3A
+wave 11 lane 1: 2B
+wave 11 lane 2: 2C
+wave 11 lane 3: 2E
+wave 11 lane 4: 3B
+wave 12 lane 1: 2F
+wave 12 lane 2: 3C
+wave 12 lane 3: 3D
+wave 13 lane 1: 3E
+wave 14 lane 1: 3F
+wave 14 lane 2: 3G
+wave 14 lane 3: 3I
+wave 14 lane 4: 4E
+wave 15 lane 1: 3H
+wave 15 lane 2: 4F
+wave 16 lane 1: 4G
+wave 17 lane 1: 5A
+wave 18 lane 1: 5B
+wave 19 lane 1: 5C
+wave 20 lane 1: 5D
+wave 21 lane 1: 5E
+wave 22 lane 1: 6A
 ```
 
 ## Out of scope
