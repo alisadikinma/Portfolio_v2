@@ -44,6 +44,10 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('internal-crawler', fn (Request $request) => Limit::perMinute(600)
             ->by('internal-crawler|'.$request->ip()));
 
+        // Public waitlist write: own bucket, 5 submits per hour per client IP.
+        RateLimiter::for('training-waitlist', fn (Request $request) => Limit::perHour(5)
+            ->by('training-waitlist|'.$request->ip()));
+
         $this->registerScheduledCommandAuditHooks();
     }
 

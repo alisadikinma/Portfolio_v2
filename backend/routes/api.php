@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\GeoController;
 use App\Http\Controllers\Api\FaqController;
 use App\Http\Controllers\Api\ActivityFeedController;
 use App\Http\Controllers\Api\NewsletterController;
+use App\Http\Controllers\Api\TrainingWaitlistController;
 use App\Http\Controllers\Api\BlogPromoSlotController;
 use App\Http\Controllers\Api\CarouselDraftController;
 use App\Http\Controllers\Api\Admin\ContentIdeaController;
@@ -174,6 +175,9 @@ Route::get('/blog/promo-slot', [BlogPromoSlotController::class, 'show']);
 Route::post('/newsletter/subscribe', [NewsletterController::class, 'subscribe'])->middleware('throttle:5,60');
 Route::delete('/newsletter/unsubscribe', [NewsletterController::class, 'unsubscribe']);
 Route::post('/newsletter/unsubscribe-by-token', [NewsletterController::class, 'unsubscribeByToken']);
+
+// Training waitlist (PF-2) - dedicated limiter, honeypot + client_key idempotency
+Route::post('/training-waitlist', [TrainingWaitlistController::class, 'store'])->middleware('throttle:training-waitlist');
 
 // Public Menu Items Routes (for navbar)
 Route::get('/menu-items', [MenuItemController::class, 'publicMenuItems']);
