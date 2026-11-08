@@ -1,0 +1,156 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { LANGS, type Lang } from "../../lib/i18n";
+import { SITE, breadcrumb, faqPage, graph, personNode, serviceNode, webPageNode, websiteNode } from "../../lib/schema";
+import { id } from "../../content/copy/id";
+import { en } from "../../content/copy/en";
+import { ANCHORS, TITLES } from "../../../scripts/seo-gate.config.mjs";
+
+// Only /id/pelatihan-ai and /en/ai-training exist. Static siblings (/id/faq, /id/about, /id/contact)
+// are separate files and take priority over this 1-segment dynamic route.
+const SEG: Record<Lang, string> = { id: "pelatihan-ai", en: "ai-training" };
+const { lang: rawLang, trainingSeg } = Astro.params;
+if (!(LANGS as readonly string[]).includes(rawLang ?? "") || trainingSeg !== SEG[rawLang as Lang]) {
+  return new Response(null, { status: 404 });
+}
+const lang = rawLang as Lang;
+const c = (lang === "id" ? id : en).training;
+const path = `/${lang}/${SEG[lang]}`;
+const title = (TITLES as Record<string, string>)[path];
+const url = SITE + path;
+const dev = ANCHORS[lang].devServicesTraining;
+
+const topics = [1, 2, 3, 4].map((n) => ({ h: c[`t${n}h` as keyof typeof c], p: c[`t${n}p` as keyof typeof c] }));
+const formats = [1, 2, 3].map((n) => ({
+  dur: c[`f${n}dur` as keyof typeof c], h: c[`f${n}h` as keyof typeof c], p: c[`f${n}p` as keyof typeof c],
+}));
+const faq = [1, 2, 3, 4, 5].map((n) => ({ q: c[`q${n}` as keyof typeof c], a: c[`a${n}` as keyof typeof c] }));
+const a5 = `${c.a5pre} ${c.a5link}${c.a5post}`;
+const faqPlain = faq.map((f, i) => ({ q: f.q, a: i === 4 ? a5 : f.a }));
+
+const jsonld = graph(
+  personNode(),
+  websiteNode(),
+  webPageNode({ url, lang, name: title, description: c.metaDescription }),
+  serviceNode({ name: c.h1, url, lang }),
+  breadcrumb([
+    { name: "Ali Sadikin Ma", url: `${SITE}/${lang}` },
+    { name: c.breadcrumb, url },
+  ]),
+  faqPage(faqPlain),
+);
+---
+<BaseLayout title={title} description={c.metaDescription} path={path} lang={lang} jsonld={jsonld}>
+  <main>
+    <section class="page-hero">
+      <div class="wrap">
+        <span class="status">{c.status}</span>
+        <h1>{c.h1}</h1>
+        <p class="lead">{c.lead}</p>
+        <div class="hero-ctas">
+          <a class="btn btn-primary" href="#waitlist">{c.ctaWaitlist}</a>
+          <a class="btn btn-ghost" href="#topik">{c.ctaTopics}</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="sec" id="topik" aria-labelledby="topik-h">
+      <div class="wrap">
+        <div class="sec-head"><h2 id="topik-h">{c.topicsH2}</h2><p class="lead">{c.topicsLead}</p></div>
+        <ul class="topics">
+          {topics.map((t) => <li><h3>{t.h}</h3><p>{t.p}</p></li>)}
+        </ul>
+      </div>
+    </section>
+
+    <section class="sec alt" aria-labelledby="format-h">
+      <div class="wrap">
+        <div class="sec-head"><h2 id="format-h">{c.formatH2}</h2></div>
+        <div class="formats">
+          {formats.map((f) => <div><span class="dur">{f.dur}</span><h3>{f.h}</h3><p>{f.p}</p></div>)}
+        </div>
+        <p class="muted" style="margin-top:24px">{c.fees}</p>
+        <p class="muted" style="margin-top:12px">{c.relatedLead} <a href={`/${lang}/faq`}>{c.relatedFaq}</a> {c.relatedAnd} <a href={`/${lang}/about`}>{c.relatedAbout}</a>.</p>
+      </div>
+    </section>
+
+    <section class="sec" id="waitlist" aria-labelledby="wl-h">
+      <div class="wrap split">
+        <div>
+          <h2 id="wl-h">{c.formH2}</h2>
+          <p class="muted" style="margin-top:16px">{c.formLead}</p>
+          <p class="muted" style="margin-top:16px">{c.formDevLead} <a href={dev.href}>{dev.anchor}</a>.</p>
+        </div>
+        <div class="panel">
+          <form
+            class="form"
+            id="wl-form"
+            novalidate
+            data-waitlist
+            data-endpoint="/api/training-waitlist"
+            data-source-page={path}
+            data-locale={lang}
+            data-sending={c.sending}
+            data-required={c.required}
+            data-invalid-email={c.invalidEmail}
+            data-invalid-wa={c.invalidWa}
+            data-wa-required={c.waRequired}
+            data-rate={c.rate}
+            data-network={c.network}
+            data-server={c.server}
+          >
+            <div class="err-summary" id="wl-errors" data-summary role="alert" tabindex="-1" aria-labelledby="wl-err-h" hidden>
+              <h3 id="wl-err-h">{c.summaryTitle}</h3>
+              <ul></ul>
+            </div>
+            <div class="two">
+              <div class="field"><label for="f-name">{c.nameLabel}</label><input id="f-name" name="name" autocomplete="name" maxlength="120" required aria-describedby="e-name" /><span class="err" id="e-name" data-err="name"></span></div>
+              <div class="field"><label for="f-company">{c.companyLabel} <span class="opt">{c.optional}</span></label><input id="f-company" name="company" autocomplete="organization" maxlength="160" /></div>
+            </div>
+            <div class="two">
+              <div class="field"><label for="f-email">{c.emailLabel}</label><input id="f-email" name="email" type="email" autocomplete="email" maxlength="190" required aria-describedby="e-email" /><span class="err" id="e-email" data-err="email"></span></div>
+              <div class="field"><label for="f-wa">{c.waLabel} <span class="opt">{c.optional}</span></label><input id="f-wa" name="whatsapp" type="tel" autocomplete="tel" inputmode="tel" aria-describedby="h-wa e-wa" /><span class="help" id="h-wa">{c.waHelp}</span><span class="err" id="e-wa" data-err="whatsapp"></span></div>
+            </div>
+            <fieldset class="field">
+              <legend>{c.interestLegend}</legend>
+              <div class="choices">
+                <label><input type="radio" name="interest" value="inhouse" checked /> {c.f1h}</label>
+                <label><input type="radio" name="interest" value="workshop" /> {c.f2h}</label>
+                <label><input type="radio" name="interest" value="public_class" /> {c.f3h}</label>
+              </div>
+            </fieldset>
+            <div class="field"><label for="f-note">{c.noteLabel} <span class="opt">{c.optional}</span></label><textarea id="f-note" name="note" maxlength="1000" placeholder={c.notePlaceholder}></textarea></div>
+            <label class="hp" for="f-site">{c.honeypot}</label><input class="hp" id="f-site" name="website" tabindex="-1" autocomplete="off" />
+            <label class="check"><input type="checkbox" name="newsletter" /> {c.newsletterLabel}</label>
+            <div><button class="btn btn-primary" type="submit">{c.submit}</button></div>
+            <p data-status role="status" aria-live="polite"></p>
+          </form>
+          <div class="done" id="wl-done" data-done tabindex="-1" hidden>
+            <h3>{c.doneH}</h3>
+            <p>{c.doneP}</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="sec alt faq" aria-labelledby="faq-h">
+      <div class="wrap split">
+        <h2 id="faq-h">{c.faqH2}</h2>
+        <div>
+          {faq.map((f, i) => (
+            <details open={i === 0}>
+              <summary>{f.q}</summary>
+              {i === 4
+                ? <p>{c.a5pre} <a href={dev.href}>{c.a5link}</a>{c.a5post}</p>
+                : <p>{f.a}</p>}
+            </details>
+          ))}
+        </div>
+      </div>
+    </section>
+  </main>
+</BaseLayout>
+<script>
+  import { initAllWaitlistForms } from "../../scripts/waitlist-form";
+  initAllWaitlistForms();
+</script>

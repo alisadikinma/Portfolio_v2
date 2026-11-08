@@ -14,7 +14,7 @@ const CLOSES_P = new Set([
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const NAMED = {
-  nbsp: " ", quot: '"', apos: "'", lt: "<", gt: ">", rsquo: "\u2019", lsquo: "\u2018", ldquo: "\u201C", rdquo: "\u201D",
+  amp: "&", nbsp: " ", quot: '"', apos: "'", lt: "<", gt: ">", rsquo: "\u2019", lsquo: "\u2018", ldquo: "\u201C", rdquo: "\u201D",
   ndash: "\u2013", mdash: "\u2014", hellip: "\u2026",
 };
 // Single pass, so "&amp;lt;" stays "&lt;" (no double decoding).
