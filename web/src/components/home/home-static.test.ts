@@ -55,31 +55,28 @@ describe.each(["id", "en"] as const)("WhoIAm (%s)", (lang) => {
     expect(html).toContain('id="tentang"');
   });
 
-  it("career map: real portrait, 4 chapters in order as an ordered list, decorative SVG", async () => {
+  it("career infographic (Ali 2026-11-08): sized lazy image, opens full size, chapters stay real HTML text", async () => {
     const html = await render(WhoIAm, lang);
     const fig = html.match(/<figure[^>]*data-who-map[^>]*>[\s\S]*?<\/figure>/)?.[0] ?? "";
     expect(fig).not.toBe("");
-    // portrait = the hero photo (already cached), below the fold -> lazy, sized, with alt
     const img = fig.match(/<img [^>]*>/)![0];
-    expect(img).toContain('src="/images/ali-sadikin-ma-pakar-ai-indonesia.jpg"');
-    expect(img).toMatch(/alt="[^"]+"/);
+    expect(img).toMatch(/src="\/_image\?href=[^"]*who-infographic/);
+    expect(img).toMatch(/srcset="[^"]+ 640w[^"]+ 1280w/);
+    expect(img).toMatch(/alt="[^"]{40,}"/);
     expect(img).toContain('width="');
     expect(img).toContain('height="');
     expect(img).toContain('loading="lazy"');
-    // line art is decoration only; the facts live in real HTML text
-    expect(fig).toMatch(/<svg[^>]*aria-hidden="true"/);
+    // click/tap opens the full-size image in the site lightbox
+    expect(fig).toMatch(/<button[^>]*data-lightbox[^>]*data-lightbox-items="\[[^"]*who-infographic/);
+    // the text inside the image is not crawlable: chapters are repeated as HTML
     const items = [...fig.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/g)].map((m) => m[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim());
     expect(items).toHaveLength(4);
     expect(items[0]).toContain("2008–2015");
     expect(items[1]).toContain("Marlin Booking");
-    expect(items[1]).toContain("2016–2019");
     expect(items[2]).toContain("Satnusa");
-    expect(items[2]).toContain("2021–2025");
     expect(items[3]).toContain("INDUSIA.ai");
-    expect(fig).toMatch(/<ol[^>]*>/);
     expect(fig).toContain('aria-current="step"');
-    // seam for a future generated illustration
-    expect(fig).toContain("data-art");
+    expect(fig).not.toContain("<svg");
   });
 
   it("heading comes before the figure and body text (document order)", async () => {

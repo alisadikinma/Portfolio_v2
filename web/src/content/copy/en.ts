@@ -45,7 +45,7 @@ export const en: Copy = {
     companyLink: "AI company Indonesia",
     p2End: ". On this site I write, teach, and speak about what I build.",
     mapLabel: "Career map of Ali Sadikin Ma, from Singapore to INDUSIA.ai",
-    mapPortraitAlt: "Portrait of Ali Sadikin Ma, AI consultant in Indonesia",
+    mapOpen: "Click to enlarge",
     mapTag: "Ali Sadikin Ma",
     ch1Year: "2008–2015",
     ch1Name: "Singapore",

@@ -43,7 +43,7 @@ export const id = {
     companyLink: "perusahaan AI Indonesia",
     p2End: ". Di situs ini saya menulis, mengajar, dan berbicara tentang yang saya kerjakan.",
     mapLabel: "Peta perjalanan karier Ali Sadikin Ma, dari Singapura sampai INDUSIA.ai",
-    mapPortraitAlt: "Potret Ali Sadikin Ma, pakar AI Indonesia",
+    mapOpen: "Klik untuk memperbesar",
     mapTag: "Ali Sadikin Ma",
     ch1Year: "2008–2015",
     ch1Name: "Singapura",

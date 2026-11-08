@@ -1,5 +1,7 @@
 ---
+import { Image, getImage } from "astro:assets";
 import type { Lang } from "../../lib/i18n";
+import infographic from "../../assets/who-infographic-id.jpg";
 import { id } from "../../content/copy/id";
 import { en } from "../../content/copy/en";
 
@@ -8,8 +10,9 @@ const { lang } = Astro.props;
 const w = (lang === "id" ? id : en).whoIAm;
 // Dofollow backlinks to INDUSIA.ai: no rel attribute (spec backlink table).
 const base = lang === "id" ? "https://indusia.ai/id/" : "https://indusia.ai/";
-// Same file as the hero LCP image, so the browser already has it cached.
-const PORTRAIT = "/images/ali-sadikin-ma-pakar-ai-indonesia.jpg";
+// Ali's career infographic (2026-11-08). Text inside the image is not crawlable, so the
+// four chapters below repeat it as HTML.
+const infoFull = (await getImage({ src: infographic, width: 2752, format: "webp", quality: 85 })).src;
 const chapters = [
   { pos: "c1", y: w.ch1Year, n: w.ch1Name, d: w.ch1Desc },
   { pos: "c2", y: w.ch2Year, n: w.ch2Name, d: w.ch2Desc },
@@ -24,143 +27,24 @@ const chapters = [
       <p><strong>{w.p1Strong}</strong>{w.p1Rest}</p>
       <p>{w.p2Lead}<a href={`${base}ai-vision/`}>{w.visionLink}</a>, <a href={`${base}ai-fleet-transportation/`}>{w.fleetLink}</a>, <a href={`${base}ai-assistant/`}>{w.chatbotLink}</a>{w.p2Mid}<a href={base}>{w.companyLink}</a>{w.p2End}</p>
     </div>
-    <figure class="who-map" data-who-map aria-label={w.mapLabel}>
-      <!--
-        data-art = the illustration layer (line art + portrait). It can be swapped for one generated
-        image later; the chapter labels below stay real HTML text either way.
-      -->
-      <div class="wm-art" data-art>
-        <img class="wm-portrait" src={PORTRAIT} alt={w.mapPortraitAlt} width="1200" height="1200" loading="lazy" decoding="async" />
-        <svg class="wm-svg" viewBox="0 0 600 600" aria-hidden="true" focusable="false">
-          <defs>
-            <linearGradient id="wm-path" x1="0" y1="1" x2="1" y2="1">
-              <stop offset="0" stop-color="#3fb8c5" stop-opacity=".55" />
-              <stop offset=".7" stop-color="#3fb8c5" />
-              <stop offset="1" stop-color="#d4a24d" />
-            </linearGradient>
-            <radialGradient id="wm-glow">
-              <stop offset="0" stop-color="#3fb8c5" stop-opacity=".35" />
-              <stop offset="1" stop-color="#3fb8c5" stop-opacity="0" />
-            </radialGradient>
-            <filter id="wm-blur" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="4" /></filter>
-          </defs>
-
-          <!-- track + ticks -->
-          <circle cx="300" cy="300" r="190" fill="none" stroke="rgba(232,238,248,.08)" stroke-width="1.5" />
-          <circle cx="300" cy="300" r="214" fill="none" stroke="rgba(232,238,248,.06)" stroke-dasharray="2 9" />
-          <circle cx="300" cy="300" r="138" fill="none" stroke="rgba(63,184,197,.22)" stroke-dasharray="3 6" />
-
-          <!-- the one path through 17 years: Singapore (bottom-left) clockwise to INDUSIA.ai (bottom-right) -->
-          <path class="wm-glowline" d="M166 434 A190 190 0 1 1 434 434" fill="none" stroke="url(#wm-path)" stroke-width="10" stroke-linecap="round" filter="url(#wm-blur)" opacity=".45" pathLength="1" />
-          <path class="wm-line" d="M166 434 A190 190 0 1 1 434 434" fill="none" stroke="url(#wm-path)" stroke-width="3" stroke-linecap="round" pathLength="1" />
-
-          <!-- portrait frame: same detection-box motif as the hero -->
-          <g class="wm-frame" fill="none" stroke="#3fb8c5" stroke-width="3" stroke-linecap="round">
-            <path d="M196 214 V196 H214" /><path d="M386 196 H404 V214" />
-            <path d="M404 386 V404 H386" /><path d="M214 404 H196 V386" />
-          </g>
-
-          <!-- 1 · Singapore: Marina Bay skyline (Flyer + three towers under the SkyPark), enterprise software -->
-          <g class="wm-node" transform="translate(166 434)">
-            <circle r="56" fill="#0e1828" stroke="rgba(232,238,248,.16)" stroke-width="1.5" />
-            <g fill="none" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
-              <g stroke="#9fb0c7">
-                <circle cx="-24" cy="-2" r="13" />
-                <path d="M-24 -15 V11 M-37 -2 H-11 M-33 -11 L-15 7 M-33 7 L-15 -11" stroke-width="1" stroke-opacity=".7" />
-                <path d="M-30 22 L-24 11 L-18 22" />
-              </g>
-              <g stroke="#e8eef8">
-                <path d="M-6 -24 Q14 -29 38 -24 L35 -20 L-3 -20 Z" />
-                <path d="M-2 -20 L0 22 M5 -20 L5 22" />
-                <path d="M11 -20 L13 22 M18 -20 L18 22" />
-                <path d="M24 -20 L26 22 M31 -20 L31 22" />
-              </g>
-              <path d="M-42 22 H42" stroke="#3fb8c5" />
-              <path d="M-34 30 q6 -4 12 0 t12 0 t12 0 t12 0 t12 0" stroke="#3fb8c5" stroke-opacity=".6" />
-            </g>
-          </g>
-
-          <!-- 2 · Marlin Booking: ferry + QR ticket -->
-          <g class="wm-node" transform="translate(166 166)">
-            <circle r="56" fill="#0e1828" stroke="rgba(232,238,248,.16)" stroke-width="1.5" />
-            <g fill="none" stroke="#e8eef8" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
-              <path d="M-36 6 H34 L26 20 H-28 Z" />
-              <path d="M-24 6 V-6 H14 V6" />
-              <path d="M-14 -6 V-14 H4 V-6" />
-              <path d="M-36 28 q6 -4 12 0 t12 0 t12 0 t12 0 t12 0 t12 0" stroke="#3fb8c5" stroke-opacity=".7" />
-            </g>
-            <g fill="#9fb0c7"><circle cx="-16" cy="0" r="2" /><circle cx="-8" cy="0" r="2" /><circle cx="0" cy="0" r="2" /><circle cx="8" cy="0" r="2" /></g>
-            <g transform="translate(14 -40)">
-              <rect width="28" height="30" rx="4" fill="#16243a" stroke="#d4a24d" stroke-width="2" />
-              <g fill="#d4a24d">
-                <rect x="5" y="5" width="7" height="7" /><rect x="16" y="5" width="7" height="7" /><rect x="5" y="16" width="7" height="7" />
-                <rect x="16" y="16" width="3" height="3" /><rect x="20" y="20" width="3" height="3" /><rect x="16" y="22" width="3" height="3" />
-              </g>
-            </g>
-          </g>
-
-          <!-- 3 · Satnusa: electronics factory + PCB -->
-          <g class="wm-node" transform="translate(434 166)">
-            <circle r="56" fill="#0e1828" stroke="rgba(232,238,248,.16)" stroke-width="1.5" />
-            <g fill="none" stroke="#e8eef8" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
-              <path d="M-36 0 V-14 L-24 -6 V-14 L-12 -6 V-14 L0 -6 V-14 L12 -6 V0" />
-              <path d="M20 0 V-30 H28 V0" />
-              <path d="M-40 0 H40" />
-            </g>
-            <g transform="translate(-30 8)">
-              <rect width="60" height="26" rx="3" fill="#16243a" stroke="#3fb8c5" stroke-width="2" />
-              <rect x="22" y="6" width="16" height="14" rx="1.5" fill="#0e1828" stroke="#e8eef8" stroke-width="1.5" />
-              <g stroke="#3fb8c5" stroke-width="1.5" fill="none" stroke-linecap="round">
-                <path d="M4 7 H14 L18 11 H22" /><path d="M4 19 H12 L16 15 H22" /><path d="M38 9 H52" /><path d="M38 17 H46 L50 21 H56" />
-              </g>
-              <g fill="#d4a24d"><circle cx="4" cy="7" r="2" /><circle cx="4" cy="19" r="2" /><circle cx="52" cy="9" r="2" /><circle cx="56" cy="21" r="2" /></g>
-            </g>
-          </g>
-
-          <!-- 4 · INDUSIA.ai (now): AI camera inspecting a PCB, truck with GPS, WhatsApp chat -->
-          <g class="wm-node wm-now" transform="translate(434 434)">
-            <circle r="76" fill="url(#wm-glow)" class="wm-halo" />
-            <circle r="60" fill="#0e1828" stroke="#3fb8c5" stroke-width="2" />
-            <g transform="translate(-40 -36)">
-              <rect width="22" height="14" rx="3" fill="#16243a" stroke="#e8eef8" stroke-width="2" />
-              <circle cx="11" cy="7" r="3.5" fill="#3fb8c5" />
-              <path d="M6 14 L-2 44 M16 14 L34 44" stroke="#3fb8c5" stroke-width="1.5" stroke-dasharray="3 3" fill="none" />
-            </g>
-            <g transform="translate(-44 8)">
-              <rect width="46" height="22" rx="3" fill="#16243a" stroke="#e8eef8" stroke-width="1.5" />
-              <rect x="15" y="5" width="14" height="12" rx="1" fill="#0e1828" stroke="#e8eef8" stroke-width="1.2" />
-              <path d="M3 8 H15 M29 14 H43" stroke="#3fb8c5" stroke-width="1.2" />
-              <rect x="11" y="1" width="22" height="20" rx="2" fill="none" stroke="#d4a24d" stroke-width="2" />
-            </g>
-            <g transform="translate(8 -42)">
-              <path d="M0 4 a4 4 0 0 1 4 -4 h28 a4 4 0 0 1 4 4 v14 a4 4 0 0 1 -4 4 h-20 l-8 7 v-7 a4 4 0 0 1 -4 -4 Z" fill="#16243a" stroke="#3dd68c" stroke-width="2" />
-              <g fill="#3dd68c"><circle cx="11" cy="11" r="2.2" /><circle cx="18" cy="11" r="2.2" /><circle cx="25" cy="11" r="2.2" /></g>
-            </g>
-            <g transform="translate(10 6)" fill="none" stroke="#e8eef8" stroke-width="2" stroke-linejoin="round">
-              <path d="M0 10 H26 V26 H0 Z" />
-              <path d="M26 15 H36 L42 21 V26 H26" />
-              <circle cx="8" cy="29" r="4" fill="#0e1828" /><circle cx="34" cy="29" r="4" fill="#0e1828" />
-              <path d="M13 -4 a6 6 0 1 1 12 0 c0 5 -6 10 -6 10 s-6 -5 -6 -10 Z" fill="#d4a24d" stroke="none" />
-              <circle cx="19" cy="-4" r="2.2" fill="#0e1828" stroke="none" />
-            </g>
-          </g>
-
-        </svg>
-        <span class="wm-tag" aria-hidden="true">{w.mapTag}</span>
-      </div>
-      <ol class="wm-list">
-        {chapters.map((c) => (
-          <li class={`wm-ch ${c.pos}`} aria-current={c.now ? "step" : undefined}>
-            <span class="wm-yr">{c.now && <span class="wm-live" aria-hidden="true"></span>}{c.y}</span>
-            <strong>{c.n}</strong>
-            <span class="wm-d">{c.d}</span>
-          </li>
-        ))}
-      </ol>
+    <figure class="who-map who-info" data-who-map>
+      <button class="wi-open" type="button" data-lightbox data-lightbox-title={w.mapLabel} data-lightbox-items={JSON.stringify([infoFull])}>
+        <Image src={infographic} widths={[640, 960, 1280, 1920, 2752]} sizes="(max-width: 1200px) 100vw, 1200px"
+          alt={w.mapLabel} loading="lazy" decoding="async" format="webp" quality={82} />
+        <span class="wi-hint" aria-hidden="true">{w.mapOpen}</span>
+      </button>
+      <figcaption class="wi-cap">
+        <ol class="wm-list">
+          {chapters.map((c) => (
+            <li class="wm-ch" aria-current={c.now ? "step" : undefined}>
+              <span class="wm-yr">{c.y}</span>
+              <strong>{c.n}</strong>
+              <span class="wm-d">{c.d}</span>
+            </li>
+          ))}
+        </ol>
+      </figcaption>
     </figure>
   </div>
 </section>
-<script>
-  import { initWhoMap } from "../../scripts/who-map";
-  initWhoMap();
-</script>
+
