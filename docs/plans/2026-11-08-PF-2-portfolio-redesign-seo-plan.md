@@ -240,9 +240,52 @@ PF-2 and repair pending rows at release; published rows are not touched.
 - [ ] `LinkedInDraftApproveSlotAssignmentTest` green on Carbon 3.15 without changing its assertions
 - [ ] Repair command dry-run writes nothing; real run only changes rows whose logged `publish_at` proves the 7 h shift
 
+### Phase 0E: Fix bugs hidden in the PHPStan baseline + review leftovers
+
+**Deps:** 0D
+**Complexity:** complex — touches many controllers/services; each fix needs its own proof.
+**Estimated time:** 60 minutes
+
+**Files:**
+- Modify: `backend/app/Http/Controllers/Api/ContactController.php`
+- Modify: `backend/app/Http/Controllers/Api/LinkedInOAuthController.php`
+- Modify: `backend/app/Http/Controllers/Api/Admin/ContentIdeaController.php`
+- Modify: `backend/config/app.php`
+- Modify: `backend/config/mail.php`
+- Modify: `backend/phpstan-baseline.neon`
+- Create: `docs/plans/PF-2-phpstan-triage.md`
+- Test: `backend/tests/Feature/LinkedInOAuthCallbackRedirectTest.php`
+- Test: `backend/tests/Feature/GeminiGenRelayTokenTest.php`
+- Test: `backend/tests/Feature/PhpstanTriageRegressionTest.php`
+
+Ali (2026-11-08): "Perbaiki saja semua bug sekaligus" — every bug found while working PF-2 is fixed in
+PF-2, not deferred. Known from the 0B Opus review: `env()` outside config in `ContactController.php:217`
+(`ADMIN_EMAIL`) and `LinkedInOAuthController.php:82` (`FRONTEND_URL`/`APP_URL`) — with `config:cache`
+(deploy.sh caches config) `env()` returns null, so the LinkedIn OAuth callback redirects to
+`http://localhost:5173`; `variable.undefined` ×6 in `ContentIdeaController.php` (`$priorSlot`,
+`$reuseIndex`, `$variationIndex`); GeminiGen relay (`GeminiGenRelayController.php:38`) lacks an
+array-token 401 test; unused old Inter fonts under `backend/public/fonts/filament`.
+
+**Steps:**
+1. Write failing test for the OAuth callback redirect under cached config: with `config(['app.frontend_url' => 'https://alisadikinma.com'])` and `FRONTEND_URL` unset in env, `GET /api/admin/linkedin/oauth/callback?error=x` redirects to `https://alisadikinma.com/admin/settings/about?...`. Expected error: `Failed asserting that 'http://localhost:5173/admin/settings/about…' starts with 'https://alisadikinma.com'`
+2. Run, confirm failure
+3. Add `'frontend_url' => env('FRONTEND_URL', env('APP_URL'))` to `config/app.php` and `'admin_email' => env('ADMIN_EMAIL')` to `config/mail.php`; replace both `env()` calls with `config(...)`; contact notification with no admin email configured logs a warning and skips (no send to `admin@example.com`)
+4. `variable.undefined`: read each flagged path in `ContentIdeaController`, write a failing test that drives the code path where the variable is unset (Expected error: `ErrorException: Undefined variable`), fix by initialising/restructuring, test green
+5. GeminiGen relay: test `?token[]=<valid>` → 401 and valid string → 200
+6. Triage the remaining risky baseline identifiers (`larastan.relationExistence` 102, `method.notFound` 23, `argument.type` 22, `nullCoalesce.*`, `property.nonObject`, `method.nonObject`, `return.type`, `match.unhandled`, `identical.alwaysFalse`, `if.alwaysTrue`, `deadCode.unreachable`, `argument.unresolvableType`): per entry decide BUG (reachable runtime error or wrong logic) or NOISE (false positive, magic Eloquent, intentional) — record each in `docs/plans/PF-2-phpstan-triage.md` (`file:line | identifier | BUG/NOISE | reason | fix commit`). Every BUG gets a failing test first, then the fix, then its baseline entry removed. `property.notFound` magic-attribute entries stay as NOISE (one line summary)
+7. Regenerate the baseline (`--generate-baseline`) only to drop fixed entries; it must shrink, never grow
+8. Delete the unused old Inter font files (only those no Filament CSS references — grep `inter-*.woff2` names in `public/css/filament`)
+9. Full suite = 167 baseline, 0 new; phpstan exit 0; pint on touched files; commit per bug group ("fix(PF-2): …")
+
+**Verification:**
+- [ ] OAuth callback redirect uses `config('app.frontend_url')` and the test passes with env unset
+- [ ] `grep -rn "env(" backend/app` returns nothing
+- [ ] Triage file lists every risky baseline entry as BUG or NOISE with a reason; baseline count dropped by the number of BUG fixes
+- [ ] Each BUG fix has a test that failed before the fix
+
 ### Phase 0C: Production PHP 8.4 runbook + one-runtime check
 
-**Deps:** 0B, 0D
+**Deps:** 0B, 0D, 0E
 **Complexity:** complex — production infrastructure change; wrong step takes the site down.
 **Estimated time:** 20 minutes (writing); execution only with Ali's OK
 
@@ -1195,47 +1238,48 @@ PF-2 and repair pending rows at release; published rows are not touched.
 wave 1 lane 1: 0A
 wave 2 lane 1: 0B
 wave 3 lane 1: 0D
-wave 4 lane 1: 0C
-wave 5 lane 1: 1A
-wave 5 lane 2: 1I
-wave 5 lane 3: 4A
-wave 6 lane 1: 1B
-wave 6 lane 2: 1C
-wave 6 lane 3: 1D
-wave 6 lane 4: 1E
-wave 6 lane 5: 1F
-wave 6 lane 6: 1K
-wave 6 lane 7: 4B
-wave 7 lane 1: 1G
-wave 7 lane 2: 1J
-wave 7 lane 3: 4C
-wave 8 lane 1: 1H
-wave 8 lane 2: 4D
-wave 9 lane 1: 1L
-wave 10 lane 1: 2A
-wave 10 lane 2: 2D
-wave 10 lane 3: 3A
-wave 11 lane 1: 2B
-wave 11 lane 2: 2C
-wave 11 lane 3: 2E
-wave 11 lane 4: 3B
-wave 12 lane 1: 2F
-wave 12 lane 2: 3C
-wave 12 lane 3: 3D
-wave 13 lane 1: 3E
-wave 14 lane 1: 3F
-wave 14 lane 2: 3G
-wave 14 lane 3: 3I
-wave 14 lane 4: 4E
-wave 15 lane 1: 3H
-wave 15 lane 2: 4F
-wave 16 lane 1: 4G
-wave 17 lane 1: 5A
-wave 18 lane 1: 5B
-wave 19 lane 1: 5C
-wave 20 lane 1: 5D
-wave 21 lane 1: 5E
-wave 22 lane 1: 6A
+wave 4 lane 1: 0E
+wave 5 lane 1: 0C
+wave 6 lane 1: 1A
+wave 6 lane 2: 1I
+wave 6 lane 3: 4A
+wave 7 lane 1: 1B
+wave 7 lane 2: 1C
+wave 7 lane 3: 1D
+wave 7 lane 4: 1E
+wave 7 lane 5: 1F
+wave 7 lane 6: 1K
+wave 7 lane 7: 4B
+wave 8 lane 1: 1G
+wave 8 lane 2: 1J
+wave 8 lane 3: 4C
+wave 9 lane 1: 1H
+wave 9 lane 2: 4D
+wave 10 lane 1: 1L
+wave 11 lane 1: 2A
+wave 11 lane 2: 2D
+wave 11 lane 3: 3A
+wave 12 lane 1: 2B
+wave 12 lane 2: 2C
+wave 12 lane 3: 2E
+wave 12 lane 4: 3B
+wave 13 lane 1: 2F
+wave 13 lane 2: 3C
+wave 13 lane 3: 3D
+wave 14 lane 1: 3E
+wave 15 lane 1: 3F
+wave 15 lane 2: 3G
+wave 15 lane 3: 3I
+wave 15 lane 4: 4E
+wave 16 lane 1: 3H
+wave 16 lane 2: 4F
+wave 17 lane 1: 4G
+wave 18 lane 1: 5A
+wave 19 lane 1: 5B
+wave 20 lane 1: 5C
+wave 21 lane 1: 5D
+wave 22 lane 1: 5E
+wave 23 lane 1: 6A
 ```
 
 ## Out of scope
