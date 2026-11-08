@@ -14,7 +14,7 @@ class ContactAdminEmailTest extends TestCase
     {
         $contact = new Contact(['name' => 'Budi', 'email' => 'budi@example.com', 'subject' => 'Halo', 'message' => 'Pesan']);
         $method = new \ReflectionMethod(ContactController::class, 'sendEmailNotification');
-        $method->invoke(new ContactController(), $contact);
+        $method->invoke(new ContactController, $contact);
     }
 
     public function test_notification_goes_to_configured_admin_email(): void
