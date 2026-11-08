@@ -31,8 +31,8 @@ export const id = {
   faq: {
     metaTitle: "FAQ Pakar AI Indonesia — Ali Sadikin Ma",
     metaDescription:
-      "Jawaban singkat tentang Ali Sadikin Ma, pakar AI Indonesia dan founder INDUSIA.ai: siapa dia, apa yang dikerjakan, dan cara bekerja sama.",
-    h1: "Pertanyaan umum tentang pakar AI Indonesia, Ali Sadikin Ma",
+      "FAQ singkat tentang Ali Sadikin Ma, pakar AI Indonesia dan founder INDUSIA.ai: siapa dia, apa yang dikerjakan, dan cara bekerja sama.",
+    h1: "FAQ: pertanyaan umum tentang pakar AI Indonesia, Ali Sadikin Ma",
     intro:
       "Ali Sadikin Ma adalah pakar AI Indonesia dan founder INDUSIA.ai di Batam. Halaman ini menjawab pertanyaan yang paling sering diajukan tentang dirinya, layanannya, dan cara menghubunginya.",
     unavailable: "Daftar pertanyaan sedang tidak bisa dimuat. Silakan coba lagi sebentar lagi.",

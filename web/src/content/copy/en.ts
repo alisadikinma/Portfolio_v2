@@ -33,8 +33,8 @@ export const en: Copy = {
   faq: {
     metaTitle: "FAQ AI Consultant Indonesia — Ali Sadikin Ma",
     metaDescription:
-      "Short answers about Ali Sadikin Ma, AI consultant in Indonesia and founder of INDUSIA.ai: who he is, what he does, and how to work with him.",
-    h1: "Common questions about Ali Sadikin Ma, AI consultant Indonesia",
+      "FAQ with short answers about Ali Sadikin Ma, AI consultant in Indonesia and founder of INDUSIA.ai: who he is, what he does, and how to work with him.",
+    h1: "FAQ: common questions about Ali Sadikin Ma, AI consultant Indonesia",
     intro:
       "Ali Sadikin Ma is an AI consultant in Indonesia and the founder of INDUSIA.ai in Batam. This page answers the questions people ask most about him, his services, and how to reach him.",
     unavailable: "The question list cannot be loaded right now. Please try again shortly.",
