@@ -79,7 +79,7 @@ class ParseAndScheduleReply implements ShouldQueue
             return; // keep state — operator can retry
         }
 
-        $slot = Carbon::parse($iso)->setTimezone('Asia/Jakarta');
+        $slot = \App\Support\WibTime::parse($iso)->setTimezone(\App\Support\WibTime::ZONE);
         $now = Carbon::now('Asia/Jakarta');
 
         if ($slot->lessThanOrEqualTo($now)) {
