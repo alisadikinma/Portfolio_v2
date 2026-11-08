@@ -28,7 +28,7 @@ class ProcessScheduledIdeas extends Command
         $this->info("Found {$due->count()} scheduled ideas to process.");
 
         foreach ($due as $idea) {
-            $this->line("  Processing: {$idea->title} (scheduled: {$idea->scheduled_at})");
+            $this->line("  Processing: {$idea->title} (scheduled: ".\App\Support\WibTime::label($idea->scheduled_at).")");
 
             try {
                 $idea->transitionTo(ContentIdeaStatus::Researching, 'scheduled_start', [
