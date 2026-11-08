@@ -162,6 +162,12 @@ if command -v sudo >/dev/null 2>&1; then
 fi
 chmod -R 775 backend/storage backend/bootstrap/cache 2>/dev/null || true
 
+# ---- 6b. FPM reload (opcache) ------------------------------------------------
+# After PF-2 the web runtime is php8.4-fpm (NOT php8.2-fpm). No-op if the unit
+# is missing or inactive. Never fails the deploy.
+echo "▶ Reload php8.4-fpm (if active)"
+bash scripts/reload-php-fpm.sh
+
 # ---- 7. Queue worker restart (if supervisor/systemd) -------------------------
 echo "▶ Signal queue workers to reload (if any)"
 cd backend && php artisan queue:restart && cd ..
