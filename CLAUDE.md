@@ -1818,7 +1818,7 @@ Idempotent via `firstOrCreate(['signature' => ...], $row)` — re-seeding on exi
 
 **Maintainer:** Ali Sadikin (ali.sadikincom85@gmail.com)
 **Environment:** macOS + Docker Desktop, /Users/alisadikin/Drive-D/Projects/Portfolio_v2
-**PHP:** 8.4 everywhere (VPS fpm + CLI, Docker `portfolio_backend` container; runbook: [docs/runbooks/pf2-php84-upgrade.md](docs/runbooks/pf2-php84-upgrade.md)) — no host php; run `docker exec portfolio_backend php ...` (e.g. `docker exec portfolio_backend php artisan test`)
+**PHP:** 8.4 everywhere (VPS fpm + CLI, Docker `portfolio_backend` container; runbook: [docs/runbooks/pf2-php84-upgrade.md](docs/runbooks/pf2-php84-upgrade.md)). **Exception: phpMyAdmin (Ubuntu 5.2.1) stays on `php8.2-fpm` until it is upgraded to 5.2.2+ or dropped**, so `php8.2-fpm` stays installed (debt: remove after that + 7 days green). Reload `php8.4-fpm` after deploys (`scripts/deploy.sh` does it) — no host php; run `docker exec portfolio_backend php ...` (e.g. `docker exec portfolio_backend php artisan test`)
 **Backend:** Laravel 12 + PHP 8.4 + MySQL 8 + Sanctum 4 + Filament 4.1
 **Frontend:** Vue 3.5 + Rolldown-Vite 7.1 + Pinia 3 + TanStack Query 5.90 + Tailwind 4
 **Production:** https://alisadikinma.com
