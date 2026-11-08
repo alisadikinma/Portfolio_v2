@@ -2160,65 +2160,15 @@ parameters:
 			count: 1
 			path: app/Http/Resources/ScheduledCommandResource.php
 
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\ServiceResource\:\:\$is_active\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/ServiceResource.php
 
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\ServiceResource\:\:\$content\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/ServiceResource.php
 
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\ServiceResource\:\:\$created_at\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/ServiceResource.php
 
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\ServiceResource\:\:\$description\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/ServiceResource.php
 
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\ServiceResource\:\:\$icon\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/ServiceResource.php
 
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\ServiceResource\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/ServiceResource.php
 
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\ServiceResource\:\:\$sort_order\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/ServiceResource.php
 
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\ServiceResource\:\:\$slug\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/ServiceResource.php
 
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\ServiceResource\:\:\$title\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/ServiceResource.php
 
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\ServiceResource\:\:\$updated_at\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/ServiceResource.php
 
 		-
 			message: '#^Access to an undefined property App\\Http\\Resources\\SettingResource\:\:\$created_at\.$#'

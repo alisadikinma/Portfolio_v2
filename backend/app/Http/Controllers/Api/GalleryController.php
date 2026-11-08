@@ -40,7 +40,7 @@ class GalleryController extends Controller
         }
 
         // Guests only ever see active galleries; the ?is_active= filter is admin-only.
-        if (!auth('sanctum')->check()) {
+        if (!\App\Support\AdminViewer::is()) {
             $query->where('is_active', true);
         } elseif ($request->has('is_active')) {
             $isActive = $request->query('is_active');
@@ -115,7 +115,7 @@ class GalleryController extends Controller
         $query = Gallery::with(['award', 'items']);
 
         // Inactive galleries are visible only to an authenticated admin.
-        if (!auth('sanctum')->check()) {
+        if (!\App\Support\AdminViewer::is()) {
             $query->where('is_active', true);
         }
 

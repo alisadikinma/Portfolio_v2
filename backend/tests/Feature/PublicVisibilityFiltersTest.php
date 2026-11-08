@@ -41,7 +41,7 @@ class PublicVisibilityFiltersTest extends TestCase
 
     private function admin(): void
     {
-        Sanctum::actingAs(User::factory()->create());
+        Sanctum::actingAs(User::factory()->create(), ['*']);
     }
 
     // ---- Services
@@ -145,5 +145,67 @@ class PublicVisibilityFiltersTest extends TestCase
         $slugs = collect($this->getJson('/api/projects')->json('data'))->pluck('slug')->sort()->values()->all();
         $this->assertSame(['draft-p', 'live-p', 'off-p'], $slugs);
         $this->assertCount(3, $this->getJson('/api/admin/projects')->json('data'));
+    }
+
+    // ---- Gallery items of inactive gallery
+    public function test_inactive_gallery_items_hidden_from_guest_visible_to_admin(): void
+    {
+        $g = Gallery::factory()->create(['is_active' => false]);
+        $this->getJson("/api/galleries/{$g->id}/items")->assertStatus(404);
+        $this->getJson("/api/gallery/{$g->id}/items")->assertStatus(404);
+        $this->admin();
+        $this->getJson("/api/galleries/{$g->id}/items")->assertStatus(200);
+    }
+
+    public function test_active_gallery_items_are_public(): void
+    {
+        $g = Gallery::factory()->create(['is_active' => true]);
+        $this->getJson("/api/galleries/{$g->id}/items")->assertStatus(200);
+    }
+
+    // ---- Token scoping: only admin (wildcard) tokens see hidden records
+    public function test_cv_read_token_does_not_see_inactive_records(): void
+    {
+        $this->mkService(false, 'hidden-svc');
+        $g = Gallery::factory()->create(['is_active' => false]);
+        $this->mkProject(false, true, 'draft-p');
+        Sanctum::actingAs(User::factory()->create(), ['cv:read']);
+        $this->getJson('/api/services/hidden-svc')->assertStatus(404);
+        $this->getJson("/api/galleries/{$g->id}/items")->assertStatus(404);
+        $this->getJson('/api/projects/draft-p')->assertStatus(404);
+    }
+
+    public function test_automation_token_does_not_see_inactive_records(): void
+    {
+        $this->mkService(false, 'hidden-svc');
+        Sanctum::actingAs(User::factory()->create(), ['post:read', 'post:write']);
+        $this->getJson('/api/services/hidden-svc')->assertStatus(404);
+    }
+
+    public function test_real_login_token_is_admin(): void
+    {
+        $this->mkService(false, 'hidden-svc');
+        $user = User::factory()->create();
+        $token = $user->createToken('auth-token')->plainTextToken;
+        $this->withToken($token)->getJson('/api/services/hidden-svc')->assertStatus(200);
+    }
+
+    public function test_cv_minted_token_does_not_see_inactive_records(): void
+    {
+        $this->mkService(false, 'hidden-svc');
+        $token = User::factory()->create()->createToken('cv-x', ['cv:read'])->plainTextToken;
+        $this->withToken($token)->getJson('/api/services/hidden-svc')->assertStatus(404);
+    }
+
+    // ---- Service ?active= admin filter
+    public function test_service_admin_active_filter_parses_booleans(): void
+    {
+        $this->mkService(false, 'off-svc');
+        $this->mkService(true, 'on-svc');
+        $this->admin();
+        $off = collect($this->getJson('/api/services?active=false&all=1')->json('data'))->pluck('slug')->all();
+        $on = collect($this->getJson('/api/services?active=true&all=1')->json('data'))->pluck('slug')->all();
+        $this->assertSame(['off-svc'], $off);
+        $this->assertSame(['on-svc'], $on);
     }
 }

@@ -42,7 +42,7 @@ class AppServiceProvider extends ServiceProvider
 
         // Dedicated bucket: the default throttle key is domain|ip, so a bare
         // `throttle:600,1` would share a counter with /contact, newsletter, chatbot.
-        RateLimiter::for('internal-crawler', fn (Request $request) => Limit::perMinute(600)
+        RateLimiter::for('internal-crawler', fn (Request $request) => Limit::perMinute(6000)
             ->by('internal-crawler|'.$request->ip()));
 
         // Public waitlist write: own bucket, 5 submits per hour per client IP.

@@ -124,6 +124,15 @@ class InternalCrawlerHitTest extends TestCase
         $this->assertNotSame(429, $this->postJson('/api/contact', [])->getStatusCode());
     }
 
+    public function test_crawler_limiter_allows_6000_per_minute_per_ip(): void
+    {
+        $limit = \Illuminate\Support\Facades\RateLimiter::limiter('internal-crawler')(
+            \Illuminate\Http\Request::create('/', 'POST', [], [], [], ['REMOTE_ADDR' => '127.0.0.1'])
+        );
+        $this->assertSame(6000, $limit->maxAttempts);
+        $this->assertSame('internal-crawler|127.0.0.1', $limit->key);
+    }
+
     public function test_bot_config_shape(): void
     {
         $map = config('ai_bots.map');

@@ -173,7 +173,7 @@ class GalleryApiTest extends TestCase
     /** @test */
     public function it_can_list_gallery_items()
     {
-        $gallery = Gallery::factory()->create();
+        $gallery = Gallery::factory()->active()->create();
         GalleryItem::factory()->count(10)->create([
             'gallery_id' => $gallery->id
         ]);

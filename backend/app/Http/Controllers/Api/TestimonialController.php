@@ -118,7 +118,7 @@ class TestimonialController extends Controller
         $query = Testimonial::query();
 
         // Inactive testimonials are visible only to an authenticated admin.
-        if (!auth('sanctum')->check()) {
+        if (!\App\Support\AdminViewer::is()) {
             $query->where('is_active', true);
         }
 

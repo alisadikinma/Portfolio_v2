@@ -22,10 +22,10 @@ class ServiceController extends Controller
         $query = Service::query();
 
         // Guests only ever see active services; the ?active= filter is admin-only.
-        if (!auth('sanctum')->check()) {
+        if (!\App\Support\AdminViewer::is()) {
             $query->where('is_active', true);
         } elseif ($request->has('active')) {
-            $query->where('is_active', $request->query('active'));
+            $query->where('is_active', $request->boolean('active'));
         }
 
         // Search
@@ -92,7 +92,7 @@ class ServiceController extends Controller
         $query = Service::where('slug', $slug);
 
         // Inactive services are visible only to an authenticated admin.
-        if (!auth('sanctum')->check()) {
+        if (!\App\Support\AdminViewer::is()) {
             $query->where('is_active', true);
         }
 

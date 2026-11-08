@@ -190,7 +190,7 @@ class PostController extends Controller
         // ?preview=1 exposes unpublished posts ONLY to an authenticated admin
         // (sanctum bearer; this route sits outside auth middleware, so resolve
         // the guard explicitly). Everyone else gets normal public behaviour.
-        $isAdminPreview = $request->boolean('preview') && auth('sanctum')->check();
+        $isAdminPreview = $request->boolean('preview') && \App\Support\AdminViewer::is();
         if (!$isAdminPreview) {
             $query->where('published', true);
         }

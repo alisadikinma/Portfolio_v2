@@ -23,6 +23,10 @@ class GalleryItemController extends Controller
     {
         $gallery = Gallery::findOrFail($galleryId);
 
+        if (!$gallery->is_active && !\App\Support\AdminViewer::is()) {
+            abort(404);
+        }
+
         $query = $gallery->items();
 
         // Filter by type

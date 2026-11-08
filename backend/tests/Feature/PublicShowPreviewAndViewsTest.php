@@ -40,7 +40,7 @@ class PublicShowPreviewAndViewsTest extends TestCase
     public function test_admin_preview_of_draft_is_200(): void
     {
         $this->mkPost(false, 'draft-b');
-        Sanctum::actingAs(User::factory()->create());
+        Sanctum::actingAs(User::factory()->create(), ['*']);
 
         $this->getJson('/api/posts/draft-b?preview=1')->assertStatus(200);
     }
@@ -48,7 +48,7 @@ class PublicShowPreviewAndViewsTest extends TestCase
     public function test_admin_without_preview_flag_still_404_on_draft(): void
     {
         $this->mkPost(false, 'draft-c');
-        Sanctum::actingAs(User::factory()->create());
+        Sanctum::actingAs(User::factory()->create(), ['*']);
 
         $this->getJson('/api/posts/draft-c')->assertStatus(404);
     }
@@ -104,7 +104,7 @@ class PublicShowPreviewAndViewsTest extends TestCase
 
         $this->getJson('/api/projects/secret-proj')->assertStatus(404);
 
-        Sanctum::actingAs(User::factory()->create());
+        Sanctum::actingAs(User::factory()->create(), ['*']);
         $this->getJson('/api/projects/secret-proj')->assertStatus(200);
     }
 

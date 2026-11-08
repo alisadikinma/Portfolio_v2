@@ -32,7 +32,7 @@ class ProjectController extends Controller
         $query = Project::query(); // Removed translations eager load for performance
 
         // Unpublished/inactive projects are listed only for an authenticated admin.
-        if (!auth('sanctum')->check()) {
+        if (!\App\Support\AdminViewer::is()) {
             $query->where('published', true)->where('is_active', true);
         }
 
@@ -165,7 +165,7 @@ class ProjectController extends Controller
         $query = Project::with(['translations'])->where('slug', $slug);
 
         // Unpublished/inactive projects are visible only to an authenticated admin.
-        if (!auth('sanctum')->check()) {
+        if (!\App\Support\AdminViewer::is()) {
             $query->where('published', true)->where('is_active', true);
         }
 

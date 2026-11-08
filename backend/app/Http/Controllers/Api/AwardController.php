@@ -91,7 +91,7 @@ class AwardController extends Controller
      */
     public function index(Request $request)
     {
-        $isAdmin = auth('sanctum')->check();
+        $isAdmin = \App\Support\AdminViewer::is();
         $query = Award::with(['galleries' => function ($q) use ($isAdmin) {
             if (!$isAdmin) {
                 $q->where('is_active', true);
@@ -204,7 +204,7 @@ class AwardController extends Controller
      */
     public function show($id)
     {
-        $isAdmin = auth('sanctum')->check();
+        $isAdmin = \App\Support\AdminViewer::is();
         $award = Award::with(['galleries' => function ($q) use ($isAdmin) {
             if (!$isAdmin) {
                 $q->where('is_active', true);
@@ -445,7 +445,7 @@ class AwardController extends Controller
      */
     public function getGalleries($id)
     {
-        $isAdmin = auth('sanctum')->check();
+        $isAdmin = \App\Support\AdminViewer::is();
         $award = Award::with(['galleries' => function ($q) use ($isAdmin) {
             if (!$isAdmin) {
                 $q->where('is_active', true);
