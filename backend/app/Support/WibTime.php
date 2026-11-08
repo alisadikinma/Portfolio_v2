@@ -26,4 +26,15 @@ final class WibTime
         // Carbon::parse($v, $tz) applies $tz only when the string has no offset.
         return Carbon::parse($value, self::ZONE);
     }
+
+    /**
+     * Operator-facing label, always WIB: "Rab, 13 Mei 12:00 WIB".
+     */
+    public static function label(\DateTimeInterface $when): string
+    {
+        return Carbon::instance($when)
+            ->setTimezone(self::ZONE)
+            ->locale('id')
+            ->isoFormat('ddd, D MMM HH:mm').' WIB';
+    }
 }

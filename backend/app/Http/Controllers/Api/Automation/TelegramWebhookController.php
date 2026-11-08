@@ -190,7 +190,7 @@ class TelegramWebhookController extends Controller
             Cache::forget($stateKey);
             $telegram->sendScheduleConfirmed($draft, $slot);
 
-            return '✅ Dijadwalkan ' . $slot->locale('id')->isoFormat('ddd, D MMM HH:mm') . ' WIB.';
+            return '✅ Dijadwalkan ' . \App\Support\WibTime::label($slot) . '.';
         }
 
         if ($action === 'confirm') {

@@ -88,4 +88,15 @@ class CalendarWibDayBoundaryTest extends TestCase
         $this->assertTrue($ids->contains($in->id));
         $this->assertFalse($ids->contains($out->id));
     }
+
+    public function test_calendar_schedule_fields_carry_an_explicit_offset(): void
+    {
+        Sanctum::actingAs(User::factory()->create());
+        $this->linkedIn('2026-05-12 22:00:00');
+
+        $item = $this->getJson('/api/admin/linkedin-posts/calendar?from=2026-05-13&to=2026-05-13')->json('data.items.0');
+
+        $this->assertMatchesRegularExpression('/(Z|[+-]\d{2}:\d{2})$/', $item['scheduled_at']);
+        $this->assertMatchesRegularExpression('/(Z|[+-]\d{2}:\d{2})$/', $item['pin_at']);
+    }
 }

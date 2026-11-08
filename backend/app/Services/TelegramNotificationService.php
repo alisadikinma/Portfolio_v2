@@ -752,7 +752,7 @@ class TelegramNotificationService
 
         $rows = [];
         foreach (array_values($candidateSlots) as $i => $slot) {
-            $label = $slot->locale('id')->isoFormat('ddd, D MMM HH:mm') . ' WIB';
+            $label = \App\Support\WibTime::label($slot);
             $rows[] = [[
                 'text' => $label,
                 'callback_data' => self::signCallback("slot{$i}", 'schedule', $draft->id, $secret),
@@ -795,7 +795,7 @@ class TelegramNotificationService
         }
 
         $secret = (string) $this->getSetting('telegram_webhook_secret');
-        $when = $proposed->locale('id')->isoFormat('ddd, D MMM HH:mm') . ' WIB';
+        $when = \App\Support\WibTime::label($proposed);
         $other = $this->escapeMarkdown($this->truncate((string) ($conflict['post_title'] ?? 'draft lain'), 60));
 
         $lines = [
@@ -823,7 +823,7 @@ class TelegramNotificationService
             return false;
         }
 
-        $when = $slot->locale('id')->isoFormat('ddd, D MMM HH:mm') . ' WIB';
+        $when = \App\Support\WibTime::label($slot);
         $title = $this->escapeMarkdown($this->truncate($this->resolveDraftTitle($draft), 70));
 
         return $this->send("✅ *Dijadwalkan* {$when}\n{$title}");

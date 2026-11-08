@@ -119,7 +119,7 @@ class ParseAndScheduleReply implements ShouldQueue
         $suggestion = '';
         try {
             $slot = app(LinkedInFixedSlotScheduler::class)->nextAvailableSlot();
-            $suggestion = ' Saran terdekat: ' . $slot->locale('id')->isoFormat('ddd, D MMM HH:mm') . ' WIB.';
+            $suggestion = ' Saran terdekat: ' . \App\Support\WibTime::label($slot) . '.';
         } catch (\Throwable $e) {
             // No suggestion available — still tell the operator why.
         }
