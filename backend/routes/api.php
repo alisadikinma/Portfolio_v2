@@ -198,7 +198,7 @@ Route::middleware(['auth:sanctum'])->prefix('admin/geminigen')->group(function (
 // Internal (server-to-server) — Astro frontend reports AI-bot crawls.
 // Shared-secret auth inside the controller; intentionally outside auth:sanctum.
 Route::post('/internal/crawler-hit', \App\Http\Controllers\Api\InternalCrawlerHitController::class)
-    ->middleware('throttle:600,1');
+    ->middleware('throttle:internal-crawler');
 
 // Admin GEO crawler-hit stats (read-only) — AI bot crawls GA4 can't see.
 Route::middleware(['auth:sanctum'])->prefix('admin/geo')->group(function () {

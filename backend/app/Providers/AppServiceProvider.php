@@ -8,7 +8,10 @@ use Illuminate\Console\Events\ScheduledTaskFailed;
 use Illuminate\Console\Events\ScheduledTaskFinished;
 use Illuminate\Console\Events\ScheduledTaskStarting;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
@@ -35,6 +38,11 @@ class AppServiceProvider extends ServiceProvider
         if (config('app.env') === 'production') {
             URL::forceScheme('https');
         }
+
+        // Dedicated bucket: the default throttle key is domain|ip, so a bare
+        // `throttle:600,1` would share a counter with /contact, newsletter, chatbot.
+        RateLimiter::for('internal-crawler', fn (Request $request) => Limit::perMinute(600)
+            ->by('internal-crawler|'.$request->ip()));
 
         $this->registerScheduledCommandAuditHooks();
     }

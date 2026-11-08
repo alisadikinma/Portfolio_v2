@@ -75,6 +75,19 @@ class InternalCrawlerHitTest extends TestCase
             ->assertStatus(202);
     }
 
+    public function test_crawler_hits_do_not_consume_contact_throttle(): void
+    {
+        $this->setServerToken();
+        $h = ['X-Internal-Token' => 'secret-token'];
+
+        for ($i = 0; $i < 5; $i++) {
+            $this->postJson(self::URL, ['bot' => 'GPTBot'], $h)->assertStatus(202);
+        }
+
+        // /contact allows 3 per 15 min per IP; crawler hits must not eat that bucket.
+        $this->assertNotSame(429, $this->postJson('/api/contact', [])->getStatusCode());
+    }
+
     public function test_bot_config_matches_middleware_list(): void
     {
         $map = config('ai_bots.map');
