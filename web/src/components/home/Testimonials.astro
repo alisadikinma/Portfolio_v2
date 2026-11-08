@@ -1,0 +1,62 @@
+---
+import type { Lang } from "../../lib/i18n";
+import { apiGet } from "../../lib/api";
+import { excerptAtSentence } from "../../lib/excerpt";
+import { SITE } from "../../lib/schema";
+import { id } from "../../content/copy/id";
+import { en } from "../../content/copy/en";
+
+interface Testimonial {
+  client_name?: string | null;
+  company_name?: string | null;
+  job_title?: string | null;
+  testimonial_text?: string | null;
+  client_photo?: string | null;
+  linkedin_url?: string | null;
+  sort_order?: number | null;
+}
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const t = (lang === "id" ? id : en).testimonials;
+
+let rows: Testimonial[] = [];
+try {
+  const data = await apiGet<Testimonial[]>("/testimonials", { lang });
+  if (Array.isArray(data)) rows = data;
+} catch (e) {
+  console.warn("[home] testimonials unavailable", (e as Error).message);
+}
+const items = rows
+  .filter((r) => r.client_name && r.testimonial_text)
+  .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+  .slice(0, 4)
+  .map((r) => ({
+    name: r.client_name as string,
+    quote: excerptAtSentence(r.testimonial_text as string, 220),
+    role: [r.job_title, r.company_name].filter((x) => x && x.trim() !== "").join(" · "),
+    photo: r.client_photo ? (/^https?:\/\//.test(r.client_photo) ? r.client_photo : SITE + (r.client_photo.startsWith("/") ? "" : "/") + r.client_photo) : "",
+    url: r.linkedin_url && /^https:\/\//.test(r.linkedin_url) ? r.linkedin_url : "",
+  }));
+---
+{items.length > 0 && (
+  <section class="sec alt" id="testimoni" aria-labelledby="testi-h">
+    <div class="wrap">
+      <div class="sec-head"><h2 id="testi-h">{t.h2}</h2><p class="lead">{t.lead}</p></div>
+      <ul class="tms">
+        {items.map((i) => (
+          <li><figure class="tm">
+            <blockquote lang="en"><p>“{i.quote}”</p></blockquote>
+            <figcaption>
+              {i.photo && <img src={i.photo} alt={i.name} width="56" height="56" loading="lazy" decoding="async" />}
+              <span>
+                <strong>{i.name}</strong>
+                {i.role && <span>{i.role}</span>}
+                {i.url && <a href={i.url} rel="noopener" target="_blank">{t.linkedin}</a>}
+              </span>
+            </figcaption>
+          </figure></li>
+        ))}
+      </ul>
+    </div>
+  </section>
+)}

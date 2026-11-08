@@ -1,0 +1,53 @@
+---
+import type { Lang } from "../lib/i18n";
+import { id } from "../content/copy/id";
+import { en } from "../content/copy/en";
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const n = (lang === "id" ? id : en).newsletter;
+---
+<section class="sec alt" aria-labelledby="news-h">
+  <div class="wrap news">
+    <div><h2 id="news-h">{n.h2}</h2><p class="muted" style="margin-top:12px">{n.lead}</p></div>
+    <form
+      class="form"
+      novalidate
+      data-newsletter
+      data-endpoint="/api/newsletter/subscribe"
+      data-source="homepage_join"
+      data-sending={n.sending}
+      data-ok={n.ok}
+      data-rate={n.rate}
+      data-network={n.network}
+      data-dup={n.dup}
+      data-server={n.server}
+      data-required={n.required}
+      data-invalid-email={n.invalidEmail}
+      data-invalid-wa={n.invalidWa}
+    >
+      <div class="field">
+        <label for="nl-name">{n.nameLabel}</label>
+        <input id="nl-name" name="name" type="text" autocomplete="name" maxlength="120" required aria-describedby="nl-name-err" />
+        <span class="err" id="nl-name-err" data-err="name"></span>
+      </div>
+      <div class="field">
+        <label for="nl-email">{n.emailLabel}</label>
+        <input id="nl-email" name="email" type="email" autocomplete="email" maxlength="255" required aria-describedby="nl-email-err" />
+        <span class="err" id="nl-email-err" data-err="email"></span>
+      </div>
+      <div class="field">
+        <label for="nl-wa">{n.waLabel}</label>
+        <input id="nl-wa" name="whatsapp" type="tel" autocomplete="tel" inputmode="tel" placeholder="+628123456789" required aria-describedby="nl-wa-help nl-wa-err" />
+        <span class="help" id="nl-wa-help">{n.waHelp}</span>
+        <span class="err" id="nl-wa-err" data-err="whatsapp"></span>
+      </div>
+      <button class="btn btn-primary" type="submit">{n.cta}</button>
+      <p data-status role="status" aria-live="polite"></p>
+    </form>
+  </div>
+</section>
+<script>
+  import { initAllNewsletterForms } from "../scripts/newsletter-form";
+  initAllNewsletterForms();
+</script>
