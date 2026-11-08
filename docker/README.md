@@ -1,68 +1,30 @@
-# Docker Local Stack — Portfolio_v2
+# Docker — Portfolio_v2
 
-Full local stack: MySQL 8 + Laravel (PHP-FPM) + Nginx + Vue (Vite) + phpMyAdmin.
-The dump `portfolio_v2_20260530.sql` is auto-imported into MySQL on first boot.
+Two local stacks. The public site is Astro (`web/`) since PF-2; the Vue app in `frontend/` is admin-only.
 
-## Services & URLs
+| Stack | Command | Use |
+|---|---|---|
+| **Full site + prod-data copy** (review before release) | `scripts/pf2-local.sh up` | Astro + admin + API on http://localhost:8000. See [pf2-local/README.md](pf2-local/README.md). |
+| **Dev API + admin** (root `docker-compose.yml`) | `docker compose up -d --build` | MySQL + Laravel (`portfolio_backend`) + nginx :8000 + admin Vite :5173 + phpMyAdmin :8080. Starts with an EMPTY database. |
 
-| Service     | URL                          | Notes                                   |
-|-------------|------------------------------|-----------------------------------------|
-| Frontend    | http://localhost:5173        | Vue 3 + Vite dev server (HMR)           |
-| Backend API | http://localhost:8000/api    | Laravel 12 via Nginx + PHP-FPM          |
-| phpMyAdmin  | http://localhost:8080        | server `mysql`, user `root` / `root`    |
-| MySQL       | localhost:3306               | db `portfolio_v2`                        |
-
-## Credentials
-
-- MySQL root: `root` / `root`
-- MySQL app user: `portfolio` / `secret`
-- DB name: `portfolio_v2`
-
-## Usage
+## Dev API + admin stack
 
 ```bash
-# Start everything (build on first run)
 docker compose up -d --build
-
-# Status / logs
-docker compose ps
-docker compose logs -f backend
-docker compose logs -f frontend
-
-# Stop (keeps data)
-docker compose down
-
-# Stop + WIPE database/volumes (re-import SQL on next up)
-docker compose down -v
-
-# Run artisan inside the backend container
-docker compose exec backend php artisan migrate:status
-docker compose exec backend php artisan tinker
+docker compose exec backend php artisan migrate --seed   # first run only
+docker compose exec backend php artisan test
+docker compose down        # keep data
+docker compose down -v     # wipe database volume
 ```
 
-## Important: re-importing the SQL
+- MySQL: `root`/`root`, app user `portfolio`/`secret`, db `portfolio_v2`.
+- No database dump is imported. Need real data? Use the pf2-local stack (`scripts/pf2-local.sh import`).
+- Mail: set `MAIL_MAILER=log` in `backend/.env` (mail lands in `backend/storage/logs/laravel.log`).
 
-The dump is imported **only on first boot**, when the `mysql_data` volume is empty.
-To re-import (e.g. after replacing the `.sql` file):
+## Files
 
-```bash
-docker compose down -v        # drops the mysql_data volume
-docker compose up -d          # fresh import
-```
-
-## Config files
-
-- `docker-compose.yml` — service definitions (root)
-- `docker/php/Dockerfile` — PHP 8.2-fpm image (pdo_mysql, gd, intl, zip, bcmath, exif…)
-- `docker/php/entrypoint.sh` — composer install + key:generate + storage:link on boot
-- `docker/nginx/default.conf` — serves `backend/public`, proxies PHP to `backend:9000`
-- `backend/.env` — points DB to the `mysql` service
-- `frontend/.env.development.local` — points the browser API base to `http://localhost:8000/api`
-
-## Notes
-
-- No `php artisan migrate` is run — the schema+data come entirely from the imported dump.
-  If you later need to apply newer Laravel migrations, run
-  `docker compose exec backend php artisan migrate` manually.
-- Mail uses the `log` driver (no real SMTP) — emails land in `backend/storage/logs/laravel.log`.
-- Sessions/cache/queue use the `database` driver (those tables exist in the dump).
+- `../docker-compose.yml` — dev stack above
+- `php/Dockerfile` — PHP 8.4-fpm image (also the `pf2-backend` image used by pf2-local and the phpunit command in PF-2 docs)
+- `php/entrypoint.sh` — composer install + key:generate + storage:link on boot
+- `nginx/default.conf` — serves `backend/public`, proxies PHP to `backend:9000` (dev stack only)
+- `pf2-local/` — full-site review stack

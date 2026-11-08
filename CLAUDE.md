@@ -1025,6 +1025,9 @@ Match the model to the actual cognitive effort of the work. Don't pay Opus rates
 2. Check `PROJECT_STATUS.md` for current state
 3. Review existing patterns before creating new ones
 
+### Repo hygiene (PF-2)
+Never track `vendor/`, `node_modules/`, DB dumps (`*.sql`), `.env`, `*.bak|old|orig|backup-*`, generated reports (`playwright-report/`) or debug pages. Only `backend/`, `frontend/`, `web/` have dependency manifests (none at repo root). Guard: `bash scripts/tests/repo-hygiene.test.sh`. Local data: use `scripts/pf2-local.sh import`, not a committed dump.
+
 ### After Changes (MANDATORY):
 1. Run tests
 2. **Update CLAUDE.md** — every change that touches architecture, routes, schema, composables, page-section mapping, new env vars, or pipeline stages MUST be reflected in the relevant CLAUDE.md section (root / backend / frontend) before commit. Skipping this leaves next session (or next contributor) debugging stale docs. Also update the "Last Updated" line at the bottom of root CLAUDE.md.

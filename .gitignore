@@ -257,3 +257,25 @@ web/test-results/
 web/playwright-report/
 .local-stack/
 web/.pf2-local-build/
+
+# ====================================
+# Hygiene guard (PF-2) — see scripts/tests/repo-hygiene.test.sh
+# ====================================
+# Root-level leftovers of the pre-PF-2 skeleton / local tooling. backend/, frontend/
+# and web/ each own their own manifests; nothing at the repo root installs deps.
+/vendor/
+node_modules/
+/.env
+/composer.json
+/composer.lock
+/package.json
+/package-lock.json
+/playwright.config.js
+# Generated test output
+playwright-report/
+test-results/
+# Backups and debug pages
+*.old
+*.orig
+*.backup-*
+backend/public/*debug*.html
