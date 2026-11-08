@@ -74,7 +74,8 @@ const jsonld = graph(
   faqPage(faq),
 );
 ---
-<BaseLayout title={title} description={c.metaDescription} path={path} lang={lang} jsonld={jsonld}>
+<BaseLayout title={title} description={c.metaDescription} path={path} lang={lang} jsonld={jsonld}
+  image={`${SITE}/og/speaker-${lang}.jpg`} imageWidth={1200} imageHeight={630}>
   <main>
     <section class:list={["sp-hero", { "has-photo": hero }]}>
       {hero && (

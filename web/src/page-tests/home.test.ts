@@ -61,6 +61,12 @@ describe("/{lang} home", () => {
     expect(checkHtml(html, spec, headers)).toEqual([]);
   });
 
+  it.each(["id", "en"] as const)("og:image is the 1200x630 stage card for %s (Ali 2026-11-09)", async (lang) => {
+    const { html } = await load(lang);
+    expect(html).toContain(`<meta property="og:image" content="https://alisadikinma.com/og/home-${lang}.jpg">`);
+    expect(html).toContain('<meta property="og:image:height" content="630">');
+  });
+
   it("Person + WebSite JSON-LD, H1 with name and keyword", async () => {
     const { html } = await load("id");
     const types = jsonld(html)["@graph"].map((n: { "@type": string }) => n["@type"]);

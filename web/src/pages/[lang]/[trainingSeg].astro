@@ -70,7 +70,8 @@ const jsonld = graph(
 );
 ---
 {isSpeaker && <SpeakerPage lang={lang} path={path} />}
-{isTraining && <BaseLayout title={title} description={c.metaDescription} path={path} lang={lang} jsonld={jsonld}>
+{isTraining && <BaseLayout title={title} description={c.metaDescription} path={path} lang={lang} jsonld={jsonld}
+  image={`${SITE}/og/training-${lang}.jpg`} imageWidth={1200} imageHeight={630}>
   <main>
     <section class="page-hero th-hero">
       <div class="wrap th-hero-grid">

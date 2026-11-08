@@ -238,3 +238,13 @@ describe("FAQ illustration (Ali 2026-11-09)", () => {
     expect(faq.indexOf('id="faq-h"')).toBeLessThan(faq.indexOf("faq-illus"));
   });
 });
+
+describe("og:image per main page (Ali 2026-11-09: stage photo + proof)", () => {
+  it.each([["id", "pembicara-ai", "speaker-id"], ["en", "ai-speaker", "speaker-en"], ["id", "pelatihan-ai", "training-id"], ["en", "ai-training", "training-en"]])("%s/%s uses /og/%s.jpg 1200x630", async (lang, seg, file) => {
+    const { html } = await load(lang, seg);
+    expect(html).toContain(`<meta property="og:image" content="https://alisadikinma.com/og/${file}.jpg">`);
+    expect(html).toContain('<meta property="og:image:width" content="1200">');
+    expect(html).toContain('<meta property="og:image:height" content="630">');
+    expect(readFileSync(new URL(`../../public/og/${file}.jpg`, import.meta.url)).length).toBeGreaterThan(20000);
+  });
+});

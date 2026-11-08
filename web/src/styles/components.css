@@ -709,3 +709,10 @@ fieldset.field { border: 0; margin: 0; padding: 0; }
 /* INDUSIA.ai logo on the chest, crisp over the point cloud (Ali 2026-11-09: must stand out) */
 .hx .hx-logo { position: absolute; z-index: 2; visibility: hidden; display: flex; align-items: center; transform: rotate(-5deg); pointer-events: none; }
 .hx .hx-logo img { width: 100%; height: auto; filter: drop-shadow(0 0 6px rgba(63,184,197,.95)) drop-shadow(0 0 18px rgba(63,184,197,.6)); }
+
+/* icon-only social links (Ali 2026-11-09) */
+.soc { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 12px;
+  color: var(--text-secondary); border: 1px solid var(--border-subtle); background: rgba(255,255,255,.03); transition: color var(--dur-hover) var(--ease-out), border-color var(--dur-hover) var(--ease-out); }
+.soc:hover, .soc:focus-visible { color: var(--accent-primary); border-color: rgba(63,184,197,.5); outline: none; }
+.foot nav { align-items: center; gap: 10px; }
+.about-profiles, .contact-social { display: flex; flex-wrap: wrap; gap: 10px; list-style: none; padding: 0; }

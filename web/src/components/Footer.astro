@@ -1,6 +1,7 @@
 ---
 import type { Lang } from "../lib/i18n";
 import { SAME_AS } from "../lib/schema";
+import SocialLink from "./SocialLink.astro";
 import { id } from "../content/copy/id";
 import { en } from "../content/copy/en";
 
@@ -12,12 +13,12 @@ const social = (host: string) => SAME_AS.find((u) => u.includes(host)) ?? "";
 ---
 <footer class="foot">
   <div class="wrap">
-    <span>{c.footer.copyright} · <a href={founderHref}>Founder INDUSIA.ai</a></span>
+    <span>{c.footer.copyright} · <a href={founderHref} target="_blank">Founder INDUSIA.ai</a></span>
     <nav aria-label={c.footer.ariaSocial}>
-      {social("linkedin") !== "" && <a href={social("linkedin")} rel="noopener">{c.footer.linkedin}</a>}
-      {social("instagram") !== "" && <a href={social("instagram")} rel="noopener">{c.footer.instagram}</a>}
-      {social("youtube") !== "" && <a href={social("youtube")} rel="noopener">{c.footer.youtube}</a>}
-      {social("tiktok") !== "" && <a href={social("tiktok")} rel="noopener">{c.footer.tiktok}</a>}
+      {social("linkedin") !== "" && <SocialLink href={social("linkedin")} label={c.footer.linkedin} />}
+      {social("instagram") !== "" && <SocialLink href={social("instagram")} label={c.footer.instagram} />}
+      {social("youtube") !== "" && <SocialLink href={social("youtube")} label={c.footer.youtube} />}
+      {social("tiktok") !== "" && <SocialLink href={social("tiktok")} label={c.footer.tiktok} />}
       <a href={`/${lang}/faq`}>{c.footer.faq}</a>
     </nav>
   </div>

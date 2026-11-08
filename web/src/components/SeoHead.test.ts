@@ -133,7 +133,22 @@ describe("BaseLayout", () => {
 
   it("footer has dofollow Founder INDUSIA.ai link (ID)", async () => {
     const h = await render();
-    expect(h).toMatch(/<a href="https:\/\/indusia\.ai\/id\/">Founder INDUSIA\.ai<\/a>/);
+    expect(h).toMatch(/<a href="https:\/\/indusia\.ai\/id\/" target="_blank">Founder INDUSIA\.ai<\/a>/);
+  });
+
+  // Ali 2026-11-09: social links are icons only and every external footer link opens a new tab.
+  it("footer social links are icon-only, labelled, and open in a new tab; FAQ stays in the tab", async () => {
+    const h = await render();
+    const nav = h.match(/<footer[\s\S]*?<\/footer>/)![0];
+    const socs = [...nav.matchAll(/<a class="soc"([^>]*)>([\s\S]*?)<\/a>/g)];
+    expect(socs.length).toBeGreaterThanOrEqual(4);
+    for (const [, attrs, inner] of socs) {
+      expect(attrs).toContain('target="_blank"');
+      expect(attrs).toMatch(/aria-label="[^"]+"/);
+      expect(inner.replace(/<[^>]+>/g, "").trim()).toBe("");
+      expect(inner).toContain("<svg");
+    }
+    expect(nav).toMatch(/<a href="\/id\/faq">/);
   });
 
   it("EN footer points to unprefixed indusia.ai", async () => {

@@ -12,7 +12,7 @@ import Lightbox from "../../components/Lightbox.astro";
 import { apiGet } from "../../lib/api";
 import { LANGS, type Lang } from "../../lib/i18n";
 import { waLink } from "../../lib/whatsapp";
-import { SITE, PORTRAIT_URL, graph, personNode, webPageNode, websiteNode } from "../../lib/schema";
+import { SITE, graph, personNode, webPageNode, websiteNode } from "../../lib/schema";
 import { TITLES } from "../../../scripts/seo-gate.config.mjs";
 import { id } from "../../content/copy/id";
 import { en } from "../../content/copy/en";
@@ -59,9 +59,9 @@ const jsonld = graph(
   path={path}
   lang={lang}
   jsonld={jsonld}
-  image={PORTRAIT_URL}
+  image={`${SITE}/og/home-${lang}.jpg`}
   imageWidth={1200}
-  imageHeight={1200}
+  imageHeight={630}
   preloadImage="/images/ali-sadikin-ma-pakar-ai-indonesia.jpg"
   home
 >
