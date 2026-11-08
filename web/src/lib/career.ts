@@ -93,11 +93,17 @@ function photosOf(items: unknown): Photo[] {
   return out.sort((a, b) => a.seq - b.seq || a.idx - b.idx).map((x) => x.photo);
 }
 
-function build(thumbnail: unknown, items: unknown): Photos {
+/**
+ * preferThumb: career galleries show their curated composite thumbnail as the cover
+ * (the old site did `g.thumbnail || items[0]`). Award stages keep the first photo
+ * with variants, which is what the old stage cards showed.
+ */
+function build(thumbnail: unknown, items: unknown, preferThumb = false): Photos {
   const photos = photosOf(items);
   const thumb = ownMediaUrl(thumbnail);
   const withVariants = photos.find((p) => p.srcset !== undefined);
-  const cover: { src: string; srcset?: string } | null = withVariants ?? (thumb ? { src: thumb } : (photos[0] ?? null));
+  const cover: { src: string; srcset?: string } | null =
+    preferThumb && thumb ? { src: thumb } : (withVariants ?? (thumb ? { src: thumb } : (photos[0] ?? null)));
   return { cover: cover ? { src: cover.src, srcset: cover.srcset } : null, photos };
 }
 
@@ -110,7 +116,7 @@ export async function loadGallery(id: number, lang: Lang): Promise<Photos | null
   try {
     const g = await apiGet<RawGallery>(apiPath`/galleries/${String(id)}`, { lang });
     if (!g) return warn("gallery", id, "not found"), null;
-    return build(g.thumbnail, g.items);
+    return build(g.thumbnail, g.items, true);
   } catch (e) {
     warn("gallery", id, e);
     return null;

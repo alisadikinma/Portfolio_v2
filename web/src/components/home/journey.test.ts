@@ -88,16 +88,16 @@ describe.each(["id", "en"] as const)("Journey (%s)", (lang) => {
     expect((html.match(/<li/g) ?? []).length).toBe(4);
   });
 
-  it("Singapore cover uses the first photo's image_variants srcset; Satnusa falls back to the thumbnail; both keep object-position 50% 15%", async () => {
+  it("career covers use the gallery's curated thumbnail (as on the old site), object-position 50% 15%", async () => {
+    // Ali 2026-11-08: the career cards must show the curated composite thumbnail
+    // (portrait at Marina Bay / Satnusa), not the first gallery photo.
     const html = await render(Journey, lang);
     const sg = liOf(html, 'data-career="14"').match(/<img[^>]*>/)![0];
+    expect(sg).toContain(`src="${thumb(14)}"`);
     expect(sg).toContain("object-position:50% 15%");
     expect(sg).toContain('loading="lazy"');
-    expect(sg).toContain(`srcset="${HOST.replace("/storage", "")}/storage/v/g14-0-320.webp 320w`);
-    expect(sg).toContain(" 1920w");
-    expect(sg).toMatch(/sizes="/);
     expect(sg).toMatch(/width="\d+" height="\d+"/);
-    expect(sg).not.toContain(thumb(14));
+    expect(sg).not.toContain("g14-0-320.webp");
     const st = liOf(html, 'data-career="16"').match(/<img[^>]*>/)![0];
     expect(st).toContain(`src="${thumb(16)}"`);
     expect(st).toContain("object-position:50% 15%");
