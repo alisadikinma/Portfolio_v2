@@ -349,24 +349,6 @@ parameters:
 			path: app/Http/Controllers/Api/Admin/ContentIdeaController.php
 
 		-
-			message: '#^Variable \$priorSlot might not be defined\.$#'
-			identifier: variable.undefined
-			count: 1
-			path: app/Http/Controllers/Api/Admin/ContentIdeaController.php
-
-		-
-			message: '#^Variable \$reuseIndex might not be defined\.$#'
-			identifier: variable.undefined
-			count: 1
-			path: app/Http/Controllers/Api/Admin/ContentIdeaController.php
-
-		-
-			message: '#^Variable \$variationIndex might not be defined\.$#'
-			identifier: variable.undefined
-			count: 4
-			path: app/Http/Controllers/Api/Admin/ContentIdeaController.php
-
-		-
 			message: '#^Access to an undefined property App\\Models\\Post\:\:\$translations\.$#'
 			identifier: property.notFound
 			count: 2
@@ -775,12 +757,6 @@ parameters:
 			path: app/Http/Controllers/Api/CategoryController.php
 
 		-
-			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
-			identifier: larastan.noEnvCallsOutsideOfConfig
-			count: 1
-			path: app/Http/Controllers/Api/ContactController.php
-
-		-
 			message: '#^Offset ''company'' on non\-empty\-array\<mixed\> on left side of \?\? always exists and is not nullable\.$#'
 			identifier: nullCoalesce.offset
 			count: 1
@@ -851,12 +827,6 @@ parameters:
 			identifier: larastan.relationExistence
 			count: 1
 			path: app/Http/Controllers/Api/HomepageController.php
-
-		-
-			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
-			identifier: larastan.noEnvCallsOutsideOfConfig
-			count: 2
-			path: app/Http/Controllers/Api/LinkedInOAuthController.php
 
 		-
 			message: '#^Using nullsafe property access "\?\-\>id" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
