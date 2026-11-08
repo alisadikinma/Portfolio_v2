@@ -31,6 +31,11 @@ class ProjectController extends Controller
 
         $query = Project::query(); // Removed translations eager load for performance
 
+        // Unpublished/inactive projects are listed only for an authenticated admin.
+        if (!auth('sanctum')->check()) {
+            $query->where('published', true)->where('is_active', true);
+        }
+
         // Filter by status
         if ($request->has('status')) {
             $query->byStatus($request->query('status'));

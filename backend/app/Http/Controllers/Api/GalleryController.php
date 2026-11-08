@@ -39,8 +39,10 @@ class GalleryController extends Controller
             $query->where('period', $request->query('period'));
         }
 
-        // Filter by active status
-        if ($request->has('is_active')) {
+        // Guests only ever see active galleries; the ?is_active= filter is admin-only.
+        if (!auth('sanctum')->check()) {
+            $query->where('is_active', true);
+        } elseif ($request->has('is_active')) {
             $isActive = $request->query('is_active');
             // Convert string boolean to integer (0/1)
             if (is_string($isActive)) {
@@ -110,7 +112,14 @@ class GalleryController extends Controller
      */
     public function show(string $id): JsonResponse
     {
-        $gallery = Gallery::with(['award', 'items'])->findOrFail($id);
+        $query = Gallery::with(['award', 'items']);
+
+        // Inactive galleries are visible only to an authenticated admin.
+        if (!auth('sanctum')->check()) {
+            $query->where('is_active', true);
+        }
+
+        $gallery = $query->findOrFail($id);
 
         return response()->json([
             'success' => true,

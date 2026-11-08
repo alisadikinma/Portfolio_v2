@@ -2161,7 +2161,7 @@ parameters:
 			path: app/Http/Resources/ScheduledCommandResource.php
 
 		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\ServiceResource\:\:\$active\.$#'
+			message: '#^Access to an undefined property App\\Http\\Resources\\ServiceResource\:\:\$is_active\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Http/Resources/ServiceResource.php
@@ -2197,7 +2197,7 @@ parameters:
 			path: app/Http/Resources/ServiceResource.php
 
 		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\ServiceResource\:\:\$order\.$#'
+			message: '#^Access to an undefined property App\\Http\\Resources\\ServiceResource\:\:\$sort_order\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Http/Resources/ServiceResource.php

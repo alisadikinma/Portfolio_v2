@@ -91,7 +91,17 @@ class AwardController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Award::with('galleries');
+        $isAdmin = auth('sanctum')->check();
+        $query = Award::with(['galleries' => function ($q) use ($isAdmin) {
+            if (!$isAdmin) {
+                $q->where('is_active', true);
+            }
+        }]);
+
+        // Guests only see active awards.
+        if (!$isAdmin) {
+            $query->where('is_active', true);
+        }
 
         try {
             $query->orderBy('sort_order', 'asc')
@@ -194,7 +204,14 @@ class AwardController extends Controller
      */
     public function show($id)
     {
-        $award = Award::with('galleries.items')->findOrFail($id);
+        $isAdmin = auth('sanctum')->check();
+        $award = Award::with(['galleries' => function ($q) use ($isAdmin) {
+            if (!$isAdmin) {
+                $q->where('is_active', true);
+            }
+        }, 'galleries.items'])
+            ->when(!$isAdmin, fn ($q) => $q->where('is_active', true))
+            ->findOrFail($id);
 
         return response()->json([
             'success' => true,
@@ -428,8 +445,15 @@ class AwardController extends Controller
      */
     public function getGalleries($id)
     {
-        $award = Award::with('galleries.items')->findOrFail($id);
-        
+        $isAdmin = auth('sanctum')->check();
+        $award = Award::with(['galleries' => function ($q) use ($isAdmin) {
+            if (!$isAdmin) {
+                $q->where('is_active', true);
+            }
+        }, 'galleries.items'])
+            ->when(!$isAdmin, fn ($q) => $q->where('is_active', true))
+            ->findOrFail($id);
+
         return response()->json([
             'success' => true,
             'data' => [
