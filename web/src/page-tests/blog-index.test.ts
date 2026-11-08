@@ -3,7 +3,7 @@ import { experimental_AstroContainer as AstroContainer } from "astro/container";
 import { resetApiCache } from "../lib/api";
 import { checkHtml } from "../../scripts/seo-gate.mjs";
 import { ROUTES } from "../../scripts/seo-gate.config.mjs";
-import BlogIndex from "./[lang]/blog/index.astro";
+import BlogIndex from "../pages/[lang]/blog/index.astro";
 
 const post = (n: number, extra: Record<string, unknown> = {}) => ({
   id: n,

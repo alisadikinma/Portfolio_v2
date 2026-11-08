@@ -4,7 +4,7 @@ import { resetApiCache } from "../lib/api";
 import { resetImageDimsCache } from "../lib/image-dims";
 import { checkHtml } from "../../scripts/seo-gate.mjs";
 import { basicSpec } from "../../scripts/seo-gate.config.mjs";
-import ProjectDetail from "./[lang]/projects/[slug].astro";
+import ProjectDetail from "../pages/[lang]/projects/[slug].astro";
 
 const PROJECT: Record<string, unknown> = {
   id: 7,

@@ -5,7 +5,7 @@ import { resetImageDimsCache } from "../lib/image-dims";
 import { PORTRAIT_URL } from "../lib/schema";
 import { checkHtml } from "../../scripts/seo-gate.mjs";
 import { blogPostSpec } from "../../scripts/seo-gate.config.mjs";
-import BlogDetail from "./[lang]/blog/[slug].astro";
+import BlogDetail from "../pages/[lang]/blog/[slug].astro";
 
 const SLUG = "vibe-coding-untuk-pabrik";
 const DESC =

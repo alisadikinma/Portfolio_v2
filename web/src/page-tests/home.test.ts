@@ -3,7 +3,7 @@ import { experimental_AstroContainer as AstroContainer } from "astro/container";
 import { resetApiCache } from "../lib/api";
 import { checkHtml } from "../../scripts/seo-gate.mjs";
 import { ROUTES } from "../../scripts/seo-gate.config.mjs";
-import Home from "./[lang]/index.astro";
+import Home from "../pages/[lang]/index.astro";
 
 const HOST = "https://alisadikinma.com/storage";
 const gallery = (id: number) => ({

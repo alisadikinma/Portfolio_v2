@@ -3,7 +3,7 @@ import { experimental_AstroContainer as AstroContainer } from "astro/container";
 import { resetApiCache } from "../lib/api";
 import { checkHtml } from "../../scripts/seo-gate.mjs";
 import { basicSpec } from "../../scripts/seo-gate.config.mjs";
-import CategoryPage from "./[lang]/blog/category/[slug].astro";
+import CategoryPage from "../pages/[lang]/blog/category/[slug].astro";
 
 const post = (n: number) => ({
   id: n,

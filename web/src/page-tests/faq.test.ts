@@ -3,7 +3,7 @@ import { experimental_AstroContainer as AstroContainer } from "astro/container";
 import { resetApiCache } from "../lib/api";
 import { checkHtml } from "../../scripts/seo-gate.mjs";
 import { ROUTES } from "../../scripts/seo-gate.config.mjs";
-import FaqPage from "./[lang]/faq.astro";
+import FaqPage from "../pages/[lang]/faq.astro";
 
 const ITEMS = [
   { question: "Who is Ali Sadikin Ma?", answer: "Ali Sadikin Ma is an AI Generalist based in Indonesia." },
