@@ -24,6 +24,18 @@ describe("samplePortrait", () => {
     for (let i = 0; i < s.pos.length; i++) expect(Math.abs(s.pos[i]!)).toBeLessThan(0.2);
   });
 
+  it("with a fixed random source, positions/rnd/lum are exact", () => {
+    const s = samplePortrait(synthetic(), 8, () => 0.5);
+    // centre pixels in row-major order: (3,3) (4,3) (3,4) (4,4)
+    expect(Array.from(s.pos)).toEqual([-0.125, 0.125, 0, 0.125, -0.125, 0, 0, 0]);
+    expect(Array.from(s.rnd)).toEqual(new Array(16).fill(0.5));
+    [0, 0.5, 0.5, 1].forEach((v, i) => expect(s.lum[i]).toBeCloseTo(v, 5));
+  });
+
+  it("throws when n does not match the image size", () => {
+    expect(() => samplePortrait(synthetic(), 4)).toThrow(/expected 4x4/);
+  });
+
   it("contrast-stretches luminance into 0..1 using the full range", () => {
     const s = samplePortrait(synthetic(), 8);
     for (const l of s.lum) {
@@ -58,7 +70,8 @@ describe("pointBudget", () => {
     expect(pointBudget({ width: 1440 })).toBe(250);
     expect(pointBudget({ width: 390 })).toBe(160);
   });
-  it("boundary width 760 is desktop", () => {
-    expect(pointBudget({ cores: 8, memory: 8, width: 760 })).toBe(250);
+  it("boundary: 760 is mobile (matches CSS max-width:760px), 761 is desktop", () => {
+    expect(pointBudget({ cores: 8, memory: 8, width: 760 })).toBe(160);
+    expect(pointBudget({ cores: 8, memory: 8, width: 761 })).toBe(250);
   });
 });

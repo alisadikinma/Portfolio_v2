@@ -1,7 +1,7 @@
 // Hero client island: portrait -> AI point cloud (ogl) orchestrated by GSAP.
 // Starts after window `load` (so the <img> LCP is already painted), lazy-imports ogl + gsap,
 // and degrades silently to the duotone <img> on any failure. Never throws.
-import { samplePortrait, pointBudget } from "./portrait-sample";
+import { samplePortrait, pointBudget, MOBILE_MAX } from "./portrait-sample";
 
 const VERTEX = /* glsl */ `
   attribute vec2 position;
@@ -26,7 +26,11 @@ const VERTEX = /* glsl */ `
   }`;
 
 const FRAGMENT = /* glsl */ `
+  #ifdef GL_FRAGMENT_PRECISION_HIGH
   precision highp float;
+  #else
+  precision mediump float;
+  #endif
   varying float vLum, vIn;
   void main() {
     float r = length(gl_PointCoord - 0.5);
@@ -39,18 +43,20 @@ const FRAGMENT = /* glsl */ `
 
 interface Layout { aspect: number; scale: number; offset: [number, number] }
 
-/** Where the portrait sits in shader space (y in [-1,1]). */
-function layout(w: number, h: number): Layout {
+/** Where the portrait sits in shader space (y in [-1,1]). Mobile boundary matches the CSS (<=760px). */
+export function layout(w: number, h: number): Layout {
   const aspect = w / h;
-  return w < 760
+  return w <= MOBILE_MAX
     ? { aspect, scale: 1.05, offset: [0, 0.38] }
     : { aspect, scale: 1.8, offset: [aspect * 0.4, -0.06] };
 }
 
-/** Image-space detection boxes (0..1, top-left origin) -> CSS px inside the hero. */
-function placeBoxes(dets: HTMLElement[], w: number, h: number, L: Layout): void {
+/** Image-space detection boxes (0..1, top-left origin) -> CSS px inside the hero. Bad data-box is skipped. */
+export function placeBoxes(dets: HTMLElement[], w: number, h: number, L: Layout): void {
   for (const el of dets) {
-    const [u, v, bw, bh] = (el.dataset.box ?? "").split(",").map(Number) as [number, number, number, number];
+    const parts = (el.dataset.box ?? "").split(",").map(Number);
+    if (parts.length !== 4 || !parts.every(Number.isFinite)) continue;
+    const [u, v, bw, bh] = parts as [number, number, number, number];
     const x0 = (u - 0.5) * L.scale + L.offset[0];
     const y0 = (0.5 - v) * L.scale + L.offset[1];
     el.style.left = `${((x0 / L.aspect + 1) / 2) * w}px`;
@@ -60,19 +66,32 @@ function placeBoxes(dets: HTMLElement[], w: number, h: number, L: Layout): void 
   }
 }
 
+function releaseContext(gl: unknown): void {
+  try {
+    (gl as WebGLRenderingContext).getExtension("WEBGL_lose_context")?.loseContext();
+  } catch {
+    /* ignore */
+  }
+}
+
 function hasWebGL(): boolean {
   try {
-    const c = document.createElement("canvas");
-    return !!(c.getContext("webgl2") ?? c.getContext("webgl"));
+    const gl = document.createElement("canvas").getContext("webgl2") ?? document.createElement("canvas").getContext("webgl");
+    if (!gl) return false;
+    releaseContext(gl);
+    return true;
   } catch {
     return false;
   }
 }
 
-function wireMoreToggle(hero: HTMLElement): void {
+/** Unhides the (JS-only) mobile toggle and enables the 2-line clamp via `.js`. */
+export function wireMoreToggle(hero: HTMLElement): void {
   const btn = hero.querySelector<HTMLButtonElement>(".hx-more");
   const lead = hero.querySelector<HTMLElement>("#hero-lead");
   if (!btn || !lead) return;
+  hero.classList.add("js");
+  btn.hidden = false;
   btn.addEventListener("click", () => {
     const open = btn.getAttribute("aria-expanded") !== "true";
     btn.setAttribute("aria-expanded", String(open));
@@ -81,7 +100,34 @@ function wireMoreToggle(hero: HTMLElement): void {
   });
 }
 
-async function startCloud(hero: HTMLElement): Promise<void> {
+/** Resources are registered as they are created so a failure at any step tears down only what exists. */
+interface Disposer { fns: Array<() => void>; run: () => void }
+function disposer(): Disposer {
+  const d: Disposer = {
+    fns: [],
+    run() {
+      const fns = d.fns.splice(0).reverse();
+      for (const f of fns) {
+        try { f(); } catch { /* best effort */ }
+      }
+    },
+  };
+  return d;
+}
+
+/** Final counters + status. Boxes are shown only over the cloud: their coordinates do not match the photo. */
+function showFinalValues(hero: HTMLElement, boxes = true): void {
+  for (const el of hero.querySelectorAll<HTMLElement>(".det")) {
+    el.style.visibility = boxes ? "visible" : "hidden";
+    el.style.opacity = boxes ? "1" : "0";
+    el.style.transform = "none";
+  }
+  for (const el of hero.querySelectorAll<HTMLElement>("[data-count]")) el.textContent = el.dataset.count ?? el.textContent;
+  const status = hero.querySelector<HTMLElement>("[data-status]");
+  if (status) status.textContent = status.dataset.done ?? status.textContent;
+}
+
+async function startCloud(hero: HTMLElement, d: Disposer): Promise<void> {
   const host = hero.querySelector<HTMLElement>("[data-cloud]");
   const photo = hero.querySelector<HTMLImageElement>(".hx-fallback");
   if (!host || !photo || !hasWebGL()) return; // duotone image stays
@@ -105,12 +151,14 @@ async function startCloud(hero: HTMLElement): Promise<void> {
 
   const renderer = new Renderer({ dpr: Math.min(window.devicePixelRatio, 2), alpha: true, antialias: false });
   const gl = renderer.gl;
+  d.fns.push(() => releaseContext(gl));
   gl.clearColor(0, 0, 0, 0);
   gl.enable(gl.BLEND);
   gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
   host.appendChild(gl.canvas);
+  d.fns.push(() => gl.canvas.remove());
 
-  const mobile = window.innerWidth < 760;
+  const mobile = window.innerWidth <= MOBILE_MAX;
   const geometry = new Geometry(gl, {
     position: { size: 2, data: s.pos },
     random: { size: 4, data: s.rnd },
@@ -122,12 +170,25 @@ async function startCloud(hero: HTMLElement): Promise<void> {
     uDpr: { value: renderer.dpr }, uPoint: { value: mobile ? 2.0 : 2.4 },
   };
   const program = new Program(gl, { vertex: VERTEX, fragment: FRAGMENT, uniforms, transparent: true, depthTest: false });
+  // ogl only console.warns on compile/link failure: check, or the hero would go blank
+  if (!gl.getProgramParameter(program.program, gl.LINK_STATUS)) throw new Error("hero shader failed to link");
   const mesh = new Mesh(gl, { mode: gl.POINTS, geometry, program });
+
+  // context loss (GPU reset): fall back to the photo and final values
+  const onLost = (e: Event) => {
+    e.preventDefault();
+    d.run();
+    document.documentElement.classList.remove("has-cloud");
+    showFinalValues(hero, false);
+  };
+  gl.canvas.addEventListener("webglcontextlost", onLost);
 
   let L = layout(1, 1);
   const draw = () => renderer.render({ scene: mesh });
   const resize = () => {
     const r = hero.getBoundingClientRect();
+    renderer.dpr = Math.min(window.devicePixelRatio, 2);
+    uniforms.uDpr.value = renderer.dpr;
     renderer.setSize(r.width, r.height);
     L = layout(r.width, r.height);
     uniforms.uAspect.value = L.aspect;
@@ -136,7 +197,13 @@ async function startCloud(hero: HTMLElement): Promise<void> {
     placeBoxes(dets, r.width, r.height, L);
     draw();
   };
-  window.addEventListener("resize", resize);
+  let raf = 0;
+  const onResize = () => {
+    if (raf) return;
+    raf = requestAnimationFrame(() => { raf = 0; resize(); });
+  };
+  window.addEventListener("resize", onResize);
+  d.fns.push(() => { window.removeEventListener("resize", onResize); if (raf) cancelAnimationFrame(raf); });
   resize();
 
   const finalState = () => {
@@ -147,14 +214,15 @@ async function startCloud(hero: HTMLElement): Promise<void> {
     draw();
   };
 
-  // render only while the hero is on screen and the tab is visible
+  // ticker only runs while the hero is on screen and the tab is visible
   let onScreen = true;
-  const io = new IntersectionObserver(([en]) => { onScreen = !!en?.isIntersecting; });
+  let sync: () => void = () => {};
+  const io = new IntersectionObserver(([en]) => { onScreen = !!en?.isIntersecting; sync(); });
   io.observe(hero);
-
-  document.documentElement.classList.add("has-cloud");
+  d.fns.push(() => io.disconnect());
 
   const mm = gsap.matchMedia();
+  d.fns.push(() => mm.revert());
   mm.add(
     { reduce: "(prefers-reduced-motion: reduce)", motion: "(prefers-reduced-motion: no-preference)" },
     (mctx) => {
@@ -178,12 +246,18 @@ async function startCloud(hero: HTMLElement): Promise<void> {
       hero.addEventListener("pointerleave", onLeave);
 
       const tick = (t: number) => {
-        if (!onScreen || document.hidden) return;
         uniforms.uTime.value = t;
         uniforms.uMouse.value = [mouse.x, mouse.y];
         draw();
       };
-      gsap.ticker.add(tick);
+      let ticking = false;
+      sync = () => {
+        const want = onScreen && !document.hidden;
+        if (want && !ticking) { gsap.ticker.add(tick); ticking = true; }
+        else if (!want && ticking) { gsap.ticker.remove(tick); ticking = false; }
+      };
+      document.addEventListener("visibilitychange", sync);
+      sync();
 
       const tl = gsap.timeline({ delay: 0.2 });
       tl.to(uniforms.uProgress, { value: 1, duration: 2.8, ease: "power2.inOut" })
@@ -198,11 +272,16 @@ async function startCloud(hero: HTMLElement): Promise<void> {
       return () => {
         hero.removeEventListener("pointermove", onMove);
         hero.removeEventListener("pointerleave", onLeave);
-        gsap.ticker.remove(tick);
+        document.removeEventListener("visibilitychange", sync);
+        if (ticking) gsap.ticker.remove(tick);
+        ticking = false;
+        sync = () => {};
         tl.kill();
       };
     },
   );
+
+  document.documentElement.classList.add("has-cloud");
 }
 
 export function initHero(): void {
@@ -210,7 +289,9 @@ export function initHero(): void {
   if (!hero) return;
   wireMoreToggle(hero);
   const go = () => {
-    startCloud(hero).catch(() => {
+    const d = disposer();
+    startCloud(hero, d).catch(() => {
+      d.run();
       document.documentElement.classList.remove("has-cloud");
     });
   };

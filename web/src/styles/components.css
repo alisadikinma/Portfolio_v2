@@ -275,9 +275,10 @@ fieldset.field { border: 0; margin: 0; padding: 0; }
   .hx .hero-ctas { margin-top: 14px; gap: 10px; flex-wrap: nowrap; }
   .hx .hero-ctas .btn { font-size: 15px; padding-left: 14px; padding-right: 14px; min-height: 44px; white-space: nowrap; }
   .hx-hud { height: 44px; }
-  .hx-lead:not(.open) { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+  .hx.js .hx-lead:not(.open) { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
   .hx-more { display: inline-flex; align-items: center; min-height: 44px; margin-top: -4px; padding: 0; background: none; border: 0;
     font: 500 15px/1 var(--font-body); color: var(--accent-primary); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+  .hx-more[hidden] { display: none; }
   .hx-more:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
   .hx .hero-ctas { margin-top: 4px; }
   .hx-fallback { width: 80vw; right: 10vw; top: 6vh; bottom: auto; }

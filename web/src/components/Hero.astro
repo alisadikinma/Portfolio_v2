@@ -25,7 +25,7 @@ const founderHref = lang === "id" ? "https://indusia.ai/id/" : "https://indusia.
   <div class="wrap hx-text">
     <h1 id="hero-h1"><span class="hx-h1-name">{h.h1Name}</span> {h.h1Title}</h1>
     <p class="hx-lead" id="hero-lead">{h.leadBefore}<a href={founderHref}>{h.leadLinkText}</a>{h.leadAfter}</p>
-    <button type="button" class="hx-more" aria-expanded="false" aria-controls="hero-lead" data-more={h.more} data-less={h.less}>{h.more}</button>
+    <button type="button" class="hx-more" hidden aria-expanded="false" aria-controls="hero-lead" data-more={h.more} data-less={h.less}>{h.more}</button>
     <div class="hero-ctas">
       {wa !== "" && <a class="btn btn-primary" href={wa}>{h.ctaWhatsapp}</a>}
       <a class="btn btn-ghost" href="#layanan">{h.ctaServices}</a>

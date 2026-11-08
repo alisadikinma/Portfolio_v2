@@ -16,12 +16,15 @@ export interface Sampled {
 }
 
 const BG_TOLERANCE = 26;
+/** Same boundary as the CSS `@media (max-width: 760px)` hero rules. */
+export const MOBILE_MAX = 760;
 
 /**
  * Turn an n×n pixel grid into points. Background = colour of the top-left pixel, removed by a
  * flood fill from every border pixel. Luminance is stretched between the 3rd and 97th percentile.
  */
 export function samplePortrait(img: PixelGrid, n: number, random: () => number = Math.random): Sampled {
+  if (img.width !== n || img.height !== n) throw new Error(`samplePortrait: image is ${img.width}x${img.height}, expected ${n}x${n}`);
   const px = img.data;
   const bg = [px[0]!, px[1]!, px[2]!];
   const isBg = (i: number) =>
@@ -68,5 +71,5 @@ export interface BudgetInput {
 /** Sample grid size (points scale with n²). Low-end devices get the smallest budget. */
 export function pointBudget({ cores, memory, width }: BudgetInput): number {
   if ((cores !== undefined && cores <= 4) || (memory !== undefined && memory <= 4)) return 110;
-  return width < 760 ? 160 : 250;
+  return width <= MOBILE_MAX ? 160 : 250;
 }

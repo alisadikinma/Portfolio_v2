@@ -36,7 +36,7 @@ describe.each(["id", "en"] as const)("Hero (%s)", (lang) => {
     const lead = html.match(/<p[^>]*id="hero-lead"[^>]*>[\s\S]*?<\/p>/)?.[0] ?? "";
     const a = lead.match(/<a [^>]*>INDUSIA\.ai<\/a>/)?.[0] ?? "";
     expect(a).toContain(`href="${href}"`);
-    expect(a).not.toContain("nofollow");
+    expect(a).not.toMatch(/\srel=/);
     expect(lead).not.toContain("nofollow");
   });
 
@@ -46,6 +46,7 @@ describe.each(["id", "en"] as const)("Hero (%s)", (lang) => {
     expect(btn).toContain('aria-expanded="false"');
     expect(btn).toContain('aria-controls="hero-lead"');
     expect(btn).toContain('type="button"');
+    expect(btn).toMatch(/\shidden[\s>=]/); // inert without JS; the script unhides it
   });
 
   it("renders 4 detection boxes and the HUD counters", async () => {
