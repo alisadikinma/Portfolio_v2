@@ -91,8 +91,4 @@ describe("static llms.txt", () => {
     expect(body).not.toMatch(/\bAI Generalist|16 countries|16 negara|56 AI products|Startup Grind|IDBYTE/i);
     expect(body).not.toMatch(/https:\/\/alisadikinma\.com\/(about|faq|blog|projects|contact)\b/);
   });
-  it("keeps frontend/public/llms.txt identical until the cutover removes it", () => {
-    const old = readFileSync(new URL("../../../frontend/public/llms.txt", import.meta.url), "utf8");
-    expect(old).toBe(body);
-  });
 });
