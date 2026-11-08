@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   personNode, websiteNode, breadcrumb, faqPage, blogPosting, creativeWork,
-  serviceNode, profilePage, eventNode, graph, SAME_AS,
+  serviceNode, profilePage, eventNode, graph, SAME_AS, orgNode, ORG_ID,
 } from "./schema";
 
 const PERSON_ID = "https://alisadikinma.com/#person";
@@ -84,7 +84,7 @@ describe("other nodes", () => {
     expect(e.location.name).toBe("L");
   });
   it("graph wraps nodes with single @context", () => {
-    const g = graph(personNode(), websiteNode()) as any;
+    const g = graph(websiteNode(), breadcrumb([])) as any;
     expect(g["@context"]).toBe("https://schema.org");
     expect(g["@graph"]).toHaveLength(2);
     expect(g["@graph"][0]["@context"]).toBeUndefined();
@@ -182,5 +182,23 @@ describe("creativeWork creator", () => {
     const c = creativeWork({ name: "P", url: "https://alisadikinma.com/en/projects/p" }) as any;
     expect(c.creator).toEqual({ "@id": PERSON_ID });
     expect(c.author).toEqual({ "@id": PERSON_ID });
+  });
+});
+
+describe("graph: INDUSIA.ai organization + nationality", () => {
+  it("adds the #org Organization node once when a node references it", () => {
+    const g = graph(personNode(), websiteNode()) as any;
+    const orgs = g["@graph"].filter((n: any) => n["@id"] === ORG_ID);
+    expect(orgs).toHaveLength(1);
+    expect(orgs[0]).toMatchObject({ "@type": "Organization", name: "INDUSIA.ai", url: "https://indusia.ai" });
+    expect(orgs[0].founder).toEqual({ "@id": PERSON_ID });
+  });
+  it("does not add it when nothing references #org, nor twice", () => {
+    expect(JSON.stringify(graph(websiteNode()))).not.toContain(ORG_ID);
+    const g = graph(personNode(), orgNode()) as any;
+    expect(g["@graph"].filter((n: any) => n["@id"] === ORG_ID)).toHaveLength(1);
+  });
+  it("Person carries nationality Indonesia as a Country", () => {
+    expect(personNode().nationality).toEqual({ "@type": "Country", name: "Indonesia" });
   });
 });

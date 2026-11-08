@@ -76,10 +76,10 @@ export function parseHtml(html) {
 }
 
 const within = (el, tags) => { for (let n = el.parent; n; n = n.parent) if (tags.includes(n.tag)) return true; return false; };
-const norm = (s) => decode(s).replace(/\s+/g, " ").trim();
+export const norm = (s) => decode(s).replace(/\s+/g, " ").trim();
 const words = (s) => norm(s).split(" ").filter(Boolean).length;
 const hasKw = (text, kws) => kws.some((k) => text.toLowerCase().includes(k.toLowerCase()));
-const nodesOf = (v) => (Array.isArray(v) ? v : v ? [v] : []);
+export const nodesOf = (v) => (Array.isArray(v) ? v : v ? [v] : []);
 const typesOf = (n) => nodesOf(n["@type"]);
 const refId = (v) => nodesOf(v).some((x) => x && x["@id"] === ORG_ID);
 const HIDDEN_STYLE = /(?:^|;)\s*(?:display\s*:\s*none|visibility\s*:\s*hidden)\s*(?:!important\s*)?(?:;|$)/i;

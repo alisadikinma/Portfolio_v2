@@ -40,6 +40,7 @@ export function personNode(opts: { sameAs?: string[]; image?: string } = {}): No
       "@type": "Place",
       address: { "@type": "PostalAddress", addressLocality: "Batam", addressRegion: "Kepulauan Riau", addressCountry: "ID" },
     },
+    nationality: { "@type": "Country", name: "Indonesia" },
     hasOccupation: { "@type": "Occupation", name: "AI Consultant" },
     alumniOf: [
       { "@type": "CollegeOrUniversity", name: "BINUS University" },
@@ -186,6 +187,20 @@ export function eventNode(a: {
   return n;
 }
 
+/** INDUSIA.ai, the company Ali founded. Its canonical node lives on indusia.ai; this copy makes #org resolvable here. */
+export function orgNode(): Node {
+  return {
+    "@type": "Organization",
+    "@id": ORG_ID,
+    name: "INDUSIA.ai",
+    url: "https://indusia.ai",
+    founder: PERSON_REF,
+  };
+}
+
+/** Wraps nodes in one @graph. Adds the #org node when some node references it and none defines it. */
 export function graph(...nodes: Node[]): Node {
-  return { "@context": "https://schema.org", "@graph": nodes };
+  const defined = nodes.some((n) => n["@id"] === ORG_ID);
+  const referenced = !defined && JSON.stringify(nodes).includes(`"${ORG_ID}"`);
+  return { "@context": "https://schema.org", "@graph": referenced ? [...nodes, orgNode()] : nodes };
 }
