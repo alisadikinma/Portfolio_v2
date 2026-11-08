@@ -36,10 +36,10 @@ const photos = new Map<number, Photos | null>(
 /** The photo whose file name contains `file`, else the first one (curated picks, robust to reordering). */
 const pick = (award: number, file: string): Photo | null => {
   const list = photos.get(award)?.photos ?? [];
-  return list.find((p) => p.src.includes(file)) ?? list[0] ?? null;
+  return list.find((p) => p.original.includes(file)) ?? list[0] ?? null;
 };
 // Hero: Ali at the Global AI Demo Day podium, presenting Sparkfluence.
-const hero = (photos.get(STAGE_AWARDS.demoDay)?.photos ?? []).find((p) => p.src.includes("item_20_0")) ?? null;
+const hero = (photos.get(STAGE_AWARDS.demoDay)?.photos ?? []).find((p) => p.original.includes("item_20_0")) ?? null;
 // Card covers, chosen by eye from each award gallery.
 const COVER: Record<number, string> = {
   [STAGE_AWARDS.demoDay]: "item_20_3",
@@ -181,7 +181,7 @@ const jsonld = graph(
       <div class="wrap split">
         <FaqSide lang={lang} heading={c.faqH2} />
         <div>
-          {faq.map((f, i) => <details open={i === 0}><summary>{f.q}</summary><p>{f.a}</p></details>)}
+          {faq.map((f, i) => <details open={i === 0}><summary><h3 class="faq-q">{f.q}</h3></summary><p>{f.a}</p></details>)}
         </div>
       </div>
     </section>

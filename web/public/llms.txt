@@ -2,6 +2,8 @@
 
 > Ali Sadikin Ma is an Indonesian AI expert and AI consultant based in Batam, Indonesia, and the founder of INDUSIA.ai (https://indusia.ai). He turns frontier AI models into shipped products, with 17 years of building experience, and was ranked #1 at the Global AI Demo Day 2026. He builds, trains and speaks about applied AI.
 
+Note: Ali Sadikin Ma (with "Ma") is not Ali Sadikin, the Governor of Jakarta (1966–1977).
+
 ## Who is Ali Sadikin Ma
 Ali Sadikin Ma (pakar AI Indonesia / AI consultant) builds and ships AI products end to end, including 56+ digital products (AI, IoT, mobile) built at Satnusa. In January 2026 he was ranked #1 at the Global AI Demo Day (Bengaluru, India), beating 26 startups. He is the founder of INDUSIA.ai (https://indusia.ai) and teaches the same skills through training and talks.
 
@@ -15,6 +17,13 @@ Ali Sadikin Ma (pakar AI Indonesia / AI consultant) builds and ships AI products
 - UN-UNCTAD × Alibaba eFounders Fellowship 2019 (1 of 48 in Asia, Hangzhou)
 - 1st Place — Telkomsel NextDev
 - Wild Card Winner — Fenox Startup World Cup
+
+## INDUSIA.ai — the AI company he founded (Batam, Indonesia)
+- Company: https://indusia.ai/id/ · https://indusia.ai/
+- AI development services (jasa pembuatan AI): https://indusia.ai/id/ai-development-services/
+- Machine vision / AI quality control for factories: https://indusia.ai/id/ai-vision/
+- Fleet management system: https://indusia.ai/id/ai-fleet-transportation/
+- WhatsApp AI assistant (chatbot WhatsApp AI): https://indusia.ai/id/ai-assistant/
 
 ## Pages (Indonesian / English)
 - AI training: https://alisadikinma.com/id/pelatihan-ai · https://alisadikinma.com/en/ai-training
@@ -31,6 +40,7 @@ Ali Sadikin Ma (pakar AI Indonesia / AI consultant) builds and ships AI products
 - Instagram: https://www.instagram.com/alisadikinma
 - TikTok: https://www.tiktok.com/@alisadikinma
 - YouTube: https://www.youtube.com/@alisadikinma
+- Threads: https://www.threads.com/@alisadikinma
 - GitHub: https://github.com/alisadikinma
 
 ## For the complete AI-readable profile

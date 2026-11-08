@@ -55,6 +55,7 @@ try {
           description: typeof p.description === "string" ? p.description : "",
           category: typeof p.category === "string" ? p.category.trim() : "",
           image: typeof p.featured_image === "string" && p.featured_image !== "" ? p.featured_image : null,
+          variants: p.image_variants && typeof p.image_variants === "object" ? (p.image_variants as Record<string, string>) : null,
         });
       }
       const last = Number((res.meta as { last_page?: unknown } | null)?.last_page ?? 1);

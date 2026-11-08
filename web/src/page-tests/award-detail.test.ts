@@ -209,7 +209,7 @@ describe("content", () => {
     const { html } = await load("id", DEMO);
     const imgs = [...html.matchAll(/<img\b[^>]*>/g)].map((m) => m[0]).filter((t) => t.includes("/storage/award/"));
     expect(imgs).toHaveLength(2);
-    expect(imgs[0]).toContain("p1.jpg");
+    expect(imgs[0]).toContain(`src="https://alisadikinma.com/storage/award/p1-640.webp"`); // largest variant <= 1280w, not the original
     expect(imgs[0]).toMatch(/srcset="[^"]*p1-320\.webp 320w[^"]*p1-1920\.webp 1920w/);
     expect(imgs[0]).toMatch(/alt="[^"]+"/);
     expect(imgs[0]).toMatch(/width="\d+"/);

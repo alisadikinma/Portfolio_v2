@@ -318,6 +318,15 @@ describe.each(["id", "en"] as const)("Stages (%s)", (lang) => {
     expect(itemsOf(main)[1]).toBe(`${HOST}/a13-b0.jpg`);
   });
 
+  // SEO audit 2026-11-09: originals reach 28.9MB; clients that ignore srcset must not get them.
+  it("img src is a mid-size variant, not the original upload, when variants exist", async () => {
+    const html = await render(Stages, lang);
+    const img = html.split("<li").slice(1)[0].match(/<img[^>]*>/)![0];
+    const src = /\ssrc="([^"]+)"/.exec(img)![1];
+    expect(src).toMatch(/\.webp$/);
+    expect(src).not.toContain("1920");
+  });
+
   it("card buttons keep their visible content as the name (no aria-label) and add a hidden open hint", async () => {
     const html = await render(Stages, lang);
     const lis = html.split("<li").slice(1);

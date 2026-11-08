@@ -1,10 +1,14 @@
 ---
+import { imageOrigin, srcsetOf, variantList } from "../lib/post-images";
+
 export interface ProjectCardData {
   slug: string;
   title: string;
   description: string;
   category: string;
   image: string | null;
+  /** API image_variants ("320w" WebP); relative to the image's origin. */
+  variants?: Record<string, string> | null;
 }
 interface Props {
   project: ProjectCardData;
@@ -13,10 +17,13 @@ interface Props {
 }
 const { project, lang, readMore } = Astro.props;
 const href = `/${lang}/projects/${encodeURIComponent(project.slug)}`;
+// Thumbnails are 512px PNGs; phones show them at 96px, so they get the small WebP variant.
+const variants = project.image ? variantList(project.variants, imageOrigin(project.image)).filter((v) => Number(v.w) < 512) : [];
+const srcset = project.image && variants.length > 0 ? `${srcsetOf(variants)}, ${project.image} 512w` : undefined;
 ---
 <article class="project-card">
   <a href={href}>
-    {project.image && <img src={project.image} alt={project.title} width="640" height="400" loading="lazy" decoding="async" />}
+    {project.image && <img src={project.image} srcset={srcset} sizes={srcset ? "(max-width: 760px) 96px, 400px" : undefined} alt={project.title} width="640" height="400" loading="lazy" decoding="async" />}
     {project.category && <span class="project-card-cat">{project.category}</span>}
     <h2>{project.title}</h2>
     {project.description && <p>{project.description}</p>}

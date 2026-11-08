@@ -237,6 +237,7 @@ fieldset.field { border: 0; margin: 0; padding: 0; }
 .faq details:last-child { border-bottom: 1px solid var(--border-subtle); }
 .faq summary { cursor: pointer; list-style: none; padding: 22px 40px 22px 0; position: relative; font: 600 19px/1.35 var(--font-display); }
 .faq summary::-webkit-details-marker { display: none; }
+.faq summary .faq-q { font: inherit; margin: 0; color: inherit; } /* question = heading for outline/AI, styled as the summary */
 .faq summary::after { content: "+"; position: absolute; right: 4px; top: 18px; font-size: 26px; color: var(--accent-primary); font-weight: 400; }
 .faq details[open] summary::after { content: "−"; }
 .faq details p { padding: 0 0 24px; color: var(--text-secondary); }

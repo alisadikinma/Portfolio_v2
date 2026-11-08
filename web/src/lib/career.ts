@@ -16,10 +16,14 @@ export const STAGE_AWARD_IDS = Object.values(STAGE_AWARDS);
 export const LIGHTBOX_WIDTH = 1920;
 /** Smallest variant width that still looks sharp in the lightbox grid (~240px cells, 2x). */
 export const THUMB_MIN_WIDTH = 480;
+/** <img src> for clients that ignore srcset: largest variant up to this width. */
+const DISPLAY_MAX = 1280;
 
 export interface Photo {
-  /** Original (or best available) URL, used as <img src>. */
+  /** <img src>: a ~1024w variant when generated (originals reach 28MB), else the original. */
   src: string;
+  /** The uploaded original; its file name identifies a photo (curated picks). */
+  original: string;
   /** Responsive candidates from image_variants, when generated. */
   srcset?: string;
   /** What the lightbox loads: 1920w variant, else largest variant, else the original. */
@@ -93,7 +97,9 @@ function photosOf(items: unknown): Photo[] {
     // null sequence ranks after numbered ones
     const seq = typeof it.sequence === "number" ? it.sequence : Infinity;
     const thumb = [...list].filter((v) => v.w >= THUMB_MIN_WIDTH).sort((a, b) => a.w - b.w)[0]?.url ?? src;
-    out.push({ photo: { src, srcset: srcsetOf(list), full: urlAtWidth(list, LIGHTBOX_WIDTH) ?? largestUrl(list) ?? src, thumb }, seq, idx });
+    const fit = list.filter((v) => v.w <= DISPLAY_MAX).sort((a, b) => b.w - a.w)[0] ?? [...list].sort((a, b) => a.w - b.w)[0];
+    const display = fit?.url ?? src;
+    out.push({ photo: { src: display, original: src, srcset: srcsetOf(list), full: urlAtWidth(list, LIGHTBOX_WIDTH) ?? largestUrl(list) ?? src, thumb }, seq, idx });
   });
   return out.sort((a, b) => a.seq - b.seq || a.idx - b.idx).map((x) => x.photo);
 }

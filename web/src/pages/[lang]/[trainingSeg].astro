@@ -88,7 +88,7 @@ const jsonld = graph(
           <figure class="th-photo">
             <div class="th-frame">
               <img src={picked.hero.src} srcset={picked.hero.srcset} sizes={picked.hero.srcset ? "(min-width: 960px) 520px, 100vw" : undefined}
-                width="1280" height="960" alt={c.heroPhotoAlt} loading="eager" decoding="async" />
+                width="1280" height="960" alt={c.heroPhotoAlt} loading="eager" fetchpriority="high" decoding="async" />
               <span class="cnr tl" aria-hidden="true"></span><span class="cnr tr" aria-hidden="true"></span>
               <span class="cnr bl" aria-hidden="true"></span><span class="cnr br" aria-hidden="true"></span>
             </div>
@@ -202,7 +202,7 @@ const jsonld = graph(
         <div>
           {faq.map((f, i) => (
             <details open={i === 0}>
-              <summary>{f.q}</summary>
+              <summary><h3 class="faq-q">{f.q}</h3></summary>
               {i === 4
                 ? <p>{c.a5pre} <a href={dev.href}>{c.a5link}</a>{c.a5post}</p>
                 : <p>{f.a}</p>}

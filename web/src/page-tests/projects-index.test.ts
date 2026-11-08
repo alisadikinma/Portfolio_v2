@@ -122,3 +122,14 @@ describe("/{lang}/projects", () => {
     expect(html).toContain('href="/id/projects/proj-9"');
   });
 });
+
+// SEO audit 2026-11-09: 56 cards pulled 512px PNGs (450-690KB each). Phones (96px thumbs) get the 320w WebP.
+describe("project card images", () => {
+  it("uses the 320w WebP variant in srcset with phone-sized sizes", async () => {
+    (PROJECTS[0] as Record<string, unknown>).image_variants = { "320w": "/storage/p1-320w.webp", lqip: "data:image/jpeg;base64,AA" };
+    const html = (await load("id")).html;
+    expect(html).toContain('srcset="https://alisadikinma.com/storage/p1-320w.webp 320w, https://alisadikinma.com/storage/p1.jpg 512w"');
+    expect(html).toContain('sizes="(max-width: 760px) 96px, 400px"');
+    delete (PROJECTS[0] as Record<string, unknown>).image_variants;
+  });
+});

@@ -1,0 +1,33 @@
+---
+// Unknown URLs (and pages that return an empty 404) render here: site layout, noindex, a way back.
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { graph, personNode, websiteNode } from "../lib/schema";
+import { id } from "../content/copy/id";
+import { en } from "../content/copy/en";
+import type { Lang } from "../lib/i18n";
+
+const lang: Lang = /^\/id(?:\/|$)/i.test(Astro.url.pathname) ? "id" : "en";
+const c = (lang === "id" ? id : en).notFound;
+Astro.response.status = 404;
+const links = [
+  { href: `/${lang}`, label: c.home },
+  { href: `/${lang}/blog`, label: c.blog },
+  { href: `/${lang}/projects`, label: c.projects },
+  { href: `/${lang}/contact`, label: c.contact },
+];
+---
+<BaseLayout title={c.title} description={c.description} path={`/${lang}`} lang={lang} jsonld={graph(personNode(), websiteNode())} noindex>
+  <main class="wrap not-found">
+    <h1>{c.h1}</h1>
+    <p class="lead">{c.lead}</p>
+    <ul>
+      {links.map((l) => <li><a href={l.href}>{l.label}</a></li>)}
+    </ul>
+  </main>
+</BaseLayout>
+<style>
+  .not-found { padding-block: 96px; }
+  .not-found ul { list-style: none; padding: 0; margin: 28px 0 0; display: flex; flex-wrap: wrap; gap: 12px; }
+  .not-found a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 18px; border: 1px solid var(--border-emphasis); border-radius: var(--radius-md); color: var(--text-primary); text-decoration: none; }
+  .not-found a:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+</style>
