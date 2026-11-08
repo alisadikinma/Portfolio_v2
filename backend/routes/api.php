@@ -34,6 +34,7 @@ use App\Http\Controllers\Api\Admin\RepurposeJobController;
 use App\Http\Controllers\Api\Admin\VideoFullController;
 use App\Http\Controllers\Api\VideoFullWorkerController;
 use App\Http\Controllers\Api\Admin\NewsletterAdminController;
+use App\Http\Controllers\Api\Admin\TrainingWaitlistAdminController;
 use App\Http\Controllers\Api\Admin\PostingRuleController;
 use App\Http\Controllers\Api\LinkedInOAuthController;
 use App\Http\Controllers\Api\HomepageController;
@@ -323,6 +324,13 @@ Route::middleware(['auth:sanctum'])->prefix('admin/newsletter')->group(function 
     Route::get('/sends', [NewsletterAdminController::class, 'sends']);
     Route::get('/sends/{id}', [NewsletterAdminController::class, 'showSend']);
     Route::delete('/{id}', [NewsletterAdminController::class, 'destroy']);
+});
+
+// Admin Training Waitlist Routes (PF-2)
+Route::middleware(['auth:sanctum'])->prefix('admin/training-waitlist')->group(function () {
+    Route::get('/', [TrainingWaitlistAdminController::class, 'index']);
+    Route::get('/export', [TrainingWaitlistAdminController::class, 'export']);
+    Route::patch('/{id}', [TrainingWaitlistAdminController::class, 'update'])->whereNumber('id');
 });
 
 // Admin Settings Routes
