@@ -27,11 +27,11 @@ const founderHref = lang === "id" ? "https://indusia.ai/id/" : "https://indusia.
   </div>
   <div class="wrap hx-text">
     <h1 id="hero-h1"><span class="hx-h1-name">{h.h1Name}</span> {h1Head} <span class="hx-h1-l2">{h1Last}</span></h1>
-    <p class="hx-lead" id="hero-lead">{h.leadBefore}<a href={founderHref}>{h.leadLinkText}</a>{h.leadAfter}</p>
-    <p class="hx-build">{h.buildLead}<a href={`${founderHref}ai-vision/`}>{h.visionLink}</a>, <a href={`${founderHref}ai-fleet-transportation/`}>{h.fleetLink}</a>{lang === "id" ? ", dan " : ", and "}<a href={`${founderHref}ai-assistant/`}>{h.chatbotLink}</a>{h.buildMid}<a href={founderHref}>{h.companyLink}</a>{h.buildEnd}</p>
+    <p class="hx-lead" id="hero-lead">{h.leadBefore}<a href={founderHref} target="_blank">{h.leadLinkText}</a>{h.leadAfter}</p>
+    <p class="hx-build">{h.buildLead}<a href={`${founderHref}ai-vision/`} target="_blank">{h.visionLink}</a>, <a href={`${founderHref}ai-fleet-transportation/`} target="_blank">{h.fleetLink}</a>{lang === "id" ? ", dan " : ", and "}<a href={`${founderHref}ai-assistant/`} target="_blank">{h.chatbotLink}</a>{h.buildMid}<a href={founderHref} target="_blank">{h.companyLink}</a>{h.buildEnd}</p>
     <button type="button" class="hx-more" hidden aria-expanded="false" aria-controls="hero-lead" data-more={h.more} data-less={h.less}>{h.more}</button>
     <div class="hero-ctas">
-      {wa !== "" && <a class="btn btn-primary" href={wa}>{h.ctaWhatsapp}</a>}
+      {wa !== "" && <a class="btn btn-primary" href={wa} target="_blank" rel="noopener">{h.ctaWhatsapp}</a>}
       <a class="btn btn-ghost" href="#layanan">{h.ctaServices}</a>
     </div>
   </div>

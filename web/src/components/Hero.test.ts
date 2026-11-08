@@ -103,3 +103,17 @@ describe.each(["id", "en"] as const)("Hero (%s)", (lang) => {
     }
   });
 });
+
+// Ali 2026-11-09: every hero link to INDUSIA.ai and WhatsApp opens a new tab; INDUSIA links stay dofollow.
+describe.each(["id", "en"] as const)("Hero links (%s)", (lang) => {
+  it("external links open a new tab; INDUSIA links carry no rel", async () => {
+    const html = await render(lang);
+    const text = html.slice(html.indexOf('class="wrap hx-text"'), html.indexOf('class="hx-hud"'));
+    const ext = [...text.matchAll(/<a [^>]*href="(https?:[^"]+)"[^>]*>/g)];
+    expect(ext.length).toBeGreaterThanOrEqual(6);
+    for (const [tag, href] of ext) {
+      expect(tag, href).toContain('target="_blank"');
+      if (href.includes("indusia.ai")) expect(tag).not.toMatch(/\srel=/);
+    }
+  });
+});
