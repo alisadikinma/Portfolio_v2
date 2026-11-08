@@ -135,3 +135,50 @@ describe("addImageDimensions", () => {
     expect(await addImageDimensions("<p>none</p>")).toBe("<p>none</p>");
   });
 });
+
+describe("IMAGE_DIMS_ORIGIN (same-host loopback)", () => {
+  const LOOP = "http://127.0.0.1:8081";
+  const fetchedUrls = () => fetchMock.mock.calls.map((c) => String(c[0]));
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("reads own-site /storage images from the loopback origin", async () => {
+    vi.stubEnv("IMAGE_DIMS_ORIGIN", LOOP);
+    const out = await addImageDimensions(img(URL1));
+    expect(fetchedUrls()).toEqual([`${LOOP}/storage/blog-images/a.png`]);
+    expect(out).toContain('width="800"');
+  });
+
+  it("also rewrites /uploads and keeps the query string", async () => {
+    vi.stubEnv("IMAGE_DIMS_ORIGIN", LOOP + "/");
+    await addImageDimensions(img("https://alisadikinma.com/uploads/x/b.png?v=2"));
+    expect(fetchedUrls()).toEqual([`${LOOP}/uploads/x/b.png?v=2`]);
+  });
+
+  it("does not rewrite other paths on the own site", async () => {
+    vi.stubEnv("IMAGE_DIMS_ORIGIN", LOOP);
+    await addImageDimensions(img("https://alisadikinma.com/images/p.png"));
+    expect(fetchedUrls()).toEqual(["https://alisadikinma.com/images/p.png"]);
+  });
+
+  it("never sends foreign hosts to the loopback origin", async () => {
+    vi.stubEnv("IMAGE_DIMS_ORIGIN", LOOP);
+    await addImageDimensions(img("https://evil.example/storage/a.png"));
+    expect(fetchedUrls()).toEqual(["https://evil.example/storage/a.png"]);
+  });
+
+  it("is a no-op when the env var is unset or not http(s)", async () => {
+    vi.stubEnv("IMAGE_DIMS_ORIGIN", "");
+    await addImageDimensions(img(URL1));
+    vi.stubEnv("IMAGE_DIMS_ORIGIN", "ftp://x");
+    resetImageDimsCache();
+    await addImageDimensions(img(URL1));
+    expect(fetchedUrls()).toEqual([URL1, URL1]);
+  });
+
+  it("caches by the public URL, not the loopback URL", async () => {
+    vi.stubEnv("IMAGE_DIMS_ORIGIN", LOOP);
+    await addImageDimensions(img(URL1));
+    await addImageDimensions(img(URL1));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});

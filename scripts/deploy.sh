@@ -11,11 +11,72 @@
 #   ./scripts/deploy.sh                   # standard deploy
 #   DEPLOY_SKIP_FRONTEND=1 ./scripts/deploy.sh   # skip `npm run build`
 #   DEPLOY_SKIP_COMPOSER=1 ./scripts/deploy.sh   # skip composer install
+#   DEPLOY_SKIP_WEB=1 ./scripts/deploy.sh        # skip the Astro web/ build + restart
+#   DEPLOY_DRY_RUN=1 (with DEPLOY_SOURCE_ONLY=1, tests only) prints deploy_web commands
 #
 # Triggered by .github/workflows/deploy.yml on push to main.
 # ------------------------------------------------------------------------------
 
 set -euo pipefail
+
+# ---- Functions (sourceable for tests: DEPLOY_SOURCE_ONLY=1 source scripts/deploy.sh) --
+
+# run: print the command; execute it unless DEPLOY_DRY_RUN=1.
+run() {
+  echo "  + $*"
+  if [ "${DEPLOY_DRY_RUN:-0}" = "1" ]; then return 0; fi
+  "$@"
+}
+
+# deploy_web — build the Astro public site (web/) and restart its systemd service.
+# Prints nothing when DEPLOY_SKIP_WEB=1. DEPLOY_DRY_RUN=1 prints without executing.
+# Needs: node >= 22, web/.env, the portfolio-web unit installed, and passwordless
+# `sudo -n systemctl restart portfolio-web` (see docs/runbooks/pf2-astro-cutover.md).
+deploy_web() {
+  if [ "${DEPLOY_SKIP_WEB:-0}" = "1" ]; then return 0; fi
+  local root; root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  echo "▶ Astro web build + restart (portfolio-web)"
+  if [ "${DEPLOY_DRY_RUN:-0}" != "1" ]; then
+    local major; major="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
+    if [ "$major" -lt 22 ]; then
+      echo "❌ web/ needs node >= 22 (found: $major). Fix the deploy user's node, or DEPLOY_SKIP_WEB=1."
+      return 1
+    fi
+    if [ ! -f "$root/web/.env" ]; then
+      echo "❌ web/.env missing — create it first (runbook: docs/runbooks/pf2-astro-cutover.md)."
+      return 1
+    fi
+  fi
+  (
+    cd "$root/web" || exit 1
+    run npm ci --no-audit --no-fund --prefer-offline
+    run npm run build
+  ) || return 1
+  run sudo -n systemctl restart portfolio-web || {
+    echo "❌ could not restart portfolio-web (unit not installed, or no passwordless sudo)."
+    return 1
+  }
+  # Health check: the service needs a moment to listen. Fail the deploy if it never answers.
+  local i
+  for i in 1 2 3 4 5 6 7 8 9 10; do
+    if [ "${DEPLOY_DRY_RUN:-0}" = "1" ]; then
+      echo "  + curl -fsS http://127.0.0.1:4321/id/faq -o /dev/null (retry up to 10x, 2s apart)"
+      return 0
+    fi
+    if curl -fsS http://127.0.0.1:4321/id/faq -o /dev/null; then
+      echo "  ✓ portfolio-web answers /id/faq"
+      return 0
+    fi
+    sleep 2
+  done
+  echo "❌ portfolio-web did not answer http://127.0.0.1:4321/id/faq — check: journalctl -u portfolio-web -n 50"
+  return 1
+}
+
+# Test seam: stop after defining functions, before touching git/composer/php.
+if [ "${DEPLOY_SOURCE_ONLY:-0}" = "1" ]; then
+  return 0 2>/dev/null || exit 0
+fi
 
 # ---- 0. Load shell environment (non-interactive SSH skips these by default) --
 # Tools like composer/npm/php/node often live in non-default PATH — must source
@@ -130,6 +191,13 @@ echo "▶ php artisan db:seed scheduled_commands (idempotent)"
 php artisan db:seed --class=ScheduledCommandSeeder --force || \
   echo "  (seeder failed or already applied — continuing)"
 
+# PF-2: the public homepage is now Astro and reads page_sections by kebab-case
+# section_type. This seeder deletes the obsolete snake_case homepage ghost rows
+# (so admin toggles that do nothing disappear). Idempotent — safe to re-run.
+echo "▶ php artisan db:seed PageSectionSeeder (idempotent)"
+php artisan db:seed --class=PageSectionSeeder --force || \
+  echo "  (seeder failed or already applied — continuing)"
+
 # ---- 4. Cache refresh --------------------------------------------------------
 echo "▶ Laravel cache refresh"
 php artisan config:clear
@@ -146,12 +214,22 @@ cd ..
 
 # ---- 5. Frontend build -------------------------------------------------------
 if [ "${DEPLOY_SKIP_FRONTEND:-0}" != "1" ]; then
-  echo "▶ npm ci + npm run build (frontend)"
+  echo "▶ npm ci + npm run build (frontend — admin/login/unsubscribe SPA only after PF-2)"
+  # Rolling backup of the previous SPA build, for a fast admin rollback.
+  # The PRE-PF-2 (full public SPA) build is backed up by hand as frontend/dist.pre-pf2
+  # (runbook step 1) — this script never touches that one.
+  if [ -d frontend/dist ]; then
+    rm -rf frontend/dist.prev
+    cp -a frontend/dist frontend/dist.prev
+  fi
   cd frontend
   npm ci --no-audit --no-fund --prefer-offline
   npm run build
   cd ..
 fi
+
+# ---- 5b. Astro public site (web/) -------------------------------------------
+deploy_web
 
 # ---- 6. Permissions (www-data owns storage + bootstrap/cache) ----------------
 echo "▶ Fix storage permissions"

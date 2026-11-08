@@ -748,12 +748,18 @@ git push origin main   # ← auto-deploys, watch at https://github.com/alisadiki
 
 **Required GitHub secrets** (already configured — see [.github/workflows/README.md](.github/workflows/README.md)): `VPS_SSH_HOST`, `VPS_SSH_USER`, `VPS_SSH_KEY`, `VPS_SSH_PORT`, `VPS_PROJECT_PATH`.
 
+**Astro public site (PF-2, `web/`):** `deploy.sh` also runs `deploy_web` (after the frontend build): `npm ci` + `npm run build` in `web/`, `sudo -n systemctl restart portfolio-web`, then a health check on `http://127.0.0.1:4321/id/faq` (fails the deploy if it never answers). Skip with `DEPLOY_SKIP_WEB=1`. `deploy.sh` also runs `PageSectionSeeder` (idempotent, removes old homepage ghost rows) and keeps `frontend/dist.prev` (previous SPA build). The Vue `frontend/` is now admin/login/unsubscribe only. One-time install + cutover + rollback: [docs/runbooks/pf2-astro-cutover.md](docs/runbooks/pf2-astro-cutover.md). Tests: `bash scripts/tests/{deploy-web-step,web-unit,nginx-routing}.test.sh`.
+
 **Concurrency:** `deploy-production` group with `cancel-in-progress: false` — pushes during an active deploy queue rather than interrupt mid-migration.
 
 **DO NOT:**
 - Manually `ssh` and run `git pull` / `deploy.sh` (creates drift vs. workflow state)
 - `--force` push to `main` (breaks concurrent deploy assumptions)
 - Edit files directly on the VPS (next deploy will `git reset --hard` over them)
+
+## nginx routing split (PF-2) — `scripts/nginx/portfolio-8080.conf`
+
+Snapshot of the live vhost (deploy.sh does NOT touch nginx; sync by hand, `nginx -t && systemctl reload nginx`). Public port 8080: Laravel for `/api/*`, `/r/{code}`, `/storage/*`, `/uploads/*` (`/api/internal/*` = 404); Vue SPA for `/admin*`, `/login`, `/newsletter/unsubscribe`, `/assets/*`, `/sw.js` (kill-switch worker, must stay reachable); **everything else → Astro** `127.0.0.1:4321` (`^~ /_astro/`, `= /_image`, pages, `/robots.txt`, `/sitemap*.xml`, `/llms.txt`, `web/public/*`). There is no extension-regex static block any more (it 404'd Astro assets). Loopback `127.0.0.1:8081` serves `/api/*`, `/storage/*`, `/uploads/*` for Astro → Laravel (`web/.env`: `API_INTERNAL_URL=http://127.0.0.1:8081/api`, `IMAGE_DIMS_ORIGIN=http://127.0.0.1:8081`, `INTERNAL_API_TOKEN` = same value as `backend/.env`, `SITE_URL`, `GA4_MEASUREMENT_ID`). Astro runs as `portfolio-web.service` (same user as the queue unit, `MemoryMax=512M`, env from `web/.env`). Leftover prod env `SEO_SPA_SHELL_PATH` / `SEO_HTML_CACHE_TTL` and `seo_html:*` cache keys are unused and harmless.
 
 ## VPS Background Process Setup (Required for Pipelines)
 

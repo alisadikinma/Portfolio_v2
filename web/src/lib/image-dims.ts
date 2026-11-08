@@ -1,4 +1,5 @@
 import { imageSize } from "image-size";
+import { getConfig } from "./config";
 
 export const DIMS_CACHE_MAX = 1000;
 export const FAIL_TTL_MS = 10 * 60 * 1000;
@@ -34,6 +35,26 @@ function fetchable(src: string): boolean {
   }
 }
 
+/**
+ * Own-site /storage and /uploads images can be read from a loopback origin (env IMAGE_DIMS_ORIGIN,
+ * e.g. http://127.0.0.1:8081) instead of going out through Cloudflare. Only the exact site host and
+ * only those two path prefixes are rewritten, so a CMS-controlled <img> can never aim this fetch at
+ * an arbitrary internal address. The cache key stays the public URL.
+ */
+function fetchUrl(src: string, env: Record<string, string | undefined> = process.env): string {
+  const origin = (env.IMAGE_DIMS_ORIGIN ?? "").trim().replace(/\/+$/, "");
+  if (!/^https?:\/\/[^/]+$/i.test(origin)) return src;
+  try {
+    const u = new URL(src);
+    const site = new URL(getConfig(env).siteUrl);
+    const own = u.hostname === site.hostname || u.hostname === `www.${site.hostname}`;
+    if (!own || !/^\/(storage|uploads)\//.test(u.pathname)) return src;
+    return `${origin}${u.pathname}${u.search}`;
+  } catch {
+    return src;
+  }
+}
+
 /** Reads at most RANGE_BYTES: a server that ignores Range must not make us download the file. */
 async function readHead(res: Response): Promise<Uint8Array> {
   if (!res.body) return new Uint8Array(await res.arrayBuffer()).subarray(0, RANGE_BYTES);
@@ -62,7 +83,7 @@ async function load(src: string, timeoutMs: number): Promise<Dims | null> {
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), timeoutMs);
   try {
-    const res = await fetch(src, { headers: { Range: `bytes=0-${RANGE_BYTES - 1}` }, signal: ctl.signal });
+    const res = await fetch(fetchUrl(src), { headers: { Range: `bytes=0-${RANGE_BYTES - 1}` }, signal: ctl.signal });
     if (res.status !== 200 && res.status !== 206) return null;
     const head = await readHead(res);
     const size = imageSize(head);

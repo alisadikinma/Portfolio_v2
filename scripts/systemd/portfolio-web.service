@@ -1,0 +1,40 @@
+[Unit]
+# Astro public site (web/) for alisadikinma.com — PF-2.
+#
+# nginx proxies every public page to 127.0.0.1:4321 (see scripts/nginx/portfolio-8080.conf).
+# Laravel (/api, /storage, /uploads, /r) and the admin Vue SPA are NOT served by this unit.
+#
+# Install on VPS (once, before the PF-2 cutover — runbook docs/runbooks/pf2-astro-cutover.md):
+#   sudo cp scripts/systemd/portfolio-web.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable portfolio-web.service      # start it AFTER the first web build exists
+#   journalctl -u portfolio-web -f
+#
+# deploy.sh (deploy_web) runs `sudo -n systemctl restart portfolio-web` after each build.
+Description=Portfolio_v2 Astro public site (web/)
+After=network.target
+
+[Service]
+Type=simple
+# Same user as portfolio-queue.service: owns the project tree and runs deploy.sh.
+User=claudesn
+Group=claudesn
+WorkingDirectory=/var/www/Portfolio_v2/web
+# HOST/PORT also live in web/.env; set here so a missing .env line can never expose
+# the server on a public interface. nginx is the only intended client.
+Environment=HOST=127.0.0.1
+Environment=PORT=4321
+Environment=NODE_ENV=production
+# API_INTERNAL_URL, INTERNAL_API_TOKEN, SITE_URL, GA4_MEASUREMENT_ID. Keep mode 600.
+EnvironmentFile=/var/www/Portfolio_v2/web/.env
+ExecStart=/usr/bin/node dist/server/entry.mjs
+Restart=always
+RestartSec=5
+# Hard memory ceiling: a leak restarts this unit instead of starving PHP-FPM / MySQL.
+MemoryMax=512M
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=portfolio-web
+
+[Install]
+WantedBy=multi-user.target
