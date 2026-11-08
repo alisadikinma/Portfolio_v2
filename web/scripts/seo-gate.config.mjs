@@ -165,6 +165,12 @@ export function blogPostSpec(lang, route, alt, keyword) {
   };
 }
 
+// Project pages: Ali 2026-11-08 — same <title> rule as blog posts (meta_title as-is; long titles
+// would otherwise lose the name or get cut). The name is carried by CreativeWork.creator + footer.
+export function projectSpec(lang, route, alt, keyword) {
+  return { ...basicSpec(lang, route, alt, [keyword], "CreativeWork"), titleName: false };
+}
+
 // Award pages (/id/penghargaan/{slug}, /en/awards/{slug}): Event schema, footer backlink only.
 // Keyword = the award's main words; the page title leads with the award name and ends with the person name.
 export function awardSpec(lang, slug, keyword) {

@@ -81,6 +81,19 @@ const specFor = (lang: "id" | "en", slug = "fleet-vision") =>
     "CreativeWork",
   );
 
+describe("project <title> (blog rule: meta_title as-is)", () => {
+  it("uses meta_title as-is when set, without forcing the name", async () => {
+    PROJECT.meta_title = "SMT Store Room Using IoT for Auto Humidity Control and Monitoring";
+    const { html } = await load("en");
+    PROJECT.meta_title = null;
+    expect(titleOf(html)).toBe("SMT Store Room Using IoT for Auto Humidity Control and…");
+  });
+  it("without meta_title: title + name when it fits", async () => {
+    const { html } = await load("en");
+    expect(titleOf(html)).toContain("Ali Sadikin Ma");
+  });
+});
+
 describe("/{lang}/projects/{slug}", () => {
   it.each(["id", "en"] as const)("passes the SEO gate (%s)", async (lang) => {
     const { status, html, headers } = await load(lang);

@@ -424,3 +424,14 @@ describe("decode: &amp;", () => {
     expect(norm("&amp;lt;")).toBe("&lt;"); // single pass, no double decode
   });
 });
+
+describe("projectSpec (Ali 2026-11-08: project <title> follows the blog rule)", () => {
+  it("is a CreativeWork spec without the name-in-title rule and without price check", async () => {
+    const { projectSpec } = await import("./seo-gate.config.mjs");
+    const s = projectSpec("id", "/id/projects/x", { id: "/id/projects/x", en: "/en/projects/x" }, "X");
+    expect(s.pageType).toBe("CreativeWork");
+    expect(s.titleName).toBe(false);
+    expect(s.checkPrice).toBe(false);
+    expect(s.keywords).toEqual(["X"]);
+  });
+});

@@ -59,8 +59,12 @@ const related: ProjectCardData[] = (Array.isArray(project?.related_projects) ? (
     image: str(r.featured_image) || null,
   }));
 
+// Same rule as blog posts (Ali 2026-11-08): meta_title as-is when set; else title + name if it fits.
+const metaTitleRaw = str(project?.meta_title).trim();
 const withName = `${title} — ${c.titleSuffix}`;
-const metaTitle = withName.length <= TITLE_MAX ? withName : clipWords(title, TITLE_MAX);
+const metaTitle = metaTitleRaw !== ""
+  ? clipWords(metaTitleRaw, TITLE_MAX)
+  : withName.length <= TITLE_MAX ? withName : clipWords(title, TITLE_MAX);
 // meta_description -> project description -> content first <p>; a source under 120 chars yields to the next.
 const metaDescription = postDescription({ meta: str(project?.meta_description), excerpt: description, content: str(project?.content), fallback: title });
 const ogImage = str(project?.og_image) || hero || undefined;
