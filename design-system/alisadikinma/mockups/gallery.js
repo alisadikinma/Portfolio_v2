@@ -7,6 +7,16 @@
     el.textContent = n ? n + " foto" : "";
   });
   function show() { img.src = list[i]; img.alt = title + ", foto " + (i + 1); cap.textContent = title + " · " + (i + 1) + " / " + list.length; }
+  document.querySelectorAll("[data-ccount]").forEach(function (el) {
+    var n = (window.CAREER[el.dataset.ccount] || []).length;
+    el.textContent = n ? n + " foto" : "";
+  });
+  document.querySelectorAll("[data-career]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      list = window.CAREER[b.dataset.career] || []; if (!list.length) return;
+      i = 0; title = b.querySelector("strong").textContent; show(); lb.showModal();
+    });
+  });
   document.querySelectorAll("[data-stage]").forEach(function (b) {
     b.addEventListener("click", function () {
       list = window.STAGES[b.dataset.stage] || []; if (!list.length) return;
