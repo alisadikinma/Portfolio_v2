@@ -65,7 +65,9 @@ describe("Testimonials", () => {
     expect((html.match(/<figure class="tm">/g) ?? []).length).toBe(2);
     expect(html.indexOf("Person 1")).toBeLessThan(html.indexOf("Person 2"));
     expect(html).toContain('<blockquote lang="en">');
-    expect(html).toMatch(/<img[^>]*src="https:\/\/alisadikinma\.com\/uploads\/testimonials\/p1\.jpg"[^>]*alt="Person 1"/);
+    // Relative paths stay same-origin (served by this site's /uploads), so a local or
+    // staging stack never pulls testimonial photos from production.
+    expect(html).toMatch(/<img[^>]*src="\/uploads\/testimonials\/p1\.jpg"[^>]*alt="Person 1"/);
     expect(html).toContain('width="56"');
     expect(html).toContain('loading="lazy"');
     expect(html).toContain("Role 1 · Co 1");

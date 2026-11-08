@@ -45,7 +45,10 @@ const str = (v: unknown): string | null => (typeof v === "string" && v !== "" ? 
 
 function allowedHosts(): Set<string> {
   const hosts = new Set<string>();
-  for (const base of [SITE, getConfig().apiInternalUrl]) {
+  const cfg = getConfig();
+  // SITE = canonical prod origin; cfg.siteUrl = where this server is actually served
+  // (same in prod, localhost:8000 on the local review stack).
+  for (const base of [SITE, cfg.siteUrl, cfg.apiInternalUrl]) {
     try {
       const h = new URL(base).hostname;
       hosts.add(h);

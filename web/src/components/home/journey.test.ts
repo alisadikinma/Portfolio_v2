@@ -119,6 +119,16 @@ describe.each(["id", "en"] as const)("Journey (%s)", (lang) => {
     expect(html).not.toMatch(/via\.placeholder|evil\.example|clip\.mp4/);
   });
 
+  it("ownMediaUrl also accepts media on the configured SITE_URL host (local/staging stack)", () => {
+    vi.stubEnv("SITE_URL", "http://localhost:8000");
+    try {
+      expect(ownMediaUrl("http://localhost:8000/storage/gallery/a.jpg")).toBe("http://localhost:8000/storage/gallery/a.jpg");
+      expect(ownMediaUrl("https://evil.example/storage/a.jpg")).toBeNull();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("ownMediaUrl accepts only site/API origin media", () => {
     expect(ownMediaUrl("https://alisadikinma.com/storage/a.jpg")).toBe("https://alisadikinma.com/storage/a.jpg");
     expect(ownMediaUrl("/storage/a.jpg")).toBe("https://alisadikinma.com/storage/a.jpg");

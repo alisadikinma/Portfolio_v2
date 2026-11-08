@@ -255,3 +255,5 @@ web/dist.prev
 # Playwright (PF-2 5E)
 web/test-results/
 web/playwright-report/
+.local-stack/
+web/.pf2-local-build/
