@@ -7,18 +7,20 @@ const html = (items = ITEMS) => `
 <button type="button" id="t1" data-lightbox data-lightbox-title="Marlin" data-lightbox-items='${JSON.stringify(items)}'>open</button>
 <button type="button" id="t2" data-lightbox data-lightbox-title="Solo" data-lightbox-items='["/solo.jpg"]'>solo</button>
 <button type="button" id="t3" data-lightbox data-lightbox-title="Empty" data-lightbox-items='[]'>empty</button>
+<button type="button" id="t5" data-lightbox data-lightbox-title="&lt;img src=x onerror=alert(1)&gt;" data-lightbox-items='["/x.jpg"]'>xss</button>
 <button type="button" id="t4" data-lightbox data-lightbox-title="Bad" data-lightbox-items='not json'>bad</button>
 <dialog class="lb" id="lb" aria-label="Galeri foto" data-alt="{title}, foto {n}">
   <button type="button" data-lb="close" aria-label="Tutup">x</button>
   <button type="button" data-lb="prev" aria-label="Sebelumnya">‹</button>
-  <figure><img id="lb-img" alt=""><figcaption aria-live="polite"><span data-lb-title></span> · <span data-lb-count></span></figcaption></figure>
+  <figure><p data-lb-error hidden>Foto tidak bisa dimuat</p><figcaption aria-live="polite"><span data-lb-title></span> · <span data-lb-count></span></figcaption></figure>
   <button type="button" data-lb="next" aria-label="Berikutnya">›</button>
 </dialog>`;
 
 const $ = <T extends Element>(s: string) => document.querySelector<T>(s)!;
 const dialog = () => $<HTMLDialogElement>("#lb");
 const count = () => $("[data-lb-count]").textContent;
-const src = () => $<HTMLImageElement>("#lb-img").getAttribute("src");
+const img = () => $<HTMLImageElement>("#lb figure img");
+const src = () => img().getAttribute("src");
 const key = (k: string) => dialog().dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }));
 
 let dispose: () => void;
@@ -35,7 +37,7 @@ describe("lightbox", () => {
     expect(count()).toBe("1 / 3");
     expect($("[data-lb-title]").textContent).toBe("Marlin");
     expect(src()).toBe("/a.jpg");
-    expect($<HTMLImageElement>("#lb-img").alt).toBe("Marlin, foto 1");
+    expect(img().alt).toBe("Marlin, foto 1");
   });
 
   it("next and prev wrap around via buttons", () => {
@@ -82,9 +84,14 @@ describe("lightbox", () => {
 
   it("backdrop click (target is the dialog) closes; click inside does not", () => {
     $<HTMLButtonElement>("#t1").click();
-    $<HTMLImageElement>("#lb-img").click();
+    img().click();
     expect(dialog().open).toBe(true);
-    dialog().click();
+    const rect = { left: 100, top: 100, right: 500, bottom: 400, width: 400, height: 300, x: 100, y: 100 } as DOMRect;
+    dialog().getBoundingClientRect = () => rect;
+    const click = (x: number, y: number) => dialog().dispatchEvent(new MouseEvent("click", { bubbles: true, clientX: x, clientY: y }));
+    click(300, 200); // inside the dialog box (e.g. figcaption margin): stays open
+    expect(dialog().open).toBe(true);
+    click(20, 20); // real backdrop
     expect(dialog().open).toBe(false);
   });
 
@@ -112,6 +119,62 @@ describe("lightbox", () => {
     expect(dialog().open).toBe(false);
     $<HTMLButtonElement>("#t4").click();
     expect(dialog().open).toBe(false);
+  });
+
+  it("creates the <img> lazily on first open, once", () => {
+    expect(document.querySelectorAll("#lb img").length).toBe(0);
+    $<HTMLButtonElement>("#t1").click();
+    expect(document.querySelectorAll("#lb img").length).toBe(1);
+    key("Escape");
+    $<HTMLButtonElement>("#t2").click();
+    expect(document.querySelectorAll("#lb img").length).toBe(1);
+  });
+
+  it("starts at 1 / N again after reopening, even after navigating", () => {
+    $<HTMLButtonElement>("#t1").click();
+    key("ArrowRight");
+    key("ArrowRight");
+    key("Escape");
+    $<HTMLButtonElement>("#t1").click();
+    expect(count()).toBe("1 / 3");
+    expect(src()).toBe("/a.jpg");
+  });
+
+  it("renders an untrusted title as text, never markup", () => {
+    $<HTMLButtonElement>("#t5").click();
+    expect($("[data-lb-title]").textContent).toBe("<img src=x onerror=alert(1)>");
+    expect(document.querySelectorAll("figcaption img").length).toBe(0);
+  });
+
+  it("shows an error message when the photo fails to load and hides it on the next one", () => {
+    $<HTMLButtonElement>("#t1").click();
+    img().dispatchEvent(new Event("error"));
+    expect($<HTMLElement>("[data-lb-error]").hidden).toBe(false);
+    key("ArrowRight");
+    img().dispatchEvent(new Event("load"));
+    expect($<HTMLElement>("[data-lb-error]").hidden).toBe(true);
+  });
+
+  it("dispose removes every listener", () => {
+    dispose();
+    $<HTMLButtonElement>("#t1").click();
+    expect(dialog().open).toBe(false);
+    dispose = initLightbox(document);
+    $<HTMLButtonElement>("#t1").click();
+    expect(dialog().open).toBe(true);
+    dispose();
+    key("ArrowRight");
+    expect(count()).toBe("1 / 3");
+    key("Escape");
+    expect(dialog().open).toBe(true);
+    dialog().close();
+  });
+
+  it("falls back to the open attribute when showModal is unavailable", () => {
+    (dialog() as unknown as { showModal: unknown }).showModal = undefined;
+    $<HTMLButtonElement>("#t1").click();
+    expect(dialog().hasAttribute("open")).toBe(true);
+    expect(count()).toBe("1 / 3");
   });
 
   it("is a no-op when the dialog is missing", () => {

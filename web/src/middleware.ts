@@ -27,7 +27,7 @@ function warnLimited(key: string, ...args: unknown[]): void {
 }
 
 const STATIC_EXT = /\.(?:js|css|png|jpe?g|webp|avif|gif|svg|ico|txt|xml|json|webmanifest|woff2?|mp4|webm|map|pdf)$/i;
-const isStatic = (p: string): boolean => p.startsWith("/_astro/") || p.startsWith("/api/") || STATIC_EXT.test(p);
+const isStatic = (p: string): boolean => p.startsWith("/_astro/") || p === "/_image" || p.startsWith("/api/") || STATIC_EXT.test(p);
 
 const redirect = (location: string, status: 301 | 302, headers: Record<string, string> = {}): Response =>
   new Response(null, { status, headers: { Location: location, ...headers } });

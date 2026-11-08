@@ -76,6 +76,9 @@ function page(lang, route, alt, o) {
   };
 }
 
+/** Exact-match INDUSIA anchors per language: the one source for components and the gate. */
+export const ANCHORS = A;
+
 const products = (a) => [a.vision, a.fleet, a.chatbot];
 
 export const ROUTES = {

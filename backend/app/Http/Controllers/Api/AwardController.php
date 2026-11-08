@@ -486,6 +486,7 @@ class AwardController extends Controller
                                 'image' => $item->file_path 
                                     ? asset('storage/' . $item->file_path) 
                                     : null,
+                                'image_variants' => $item->image_variants,
                                 'sequence' => $item->sequence,
                             ];
                         })

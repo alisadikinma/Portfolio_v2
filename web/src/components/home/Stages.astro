@@ -2,13 +2,15 @@
 import type { Lang } from "../../lib/i18n";
 import { id } from "../../content/copy/id";
 import { en } from "../../content/copy/en";
-import { imageDimensions } from "../../lib/image-dims";
-import { STAGE_AWARD_IDS, awardHref, loadAwardPhotos, loadAwardSlugs, type Photos } from "../../lib/career";
+import { STAGE_AWARDS, STAGE_AWARD_IDS, awardHref, loadAwardPhotos, loadAwardSlugs, type Photos } from "../../lib/career";
 
 interface Props { lang: Lang }
 const { lang } = Astro.props;
 const s = (lang === "id" ? id : en).stages;
 const n = (count: number) => s.photos.replace("{n}", String(count));
+// Slot sizes only (object-fit: cover); the real photo size is unknown without a probe.
+const SIZES_MAIN = "(min-width: 860px) 50vw, 100vw";
+const SIZES = "(min-width: 860px) 25vw, 50vw";
 
 const [photoRes, slugRes] = await Promise.all([
   Promise.allSettled(STAGE_AWARD_IDS.map((a) => loadAwardPhotos(a, lang))),
@@ -18,43 +20,46 @@ const photos = new Map<number, Photos | null>(
   STAGE_AWARD_IDS.map((a, i) => [a, photoRes[i].status === "fulfilled" ? photoRes[i].value : null]),
 );
 
+const A = STAGE_AWARDS;
 const cards = [
-  { award: 13, main: true, yr: s.demoDayYear, title: s.demoDayTitle, desc: s.demoDayDesc, lock: s.demoDayLock, lockSm: false, alt: s.demoDayAlt },
-  { award: 10, main: false, yr: s.unctadYear, title: s.unctadTitle, desc: "", lock: "", lockSm: false, alt: s.unctadAlt },
-  { award: 11, main: false, yr: s.grindYear, title: s.grindTitle, desc: "", lock: "", lockSm: false, alt: s.grindAlt },
-  { award: 7, main: false, yr: s.nextdevYear, title: s.nextdevTitle, desc: "", lock: s.nextdevLock, lockSm: true, alt: s.nextdevAlt },
-  { award: 8, main: false, yr: s.fenoxYear, title: s.fenoxTitle, desc: "", lock: s.fenoxLock, lockSm: true, alt: s.fenoxAlt },
+  { award: A.demoDay, main: true, yr: s.demoDayYear, title: s.demoDayTitle, desc: s.demoDayDesc, lock: s.demoDayLock, lockSm: false, alt: s.demoDayAlt },
+  { award: A.unctad, main: false, yr: s.unctadYear, title: s.unctadTitle, desc: "", lock: "", lockSm: false, alt: s.unctadAlt },
+  { award: A.grind, main: false, yr: s.grindYear, title: s.grindTitle, desc: "", lock: "", lockSm: false, alt: s.grindAlt },
+  { award: A.nextdev, main: false, yr: s.nextdevYear, title: s.nextdevTitle, desc: "", lock: s.nextdevLock, lockSm: true, alt: s.nextdevAlt },
+  { award: A.fenox, main: false, yr: s.fenoxYear, title: s.fenoxTitle, desc: "", lock: s.fenoxLock, lockSm: true, alt: s.fenoxAlt },
 ];
-const dimList = await Promise.all(cards.map((c) => { const u = photos.get(c.award)?.cover; return u ? imageDimensions(u) : null; }));
 ---
 <section class="sec" id="panggung" aria-labelledby="stages-h">
   <div class="wrap">
     <div class="sec-head"><h2 id="stages-h">{s.h2}</h2><p class="lead">{s.lead}</p></div>
     <ul class="bento">
-      {cards.map((c, i) => {
+      {cards.map((c) => {
         const p = photos.get(c.award) ?? null;
-        const urls = p?.urls ?? [];
+        const items = p?.photos.map((x) => x.full) ?? [];
         const cover = p?.cover ?? null;
-        const d = dimList[i];
         const href = awardHref({ slug: slugRes.get(c.award) }, lang);
-        const open = s.openGallery.replace("{title}", c.title);
-        const trigger = { "data-lightbox": "", "data-lightbox-title": c.title, "data-lightbox-items": JSON.stringify(urls) };
-        const Tag = href ? "a" : urls.length > 0 ? "button" : "div";
-        const tagAttrs = href ? { href } : urls.length > 0 ? { type: "button" as const, "aria-label": open, ...trigger } : {};
+        const gallery = items.length > 0;
+        const trigger = { "data-lightbox": "", "data-lightbox-title": c.title, "data-lightbox-items": JSON.stringify(items) };
+        const Tag = href ? "a" : gallery ? "button" : "div";
+        const tagAttrs = href ? { href } : gallery ? { type: "button" as const, ...trigger } : {};
+        const w = c.main ? 800 : 640;
+        const h = c.main ? 800 : 416;
         return (
           <li class:list={["bt-item", { "bt-main": c.main }]}>
             <Tag class="bt-card" {...tagAttrs}>
-              {cover && <img src={cover} alt={c.alt} loading="lazy" decoding="async" width={d?.w} height={d?.h} />}
+              {cover && <img src={cover.src} srcset={cover.srcset} sizes={cover.srcset ? (c.main ? SIZES_MAIN : SIZES) : undefined} alt={c.alt} loading="lazy" decoding="async" width={w} height={h} />}
               {c.lock && <span class:list={["bt-lock", { "gold-sm": c.lockSm }]} aria-hidden="true"><b>{c.lock}</b></span>}
               <span class="bt-cap">
                 <span class="yr">{c.yr}</span>
                 <strong>{c.title}</strong>
                 {c.desc && <span>{c.desc}</span>}
-                {urls.length > 0 && <em>{n(urls.length)}</em>}
+                {c.lock && <span class="sr">{c.lock}</span>}
+                {gallery && <em>{n(items.length)}</em>}
+                {gallery && !href && <span class="sr"> · {s.openHint}</span>}
               </span>
             </Tag>
-            {href && urls.length > 0 && (
-              <button type="button" class="bt-open" aria-label={open} {...trigger}>{n(urls.length)}</button>
+            {href && gallery && (
+              <button type="button" class="bt-open" aria-label={`${n(items.length)}, ${s.openGallery.replace("{title}", c.title)}`} {...trigger}>{n(items.length)}</button>
             )}
           </li>
         );

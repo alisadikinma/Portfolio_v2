@@ -1,6 +1,6 @@
 ---
 import type { Lang } from "../lib/i18n";
-import { imageOrigin } from "../lib/post-images";
+import { imageOrigin, largestUrl, srcsetOf, variantList } from "../lib/post-images";
 
 export interface PostItem {
   slug: string;
@@ -30,13 +30,9 @@ const H = 360;
 
 // image_variants keys look like "320w": "/storage/..."; paths are relative to the API origin.
 const origin = imageOrigin(post.featured_image);
-const abs = (u: string) => (/^https?:\/\//.test(u) ? u : origin + u);
-const variants = Object.entries(post.image_variants ?? {})
-  .map(([k, v]) => ({ w: /^(\d+)w$/.exec(k)?.[1], url: v }))
-  .filter((x): x is { w: string; url: string } => !!x.w && typeof x.url === "string" && x.url !== "")
-  .sort((a, b) => Number(a.w) - Number(b.w));
-const srcset = variants.length > 0 ? variants.map((v) => `${abs(v.url)} ${v.w}w`).join(", ") : undefined;
-const src = post.featured_image ?? (variants.length > 0 ? abs(variants[variants.length - 1].url) : "");
+const variants = variantList(post.image_variants, origin);
+const srcset = srcsetOf(variants);
+const src = post.featured_image ?? largestUrl(variants) ?? "";
 
 const date = post.published_at ? new Date(post.published_at) : null;
 const validDate = date && !Number.isNaN(date.getTime()) ? date : null;

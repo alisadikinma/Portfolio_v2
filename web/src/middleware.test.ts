@@ -184,7 +184,7 @@ describe("static assets", () => {
     const res = (await onRequest(ctx("/blog/gpt-4.5"), ok)) as Response;
     expect(res.status).toBe(301);
   });
-  it.each(["/_astro/app.js", "/robots.txt", "/images/a.png", "/llms.txt"])("%s untouched and not counted", async (p) => {
+  it.each(["/_astro/app.js", "/_image", "/robots.txt", "/images/a.png", "/llms.txt"])("%s untouched and not counted", async (p) => {
     const f = vi.fn();
     vi.stubGlobal("fetch", f);
     const res = (await onRequest(ctx(p, { "user-agent": "GPTBot/1.0" }), ok)) as Response;
