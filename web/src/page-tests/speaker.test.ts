@@ -155,15 +155,26 @@ describe("speaker page", () => {
     }
   });
 
-  it("press kit: short + long bio, portrait download, bio text download", async () => {
+  it("press kit: short + long bio, resume PDF in the page language, bio text download; no photo download (Ali 2026-11-09)", async () => {
     const { html } = await load("id", "pembicara-ai");
     const kit = html.match(/<section[^>]*id="press"[\s\S]*?<\/section>/)![0];
     expect(kit).toContain(id.speaker.shortBioPost.trim().slice(0, 30));
     expect(kit).toContain(id.speaker.longBio1.slice(0, 30));
-    expect(kit).toMatch(/href="\/images\/ali-sadikin-ma-pakar-ai-indonesia\.jpg"[^>]*download/);
+    expect(kit).toMatch(/href="\/press\/ali-sadikin-ma-resume-id\.pdf"[^>]*download/);
+    expect(kit).not.toMatch(/href="\/images\/[^"]*"[^>]*download/);
+    expect(kit).toContain("ali-sadikin-ma-pakar-ai-indonesia.jpg"); // portrait still shown
+    expect((await load("en", "ai-speaker")).html).toMatch(/href="\/press\/ali-sadikin-ma-resume-en\.pdf"[^>]*download/);
     expect(kit).toMatch(/href="\/press\/ali-sadikin-ma-bio\.txt"[^>]*download/);
     const en2 = (await load("en", "ai-speaker")).html;
     expect(en2).toContain(en.speaker.longBio1.slice(0, 30));
+  });
+
+  it("resume PDFs exist and are not the job-application CV", () => {
+    for (const l of ["en", "id"]) {
+      const pdf = readFileSync(new URL(`../../public/press/ali-sadikin-ma-resume-${l}.pdf`, import.meta.url));
+      expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
+      expect(pdf.toString("latin1")).not.toMatch(/Suzhou|Kunling/i);
+    }
   });
 
   it("bio text file carries both languages' bios", () => {
