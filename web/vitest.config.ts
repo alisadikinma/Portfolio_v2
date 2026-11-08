@@ -1,8 +1,8 @@
-import { defineConfig } from "vitest/config";
+import { getViteConfig } from "astro/config";
 
-export default defineConfig({
+export default getViteConfig({
   test: {
     include: ["src/**/*.test.ts", "scripts/**/*.test.mjs"],
     environment: "node",
   },
-});
+} as never);

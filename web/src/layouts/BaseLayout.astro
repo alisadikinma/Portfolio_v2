@@ -1,0 +1,105 @@
+---
+import "../styles/tokens.css";
+import "../styles/base.css";
+import "../styles/components.css";
+import SeoHead from "../components/SeoHead.astro";
+import { alternates, localizedPath, type Lang } from "../lib/i18n";
+import { getConfig } from "../lib/config";
+import { SAME_AS, type Node } from "../lib/schema";
+import { id } from "../content/copy/id";
+import { en } from "../content/copy/en";
+
+interface Props {
+  title: string;
+  description: string;
+  path: string;
+  lang: Lang;
+  jsonld: Node;
+  image?: string;
+  imageWidth?: number;
+  imageHeight?: number;
+  preloadImage?: string;
+  ga4Id?: string;
+  /** Home page: nav anchors stay in-page. Elsewhere they point to /{lang}/#id. */
+  home?: boolean;
+}
+
+const { lang, path, home = false, ga4Id = getConfig().ga4Id, ...seo } = Astro.props;
+const c = lang === "id" ? id : en;
+const alts = alternates(path);
+const homePath = `/${lang}/`;
+const spy = (hash: string) => (home ? hash : `${homePath}${hash}`);
+const wa = process.env.WHATSAPP_NUMBER ? `https://wa.me/${process.env.WHATSAPP_NUMBER.replace(/\D/g, "")}` : "#wa";
+const founderHref = lang === "id" ? "https://indusia.ai/id/" : "https://indusia.ai/";
+const social = (host: string) => SAME_AS.find((u) => u.includes(host)) ?? "#";
+---
+<!doctype html>
+<html lang={lang}>
+  <head>
+    <SeoHead {...seo} path={path} lang={lang} />
+    {ga4Id !== "" && (
+      <>
+        <script is:inline async src={`https://www.googletagmanager.com/gtag/js?id=${ga4Id}`}></script>
+        <script is:inline define:vars={{ ga4Id }}>
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag("js", new Date());
+          gtag("config", ga4Id);
+        </script>
+      </>
+    )}
+  </head>
+  <body>
+    <header class="site-head">
+      <div class="wrap">
+        <a class="brand" href={homePath}>Ali Sadikin Ma <span>/ AI</span></a>
+        <nav class="nav" aria-label={c.nav.ariaMain}>
+          <a href={spy("#tentang")} data-spy>{c.nav.about}</a>
+          <a href={spy("#perjalanan")} data-spy>{c.nav.journey}</a>
+          <a href={spy("#layanan")} data-spy>{c.nav.services}</a>
+          <a href={localizedPath(`/${lang}/pelatihan-ai`, lang)}>{c.nav.training}</a>
+          <a href={localizedPath(`/${lang}/pembicara-ai`, lang)}>{c.nav.speaker}</a>
+          <a href={spy("#tulisan")} data-spy>{c.nav.blog}</a>
+          <a class="lang" href={lang === "id" ? alts.en : alts.id} hreflang={lang === "id" ? "en" : "id"} aria-label={c.nav.ariaLang}>{c.nav.langSwitch}</a>
+        </nav>
+        <a class="btn btn-primary" href={wa}>{c.nav.ctaWhatsapp}</a>
+      </div>
+    </header>
+    <slot />
+    <footer class="foot">
+      <div class="wrap">
+        <span>{c.footer.copyright} · <a href={founderHref}>Founder INDUSIA.ai</a></span>
+        <nav aria-label={c.footer.ariaSocial}>
+          <a href={social("linkedin")} rel="noopener">{c.footer.linkedin}</a>
+          <a href={social("instagram")} rel="noopener">{c.footer.instagram}</a>
+          <a href={social("youtube")} rel="noopener">{c.footer.youtube}</a>
+          <a href={social("tiktok")} rel="noopener">{c.footer.tiktok}</a>
+          <a href={`/${lang}/faq`}>{c.footer.faq}</a>
+        </nav>
+      </div>
+    </footer>
+    <script is:inline>
+      (function () {
+        var links = [].slice.call(document.querySelectorAll(".nav a[data-spy]"));
+        var byId = {};
+        links.forEach(function (a) { if (a.hash) byId[a.hash.slice(1)] = a; });
+        var sections = Object.keys(byId).map(function (i) { return document.getElementById(i); }).filter(Boolean);
+        if (!sections.length || !("IntersectionObserver" in window)) return;
+        function setActive(sid) {
+          links.forEach(function (a) {
+            var on = a.hash.slice(1) === sid;
+            a.classList.toggle("is-active", on);
+            if (on) a.setAttribute("aria-current", "location"); else a.removeAttribute("aria-current");
+          });
+        }
+        var visible = new Set();
+        var io = new IntersectionObserver(function (entries) {
+          entries.forEach(function (e) { if (e.isIntersecting) visible.add(e.target.id); else visible.delete(e.target.id); });
+          var active = sections.filter(function (s) { return visible.has(s.id); }).pop();
+          setActive(active ? active.id : null);
+        }, { rootMargin: "-45% 0px -50% 0px" });
+        sections.forEach(function (s) { io.observe(s); });
+      })();
+    </script>
+  </body>
+</html>
