@@ -291,12 +291,11 @@ fieldset.field { border: 0; margin: 0; padding: 0; }
   -webkit-mask-image: radial-gradient(closest-side, #000 60%, transparent);
           mask-image: radial-gradient(closest-side, #000 60%, transparent);
 }
-.has-cloud .hx-fallback { display: none; }
+.has-cloud .hx-fallback { opacity: 0; transition: opacity .6s; } /* stays in DOM for crawlers + LCP */
 .hx .det { z-index: 2; }
 .hx .det { visibility: hidden; }
 .hx-text { position: relative; z-index: 3; width: 100%; padding-bottom: 104px; padding-top: 48px; }
-.hx-name { font: 500 17px/1.4 var(--font-body); color: var(--text-secondary); margin-bottom: 8px; }
-.hx-name span { color: var(--text-secondary); }
+.hx-h1-name { display: block; font: 500 clamp(22px, 2.4vw, 34px)/1.2 var(--font-display); letter-spacing: -0.01em; color: var(--text-primary); margin-bottom: 14px; }
 .hx h1 {
   font-size: clamp(64px, 11.5vw, 188px); line-height: .88; letter-spacing: -0.045em; font-weight: 600;
   max-width: 7ch; text-wrap: balance;

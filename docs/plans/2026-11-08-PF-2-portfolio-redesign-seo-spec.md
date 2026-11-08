@@ -81,13 +81,50 @@ Inputs (read first):
     `sameAs` = all of Ali's social profiles (moved off Organization).
   - `worksFor` / `founder` → `{"@id": "https://indusia.ai/#organization"}` — reference only, no second
     INDUSIA Organization with different data. **Phase 1 must confirm the exact `@id` indusia.ai emits.**
-  - Testimonial `aggregateRating` / `review` move from the INDUSIA Organization to the Person
-    (today wrongly attached to the company).
+  - Testimonial `aggregateRating` / `review` are **dropped**, not moved (SEO audit 2026-11-08):
+    self-written reviews on your own Person/Organization are self-serving and Google ignores or
+    penalises them. Testimonials stay as visible quotes only.
+  - `Person` also gets `disambiguatingDescription` ("Indonesian AI consultant and founder of
+    INDUSIA.ai, based in Batam — not the former Governor of Jakarta Ali Sadikin"), `image` (the
+    indexable hero portrait), `alumniOf`/`hasOccupation` from vault facts, and `sameAs` including the
+    Wikidata item once Ali creates it.
+  - Career facts (vault `10-Identity/experience.md`): Satnusa `2021-01 → 2025-12`; INDUSIA.ai
+    `foundingDate 2026-01-01`.
   - Page-level: `BlogPosting`, `CreativeWork`, `BreadcrumbList`, `FAQPage`, `Service`
-    (training/speaker pages, `provider` = Person, `areaServed` Indonesia, no `offers`/price/schedule).
+    (training/speaker pages, `provider` = Person, `areaServed` Indonesia, no `offers`/price/schedule),
+    `ProfilePage` (About = entity home, `mainEntity` = Person), `Event` (award pages).
+  - FAQ rich results were retired by Google on 2026-05-07. `FAQPage` stays only because the Q&A is
+    visible and useful to LLMs; no SERP feature is promised.
 - Every page: H1 contains its keyword; first sentence answers "who/what" plainly (LLM-quotable);
   FAQ 4–6 Q&A where the brief asks for it; ID and EN equivalent.
 - Page/title/keyword map = brief §3, unchanged.
+
+### SEO/GEO audit additions (mockup review 2026-11-08)
+
+1. **Indexable hero portrait.** The WebGL point cloud is invisible to crawlers. The hero keeps a real
+   `<img>` (descriptive filename `ali-sadikin-ma-pakar-ai-indonesia.jpg`, alt "Ali Sadikin Ma, pakar AI
+   Indonesia dan founder INDUSIA.ai", width/height set) in the DOM; the canvas sits on top. Same image
+   = `og:image` = `Person.image`.
+2. **Name visible in H1.** H1 = "Ali Sadikin Ma — Pakar AI Indonesia" (name line + keyword line), not a
+   screen-reader-only name.
+3. **Third-person opening sentence (40–60 words)** under the H1, quotable as-is by an LLM: who, what,
+   where, one proof. First person stays for the rest of the copy.
+4. **One page per award** (`/id/penghargaan/<slug>`, `/en/awards/<slug>`) with `Event` schema
+   (name, date, location, organiser, `award` on Person), photos, and the result. Home stage cards
+   become `<a>` links to these pages; the lightbox stays as an enhancement.
+5. **Speaker page proof:** list of past sessions (event, city, date, topic), embedded or linked video,
+   and a downloadable press kit (bio short/long, photos). Event organisers check this first.
+6. **About = entity home** (`ProfilePage`): full bio, career timeline with dates, awards, links to
+   every profile. All `sameAs` point back here.
+7. **Freshness:** `dateModified` on every page from the API `updated_at`; visible "Diperbarui …" on
+   About, training and speaker pages.
+8. **Content cluster for "pelatihan AI"**: 3–5 blog posts (e.g. "pelatihan AI untuk karyawan",
+   "workshop AI perusahaan") linking to the training page, via the existing Content Engine.
+9. **Hero performance:** `ogl` installed from npm and bundled (no CDN at runtime); point count cut on
+   low-end devices (`navigator.hardwareConcurrency <= 4` or `deviceMemory <= 4`); canvas loads after
+   LCP (the `<img>` is the LCP element).
+10. **Off-site (Ali, not code):** create the Wikidata item "Ali Sadikin Ma"; use one identical bio
+    sentence on LinkedIn, YouTube, Instagram, TikTok and the About page.
 
 ### Design system
 
