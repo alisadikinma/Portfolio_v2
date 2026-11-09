@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { nearestIndex, nextStep, STEPS } from "./journey-cycle";
+import { nearestIndex, nextStep, noteText, STEPS } from "./journey-cycle";
 
 describe("journey cycle", () => {
   it("walks 1 -> 4 and loops back to the first chapter", () => {
@@ -24,5 +24,19 @@ describe("nearestIndex (which card a swiped carousel settled on)", () => {
   });
   it("returns 0 for an empty list", () => {
     expect(nearestIndex([], 100)).toBe(0);
+  });
+});
+
+// Ali 2026-11-09: on wide screens the active chapter's note shows in one strip under the board.
+describe("noteText (strip text for the active chapter)", () => {
+  const notes = [" Delapan tahun\n  membangun ", "Kedua", "", "Keempat"];
+  it("returns the active (1-based) note with whitespace collapsed", () => {
+    expect(noteText(notes, 1)).toBe("Delapan tahun membangun");
+    expect(noteText(notes, 4)).toBe("Keempat");
+  });
+  it("is empty for a missing or out-of-range chapter", () => {
+    expect(noteText(notes, 3)).toBe("");
+    expect(noteText(notes, 9)).toBe("");
+    expect(noteText([], 1)).toBe("");
   });
 });

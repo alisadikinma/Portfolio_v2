@@ -765,3 +765,36 @@ fieldset.field { border: 0; margin: 0; padding: 0; }
 .foot nav { align-items: center; gap: 10px; }
 .about-profiles, .contact-social { display: flex; flex-wrap: wrap; gap: 10px; list-style: none; padding: 0; }
 .about-disambig { margin-top: 8px; font-size: 14px; color: var(--text-secondary); }
+
+/* ================= journey fits one screen on wide displays (Ali 2026-11-09) =================
+   Illustration left, the four chapters as a vertical timeline right, and the active chapter's
+   note in one strip underneath (journey-cycle.ts fills .jr-detail). The illustration column is
+   capped by the viewport height so heading + board + strip fit in 100svh under the header. */
+.jr-detail { display: none; }
+@media (min-width: 1001px) {
+  #perjalanan.sec { padding-block: clamp(24px, 4svh, 72px); scroll-margin-top: 64px; }
+  #perjalanan .sec-head { margin-bottom: clamp(16px, 2.5svh, 32px); gap: 8px; }
+  #perjalanan .sec-head .lead { max-width: none; }
+  .jr-board { display: grid; grid-template-columns: minmax(0, min(64%, calc((100svh - 380px) * 2.524))) minmax(0, 1fr); align-items: center; }
+  .journey { grid-template-columns: 1fr; row-gap: 0; padding: 8px 18px 8px 46px; align-self: stretch; align-content: center; }
+  .journey::before { left: 30px; right: auto; top: 26px; bottom: 26px; width: 2px; height: auto;
+    background: linear-gradient(180deg, rgba(63,184,197,.15), var(--accent-primary)); }
+  .journey li { text-align: left; }
+  .journey li::before { top: 9px; left: -21px; margin-left: 0; }
+  .journey button, .journey .jr-card { justify-items: start; padding: 5px 10px; gap: 1px; }
+  .jr-yr { font-size: 12px; line-height: 1.25; }
+  .journey strong { font-size: 16px; line-height: 1.25; }
+  .jr-org { font-size: 13.5px; line-height: 1.3; }
+  .jr-count, .jr-cta { display: none; }
+  .jr-board.is-cycling .journey::after { top: 26px; left: 30px; width: 2px; height: 0; transition: height .9s var(--ease-out);
+    background: linear-gradient(180deg, rgba(63,184,197,.4), var(--accent-primary)); }
+  .jr-board.is-cycling[data-step] .journey::after { width: 2px; }
+  .jr-board.is-cycling[data-step="1"] .journey::after { height: 4%; }
+  .jr-board.is-cycling[data-step="2"] .journey::after { height: 33%; }
+  .jr-board.is-cycling[data-step="3"] .journey::after { height: 62%; }
+  .jr-board.is-cycling[data-step="4"] .journey::after { height: calc(100% - 52px); }
+  /* the note moves to the strip only while cycling; the card keeps it for crawlers + screen readers */
+  .jr-board.is-cycling .journey .jr-note { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .jr-board.is-cycling .jr-detail { display: block; grid-column: 1 / -1; margin: 0; padding: 14px 24px; min-height: calc(2 * 1.55em + 28px);
+    border-top: 1px solid var(--border-subtle); font-size: 15px; line-height: 1.55; color: var(--text-secondary); }
+}

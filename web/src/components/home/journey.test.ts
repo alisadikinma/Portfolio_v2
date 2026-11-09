@@ -88,6 +88,15 @@ describe.each(["id", "en"] as const)("Journey (%s)", (lang) => {
     expect((html.match(/<li/g) ?? []).length).toBe(4);
   });
 
+  it("has one empty, aria-hidden note strip after the list (desktop shows the active chapter's note there)", async () => {
+    const html = await render(Journey, lang);
+    const m = html.match(/<p class="jr-detail"[^>]*>([^<]*)<\/p>/);
+    expect(m).not.toBeNull();
+    expect(m![0]).toContain('aria-hidden="true"');
+    expect(m![1]).toBe("");
+    expect(html.indexOf('class="jr-detail"')).toBeGreaterThan(html.indexOf("</ol>"));
+  });
+
   it("journey illustration (from indusia.ai/founder) sits between the lead and the chapter list: sized, lazy, alt", async () => {
     const html = await render(Journey, lang);
     const fig = html.match(/<figure class="jr-illus"[\s\S]*?<\/figure>/)?.[0] ?? "";

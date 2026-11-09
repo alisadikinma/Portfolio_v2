@@ -19,6 +19,11 @@ export function nearestIndex(lefts: number[], scrollLeft: number): number {
   return best;
 }
 
+/** Text for the note strip: the active (1-based) chapter's note, whitespace collapsed; "" when absent. */
+export function noteText(notes: string[], step: number): string {
+  return (notes[step - 1] ?? "").replace(/\s+/g, " ").trim();
+}
+
 export function initJourneyCycle(doc: Document = document): void {
   const board = doc.querySelector<HTMLElement>(".jr-board");
   if (!board) return;
@@ -34,9 +39,14 @@ export function initJourneyCycle(doc: Document = document): void {
   const cards = list ? Array.from(list.children) as HTMLElement[] : [];
   const lefts = () => cards.map((c) => c.offsetLeft - cards[0].offsetLeft);
   const isCarousel = () => !!list && cards.length > 0 && list.scrollWidth > list.clientWidth + 1;
+  // Wide screens show the active chapter's note in one strip under the board (CSS hides the
+  // per-card notes there only while cycling, so no-JS and reduced motion keep them in the cards).
+  const strip = board.querySelector<HTMLElement>(".jr-detail");
+  const notes = Array.from(board.querySelectorAll<HTMLElement>(".journey .jr-note")).map((n) => n.textContent ?? "");
   const show = (s: number, fromUser = false) => {
     step = s;
     board.dataset.step = String(s);
+    if (strip) strip.textContent = noteText(notes, s);
     if (!fromUser && isCarousel()) list!.scrollTo({ left: lefts()[s - 1] ?? 0, behavior: "smooth" });
   };
   const stop = () => { if (timer !== undefined) { clearInterval(timer); timer = undefined; } };

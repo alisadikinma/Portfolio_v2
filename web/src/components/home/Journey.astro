@@ -92,6 +92,9 @@ const chapters = [
           </div>
         </li>
       </ol>
+      {/* Filled by journey-cycle.ts with the active chapter's note (wide screens). The cards keep the
+          real text for crawlers and screen readers, so this copy is aria-hidden. */}
+      <p class="jr-detail" aria-hidden="true"></p>
     </div>
   </div>
 </section>
