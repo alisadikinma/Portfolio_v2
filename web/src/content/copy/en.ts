@@ -10,7 +10,7 @@ export const en: Copy = {
     leadBefore: "Founder of ",
     leadLinkText: "INDUSIA.ai",
     leadAfter:
-      " in Batam, helping companies put AI to work, from visual inspection on the factory floor to WhatsApp assistants for sales teams. He won 1st place at Global AI Demo Day 2026 in Bengaluru and, while leading digital transformation at Satnusa, built more than 56 digital products: AI, IoT, and mobile apps.",
+      ", helping companies across Indonesia put AI to work, from AI visual inspection on the factory floor to WhatsApp assistants for sales teams. He won 1st place at Global AI Demo Day 2026 in Bengaluru and, while leading digital transformation at Satnusa, built more than 56 digital products: AI, IoT, and mobile apps.",
     buildLead: "Company AI projects such as ",
     visionLink: "machine vision Indonesia",
     fleetLink: "fleet management system",
@@ -22,7 +22,7 @@ export const en: Copy = {
     less: "Show less",
     ctaWhatsapp: "Consult via WhatsApp",
     ctaServices: "See services",
-    det1: "AI Consultant · Batam",
+    det1: "AI Consultant Indonesia",
     statusBusy: "Reconstructing profile…",
     statusDone: "Profile verified",
     hudProducts: "products",

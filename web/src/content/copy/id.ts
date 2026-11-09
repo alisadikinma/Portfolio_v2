@@ -8,7 +8,7 @@ export const id = {
     leadBefore: "Founder ",
     leadLinkText: "INDUSIA.ai",
     leadAfter:
-      " di Batam. Membantu perusahaan memakai AI di pekerjaan nyata, dari inspeksi visual di pabrik sampai asisten WhatsApp untuk tim penjualan. Ia juara 1 Global AI Demo Day 2026 di Bengaluru dan, saat memimpin transformasi digital di Satnusa, membangun lebih dari 56 produk digital: AI, IoT, dan aplikasi mobile.",
+      ". Membantu perusahaan di seluruh Indonesia memakai AI di pekerjaan nyata, dari inspeksi visual AI di pabrik sampai asisten WhatsApp untuk tim penjualan. Ia juara 1 Global AI Demo Day 2026 di Bengaluru dan, saat memimpin transformasi digital di Satnusa, membangun lebih dari 56 produk digital: AI, IoT, dan aplikasi mobile.",
     buildLead: "Proyek AI perusahaan seperti ",
     visionLink: "machine vision Indonesia",
     fleetLink: "fleet management system",
@@ -20,7 +20,7 @@ export const id = {
     less: "Lebih sedikit",
     ctaWhatsapp: "Konsultasi via WhatsApp",
     ctaServices: "Lihat layanan",
-    det1: "AI Consultant · Batam",
+    det1: "Pakar AI Indonesia",
     statusBusy: "Merekonstruksi profil…",
     statusDone: "Profil terverifikasi",
     hudProducts: "produk",
