@@ -226,7 +226,8 @@ describe.each(["id", "en"] as const)("Journey (%s)", (lang) => {
     const html = await render(Journey, lang);
     expect(html).not.toContain("2019–2021");
     expect(html).not.toMatch(/56 produk AI|56 AI products/i);
-    expect(html).toMatch(/56\+/);
+    // Ali 2026-11-09: the count is Ali-wide (59+), not stated per chapter.
+    expect(html).not.toMatch(/\b56\b/);
   });
 
   it("a failed gallery hides its count but keeps the chapter text; others still render", async () => {

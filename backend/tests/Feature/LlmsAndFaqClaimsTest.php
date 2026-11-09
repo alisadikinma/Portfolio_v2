@@ -33,7 +33,9 @@ class LlmsAndFaqClaimsTest extends TestCase
             $body,
         );
         $this->assertDoesNotMatchRegularExpression(self::FORBIDDEN, $body);
-        $this->assertStringContainsString('56+ digital products (AI, IoT, mobile) built at Satnusa', $body);
+        // Ali 2026-11-09: the count is Ali-wide (59 = 56 Satnusa + PCI, IRN, MONI), not Satnusa-only.
+        $this->assertStringContainsString('59+ digital products (AI, IoT, mobile)', $body);
+        $this->assertStringNotContainsString('56+', $body);
     }
 
     public function test_llms_txt_lists_new_pages_language_prefixed(): void

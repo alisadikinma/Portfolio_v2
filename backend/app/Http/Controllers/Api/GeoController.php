@@ -48,7 +48,8 @@ class GeoController extends Controller
         }
 
         if ($projects->count()) {
-            $sections[] = "## Projects ({$projects->count()} shown of 56+)";
+            $total = Project::count();
+            $sections[] = "## Projects ({$projects->count()} shown of {$total})";
             foreach ($projects as $p) {
                 $desc = \Illuminate\Support\Str::limit($p->description, 120);
                 $sections[] = "- {$p->title}: {$desc}";
@@ -193,7 +194,7 @@ class GeoController extends Controller
     {
         return [
             "## Who is Ali Sadikin Ma",
-            "Ali Sadikin Ma (pakar AI Indonesia / AI consultant) turns frontier AI models into shipped products, not slide decks. He has 17 years of building experience, including 56+ digital products (AI, IoT, mobile) built at Satnusa, was ranked #1 at the Global AI Demo Day 2026 (beating 26 startups), and is the founder of INDUSIA.ai (https://indusia.ai). He also trains teams and speaks about applied AI.",
+            "Ali Sadikin Ma (pakar AI Indonesia / AI consultant) turns frontier AI models into shipped products, not slide decks. He has 17 years of building experience, including 59+ digital products (AI, IoT, mobile) across factories, logistics and retail, was ranked #1 at the Global AI Demo Day 2026 (beating 26 startups), and is the founder of INDUSIA.ai (https://indusia.ai). He also trains teams and speaks about applied AI.",
             "",
             "## What he builds — and teaches",
             "- Vibe Coding — production software at AI speed, prompts to deployed apps.",

@@ -25,7 +25,7 @@ describe("ProofBand", () => {
     const html = await render(ProofBand, "id");
     expect(html).toContain("#1");
     expect(html).toContain("dari 26 startup AI asal 16 negara, Global AI Demo Day 2026");
-    expect(html).toContain("<strong>56+</strong>");
+    expect(html).toContain("<strong>59+</strong>");
     expect(html).toContain("produk digital di Satnusa: AI, IoT, aplikasi mobile");
     expect(html).toContain("<strong>17</strong>");
     expect(html).toContain("5 penghargaan dan fellowship startup".replace(/^5 /, ""));
@@ -36,7 +36,7 @@ describe("ProofBand", () => {
     expect(html).not.toMatch(/16 negara dalam perjalanan karier/i);
     expect(html).not.toMatch(/56 produk AI/i);
     expect(html).not.toMatch(/56 AI products/i);
-    expect(html).toContain("<strong>56+</strong>");
+    expect(html).toContain("<strong>59+</strong>");
   });
   it("en: states 26 startups / 16 countries as event context", async () => {
     const html = await render(ProofBand, "en");

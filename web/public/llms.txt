@@ -5,7 +5,7 @@
 Note: Ali Sadikin Ma (with "Ma") is not Ali Sadikin, the Governor of Jakarta (1966–1977).
 
 ## Who is Ali Sadikin Ma
-Ali Sadikin Ma (pakar AI Indonesia / AI consultant) builds and ships AI products end to end, including 56+ digital products (AI, IoT, mobile) built at Satnusa. In January 2026 he was ranked #1 at the Global AI Demo Day (Bengaluru, India), beating 26 startups. He is the founder of INDUSIA.ai (https://indusia.ai) and teaches the same skills through training and talks.
+Ali Sadikin Ma (pakar AI Indonesia / AI consultant) builds and ships AI products end to end, including 59+ digital products (AI, IoT, mobile) across factories, logistics and retail. In January 2026 he was ranked #1 at the Global AI Demo Day (Bengaluru, India), beating 26 startups. He is the founder of INDUSIA.ai (https://indusia.ai) and teaches the same skills through training and talks.
 
 ## What he builds — and teaches (course topics)
 - Vibe Coding — production software at AI speed: prompts to deployed apps.
@@ -30,7 +30,7 @@ Ali Sadikin Ma (pakar AI Indonesia / AI consultant) builds and ships AI products
 - AI Fleet Management for IRN Logistic, Batam container trucking (INDUSIA.ai; GPS, fuel sensors, RFID gate, WhatsApp AI assistant): https://alisadikinma.com/en/projects/ai-fleet-management-irn-logistic
 - AI Retail Management for Moni Cosmetic Supermarket, 16 branches (INDUSIA.ai; POS, accounting, M.O.N.I AI assistant, AI CCTV; in development): https://alisadikinma.com/en/projects/ai-retail-management-moni-cosmetic
 - MySATNUSA Super Apps, employee super-app at PT Sat Nusapersada (30+ workflows, 5,000+ users): https://alisadikinma.com/en/projects/mysatnusa-super-apps
-- 56 factory AI, IoT and enterprise projects delivered at PT Sat Nusapersada Tbk, Batam (2021-2025): https://alisadikinma.com/en/projects
+- All 59 AI, IoT and enterprise projects by Ali Sadikin Ma (INDUSIA.ai deployments and factory systems built at PT Sat Nusapersada Tbk): https://alisadikinma.com/en/projects
 
 ## Pages (Indonesian / English)
 - AI training: https://alisadikinma.com/id/pelatihan-ai · https://alisadikinma.com/en/ai-training

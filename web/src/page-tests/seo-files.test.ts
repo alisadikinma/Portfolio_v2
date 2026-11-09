@@ -85,7 +85,7 @@ describe("static llms.txt", () => {
     for (const p of ["/id/pelatihan-ai", "/en/ai-training", "/id/pembicara-ai", "/en/ai-speaker", "/id/about", "/en/faq"]) {
       expect(body).toContain(`https://alisadikinma.com${p}`);
     }
-    expect(body).toContain("56+ digital products (AI, IoT, mobile) built at Satnusa");
+    expect(body).toContain("59+ digital products (AI, IoT, mobile)");
   });
   it("has no unsupported claims or unprefixed page links", () => {
     expect(body).not.toMatch(/\bAI Generalist|16 countries|16 negara|56 AI products|Startup Grind|IDBYTE/i);
