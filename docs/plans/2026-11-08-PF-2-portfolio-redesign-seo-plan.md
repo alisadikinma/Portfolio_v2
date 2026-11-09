@@ -31,7 +31,7 @@ before it counts as done.
 ## Architecture Context
 
 Paths are relative to the worktree root
-`/Users/alisadikin/Drive-D/Projects/Portfolio_v2/.claude/worktrees/pf-2-portfolio-redesign-seo`
+`/Users/alisadikin/Drive-D/Projects/alisadikinma-com/.claude/worktrees/pf-2-portfolio-redesign-seo`
 (branch `feat/PF-2-portfolio-redesign-seo`). Never `cd` to the main checkout.
 
 **Running PHP/tests (no host php).** Laravel tests use sqlite `:memory:` (`backend/phpunit.xml`), so they
@@ -39,7 +39,7 @@ run in a throwaway container built from THIS worktree, with its own vendor volum
 checkout's `portfolio_v2_backend_vendor`, because phase 0B changes `composer.lock`):
 
 ```bash
-WT=/Users/alisadikin/Drive-D/Projects/Portfolio_v2/.claude/worktrees/pf-2-portfolio-redesign-seo
+WT=/Users/alisadikin/Drive-D/Projects/alisadikinma-com/.claude/worktrees/pf-2-portfolio-redesign-seo
 docker build -t pf2-backend -f "$WT/docker/php/Dockerfile" "$WT"            # rebuild after Dockerfile changes
 PF2() { docker run --rm -v "$WT/backend:/var/www/backend" -v pf2_vendor:/var/www/backend/vendor \
           -w /var/www/backend --entrypoint "" pf2-backend "$@"; }

@@ -20,7 +20,7 @@ This repo has a knowledge graph at `graphify-out/` (god nodes, community structu
 - Cross-project questions (spanning repos, or "don't know which project") → query the federated graph: `graphify query "<question>" --graph ~/.graphify/global-graph.json`.
 - If `graphify-out/wiki/index.md` exists, use it for broad navigation before raw source browsing.
 - Read `graphify-out/GRAPH_REPORT.md` only for broad architecture review when query/path/explain don't surface enough.
-- **After modifying code, run `graphify update .`** to keep the local graph current (AST-only, no API cost). To refresh the global brain for this project: `graphify global add graphify-out/graph.json --as Portfolio_v2`.
+- **After modifying code, run `graphify update .`** to keep the local graph current (AST-only, no API cost). To refresh the global brain for this project: `graphify global add graphify-out/graph.json --as alisadikinma-com`.
 
 **Two-brain bridge (loose-coupled by design):** graphify (HOW) and the vault (WHY) are NOT edge-linked — routing happens at agent/query time per `~/CLAUDE.md`. When recording a durable decision in the vault README "Decision Log", add a `file:line` (or symbol name) backlink to the implementing code so decision↔code is a 1-hop jump. Vault recall is sequential file-read (not semantic), so keep notes lean/high-signal (R1) — this stays fine while the vault is small; vector-RAG was deliberately dropped (YAGNI), re-evaluate only if the vault exceeds ~5000 files AND keyword/graph recall proves insufficient.
 
@@ -52,7 +52,7 @@ Database:      localhost:3306 (user: ali, db: portfolio_v2)
 
 ### Key Constraints
 - **DO NOT** use `php artisan serve` — the `portfolio_backend` Docker container serves the API
-- Project path: `/Users/alisadikin/Drive-D/Projects/Portfolio_v2`
+- Project path: `/Users/alisadikin/Drive-D/Projects/alisadikinma-com`
 - Backend + MySQL run in Docker Desktop (containers `portfolio_backend` + `portfolio_mysql`); admin SPA on Vite dev server, public site via `npm run dev` / built `node dist/server/entry.mjs` in `web/`. **No host php/composer** — run backend commands via `docker exec portfolio_backend php artisan ...`
 
 ## Architecture & Patterns
@@ -745,7 +745,7 @@ php artisan content-engine:resync-stuck-variations [--dry-run] [--idea=N]  # Bac
 
 ### Public site (Astro)
 ```bash
-cd /Users/alisadikin/Drive-D/Projects/Portfolio_v2/web
+cd /Users/alisadikin/Drive-D/Projects/alisadikinma-com/web
 npm run dev           # Astro dev server (127.0.0.1:4321)
 npm run build && node dist/server/entry.mjs   # production-like (see Public Site section for env)
 npx vitest run        # unit tests
@@ -755,7 +755,7 @@ npm run e2e           # Playwright over CDP (shared headed Chrome)
 
 ### Admin SPA (Vue)
 ```bash
-cd /Users/alisadikin/Drive-D/Projects/Portfolio_v2/frontend
+cd /Users/alisadikin/Drive-D/Projects/alisadikinma-com/frontend
 npm run dev           # Start Vite dev server (port 5173)
 npm run build         # Production build
 npm run preview       # Preview production build
@@ -781,7 +781,7 @@ Every `git push origin main` triggers [.github/workflows/deploy.yml](.github/wor
 ```bash
 git add <files>
 git commit -m "..."
-git push origin main   # ← auto-deploys, watch at https://github.com/alisadikinma/Portfolio_v2/actions
+git push origin main   # ← auto-deploys, watch at https://github.com/alisadikinma/alisadikinma-com/actions
 ```
 
 **Manual trigger** (rare — e.g. retry after infra fix): Actions tab → *Deploy to VPS* → Run workflow.
@@ -969,7 +969,7 @@ Supports credentials: true
 
 ## Multi-Agent System
 
-Located at `/Users/alisadikin/Drive-D/Projects/Portfolio_v2/.claude/agents/`:
+Located at `/Users/alisadikin/Drive-D/Projects/alisadikinma-com/.claude/agents/`:
 - `orchestrator.md` - Multi-agent coordinator
 - `laravel-specialist.md` - Backend expert
 - `vue-expert.md` - Frontend expert
@@ -1752,7 +1752,7 @@ Idempotent via `firstOrCreate(['signature' => ...], $row)` — re-seeding on exi
 
 **Last Updated:** 2026-11-08 (PF-2 Phase 5E)
 **Maintainer:** Ali Sadikin (ali.sadikincom85@gmail.com)
-**Environment:** macOS + Docker Desktop, /Users/alisadikin/Drive-D/Projects/Portfolio_v2
+**Environment:** macOS + Docker Desktop, /Users/alisadikin/Drive-D/Projects/alisadikinma-com
 **PHP:** 8.4 everywhere (VPS fpm + CLI, Docker `portfolio_backend` container; runbook: [docs/runbooks/pf2-php84-upgrade.md](docs/runbooks/pf2-php84-upgrade.md)). **Exception: phpMyAdmin (Ubuntu 5.2.1) stays on `php8.2-fpm` until it is upgraded to 5.2.2+ or dropped**, so `php8.2-fpm` stays installed (debt: remove after that + 7 days green). Reload `php8.4-fpm` after deploys (`scripts/deploy.sh` does it) — no host php; run `docker exec portfolio_backend php ...` (e.g. `docker exec portfolio_backend php artisan test`)
 **Backend:** Laravel 12 + PHP 8.4 + MySQL 8 + Sanctum 4 + Filament 4.1
 **Frontend:** Vue 3.5 + Rolldown-Vite 7.1 + Pinia 3 + TanStack Query 5.90 + Tailwind 4

@@ -31,7 +31,7 @@ Rollback of this runbook is independent from the Astro cutover rollback (`pf2-as
 
 ```bash
 # 1. On your laptop: no GitHub Actions run in progress
-gh run list --repo alisadikinma/Portfolio_v2 --status in_progress          # expect: empty
+gh run list --repo alisadikinma/alisadikinma-com --status in_progress          # expect: empty
 
 # 2. On your laptop: put the checker on the VPS (it is not in the VPS checkout until the merge)
 scp scripts/check-php-runtime.sh <vps>:/tmp/check-php-runtime.sh

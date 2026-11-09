@@ -2,6 +2,9 @@
 # The PUBLIC site is Astro (web/) since PF-2 and is NOT in this file. For the full
 # site on one URL with a copy of prod data, use scripts/pf2-local.sh (docker/pf2-local/).
 # Empty DB: run `docker compose exec backend php artisan migrate --seed`.
+# Project name is pinned: the folder was renamed to alisadikinma-com, and without
+# this line Docker would derive a new name and start on empty volumes.
+name: portfolio_v2
 services:
   mysql:
     image: mysql:8.0
