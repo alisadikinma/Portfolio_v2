@@ -40,7 +40,7 @@ Loopback `127.0.0.1:8081` is the Astro-to-Laravel link: `/api/*`, `/storage/*`, 
 ## Step 0: Pre-flight (read-only)
 
 ```bash
-node -v                                            # must be v22 or newer
+node -v                                            # must be v22.23.4 or newer (Astro engine floor)
 php -v | head -1                                   # 8.4.x
 systemctl is-active php8.4-fpm portfolio-queue     # active active
 ls -d /var/www/Portfolio_v2/frontend/dist          # the current (old, public) SPA build
@@ -128,6 +128,11 @@ The unit must be installed before Step 4: otherwise `deploy_web` fails at `syste
 Verify: `systemctl cat portfolio-web | grep -E 'User=|MemoryMax=|ExecStart='`. Rollback: `sudo systemctl disable portfolio-web; sudo rm /etc/systemd/system/portfolio-web.service /etc/sudoers.d/portfolio-web; sudo systemctl daemon-reload`.
 
 ## Step 4: Deploy (merge + push; CI runs `scripts/deploy.sh`)
+
+> **Lesson from the 2026-11-09 release (read before Step 4):**
+> - `deploy_web`'s health check (`/id/faq` on `127.0.0.1:4321`) calls Laravel through the `127.0.0.1:8081` listener, which exists only in the NEW nginx file. Before Step 5 it answers 503, so the first deploy turns red even when the build is fine. Do Step 5-6 as soon as `systemctl is-active portfolio-web` is `active`, then re-run the workflow: it turns green.
+> - Astro needs node `>=22.23.4` (`apt-get install --only-upgrade nodejs` on the nodesource repo). Check in Step 0.
+> - Before the push, build from a clean `git archive HEAD web` copy: the root `.gitignore` drops `*.jpg/*.png/*.webp`, and `web/.gitignore` must re-include the site's own images.
 
 Order inside the deploy: composer install, `migrate --force` (includes `2026_11_08_000001_add_slug_to_awards_table`: award slugs), `PageSectionSeeder` (deletes the old homepage ghost toggles; idempotent), cache refresh, frontend build (admin-only SPA, previous build saved as `frontend/dist.prev`), `deploy_web` (checks `/usr/bin/node` >= 22, `npm ci`, builds into `web/dist.next`, keeps the old build as `web/dist.prev`, swaps it into `web/dist`, `systemctl restart portfolio-web`, health check on `127.0.0.1:4321/id/faq`; if the health check fails it restores `web/dist.prev`, restarts again and fails), chown, `php8.4-fpm` reload, `queue:restart`. A `deploy_web` failure no longer aborts the script: chown, FPM reload and `queue:restart` still run, then the script exits non-zero with `Astro web deploy FAILED`.
 

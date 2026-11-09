@@ -1,6 +1,6 @@
 ---
 import type { Lang } from "../../lib/i18n";
-import { loadLatestArticles } from "../../lib/latest";
+import { loadLatestArticles, plainText } from "../../lib/latest";
 import { id } from "../../content/copy/id";
 import { en } from "../../content/copy/en";
 
@@ -28,8 +28,7 @@ const items = await loadLatestArticles(lang, 3);
                     sizes={i.img.srcset ? (n === 0 ? "(min-width: 900px) 640px, 100vw" : "(min-width: 900px) 240px, 100vw") : undefined}
                     width={n === 0 ? 1200 : 640}
                     height={n === 0 ? 675 : 360}
-                    alt=""
-                    aria-hidden="true"
+                    alt={plainText(i.title)}
                     loading="lazy"
                     decoding="async"
                   />
