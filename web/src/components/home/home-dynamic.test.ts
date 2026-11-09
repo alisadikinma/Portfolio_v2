@@ -132,8 +132,8 @@ describe("LatestWriting", () => {
       expect(im).toContain('loading="lazy"');
       expect(im).toMatch(/width="\d+"/);
       expect(im).toMatch(/height="\d+"/);
-      expect(im).toContain('alt=""');
-      expect(im).toContain('aria-hidden="true"');
+      expect(im).toMatch(/alt="Judul \d"/);
+      expect(im).not.toContain('aria-hidden="true"');
     }
     expect(imgs[0]).toContain('srcset="https://alisadikinma.com/storage/v/p1-320.webp 320w, https://alisadikinma.com/storage/v/p1-640.webp 640w"');
     expect(imgs[1]).toContain('src="https://alisadikinma.com/storage/blog-images/p2.jpg"');
@@ -209,8 +209,10 @@ describe("NewsletterForm", () => {
     expect(prev).toContain("Friday Digest · 3 reads from this week");
     expect(prev).toContain("Jumat");
     expect(prev).not.toMatch(/<a /); // no duplicate links for keyboard users
+    expect(prev).toMatch(/<img class="mail-ava"[^>]*alt="Ali Sadikin Ma"/);
     for (const im of prev.match(/<img [^>]*>/g) ?? []) {
-      expect(im).toContain('alt=""');
+      expect(im).not.toContain('alt=""');
+      expect(im).toMatch(/alt="[^"]+"/);
       expect(im).toContain('loading="lazy"');
       expect(im).toMatch(/width="\d+"/);
     }

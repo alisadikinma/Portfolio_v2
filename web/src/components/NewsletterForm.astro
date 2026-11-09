@@ -1,6 +1,6 @@
 ---
 import type { Lang } from "../lib/i18n";
-import { loadLatestArticles } from "../lib/latest";
+import { loadLatestArticles, plainText } from "../lib/latest";
 import { id } from "../content/copy/id";
 import { en } from "../content/copy/en";
 
@@ -60,7 +60,7 @@ const subject = n.previewSubject.replace("{n}", String(posts.length));
         <aside class="mail" data-mail-preview aria-hidden="true">
           <div class="mail-bar"><span></span><span></span><span></span></div>
           <div class="mail-head">
-            <img class="mail-ava" src="/images/ali-sadikin-ma-pakar-ai-indonesia.jpg" width="80" height="80" alt="" aria-hidden="true" loading="lazy" decoding="async" />
+            <img class="mail-ava" src="/images/ali-sadikin-ma-pakar-ai-indonesia.jpg" width="80" height="80" alt="Ali Sadikin Ma" loading="lazy" decoding="async" />
             <div class="mail-from">
               <strong>{n.previewFrom}</strong>
               <span>{n.previewTo}</span>
@@ -72,7 +72,7 @@ const subject = n.previewSubject.replace("{n}", String(posts.length));
             {posts.map((p, i) => (
               <li>
                 {p.img
-                  ? <img src={p.img.src} srcset={p.img.srcset} sizes={p.img.srcset ? "120px" : undefined} width="120" height="68" alt="" aria-hidden="true" loading="lazy" decoding="async" />
+                  ? <img src={p.img.src} srcset={p.img.srcset} sizes={p.img.srcset ? "120px" : undefined} width="120" height="68" alt={plainText(p.title)} loading="lazy" decoding="async" />
                   : <span class="mail-ph"></span>}
                 <span class="mail-t"><em>{String(i + 1).padStart(2, "0")}</em>{p.title}</span>
               </li>

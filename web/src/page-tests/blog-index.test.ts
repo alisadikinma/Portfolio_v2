@@ -79,6 +79,7 @@ describe("/{lang}/blog", () => {
     expect(html).toContain('href="/id/blog/post-1"');
     expect(html).toContain("Judul &lt;b&gt;1&lt;/b&gt; &amp; lain");
     expect(html).not.toContain("<b>1</b>");
+    expect(html).toContain('alt="Judul 1 &amp; lain"'); // thumbnail alt = title as plain text
     expect(html).toContain("Ringkasan artikel 2.");
     expect(html).toContain('datetime="2026-10-05');
   });

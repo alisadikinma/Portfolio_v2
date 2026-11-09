@@ -80,7 +80,7 @@ describe.each(["id", "en"] as const)("Hero (%s)", (lang) => {
     const logo = html.match(/<span class="hx-logo"[^>]*>[\s\S]*?<\/span>/)?.[0] ?? "";
     expect(logo).toMatch(/data-box="[\d.]+,[\d.]+,[\d.]+,[\d.]+"/);
     expect(logo).toContain('src="/images/indusia-logo-light.png"');
-    expect(logo).toContain('alt=""');
+    expect(logo).toContain('alt="INDUSIA.ai"');
   });
 
   it("never states forbidden facts", async () => {

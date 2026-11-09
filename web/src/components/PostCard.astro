@@ -1,6 +1,7 @@
 ---
 import type { Lang } from "../lib/i18n";
 import { imageOrigin, largestUrl, srcsetOf, variantList } from "../lib/post-images";
+import { plainText } from "../lib/latest";
 
 export interface PostItem {
   slug: string;
@@ -51,8 +52,7 @@ const dateLabel = validDate
         sizes={srcset ? "(min-width: 900px) 360px, 100vw" : undefined}
         width={W}
         height={H}
-        alt=""
-        aria-hidden="true"
+        alt={plainText(post.title)}
         loading={eager ? "eager" : "lazy"}
         decoding="async"
       />
