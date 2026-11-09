@@ -49,6 +49,13 @@ const hero = str(project?.featured_image);
 const gallery = strList(project?.images).filter((u) => u !== hero);
 const technologies = strList(project?.technologies);
 const bodyHtml = await addImageDimensions(sanitizeHtml(str(project?.content)));
+// Hero at its real size (Ali 2026-11-09: a forced 16:10 crop cut the logo off). Dimensions are read
+// from the file. Unknown size: 1200x750 only reserves space; CSS width/height:auto keeps the real ratio.
+const esc = (v: string) => v.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const heroHtml = hero
+  ? (await addImageDimensions(`<img class="project-hero" src="${esc(hero)}" alt="${esc(title)}" decoding="async" fetchpriority="high">`))
+      .replace(/^<img(?![^>]*\swidth=)/, '<img width="1200" height="750"')
+  : "";
 const related: ProjectCardData[] = (Array.isArray(project?.related_projects) ? (project?.related_projects as Record<string, unknown>[]) : [])
   .filter((r) => r && str(r.slug) !== "" && str(r.title) !== "" && str(r.slug) !== slug)
   .map((r) => ({
@@ -99,7 +106,7 @@ const jsonld = failed
             <h1>{title}</h1>
             {description && <p class="project-lede">{description}</p>}
           </header>
-          {hero && <img class="project-hero" src={hero} alt={title} width="1200" height="750" decoding="async" fetchpriority="high" />}
+          {heroHtml !== "" && <Fragment set:html={heroHtml} />}
           {technologies.length > 0 && (
             <section aria-labelledby="project-tech">
               <h2 id="project-tech">{c.technologiesHeading}</h2>
@@ -138,7 +145,7 @@ const jsonld = failed
   .project-crumbs { color: var(--text-secondary); margin-bottom: 24px; }
   .project-cat { font: 500 13px/1 var(--font-mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent-primary); }
   .project-lede { color: var(--text-secondary); font-size: 1.15rem; max-width: 70ch; }
-  .project-hero { width: 100%; height: auto; aspect-ratio: 16 / 10; object-fit: cover; border-radius: var(--radius-lg); margin-block: 32px; }
+  :global(.project-hero) { display: block; width: auto; height: auto; max-width: 100%; max-height: min(78vh, 760px); margin: 32px auto; border-radius: var(--radius-lg); }
   .project-tech { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; padding: 0; }
   .project-tech li { padding: 6px 14px; border: 1px solid var(--border-emphasis); border-radius: var(--radius-md); }
   .project-body { max-width: 72ch; margin-block: 32px; }

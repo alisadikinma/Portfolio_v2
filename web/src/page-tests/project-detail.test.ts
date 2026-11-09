@@ -209,6 +209,23 @@ describe("project detail: SEO fixes", () => {
     expect(headers.get("retry-after")).toBe("120");
   });
 
+  it("hero image keeps its real size and ratio (never cropped to 16:10)", async () => {
+    withProject({ featured_image: "https://alisadikinma.com/storage/blog-images/hero.png" });
+    const { html } = await load("id");
+    const img = /<img[^>]*class="project-hero"[^>]*>/.exec(html)![0];
+    expect(img).toContain('width="640"');
+    expect(img).toContain('height="360"');
+    expect(img).toMatch(/alt="Fleet Vision[^"<>]*"/);
+    expect(img).toContain('fetchpriority="high"');
+  });
+
+  it("hero image of unknown size still renders and reserves a fallback box", async () => {
+    const { html } = await load("id");
+    const img = /<img[^>]*class="project-hero"[^>]*>/.exec(html)![0];
+    expect(img).toContain('src="https://alisadikinma.com/storage/fleet.jpg"');
+    expect(img).toContain('width="1200"');
+  });
+
   it("inline CMS images get width/height injected and ids are namespaced", async () => {
     withProject({
       content: '<h2 id="layanan">x</h2><p>t</p><img src="https://alisadikinma.com/storage/blog-images/a.jpg" alt="Diagram">',
