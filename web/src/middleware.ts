@@ -2,6 +2,7 @@ import { matchAiBot } from "./lib/aiBots";
 import { getConfig, requireInternalToken } from "./lib/config";
 import { localizedPath, pickLang, type Lang } from "./lib/i18n";
 import { apiGetPost } from "./lib/api";
+import { newTabLinks } from "./lib/new-tab";
 
 type Ctx = { request: Request; url?: URL };
 type Next = () => Promise<Response>;
@@ -67,6 +68,14 @@ function withSecurityHeaders(res: Response): Response {
     for (const [k, v] of missing) headers.set(k, v);
     return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
   }
+}
+
+/** HTML pages: every link opens a new tab (lib/new-tab.ts). Other bodies pass through untouched. */
+async function withNewTabLinks(res: Response): Promise<Response> {
+  if (!(res.headers.get("content-type") ?? "").toLowerCase().includes("text/html") || res.body === null) return res;
+  const headers = new Headers(res.headers);
+  headers.delete("content-length");
+  return new Response(newTabLinks(await res.text()), { status: res.status, statusText: res.statusText, headers });
 }
 
 /** Fire-and-forget. Never throws, never awaited by the caller. */
@@ -141,7 +150,7 @@ export async function onRequest(context: Ctx, next: Next): Promise<Response> {
     const fixed = prefixed[1].toLowerCase() + norm.slice(prefixed[0].length);
     const target = "/" + fixed + search;
     if (path !== "/" + fixed) return redirect(target, 301);
-    return withSecurityHeaders(await next());
+    return withSecurityHeaders(await withNewTabLinks(await next()));
   }
 
   const blog = norm.match(/^\/blog\/([^/]+)$/);

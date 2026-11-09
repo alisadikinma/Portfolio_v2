@@ -89,6 +89,17 @@ describe("redirects", () => {
     const res = (await onRequest(ctx("/id/about"), ok)) as Response;
     expect(res.status).toBe(200);
   });
+  it("HTML pages get new-tab links; status, headers and non-HTML bodies are kept", async () => {
+    const html = () => Promise.resolve(new Response('<a href="/id/faq">F</a><a href="#x">S</a>',
+      { status: 404, headers: { "Content-Type": "text/html; charset=utf-8", "X-Keep": "1", "Content-Length": "40" } }));
+    const res = (await onRequest(ctx("/id/nope"), html)) as Response;
+    expect(res.status).toBe(404);
+    expect(res.headers.get("X-Keep")).toBe("1");
+    expect(res.headers.get("Content-Length")).toBeNull();
+    expect(await res.text()).toBe('<a href="/id/faq" target="_blank">F</a><a href="#x">S</a>');
+    const json = () => Promise.resolve(new Response('<a href="/y">', { headers: { "Content-Type": "application/json" } }));
+    expect(await ((await onRequest(ctx("/id/x"), json)) as Response).text()).toBe('<a href="/y">');
+  });
 });
 
 describe("trailing slash + uppercase prefix", () => {
