@@ -129,7 +129,7 @@
         <!-- Schedule Modal -->
         <div v-if="showScheduleModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div class="bg-white rounded-lg p-6 max-w-md w-full">
-            <h2 class="text-xl font-bold text-gray-900 mb-4">Schedule Posting</h2>
+            <h2 class="text-xl font-bold text-gray-900 mb-4">Schedule Posting (WIB)</h2>
             <input
               v-model="scheduledDate"
               type="datetime-local"

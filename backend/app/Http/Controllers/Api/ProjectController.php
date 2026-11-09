@@ -31,6 +31,11 @@ class ProjectController extends Controller
 
         $query = Project::query(); // Removed translations eager load for performance
 
+        // Unpublished/inactive projects are listed only for an authenticated admin.
+        if (!\App\Support\AdminViewer::is()) {
+            $query->where('published', true)->where('is_active', true);
+        }
+
         // Filter by status
         if ($request->has('status')) {
             $query->byStatus($request->query('status'));
@@ -157,9 +162,14 @@ class ProjectController extends Controller
         $language = $request->query('lang', $request->header('Accept-Language', 'en'));
         $language = strtolower(substr($language, 0, 2));
 
-        $project = Project::with(['translations'])
-            ->where('slug', $slug)
-            ->first();
+        $query = Project::with(['translations'])->where('slug', $slug);
+
+        // Unpublished/inactive projects are visible only to an authenticated admin.
+        if (!\App\Support\AdminViewer::is()) {
+            $query->where('published', true)->where('is_active', true);
+        }
+
+        $project = $query->first();
 
         if (!$project) {
             return response()->json([

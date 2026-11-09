@@ -59,18 +59,17 @@ class LinkedInSchedulingServiceTest extends TestCase
         $slot = Carbon::parse('2026-08-18 12:00:00', 'Asia/Jakarta');
 
         app(LinkedInSchedulingService::class)->scheduleAt($draft, $slot, 'test_reason');
-
-        // Eloquent serializes a WIB Carbon as wall-clock + rehydrates in app
-        // tz (existing approve() behaviour) — assert the wall-clock round-trips.
+        // Stored as UTC (StoresDatesInAppTimezone); the test converts back to WIB
+        // to compare the slot wall-clock.
         $wall = $slot->format('Y-m-d H:i');
         $draft->refresh();
         $this->assertSame(LinkedInPostStatus::AwaitingPublish->value, $draft->status);
-        $this->assertSame($wall, $draft->scheduled_at->format('Y-m-d H:i'), 'scheduled_at = slot');
-        $this->assertSame($wall, $draft->cancel_window_ends_at->format('Y-m-d H:i'), 'cancel_window_ends_at = slot');
+        $this->assertSame($wall, $draft->scheduled_at->copy()->setTimezone('Asia/Jakarta')->format('Y-m-d H:i'), 'scheduled_at = slot');
+        $this->assertSame($wall, $draft->cancel_window_ends_at->copy()->setTimezone('Asia/Jakarta')->format('Y-m-d H:i'), 'cancel_window_ends_at = slot');
         $this->assertNull($draft->schedule_prompt_sent_at, 'prompt flag cleared');
 
         $tiktok->refresh();
-        $this->assertSame($wall, $tiktok->scheduled_at->format('Y-m-d H:i'), 'sibling scheduled_at propagated');
+        $this->assertSame($wall, $tiktok->scheduled_at->copy()->setTimezone('Asia/Jakarta')->format('Y-m-d H:i'), 'sibling scheduled_at propagated');
     }
 
     public function test_schedule_at_on_already_awaiting_publish_reschedules_without_fsm_error(): void
@@ -91,6 +90,6 @@ class LinkedInSchedulingServiceTest extends TestCase
 
         $draft->refresh();
         $this->assertSame(LinkedInPostStatus::AwaitingPublish->value, $draft->status);
-        $this->assertSame($newSlot->format('Y-m-d H:i'), $draft->scheduled_at->format('Y-m-d H:i'));
+        $this->assertSame($newSlot->format('Y-m-d H:i'), $draft->scheduled_at->copy()->setTimezone('Asia/Jakarta')->format('Y-m-d H:i'));
     }
 }

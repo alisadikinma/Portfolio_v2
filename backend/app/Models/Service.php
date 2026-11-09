@@ -18,13 +18,13 @@ class Service extends Model
         'content',
         'icon',
         'features',
-        'active',
-        'order',
+        'is_active',
+        'sort_order',
     ];
 
     protected $casts = [
         'features' => 'array',
-        'active' => 'boolean',
+        'is_active' => 'boolean',
     ];
 
     /**
@@ -50,6 +50,6 @@ class Service extends Model
      */
     public function scopeActive($query)
     {
-        return $query->where('active', true);
+        return $query->where('is_active', true);
     }
 }

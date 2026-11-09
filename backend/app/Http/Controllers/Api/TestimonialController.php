@@ -115,7 +115,14 @@ class TestimonialController extends Controller
      */
     public function show(int $id): JsonResponse
     {
-        $testimonial = Testimonial::findOrFail($id);
+        $query = Testimonial::query();
+
+        // Inactive testimonials are visible only to an authenticated admin.
+        if (!\App\Support\AdminViewer::is()) {
+            $query->where('is_active', true);
+        }
+
+        $testimonial = $query->findOrFail($id);
 
         return response()->json([
             'data' => new TestimonialResource($testimonial),

@@ -55,6 +55,12 @@ return [
     'url' => env('APP_URL', 'http://localhost'),
 
     /*
+    | Public SPA origin used for browser redirects (e.g. LinkedIn OAuth callback).
+    | Read via config() only — env() returns null once config is cached.
+    */
+    'frontend_url' => env('FRONTEND_URL', env('APP_URL')),
+
+    /*
     |--------------------------------------------------------------------------
     | Years of Experience
     |--------------------------------------------------------------------------

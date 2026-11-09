@@ -11,6 +11,7 @@ dispatch but never execute, schedules are defined but never fire.
 |---|---|
 | `portfolio-queue.service` | systemd unit running `php artisan queue:work` on the `default` queue |
 | `portfolio-crosspost@.service` | systemd **template** unit — N parallel workers on the `social-crosspost` queue (cross-post caption-gen) |
+| `portfolio-web.service` | systemd unit running the Astro public site (`web/`, node on `127.0.0.1:4321`); nginx proxies public pages to it. Install per `docs/runbooks/pf2-astro-cutover.md` (needs `web/.env` + a sudoers rule for `systemctl restart portfolio-web`) |
 | `portfolio-scheduler.crontab` | crontab line running `php artisan schedule:run` every minute |
 
 ## One-time installation (manual operator step)

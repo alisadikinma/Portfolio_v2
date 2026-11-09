@@ -1,0 +1,3349 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$slug\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Console/Commands/BackfillLinkedInLinkComment.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>slug" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Console/Commands/BackfillLinkedInLinkComment.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\InstagramPost\:\:\$zernio_post_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Console/Commands/BackfillZernioPostUrls.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Post\:\:\$translations\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Console/Commands/FlagStalePosts.php
+
+		-
+			message: '#^Relation ''translations'' is not found in App\\Models\\Post model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Console/Commands/FlagStalePosts.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>title" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Console/Commands/FlagStalePosts.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$composited_status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Console/Commands/PollRebrandAssets.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Console/Commands/PollRebrandAssets.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$keyframe_status\.$#'
+			identifier: property.notFound
+			count: 5
+			path: app/Console/Commands/PollRebrandAssets.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$keyframe_url\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Console/Commands/PollRebrandAssets.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$last_error\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Console/Commands/PollRebrandAssets.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$veo_status\.$#'
+			identifier: property.notFound
+			count: 7
+			path: app/Console/Commands/PollRebrandAssets.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$video_provider\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Console/Commands/PollRebrandAssets.php
+
+		-
+			message: '#^Parameter \#1 \$slide of method App\\Console\\Commands\\PollRebrandAssets\:\:veoRetryPrompt\(\) expects App\\Models\\RepurposeVideoSlide, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Console/Commands/PollRebrandAssets.php
+
+		-
+			message: '#^Parameter \#2 \$slide of method App\\Console\\Commands\\PollRebrandAssets\:\:dispatchClipForProvider\(\) expects App\\Models\\RepurposeVideoSlide, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Console/Commands/PollRebrandAssets.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>last_error" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Console/Commands/PollRebrandAssets.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$translations\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Console/Commands/ProcessPendingImages.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between ''hero''\|''inline'' and ''carousel_slide'' will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 4
+			path: app/Console/Commands/ProcessPendingImages.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>languages" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Console/Commands/ProcessPendingTranslations.php
+
+		-
+			message: '#^Offset ''ready'' on array\{ready\: bool, blockers\: array\<string\>\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Console/Commands/PromptScheduleReadyDrafts.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Console/Commands/PublishSlotOrchestrator.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$contentIdea\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Console/Commands/PurgeLowViralityLinkedInDrafts.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$translations\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Console/Commands/PurgeLowViralityLinkedInDrafts.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>virality_score" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Console/Commands/PurgeLowViralityLinkedInDrafts.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$published_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Console/Commands/ReapRepurposeArtifacts.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Console/Commands/ReapRepurposeArtifacts.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 5
+			path: app/Console/Commands/ReapStuckCrossPostCaptions.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$last_error\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Console/Commands/ReapStuckCrossPostCaptions.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$linkedin_post_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Console/Commands/ReapStuckCrossPostCaptions.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Console/Commands/ReapStuckCrossPostCaptions.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$updated_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Console/Commands/ReapStuckCrossPostCaptions.php
+
+		-
+			message: '#^Using nullsafe method call on non\-nullable type Carbon\\Carbon\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Console/Commands/ReapUnclaimedPostizJobs.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Console/Commands/RegenerateNonPublishedCrossPosts.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$slug\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Console/Commands/RegenerateNonPublishedCrossPosts.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$translations\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Console/Commands/RegenerateNonPublishedCrossPosts.php
+
+		-
+			message: '#^Offset ''instagram''\|''linkedin''\|''threads''\|''tiktok'' on array\{linkedin\: int, instagram\: 0, tiktok\: 0, threads\: 0\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: app/Console/Commands/RegenerateNonPublishedCrossPosts.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Post\:\:\$contentIdea\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Console/Commands/ScanBlogForLinkedInConversion.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Post\:\:\$translations\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Console/Commands/ScanBlogForLinkedInConversion.php
+
+		-
+			message: '#^Relation ''contentIdea'' is not found in App\\Models\\Post model\.$#'
+			identifier: larastan.relationExistence
+			count: 2
+			path: app/Console/Commands/ScanBlogForLinkedInConversion.php
+
+		-
+			message: '#^Relation ''linkedinPosts'' is not found in App\\Models\\Post model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Console/Commands/ScanBlogForLinkedInConversion.php
+
+		-
+			message: '#^Relation ''translations'' is not found in App\\Models\\Post model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Console/Commands/ScanBlogForLinkedInConversion.php
+
+		-
+			message: '#^Relation ''category'' is not found in App\\Models\\Post model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Console/Commands/SendWeeklyNewsletter.php
+
+		-
+			message: '#^Relation ''translations'' is not found in App\\Models\\Post model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Console/Commands/SendWeeklyNewsletter.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Console/Commands/SyncSiblingSlots.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$scheduled_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Console/Commands/SyncSiblingSlots.php
+
+		-
+			message: '#^Offset ''archived''\|''article_ready''\|''awaiting_manual…''\|''completed''\|''draft''\|''failed''\|''generating_images''\|''images_ready''\|''researching'' on array\{draft\: array\{''researching'', ''archived''\}, researching\: array\{''researching'', ''article_ready'', ''failed'', ''awaiting_manual…''\}, awaiting_manual_upload\: array\{''generating_images'', ''failed'', ''archived''\}, article_ready\: array\{''researching'', ''generating_images'', ''completed'', ''failed'', ''archived'', ''draft''\}, generating_images\: array\{''generating_images'', ''images_ready'', ''completed'', ''failed'', ''awaiting_manual…''\}, images_ready\: array\{''completed'', ''archived'', ''draft''\}, completed\: array\{''archived'', ''researching'', ''generating_images''\}, failed\: array\{''researching'', ''article_ready'', ''generating_images'', ''archived'', ''draft''\}, \.\.\.\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Enums/ContentIdeaStatus.php
+
+		-
+			message: '#^Offset ''awaiting_review''\|''cancelled''\|''failed''\|''generating''\|''pending_generation''\|''published''\|''publishing'' on array\{pending_generation\: array\{''generating'', ''cancelled''\}, generating\: array\{''generating'', ''awaiting_review'', ''failed'', ''cancelled''\}, awaiting_review\: array\{''publishing'', ''generating'', ''cancelled''\}, publishing\: array\{''published'', ''failed'', ''cancelled''\}, failed\: array\{''generating'', ''cancelled''\}, cancelled\: array\{''generating''\}, published\: array\{\}\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Enums/FacebookPostStatus.php
+
+		-
+			message: '#^Offset ''awaiting_review''\|''cancelled''\|''failed''\|''generating''\|''pending_generation''\|''published''\|''publishing'' on array\{pending_generation\: array\{''generating'', ''cancelled''\}, generating\: array\{''generating'', ''awaiting_review'', ''failed'', ''cancelled''\}, awaiting_review\: array\{''publishing'', ''generating'', ''cancelled''\}, publishing\: array\{''published'', ''failed'', ''cancelled''\}, failed\: array\{''generating'', ''cancelled''\}, cancelled\: array\{''generating''\}, published\: array\{\}\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Enums/InstagramPostStatus.php
+
+		-
+			message: '#^Offset ''awaiting_publish''\|''cancelled''\|''failed''\|''generating''\|''manual_review''\|''pending_generation''\|''published''\|''validating'' on array\{pending_generation\: array\{''generating'', ''cancelled''\}, generating\: array\{''generating'', ''validating'', ''failed'', ''cancelled''\}, validating\: array\{''awaiting_publish'', ''manual_review'', ''failed'', ''cancelled''\}, manual_review\: array\{''awaiting_publish'', ''validating'', ''cancelled''\}, awaiting_publish\: array\{''published'', ''cancelled'', ''manual_review'', ''failed''\}, failed\: array\{''generating'', ''cancelled'', ''pending_generation''\}, published\: array\{\}, cancelled\: array\{''generating'', ''manual_review''\}\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Enums/LinkedInPostStatus.php
+
+		-
+			message: '#^Offset ''awaiting_review''\|''cancelled''\|''failed''\|''generating''\|''pending_generation''\|''published''\|''publishing'' on array\{pending_generation\: array\{''generating'', ''cancelled''\}, generating\: array\{''generating'', ''awaiting_review'', ''failed'', ''cancelled''\}, awaiting_review\: array\{''publishing'', ''generating'', ''cancelled''\}, publishing\: array\{''published'', ''failed'', ''cancelled''\}, failed\: array\{''generating'', ''cancelled''\}, cancelled\: array\{''generating''\}, published\: array\{\}\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Enums/RedditPostStatus.php
+
+		-
+			message: '#^Offset ''assets_ready''\|''captured''\|''capturing''\|''claimed_local''\|''composed''\|''compositing''\|''drafted''\|''extracted''\|''extracting''\|''failed''\|''finalizing''\|''generating_assets''\|''processing_local''\|''queued_local''\|''received''\|''researched''\|''researching''\|''rewriting''\|''rewritten''\|''uploaded'' on array\{received\: array\{''capturing'', ''queued_local'', ''failed''\}, capturing\: array\{''captured'', ''failed''\}, captured\: array\{''extracting'', ''failed''\}, extracting\: array\{''extracted'', ''failed''\}, extracted\: array\{''researching'', ''generating_assets'', ''finalizing'', ''failed''\}, researching\: array\{''researched'', ''failed''\}, researched\: array\{''rewriting'', ''failed''\}, rewriting\: array\{''rewritten'', ''failed''\}, \.\.\.\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Enums/RepurposeJobStatus.php
+
+		-
+			message: '#^Offset ''awaiting_review''\|''cancelled''\|''failed''\|''generating''\|''pending_generation''\|''published''\|''publishing'' on array\{pending_generation\: array\{''generating'', ''cancelled''\}, generating\: array\{''generating'', ''awaiting_review'', ''failed'', ''cancelled''\}, awaiting_review\: array\{''publishing'', ''generating'', ''cancelled''\}, publishing\: array\{''published'', ''failed'', ''cancelled''\}, failed\: array\{''generating'', ''cancelled''\}, cancelled\: array\{''generating''\}, published\: array\{\}\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Enums/ThreadsPostStatus.php
+
+		-
+			message: '#^Offset ''awaiting_review''\|''cancelled''\|''failed''\|''generating''\|''pending_generation''\|''published''\|''publishing'' on array\{pending_generation\: array\{''generating'', ''cancelled''\}, generating\: array\{''generating'', ''awaiting_review'', ''failed'', ''cancelled''\}, awaiting_review\: array\{''publishing'', ''generating'', ''cancelled''\}, publishing\: array\{''published'', ''failed'', ''cancelled''\}, failed\: array\{''generating'', ''cancelled''\}, cancelled\: array\{''generating''\}, published\: array\{\}\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Enums/TiktokPostStatus.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Post\|Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Post\>\:\:\$translations\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Admin/ContentIdeaController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$published_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Admin/ContentIdeaController.php
+
+		-
+			message: '#^Offset ''success'' on array\{success\: bool, pid\: int\|null, error\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Http/Controllers/Api/Admin/ContentIdeaController.php
+
+		-
+			message: '#^Relation ''translations'' is not found in App\\Models\\Post model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Http/Controllers/Api/Admin/ContentIdeaController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Post\:\:\$translations\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/Admin/DashboardController.php
+
+		-
+			message: '#^Expression on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.expr
+			count: 3
+			path: app/Http/Controllers/Api/Admin/DashboardController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\Api\\Admin\\DashboardController\:\:getStatusVariant\(\) is unused\.$#'
+			identifier: method.unused
+			count: 1
+			path: app/Http/Controllers/Api/Admin/DashboardController.php
+
+		-
+			message: '#^Relation ''translations'' is not found in App\\Models\\Post model\.$#'
+			identifier: larastan.relationExistence
+			count: 2
+			path: app/Http/Controllers/Api/Admin/DashboardController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Http/Controllers/Api/Admin/FacebookDraftController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$post\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Admin/FacebookDraftController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$post_id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/Admin/FacebookDraftController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$published_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Admin/FacebookDraftController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$scheduled_at\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/Admin/FacebookDraftController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 6
+			path: app/Http/Controllers/Api/Admin/FacebookDraftController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Api/Admin/FacebookDraftController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Http/Controllers/Api/Admin/InstagramDraftController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$post\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Admin/InstagramDraftController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$post_id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/Admin/InstagramDraftController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$published_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Admin/InstagramDraftController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$scheduled_at\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/Admin/InstagramDraftController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 6
+			path: app/Http/Controllers/Api/Admin/InstagramDraftController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Api/Admin/InstagramDraftController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\LinkedInPost\:\:\$reauthor_started_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Admin/LinkedInDraftController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\LinkedInPost\:\:\$render_done\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Admin/LinkedInDraftController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\LinkedInPost\:\:\$render_total\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Admin/LinkedInDraftController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 6
+			path: app/Http/Controllers/Api/Admin/LinkedInDraftController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/Admin/LinkedInDraftController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$translations\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Admin/LinkedInDraftController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\LinkedInPost\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Api/Admin/LinkedInDraftController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>title" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Api/Admin/LinkedInDraftController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Post\:\:\$translations\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Admin/NewsletterAdminController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$email\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Admin/NewsletterAdminController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Admin/NewsletterAdminController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Admin/NewsletterAdminController.php
+
+		-
+			message: '#^Relation ''category'' is not found in App\\Models\\Post model\.$#'
+			identifier: larastan.relationExistence
+			count: 2
+			path: app/Http/Controllers/Api/Admin/NewsletterAdminController.php
+
+		-
+			message: '#^Relation ''translations'' is not found in App\\Models\\Post model\.$#'
+			identifier: larastan.relationExistence
+			count: 3
+			path: app/Http/Controllers/Api/Admin/NewsletterAdminController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>title" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Api/Admin/NewsletterAdminController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$composited_path\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Admin/RepurposeJobController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$composited_status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Admin/RepurposeJobController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$header_title\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Admin/RepurposeJobController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Admin/RepurposeJobController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$keyframe_status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Admin/RepurposeJobController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$role\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Http/Controllers/Api/Admin/RepurposeJobController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$slide_index\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Admin/RepurposeJobController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$veo_status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Admin/RepurposeJobController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$veo_url\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Admin/RepurposeJobController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Api/Admin/RepurposeJobController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>timestamp" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Api/Admin/RepurposeJobController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Http/Controllers/Api/Admin/TiktokDraftController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$post\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Admin/TiktokDraftController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$post_id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/Admin/TiktokDraftController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$published_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Admin/TiktokDraftController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$scheduled_at\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/Admin/TiktokDraftController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 6
+			path: app/Http/Controllers/Api/Admin/TiktokDraftController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Api/Admin/TiktokDraftController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Post\:\:\$translations\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Automation/PostizPublishController.php
+
+		-
+			message: '#^Using nullsafe method call on non\-nullable type Carbon\\Carbon\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Api/Automation/PostizPublishController.php
+
+		-
+			message: '#^Expression on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.expr
+			count: 1
+			path: app/Http/Controllers/Api/AutomationController.php
+
+		-
+			message: '#^Relation ''category'' is not found in App\\Models\\Post model\.$#'
+			identifier: larastan.relationExistence
+			count: 6
+			path: app/Http/Controllers/Api/AutomationController.php
+
+		-
+			message: '#^Relation ''translations'' is not found in App\\Models\\Post model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Http/Controllers/Api/AutomationController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Award\:\:\$galleries\.$#'
+			identifier: property.notFound
+			count: 7
+			path: app/Http/Controllers/Api/AwardController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Award\|Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Award\>\:\:\$featured_gallery_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/AwardController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Award\|Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Award\>\:\:\$galleries\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/AwardController.php
+
+		-
+			message: '#^Relation ''galleries'' is not found in App\\Models\\Award model\.$#'
+			identifier: larastan.relationExistence
+			count: 5
+			path: app/Http/Controllers/Api/AwardController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Post\:\:\$translations\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/BlogPipelineController.php
+
+		-
+			message: '#^Relation ''category'' is not found in App\\Models\\Post model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Http/Controllers/Api/BlogPipelineController.php
+
+		-
+			message: '#^Relation ''relatedPosts'' is not found in App\\Models\\Post model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Http/Controllers/Api/BlogPipelineController.php
+
+		-
+			message: '#^Relation ''translations'' is not found in App\\Models\\Post model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Http/Controllers/Api/BlogPipelineController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Api/BlogPipelineController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>slug" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Api/BlogPipelineController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Category\:\:\$posts_count\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/CategoryController.php
+
+		-
+			message: '#^Relation ''posts'' is not found in App\\Models\\Category model\.$#'
+			identifier: larastan.relationExistence
+			count: 7
+			path: app/Http/Controllers/Api/CategoryController.php
+
+		-
+			message: '#^Offset ''company'' on non\-empty\-array\<mixed\> on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Http/Controllers/Api/CvExportController.php
+
+		-
+			message: '#^Relation ''category'' is not found in App\\Models\\Post model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Http/Controllers/Api/CvExportController.php
+
+		-
+			message: '#^Relation ''translations'' is not found in App\\Models\\Post model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Http/Controllers/Api/CvExportController.php
+
+		-
+			message: '#^Relation ''translations'' is not found in App\\Models\\Project model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Http/Controllers/Api/CvExportController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Gallery\:\:\$items\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/GalleryController.php
+
+		-
+			message: '#^Relation ''award'' is not found in App\\Models\\Gallery model\.$#'
+			identifier: larastan.relationExistence
+			count: 5
+			path: app/Http/Controllers/Api/GalleryController.php
+
+		-
+			message: '#^Relation ''items'' is not found in App\\Models\\Gallery model\.$#'
+			identifier: larastan.relationExistence
+			count: 7
+			path: app/Http/Controllers/Api/GalleryController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Post\:\:\$translations\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/GeoController.php
+
+		-
+			message: '#^Relation ''translations'' is not found in App\\Models\\Post model\.$#'
+			identifier: larastan.relationExistence
+			count: 2
+			path: app/Http/Controllers/Api/GeoController.php
+
+		-
+			message: '#^Relation ''category'' is not found in App\\Models\\Post model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Http/Controllers/Api/HomepageController.php
+
+		-
+			message: '#^Relation ''translations'' is not found in App\\Models\\Post model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Http/Controllers/Api/HomepageController.php
+
+		-
+			message: '#^Relation ''translations'' is not found in App\\Models\\Project model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Http/Controllers/Api/HomepageController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>id" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Api/LinkedInOAuthController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Post\:\:\$translations\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Http/Controllers/Api/PostController.php
+
+		-
+			message: '#^Relation ''category'' is not found in App\\Models\\Post model\.$#'
+			identifier: larastan.relationExistence
+			count: 7
+			path: app/Http/Controllers/Api/PostController.php
+
+		-
+			message: '#^Relation ''relatedPosts'' is not found in App\\Models\\Post model\.$#'
+			identifier: larastan.relationExistence
+			count: 6
+			path: app/Http/Controllers/Api/PostController.php
+
+		-
+			message: '#^Relation ''translations'' is not found in App\\Models\\Post model\.$#'
+			identifier: larastan.relationExistence
+			count: 8
+			path: app/Http/Controllers/Api/PostController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>title" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Api/PostController.php
+
+		-
+			message: '#^Relation ''translations'' is not found in App\\Models\\Project model\.$#'
+			identifier: larastan.relationExistence
+			count: 5
+			path: app/Http/Controllers/Api/ProjectController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Gallery\:\:\$items\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/SettingsController.php
+
+		-
+			message: '#^Comparison operation "\>" between int\<1, 24\> and 24 is always false\.$#'
+			identifier: greater.alwaysFalse
+			count: 1
+			path: app/Http/Controllers/Api/SettingsController.php
+
+		-
+			message: '#^Relation ''items'' is not found in App\\Models\\Gallery model\.$#'
+			identifier: larastan.relationExistence
+			count: 2
+			path: app/Http/Controllers/Api/SettingsController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Post\:\:\$translations\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/SitemapController.php
+
+		-
+			message: '#^Relation ''translations'' is not found in App\\Models\\Post model\.$#'
+			identifier: larastan.relationExistence
+			count: 2
+			path: app/Http/Controllers/Api/SitemapController.php
+
+		-
+			message: '#^Cannot access property \$headers on class\-string\|object\.$#'
+			identifier: property.nonObject
+			count: 4
+			path: app/Http/Middleware/ApiETag.php
+
+		-
+			message: '#^Cannot call method setContent\(\) on class\-string\|object\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Middleware/ApiETag.php
+
+		-
+			message: '#^Cannot call method setStatusCode\(\) on class\-string\|object\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Middleware/ApiETag.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\AwardResource\:\:\$created_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/AwardResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\AwardResource\:\:\$credential_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/AwardResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\AwardResource\:\:\$credential_url\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/AwardResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\AwardResource\:\:\$description\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/AwardResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\AwardResource\:\:\$featured_gallery_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/AwardResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\AwardResource\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/AwardResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\AwardResource\:\:\$image\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/AwardResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\AwardResource\:\:\$order\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/AwardResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\AwardResource\:\:\$organization\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Resources/AwardResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\AwardResource\:\:\$received_at\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Resources/AwardResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\AwardResource\:\:\$title\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Resources/AwardResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\AwardResource\:\:\$total_photos\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/AwardResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\AwardResource\:\:\$updated_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/AwardResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CarouselDraftResource\:\:\$captions\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CarouselDraftResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CarouselDraftResource\:\:\$created_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CarouselDraftResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CarouselDraftResource\:\:\$creative_direction\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CarouselDraftResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CarouselDraftResource\:\:\$hook_category\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CarouselDraftResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CarouselDraftResource\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CarouselDraftResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CarouselDraftResource\:\:\$post_result\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CarouselDraftResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CarouselDraftResource\:\:\$posted_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CarouselDraftResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CarouselDraftResource\:\:\$rejection_reason\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CarouselDraftResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CarouselDraftResource\:\:\$scheduled_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CarouselDraftResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CarouselDraftResource\:\:\$shortcode\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CarouselDraftResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CarouselDraftResource\:\:\$source_analysis\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CarouselDraftResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CarouselDraftResource\:\:\$source_images\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CarouselDraftResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CarouselDraftResource\:\:\$source_url\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CarouselDraftResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CarouselDraftResource\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CarouselDraftResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CarouselDraftResource\:\:\$target_platform\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CarouselDraftResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CarouselDraftResource\:\:\$title\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CarouselDraftResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CarouselDraftResource\:\:\$updated_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CarouselDraftResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CarouselSlideResource\:\:\$carousel_draft_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CarouselSlideResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CarouselSlideResource\:\:\$created_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CarouselSlideResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CarouselSlideResource\:\:\$error_message\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CarouselSlideResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CarouselSlideResource\:\:\$generated_image_url\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CarouselSlideResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CarouselSlideResource\:\:\$generation_status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CarouselSlideResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CarouselSlideResource\:\:\$generation_uuid\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CarouselSlideResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CarouselSlideResource\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CarouselSlideResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CarouselSlideResource\:\:\$prompt\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CarouselSlideResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CarouselSlideResource\:\:\$slide_index\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CarouselSlideResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CarouselSlideResource\:\:\$slide_type\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CarouselSlideResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CarouselSlideResource\:\:\$source_image_url\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CarouselSlideResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CarouselSlideResource\:\:\$updated_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CarouselSlideResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CarouselSlideResource\:\:\$wow_score\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CarouselSlideResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CategoryResource\:\:\$color\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CategoryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CategoryResource\:\:\$created_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CategoryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CategoryResource\:\:\$description\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CategoryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CategoryResource\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CategoryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CategoryResource\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CategoryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CategoryResource\:\:\$order\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CategoryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CategoryResource\:\:\$posts_count\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CategoryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CategoryResource\:\:\$slug\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CategoryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CategoryResource\:\:\$updated_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CategoryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ContactResource\:\:\$created_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ContactResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ContactResource\:\:\$email\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ContactResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ContactResource\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ContactResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ContactResource\:\:\$is_read\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ContactResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ContactResource\:\:\$message\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ContactResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ContactResource\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ContactResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ContactResource\:\:\$read_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ContactResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ContactResource\:\:\$subject\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ContactResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ContactResource\:\:\$updated_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ContactResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ContactResource\:\:\$whatsapp_number\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ContactResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Cv\\CvAwardResource\:\:\$description\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Resources/Cv/CvAwardResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Cv\\CvAwardResource\:\:\$organization\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Cv/CvAwardResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Cv\\CvAwardResource\:\:\$received_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Cv/CvAwardResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Cv\\CvAwardResource\:\:\$title\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Cv/CvAwardResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Cv\\CvProjectResource\:\:\$category\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Cv/CvProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Cv\\CvProjectResource\:\:\$completed_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Cv/CvProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Cv\\CvProjectResource\:\:\$description\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Cv/CvProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Cv\\CvProjectResource\:\:\$domain\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Cv/CvProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Cv\\CvProjectResource\:\:\$end_date\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Cv/CvProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Cv\\CvProjectResource\:\:\$impact_statement\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Cv/CvProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Cv\\CvProjectResource\:\:\$problem\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Cv/CvProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Cv\\CvProjectResource\:\:\$result\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Cv/CvProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Cv\\CvProjectResource\:\:\$slug\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Cv/CvProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Cv\\CvProjectResource\:\:\$solution\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Cv/CvProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Cv\\CvProjectResource\:\:\$start_date\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Cv/CvProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Cv\\CvProjectResource\:\:\$tech_stack_details\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Cv/CvProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Cv\\CvProjectResource\:\:\$title\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Cv/CvProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Cv\\CvProjectResource\:\:\$translations\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Cv/CvProjectResource.php
+
+		-
+			message: '#^Call to an undefined method App\\Http\\Resources\\Cv\\CvProjectResource\:\:relationLoaded\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Resources/Cv/CvProjectResource.php
+
+		-
+			message: '#^Call to an undefined method App\\Http\\Resources\\Cv\\CvProjectResource\:\:translations\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Resources/Cv/CvProjectResource.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>description" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Resources/Cv/CvProjectResource.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>title" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Resources/Cv/CvProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Cv\\CvThoughtResource\:\:\$category\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Cv/CvThoughtResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Cv\\CvThoughtResource\:\:\$published_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Cv/CvThoughtResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Cv\\CvThoughtResource\:\:\$slug\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Cv/CvThoughtResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Cv\\CvThoughtResource\:\:\$translations\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Cv/CvThoughtResource.php
+
+		-
+			message: '#^Call to an undefined method App\\Http\\Resources\\Cv\\CvThoughtResource\:\:relationLoaded\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: app/Http/Resources/Cv/CvThoughtResource.php
+
+		-
+			message: '#^Call to an undefined method App\\Http\\Resources\\Cv\\CvThoughtResource\:\:translations\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Resources/Cv/CvThoughtResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\GalleryItemResource\:\:\$created_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/GalleryItemResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\GalleryItemResource\:\:\$description\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/GalleryItemResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\GalleryItemResource\:\:\$file_path\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Resources/GalleryItemResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\GalleryItemResource\:\:\$gallery_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/GalleryItemResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\GalleryItemResource\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/GalleryItemResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\GalleryItemResource\:\:\$image_variants\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/GalleryItemResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\GalleryItemResource\:\:\$sequence\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/GalleryItemResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\GalleryItemResource\:\:\$title\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/GalleryItemResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\GalleryItemResource\:\:\$type\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/GalleryItemResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\GalleryItemResource\:\:\$updated_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/GalleryItemResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\GalleryResource\:\:\$award\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Resources/GalleryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\GalleryResource\:\:\$award_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/GalleryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\GalleryResource\:\:\$company\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/GalleryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\GalleryResource\:\:\$created_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/GalleryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\GalleryResource\:\:\$description\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/GalleryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\GalleryResource\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/GalleryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\GalleryResource\:\:\$is_active\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/GalleryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\GalleryResource\:\:\$items\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/GalleryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\GalleryResource\:\:\$period\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/GalleryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\GalleryResource\:\:\$sort_order\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/GalleryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\GalleryResource\:\:\$thumbnail\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/GalleryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\GalleryResource\:\:\$title\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Resources/GalleryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\GalleryResource\:\:\$updated_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/GalleryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\PostResource\:\:\$category_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/PostResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\PostResource\:\:\$content\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/PostResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\PostResource\:\:\$created_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/PostResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\PostResource\:\:\$excerpt\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Resources/PostResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\PostResource\:\:\$faq_schema\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/PostResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\PostResource\:\:\$featured_image\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/PostResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\PostResource\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/PostResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\PostResource\:\:\$image_variants\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/PostResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\PostResource\:\:\$index_follow\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/PostResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\PostResource\:\:\$is_premium\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/PostResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\PostResource\:\:\$og_image\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/PostResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\PostResource\:\:\$published\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/PostResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\PostResource\:\:\$published_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/PostResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\PostResource\:\:\$reading_time\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/PostResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\PostResource\:\:\$relatedPosts\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/PostResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\PostResource\:\:\$schema_markup\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/PostResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\PostResource\:\:\$seo_score\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/PostResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\PostResource\:\:\$slug\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/PostResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\PostResource\:\:\$title\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Resources/PostResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\PostResource\:\:\$translations\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Http/Resources/PostResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\PostResource\:\:\$updated_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/PostResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\PostResource\:\:\$views\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/PostResource.php
+
+		-
+			message: '#^Call to an undefined method App\\Http\\Resources\\PostResource\:\:relationLoaded\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Resources/PostResource.php
+
+		-
+			message: '#^Call to an undefined method App\\Http\\Resources\\PostResource\:\:translations\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Resources/PostResource.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>content" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Resources/PostResource.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>excerpt" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Http/Resources/PostResource.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>meta_description" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Resources/PostResource.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>meta_title" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Resources/PostResource.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>title" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 3
+			path: app/Http/Resources/PostResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ProjectResource\:\:\$canonical_url\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ProjectResource\:\:\$category\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ProjectResource\:\:\$client\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ProjectResource\:\:\$completed_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ProjectResource\:\:\$content\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ProjectResource\:\:\$context\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ProjectResource\:\:\$created_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ProjectResource\:\:\$deleted_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ProjectResource\:\:\$description\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ProjectResource\:\:\$end_date\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ProjectResource\:\:\$featured\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ProjectResource\:\:\$focus_keyword\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ProjectResource\:\:\$github_url\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ProjectResource\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ProjectResource\:\:\$image\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ProjectResource\:\:\$image_variants\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ProjectResource\:\:\$images\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ProjectResource\:\:\$impact_statement\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ProjectResource\:\:\$integration\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ProjectResource\:\:\$meta_description\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ProjectResource\:\:\$meta_title\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ProjectResource\:\:\$og_description\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ProjectResource\:\:\$og_image\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ProjectResource\:\:\$og_title\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ProjectResource\:\:\$problem\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ProjectResource\:\:\$published\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ProjectResource\:\:\$related_project_ids\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ProjectResource\:\:\$result\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ProjectResource\:\:\$role\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ProjectResource\:\:\$slug\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ProjectResource\:\:\$solution\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ProjectResource\:\:\$start_date\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ProjectResource\:\:\$title\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ProjectResource\:\:\$translations\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ProjectResource\:\:\$updated_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ProjectResource\:\:\$url\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Call to an undefined method App\\Http\\Resources\\ProjectResource\:\:relationLoaded\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Call to an undefined method App\\Http\\Resources\\ProjectResource\:\:translations\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>content" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>description" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>title" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Resources/ProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ScheduledCommandResource\:\:\$category\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ScheduledCommandResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ScheduledCommandResource\:\:\$cron_expression\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Http/Resources/ScheduledCommandResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ScheduledCommandResource\:\:\$description\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ScheduledCommandResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ScheduledCommandResource\:\:\$display_name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ScheduledCommandResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ScheduledCommandResource\:\:\$enabled\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ScheduledCommandResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ScheduledCommandResource\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ScheduledCommandResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ScheduledCommandResource\:\:\$is_placeholder\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ScheduledCommandResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ScheduledCommandResource\:\:\$last_duration_ms\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ScheduledCommandResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ScheduledCommandResource\:\:\$last_error\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ScheduledCommandResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ScheduledCommandResource\:\:\$last_finished_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ScheduledCommandResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ScheduledCommandResource\:\:\$last_run_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ScheduledCommandResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ScheduledCommandResource\:\:\$last_status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ScheduledCommandResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ScheduledCommandResource\:\:\$run_in_background\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ScheduledCommandResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ScheduledCommandResource\:\:\$signature\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ScheduledCommandResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ScheduledCommandResource\:\:\$sort_order\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ScheduledCommandResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ScheduledCommandResource\:\:\$timezone\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Http/Resources/ScheduledCommandResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ScheduledCommandResource\:\:\$without_overlapping_minutes\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ScheduledCommandResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\SettingResource\:\:\$created_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/SettingResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\SettingResource\:\:\$group\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/SettingResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\SettingResource\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/SettingResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\SettingResource\:\:\$key\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/SettingResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\SettingResource\:\:\$type\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/SettingResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\SettingResource\:\:\$updated_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/SettingResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\SettingResource\:\:\$value\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/SettingResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\TestimonialResource\:\:\$client_name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/TestimonialResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\TestimonialResource\:\:\$client_photo\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/TestimonialResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\TestimonialResource\:\:\$company_name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/TestimonialResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\TestimonialResource\:\:\$created_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/TestimonialResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\TestimonialResource\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/TestimonialResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\TestimonialResource\:\:\$is_active\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/TestimonialResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\TestimonialResource\:\:\$job_title\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/TestimonialResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\TestimonialResource\:\:\$linkedin_url\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/TestimonialResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\TestimonialResource\:\:\$sort_order\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/TestimonialResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\TestimonialResource\:\:\$source_url\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/TestimonialResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\TestimonialResource\:\:\$star_rating\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/TestimonialResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\TestimonialResource\:\:\$testimonial_text\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/TestimonialResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\TestimonialResource\:\:\$updated_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/TestimonialResource.php
+
+		-
+			message: '#^Offset ''count'' on array\{success\: bool, count\: int, slides\: array\<int, string\>, caption\: string, error\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: app/Jobs/CaptureInstagramPost.php
+
+		-
+			message: '#^Offset ''success'' on array\{success\: bool, count\: int, slides\: array\<int, string\>, caption\: string, error\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Jobs/CaptureInstagramPost.php
+
+		-
+			message: '#^Offset ''count'' on array\{success\: bool, count\: int, slides\: array\<int, array\<string, mixed\>\>, error\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: app/Jobs/CaptureVideoCarousel.php
+
+		-
+			message: '#^Offset ''success'' on array\{success\: bool, count\: int, slides\: array\<int, array\<string, mixed\>\>, error\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Jobs/CaptureVideoCarousel.php
+
+		-
+			message: '#^Offset ''success'' on array\{success\: bool, extracted\: array\<string, mixed\>\|null, error\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Jobs/ExtractSlideContent.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$slide_index\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Jobs/ExtractVideoSlides.php
+
+		-
+			message: '#^Offset ''dropped'' on array\{success\: bool, error\: string\|null, dropped\: array\<int, int\>\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Jobs/ExtractVideoSlides.php
+
+		-
+			message: '#^Offset ''success'' on array\{success\: bool, error\: string\|null, dropped\: array\<int, int\>\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Jobs/ExtractVideoSlides.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$pillar\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Jobs/FinalizeRepurpose.php
+
+		-
+			message: '#^Offset ''status'' on array\{success\: bool, draft_id\: int, status\: string, error\?\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Jobs/GenerateFacebookPost.php
+
+		-
+			message: '#^Offset ''success'' on array\{success\: bool, draft_id\: int, status\: string, error\?\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: app/Jobs/GenerateFacebookPost.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$format\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Jobs/GenerateHookVideo.php
+
+		-
+			message: '#^Offset ''status'' on array\{success\: bool, draft_id\: int, status\: string, error\?\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Jobs/GenerateInstagramPost.php
+
+		-
+			message: '#^Offset ''success'' on array\{success\: bool, draft_id\: int, status\: string, error\?\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: app/Jobs/GenerateInstagramPost.php
+
+		-
+			message: '#^Offset ''status'' on array\{success\: bool, draft_id\: int, status\: string, depth_score\?\: int\|null, error\?\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Jobs/GenerateLinkedInPost.php
+
+		-
+			message: '#^Offset ''success'' on array\{success\: bool, draft_id\: int, status\: string, depth_score\?\: int\|null, error\?\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: app/Jobs/GenerateLinkedInPost.php
+
+		-
+			message: '#^Call to function is_string\(\) with string will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Jobs/GenerateRebrandAssets.php
+
+		-
+			message: '#^Offset ''scene_prompt'' on array\{success\: bool, figure_name\: string\|null, brand_name\?\: string\|null, scene_prompt\: string, error\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Jobs/GenerateRebrandAssets.php
+
+		-
+			message: '#^Offset ''success'' on array\{success\: bool, figure_name\: string\|null, brand_name\?\: string\|null, scene_prompt\: string, error\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: app/Jobs/GenerateRebrandAssets.php
+
+		-
+			message: '#^Offset ''status'' on array\{success\: bool, draft_id\: int, status\: string, error\?\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Jobs/GenerateThreadsPost.php
+
+		-
+			message: '#^Offset ''success'' on array\{success\: bool, draft_id\: int, status\: string, error\?\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: app/Jobs/GenerateThreadsPost.php
+
+		-
+			message: '#^Offset ''status'' on array\{success\: bool, draft_id\: int, status\: string, error\?\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Jobs/GenerateTiktokPost.php
+
+		-
+			message: '#^Offset ''success'' on array\{success\: bool, draft_id\: int, status\: string, error\?\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: app/Jobs/GenerateTiktokPost.php
+
+		-
+			message: '#^Match expression does not handle remaining value\: string$#'
+			identifier: match.unhandled
+			count: 1
+			path: app/Jobs/PublishViaZernio.php
+
+		-
+			message: '#^Offset ''count'' on array\{success\: bool, count\: int, slides\: array\<int, string\>, caption\: string, error\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Jobs/RefetchSourceSlides.php
+
+		-
+			message: '#^Offset ''success'' on array\{success\: bool, count\: int, slides\: array\<int, string\>, caption\: string, error\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Jobs/RefetchSourceSlides.php
+
+		-
+			message: '#^Parameter \#1 \$key of class Illuminate\\Queue\\Middleware\\WithoutOverlapping constructor expects string\|UnitEnum, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Jobs/RegenerateLinkedInCarouselContent.php
+
+		-
+			message: '#^Offset ''success'' on array\{success\: bool, research\: array\<string, mixed\>\|null, error\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Jobs/ResearchRepurposeClaims.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Jobs/ReskinBookendSlide.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$role\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Jobs/ReskinBookendSlide.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$slide_index\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Jobs/ReskinBookendSlide.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$veo_url\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Jobs/ReskinBookendSlide.php
+
+		-
+			message: '#^Parameter \#1 \$slide of method App\\Services\\VideoBookendOverlayApplier\:\:apply\(\) expects App\\Models\\RepurposeVideoSlide, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Jobs/ReskinBookendSlide.php
+
+		-
+			message: '#^Offset ''success'' on array\{success\: bool, rewritten\: array\<string, mixed\>\|null, error\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Jobs/RewriteRepurposeContent.php
+
+		-
+			message: '#^Parameter \#1 \$post of method App\\Services\\ShortLinkService\:\:forBlogPost\(\) expects App\\Models\\Post\|int, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Models/LinkedInPost.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between int\<1, max\> and 0 will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: app/Models/Project.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:isVideoCarousel\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Models/RepurposeJob.php
+
+		-
+			message: '#^Method App\\Models\\RepurposeJob\:\:videoAnchor\(\) should return App\\Models\\LinkedInPost\|null but returns Illuminate\\Database\\Eloquent\\Model\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Models/RepurposeJob.php
+
+		-
+			message: '#^Expression on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.expr
+			count: 1
+			path: app/Providers/AppServiceProvider.php
+
+		-
+			message: '#^Using nullsafe method call on non\-nullable type Throwable\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Providers/AppServiceProvider.php
+
+		-
+			message: '#^Offset ''success'' on array\{success\: bool, pid\: int\|null, error\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 4
+			path: app/Services/AutoPipelineOrchestrator.php
+
+		-
+			message: '#^Offset ''success'' on array\{success\: bool, skipped\?\: bool, error\?\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/AutoPipelineOrchestrator.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Services/BaseSocialGenerationService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$linkedinPost\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/BaseSocialGenerationService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$translations\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Services/CarouselCoverFigureEnricher.php
+
+		-
+			message: '#^Call to function is_array\(\) with array will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Services/CarouselCoverFigureEnricher.php
+
+		-
+			message: '#^Offset ''scene_prompt'' on array\{success\: bool, figure_name\: string, brand_name\?\: string\|null, scene_prompt\: string, error\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/CarouselCoverFigureEnricher.php
+
+		-
+			message: '#^Offset ''success'' on array\{success\: bool, figure_name\: string\|null, brand_name\?\: string\|null, scene_prompt\: string, error\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/CarouselCoverFigureEnricher.php
+
+		-
+			message: '#^Call to function is_array\(\) with array will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Services/CarouselPersonPhotoEnricher.php
+
+		-
+			message: '#^Offset ''h'' on array\{y\: float, h\: float\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/CarouselPersonStripRenderer.php
+
+		-
+			message: '#^Offset ''path'' on array\{path\: string, name\?\: string, role\?\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/CarouselPersonStripRenderer.php
+
+		-
+			message: '#^Offset ''y'' on array\{y\: float, h\: float\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/CarouselPersonStripRenderer.php
+
+		-
+			message: '#^Parameter \#1 \$array \(non\-empty\-list\<array\{path\: non\-empty\-string, name\: string, role\: string\}\>\) of array_values is already a list, call has no effect\.$#'
+			identifier: arrayValues.list
+			count: 1
+			path: app/Services/CarouselPersonStripRenderer.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between null and null will always evaluate to true\.$#'
+			identifier: identical.alwaysTrue
+			count: 1
+			path: app/Services/CarouselSlideEnhancer.php
+
+		-
+			message: '#^Method App\\Services\\ContentPublishService\:\:compactVariations\(\) never assigns null to &\$urlsToDelete so it can be removed from the by\-ref type\.$#'
+			identifier: parameterByRef.unusedType
+			count: 1
+			path: app/Services/ContentPublishService.php
+
+		-
+			message: '#^Method App\\Services\\ContentPublishService\:\:resolveBroadTopic\(\) never returns null so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: app/Services/ContentPublishService.php
+
+		-
+			message: '#^Variable \$content on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.variable
+			count: 1
+			path: app/Services/ContentPublishService.php
+
+		-
+			message: '#^Offset ''success'' on array\{success\: bool, rewritten_vd\: string\|null, error\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/CoverBrandingEnhancer.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Post\:\:\$translations\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/CvMasterMarkdownService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Project\:\:\$translations\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/CvMasterMarkdownService.php
+
+		-
+			message: '#^Relation ''category'' is not found in App\\Models\\Post model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Services/CvMasterMarkdownService.php
+
+		-
+			message: '#^Relation ''translations'' is not found in App\\Models\\Post model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Services/CvMasterMarkdownService.php
+
+		-
+			message: '#^Relation ''translations'' is not found in App\\Models\\Project model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Services/CvMasterMarkdownService.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>description" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Services/CvMasterMarkdownService.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>excerpt" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Services/CvMasterMarkdownService.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Services/CvMasterMarkdownService.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>title" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 4
+			path: app/Services/CvMasterMarkdownService.php
+
+		-
+			message: '#^Variable \$description on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.variable
+			count: 2
+			path: app/Services/CvMasterMarkdownService.php
+
+		-
+			message: '#^Negated boolean expression is always true\.$#'
+			identifier: booleanNot.alwaysTrue
+			count: 1
+			path: app/Services/EntityReferenceService.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 1
+			path: app/Services/EntityReferenceService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Post\:\:\$contentIdea\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/FacebookGenerationService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$content\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/FacebookGenerationService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$instagramPost\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/FacebookGenerationService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$slug\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/FacebookGenerationService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$title\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/FacebookGenerationService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$translations\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Services/FacebookGenerationService.php
+
+		-
+			message: '#^Parameter \#1 \$post of method App\\Services\\FacebookGenerationService\:\:buildContentIdeaPayload\(\) expects App\\Models\\Post, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/FacebookGenerationService.php
+
+		-
+			message: '#^Relation ''contentIdea'' is not found in App\\Models\\Post model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Services/FacebookGenerationService.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between ''carousel'' and ''carousel'' will always evaluate to true\.$#'
+			identifier: identical.alwaysTrue
+			count: 1
+			path: app/Services/FacebookGenerationService.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 1
+			path: app/Services/FacebookGenerationService.php
+
+		-
+			message: '#^Comparison operation "\<" between int\<400, 428\>\|int\<430, 499\> and 500 is always true\.$#'
+			identifier: smaller.alwaysTrue
+			count: 1
+			path: app/Services/GeminiGenCircuitBreaker.php
+
+		-
+			message: '#^Call to function is_string\(\) with string will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Services/GeminiGenVideoService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$translations\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/ImageGenerationService.php
+
+		-
+			message: '#^Offset ''success'' on array\{success\: bool, rewritten_vd\: string\|null, error\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/ImageGenerationService.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between ''hero''\|''inline'' and ''carousel_slide'' will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: app/Services/ImageGenerationService.php
+
+		-
+			message: '#^Offset ''exit'' on array\{stdout\: string, stderr\: string, exit\: int\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/InstagramCaptureService.php
+
+		-
+			message: '#^Offset ''stderr'' on array\{stdout\: string, stderr\: string, exit\: int\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/InstagramCaptureService.php
+
+		-
+			message: '#^Offset ''stdout'' on array\{stdout\: string, stderr\: string, exit\: int\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: app/Services/InstagramCaptureService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Post\:\:\$contentIdea\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/InstagramGenerationService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$slug\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/InstagramGenerationService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$translations\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Services/InstagramGenerationService.php
+
+		-
+			message: '#^Parameter \#1 \$linkedinPost of method App\\Services\\InstagramGenerationService\:\:detectCrossPostTargets\(\) expects App\\Models\\LinkedInPost, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/InstagramGenerationService.php
+
+		-
+			message: '#^Parameter \#1 \$post of method App\\Services\\InstagramGenerationService\:\:buildContentIdeaPayload\(\) expects App\\Models\\Post, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/InstagramGenerationService.php
+
+		-
+			message: '#^Parameter \#1 \$post of method App\\Services\\ShortLinkService\:\:forBlogPost\(\) expects App\\Models\\Post\|int, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Services/InstagramGenerationService.php
+
+		-
+			message: '#^Relation ''contentIdea'' is not found in App\\Models\\Post model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Services/InstagramGenerationService.php
+
+		-
+			message: '#^Call to function is_array\(\) with array will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Services/LinkedInCarouselImageService.php
+
+		-
+			message: '#^Offset ''success'' on array\{success\: bool, rewritten_vd\: string\|null, error\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/LinkedInCarouselImageService.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>carousel_slides" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Services/LinkedInCarouselImageService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$contentIdea\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/LinkedInGenerationService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$slug\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/LinkedInGenerationService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$translations\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Services/LinkedInGenerationService.php
+
+		-
+			message: '#^Parameter \#1 \$post of method App\\Services\\ShortLinkService\:\:forBlogPost\(\) expects App\\Models\\Post\|int, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/LinkedInGenerationService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$featured_image\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/LinkedInPublishService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$translations\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/LinkedInPublishService.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:isAccessTokenExpired\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Services/LinkedInPublishService.php
+
+		-
+			message: '#^Call to function is_array\(\) with array will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Services/LinkedInPublishService.php
+
+		-
+			message: '#^Parameter \#1 \$account of method App\\Services\\LinkedInOAuthService\:\:refreshAccount\(\) expects App\\Models\\LinkedInAccount, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/LinkedInPublishService.php
+
+		-
+			message: '#^Parameter \#2 \$account of method App\\Services\\LinkedInPublishService\:\:publishCarousel\(\) expects App\\Models\\LinkedInAccount, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/LinkedInPublishService.php
+
+		-
+			message: '#^Parameter \#2 \$account of method App\\Services\\LinkedInPublishService\:\:publishText\(\) expects App\\Models\\LinkedInAccount, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/LinkedInPublishService.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>featured_image" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Services/LinkedInPublishService.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>title" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Services/LinkedInPublishService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$translations\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/LinkedInScheduleConflictService.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>title" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Services/LinkedInScheduleConflictService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/PipelineGuard.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/PipelineGuard.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:transitionTo\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Services/PipelineGuard.php
+
+		-
+			message: '#^Call to function is_array\(\) with array will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 2
+			path: app/Services/PublerClient.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between non\-falsy\-string and '''' will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 1
+			path: app/Services/PublerClient.php
+
+		-
+			message: '#^Offset ''success'' on array\{success\: bool, copy_id\: string, copy_en\: string, image_prompt\: string, error\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/RepurposeCarouselBuilder.php
+
+		-
+			message: '#^Offset ''success'' on array\{success\: bool, parsed\: array\<string, mixed\>\|null, output\: string, error\: string\|null, repaired\: bool\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/RepurposeCarouselBuilder.php
+
+		-
+			message: '#^Offset ''success'' on array\{success\: bool, parsed\: array\<string, mixed\>\|null, output\: string, error\: string\|null, repaired\: bool\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/RepurposeHookTitleResolver.php
+
+		-
+			message: '#^Call to function is_string\(\) with string will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 2
+			path: app/Services/SourceFaceLocator.php
+
+		-
+			message: '#^Offset ''name'' on array\{name\: string, role\?\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: app/Services/SourceFaceLocator.php
+
+		-
+			message: '#^Offset ''success'' on array\{success\: bool, parsed\: array\<string, mixed\>\|null, output\: string, error\: string\|null, repaired\: bool\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/SourceFaceLocator.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$translations\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Services/TelegramNotificationService.php
+
+		-
+			message: '#^Offset ''days'' on array\{id\: int, title\: string, days\: int, slug\?\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/TelegramNotificationService.php
+
+		-
+			message: '#^Offset ''id'' on array\{id\: int, post_title\: string, scheduled_at\: string, minutes_apart\: int\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/TelegramNotificationService.php
+
+		-
+			message: '#^Offset ''index'' on array\{index\: int, type\: string\|null, status\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/TelegramNotificationService.php
+
+		-
+			message: '#^Offset ''post_title'' on array\{id\: int, post_title\: string, scheduled_at\: string, minutes_apart\: int\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/TelegramNotificationService.php
+
+		-
+			message: '#^Offset ''title'' on array\{id\: int, title\: string, days\: int, slug\?\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/TelegramNotificationService.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>title" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 4
+			path: app/Services/TelegramNotificationService.php
+
+		-
+			message: '#^Call to function is_array\(\) with non\-empty\-array will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Services/TelegramNotifier.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>excerpt" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Services/TelegramNotifier.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>meta_description" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Services/TelegramNotifier.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>title" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Services/TelegramNotifier.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Post\:\:\$contentIdea\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/ThreadsGenerationService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$slug\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/ThreadsGenerationService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$translations\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Services/ThreadsGenerationService.php
+
+		-
+			message: '#^Parameter \#1 \$post of method App\\Services\\ShortLinkService\:\:forBlogPost\(\) expects App\\Models\\Post\|int, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/ThreadsGenerationService.php
+
+		-
+			message: '#^Parameter \#1 \$post of method App\\Services\\ThreadsGenerationService\:\:buildContentIdeaPayload\(\) expects App\\Models\\Post, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/ThreadsGenerationService.php
+
+		-
+			message: '#^Relation ''contentIdea'' is not found in App\\Models\\Post model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Services/ThreadsGenerationService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Post\:\:\$contentIdea\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/TiktokGenerationService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$slug\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/TiktokGenerationService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$translations\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Services/TiktokGenerationService.php
+
+		-
+			message: '#^Parameter \#1 \$post of method App\\Services\\ShortLinkService\:\:forBlogPost\(\) expects App\\Models\\Post\|int, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Services/TiktokGenerationService.php
+
+		-
+			message: '#^Parameter \#1 \$post of method App\\Services\\TiktokGenerationService\:\:buildContentIdeaPayload\(\) expects App\\Models\\Post, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/TiktokGenerationService.php
+
+		-
+			message: '#^Relation ''contentIdea'' is not found in App\\Models\\Post model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Services/TiktokGenerationService.php
+
+		-
+			message: '#^Ternary operator condition is always true\.$#'
+			identifier: ternary.alwaysTrue
+			count: 1
+			path: app/Services/TopicScoringService.php
+
+		-
+			message: '#^Ternary operator condition is always true\.$#'
+			identifier: ternary.alwaysTrue
+			count: 1
+			path: app/Services/TrendingTopicService.php
+
+		-
+			message: '#^Parameter \#1 \$job of method App\\Services\\RepurposeHookTitleResolver\:\:resolve\(\) expects App\\Models\\RepurposeJob, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/VideoBookendOverlayApplier.php
+
+		-
+			message: '#^Offset ''success'' on array\{success\: bool, parsed\: array\<string, mixed\>\|null, output\: string, error\: string\|null, repaired\: bool\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/VideoHookSceneAuthor.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$composited_path\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/VideoRebrandComposer.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$composited_status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/VideoRebrandComposer.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/VideoRebrandComposer.php
+
+		-
+			message: '#^Parameter \#1 \$slide of method App\\Services\\VideoChromeRenderer\:\:renderSlide\(\) expects App\\Models\\RepurposeVideoSlide, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/VideoRebrandComposer.php
+
+		-
+			message: '#^Parameter \#1 \$slide of method App\\Services\\VideoRebrandComposer\:\:composeSlide\(\) expects App\\Models\\RepurposeVideoSlide, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/VideoRebrandComposer.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$poster_path\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/VideoSlideExtractor.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$slide_index\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Services/VideoSlideExtractor.php
+
+		-
+			message: '#^Method App\\Services\\VideoSlideExtractor\:\:extract\(\) should return array\{success\: bool, error\: string\|null, dropped\: array\<int, int\>\} but returns array\{success\: false, error\: non\-falsy\-string\}\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Services/VideoSlideExtractor.php
+
+		-
+			message: '#^Offset ''output'' on array\{success\: bool, parsed\: array\<string, mixed\>\|null, output\: string, error\: string\|null, repaired\: bool\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/VideoSlideExtractor.php
+
+		-
+			message: '#^Offset ''success'' on array\{success\: bool, parsed\: array\<string, mixed\>\|null, output\: string, error\: string\|null, repaired\: bool\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/VideoSlideExtractor.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:isRepurpose\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: app/Services/ZernioPayloadBuilder.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between non\-empty\-string and '''' will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: app/Support/ScheduledTaskSignatureExtractor.php
+
+		-
+			message: '#^Trait App\\Traits\\HasSeoFields is used zero times and is not analysed\.$#'
+			identifier: trait.unused
+			count: 1
+			path: app/Traits/HasSeoFields.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>id" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: database/factories/GalleryFactory.php
+
+		-
+			message: '#^Relation ''linkedinPosts'' is not found in App\\Models\\Post model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: database/factories/LinkedInPostFactory.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Schema\\ForeignKeyDefinition\:\:comment\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: database/migrations/2026_05_07_100001_create_instagram_posts_table.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Schema\\ForeignKeyDefinition\:\:comment\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: database/migrations/2026_05_07_100002_create_tiktok_posts_table.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Schema\\ForeignKeyDefinition\:\:comment\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: database/migrations/2026_05_08_100002_create_facebook_posts_table.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Schema\\ForeignKeyDefinition\:\:comment\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: database/migrations/2026_05_10_100001_create_threads_posts_table.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Schema\\ForeignKeyDefinition\:\:comment\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: database/migrations/2026_05_10_130001_create_short_links_table.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Schema\\ForeignKeyDefinition\:\:comment\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: database/migrations/2026_06_16_000001_create_reddit_posts_table.php
+
+		-
+			message: '#^If condition is always true\.$#'
+			identifier: if.alwaysTrue
+			count: 1
+			path: database/seeders/BlogPromoSettingsSeeder.php
+
+		-
+			message: '#^If condition is always true\.$#'
+			identifier: if.alwaysTrue
+			count: 1
+			path: database/seeders/CreatorBrandSettingsSeeder.php
+
+		-
+			message: '#^If condition is always true\.$#'
+			identifier: if.alwaysTrue
+			count: 1
+			path: database/seeders/CvSettingsSeeder.php
+
+		-
+			message: '#^Relation ''linkedinPosts'' is not found in App\\Models\\Post model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: database/seeders/LinkedInPostSeeder.php
+
+		-
+			message: '#^Using nullsafe method call on non\-nullable type Illuminate\\Console\\Command\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: database/seeders/LinkedInPostSeeder.php
+
+		-
+			message: '#^If condition is always true\.$#'
+			identifier: if.alwaysTrue
+			count: 1
+			path: database/seeders/LinkedInSettingsSeeder.php
+
+		-
+			message: '#^If condition is always true\.$#'
+			identifier: if.alwaysTrue
+			count: 1
+			path: database/seeders/MailSettingsSeeder.php
+
+		-
+			message: '#^If condition is always true\.$#'
+			identifier: if.alwaysTrue
+			count: 1
+			path: database/seeders/PublerSettingsSeeder.php
+
+		-
+			message: '#^Offset ''description'' on array\{signature\: ''blog\:process\-images'', display_name\: ''Content Engine —…'', description\: ''Fallback poller…'', category\: ''content_engine'', cron_expression\: ''\* \* \* \* \*'', without_overlapping_minutes\: null, arguments\: null, sort_order\: 20\}\|array\{signature\: ''content\:auto…'', display_name\: ''Content Engine —…'', description\: ''Antrian otomatis\:…'', category\: ''content_engine'', cron_expression\: ''0 5,6,12,15,17,18…'', without_overlapping_minutes\: 10, arguments\: null, sort_order\: 40\}\|array\{signature\: ''content\:flag\-stale…'', display_name\: ''Content Engine —…'', description\: ''Tiap Senin jam 6…'', category\: ''content_engine'', cron_expression\: ''0 6 \* \* 1'', without_overlapping_minutes\: 30, arguments\: array\{''\-\-days\=90''\}, sort_order\: 60\}\|array\{signature\: ''content\:process…'', display_name\: ''Content Engine —…'', description\: ''Jalanin artikel…'', category\: ''content_engine'', cron_expression\: ''\* \* \* \* \*'', without_overlapping_minutes\: null, arguments\: null, sort_order\: 10\}\|array\{signature\: ''content\:process…'', display_name\: ''Content Engine —…'', description\: ''Retry translation…'', category\: ''content_engine'', cron_expression\: ''\*/5 \* \* \* \*'', without_overlapping_minutes\: 5, arguments\: null, sort_order\: 30\}\|array\{signature\: ''content\:pull…'', display_name\: ''Content Engine —…'', description\: ''Tiap pagi jam 5\:…'', category\: ''content_engine'', cron_expression\: ''0 5 \* \* \*'', without_overlapping_minutes\: null, arguments\: null, sort_order\: 50\}\|array\{signature\: ''crosspost\:backfill…'', display_name\: ''Social — Backfill…'', description\: ''Tiap 2 menit\: poll…'', category\: ''linkedin'', cron_expression\: ''\*/2 \* \* \* \*'', without_overlapping_minutes\: 2, arguments\: null, sort_order\: 95\}\|array\{signature\: ''crosspost\:poll\-hook…'', display_name\: ''Social — Poll GROK…'', description\: ''Tiap menit\: cek…'', category\: ''linkedin'', cron_expression\: ''\* \* \* \* \*'', without_overlapping_minutes\: 2, arguments\: null, sort_order\: 100\}\|array\{signature\: ''crosspost\:reap'', display_name\: ''Social — Reap Stuck…'', description\: ''Tiap 10 menit\: re…'', category\: ''linkedin'', cron_expression\: ''\*/10 \* \* \* \*'', without_overlapping_minutes\: 10, arguments\: null, sort_order\: 90\}\|array\{signature\: ''geminigen\:circuit…'', display_name\: ''GeminiGen — Circuit…'', description\: ''Tiap 5 menit cek…'', category\: ''system'', cron_expression\: ''\*/5 \* \* \* \*'', without_overlapping_minutes\: 5, arguments\: null, sort_order\: 20\}\|array\{signature\: ''linkedin\:auto…'', display_name\: ''LinkedIn — Auto…'', description\: ''Tiap pagi jam 4\:30\:…'', category\: ''linkedin'', cron_expression\: ''30 4 \* \* \*'', without_overlapping_minutes\: 15, arguments\: null, sort_order\: 70\}\|array\{signature\: ''linkedin\:prompt…'', display_name\: ''LinkedIn — Telegram…'', description\: ''Tiap menit\: kalau…'', category\: ''linkedin'', cron_expression\: ''\* \* \* \* \*'', without_overlapping_minutes\: 5, arguments\: null, sort_order\: 75\}\|array\{signature\: ''linkedin\:purge\-low…'', display_name\: ''LinkedIn — Purge…'', description\: ''Tiap pagi jam 4\:…'', category\: ''linkedin'', cron_expression\: ''0 4 \* \* \*'', without_overlapping_minutes\: 15, arguments\: null, sort_order\: 60\}\|array\{signature\: ''linkedin\:reap\-stuck'', display_name\: ''LinkedIn — Reap…'', description\: ''Tiap 5 menit\: cek…'', category\: ''linkedin'', cron_expression\: ''\*/5 \* \* \* \*'', without_overlapping_minutes\: 5, arguments\: null, sort_order\: 30\}\|array\{signature\: ''linkedin\:reap\-stuck…'', display_name\: ''LinkedIn — Reap…'', description\: ''Tiap 5 menit\: cek…'', category\: ''linkedin'', cron_expression\: ''\*/5 \* \* \* \*'', without_overlapping_minutes\: 5, arguments\: null, sort_order\: 50\}\|array\{signature\: ''linkedin\:retry…'', display_name\: ''LinkedIn — Auto…'', description\: ''Tiap 10 menit\:…'', category\: ''linkedin'', cron_expression\: ''\*/10 \* \* \* \*'', without_overlapping_minutes\: 15, arguments\: null, sort_order\: 40\}\|array\{signature\: ''newsletter\:send…'', display_name\: ''Newsletter — Weekly…'', description\: ''Jumat jam 9 pagi\:…'', category\: ''newsletter'', cron_expression\: ''0 9 \* \* 5'', without_overlapping_minutes\: 60, arguments\: null, sort_order\: 10\}\|array\{signature\: ''posting\-rules…'', display_name\: ''Posting Rules —…'', description\: ''Tiap 3 bulan \(Jan…'', category\: ''system'', cron_expression\: ''0 3 1 \*/3 \*'', without_overlapping_minutes\: 15, arguments\: array\{''\-\-platform\=linkedin''\}, sort_order\: 10\}\|array\{signature\: ''postiz\:reap…'', display_name\: ''Postiz — Unclaimed…'', description\: ''Tiap menit\: kalau…'', category\: ''system'', cron_expression\: ''\* \* \* \* \*'', without_overlapping_minutes\: null, arguments\: null, sort_order\: 40\}\|array\{signature\: ''repurpose\:poll…'', display_name\: ''IG Repurpose — Poll…'', description\: ''Tiap menit\: cek…'', category\: ''linkedin'', cron_expression\: ''\* \* \* \* \*'', without_overlapping_minutes\: 2, arguments\: null, sort_order\: 110\}\|array\{signature\: ''repurpose\:reap'', display_name\: ''IG Repurpose —…'', description\: ''Tiap hari jam 4…'', category\: ''system'', cron_expression\: ''0 4 \* \* \*'', without_overlapping_minutes\: 30, arguments\: array\{''\-\-days\=7''\}, sort_order\: 30\}\|array\{signature\: ''social\-cross\-post…'', display_name\: ''Social — Cross\-Post…'', description\: ''Tiap 2 menit\: fan…'', category\: ''linkedin'', cron_expression\: ''\*/2 \* \* \* \*'', without_overlapping_minutes\: 5, arguments\: null, sort_order\: 80\}\|array\{signature\: ''social\:publish\-slot'', display_name\: ''Social — Atomic…'', description\: ''Tiap menit cek…'', category\: ''linkedin'', cron_expression\: ''\* \* \* \* \*'', without_overlapping_minutes\: 5, arguments\: null, sort_order\: 10\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: database/seeders/ScheduledCommandSeeder.php
+
+		-
+			message: '#^If condition is always true\.$#'
+			identifier: if.alwaysTrue
+			count: 1
+			path: database/seeders/TelegramSettingsSeeder.php
+
+		-
+			message: '#^If condition is always true\.$#'
+			identifier: if.alwaysTrue
+			count: 1
+			path: database/seeders/ZernioSettingsSeeder.php
+
+		-
+			message: '#^Offset ''content'' on array\{title\: mixed, content\: mixed, word_count\: mixed\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: routes/api.php
+
+		-
+			message: '#^Offset ''title'' on array\{title\: mixed, content\: mixed, word_count\: mixed\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: routes/api.php
+
+		-
+			message: '#^Offset ''word_count'' on array\{title\: mixed, content\: mixed, word_count\: mixed\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: routes/api.php

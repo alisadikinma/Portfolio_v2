@@ -189,10 +189,14 @@ class LinkedInFixedSlotScheduler
 
     private function isOccupied(Carbon $slot): bool
     {
-        $hourEnd = $slot->copy()->addHour();
+        // Query bindings are NOT zone-converted by Eloquent; scheduled_at is
+        // stored in app.timezone, so compare in that zone.
+        $appTz = (string) config('app.timezone');
+        $from = $slot->copy()->setTimezone($appTz);
+        $to = $slot->copy()->addHour()->subSecond()->setTimezone($appTz);
 
         return LinkedInPost::query()
-            ->whereBetween('scheduled_at', [$slot, $hourEnd->copy()->subSecond()])
+            ->whereBetween('scheduled_at', [$from, $to])
             ->whereIn('status', self::OCCUPYING_STATUSES)
             ->whereNull('deleted_at')
             ->exists();

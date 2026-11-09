@@ -24,7 +24,7 @@ class GenerateHookVideoJobTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function makeSibling(array $hookSlide = null, string $igStatus = 'awaiting_review'): InstagramPost
+    private function makeSibling(?array $hookSlide = null, string $igStatus = 'awaiting_review'): InstagramPost
     {
         $category = Category::create(['name' => 'T', 'slug' => 'c-'.uniqid()]);
         $post = Post::create([

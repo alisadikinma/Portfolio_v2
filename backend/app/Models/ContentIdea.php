@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\ContentIdeaStatus;
+use App\Models\Concerns\StoresDatesInAppTimezone;
 use App\Traits\HasStatusTransitions;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -12,6 +13,7 @@ class ContentIdea extends Model
 {
     use HasFactory;
     use HasStatusTransitions;
+    use StoresDatesInAppTimezone;
 
     protected function statusEnumClass(): string
     {

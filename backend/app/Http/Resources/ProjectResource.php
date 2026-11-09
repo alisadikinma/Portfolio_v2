@@ -76,8 +76,9 @@ class ProjectResource extends JsonResource
             'content' => $translation?->content ?? $this->content,
 
             // SEO fields (flat structure for form compatibility)
-            'meta_title' => $this->meta_title ?: null,
-            'meta_description' => $this->meta_description ?: null,
+            // Translated meta first (PF-2: /id/projects/* had English <title>s), else the base row.
+            'meta_title' => ($translation?->meta_title ?: $this->meta_title) ?: null,
+            'meta_description' => ($translation?->meta_description ?: $this->meta_description) ?: null,
             'focus_keyword' => $this->focus_keyword ?: null,
             'canonical_url' => $this->canonical_url ?: null,
             'og_title' => $this->og_title ?: null,

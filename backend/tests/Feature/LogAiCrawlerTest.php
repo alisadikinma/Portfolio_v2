@@ -57,10 +57,10 @@ class LogAiCrawlerTest extends TestCase
     public function test_middleware_is_wired_to_the_web_group(): void
     {
         // Goes through the real HTTP/web stack — catches a bootstrap/app.php
-        // misregistration the unit-level dispatch() tests can't. The SSR route
-        // may redirect (no dist shell in test), but the web middleware still
-        // runs before the controller.
-        $this->withHeaders(['User-Agent' => 'GPTBot/1.2'])->get('/');
+        // misregistration the unit-level dispatch() tests can't. /r/{code} is the
+        // remaining public web route (unknown code → 404, but the web middleware
+        // still runs before the controller).
+        $this->withHeaders(['User-Agent' => 'GPTBot/1.2'])->get('/r/nocode1');
 
         $this->assertDatabaseHas('geo_crawler_hits', ['bot' => 'GPTBot']);
     }

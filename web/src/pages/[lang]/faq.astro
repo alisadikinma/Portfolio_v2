@@ -1,0 +1,62 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import FaqList, { type FaqItem } from "../../components/FaqList.astro";
+import { apiGet } from "../../lib/api";
+import { localizedPath, LANGS, type Lang } from "../../lib/i18n";
+import { SITE, breadcrumb, faqPage, graph, personNode, webPageNode, websiteNode } from "../../lib/schema";
+import { id } from "../../content/copy/id";
+import { en } from "../../content/copy/en";
+
+const raw = Astro.params.lang;
+if (!(LANGS as readonly string[]).includes(raw ?? "")) {
+  return new Response(null, { status: 404 });
+}
+const lang = raw as Lang;
+const c = (lang === "id" ? id : en).faq;
+const path = `/${lang}/faq`;
+
+// /api/faq?lang=id returns the Indonesian mirror of the curated list; other languages get English.
+let items: FaqItem[] = [];
+try {
+  const data = await apiGet<unknown>("/faq", { lang });
+  if (Array.isArray(data)) {
+    items = data.filter(
+      (x): x is FaqItem =>
+        x !== null &&
+        typeof x === "object" &&
+        typeof (x as FaqItem).question === "string" &&
+        (x as FaqItem).question.trim() !== "" &&
+        typeof (x as FaqItem).answer === "string" &&
+        (x as FaqItem).answer.trim() !== "",
+    );
+  }
+} catch {
+  items = [];
+}
+const available = items.length > 0;
+if (!available) Astro.response.status = 503;
+
+const url = SITE + path;
+const nodes = [
+  personNode(),
+  websiteNode(),
+  webPageNode({ url, lang, name: c.metaTitle, description: c.metaDescription }),
+  breadcrumb([
+    { name: "Ali Sadikin Ma", url: `${SITE}/${lang}` },
+    { name: "FAQ", url },
+  ]),
+];
+if (available) nodes.push(faqPage(items.map((i) => ({ q: i.question, a: i.answer }))));
+const jsonld = graph(...nodes);
+---
+<BaseLayout title={c.metaTitle} description={c.metaDescription} path={path} lang={lang} jsonld={jsonld}>
+  <main class="wrap faq-page">
+    <h1>{c.h1}</h1>
+    <p>{c.intro}</p>
+    {available ? <FaqList items={items} /> : <p class="faq-unavailable" role="status">{c.unavailable}</p>}
+    <p class="faq-links">
+      {c.linkTrainingLead} <a href={localizedPath(`/${lang}/pelatihan-ai`, lang)}>{c.linkTraining}</a>.
+      {" "}{c.linkAboutLead} <a href={`/${lang}/about`}>{c.linkAbout}</a>.
+    </p>
+  </main>
+</BaseLayout>

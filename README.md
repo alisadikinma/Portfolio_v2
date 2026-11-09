@@ -1,8 +1,9 @@
 # Portfolio v2 — A Portfolio That Runs Its Own Content Factory
 
 [![Laravel](https://img.shields.io/badge/Laravel-12.x-FF2D20?logo=laravel)](https://laravel.com)
-[![Vue.js](https://img.shields.io/badge/Vue.js-3.5-4FC08D?logo=vue.js)](https://vuejs.org)
-[![PHP](https://img.shields.io/badge/PHP-8.2-777BB4?logo=php)](https://php.net)
+[![Astro](https://img.shields.io/badge/Astro-7_SSR-FF5D01?logo=astro)](https://astro.build)
+[![Vue.js](https://img.shields.io/badge/Vue.js-3.5_admin-4FC08D?logo=vue.js)](https://vuejs.org)
+[![PHP](https://img.shields.io/badge/PHP-8.4-777BB4?logo=php)](https://php.net)
 [![MySQL](https://img.shields.io/badge/MySQL-8.x-4479A1?logo=mysql)](https://mysql.com)
 [![Filament](https://img.shields.io/badge/Filament-4.1-FDAE4B?logo=laravel)](https://filamentphp.com)
 [![Status](https://img.shields.io/badge/Status-Production-22c55e)](https://alisadikinma.com)
@@ -58,10 +59,11 @@ Then it asks, right inside Telegram: **"When should I post this?"** — suggesti
 
 Everything above rides on a production-grade full-stack app:
 
-- **Backend** — Laravel 12 (PHP 8.2) · MySQL 8 · Sanctum 4 (auth) · Filament 4.1 (admin) · 140+ REST endpoints
-- **Frontend** — Vue 3.5 · Rolldown-Vite 7.1 · Pinia 3 · TanStack Query 5.90 · Tailwind 4 — a fast SPA with an admin **Content Engine**, **Social Studio**, **Content Calendar**, and **Scheduler** built in
+- **Backend** — Laravel 12 (PHP 8.4) · MySQL 8 · Sanctum 4 (auth) · Filament 4.1 (admin) · 140+ REST endpoints
+- **Public site** — Astro 7 SSR (`web/`) — server-rendered pages, JSON-LD, `llms.txt`
+- **Admin** — Vue 3.5 SPA (`frontend/`, `/admin` only) · Rolldown-Vite 7.1 · Pinia 3 · TanStack Query 5.90 · Tailwind 4 — with the **Content Engine**, **Social Studio**, **Content Calendar**, and **Scheduler** built in
 - **AI layer** — Claude Code CLI + custom plugins on the VPS (article-writer, carousel-gen, linkedin/ig/tiktok/threads writers), GeminiGen for images, Firecrawl + Wikidata for facts
-- **SEO/GEO** — server-side-enriched homepage + blog (JSON-LD entity graph, crawlable `<article>`, `llms.txt`) so ChatGPT, Perplexity, Claude & Google AI can cite the content
+- **SEO/GEO** — server-rendered Astro pages (JSON-LD entity graph, crawlable `<article>`, `llms.txt`) so ChatGPT, Perplexity, Claude & Google AI can cite the content
 - **Edge** — Cloudflare CDN (60–80% origin bandwidth saved) + ETag/304 revalidation + WebP/LQIP image variants
 
 | At a glance | |
@@ -75,36 +77,27 @@ Everything above rides on a production-grade full-stack app:
 
 ---
 
-## 🚀 Quick Start (local, ~15 min)
+## 🚀 Quick Start (local)
 
-> Backend runs on **XAMPP Apache** — do **NOT** use `php artisan serve`.
+Needs Docker Desktop (no host PHP). Full site + admin + API on one URL, with a copy of prod data:
 
 ```bash
-# 1. Start XAMPP (Apache :80 + MySQL :3306)
-
-# 2. Backend
-cd backend
-composer install
-cp .env.example .env
-php artisan key:generate          # then edit .env DB credentials
-php artisan migrate --seed
-php artisan storage:link
-
-# 3. Frontend
-cd ../frontend
-npm install
-cp .env.example .env
-npm run dev                       # http://localhost:5173
+scripts/pf2-local.sh up      # http://localhost:8000  (site /id, admin /admin, API /api)
+scripts/pf2-local.sh down
 ```
 
-| Service | URL |
-|---|---|
-| Frontend (dev) | http://localhost:5173 |
-| Backend API | http://localhost/Portfolio_v2/backend/public/api |
-| Health check | …/api/health |
-| Production | https://alisadikinma.com |
+Details: [docker/pf2-local/README.md](./docker/pf2-local/README.md). Lighter dev stack (API + admin, empty DB): [docker/README.md](./docker/README.md).
 
-Create an admin: `php artisan tinker` → `User::create(['name'=>'Admin','email'=>'admin@test.com','password'=>bcrypt('password')]);`
+```bash
+# Public site (Astro)
+cd web && npm ci && npm run dev
+# Admin SPA (Vue)
+cd frontend && npm ci && npm run dev      # http://localhost:5173
+# Backend tests (inside the container)
+docker compose exec backend php artisan test
+```
+
+Production: https://alisadikinma.com — health check `…/api/health`.
 
 ---
 
@@ -167,9 +160,9 @@ php artisan test
 php artisan linkedin:scan-blog --hours=720    # backfill social drafts
 php artisan images:generate-variants          # WebP + LQIP backfill
 
-# Frontend
-npm run dev          # dev server :5173
-npm run build        # production build
+# Admin SPA (frontend/)        # Public site (web/)
+npm run dev                     npm run dev
+npm run build                   npm run build && npm run check
 ```
 
 | Issue | Fix |
@@ -188,7 +181,7 @@ npm run build        # production build
 
 ```
 git reset --hard → composer install → migrate --force → idempotent seeders
-→ cache:recache → npm ci && npm run build → fix permissions → queue:restart → health check
+→ cache:recache → web (Astro) atomic build → admin npm ci && npm run build → fix permissions → queue:restart → health check
 ```
 
 Production runs on a VPS (Nginx + SSL + Cloudflare). The queue worker (`portfolio-queue.service`) and scheduler cron must be running for the content engine to fire — see [CLAUDE.md](./CLAUDE.md) → *VPS Background Process Setup*.

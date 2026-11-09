@@ -8,7 +8,11 @@ use Illuminate\Console\Events\ScheduledTaskFailed;
 use Illuminate\Console\Events\ScheduledTaskFinished;
 use Illuminate\Console\Events\ScheduledTaskStarting;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
@@ -35,6 +39,31 @@ class AppServiceProvider extends ServiceProvider
         if (config('app.env') === 'production') {
             URL::forceScheme('https');
         }
+
+        // Dedicated bucket: the default throttle key is domain|ip, so a bare
+        // `throttle:600,1` would share a counter with /contact, newsletter, chatbot.
+        RateLimiter::for('internal-crawler', fn (Request $request) => Limit::perMinute(6000)
+            ->by('internal-crawler|'.$request->ip()));
+
+        // Public waitlist write: own bucket, 5 submits per hour per client IP.
+        // Idempotent replays of an already-stored client_key are free (no limit).
+        RateLimiter::for('training-waitlist', function (Request $request) {
+            $key = $request->input('client_key');
+            if (is_string($key) && Str::isUuid($key)
+                && \App\Models\TrainingWaitlist::where('client_key', $key)->exists()) {
+                return Limit::none();
+            }
+
+            return Limit::perHour(5)
+                ->by('training-waitlist|'.$request->ip())
+                ->response(fn () => response()->json([
+                    'success' => false,
+                    'error' => [
+                        'code' => 'RATE_LIMITED',
+                        'message' => 'Too many submissions. Please try again later.',
+                    ],
+                ], 429));
+        });
 
         $this->registerScheduledCommandAuditHooks();
     }

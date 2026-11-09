@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\GeoController;
 use App\Http\Controllers\Api\FaqController;
 use App\Http\Controllers\Api\ActivityFeedController;
 use App\Http\Controllers\Api\NewsletterController;
+use App\Http\Controllers\Api\TrainingWaitlistController;
 use App\Http\Controllers\Api\BlogPromoSlotController;
 use App\Http\Controllers\Api\CarouselDraftController;
 use App\Http\Controllers\Api\Admin\ContentIdeaController;
@@ -33,6 +34,7 @@ use App\Http\Controllers\Api\Admin\RepurposeJobController;
 use App\Http\Controllers\Api\Admin\VideoFullController;
 use App\Http\Controllers\Api\VideoFullWorkerController;
 use App\Http\Controllers\Api\Admin\NewsletterAdminController;
+use App\Http\Controllers\Api\Admin\TrainingWaitlistAdminController;
 use App\Http\Controllers\Api\Admin\PostingRuleController;
 use App\Http\Controllers\Api\LinkedInOAuthController;
 use App\Http\Controllers\Api\HomepageController;
@@ -84,6 +86,8 @@ Route::middleware(['auth:sanctum', 'ability:cv:read', 'throttle:30,1'])->group(f
 // Public Awards Routes
 Route::prefix('awards')->group(function () {
     Route::get('/', [AwardController::class, 'index']);
+    // Before /{id}: "slug" must not be captured as an id.
+    Route::get('/slug/{slug}', [AwardController::class, 'showBySlug']);
     Route::get('/{id}', [AwardController::class, 'show']);
     Route::get('/{id}/galleries', [AwardController::class, 'getGalleries']);
 });
@@ -160,8 +164,7 @@ Route::post('/chatbot/ask', [ChatbotController::class, 'ask'])->middleware('thro
 Route::get('/llms.txt', [GeoController::class, 'llmsTxt']);
 Route::get('/llms-full.txt', [GeoController::class, 'llmsFullTxt']);
 
-// FAQ — curated Q&A (config/faq.php), consumed by the Vue /faq view. The SSR
-// /faq page (SpaPrerenderController::faq) renders the same source server-side.
+// FAQ — curated Q&A (config/faq.php), consumed by the Astro /faq page (web/).
 Route::get('/faq', [FaqController::class, 'index']);
 
 // Activity Feed
@@ -174,6 +177,9 @@ Route::get('/blog/promo-slot', [BlogPromoSlotController::class, 'show']);
 Route::post('/newsletter/subscribe', [NewsletterController::class, 'subscribe'])->middleware('throttle:5,60');
 Route::delete('/newsletter/unsubscribe', [NewsletterController::class, 'unsubscribe']);
 Route::post('/newsletter/unsubscribe-by-token', [NewsletterController::class, 'unsubscribeByToken']);
+
+// Training waitlist (PF-2) - dedicated limiter, honeypot + client_key idempotency
+Route::post('/training-waitlist', [TrainingWaitlistController::class, 'store'])->middleware('throttle:training-waitlist');
 
 // Public Menu Items Routes (for navbar)
 Route::get('/menu-items', [MenuItemController::class, 'publicMenuItems']);
@@ -194,6 +200,11 @@ Route::middleware(['auth:sanctum'])->prefix('admin/dashboard')->group(function (
 Route::middleware(['auth:sanctum'])->prefix('admin/geminigen')->group(function () {
     Route::get('/circuit-status', \App\Http\Controllers\Api\Admin\GeminigenStatusController::class);
 });
+
+// Internal (server-to-server) — Astro frontend reports AI-bot crawls.
+// Shared-secret auth inside the controller; intentionally outside auth:sanctum.
+Route::post('/internal/crawler-hit', \App\Http\Controllers\Api\InternalCrawlerHitController::class)
+    ->middleware('throttle:internal-crawler');
 
 // Admin GEO crawler-hit stats (read-only) — AI bot crawls GA4 can't see.
 Route::middleware(['auth:sanctum'])->prefix('admin/geo')->group(function () {
@@ -314,6 +325,13 @@ Route::middleware(['auth:sanctum'])->prefix('admin/newsletter')->group(function 
     Route::get('/sends', [NewsletterAdminController::class, 'sends']);
     Route::get('/sends/{id}', [NewsletterAdminController::class, 'showSend']);
     Route::delete('/{id}', [NewsletterAdminController::class, 'destroy']);
+});
+
+// Admin Training Waitlist Routes (PF-2)
+Route::middleware(['auth:sanctum'])->prefix('admin/training-waitlist')->group(function () {
+    Route::get('/', [TrainingWaitlistAdminController::class, 'index']);
+    Route::get('/export', [TrainingWaitlistAdminController::class, 'export']);
+    Route::patch('/{id}', [TrainingWaitlistAdminController::class, 'update'])->whereNumber('id');
 });
 
 // Admin Settings Routes
@@ -972,7 +990,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('automation')->grou
     // Carousel endpoints (protected)
     Route::get('/carousel/accounts', [CarouselDraftController::class, 'listAccounts']);
     Route::get('/carousel/drafts', [CarouselDraftController::class, 'index']);
-    Route::get('/carousel/drafts/{id}', [CarouselDraftController::class, 'show']);
+    Route::get('/carousel/drafts/{carouselDraft}', [CarouselDraftController::class, 'show']);
 });
 
 // Admin Automation Management Routes
@@ -991,11 +1009,11 @@ Route::middleware(['auth:sanctum'])->prefix('admin/automation')->group(function 
 // Admin Carousel Drafts Routes
 Route::middleware(['auth:sanctum'])->prefix('admin/carousel-drafts')->group(function () {
     Route::get('/', [CarouselDraftController::class, 'index']);
-    Route::get('/{id}', [CarouselDraftController::class, 'show']);
-    Route::post('/{id}/approve', [CarouselDraftController::class, 'approve']);
-    Route::post('/{id}/reject', [CarouselDraftController::class, 'reject']);
-    Route::post('/{id}/schedule', [CarouselDraftController::class, 'schedule']);
-    Route::patch('/{id}/slides/{slideId}/status', [CarouselDraftController::class, 'updateSlideStatus']);
+    Route::get('/{carouselDraft}', [CarouselDraftController::class, 'show']);
+    Route::match(['post', 'patch'], '/{carouselDraft}/approve', [CarouselDraftController::class, 'approve']);
+    Route::match(['post', 'patch'], '/{carouselDraft}/reject', [CarouselDraftController::class, 'reject']);
+    Route::match(['post', 'patch'], '/{carouselDraft}/schedule', [CarouselDraftController::class, 'schedule']);
+    Route::patch('/{carouselDraft}/slides/{slideId}/status', [CarouselDraftController::class, 'updateSlideStatus']);
 });
 
 // Admin Content Engine Routes

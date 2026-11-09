@@ -88,7 +88,7 @@ class ImageGenerationService
         ?int $postId,
         string $prompt,
         string $type = 'hero',
-        string $insertAfterHeading = null,
+        ?string $insertAfterHeading = null,
         ?string $model = null,
         string $aspectRatio = '16:9',
         string $style = 'Photorealistic',

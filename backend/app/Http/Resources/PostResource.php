@@ -25,10 +25,21 @@ class PostResource extends JsonResource
             $translation = $translations->firstWhere('language', 'en');
         }
 
+        // Real content freshness: latest of translation edit / operator review,
+        // clamped to [published_at, now]. updated_at stays raw (bookkeeping noise).
+        $contentUpdatedAt = $this->resource->contentUpdatedAt($language);
+
+        // Each translation has its own public slug (the sitemap lists them). Empty falls back to posts.slug.
+        $slugs = $this->translations
+            ->mapWithKeys(fn ($t) => [$t->language => ($t->slug ?: $this->slug)])
+            ->toArray();
+
         return [
             'id' => $this->id,
             'category_id' => $this->category_id,
             'slug' => $this->slug,
+            'slugs' => $slugs,
+            'localized_slug' => $slugs[$language] ?? $this->slug,
             'featured_image' => $this->featured_image
                 ? (str_starts_with($this->featured_image, 'http') ? $this->featured_image : url($this->featured_image))
                 : null,
@@ -90,13 +101,18 @@ class PostResource extends JsonResource
             })->toArray(),
 
             // Related posts
-            'related_posts' => $this->whenLoaded('relatedPosts', function () {
-                return $this->relatedPosts->map(function ($rp) {
-                    $t = $rp->translations->first();
+            'related_posts' => $this->whenLoaded('relatedPosts', function () use ($language) {
+                return $this->relatedPosts->filter(fn ($rp) => $rp->published && $rp->published_at && $rp->published_at->lte(now()))->values()->map(function ($rp) use ($language) {
+                    $t = $rp->translations->firstWhere('language', $language)
+                        ?? $rp->translations->firstWhere('language', 'en')
+                        ?? $rp->translations->first();
                     return [
                         'id' => $rp->id,
                         'slug' => $rp->slug,
+                        'localized_slug' => $t?->slug ?: $rp->slug,
                         'title' => $t?->title ?? '',
+                        'language' => $t?->language,
+                        'available_translations' => $rp->translations->pluck('language')->values()->toArray(),
                         'featured_image' => $rp->featured_image
                             ? (str_starts_with($rp->featured_image, 'http') ? $rp->featured_image : url($rp->featured_image))
                             : null,
@@ -108,6 +124,7 @@ class PostResource extends JsonResource
             // Timestamps
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
+            'content_updated_at' => $contentUpdatedAt?->toISOString(),
         ];
     }
 }

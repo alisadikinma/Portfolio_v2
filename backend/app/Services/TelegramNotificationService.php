@@ -164,6 +164,25 @@ class TelegramNotificationService
     }
 
     /**
+     * content:process-scheduled gave up on a scheduled idea after repeated
+     * trigger failures. Shares the generation_failed toggle.
+     */
+    public function sendScheduledTriggerFailed(ContentIdea $idea): bool
+    {
+        if (!$this->isEnabledFor('generation_failed')) {
+            return false;
+        }
+
+        $text = "❌ *Scheduled start failed* — Content Engine\n\n"
+            . 'Idea: _' . $this->escapeMarkdown($idea->title ?? 'Untitled') . "_\n\n"
+            . "The scheduler could not start research after 3 attempts and stopped retrying. "
+            . "Fix the cause, then start it manually.\n\n"
+            . "[Open Admin](" . $this->buildAdminUrl($idea) . ")";
+
+        return $this->send($text);
+    }
+
+    /**
      * Daily heartbeat after content:pull-trending-daily completes. Without this,
      * a silent cron failure (queue worker crash, schedule:run cron removed, VPS
      * reboot without systemd auto-start) only surfaces when the operator
@@ -752,7 +771,7 @@ class TelegramNotificationService
 
         $rows = [];
         foreach (array_values($candidateSlots) as $i => $slot) {
-            $label = $slot->locale('id')->isoFormat('ddd, D MMM HH:mm') . ' WIB';
+            $label = \App\Support\WibTime::label($slot);
             $rows[] = [[
                 'text' => $label,
                 'callback_data' => self::signCallback("slot{$i}", 'schedule', $draft->id, $secret),
@@ -795,7 +814,7 @@ class TelegramNotificationService
         }
 
         $secret = (string) $this->getSetting('telegram_webhook_secret');
-        $when = $proposed->locale('id')->isoFormat('ddd, D MMM HH:mm') . ' WIB';
+        $when = \App\Support\WibTime::label($proposed);
         $other = $this->escapeMarkdown($this->truncate((string) ($conflict['post_title'] ?? 'draft lain'), 60));
 
         $lines = [
@@ -823,7 +842,7 @@ class TelegramNotificationService
             return false;
         }
 
-        $when = $slot->locale('id')->isoFormat('ddd, D MMM HH:mm') . ' WIB';
+        $when = \App\Support\WibTime::label($slot);
         $title = $this->escapeMarkdown($this->truncate($this->resolveDraftTitle($draft), 70));
 
         return $this->send("✅ *Dijadwalkan* {$when}\n{$title}");

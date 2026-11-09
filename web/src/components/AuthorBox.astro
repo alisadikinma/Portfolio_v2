@@ -1,0 +1,28 @@
+---
+import type { Lang } from "../lib/i18n";
+import { PORTRAIT_URL } from "../lib/schema";
+import { id } from "../content/copy/id";
+import { en } from "../content/copy/en";
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const c = (lang === "id" ? id : en).blogDetail;
+// Dofollow on purpose: this is the INDUSIA.ai backlink on every post (no rel attribute).
+const indusia = lang === "id" ? "https://indusia.ai/id/" : "https://indusia.ai/";
+---
+<aside class="author-box" aria-labelledby="author-box-title">
+  <img src={PORTRAIT_URL} alt={c.authorImgAlt} width="96" height="96" loading="lazy" decoding="async" />
+  <div>
+    <h2 id="author-box-title">{c.authorHeading}</h2>
+    <p>
+      {c.authorLeadBefore}<a href={indusia}>{c.authorFounderAnchor}</a>{c.authorBetween}<a href={indusia}>{c.authorCompanyAnchor}</a>{c.authorAfter}
+    </p>
+    <p>{c.authorAboutLead} <a href={`/${lang}/about`}>{c.authorAbout}</a>.</p>
+  </div>
+</aside>
+<style>
+  .author-box { display: flex; gap: 1.25rem; align-items: flex-start; margin: 3rem 0; padding: 1.5rem; border: 1px solid currentColor; border-radius: 12px; }
+  .author-box img { border-radius: 50%; object-fit: cover; flex: none; }
+  .author-box h2 { font-size: 1.1rem; margin: 0 0 0.5rem; }
+  .author-box p { margin: 0 0 0.5rem; }
+</style>

@@ -1,0 +1,85 @@
+---
+import type { Lang } from "../../lib/i18n";
+import { id } from "../../content/copy/id";
+import { en } from "../../content/copy/en";
+import { STAGE_AWARDS, STAGE_AWARD_IDS, awardHref, loadAwardPhotos, loadAwardSlugs, type Photos } from "../../lib/career";
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const s = (lang === "id" ? id : en).stages;
+const n = (count: number) => s.photos.replace("{n}", String(count));
+// Slot sizes only (object-fit: cover); the real photo size is unknown without a probe.
+const SIZES_MAIN = "(min-width: 860px) 50vw, 100vw";
+const SIZES = "(min-width: 860px) 25vw, 50vw";
+
+const [photoRes, slugRes] = await Promise.all([
+  Promise.allSettled(STAGE_AWARD_IDS.map((a) => loadAwardPhotos(a, lang))),
+  loadAwardSlugs(lang),
+]);
+const photos = new Map<number, Photos | null>(
+  STAGE_AWARD_IDS.map((a, i) => [a, photoRes[i].status === "fulfilled" ? photoRes[i].value : null]),
+);
+
+const A = STAGE_AWARDS;
+const cards = [
+  { award: A.demoDay, main: true, yr: s.demoDayYear, title: s.demoDayTitle, desc: s.demoDayDesc, lock: s.demoDayLock, lockSm: false, alt: s.demoDayAlt },
+  { award: A.unctad, main: false, yr: s.unctadYear, title: s.unctadTitle, desc: "", lock: "", lockSm: false, alt: s.unctadAlt },
+  { award: A.grind, main: false, yr: s.grindYear, title: s.grindTitle, desc: "", lock: "", lockSm: false, alt: s.grindAlt },
+  { award: A.nextdev, main: false, yr: s.nextdevYear, title: s.nextdevTitle, desc: "", lock: s.nextdevLock, lockSm: true, alt: s.nextdevAlt },
+  { award: A.fenox, main: false, yr: s.fenoxYear, title: s.fenoxTitle, desc: "", lock: s.fenoxLock, lockSm: true, alt: s.fenoxAlt },
+];
+---
+<section class="sec" id="panggung" aria-labelledby="stages-h">
+  <div class="wrap">
+    <div class="sec-head"><h2 id="stages-h">{s.h2}</h2><p class="lead">{s.lead}</p></div>
+    <ul class="bento">
+      {cards.map((c) => {
+        const p = photos.get(c.award) ?? null;
+        const items = p?.photos.map((x) => x.full) ?? [];
+        const thumbs = p?.photos.map((x) => x.thumb) ?? [];
+        const cover = p?.cover ?? null;
+        const href = awardHref({ slug: slugRes.get(c.award) }, lang);
+        const gallery = items.length > 0;
+        const trigger = { "data-lightbox": "", "data-lightbox-title": c.title, "data-lightbox-items": JSON.stringify(items), "data-lightbox-thumbs": JSON.stringify(thumbs) };
+        const Tag = href ? "a" : gallery ? "button" : "div";
+        const tagAttrs = href ? { href } : gallery ? { type: "button" as const, ...trigger } : {};
+        const w = c.main ? 800 : 640;
+        const h = c.main ? 800 : 416;
+        return (
+          <li class:list={["bt-item", { "bt-main": c.main }]}>
+            <Tag class="bt-card" {...tagAttrs}>
+              {cover && <img src={cover.src} srcset={cover.srcset} sizes={cover.srcset ? (c.main ? SIZES_MAIN : SIZES) : undefined} alt={c.alt} loading="lazy" decoding="async" width={w} height={h} />}
+              {c.lock && <span class:list={["bt-lock", { "gold-sm": c.lockSm }]} aria-hidden="true"><b>{c.lock}</b></span>}
+              <span class="bt-cap">
+                <span class="yr">{c.yr}</span>
+                <strong>{c.title}</strong>
+                {c.desc && <span>{c.desc}</span>}
+                {c.lock && <span class="sr">{c.lock}</span>}
+                {gallery && <em>{n(items.length)}</em>}
+                {gallery && !href && <span class="sr"> · {s.openHint}</span>}
+              </span>
+            </Tag>
+            {href && gallery && (
+              <button type="button" class="bt-open" aria-label={`${n(items.length)}, ${s.openGallery.replace("{title}", c.title)}`} {...trigger}>{n(items.length)}</button>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+    <p class="bt-more"><a href={`/${lang}/work?tab=awards`}>{s.all}</a></p>
+  </div>
+</section>
+<style>
+  .bt-item { position: relative; }
+  /* same card box for the three variants (button is styled globally; a and div are not) */
+  .bt-card { box-sizing: border-box; cursor: pointer; position: relative; display: block; width: 100%; height: 100%; border-radius: var(--radius-lg); overflow: hidden; border: 1px solid var(--border-subtle); background: var(--bg-elevated); color: inherit; text-decoration: none; }
+  div.bt-card { cursor: default; }
+  a.bt-card::after, div.bt-card::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(10,18,32,0) 38%, rgba(10,18,32,.75) 68%, rgba(10,18,32,.97) 100%); }
+  a.bt-card:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 3px; }
+  a.bt-card:hover :global(img) { transform: scale(1.04); }
+  /* separate gallery trigger next to an award-page link (no nested interactive elements) */
+  .bento .bt-open { all: unset; box-sizing: border-box; cursor: pointer; position: absolute; z-index: 3; top: 12px; left: 12px; width: auto; height: auto; padding: 7px 10px; border-radius: 6px; font: 500 12px/1 var(--font-mono); color: var(--text-primary); background: rgba(10,18,32,.78); border: 1px solid var(--border-emphasis); }
+  .bento .bt-open::after { display: none; }
+  .bento .bt-open:hover { border-color: var(--accent-primary); }
+  .bento .bt-open:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+</style>

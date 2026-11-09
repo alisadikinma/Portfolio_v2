@@ -4,69 +4,23 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <!-- Font Preloads — Geist + Space Grotesk -->
+    <!-- Font Preloads — Geist + Space Grotesk (admin UI, imported by style.css) -->
     <link rel="preload" href="https://cdn.jsdelivr.net/npm/geist@1.3.1/dist/fonts/geist-sans/style.min.css" as="style" />
     <link rel="preload" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700&display=swap" as="style" />
 
-    <!-- Primary Meta Tags -->
-    <title>Ali Sadikin Ma - AI Generalist Expert</title>
-    <meta name="title" content="Ali Sadikin Ma - AI Generalist Expert">
-    <meta name="description" content="Ali Sadikin Ma is an AI Generalist who turns frontier AI models into shipped products — not slide decks. 17 years across 16 countries; ranked #1 at the Global AI Demo Day 2026. Builds & teaches AI Agents, Vibe Coding, and Generative Video.">
-    <meta name="author" content="Ali Sadikin Ma">
-    <meta name="keywords" content="AI Generalist, AI Agents, Vibe Coding, AI Video Generation, MANDOR AI, AI Agent OS, learn AI, AI course, Ali Sadikin Ma, Demo Day Champion">
-
-    <!-- Open Graph / Facebook / WhatsApp -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://alisadikinma.com/">
-    <meta property="og:title" content="Ali Sadikin Ma - AI Generalist Expert">
-    <meta property="og:description" content="AI Generalist who turns frontier AI models into shipped products — not slide decks. #1 at the Global AI Demo Day 2026. Builds & teaches AI Agents, Vibe Coding, and Generative Video.">
-    <meta property="og:image" content="https://alisadikinma.com/og-image.jpg?v=2">
-    <meta property="og:image:secure_url" content="https://alisadikinma.com/og-image.jpg?v=2">
-    <meta property="og:image:type" content="image/jpeg">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
-    <meta property="og:image:alt" content="Ali Sadikin Ma — AI Generalist Expert">
-    <meta property="og:site_name" content="Ali Sadikin Ma">
-    <meta property="og:locale" content="en_US">
-
-    <!-- Twitter Card -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:url" content="https://alisadikinma.com/">
-    <meta name="twitter:title" content="Ali Sadikin Ma - AI Generalist Expert">
-    <meta name="twitter:description" content="AI Generalist who turns frontier AI models into shipped products — not slide decks. #1 at the Global AI Demo Day 2026. Builds & teaches AI Agents, Vibe Coding, and Generative Video.">
-    <meta name="twitter:image" content="https://alisadikinma.com/og-image.jpg?v=2">
-    <meta name="twitter:image:alt" content="Ali Sadikin Ma — AI Generalist Expert">
-
-    <!-- Additional SEO -->
-    <meta name="robots" content="index, follow">
-    <meta name="googlebot" content="index, follow">
-    <link rel="canonical" href="https://alisadikinma.com/">
-
-    <!-- GEO / LLM-Friendly -->
-    <link rel="alternate" type="text/plain" href="/llms.txt" title="LLM-readable profile">
-    <link rel="sitemap" type="application/xml" href="/sitemap.xml">
-
-    <!-- Static Person + FAQ JSON-LD (GEO G2/G3). Baked into the shell so non-JS
-         LLM crawlers see the entity + answers without executing the SPA. The
-         runtime injectors in useMetaTags (data-schema person/faq, remove-then-add)
-         replace these for JS clients — enriched with the live portrait. Keep in
-         sync with src/utils/personSchema.js. -->
-    <script type="application/ld+json" data-schema="person">{"@context":"https://schema.org","@type":"Person","name":"Ali Sadikin Ma","alternateName":"Ali Sadikin","url":"https://alisadikinma.com","jobTitle":"AI Generalist","description":"Ali Sadikin Ma is an AI Generalist who turns frontier AI models into shipped products — not slide decks. 17 years building across 16 countries; ranked #1 at the Global AI Demo Day 2026. Now teaching AI Agents, Vibe Coding, and Generative Video.","knowsAbout":["AI Agents","AI Agent Operating Systems","Vibe Coding","Generative AI Video","AI Automation","Computer Vision","Edge AI","Large Language Model Applications"],"knowsLanguage":["Indonesian","English","Mandarin"],"nationality":{"@type":"Country","name":"Indonesia"},"award":["#1 Champion — Global AI Demo Day 2026 (Outskill AI Generalist Fellowship)","UN-UNCTAD × Alibaba eFounders Fellowship 2019 (1 of 48 in Asia)","1st Place — Telkomsel NextDev","Wild Card Winner — Fenox Startup World Cup","Top 8 Finalist — IDBYTE"],"alumniOf":[{"@type":"Organization","name":"UN-UNCTAD × Alibaba eFounders Fellowship"},{"@type":"Organization","name":"Google Startup Grind — Silicon Valley"}],"worksFor":{"@type":"Organization","name":"INDUSIA.ai","url":"https://indusia.ai"},"sameAs":["https://www.wikidata.org/wiki/Q140135628","https://www.linkedin.com/in/alisadikinma/","https://www.instagram.com/alisadikinma","https://www.tiktok.com/@alisadikinma","https://www.youtube.com/@alisadikinma","https://github.com/alisadikinma"]}</script>
-    <script type="application/ld+json" data-schema="faq">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Who is Ali Sadikin Ma?","acceptedAnswer":{"@type":"Answer","text":"Ali Sadikin Ma is an AI Generalist who turns frontier AI models into shipped products — not slide decks. With 17 years building across 16 countries, he was ranked #1 at the Global AI Demo Day 2026 and runs INDUSIA.ai."}},{"@type":"Question","name":"What does Ali Sadikin Ma do?","acceptedAnswer":{"@type":"Answer","text":"He builds and ships AI products across three disciplines: vibe coding (production software at AI speed), AI Agent operating systems (MANDOR AI), and generative AI video — and now teaches all three."}},{"@type":"Question","name":"Can I learn AI from Ali Sadikin Ma?","acceptedAnswer":{"@type":"Answer","text":"Yes. Ali teaches what he builds — AI Agents, Vibe Coding, and AI Video Generation — through hands-on courses and a public build log at alisadikinma.com."}}]}</script>
+    <!-- Admin SPA only (PF-2 phase 5B). Public pages, their SEO meta and JSON-LD live in the
+         Astro site (web/). Nothing served by this shell should be indexed. -->
+    <title>Admin - Ali Sadikin Ma</title>
+    <meta name="robots" content="noindex, nofollow">
 
     <!-- Favicons -->
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 
-    <!-- Theme Color — Dark Cinema -->
     <meta name="theme-color" content="#050506">
-    <meta name="msapplication-TileColor" content="#050506">
 
-    <!-- CKEditor 5 CDN -->
+    <!-- CKEditor 5 CDN (RichTextEditor.vue) -->
     <script src="https://cdn.ckeditor.com/ckeditor5/41.1.0/classic/ckeditor.js"></script>
-
-    <!-- Font Awesome 6 CDN -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
   </head>
   <body>
     <div id="app"></div>

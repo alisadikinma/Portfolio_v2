@@ -1,0 +1,62 @@
+---
+import "../styles/tokens.css";
+import "../styles/base.css";
+import "../styles/components.css";
+import SeoHead from "../components/SeoHead.astro";
+import Header from "../components/Header.astro";
+import Footer from "../components/Footer.astro";
+import type { Lang } from "../lib/i18n";
+import { getConfig } from "../lib/config";
+import type { Node } from "../lib/schema";
+
+interface Props {
+  title: string;
+  description: string;
+  path: string;
+  lang: Lang;
+  jsonld: Node;
+  image?: string;
+  imageWidth?: number;
+  imageHeight?: number;
+  preloadImage?: string;
+  ga4Id?: string;
+  /** Home page: nav anchors stay in-page. Elsewhere they point to /{lang}/#id. */
+  home?: boolean;
+  type?: "website" | "article";
+  prev?: string;
+  next?: string;
+  noindex?: boolean;
+  /** Languages the page exists in (default both): drives hreflang and the header language switch. */
+  availableLangs?: Lang[];
+  /** Per-language paths when they differ by more than the prefix (blog posts with a slug per language). */
+  altPaths?: Partial<Record<Lang, string>>;
+}
+
+const { lang, path, home = false, ga4Id = getConfig().ga4Id, availableLangs, altPaths, ...seo } = Astro.props;
+---
+<!doctype html>
+<html lang={lang}>
+  <head>
+    <SeoHead {...seo} path={path} lang={lang} availableLangs={availableLangs} altPaths={altPaths} />
+    {ga4Id !== "" && (
+      <>
+        <script is:inline async src={`https://www.googletagmanager.com/gtag/js?id=${ga4Id}`}></script>
+        <script is:inline define:vars={{ ga4Id }}>
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag("js", new Date());
+          gtag("config", ga4Id);
+        </script>
+      </>
+    )}
+  </head>
+  <body>
+    <Header lang={lang} path={path} home={home} availableLangs={availableLangs} altPaths={altPaths} />
+    <slot />
+    <Footer lang={lang} />
+    <script>
+      import { initCarousels } from "../scripts/carousel";
+      initCarousels();
+    </script>
+  </body>
+</html>

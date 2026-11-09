@@ -1,0 +1,158 @@
+---
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import ProjectCard, { type ProjectCardData } from "../../../components/ProjectCard.astro";
+import { apiGet, apiPath } from "../../../lib/api";
+import { LANGS, type Lang } from "../../../lib/i18n";
+import { sanitizeHtml } from "../../../lib/sanitize";
+import { addImageDimensions } from "../../../lib/image-dims";
+import { clipWords, postDescription, TITLE_MAX, isCut } from "../../../lib/seo-text";
+import { SITE, breadcrumb, creativeWork, graph, personNode, webPageNode, websiteNode } from "../../../lib/schema";
+import { id } from "../../../content/copy/id";
+import { en } from "../../../content/copy/en";
+
+const rawLang = Astro.params.lang;
+if (!(LANGS as readonly string[]).includes(rawLang ?? "")) {
+  return new Response(null, { status: 404 });
+}
+const lang = rawLang as Lang;
+const slug = Astro.params.slug ?? "";
+// Never forward path-like slugs to the API (would address another endpoint).
+if (slug === "" || slug === "." || slug === ".." || /[\\/]/.test(slug)) {
+  return new Response(null, { status: 404 });
+}
+const c = (lang === "id" ? id : en).projectDetail;
+const idxPath = `/${lang}/projects`;
+const path = `${idxPath}/${encodeURIComponent(slug)}`;
+
+const str = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
+const strList = (v: unknown): string[] => (Array.isArray(v) ? v.map(str).filter((x) => x !== "") : []);
+
+let project: Record<string, unknown> | null = null;
+let failed = false;
+try {
+  project = await apiGet<Record<string, unknown>>(apiPath`/projects/${slug}`, { lang });
+} catch {
+  failed = true;
+}
+if (!failed && !project) {
+  return new Response(null, { status: 404 });
+}
+if (failed) {
+  Astro.response.status = 503;
+  Astro.response.headers.set("Retry-After", "120");
+}
+
+const title = str(project?.title);
+const description = str(project?.description);
+const category = str(project?.category);
+const hero = str(project?.featured_image);
+const gallery = strList(project?.images).filter((u) => u !== hero);
+const technologies = strList(project?.technologies);
+const bodyHtml = await addImageDimensions(sanitizeHtml(str(project?.content)));
+// Hero at its real size (Ali 2026-11-09: a forced 16:10 crop cut the logo off). Dimensions are read
+// from the file. Unknown size: 1200x750 only reserves space; CSS width/height:auto keeps the real ratio.
+const esc = (v: string) => v.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const heroHtml = hero
+  ? (await addImageDimensions(`<img class="project-hero" src="${esc(hero)}" alt="${esc(title)}" decoding="async" fetchpriority="high">`))
+      .replace(/^<img(?![^>]*\swidth=)/, '<img width="1200" height="750"')
+  : "";
+const related: ProjectCardData[] = (Array.isArray(project?.related_projects) ? (project?.related_projects as Record<string, unknown>[]) : [])
+  .filter((r) => r && str(r.slug) !== "" && str(r.title) !== "" && str(r.slug) !== slug)
+  .map((r) => ({
+    slug: str(r.slug),
+    title: str(r.title),
+    description: str(r.description),
+    category: "",
+    image: str(r.featured_image) || null,
+  }));
+
+// Same rule as blog posts (Ali 2026-11-08): meta_title as-is when set; else title + name if it fits.
+const metaTitleRaw = str(project?.meta_title).trim();
+const withName = `${title} — ${c.titleSuffix}`;
+const metaTitle = metaTitleRaw !== "" && !isCut(metaTitleRaw)
+  ? clipWords(metaTitleRaw, TITLE_MAX)
+  : withName.length <= TITLE_MAX ? withName : clipWords(title, TITLE_MAX);
+// meta_description -> project description -> content first <p>; a source under 120 chars yields to the next.
+const metaDescription = postDescription({ meta: str(project?.meta_description), excerpt: description, content: str(project?.content), fallback: title });
+const ogImage = str(project?.og_image) || hero || undefined;
+
+const url = SITE + path;
+const jsonld = failed
+  ? graph(personNode(), websiteNode())
+  : graph(
+      personNode(),
+      websiteNode(),
+      webPageNode({ url, lang, name: metaTitle, description: metaDescription }),
+      creativeWork({ name: title, url, description: metaDescription || undefined, image: ogImage, lang, keywords: technologies, genre: category }),
+      breadcrumb([
+        { name: c.breadcrumbHome, url: `${SITE}/${lang}` },
+        { name: c.breadcrumbProjects, url: SITE + idxPath },
+        { name: title, url },
+      ]),
+    );
+---
+<BaseLayout title={failed ? c.titleSuffix : metaTitle} description={failed ? c.unavailable : metaDescription} path={path} lang={lang} jsonld={jsonld} image={ogImage} type="article">
+  <main class="wrap project-detail">
+    {failed ? (
+      <p class="project-unavailable" role="status">{c.unavailable}</p>
+    ) : (
+      <>
+        <nav class="project-crumbs" aria-label="Breadcrumb">
+          <a href={`/${lang}`}>{c.breadcrumbHome}</a> / <a href={idxPath}>{c.breadcrumbProjects}</a>
+        </nav>
+        <article>
+          <header>
+            {category && <p class="project-cat">{category}</p>}
+            <h1>{title}</h1>
+            {description && <p class="project-lede">{description}</p>}
+          </header>
+          {heroHtml !== "" && <Fragment set:html={heroHtml} />}
+          {technologies.length > 0 && (
+            <section aria-labelledby="project-tech">
+              <h2 id="project-tech">{c.technologiesHeading}</h2>
+              <ul class="project-tech">
+                {technologies.map((t) => <li>{t}</li>)}
+              </ul>
+            </section>
+          )}
+          {bodyHtml !== "" && <div class="project-body" set:html={bodyHtml} />}
+          {gallery.length > 0 && (
+            <section aria-labelledby="project-gallery">
+              <h2 id="project-gallery">{c.galleryHeading}</h2>
+              <div class="project-gallery">
+                {gallery.map((g) => <img src={g} alt={title} width="800" height="500" loading="lazy" decoding="async" />)}
+              </div>
+            </section>
+          )}
+        </article>
+        <p class="project-more">
+          {c.moreLead} <a href={idxPath}>{c.moreLink}</a>, {c.aboutLead} <a href={`/${lang}/about`}>{c.aboutLink}</a>.
+        </p>
+        {related.length > 0 && (
+          <section aria-labelledby="project-related">
+            <h2 id="project-related">{c.relatedHeading}</h2>
+            <div class="projects-grid">
+              {related.map((p) => <ProjectCard project={p} lang={lang} readMore={c.readMore} />)}
+            </div>
+          </section>
+        )}
+      </>
+    )}
+  </main>
+</BaseLayout>
+<style>
+  .project-detail { padding-block: 64px; }
+  .project-crumbs { color: var(--text-secondary); margin-bottom: 24px; }
+  .project-cat { font: 500 13px/1 var(--font-mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent-primary); }
+  .project-lede { color: var(--text-secondary); font-size: 1.15rem; max-width: 70ch; }
+  :global(.project-hero) { display: block; width: auto; height: auto; max-width: 100%; max-height: min(78vh, 760px); margin: 32px auto; border-radius: var(--radius-lg); }
+  .project-tech { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; padding: 0; }
+  .project-tech li { padding: 6px 14px; border: 1px solid var(--border-emphasis); border-radius: var(--radius-md); }
+  .project-body { max-width: 72ch; margin-block: 32px; }
+  .project-body :global(img) { max-width: 100%; height: auto; }
+  .project-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  .project-gallery img { width: 100%; height: auto; border-radius: var(--radius-md); }
+  .projects-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px; }
+  .project-more { margin-block: 32px; color: var(--text-secondary); }
+  .project-unavailable { color: var(--text-secondary); }
+</style>

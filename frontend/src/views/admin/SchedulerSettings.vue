@@ -224,7 +224,7 @@
                       </span>
                       <span
                         class="text-xs text-gray-500 dark:text-gray-400"
-                        :title="row.last_run_at || 'Has never run'"
+                        :title="row.last_run_at ? formatWib(row.last_run_at) : 'Has never run'"
                       >
                         {{ formatRelativeTime(row.last_run_at) }}
                       </span>
@@ -245,7 +245,7 @@
                   <td class="px-4 py-3 align-top">
                     <span
                       class="text-xs text-gray-700 dark:text-gray-300"
-                      :title="row.next_run_at || 'Not scheduled'"
+                      :title="row.next_run_at ? formatWib(row.next_run_at) : 'Not scheduled'"
                     >
                       {{ formatRelativeTime(row.next_run_at, 'future') }}
                     </span>
@@ -290,6 +290,7 @@
 </template>
 
 <script setup>
+import { formatWib } from '@/utils/wibTime'
 import { computed, ref } from 'vue'
 import {
   useScheduledCommands,

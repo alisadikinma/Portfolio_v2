@@ -1,0 +1,17 @@
+---
+// Left column of a FAQ block: heading plus a clay illustration of Ali answering (Ali 2026-11-09).
+import { Image } from "astro:assets";
+import type { Lang } from "../lib/i18n";
+import { id } from "../content/copy/id";
+import { en } from "../content/copy/en";
+import art from "../assets/faq-ali-sadikin-ma.webp";
+
+interface Props { lang: Lang; heading: string }
+const { lang, heading } = Astro.props;
+const alt = (lang === "id" ? id : en).faqArt.alt;
+---
+<div class="faq-side">
+  <h2 id="faq-h">{heading}</h2>
+  <Image class="faq-illus" src={art} alt={alt} widths={[280, 420, 560]} sizes="(min-width: 860px) 360px, 220px"
+    loading="lazy" decoding="async" format="webp" />
+</div>

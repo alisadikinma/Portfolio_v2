@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { fromWibInput, toWibInput, isFutureWibInput, wibTomorrowAt } from '@/utils/wibTime'
 import { useRoute, useRouter } from 'vue-router'
 import {
   useLinkedInDraft,
@@ -116,8 +117,8 @@ async function publishVideoNow() {
 async function scheduleVideo() {
   if (!repurposeJobId.value) return
   if (!videoScheduleAt.value) { toast.error('Pick a date + time first.'); return }
-  const iso = new Date(videoScheduleAt.value).toISOString()
-  if (new Date(iso) <= new Date()) { toast.error('Scheduled time must be in the future.'); return }
+  if (!isFutureWibInput(videoScheduleAt.value)) { toast.error('Scheduled time must be in the future (WIB).'); return }
+  const iso = fromWibInput(videoScheduleAt.value)
   try {
     if (captionsDirty.value) await saveVideoCaptions()
     await publishZernioMut.mutateAsync({ id: repurposeJobId.value, platforms: VIDEO_PLATFORMS, scheduledAt: iso })
@@ -659,9 +660,7 @@ function formatStepName(stepName) {
 function formatLogTime(ts) {
   if (!ts) return ''
   try {
-    const d = new Date(ts)
-    const pad = (n) => String(n).padStart(2, '0')
-    return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+    return new Date(ts).toLocaleTimeString('en-GB', { timeZone: 'Asia/Jakarta', hour12: false })
   } catch (_e) { return '' }
 }
 
@@ -807,8 +806,8 @@ const scheduledSlotLabel = computed(() => {
 
 // --- Schedule picker ------------------------------------------------------
 // `isScheduling` toggles the inline datetime-local input. `scheduleAt` is
-// the datetime-local value (browser-formatted "YYYY-MM-DDTHH:mm" — no
-// timezone offset; we send it as-is and let Carbon parse in local server tz).
+// the datetime-local value ("YYYY-MM-DDTHH:mm") meaning WIB wall-clock; it is
+// sent with +07:00 appended so the browser's own zone never matters.
 const isScheduling = ref(false)
 const scheduleAt = ref('')
 
@@ -816,16 +815,7 @@ function openScheduler() {
   // Default to current cancel_window_ends_at if already scheduled, else
   // suggest "tomorrow at 9am" — peak engagement hour for B2B LinkedIn.
   const existing = draft.value?.cancel_window_ends_at
-  const seed = existing ? new Date(existing) : (() => {
-    const d = new Date()
-    d.setDate(d.getDate() + 1)
-    d.setHours(9, 0, 0, 0)
-    return d
-  })()
-  // Format as YYYY-MM-DDTHH:mm in local time
-  const pad = (n) => String(n).padStart(2, '0')
-  scheduleAt.value =
-    `${seed.getFullYear()}-${pad(seed.getMonth() + 1)}-${pad(seed.getDate())}T${pad(seed.getHours())}:${pad(seed.getMinutes())}`
+  scheduleAt.value = existing ? toWibInput(existing) : wibTomorrowAt(9)
   isScheduling.value = true
 }
 
@@ -836,21 +826,20 @@ function closeScheduler() {
 
 async function submitSchedule() {
   if (!scheduleAt.value) return
-  // Convert datetime-local (no tz) to ISO with local-tz offset so backend
-  // parses to the expected wall-clock time.
-  const local = new Date(scheduleAt.value)
-  if (Number.isNaN(local.getTime())) {
+  // datetime-local is WIB wall-clock; send it with an explicit +07:00.
+  const publishAt = fromWibInput(scheduleAt.value)
+  if (!publishAt) {
     alert('Invalid date/time')
     return
   }
-  if (local.getTime() <= Date.now()) {
-    alert('Schedule time must be in the future')
+  if (!isFutureWibInput(scheduleAt.value)) {
+    alert('Schedule time must be in the future (WIB)')
     return
   }
   try {
     await approveMutation.mutateAsync({
       id: draftId.value,
-      publishAt: local.toISOString(),
+      publishAt,
     })
     closeScheduler()
     refetch()
@@ -877,14 +866,14 @@ watch(scheduleAt, (newVal) => {
   if (conflictDebounceTimer) clearTimeout(conflictDebounceTimer)
   conflictDebounceTimer = setTimeout(async () => {
     try {
-      const local = new Date(newVal)
-      if (Number.isNaN(local.getTime())) {
+      const at = fromWibInput(newVal)
+      if (!at) {
         conflictData.value = null
         return
       }
       const result = await conflictMutation.mutateAsync({
         draftId: draftId.value,
-        at: local.toISOString(),
+        at,
       })
       conflictData.value = result
     } catch (e) {
@@ -1516,7 +1505,7 @@ const showThumbnailUploadCaption = computed(() =>
 
               <div class="flex items-end gap-2">
                 <div class="flex-1">
-                  <label class="mb-1 block text-[11px] text-neutral-500">Schedule for</label>
+                  <label class="mb-1 block text-[11px] text-neutral-500">Schedule for (WIB)</label>
                   <input
                     v-model="videoScheduleAt"
                     type="datetime-local"
@@ -2027,7 +2016,7 @@ const showThumbnailUploadCaption = computed(() =>
           <div class="flex flex-wrap items-end gap-3 max-w-3xl">
             <div class="flex-1 min-w-[260px]">
               <label class="block text-[11px] font-mono uppercase tracking-[0.14em] text-amber-300 mb-1.5">
-                Publish at (your local time)
+                Publish at (WIB)
               </label>
               <input
                 v-model="scheduleAt"
@@ -2035,7 +2024,7 @@ const showThumbnailUploadCaption = computed(() =>
                 class="w-full px-3.5 py-2.5 rounded-lg border border-amber-500/30 bg-neutral-900/60 text-neutral-100 focus:outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/40 text-sm font-mono"
               >
               <p class="text-[11px] text-neutral-500 mt-1.5">
-                Pick any future moment. Pro tip: Tuesday-Thursday, 9-11am local for B2B reach.
+                Pick any future moment. Pro tip: Tuesday-Thursday, 9-11am WIB for B2B reach.
               </p>
             </div>
             <div class="flex gap-2">

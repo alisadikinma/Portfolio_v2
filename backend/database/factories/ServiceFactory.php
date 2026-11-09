@@ -29,8 +29,8 @@ class ServiceFactory extends Factory
                 fake()->sentence(),
                 fake()->sentence(),
             ],
-            'active' => fake()->boolean(80), // 80% chance of being active
-            'order' => fake()->numberBetween(1, 10),
+            'is_active' => fake()->boolean(80), // 80% chance of being active
+            'sort_order' => fake()->numberBetween(1, 10),
         ];
     }
 
@@ -40,7 +40,7 @@ class ServiceFactory extends Factory
     public function active(): static
     {
         return $this->state(fn (array $attributes) => [
-            'active' => true,
+            'is_active' => true,
         ]);
     }
 
@@ -50,7 +50,7 @@ class ServiceFactory extends Factory
     public function inactive(): static
     {
         return $this->state(fn (array $attributes) => [
-            'active' => false,
+            'is_active' => false,
         ]);
     }
 }

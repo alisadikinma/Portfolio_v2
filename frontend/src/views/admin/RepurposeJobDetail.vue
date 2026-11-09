@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
+import { fromWibInput, isFutureWibInput, formatWib } from '@/utils/wibTime'
 import { useRoute, useRouter } from 'vue-router'
 import {
   useRepurposeJob,
@@ -242,10 +243,9 @@ function openScheduleModal() {
 
 async function doSchedule() {
   if (!scheduleAt.value) { window.alert('Pick a date & time first.'); return }
-  const when = new Date(scheduleAt.value)
-  if (isNaN(when.getTime()) || when.getTime() <= Date.now()) { window.alert('Schedule must be a future time.'); return }
+  if (!isFutureWibInput(scheduleAt.value)) { window.alert('Schedule must be a future time (WIB).'); return }
   try {
-    const res = await publishZernio.mutateAsync({ id: id.value, scheduledAt: when.toISOString() })
+    const res = await publishZernio.mutateAsync({ id: id.value, scheduledAt: fromWibInput(scheduleAt.value) })
     showScheduleModal.value = false
     window.alert(res?.message || 'Scheduled.')
     refetch()
@@ -462,7 +462,7 @@ function goBack() { router.push({ name: 'admin-social-studio' }) }
               <span class="uppercase">{{ plat }}</span>
               <span>· {{ zernioState[plat].status }}</span>
               <span v-if="zernioState[plat].status === 'scheduled' && zernioState[plat].scheduled_for" class="opacity-80">
-                {{ new Date(zernioState[plat].scheduled_for).toLocaleString() }}
+                {{ formatWib(zernioState[plat].scheduled_for) }}
               </span>
               <a v-if="zernioState[plat].url" :href="zernioState[plat].url" target="_blank" rel="noopener" class="underline">view</a>
               <span v-if="zernioState[plat].error" :title="zernioState[plat].error">⚠</span>
@@ -629,7 +629,7 @@ function goBack() { router.push({ name: 'admin-social-studio' }) }
       >
         <div class="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl dark:bg-neutral-800">
           <h3 class="mb-1 text-sm font-semibold text-neutral-900 dark:text-neutral-100">Schedule to IG + Threads</h3>
-          <p class="mb-3 text-xs text-neutral-500 dark:text-neutral-400">Zernio holds the post and publishes it at this time.</p>
+          <p class="mb-3 text-xs text-neutral-500 dark:text-neutral-400">Zernio holds the post and publishes it at this time (WIB).</p>
           <input
             v-model="scheduleAt"
             type="datetime-local"

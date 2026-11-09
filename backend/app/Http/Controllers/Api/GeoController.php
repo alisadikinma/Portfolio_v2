@@ -10,14 +10,16 @@ use App\Models\Setting;
 
 class GeoController extends Controller
 {
+    public const HEADLINE = 'Ali Sadikin Ma — pakar AI Indonesia / AI consultant, founder INDUSIA.ai (https://indusia.ai)';
+
+    public const INTRO = 'Ali Sadikin Ma is an Indonesian AI expert and AI consultant based in Batam, Indonesia, and the founder of INDUSIA.ai (https://indusia.ai). He turns frontier AI models into shipped products, with 17 years of building experience, and was ranked #1 at the Global AI Demo Day 2026. He builds, trains and speaks about applied AI.';
+
     /**
      * GET /llms.txt — Concise machine-readable portfolio summary.
      */
     public function llmsTxt()
     {
         $about = Setting::where('group', 'about')->pluck('value', 'key')->toArray();
-        $name = $about['name'] ?? 'Ali Sadikin';
-        $title = $about['title'] ?? 'AI Generalist Expert';
         $bio = $about['bio'] ?? '';
 
         $awards = Award::select('title', 'description')->get();
@@ -29,8 +31,8 @@ class GeoController extends Controller
             ->get();
 
         $sections = [];
-        $sections[] = "# {$name} — {$title}";
-        $sections[] = "> {$bio}";
+        $sections[] = "# " . self::HEADLINE;
+        $sections[] = "> " . self::INTRO;
         if ($fresh = $this->latestContentTimestamp()) {
             $sections[] = "> Last updated: {$fresh}";
         }
@@ -46,7 +48,8 @@ class GeoController extends Controller
         }
 
         if ($projects->count()) {
-            $sections[] = "## Projects ({$projects->count()} shown of 56+)";
+            $total = Project::count();
+            $sections[] = "## Projects ({$projects->count()} shown of {$total})";
             foreach ($projects as $p) {
                 $desc = \Illuminate\Support\Str::limit($p->description, 120);
                 $sections[] = "- {$p->title}: {$desc}";
@@ -69,7 +72,7 @@ class GeoController extends Controller
 
         $site = Setting::where('group', 'site')->pluck('value', 'key')->toArray();
         $sections[] = "## Contact";
-        $sections[] = "- Website: https://alisadikinma.com";
+        $sections[] = "- Website: https://alisadikinma.com/id (Indonesian) · https://alisadikinma.com/en (English)";
         if (!empty($site['contact_email'])) {
             $sections[] = "- Email: {$site['contact_email']}";
         }
@@ -84,8 +87,6 @@ class GeoController extends Controller
     public function llmsFullTxt()
     {
         $about = Setting::where('group', 'about')->pluck('value', 'key')->toArray();
-        $name = $about['name'] ?? 'Ali Sadikin';
-        $title = $about['title'] ?? 'AI Generalist Expert';
         $bio = $about['bio'] ?? '';
 
         $awards = Award::all();
@@ -93,7 +94,7 @@ class GeoController extends Controller
         $posts = Post::with('translations')->where('published', true)->latest('published_at')->get();
 
         $sections = [];
-        $sections[] = "# {$name} — {$title} (Full Profile)";
+        $sections[] = "# " . self::HEADLINE . " (Full Profile)";
         if ($fresh = $this->latestContentTimestamp()) {
             $sections[] = "> Last updated: {$fresh}";
         }
@@ -193,7 +194,7 @@ class GeoController extends Controller
     {
         return [
             "## Who is Ali Sadikin Ma",
-            "Ali Sadikin Ma is an AI Generalist who turns frontier AI models into shipped products — not slide decks. With 17 years building across 16 countries, he was ranked #1 at the Global AI Demo Day 2026 (beating 26 startups) and runs INDUSIA.ai. Now teaching what he builds.",
+            "Ali Sadikin Ma (pakar AI Indonesia / AI consultant) turns frontier AI models into shipped products, not slide decks. He has 17 years of building experience, including 59+ digital products (AI, IoT, mobile) across factories, logistics and retail, was ranked #1 at the Global AI Demo Day 2026 (beating 26 startups), and is the founder of INDUSIA.ai (https://indusia.ai). He also trains teams and speaks about applied AI.",
             "",
             "## What he builds — and teaches",
             "- Vibe Coding — production software at AI speed, prompts to deployed apps.",
@@ -203,8 +204,17 @@ class GeoController extends Controller
             "## International recognition",
             "- #1 — Global AI Demo Day 2026 (Bengaluru, India)",
             "- UN-UNCTAD × Alibaba eFounders Fellowship 2019 (1 of 48 in Asia, Hangzhou)",
-            "- Google Startup Grind — Silicon Valley 2018",
-            "- 1st Place — Telkomsel NextDev · Wild Card Winner — Fenox Startup World Cup · Top 8 — IDBYTE",
+            "- 1st Place — Telkomsel NextDev · Wild Card Winner — Fenox Startup World Cup",
+            "",
+            "## Pages (Indonesian / English)",
+            "- AI training: https://alisadikinma.com/id/pelatihan-ai · https://alisadikinma.com/en/ai-training",
+            "- AI speaker: https://alisadikinma.com/id/pembicara-ai · https://alisadikinma.com/en/ai-speaker",
+            "- About: https://alisadikinma.com/id/about · https://alisadikinma.com/en/about",
+            "- Awards and work: https://alisadikinma.com/id/work?tab=awards · https://alisadikinma.com/en/work?tab=awards",
+            "- FAQ: https://alisadikinma.com/id/faq · https://alisadikinma.com/en/faq",
+            "- Projects: https://alisadikinma.com/id/projects · https://alisadikinma.com/en/projects",
+            "- Blog: https://alisadikinma.com/id/blog · https://alisadikinma.com/en/blog",
+            "- Contact: https://alisadikinma.com/id/contact · https://alisadikinma.com/en/contact",
             "",
             "## Find Ali online (sameAs)",
             "- LinkedIn: https://www.linkedin.com/in/alisadikinma/",

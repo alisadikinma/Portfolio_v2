@@ -1,0 +1,121 @@
+# PF-2 local review stack — the whole new site on one URL, with a copy of prod data.
+#
+#   http://localhost:8000          public site (Astro) + /admin (Vue) + /api (Laravel)
+#
+# nginx runs the REAL production template (scripts/nginx/portfolio-8080.conf), rendered
+# for docker by render-nginx.sh, so the routing tested here is the routing that ships.
+# Data + images come from .local-stack/ (gitignored), filled by scripts/pf2-local.sh.
+# Nothing here talks to production: mail is forced to the log driver, no queue worker
+# or scheduler runs, and plain-text secrets are blanked after import.
+#
+# Run via scripts/pf2-local.sh, not directly (it renders nginx + builds first).
+name: pf2-local
+
+x-backend-env: &backend-env
+  APP_ENV: local
+  APP_DEBUG: "true"
+  APP_URL: http://localhost:8000
+  DB_CONNECTION: mysql
+  DB_HOST: mysql
+  DB_PORT: "3306"
+  DB_DATABASE: portfolio_v2
+  DB_USERNAME: portfolio
+  DB_PASSWORD: secret
+  SESSION_DRIVER: database
+  CACHE_STORE: database
+  QUEUE_CONNECTION: database   # no worker runs -> queued jobs never fire
+  MAIL_MAILER: log
+  FILESYSTEM_DISK: local
+  SANCTUM_STATEFUL_DOMAINS: localhost:8000,localhost,127.0.0.1:8000
+  FRONTEND_URL: http://localhost:8000
+  INTERNAL_API_TOKEN: pf2-local-internal-token
+  LOG_CHANNEL: stack
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: pf2_local_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: portfolio_v2
+      MYSQL_USER: portfolio
+      MYSQL_PASSWORD: secret
+    command: --default-authentication-plugin=caching_sha2_password --max_allowed_packet=256M
+    ports:
+      - "127.0.0.1:3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  backend:
+    image: pf2-backend
+    container_name: pf2_local_backend
+    restart: unless-stopped
+    working_dir: /var/www/Portfolio_v2/backend
+    entrypoint: ["sh", "-c", "chown -R www-data:www-data storage bootstrap/cache 2>/dev/null; php artisan config:clear >/dev/null; exec php-fpm"]
+    environment: *backend-env
+    volumes:
+      - ../../backend:/var/www/Portfolio_v2/backend
+      - pf2_vendor:/var/www/Portfolio_v2/backend/vendor
+      - ../../.local-stack/storage-public:/var/www/Portfolio_v2/backend/storage/app/public
+      - ../../.local-stack/uploads:/var/www/Portfolio_v2/backend/public/uploads
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  web:
+    image: node:22-bookworm-slim
+    container_name: pf2_local_web
+    restart: unless-stopped
+    working_dir: /app
+    # Own node_modules + build dir (volumes) so the host's web/dist and macOS
+    # node_modules are never touched or reused.
+    command: sh -c "npm ci --no-audit --no-fund && npx astro build --outDir /app/.pf2-local-build && exec node /app/.pf2-local-build/server/entry.mjs"
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "4321"
+      API_INTERNAL_URL: http://nginx:8081/api
+      IMAGE_DIMS_ORIGIN: http://nginx:8081
+      SITE_URL: http://localhost:8000
+      INTERNAL_API_TOKEN: pf2-local-internal-token
+      GA4_MEASUREMENT_ID: ""
+    volumes:
+      - ../../web:/app
+      - web_node_modules:/app/node_modules
+      - web_build:/app/.pf2-local-build
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4321/id/faq').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 8s
+      retries: 60
+      start_period: 120s
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: pf2_local_nginx
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8080"
+    volumes:
+      - ../../.local-stack/nginx/portfolio.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../../.local-stack/nginx/snippets:/etc/nginx/snippets:ro
+      - ../../.local-stack/frontend-dist:/var/www/Portfolio_v2/frontend/dist:ro
+      - ../../frontend/public:/var/www/Portfolio_v2/frontend/public:ro
+      - ../../backend/public:/var/www/Portfolio_v2/backend/public:ro
+      - ../../.local-stack/storage-public:/var/www/Portfolio_v2/backend/storage/app/public:ro
+      - ../../.local-stack/uploads:/var/www/Portfolio_v2/backend/public/uploads:ro
+    depends_on:
+      - backend
+
+volumes:
+  mysql_data:
+  web_node_modules:
+  web_build:
+  pf2_vendor:
+    external: true

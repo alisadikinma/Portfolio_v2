@@ -91,7 +91,17 @@ class AwardController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Award::with('galleries');
+        $isAdmin = \App\Support\AdminViewer::is();
+        $query = Award::with(['galleries' => function ($q) use ($isAdmin) {
+            if (!$isAdmin) {
+                $q->where('is_active', true);
+            }
+        }]);
+
+        // Guests only see active awards.
+        if (!$isAdmin) {
+            $query->where('is_active', true);
+        }
 
         try {
             $query->orderBy('sort_order', 'asc')
@@ -117,6 +127,7 @@ class AwardController extends Controller
 
                 return [
                     'id' => $award->id,
+                    'slug' => $award->slug,
                     'award_title' => $award->title,
                     'title' => $award->title,
                     'description' => $award->description,
@@ -160,6 +171,7 @@ class AwardController extends Controller
 
             return [
                 'id' => $award->id,
+                'slug' => $award->slug,
                 'award_title' => $award->title,
                 'title' => $award->title,
                 'description' => $award->description,
@@ -194,12 +206,20 @@ class AwardController extends Controller
      */
     public function show($id)
     {
-        $award = Award::with('galleries.items')->findOrFail($id);
+        $isAdmin = \App\Support\AdminViewer::is();
+        $award = Award::with(['galleries' => function ($q) use ($isAdmin) {
+            if (!$isAdmin) {
+                $q->where('is_active', true);
+            }
+        }, 'galleries.items'])
+            ->when(!$isAdmin, fn ($q) => $q->where('is_active', true))
+            ->findOrFail($id);
 
         return response()->json([
             'success' => true,
             'data' => [
                 'id' => $award->id,
+                'slug' => $award->slug,
                 'title' => $award->title,
                 'description' => $award->description,
                 'organization' => $award->organization,
@@ -428,16 +448,66 @@ class AwardController extends Controller
      */
     public function getGalleries($id)
     {
-        $award = Award::with('galleries.items')->findOrFail($id);
-        
+        $award = $this->publicAward(fn ($q) => $q->findOrFail($id));
+
+        return $this->galleriesResponse($award);
+    }
+
+    /**
+     * Same payload as getGalleries, addressed by the award's public slug
+     * (used by the Astro award pages). Inactive awards and unknown slugs are 404.
+     */
+    public function showBySlug($slug)
+    {
+        $award = $this->publicAward(fn ($q) => $q->where('slug', $slug)->firstOrFail());
+
+        return $this->galleriesResponse($award, withDetails: true);
+    }
+
+    /**
+     * Award with its galleries and items; guests only see active awards/galleries.
+     */
+    private function publicAward(\Closure $find): Award
+    {
+        $isAdmin = \App\Support\AdminViewer::is();
+        $query = Award::with(['galleries' => function ($q) use ($isAdmin) {
+            if (!$isAdmin) {
+                $q->where('is_active', true);
+            }
+        }, 'galleries.items'])
+            ->when(!$isAdmin, fn ($q) => $q->where('is_active', true));
+
+        return $find($query);
+    }
+
+    private function galleriesResponse(Award $award, bool $withDetails = false)
+    {
+        $awardData = [
+            'id' => $award->id,
+            'title' => $award->title,
+            'organization' => $award->organization
+        ];
+
+        if ($withDetails) {
+            $awardData = [
+                'id' => $award->id,
+                'slug' => $award->slug,
+                'title' => $award->title,
+                'description' => $award->description,
+                'organization' => $award->organization,
+                'received_at' => $award->received_at,
+                'image' => $award->image
+                    ? (str_starts_with($award->image, '/')
+                        ? url($award->image)
+                        : asset('uploads/awards/' . $award->image))
+                    : null,
+            ];
+        }
+
         return response()->json([
             'success' => true,
             'data' => [
-                'award' => [
-                    'id' => $award->id,
-                    'title' => $award->title,
-                    'organization' => $award->organization
-                ],
+                'award' => $awardData,
                 'galleries' => $award->galleries->map(function($gallery) {
                     return [
                         'id' => $gallery->id,
@@ -462,6 +532,7 @@ class AwardController extends Controller
                                 'image' => $item->file_path 
                                     ? asset('storage/' . $item->file_path) 
                                     : null,
+                                'image_variants' => $item->image_variants,
                                 'sequence' => $item->sequence,
                             ];
                         })

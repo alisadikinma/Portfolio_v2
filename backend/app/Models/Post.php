@@ -133,7 +133,35 @@ class Post extends Model
      */
     public function incrementViews()
     {
-        $this->increment('views');
+        // Views are not content edits: keep updated_at (feeds dateModified/lastmod) untouched.
+        static::withoutTimestamps(fn () => $this->increment('views'));
+    }
+
+    /**
+     * Real content freshness: latest of the language's translation edit and the
+     * operator review stamp, clamped to [published_at, now]. posts.updated_at is
+     * deliberately NOT used (bookkeeping writes make it unreliable).
+     * Uses the loaded `translations` relation (loads it if missing).
+     */
+    public function contentUpdatedAt(?string $language = null): ?\Illuminate\Support\Carbon
+    {
+        $translations = $this->relationLoaded('translations') ? $this->getRelation('translations') : $this->translations()->get();
+        $translation = ($language ? $translations->firstWhere('language', $language) : null)
+            ?? $translations->firstWhere('language', 'en')
+            ?? $translations->first();
+
+        $candidates = array_filter([$translation?->updated_at, $this->content_reviewed_at]);
+        $latest = $candidates ? max(array_map(fn ($c) => \Illuminate\Support\Carbon::instance($c), $candidates)) : null;
+
+        if ($latest === null) {
+            return $this->published_at ? \Illuminate\Support\Carbon::instance($this->published_at) : null;
+        }
+        if ($this->published_at && $latest->lt($this->published_at)) {
+            $latest = \Illuminate\Support\Carbon::instance($this->published_at);
+        }
+        $now = \Illuminate\Support\Carbon::now();
+
+        return $latest->gt($now) ? $now : $latest;
     }
 
     /**
@@ -191,14 +219,5 @@ class Post extends Model
                 $post->reading_time = ceil($wordCount / 200); // Average reading speed: 200 words/minute
             }
         });
-
-        // Purge the SSR-enrichment HTML cache (homepage + blog surfaces) whenever
-        // a post changes, so crawlers see fresh content before the 1h TTL lapses.
-        // See App\Http\Controllers\SpaPrerenderController::purgeForPost().
-        $purge = function ($post) {
-            \App\Http\Controllers\SpaPrerenderController::purgeForPost($post);
-        };
-        static::saved($purge);
-        static::deleted($purge);
     }
 }

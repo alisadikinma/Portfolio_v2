@@ -1,3 +1,5 @@
+> **OBSOLETE — do not follow.** The Laravel SSR-enrichment layer this runbook deploys was removed in PF-2 phase 5C (Nov 2026). Public pages, SEO and JSON-LD now come from the Astro site in `web/`; nginx routing for it is in the PF-2 5D runbook. Kept only as history.
+
 # Runbook — SEO + GEO SSR-Enrichment Deploy
 
 **Ships:** server-side `<head>` + JSON-LD graph + crawlable body injection for the
@@ -57,6 +59,8 @@ enrichment happens until the build is present.
 
 ## 2. Manual step — widen nginx (the cutover)
 
+> Socket = `php8.4-fpm.sock` since PF-2 (was `php8.2-fpm.sock`). On a host that still runs only 8.2, use `php8.2-fpm.sock`. See [pf2-php84-upgrade.md](pf2-php84-upgrade.md).
+
 The live vhost is `/etc/nginx/sites-enabled/portfolio-8080` (listen 8080 behind
 Traefik). The repo snapshot is `scripts/nginx/portfolio-8080.conf` — copy the new
 blocks from there.
@@ -69,7 +73,7 @@ block is fine — replace it), the two location blocks:
 location = / {
     root /var/www/Portfolio_v2/backend/public;
     rewrite ^(.*)$ /index.php?$1 break;
-    fastcgi_pass unix:/var/run/php/php8.2-fpm.sock;
+    fastcgi_pass unix:/var/run/php/php8.4-fpm.sock;
     fastcgi_index index.php;
     fastcgi_param SCRIPT_FILENAME /var/www/Portfolio_v2/backend/public/index.php;
     fastcgi_param REQUEST_URI $request_uri;
@@ -82,7 +86,7 @@ location = / {
 location ~ ^/(?:(?:en|id)/)?(?:blog(?:/category/[^/]+|/[^/]+)?|projects/[^/]+)/?$ {
     root /var/www/Portfolio_v2/backend/public;
     rewrite ^(.*)$ /index.php?$1 break;
-    fastcgi_pass unix:/var/run/php/php8.2-fpm.sock;
+    fastcgi_pass unix:/var/run/php/php8.4-fpm.sock;
     fastcgi_index index.php;
     fastcgi_param SCRIPT_FILENAME /var/www/Portfolio_v2/backend/public/index.php;
     fastcgi_param REQUEST_URI $request_uri;
@@ -116,7 +120,7 @@ Add this block **above `location /`** (next to the homepage `location = /` block
 location = /faq {
     root /var/www/Portfolio_v2/backend/public;
     rewrite ^(.*)$ /index.php?$1 break;
-    fastcgi_pass unix:/var/run/php/php8.2-fpm.sock;
+    fastcgi_pass unix:/var/run/php/php8.4-fpm.sock;
     fastcgi_index index.php;
     fastcgi_param SCRIPT_FILENAME /var/www/Portfolio_v2/backend/public/index.php;
     fastcgi_param REQUEST_URI $request_uri;

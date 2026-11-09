@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -18,6 +19,18 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Real client IP behind Cloudflare -> Traefik -> nginx. Deferred to
+        // booted(): this callback runs before config is loaded.
+        app()->booted(function () use ($middleware) {
+            $middleware->trustProxies(
+                at: config('trusted_proxies.proxies'),
+                headers: Request::HEADER_X_FORWARDED_FOR
+                    | Request::HEADER_X_FORWARDED_HOST
+                    | Request::HEADER_X_FORWARDED_PORT
+                    | Request::HEADER_X_FORWARDED_PROTO,
+            );
+        });
+
         // Add CORS middleware for API
         $middleware->api(prepend: [
             \Illuminate\Http\Middleware\HandleCors::class,

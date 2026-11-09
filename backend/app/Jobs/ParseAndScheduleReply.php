@@ -79,7 +79,7 @@ class ParseAndScheduleReply implements ShouldQueue
             return; // keep state — operator can retry
         }
 
-        $slot = Carbon::parse($iso)->setTimezone('Asia/Jakarta');
+        $slot = \App\Support\WibTime::parse($iso)->setTimezone(\App\Support\WibTime::ZONE);
         $now = Carbon::now('Asia/Jakarta');
 
         if ($slot->lessThanOrEqualTo($now)) {
@@ -119,7 +119,7 @@ class ParseAndScheduleReply implements ShouldQueue
         $suggestion = '';
         try {
             $slot = app(LinkedInFixedSlotScheduler::class)->nextAvailableSlot();
-            $suggestion = ' Saran terdekat: ' . $slot->locale('id')->isoFormat('ddd, D MMM HH:mm') . ' WIB.';
+            $suggestion = ' Saran terdekat: ' . \App\Support\WibTime::label($slot) . '.';
         } catch (\Throwable $e) {
             // No suggestion available — still tell the operator why.
         }

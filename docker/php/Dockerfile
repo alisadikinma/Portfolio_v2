@@ -1,4 +1,4 @@
-FROM php:8.2-fpm
+FROM php:8.4-fpm
 
 # System deps for Laravel 12 + Filament + Intervention Image
 RUN apt-get update && apt-get install -y --no-install-recommends \

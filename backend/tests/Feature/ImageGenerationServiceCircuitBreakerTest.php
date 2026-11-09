@@ -61,7 +61,7 @@ class ImageGenerationServiceCircuitBreakerTest extends TestCase
         ]);
     }
 
-    private function makeIdea(array $imagePrompts = null): ContentIdea
+    private function makeIdea(?array $imagePrompts = null): ContentIdea
     {
         $imagePrompts = $imagePrompts ?? [
             [

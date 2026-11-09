@@ -123,6 +123,10 @@ class ContentIdeaController extends Controller
             'scheduled_at' => 'nullable|date',
         ]);
 
+        if (array_key_exists('scheduled_at', $validated)) {
+            $validated['scheduled_at'] = \App\Support\WibTime::parse($validated['scheduled_at']);
+        }
+
         $validated['status'] = 'draft';
         $idea = ContentIdea::create($validated);
 
@@ -174,6 +178,10 @@ class ContentIdeaController extends Controller
             'auto_mode' => 'sometimes|boolean',
             'scheduled_at' => 'nullable|date',
         ]);
+
+        if (array_key_exists('scheduled_at', $validated)) {
+            $validated['scheduled_at'] = \App\Support\WibTime::parse($validated['scheduled_at']);
+        }
 
         $idea->update($validated);
 
@@ -977,83 +985,88 @@ class ContentIdeaController extends Controller
         // Update segment reference data
         $article = $idea->generated_article ?? [];
         $imagePrompts = $article['image_prompts'] ?? [];
-        if (isset($imagePrompts[$segmentIndex])) {
-            $imagePrompts[$segmentIndex]['face_refs'] = $faceRefs;
-            $imagePrompts[$segmentIndex]['style_refs'] = $styleRefs;
-            $imagePrompts[$segmentIndex]['brand_refs'] = $brandRefObjects;
-            $imagePrompts[$segmentIndex]['additional_notes'] = $additionalNotes;
-
-            // Initialize variations array if not present
-            if (!isset($imagePrompts[$segmentIndex]['variations'])) {
-                // Migrate legacy flat generated_url into variations[0]
-                $legacyUrl = $imagePrompts[$segmentIndex]['generated_url'] ?? null;
-                $legacyUuid = $imagePrompts[$segmentIndex]['job_uuid'] ?? null;
-                if ($legacyUrl) {
-                    $imagePrompts[$segmentIndex]['variations'] = [[
-                        'url' => $legacyUrl,
-                        'job_uuid' => $legacyUuid,
-                        'status' => 'done',
-                    ]];
-                    $imagePrompts[$segmentIndex]['selected_variation'] = 0;
-                } else {
-                    $imagePrompts[$segmentIndex]['variations'] = [];
-                    $imagePrompts[$segmentIndex]['selected_variation'] = 0;
-                }
-            }
-
-            $variations = $imagePrompts[$segmentIndex]['variations'];
-
-            // Explicit replace path — operator clicked "Replace" on a specific
-            // thumbnail. Overrides the retry-in-place heuristic and always
-            // targets the requested slot, regardless of its current status
-            // (done/failed/generating). Validates the slot actually exists
-            // so a malicious or stale request can't append instead.
-            $reuseIndex = null;
-            if ($replaceIndex !== null) {
-                if (!isset($variations[$replaceIndex])) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => "Variation slot {$replaceIndex} does not exist.",
-                    ], 422);
-                }
-                $reuseIndex = $replaceIndex;
-            }
-
-            // Retry-in-place: reuse a failed or orphaned slot before appending. An
-            // orphan is status=generating with no job_uuid — left over when the
-            // queue call or save crashed before the UUID was persisted.
-            if ($reuseIndex === null) {
-                foreach ($variations as $vi => $v) {
-                    $vStatus = $v['status'] ?? '';
-                    $isFailed = $vStatus === 'failed';
-                    $isOrphan = $vStatus === 'generating' && empty($v['job_uuid']);
-                    if ($isFailed || $isOrphan) {
-                        $reuseIndex = $vi;
-                        break;
-                    }
-                }
-            }
-
-            if ($reuseIndex !== null) {
-                $variationIndex = $reuseIndex;
-                $priorSlot = $variations[$reuseIndex];
-                $variations[$reuseIndex] = ['url' => null, 'job_uuid' => null, 'status' => 'generating'];
-            } else {
-                if (count($variations) >= 3) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Maximum 3 variations per segment.',
-                    ], 422);
-                }
-                $variationIndex = count($variations);
-                $priorSlot = null;
-                $variations[] = ['url' => null, 'job_uuid' => null, 'status' => 'generating'];
-            }
-            $imagePrompts[$segmentIndex]['variations'] = $variations;
-            $imagePrompts[$segmentIndex]['status'] = 'generating';
-            $article['image_prompts'] = $imagePrompts;
-            $idea->generated_article = $article;
+        if (!isset($imagePrompts[$segmentIndex])) {
+            // Without a segment there is no variation slot to fill or restore.
+            return response()->json([
+                'success' => false,
+                'message' => "Segment {$segmentIndex} does not exist.",
+            ], 422);
         }
+        $imagePrompts[$segmentIndex]['face_refs'] = $faceRefs;
+        $imagePrompts[$segmentIndex]['style_refs'] = $styleRefs;
+        $imagePrompts[$segmentIndex]['brand_refs'] = $brandRefObjects;
+        $imagePrompts[$segmentIndex]['additional_notes'] = $additionalNotes;
+
+        // Initialize variations array if not present
+        if (!isset($imagePrompts[$segmentIndex]['variations'])) {
+            // Migrate legacy flat generated_url into variations[0]
+            $legacyUrl = $imagePrompts[$segmentIndex]['generated_url'] ?? null;
+            $legacyUuid = $imagePrompts[$segmentIndex]['job_uuid'] ?? null;
+            if ($legacyUrl) {
+                $imagePrompts[$segmentIndex]['variations'] = [[
+                    'url' => $legacyUrl,
+                    'job_uuid' => $legacyUuid,
+                    'status' => 'done',
+                ]];
+                $imagePrompts[$segmentIndex]['selected_variation'] = 0;
+            } else {
+                $imagePrompts[$segmentIndex]['variations'] = [];
+                $imagePrompts[$segmentIndex]['selected_variation'] = 0;
+            }
+        }
+
+        $variations = $imagePrompts[$segmentIndex]['variations'];
+
+        // Explicit replace path — operator clicked "Replace" on a specific
+        // thumbnail. Overrides the retry-in-place heuristic and always
+        // targets the requested slot, regardless of its current status
+        // (done/failed/generating). Validates the slot actually exists
+        // so a malicious or stale request can't append instead.
+        $reuseIndex = null;
+        if ($replaceIndex !== null) {
+            if (!isset($variations[$replaceIndex])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Variation slot {$replaceIndex} does not exist.",
+                ], 422);
+            }
+            $reuseIndex = $replaceIndex;
+        }
+
+        // Retry-in-place: reuse a failed or orphaned slot before appending. An
+        // orphan is status=generating with no job_uuid — left over when the
+        // queue call or save crashed before the UUID was persisted.
+        if ($reuseIndex === null) {
+            foreach ($variations as $vi => $v) {
+                $vStatus = $v['status'] ?? '';
+                $isFailed = $vStatus === 'failed';
+                $isOrphan = $vStatus === 'generating' && empty($v['job_uuid']);
+                if ($isFailed || $isOrphan) {
+                    $reuseIndex = $vi;
+                    break;
+                }
+            }
+        }
+
+        if ($reuseIndex !== null) {
+            $variationIndex = $reuseIndex;
+            $priorSlot = $variations[$reuseIndex];
+            $variations[$reuseIndex] = ['url' => null, 'job_uuid' => null, 'status' => 'generating'];
+        } else {
+            if (count($variations) >= 3) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Maximum 3 variations per segment.',
+                ], 422);
+            }
+            $variationIndex = count($variations);
+            $priorSlot = null;
+            $variations[] = ['url' => null, 'job_uuid' => null, 'status' => 'generating'];
+        }
+        $imagePrompts[$segmentIndex]['variations'] = $variations;
+        $imagePrompts[$segmentIndex]['status'] = 'generating';
+        $article['image_prompts'] = $imagePrompts;
+        $idea->generated_article = $article;
 
         // Persist generated_article changes, then FSM-transition status.
         $idea->save();
@@ -1555,10 +1568,10 @@ class ContentIdeaController extends Controller
             return response()->json(['success' => false, 'message' => 'Post not found.'], 404);
         }
 
-        $post->update([
+        Post::withoutTimestamps(fn () => $post->update([
             'translation_pending' => false,
             'last_translation_attempt' => now(),
-        ]);
+        ]));
 
         // Gate Completed transition on translation readiness. The idea stayed
         // at images_ready through publish() when use_translate_phase=true;

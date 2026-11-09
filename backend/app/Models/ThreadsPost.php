@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\ThreadsPostStatus;
+use App\Models\Concerns\StoresDatesInAppTimezone;
 use App\Traits\HasStatusTransitions;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -24,6 +25,7 @@ class ThreadsPost extends Model
     use HasFactory;
     use HasStatusTransitions;
     use SoftDeletes;
+    use StoresDatesInAppTimezone;
 
     protected $table = 'threads_posts';
 

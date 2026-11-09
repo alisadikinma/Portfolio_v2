@@ -27,9 +27,7 @@ class PostController extends Controller
         $language = strtolower(substr($language, 0, 2));
 
         $query = Post::with(['category', 'translations', 'relatedPosts.translations'])
-            ->where('published', true)
-            ->whereNotNull('published_at')
-            ->where('published_at', '<=', now());
+            ->published();
 
         // Filter by category
         if ($request->has('category')) {
@@ -184,15 +182,22 @@ class PostController extends Controller
         $language = $request->query('lang', $request->header('Accept-Language', 'en'));
         $language = strtolower(substr($language, 0, 2));
 
-        $query = Post::with(['category', 'translations', 'relatedPosts.translations'])
-            ->where('slug', $slug);
+        // ?preview=1 exposes unpublished posts ONLY to an authenticated admin
+        // (sanctum bearer; this route sits outside auth middleware, so resolve
+        // the guard explicitly). Everyone else gets normal public behaviour.
+        $isAdminPreview = $request->boolean('preview') && \App\Support\AdminViewer::is();
+        $find = function (callable $match) use ($isAdminPreview) {
+            $query = Post::with(['category', 'translations', 'relatedPosts.translations'])->where($match);
+            if (!$isAdminPreview) {
+                $query->published();
+            }
+            return $query->first();
+        };
 
-        // Allow preview of unpublished posts with ?preview=1
-        if (!$request->boolean('preview')) {
-            $query->where('published', true);
-        }
-
-        $post = $query->first();
+        // posts.slug first; else a translation's own slug (e.g. the EN slug of an ID-primary post),
+        // which is what the sitemap and the localized links publish.
+        $post = $find(fn ($q) => $q->where('slug', $slug))
+            ?? $find(fn ($q) => $q->whereHas('translations', fn ($t) => $t->where('slug', $slug)));
 
         if (!$post) {
             return response()->json([
@@ -201,14 +206,33 @@ class PostController extends Controller
             ], 404);
         }
 
-        // Only increment views for published posts (not previews)
-        if ($post->published) {
+        // Count only real reader views of published posts: skip previews,
+        // SSR/internal fetches (?track=0) and known AI crawlers.
+        if ($post->published && $this->shouldTrackView($request)) {
             $post->incrementViews();
         }
 
         return response()->json([
             'data' => (new PostResource($post))->additional(['lang' => $language]),
         ]);
+    }
+
+    private function shouldTrackView(Request $request): bool
+    {
+        if ($request->query('track') !== null && !$request->boolean('track')) {
+            return false;
+        }
+
+        $ua = strtolower((string) $request->userAgent());
+        if ($ua !== '') {
+            foreach (array_keys(config('ai_bots.map', [])) as $needle) {
+                if (str_contains($ua, strtolower((string) $needle))) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
     /**

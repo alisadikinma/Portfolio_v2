@@ -96,8 +96,21 @@ class ParseAndScheduleReplyTest extends TestCase
 
         $draft->refresh();
         $this->assertSame(LinkedInPostStatus::AwaitingPublish->value, $draft->status);
-        $this->assertSame('2026-08-19 12:00', $draft->scheduled_at->format('Y-m-d H:i'));
+        $this->assertSame('2026-08-19 12:00', $draft->scheduled_at->copy()->setTimezone('Asia/Jakarta')->format('Y-m-d H:i'));
         $this->assertNull(Cache::get($this->stateKey()));
+    }
+
+    public function test_naive_llm_datetime_is_read_as_wib(): void
+    {
+        $draft = $this->makeDraft();
+        $this->openConversation($draft->id);
+        $this->fakeCli('2026-08-19T12:00:00'); // no offset -> WIB
+
+        ParseAndScheduleReply::dispatchSync($this->chatId, $draft->id, 'besok jam 12');
+
+        $draft->refresh();
+        $this->assertSame(LinkedInPostStatus::AwaitingPublish->value, $draft->status);
+        $this->assertSame('2026-08-19 12:00', $draft->scheduled_at->copy()->setTimezone('Asia/Jakarta')->format('Y-m-d H:i'));
     }
 
     public function test_weekend_datetime_reprompts_without_scheduling(): void

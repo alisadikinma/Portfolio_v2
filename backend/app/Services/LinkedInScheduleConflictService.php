@@ -64,9 +64,11 @@ class LinkedInScheduleConflictService
                 LinkedInPostStatus::Published->value,
             ])
             ->whereNotNull('scheduled_at')
+            // Query bindings are NOT zone-converted; scheduled_at is stored in
+            // app.timezone, so bind the window in that zone.
             ->whereBetween('scheduled_at', [
-                $proposed->copy()->subMinutes($windowMinutes),
-                $proposed->copy()->addMinutes($windowMinutes),
+                $proposed->copy()->subMinutes($windowMinutes)->setTimezone((string) config('app.timezone')),
+                $proposed->copy()->addMinutes($windowMinutes)->setTimezone((string) config('app.timezone')),
             ]);
 
         if ($excludeDraftId !== null) {

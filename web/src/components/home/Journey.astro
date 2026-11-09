@@ -1,0 +1,104 @@
+---
+import { Image, getImage } from "astro:assets";
+import type { Lang } from "../../lib/i18n";
+import { id } from "../../content/copy/id";
+import { en } from "../../content/copy/en";
+import { ANCHORS } from "../../../scripts/seo-gate.config.mjs";
+import {
+  GALLERIES_MARLIN, GALLERY_SATNUSA, GALLERY_SINGAPORE, LIGHTBOX_WIDTH, THUMB_MIN_WIDTH, loadGallery, type Photos,
+} from "../../lib/career";
+import marlinCover from "../../assets/career-marlin.jpg"; // first lightbox photo of the Marlin chapter
+// The indusia.ai/founder illustration on the site navy, animated as an 8s seamless loop (VEO,
+// first frame = last frame): crane, waves and ferry, robot arms, trophy, flags. The still is the
+// loop's first frame, shown before the video plays and under prefers-reduced-motion.
+import journeyStill from "../../assets/founder-journey-loop-poster.webp";
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const j = (lang === "id" ? id : en).journey;
+const a = ANCHORS[lang];
+const n = (count: number) => j.photos.replace("{n}", String(count));
+
+const ids = [GALLERY_SINGAPORE, ...GALLERIES_MARLIN, GALLERY_SATNUSA];
+const settled = await Promise.allSettled(ids.map((g) => loadGallery(g, lang)));
+const got = new Map<number, Photos | null>(
+  ids.map((g, i) => [g, settled[i].status === "fulfilled" ? settled[i].value : null]),
+);
+const singapore = got.get(GALLERY_SINGAPORE) ?? null;
+const satnusa = got.get(GALLERY_SATNUSA) ?? null;
+const marlinParts = GALLERIES_MARLIN.map((g) => got.get(g) ?? null);
+const marlinFull = (await getImage({ src: marlinCover, width: LIGHTBOX_WIDTH, format: "webp" })).src;
+const poster = (await getImage({ src: journeyStill, width: 1280, format: "webp" })).src;
+const marlinThumb = (await getImage({ src: marlinCover, width: THUMB_MIN_WIDTH, format: "webp" })).src;
+const marlinUrls = [marlinFull, ...marlinParts.flatMap((p) => p?.photos.map((x) => x.full) ?? [])];
+const marlinThumbs = [marlinThumb, ...marlinParts.flatMap((p) => p?.photos.map((x) => x.thumb) ?? [])];
+// A count is only honest when every source gallery loaded.
+const marlinComplete = marlinParts.every((p) => p !== null);
+
+const chapters = [
+  { key: "singapore", gallery: String(GALLERY_SINGAPORE), items: singapore?.photos.map((x) => x.full) ?? [], thumbs: singapore?.photos.map((x) => x.thumb) ?? [], count: singapore?.photos.length ?? 0, yr: j.singaporeYear, role: j.singaporeRole, org: j.singaporeOrg, title: j.singaporeRole, note: j.singaporeNote },
+  { key: "marlin", gallery: "marlin", items: marlinUrls, thumbs: marlinThumbs, count: marlinComplete ? marlinUrls.length : 0, yr: j.marlinYear, role: j.marlinRole, org: j.marlinOrg, title: j.marlinOrg, note: j.marlinNote },
+  { key: "satnusa", gallery: String(GALLERY_SATNUSA), items: satnusa?.photos.map((x) => x.full) ?? [], thumbs: satnusa?.photos.map((x) => x.thumb) ?? [], count: satnusa?.photos.length ?? 0, yr: j.satnusaYear, role: j.satnusaRole, org: j.satnusaOrg, title: j.satnusaOrg, note: j.satnusaNote },
+];
+---
+<section class="sec" id="perjalanan" aria-labelledby="journey-h">
+  <div class="wrap">
+    <div class="sec-head"><h2 id="journey-h">{j.h2}</h2><p class="lead">{j.lead}</p></div>
+    {/* One board: the islands on top, each chapter's text right under its island.
+        Island and caption open the same gallery; hovering one lights up the other. */}
+    <div class="jr-board">
+      <figure class="jr-illus">
+        <div class="jr-art">
+          <Image class="jr-still" src={journeyStill} widths={[640, 960, 1280, 1600]} sizes="(max-width: 1200px) 100vw, 1200px"
+            alt={j.illusAlt} loading="lazy" decoding="async" format="webp" />
+          <video class="jr-video" autoplay muted loop playsinline preload="none" poster={poster} aria-hidden="true" tabindex="-1">
+            <source src="/videos/journey-loop.webm" type="video/webm" />
+            <source src="/videos/journey-loop.mp4" type="video/mp4" />
+          </video>
+        {chapters.map((c, i) => c.items.length > 0 && (
+          <button class={`jr-spot s${i + 1}`} type="button" data-hotspot={c.key} data-lightbox data-lightbox-title={c.title}
+            data-lightbox-items={JSON.stringify(c.items)} data-lightbox-thumbs={JSON.stringify(c.thumbs)} aria-label={j.illusOpen.replace("{name}", c.title)}></button>
+        ))}
+        <a class="jr-spot s4" data-hotspot="indusia" href={a.hero.href} aria-label={j.illusIndusia}></a>
+        </div>
+      </figure>
+      <ol class="journey">
+        {chapters.map((c, i) => {
+          const Tag = c.items.length > 0 ? "button" : "div";
+          const attrs = c.items.length > 0
+            ? { type: "button" as const, "data-career": c.gallery, "data-lightbox": "", "data-lightbox-title": c.title, "data-lightbox-items": JSON.stringify(c.items), "data-lightbox-thumbs": JSON.stringify(c.thumbs) }
+            : {};
+          return (
+            <li class={`c${i + 1}`}>
+              <Tag class="jr-card" {...attrs}>
+                <span class="jr-yr">{c.yr}</span>
+                <strong>{c.role}</strong>
+                <span class="jr-org">{c.org}</span>
+                <span class="jr-note">{c.note}</span>
+                {c.count > 0 && <em class="jr-count">{n(c.count)}</em>}
+                {c.items.length > 0 && <span class="sr"> · {j.openHint}</span>}
+              </Tag>
+            </li>
+          );
+        })}
+        <li class="c4 jr-now">
+          <div class="jr-card">
+            <span class="jr-yr">{j.indusiaYear}<em class="jr-live">{j.indusiaNow}</em></span>
+            <strong>{j.indusiaRole}</strong>
+            <span class="jr-org">{j.indusiaOrg}</span>
+            {/* Plain text: the hero above already links these exact anchors (one link per target, SEO audit 2026-11-09). */}
+            <p class="jr-note">{a.vision.anchor}{j.indusiaNoteMid1}{a.fleet.anchor}{j.indusiaNoteMid2}{a.chatbot.anchor}{j.indusiaNoteEnd}</p>
+            <a class="jr-cta" href={a.hero.href}>{j.indusiaCta}</a>
+          </div>
+        </li>
+      </ol>
+      {/* Filled by journey-cycle.ts with the active chapter's note (wide screens). The cards keep the
+          real text for crawlers and screen readers, so this copy is aria-hidden. */}
+      <p class="jr-detail" aria-hidden="true"></p>
+    </div>
+  </div>
+</section>
+<script>
+  import { initJourneyCycle } from "../../scripts/journey-cycle";
+  initJourneyCycle();
+</script>

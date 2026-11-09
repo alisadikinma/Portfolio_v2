@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\RedditPostStatus;
+use App\Models\Concerns\StoresDatesInAppTimezone;
 use App\Traits\HasStatusTransitions;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -24,6 +25,7 @@ class RedditPost extends Model
     use HasFactory;
     use HasStatusTransitions;
     use SoftDeletes;
+    use StoresDatesInAppTimezone;
 
     protected $table = 'reddit_posts';
 

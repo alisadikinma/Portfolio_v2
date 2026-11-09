@@ -27,7 +27,7 @@ class GalleryFactory extends Factory
             'period' => fake()->year(),
             'thumbnail' => null,
             'award_id' => null,
-            'is_active' => fake()->boolean(80),
+            'is_active' => true, // deterministic: guests only see active galleries; use ->inactive() explicitly
             'sort_order' => fake()->numberBetween(1, 100),
         ];
     }

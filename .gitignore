@@ -176,6 +176,8 @@ $RECYCLE.BIN/
 *.jpg
 # Exception: README documentation images must ship (override global *.jpg)
 !docs/assets/readme/*.jpg
+# Exception: web/ site images (portrait for Person.image) must ship
+!web/public/images/*.jpg
 
 # Archives
 *.7z
@@ -241,3 +243,39 @@ graphify-out/
 
 # gaspol worktrees (global standard 2026-08-20)
 .claude/worktrees/
+
+# PF-2 Astro app
+web/node_modules
+web/dist
+web/.astro
+web/.env
+web/dist.next
+web/dist.prev
+
+# Playwright (PF-2 5E)
+web/test-results/
+web/playwright-report/
+.local-stack/
+web/.pf2-local-build/
+
+# ====================================
+# Hygiene guard (PF-2) — see scripts/tests/repo-hygiene.test.sh
+# ====================================
+# Root-level leftovers of the pre-PF-2 skeleton / local tooling. backend/, frontend/
+# and web/ each own their own manifests; nothing at the repo root installs deps.
+/vendor/
+node_modules/
+/.env
+/composer.json
+/composer.lock
+/package.json
+/package-lock.json
+/playwright.config.js
+# Generated test output
+playwright-report/
+test-results/
+# Backups and debug pages
+*.old
+*.orig
+*.backup-*
+backend/public/*debug*.html

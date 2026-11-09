@@ -1,0 +1,79 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Hero from "../../components/Hero.astro";
+import ProofBand from "../../components/home/ProofBand.astro";
+import Journey from "../../components/home/Journey.astro";
+import Services from "../../components/home/Services.astro";
+import Stages from "../../components/home/Stages.astro";
+import Testimonials from "../../components/home/Testimonials.astro";
+import LatestWriting from "../../components/home/LatestWriting.astro";
+import NewsletterForm from "../../components/NewsletterForm.astro";
+import Lightbox from "../../components/Lightbox.astro";
+import { apiGet } from "../../lib/api";
+import { LANGS, type Lang } from "../../lib/i18n";
+import { waLink } from "../../lib/whatsapp";
+import { SITE, graph, personNode, webPageNode, websiteNode } from "../../lib/schema";
+import { TITLES } from "../../../scripts/seo-gate.config.mjs";
+import { id } from "../../content/copy/id";
+import { en } from "../../content/copy/en";
+
+const raw = Astro.params.lang;
+if (!(LANGS as readonly string[]).includes(raw ?? "")) {
+  return new Response(null, { status: 404 });
+}
+const lang = raw as Lang;
+const c = lang === "id" ? id : en;
+const path = `/${lang}`;
+const title = (TITLES as Record<string, string>)[path];
+
+// Section toggles from /admin/page-sections (homepage rows, kebab-case). A missing row means "on",
+// and if the API is down every section renders (fail open: the page never goes blank).
+// international-stages = career journey + stages bento; join-the-build = newsletter.
+const off = new Set<string>();
+try {
+  const rows = await apiGet<unknown>("/page-sections?page=homepage", { lang });
+  if (Array.isArray(rows)) {
+    for (const r of rows as { page_type?: unknown; section_type?: unknown; is_active?: unknown }[]) {
+      if (r && r.page_type === "homepage" && typeof r.section_type === "string" && (r.is_active === false || r.is_active === 0)) {
+        off.add(r.section_type);
+      }
+    }
+  }
+} catch (e) {
+  console.warn("[home] page-sections unavailable, rendering every section", e instanceof Error ? e.message : e);
+}
+// The hero is never hidden: it holds the page's only H1 and the LCP image (SEO gate items 4 and 9).
+const on = (type: string) => type === "hero" || !off.has(type);
+
+const wa = await waLink(lang, c.wa.consult);
+const url = SITE + path;
+const jsonld = graph(
+  personNode(),
+  websiteNode(),
+  webPageNode({ url, lang, name: title, description: c.home.metaDescription }),
+);
+---
+<BaseLayout
+  title={title}
+  description={c.home.metaDescription}
+  path={path}
+  lang={lang}
+  jsonld={jsonld}
+  image={`${SITE}/og/home-${lang}.jpg`}
+  imageWidth={1200}
+  imageHeight={630}
+  preloadImage="/images/ali-sadikin-ma-pakar-ai-indonesia.jpg"
+  home
+>
+  <main>
+    <Hero lang={lang} wa={wa} />
+    {on("receipts") && <ProofBand lang={lang} />}
+    {on("international-stages") && <Journey lang={lang} />}
+    {on("services") && <Services lang={lang} wa={wa} />}
+    {on("international-stages") && <Stages lang={lang} />}
+    {on("testimonials") && <Testimonials lang={lang} />}
+    {on("latest-writing") && <LatestWriting lang={lang} />}
+    {on("join-the-build") && <NewsletterForm lang={lang} />}
+  </main>
+  <Lightbox lang={lang} />
+</BaseLayout>

@@ -420,11 +420,11 @@ class ContentPublishService
         $idempotencyKey = (string) Str::uuid();
         $result = $this->articleGen->triggerTranslate($post->id, $idempotencyKey, $targetLocale);
 
-        $post->update([
+        Post::withoutTimestamps(fn () => $post->update([
             'translation_pending' => true,
             'translation_attempts' => 1,
             'last_translation_attempt' => now(),
-        ]);
+        ]));
 
         Log::info('[ContentPublish] Translation triggered', [
             'idea_id' => $idea->id,

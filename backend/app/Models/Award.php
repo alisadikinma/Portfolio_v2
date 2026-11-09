@@ -4,10 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Spatie\Sluggable\HasSlug;
+use Spatie\Sluggable\SlugOptions;
 
 class Award extends Model
 {
-    use HasFactory;
+    use HasFactory, HasSlug;
 
     protected $fillable = [
         'title',
@@ -28,6 +30,19 @@ class Award extends Model
     ];
 
     protected $appends = ['total_photos'];
+
+    /**
+     * Public URL slug from the title. Generated once on create (the URL must not
+     * change when the title is edited); duplicates get -2, -3, ...
+     */
+    public function getSlugOptions(): SlugOptions
+    {
+        return SlugOptions::create()
+            ->generateSlugsFrom('title')
+            ->saveSlugsTo('slug')
+            ->startSlugSuffixFrom(2)
+            ->doNotGenerateSlugsOnUpdate();
+    }
 
     /**
      * Award has many galleries

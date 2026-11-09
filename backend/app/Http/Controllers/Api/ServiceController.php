@@ -21,9 +21,11 @@ class ServiceController extends Controller
     {
         $query = Service::query();
 
-        // Filter by active status
-        if ($request->has('active')) {
-            $query->where('active', $request->query('active'));
+        // Guests only ever see active services; the ?active= filter is admin-only.
+        if (!\App\Support\AdminViewer::is()) {
+            $query->where('is_active', true);
+        } elseif ($request->has('active')) {
+            $query->where('is_active', $request->boolean('active'));
         }
 
         // Search
@@ -38,7 +40,14 @@ class ServiceController extends Controller
 
         // Order by
         $orderBy = $request->query('order_by', 'order');
-        $orderDir = $request->query('order_dir', 'asc');
+        // DB column was renamed order -> sort_order (2025_10_11 migration); keep the API name working.
+        if ($orderBy === 'order') {
+            $orderBy = 'sort_order';
+        }
+        if (!in_array($orderBy, ['sort_order', 'title', 'created_at', 'id'], true)) {
+            $orderBy = 'sort_order';
+        }
+        $orderDir = $request->query('order_dir', 'asc') === 'desc' ? 'desc' : 'asc';
         $query->orderBy($orderBy, $orderDir);
 
         // Check if pagination is requested
@@ -80,12 +89,36 @@ class ServiceController extends Controller
      */
     public function show(string $slug): JsonResponse
     {
-        $service = Service::where('slug', $slug)->firstOrFail();
+        $query = Service::where('slug', $slug);
+
+        // Inactive services are visible only to an authenticated admin.
+        if (!\App\Support\AdminViewer::is()) {
+            $query->where('is_active', true);
+        }
+
+        $service = $query->firstOrFail();
 
         return response()->json([
             'success' => true,
             'data' => new ServiceResource($service),
         ]);
+    }
+
+    /**
+     * API keeps `active`/`order`; DB columns are `is_active`/`sort_order`.
+     */
+    private function mapLegacyKeys(array $data): array
+    {
+        if (array_key_exists('active', $data)) {
+            $data['is_active'] = $data['active'];
+            unset($data['active']);
+        }
+        if (array_key_exists('order', $data)) {
+            $data['sort_order'] = $data['order'];
+            unset($data['order']);
+        }
+
+        return $data;
     }
 
     /**
@@ -99,13 +132,14 @@ class ServiceController extends Controller
             $data = $request->validated();
 
             // Set order if not provided
-            if (!isset($data['order'])) {
-                $maxOrder = Service::max('order') ?? 0;
-                $data['order'] = $maxOrder + 1;
+            $data = $this->mapLegacyKeys($data);
+            if (!isset($data['sort_order'])) {
+                $maxOrder = Service::max('sort_order') ?? 0;
+                $data['sort_order'] = $maxOrder + 1;
             }
 
             // Set active default
-            $data['active'] = $data['active'] ?? true;
+            $data['is_active'] = $data['is_active'] ?? true;
 
             $service = Service::create($data);
 
@@ -142,7 +176,7 @@ class ServiceController extends Controller
         try {
             DB::beginTransaction();
 
-            $data = $request->validated();
+            $data = $this->mapLegacyKeys($request->validated());
             $service->update($data);
 
             DB::commit();

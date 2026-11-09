@@ -1,0 +1,179 @@
+---
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import Lightbox from "../../../components/Lightbox.astro";
+import { apiGet, apiPath } from "../../../lib/api";
+import { LANGS, type Lang } from "../../../lib/i18n";
+import { ownMediaUrl, photosFromGalleries } from "../../../lib/career";
+import { sanitizeHtml } from "../../../lib/sanitize";
+import { addImageDimensions } from "../../../lib/image-dims";
+import { clipWords, firstParagraphText, htmlToText, wordCount } from "../../../lib/seo-text";
+import {
+  awardLocation, awardMetaDescription, awardResultKind, awardShortName, awardStartDate, awardTitleTag, organizerName,
+} from "../../../lib/award";
+import { SITE, breadcrumb, eventNode, graph, personNode, webPageNode, websiteNode } from "../../../lib/schema";
+import { id } from "../../../content/copy/id";
+import { en } from "../../../content/copy/en";
+
+const rawLang = Astro.params.lang;
+if (!(LANGS as readonly string[]).includes(rawLang ?? "")) {
+  return new Response(null, { status: 404 });
+}
+const lang = rawLang as Lang;
+// This route shares its shape with other two-segment paths; only the localized "awards" segment is ours.
+if (Astro.params.awardsSeg !== (lang === "id" ? "penghargaan" : "awards")) {
+  return new Response(null, { status: 404 });
+}
+const slug = Astro.params.slug ?? "";
+// Slugs are generated as [a-z0-9-]; anything else never reaches the API (could address another endpoint).
+if (!/^[a-z0-9-]+$/.test(slug)) {
+  return new Response(null, { status: 404 });
+}
+const c = (lang === "id" ? id : en).award;
+const path = `/${lang}/${Astro.params.awardsSeg}/${slug}`;
+const url = SITE + path;
+const workPath = `/${lang}/work`;
+
+const str = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
+
+let payload: { award?: Record<string, unknown>; galleries?: unknown } | null = null;
+let failed = false;
+try {
+  payload = await apiGet<{ award?: Record<string, unknown>; galleries?: unknown }>(apiPath`/awards/slug/${slug}`, { lang });
+} catch {
+  failed = true;
+}
+if (!failed && !payload?.award) {
+  return new Response(null, { status: 404 });
+}
+if (failed) {
+  Astro.response.status = 503;
+  Astro.response.headers.set("Retry-After", "120");
+}
+
+const award = payload?.award ?? {};
+const title = str(award.title);
+const short = awardShortName(title);
+const descriptionHtml = await addImageDimensions(sanitizeHtml(str(award.description)));
+const descriptionText = htmlToText(str(award.description));
+const needsLede = wordCount(firstParagraphText(descriptionHtml)) < 25;
+const lede = c.ledeFallback.replace("{title}", short);
+const organizer = organizerName(str(award.organization));
+const when = str(award.received_at);
+const startDate = awardStartDate(when);
+const place = awardLocation(title, descriptionText);
+const kind = awardResultKind(title);
+const result = kind === "first" ? c.resultFirst : kind === "finalist" ? c.resultFinalist : kind === "fellow" ? c.resultFellow : kind === "attendee" ? c.resultAttendee : "";
+
+const photos = photosFromGalleries(payload?.galleries).photos;
+const ogImage = photos[0]?.src ?? ownMediaUrl(award.image) ?? undefined;
+const metaTitle = awardTitleTag(title);
+const metaDescription = awardMetaDescription(short, descriptionText, c.metaTail);
+// Each thumbnail opens the lightbox on its own photo (data-lightbox-start).
+const fulls = photos.map((p) => p.full);
+
+// Event.description = the award's own text only; the meta tail is page marketing, not event data.
+const eventDescription = descriptionText.trim() !== "" ? clipWords(descriptionText, 300) : undefined;
+
+const jsonld = failed
+  ? graph(personNode(), websiteNode())
+  : graph(
+      // Person.award only for awards actually won/earned; an attended event is not an award.
+      kind === "attendee" ? personNode() : personNode({ award: title }),
+      websiteNode(),
+      webPageNode({ url, lang, name: metaTitle, description: metaDescription }),
+      eventNode({
+        name: title,
+        organizer: organizer || undefined,
+        startDate,
+        location: place,
+        url,
+        description: eventDescription,
+        image: ogImage,
+        attendee: true,
+      }),
+      breadcrumb([
+        { name: c.breadcrumbHome, url: `${SITE}/${lang}` },
+        { name: c.breadcrumbWork, url: SITE + workPath },
+        { name: short, url },
+      ]),
+    );
+---
+<BaseLayout title={failed ? c.breadcrumbWork : metaTitle} description={failed ? c.unavailable : metaDescription} path={path} lang={lang} jsonld={jsonld} image={ogImage} type="article">
+  <main class="wrap award-detail">
+    {failed ? (
+      <p class="award-unavailable" role="status">{c.unavailable}</p>
+    ) : (
+      <>
+        <nav class="award-crumbs" aria-label="Breadcrumb">
+          <a href={`/${lang}`}>{c.breadcrumbHome}</a> / <a href={workPath}>{c.breadcrumbWork}</a>
+        </nav>
+        <article>
+          <header>
+            <h1>{title}</h1>
+            {needsLede && <p class="award-lede">{lede}</p>}
+          </header>
+          {descriptionHtml !== "" && <div class="award-body" set:html={descriptionHtml} />}
+          <dl class="award-facts">
+            {organizer && (<><dt>{c.organizerLabel}</dt><dd>{organizer}</dd></>)}
+            {when && (<><dt>{c.whenLabel}</dt><dd>{when}</dd></>)}
+            {place && (<><dt>{c.whereLabel}</dt><dd>{place}</dd></>)}
+            {result && (<><dt>{c.resultLabel}</dt><dd>{result}</dd></>)}
+          </dl>
+          {photos.length > 0 && (
+            <section aria-labelledby="award-photos">
+              <h2 id="award-photos">{c.photosHeading}</h2>
+              <ul class="award-photos">
+                {photos.map((p, i) => (
+                  <li>
+                    <button
+                      type="button"
+                      class="award-thumb"
+                      data-lightbox=""
+                      data-lightbox-title={short}
+                      data-lightbox-items={JSON.stringify(fulls)}
+                      data-lightbox-thumbs={JSON.stringify(photos.map((p) => p.thumb))}
+                      data-lightbox-start={i}
+                      aria-label={c.photoOpen.replace("{n}", String(i + 1)).replace("{title}", short)}
+                    >
+                      <img
+                        src={p.src}
+                        srcset={p.srcset}
+                        sizes={p.srcset ? "(min-width: 860px) 33vw, 50vw" : undefined}
+                        alt={c.photoAlt.replace("{title}", short).replace("{n}", String(i + 1))}
+                        width="640"
+                        height="480"
+                        loading={i < 3 ? "eager" : "lazy"}
+                        decoding="async"
+                      />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </article>
+        <p class="award-more">
+          {c.moreLead} <a href={workPath}>{c.moreLink}</a>, {c.aboutLead} <a href={`/${lang}/about`}>{c.aboutLink}</a>.
+        </p>
+      </>
+    )}
+  </main>
+  {!failed && photos.length > 0 && <Lightbox lang={lang} />}
+</BaseLayout>
+<style>
+  .award-detail { padding-block: 64px; }
+  .award-crumbs { color: var(--text-secondary); margin-bottom: 24px; }
+  .award-lede { color: var(--text-secondary); font-size: 1.15rem; max-width: 70ch; }
+  .award-body { max-width: 72ch; margin-block: 24px; color: var(--text-secondary); }
+  .award-facts { display: grid; grid-template-columns: max-content 1fr; gap: 8px 24px; margin-block: 24px; max-width: 72ch; }
+  .award-facts dt { font: 500 13px/1.6 var(--font-mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent-primary); }
+  .award-facts dd { margin: 0; }
+  .award-photos { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+  /* phones: two columns instead of one long column (Ali 2026-11-09) */
+  @media (max-width: 760px) { .award-photos { grid-template-columns: 1fr 1fr; gap: 10px; } }
+  .award-thumb { all: unset; box-sizing: border-box; display: block; width: 100%; cursor: pointer; border-radius: var(--radius-md); overflow: hidden; border: 1px solid var(--border-subtle); }
+  .award-thumb:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 3px; }
+  .award-thumb img { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; }
+  .award-more { margin-block: 32px; color: var(--text-secondary); }
+  .award-unavailable { color: var(--text-secondary); }
+</style>

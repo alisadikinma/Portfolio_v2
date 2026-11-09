@@ -1,3 +1,7 @@
+# Lightweight dev stack: MySQL + Laravel API + admin SPA (Vite) + phpMyAdmin.
+# The PUBLIC site is Astro (web/) since PF-2 and is NOT in this file. For the full
+# site on one URL with a copy of prod data, use scripts/pf2-local.sh (docker/pf2-local/).
+# Empty DB: run `docker compose exec backend php artisan migrate --seed`.
 services:
   mysql:
     image: mysql:8.0
@@ -12,8 +16,6 @@ services:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      # Auto-imported ONLY on first boot (when mysql_data volume is empty)
-      - ./portfolio_v2_20260530.sql:/docker-entrypoint-initdb.d/01-portfolio.sql:ro
     command: --default-authentication-plugin=caching_sha2_password
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
@@ -55,7 +57,7 @@ services:
 
   frontend:
     image: node:20-alpine
-    container_name: portfolio_frontend
+    container_name: portfolio_frontend   # admin SPA only (/admin, /login)
     restart: unless-stopped
     working_dir: /app
     command: sh -c "npm install && npm run dev -- --host 0.0.0.0"

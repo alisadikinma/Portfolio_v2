@@ -1,0 +1,220 @@
+---
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import PostCard, { type PostItem } from "../../../components/PostCard.astro";
+import AuthorBox from "../../../components/AuthorBox.astro";
+import { apiGetPost } from "../../../lib/api";
+import { LANGS, type Lang } from "../../../lib/i18n";
+import { sanitizeHtml } from "../../../lib/sanitize";
+import { addImageDimensions } from "../../../lib/image-dims";
+import { imageOrigin } from "../../../lib/post-images";
+import { pickLede, postDescription, postTitle } from "../../../lib/seo-text";
+import { PORTRAIT_URL, SITE, blogPosting, breadcrumb, graph, personNode, webPageNode, websiteNode } from "../../../lib/schema";
+import { id } from "../../../content/copy/id";
+import { en } from "../../../content/copy/en";
+
+interface PostDetail {
+  slug: string;
+  title: string;
+  excerpt?: string | null;
+  content?: string | null;
+  featured_image?: string | null;
+  image_variants?: Record<string, string> | null;
+  published_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  /** Last real content edit (views/housekeeping do not touch it). Preferred over updated_at. */
+  content_updated_at?: string | null;
+  reading_time?: number | null;
+  category?: { name?: string; slug?: string } | null;
+  seo?: { meta_title?: string | null; meta_description?: string | null; og_image?: string | null; ai_summary?: string | null } | null;
+  available_translations?: string[] | null;
+  /** Public slug per language (each translation has its own). Absent on older payloads. */
+  slugs?: Partial<Record<string, string>> | null;
+  related_posts?: PostItem[] | null;
+}
+
+const raw = Astro.params.lang;
+if (!(LANGS as readonly string[]).includes(raw ?? "")) {
+  return new Response(null, { status: 404 });
+}
+const lang = raw as Lang;
+const slug = Astro.params.slug ?? "";
+// Never forward path-like slugs to the API (would address another endpoint).
+if (slug === "" || slug === "." || slug === ".." || /[\\/]/.test(slug)) return new Response(null, { status: 404 });
+const c = (lang === "id" ? id : en).blogDetail;
+const NAME = "Ali Sadikin Ma";
+const isLang = (l: string): l is Lang => (LANGS as readonly string[]).includes(l);
+
+let post: PostDetail | null = null;
+let failed = false;
+try {
+  post = await apiGetPost<PostDetail>(slug, { lang });
+  if (post && (typeof post.title !== "string" || post.title === "")) throw new Error("malformed post");
+} catch {
+  failed = true;
+  post = null;
+}
+if (!failed && !post) return new Response(null, { status: 404 });
+
+// The API falls back to the English text when the requested language is missing, so
+// available_translations is the truth: send the visitor to the language that exists.
+let have: Lang[] = [];
+if (post) {
+  have = (post.available_translations ?? []).filter(isLang);
+  if (have.length === 0) return new Response(null, { status: 404 });
+  if (!have.includes(lang)) {
+    // 302, not 301: the missing translation may be published later (Ali, 2026-11-08).
+    return new Response(null, {
+      status: 302,
+      headers: {
+        Location: `/${have[0]}/blog/${encodeURIComponent(post.slugs?.[have[0]] || slug)}${Astro.url.search}`,
+        "Cache-Control": "max-age=3600",
+      },
+    });
+  }
+}
+if (failed) {
+  Astro.response.status = 503;
+  Astro.response.headers.set("Retry-After", "120");
+}
+
+// Each language has its own slug. Another language's slug (or posts.slug) 301s to this language's one.
+const slugFor = (l: Lang) => post?.slugs?.[l] || slug;
+if (post && slugFor(lang) !== slug) {
+  return new Response(null, {
+    status: 301,
+    headers: { Location: `/${lang}/blog/${encodeURIComponent(slugFor(lang))}${Astro.url.search}` },
+  });
+}
+const altPaths = post?.slugs
+  ? { id: `/id/blog/${encodeURIComponent(slugFor("id"))}`, en: `/en/blog/${encodeURIComponent(slugFor("en"))}` }
+  : undefined;
+const path = `/${lang}/blog/${encodeURIComponent(slug)}`;
+const url = SITE + path;
+
+const title = post ? postTitle(post.title, post.seo?.meta_title) : NAME;
+const description = post
+  ? postDescription({ meta: post.seo?.meta_description, excerpt: post.excerpt, content: post.content, fallback: post.title })
+  : c.unavailable;
+
+const toIso = (v?: string | null) => {
+  if (!v) return null;
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+const published = post ? toIso(post.published_at) ?? toIso(post.created_at) : null;
+const modified = post ? toIso(post.content_updated_at) ?? toIso(post.updated_at) ?? published : null;
+const fmt = (d: Date) =>
+  new Intl.DateTimeFormat(lang === "id" ? "id-ID" : "en-US", { dateStyle: "long", timeZone: "UTC" }).format(d);
+
+// Images: image_variants are relative to the API origin (same logic as PostCard).
+const origin = imageOrigin(post?.featured_image);
+const absUrl = (u: string) => (/^https?:\/\//.test(u) ? u : origin + u);
+const variants = Object.entries(post?.image_variants ?? {})
+  .map(([k, v]) => ({ w: /^(\d+)w$/.exec(k)?.[1], url: v }))
+  .filter((x): x is { w: string; url: string } => !!x.w && typeof x.url === "string" && x.url !== "")
+  .sort((a, b) => Number(a.w) - Number(b.w));
+const srcset = variants.length > 0 ? variants.map((v) => `${absUrl(v.url)} ${v.w}w`).join(", ") : undefined;
+const heroSrc = post?.featured_image ?? (variants.length > 0 ? absUrl(variants[variants.length - 1].url) : "");
+const httpsOnly = (u?: string | null) => (u && /^https:\/\//.test(u) ? u : undefined);
+const ogImage = httpsOnly(post?.seo?.og_image) ?? httpsOnly(heroSrc);
+
+const cat = post?.category?.name && post.category.slug ? { name: post.category.name, slug: post.category.slug } : null;
+const crumbs = [
+  { name: c.breadcrumbHome, url: `${SITE}/${lang}` },
+  { name: c.breadcrumbBlog, url: `${SITE}/${lang}/blog` },
+  ...(cat ? [{ name: cat.name, url: `${SITE}/${lang}/blog/category/${encodeURIComponent(cat.slug)}` }] : []),
+  ...(post ? [{ name: post.title, url }] : []),
+];
+
+const nodes = [personNode(), websiteNode(), webPageNode({ url, lang, name: title, description })];
+if (post && published) {
+  nodes.push(
+    blogPosting({
+      title: post.title,
+      url,
+      datePublished: published.toISOString(),
+      dateModified: (modified ?? published).toISOString(),
+      image: ogImage ?? PORTRAIT_URL,
+      lang,
+      description,
+    }),
+    breadcrumb(crumbs),
+  );
+} else if (post) {
+  nodes.push(breadcrumb(crumbs));
+}
+const jsonld = graph(...nodes);
+
+const body = post ? await addImageDimensions(sanitizeHtml(post.content ?? "")) : "";
+const related = (post?.related_posts ?? [])
+  .filter((p) => p && typeof p.slug === "string" && p.slug !== "" && typeof p.title === "string" && p.title.trim() !== "")
+  .slice(0, 3)
+  .map((p) => {
+    const langs = (p.available_translations ?? []).filter(isLang);
+    return { post: p, hrefLang: langs.length === 0 || langs.includes(lang) ? lang : langs[0] };
+  });
+// ai_summary -> excerpt -> meta_description: the first with >= 25 words (answer-first lede for GEO).
+const lede = post ? pickLede([post.seo?.ai_summary, post.excerpt, post.seo?.meta_description]) : "";
+---
+<BaseLayout title={title} description={description} path={path} lang={lang} jsonld={jsonld} image={ogImage} type="article" availableLangs={have.length > 0 ? have : undefined} altPaths={altPaths}>
+  {failed || !post
+    ? (
+      <main class="wrap post-detail">
+        <p class="blog-unavailable" role="status">{c.unavailable}</p>
+        <p><a href={`/${lang}/blog`}>{c.backToBlog}</a></p>
+      </main>
+    )
+    : (
+      <main class="wrap post-detail">
+        <article>
+          <header>
+            <h1>{post.title}</h1>
+            <div class="post-meta">
+              {cat && <a href={`/${lang}/blog/category/${encodeURIComponent(cat.slug)}`}>{cat.name}</a>}
+              {published && <span>{c.publishedLabel} <time datetime={published.toISOString()}>{fmt(published)}</time></span>}
+              {modified && published && modified.getTime() !== published.getTime() && (
+                <span>{c.updatedLabel} <time datetime={modified.toISOString()}>{fmt(modified)}</time></span>
+              )}
+              {post.reading_time ? <span>{post.reading_time} {c.minRead}</span> : null}
+            </div>
+            {lede !== "" && <p class="post-lede">{lede}</p>}
+          </header>
+          {heroSrc && (
+            <img
+              class="post-hero"
+              src={heroSrc}
+              srcset={srcset}
+              sizes={srcset ? "(min-width: 900px) 800px, 100vw" : undefined}
+              width="1200"
+              height="675"
+              alt={`${c.heroAltPrefix} ${post.title}`}
+              loading="eager"
+              fetchpriority="high"
+            />
+          )}
+          <div class="post-body" set:html={body} />
+        </article>
+        <AuthorBox lang={lang} />
+        {related.length > 0 && (
+          <section class="post-related" aria-labelledby="related-title">
+            <h2 id="related-title">{c.relatedHeading}</h2>
+            <div class="related-grid">
+              {related.map((r) => <PostCard post={r.post} lang={lang} hrefLang={r.hrefLang} minRead={c.minRead} />)}
+            </div>
+          </section>
+        )}
+        <p><a href={`/${lang}/blog`}>{c.backToBlog}</a></p>
+      </main>
+    )}
+</BaseLayout>
+<style>
+  .post-detail { max-width: 52rem; }
+  .post-meta { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; font-size: 0.9rem; opacity: 0.8; margin: 0.5rem 0 1rem; }
+  .post-lede { font-size: 1.15rem; }
+  .post-hero { width: 100%; height: auto; border-radius: 12px; margin: 1rem 0 2rem; }
+  .post-body :global(img) { max-width: 100%; height: auto; }
+  .post-body :global(pre) { overflow-x: auto; }
+  .post-body :global(table) { display: block; overflow-x: auto; }
+  .related-grid { display: grid; gap: 2rem; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); margin: 1.5rem 0; }
+</style>

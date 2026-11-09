@@ -62,12 +62,12 @@ async function handleConfirm() {
               Working
             </span>
           </button>
-          <router-link
-            to="/blog"
+          <a
+            href="/blog"
             class="block text-fg-dim text-xs mt-4 hover:text-fg-muted transition-colors"
           >
             Cancel — keep me subscribed
-          </router-link>
+          </a>
         </template>
 
         <!-- Success state -->
@@ -83,9 +83,9 @@ async function handleConfirm() {
           <p class="text-fg-muted text-sm leading-relaxed mb-8">
             Sorry to see you go. If you change your mind, the door is always open.
           </p>
-          <router-link to="/blog" class="btn-glass w-full text-sm">
+          <a href="/blog" class="btn-glass w-full text-sm">
             Back to blog
-          </router-link>
+          </a>
         </template>
 
         <!-- Invalid token / error -->
@@ -106,14 +106,14 @@ async function handleConfirm() {
           <p class="text-fg-dim text-xs mb-6">
             If you keep getting newsletters and want them stopped, reply to any of them.
           </p>
-          <router-link to="/blog" class="btn-glass w-full text-sm">
+          <a href="/blog" class="btn-glass w-full text-sm">
             Back to blog
-          </router-link>
+          </a>
         </template>
       </div>
 
       <p class="text-center text-fg-dim text-xs mt-6">
-        <router-link to="/" class="hover:text-fg-muted transition-colors">alisadikinma.com</router-link>
+        <a href="/" class="hover:text-fg-muted transition-colors">alisadikinma.com</a>
       </p>
     </div>
   </main>

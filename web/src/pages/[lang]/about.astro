@@ -1,0 +1,209 @@
+---
+import SocialLink from "../../components/SocialLink.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { apiGet } from "../../lib/api";
+import { localizedPath, LANGS, type Lang } from "../../lib/i18n";
+import { awardHref, STAGE_AWARD_IDS, STAGE_AWARDS } from "../../lib/career";
+import { sanitizeHtml } from "../../lib/sanitize";
+import { SAME_AS, SITE, breadcrumb, graph, personNode, profilePage, webPageNode, websiteNode } from "../../lib/schema";
+import { ANCHORS, TITLES } from "../../../scripts/seo-gate.config.mjs";
+import { id } from "../../content/copy/id";
+import { en } from "../../content/copy/en";
+
+const raw = Astro.params.lang;
+if (!(LANGS as readonly string[]).includes(raw ?? "")) {
+  return new Response(null, { status: 404 });
+}
+const lang = raw as Lang;
+const copy = lang === "id" ? id : en;
+const c = copy.about;
+const j = copy.journey;
+const a = ANCHORS[lang];
+const path = `/${lang}/about`;
+const url = SITE + path;
+const title = (TITLES as Record<string, string>)[path];
+
+interface AboutData { bio?: unknown; updated_at?: unknown }
+interface AwardRow { id?: unknown; title?: unknown; organization?: unknown; received_at?: unknown; updated_at?: unknown; slug?: unknown }
+
+let about: AboutData | null = null;
+let failed = false;
+try {
+  about = await apiGet<AboutData>("/settings/about", { lang });
+} catch {
+  failed = true;
+}
+if (!failed && !about) failed = true;
+if (failed) {
+  Astro.response.status = 503;
+  Astro.response.headers.set("Retry-After", "120");
+}
+
+let awardRows: AwardRow[] = [];
+if (!failed) {
+  try {
+    const list = await apiGet<AwardRow[]>("/awards", { lang });
+    if (Array.isArray(list)) awardRows = list;
+  } catch {
+    awardRows = [];
+  }
+}
+// Display order: the five stage awards, then award 9.
+const ORDER = [...STAGE_AWARD_IDS, 9];
+const awards = ORDER.map((n) => awardRows.find((r) => r?.id === n)).filter(
+  (r): r is AwardRow => r !== undefined && typeof r.title === "string" && r.title !== "",
+);
+const yearOf = (v: unknown) => {
+  const d = typeof v === "string" ? new Date(v) : null;
+  return d && !Number.isNaN(d.getTime()) ? String(d.getUTCFullYear()) : null;
+};
+const result = (n: unknown) => (n === STAGE_AWARDS.demoDay ? c.awardWinner : n === STAGE_AWARDS.grind ? c.awardAttended : null);
+
+const cmsBio = typeof about?.bio === "string" ? about.bio : "";
+const bio = sanitizeHtml(c.bioHtml !== "" ? c.bioHtml : cmsBio);
+
+// "Updated" date = newest edit of the about settings rows (backend sends updated_at).
+// No date from the API means no date on the page: never the render clock.
+const modifiedDate = typeof about?.updated_at === "string" ? new Date(about.updated_at) : null;
+const modified = modifiedDate && !Number.isNaN(modifiedDate.getTime()) ? modifiedDate : null;
+const modifiedIso = modified ? modified.toISOString().slice(0, 10) : undefined;
+const modifiedText = modified
+  ? modified.toLocaleDateString(lang === "id" ? "id-ID" : "en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })
+  : "";
+
+const career = [
+  { from: ["2008", "2008"], to: ["2015", "2015"], place: c.placeSingapore, role: j.singaporeRole, org: j.singaporeOrg, note: j.singaporeNote },
+  { from: ["2016", "2016"], to: ["2019", "2019"], place: c.placeIndonesia, role: j.marlinRole, org: j.marlinOrg, note: j.marlinNote },
+  // 2019-2021 has no chapter: the timeline shows a dashed stretch before Satnusa (afterGap), no empty item.
+  { from: ["2021-01", "2021"], afterGap: true, to: ["2025-12", "2025"], place: c.placeBatam, role: j.satnusaRole, org: j.satnusaOrg, note: j.satnusaNote },
+  { from: ["2026-01-01", "2026"], to: null, place: c.placeBatam, role: j.indusiaRole, org: j.indusiaOrg, note: c.indusiaTimelineNote },
+];
+
+const profiles: [string, string][] = SAME_AS.map((u) => {
+  const host = new URL(u).hostname.replace(/^www\./, "").split(".")[0];
+  return [u, { instagram: "Instagram", tiktok: "TikTok", linkedin: "LinkedIn", threads: "Threads", youtube: "YouTube", github: "GitHub", wikidata: "Wikidata" }[host] ?? host];
+});
+
+const jsonld = graph(
+  personNode(),
+  websiteNode(),
+  webPageNode({ url, lang, name: title, description: c.metaDescription }),
+  profilePage({ url, dateModified: modifiedIso, name: title, description: c.metaDescription, lang }),
+  breadcrumb([
+    { name: "Ali Sadikin Ma", url: `${SITE}/${lang}` },
+    { name: copy.nav.about, url },
+  ]),
+);
+---
+<BaseLayout title={title} description={c.metaDescription} path={path} lang={lang} jsonld={jsonld}>
+  <main class="about-page">
+    <section class="page-hero th-hero about-hero">
+      <div class="wrap th-hero-grid">
+        <div>
+          <h1>{c.h1}</h1>
+          {failed ? (
+            <p class="about-unavailable" role="status">{c.unavailable}</p>
+          ) : (
+            <>
+              <p class="lead">{c.lead}</p>
+              {modifiedIso && <p class="about-updated">{c.updated} <time datetime={modifiedIso}>{modifiedText}</time></p>}
+            </>
+          )}
+        </div>
+        <figure class="th-photo about-photo">
+          <div class="th-frame">
+            <img class="about-portrait" src="/images/ali-sadikin-ma-pakar-ai-indonesia.jpg" width="1200" height="1200" alt={c.portraitAlt} loading="eager" fetchpriority="high" decoding="async" />
+            <span class="cnr tl" aria-hidden="true"></span><span class="cnr tr" aria-hidden="true"></span>
+            <span class="cnr bl" aria-hidden="true"></span><span class="cnr br" aria-hidden="true"></span>
+          </div>
+        </figure>
+      </div>
+      {!failed && (
+        <div class="wrap">
+          <dl class="about-facts">
+            <div><dt>{c.fact1Num}</dt><dd>{c.fact1}</dd></div>
+            <div><dt>{c.fact2Num}</dt><dd>{c.fact2}</dd></div>
+            <div><dt>{c.fact3Num}</dt><dd>{c.fact3}</dd></div>
+          </dl>
+        </div>
+      )}
+    </section>
+
+    {!failed && (
+      <>
+        <section class="sec" aria-labelledby="about-story">
+          <div class="wrap about-split">
+            <div class="sec-head"><h2 id="about-story">{c.storyH2}</h2></div>
+            <div class="about-bio panel" set:html={bio} />
+          </div>
+        </section>
+
+        <section class="sec alt" aria-labelledby="about-career">
+          <div class="wrap">
+            <div class="sec-head"><h2 id="about-career">{c.timelineH2}</h2></div>
+            <ol class="about-timeline">
+              {career.map((e) => (
+                  <li class={e.afterGap ? "after-gap" : undefined}>
+                    <p class="when">
+                      <time datetime={e.from[0]}>{e.from[1]}</time>–{e.to ? <time datetime={e.to[0]}>{e.to[1]}</time> : c.now} · {e.place}
+                    </p>
+                    <h3>{e.role}</h3>
+                    <p class="org">{e.org}</p>
+                    <p class="note">{e.note}</p>
+                  </li>
+              ))}
+            </ol>
+          </div>
+        </section>
+
+        <section class="sec" aria-labelledby="about-awards">
+          <div class="wrap">
+            <div class="sec-head"><h2 id="about-awards">{c.awardsH2}</h2></div>
+            <ul class="about-awards">
+              {awards.map((r) => {
+                const href = awardHref(r, lang);
+                const year = yearOf(r.received_at);
+                const res = result(r.id);
+                return (
+                  <li>
+                    <p class="aw-meta">{year && <span class="aw-year">{year}</span>}{res && <span class="aw-res">{res}</span>}</p>
+                    <strong>{String(r.title)}</strong>
+                    {typeof r.organization === "string" && r.organization !== "" && <span class="aw-org">{r.organization}</span>}
+                    {href && <a class="aw-link" href={href}>{c.awardOpen}</a>}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </section>
+
+        <section class="sec alt" aria-labelledby="about-indusia">
+          <div class="wrap about-split">
+            <div class="sec-head"><p class="about-kicker">{c.indusiaKicker}</p><h2 id="about-indusia">{c.indusiaH2}</h2></div>
+            <div class="panel about-indusia">
+              <p>
+                {c.indusiaLead}<a href={a.hero.href}>{a.hero.anchor}</a>{c.indusiaMid}<a href={a.company.href}>{a.company.anchor}</a>{c.indusiaEnd}
+                {c.indusiaProducts}<a href={a.aboutVision.href}>{a.aboutVision.anchor}</a>, <a href={a.aboutFleet.href}>{a.aboutFleet.anchor}</a>{c.indusiaAnd}<a href={a.aboutChatbot.href}>{a.aboutChatbot.anchor}</a>{c.indusiaEnd}
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section class="sec" aria-labelledby="about-profiles">
+          <div class="wrap about-close">
+            <div>
+              <h2 id="about-profiles">{c.profilesH2}</h2>
+              <p class="muted">{c.profilesLead}</p>
+              <ul class="about-profiles">
+                {profiles.map(([u, label]) => <li><SocialLink href={u} label={label} rel="me noopener" /></li>)}
+              </ul>
+            </div>
+            <p class="about-more">
+              {c.moreLead} <a href={localizedPath(`/${lang}/pelatihan-ai`, lang)}>{copy.nav.training}</a>, <a href={localizedPath(`/${lang}/pembicara-ai`, lang)}>{copy.nav.speaker}</a>, {c.moreOr} <a href={`/${lang}/faq`}>{copy.footer.faq}</a>.
+            </p>
+          </div>
+        </section>
+      </>
+    )}
+  </main>
+</BaseLayout>

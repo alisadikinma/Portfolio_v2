@@ -40,7 +40,7 @@ class ReapStuckCrossPostCaptionsTest extends TestCase
         Bus::fake();
     }
 
-    private function carouselDraft(string $status = null): LinkedInPost
+    private function carouselDraft(?string $status = null): LinkedInPost
     {
         $post = Post::create([
             'category_id' => $this->category->id,

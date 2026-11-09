@@ -79,7 +79,7 @@ class LinkedInOAuthController extends Controller
         $error = $request->query('error');
         $errorDescription = $request->query('error_description');
 
-        $frontendUrl = rtrim(env('FRONTEND_URL', env('APP_URL', 'http://localhost:5173')), '/');
+        $frontendUrl = rtrim((string) (config('app.frontend_url') ?: config('app.url') ?: 'http://localhost:5173'), '/');
         $settingsUrl = "{$frontendUrl}/admin/settings/about";
 
         if ($error !== null) {

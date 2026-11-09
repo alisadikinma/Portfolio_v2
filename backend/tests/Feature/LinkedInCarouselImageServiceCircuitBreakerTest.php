@@ -44,7 +44,7 @@ class LinkedInCarouselImageServiceCircuitBreakerTest extends TestCase
         Config::set('services.article_generation.use_safety_rewrite', false);
     }
 
-    private function makeDraft(array $slides = null): LinkedInPost
+    private function makeDraft(?array $slides = null): LinkedInPost
     {
         $category = Category::create([
             'name' => 'Test',

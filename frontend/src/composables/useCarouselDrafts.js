@@ -1,3 +1,4 @@
+import { fromWibInput } from '@/utils/wibTime'
 import { ref } from 'vue'
 import axios from 'axios'
 
@@ -93,7 +94,7 @@ export function useCarouselDrafts() {
     error.value = null
     try {
       const response = await axiosInstance.patch(`/admin/carousel-drafts/${id}/schedule`, {
-        scheduled_at: scheduledAt,
+        scheduled_at: fromWibInput(scheduledAt),
       })
       return response.data
     } catch (e) {

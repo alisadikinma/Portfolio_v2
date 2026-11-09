@@ -16,6 +16,7 @@ use App\Services\PipelineGuard;
 use App\Services\TelegramNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Support\WibTime;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
@@ -795,8 +796,19 @@ class LinkedInDraftController extends Controller
         // hours (Tuesday 9am, etc.). When omitted, fall back to the
         // legacy "now + cancel_window_minutes" behaviour.
         $validated = $request->validate([
-            'publish_at' => ['nullable', 'date', 'after:now'],
+            'publish_at' => ['nullable', 'date'],
         ]);
+
+        // A naive publish_at is WIB wall-clock; validate the future check on the
+        // WIB-parsed instant (Laravel's `after:now` would read it as UTC).
+        if (! empty($validated['publish_at'])
+            && ! WibTime::parse($validated['publish_at'])->isFuture()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The publish at field must be a future time.',
+                'errors' => ['publish_at' => ['The publish at field must be a future time (WIB).']],
+            ], 422);
+        }
 
         // Server-side carousel readiness gate. UI disables the approve
         // button when slides aren't all rendered (carouselReadyForApprove
@@ -884,7 +896,7 @@ class LinkedInDraftController extends Controller
             //
             // Operator-provided publish_at still honoured (manual override).
             if (! empty($validated['publish_at'])) {
-                $publishAt = \Carbon\Carbon::parse($validated['publish_at']);
+                $publishAt = WibTime::parse($validated['publish_at']);
             } else {
                 $publishAt = app(\App\Services\LinkedInFixedSlotScheduler::class)
                     ->nextAvailableSlot();
@@ -1518,8 +1530,9 @@ class LinkedInDraftController extends Controller
             'status' => ['nullable', 'string'], // optional client-side filter pill
         ]);
 
-        $from = Carbon::parse($validated['from'])->startOfDay();
-        $to = Carbon::parse($validated['to'])->endOfDay();
+        // Calendar days are WIB days; query in UTC (storage zone).
+        $from = Carbon::parse($validated['from'], WibTime::ZONE)->startOfDay()->utc();
+        $to = Carbon::parse($validated['to'], WibTime::ZONE)->endOfDay()->utc();
 
         $query = LinkedInPost::query()
             ->with(['post.translations', 'repurposeJob:id,linkedin_post_id'])
@@ -1596,7 +1609,7 @@ class LinkedInDraftController extends Controller
             'at' => ['required', 'date'],
         ]);
 
-        $proposed = Carbon::parse($validated['at']);
+        $proposed = WibTime::parse($validated['at']);
         $windowMinutes = LinkedInScheduleConflictService::DEFAULT_WINDOW_MINUTES;
 
         $conflicts = $this->conflictService->findConflicts($proposed, $id, $windowMinutes);
@@ -1607,7 +1620,7 @@ class LinkedInDraftController extends Controller
         // to an empty array (frontend shows the existing static hint).
         $suggestedAlternatives = [];
         if (Schema::hasTable('posting_time_rules')) {
-            $dow = $proposed->dayOfWeek; // Carbon: 0=Sun..6=Sat (matches schema)
+            $dow = $proposed->copy()->setTimezone(WibTime::ZONE)->dayOfWeek; // Carbon: 0=Sun..6=Sat (matches schema)
             $suggestedAlternatives = DB::table('posting_time_rules')
                 ->where('platform', 'linkedin')
                 ->where('audience', 'b2b_tech')

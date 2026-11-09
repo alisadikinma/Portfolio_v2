@@ -398,11 +398,16 @@ export function countdownTo(datetime) {
 export function formatDateTime(dt) {
   if (!dt) return '—'
   const d = new Date(dt)
-  // "Apr 28 · 03:08" — short, scannable, no year (irrelevant within session)
-  const month = d.toLocaleString('en-US', { month: 'short' })
-  const day = d.getDate()
-  const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-  return `${month} ${day} · ${time}`
+  if (Number.isNaN(d.getTime())) return '—'
+  // "Apr 28 · 03:08 WIB" — short, scannable, no year; always Asia/Jakarta.
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Jakarta', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit', hour12: false,
+    }).formatToParts(d).map((p) => [p.type, p.value])
+  )
+  const hour = parts.hour === '24' ? '00' : parts.hour
+  return `${parts.month} ${parts.day} · ${hour}:${parts.minute} WIB`
 }
 
 /**

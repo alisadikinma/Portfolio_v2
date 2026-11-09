@@ -1,0 +1,54 @@
+---
+import type { Lang } from "../../lib/i18n";
+import { loadLatestArticles } from "../../lib/latest";
+import { id } from "../../content/copy/id";
+import { en } from "../../content/copy/en";
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const t = (lang === "id" ? id : en).latestWriting;
+const items = await loadLatestArticles(lang, 3);
+---
+{items.length > 0 && (
+  <section class="sec" id="tulisan" aria-labelledby="tulisan-h">
+    <div class="wrap">
+      <div class="wr-head">
+        <h2 id="tulisan-h">{t.h2}</h2>
+        <a class="wr-all" href={`/${lang}/blog`}>{t.all}<span aria-hidden="true"> →</span></a>
+      </div>
+      <ul class="wr-grid">
+        {items.map((i, n) => (
+          <li class={n === 0 ? "wc wc-lead" : "wc"}>
+            <a href={i.href}>
+              <div class="wc-media">
+                {i.img ? (
+                  <img
+                    src={i.img.src}
+                    srcset={i.img.srcset}
+                    sizes={i.img.srcset ? (n === 0 ? "(min-width: 900px) 640px, 100vw" : "(min-width: 900px) 240px, 100vw") : undefined}
+                    width={n === 0 ? 1200 : 640}
+                    height={n === 0 ? 675 : 360}
+                    alt=""
+                    aria-hidden="true"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                ) : <span class="wc-ph" aria-hidden="true"></span>}
+                {n === 0 && <span class="wc-badge">{t.latest}</span>}
+              </div>
+              <div class="wc-body">
+                <div class="wc-meta">
+                  {n === 0 && i.category && <span class="wc-cat">{i.category}</span>}
+                  {i.iso && <time datetime={i.iso}>{i.dateLabel}</time>}
+                  {i.minutes > 0 && <span>{i.minutes} {t.minRead}</span>}
+                </div>
+                <h3>{i.title}</h3>
+                {n === 0 && i.excerpt && <p class="wc-ex">{i.excerpt}</p>}
+              </div>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </section>
+)}

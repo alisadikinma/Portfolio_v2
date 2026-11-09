@@ -124,4 +124,16 @@ class RepurposePublishZernioApiTest extends TestCase
 
         Queue::assertPushed(PublishRepurposeViaZernio::class, 1);
     }
+
+    public function test_naive_scheduled_at_is_read_as_wib(): void
+    {
+        $job = $this->videoJob();
+        $naive = now('Asia/Jakarta')->addDay()->format('Y-m-d\TH:i');
+
+        $this->actingAs($this->actor(), 'sanctum')
+            ->postJson("/api/admin/repurpose/{$job->id}/publish-zernio", ['platforms' => ['instagram'], 'scheduled_at' => $naive])
+            ->assertStatus(202);
+
+        Queue::assertPushed(PublishRepurposeViaZernio::class, fn ($j) => str_starts_with((string) $j->scheduledForIso, $naive) && str_ends_with((string) $j->scheduledForIso, '+07:00'));
+    }
 }

@@ -1564,6 +1564,7 @@ LINKEDIN_OAUTH_REDIRECT_URI=https://alisadikinma.com/api/admin/linkedin/oauth/ca
 </template>
 
 <script setup>
+import { formatWib } from '@/utils/wibTime'
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSettingsStore } from '@/stores/settings'
@@ -2482,7 +2483,7 @@ function consumeOauthFlash() {
 
 function formatDate(iso) {
   if (!iso) return '—'
-  return new Date(iso).toLocaleString()
+  return formatWib(iso)
 }
 
 // ===========================================================================

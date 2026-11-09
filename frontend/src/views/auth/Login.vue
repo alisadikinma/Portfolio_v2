@@ -97,7 +97,7 @@
 
     <!-- Back to Home -->
     <div class="text-center">
-      <BaseButton variant="outline" @click="$router.push('/')" class="w-full">
+      <BaseButton variant="outline" @click="goToSite" class="w-full">
         Back to Home
       </BaseButton>
     </div>
@@ -116,6 +116,11 @@ const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const uiStore = useUIStore()
+
+// "/" is the Astro public site in production (not a SPA route): full page load.
+function goToSite() {
+  window.location.assign('/')
+}
 
 const form = ref({
   email: '',

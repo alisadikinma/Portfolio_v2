@@ -1,0 +1,64 @@
+---
+import { alternates, localizedPath, withAltPaths, type Lang } from "../lib/i18n";
+import { waLink } from "../lib/whatsapp";
+import LangSwitch from "./LangSwitch.astro";
+import { id } from "../content/copy/id";
+import { en } from "../content/copy/en";
+
+interface Props {
+  lang: Lang;
+  path: string;
+  /** Home page: nav anchors stay in-page. Elsewhere they point to /{lang}/#id. */
+  home?: boolean;
+  /** Languages this page exists in (default both): the switch link to a missing one is hidden. */
+  availableLangs?: Lang[];
+  altPaths?: Partial<Record<Lang, string>>;
+}
+const { lang, path, home = false, availableLangs, altPaths } = Astro.props;
+const otherLang: Lang = lang === "id" ? "en" : "id";
+const canSwitch = !availableLangs || availableLangs.includes(otherLang);
+const c = lang === "id" ? id : en;
+const alts = withAltPaths(alternates(path), altPaths);
+const homePath = `/${lang}`;
+const spy = (hash: string) => (home ? hash : `${homePath}/${hash}`);
+const wa = await waLink(lang, c.wa.general);
+// Page links (not in-page anchors) mark the page you are on (Ali 2026-11-09).
+const trainingHref = localizedPath(`/${lang}/pelatihan-ai`, lang);
+const speakerHref = localizedPath(`/${lang}/pembicara-ai`, lang);
+const blogPrefix = `/${lang}/blog`;
+const cur = (on: boolean) => (on ? "page" : undefined);
+// "Konsultasi via WhatsApp": phones show only the last word (CSS hides .long under 520px).
+const cta = c.nav.ctaWhatsapp;
+const cut = cta.lastIndexOf(" ");
+const ctaLead = cut > 0 ? cta.slice(0, cut + 1) : "";
+const ctaLast = cut > 0 ? cta.slice(cut + 1) : cta;
+---
+<header class="site-head" data-same-tab>
+  <div class="wrap">
+    <a class="brand" href={homePath}>Ali Sadikin Ma <span>/ AI</span></a>
+    <nav class="nav" id="site-nav" popover aria-label={c.nav.ariaMain}>
+      <a href={spy("#tentang")} data-spy>{c.nav.about}</a>
+      <a href={spy("#perjalanan")} data-spy>{c.nav.journey}</a>
+      <a href={spy("#layanan")} data-spy>{c.nav.services}</a>
+      <a href={trainingHref} aria-current={cur(path === trainingHref)}>{c.nav.training}</a>
+      <a href={speakerHref} aria-current={cur(path === speakerHref)}>{c.nav.speaker}</a>
+      <a href={spy("#tulisan")} data-spy aria-current={cur(path === blogPrefix || path.startsWith(`${blogPrefix}/`))}>{c.nav.blog}</a>
+      <LangSwitch lang={lang} alts={alts} canSwitch={canSwitch} label={c.nav.ariaLang} variant="menu" />
+    </nav>
+    <LangSwitch lang={lang} alts={alts} canSwitch={canSwitch} label={c.nav.ariaLang} variant="bar" />
+    {wa !== "" && <a class="btn btn-primary" href={wa} aria-label={cta}>{ctaLead && <span class="long">{ctaLead}</span>}{ctaLast}</a>}
+    {/* Phones: the nav collapses into a native popover (Esc / tap outside close it, no JS needed). */}
+    <button type="button" class="nav-toggle" popovertarget="site-nav" aria-label={c.nav.menu}>
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+</header>
+<script>
+  import { initScrollspy } from "../scripts/scrollspy";
+  initScrollspy();
+  // Close the phone menu after a link is chosen (in-page anchors do not navigate away).
+  const nav = document.getElementById("site-nav");
+  nav?.addEventListener("click", (e) => {
+    if ((e.target as HTMLElement).closest("a") && nav.matches(":popover-open")) nav.hidePopover();
+  });
+</script>

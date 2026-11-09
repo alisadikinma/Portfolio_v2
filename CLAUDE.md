@@ -26,32 +26,34 @@ This repo has a knowledge graph at `graphify-out/` (god nodes, community structu
 
 ## Project Overview
 
-Portfolio_v2 is a full-stack portfolio, blog, and CMS platform using Laravel 12 (backend API) and Vue 3 (frontend SPA). Development on macOS via Docker Desktop.
+Portfolio_v2 is a portfolio, blog, and CMS platform: Laravel 12 (backend API) + **Astro 7 SSR public site (`web/`, node adapter)** + Vue 3 SPA (`frontend/`, **admin/login/unsubscribe only** since PF-2). Development on macOS via Docker Desktop.
 
 **Critical Context Files:**
-- Read `README.md`, `backend/README.md`, `frontend/README.md` at start of every conversation
+- Read `README.md`, `backend/README.md`, `frontend/README.md` (admin SPA) at start of every conversation; public site code lives in `web/` (`web/src/pages`, `web/src/lib/api.ts`)
 - Check `PROJECT_STATUS.md` for current development state and progress tracking
 
 ## Environment Architecture
 
 ### Tech Stack
 **Backend:** Laravel 12 + MySQL 8 + Laravel Sanctum 4 (JWT auth) + Filament 4.1 (admin panels)
-**Frontend:** Vue 3.5 + Rolldown-Vite 7.1 + Pinia 3 + Vue Router 4.5 + Tailwind CSS 4
+**Public site (`web/`):** Astro 7 SSR (`@astrojs/node` standalone, node >= 22) + GSAP + OGL hero; vitest + Playwright e2e (`web/e2e`, one headed Chrome over CDP)
+**Admin SPA (`frontend/`):** Vue 3.5 + Rolldown-Vite 7.1 + Pinia 3 + Vue Router 4.5 + Tailwind CSS 4 (admin only)
+**PHP:** 8.4 (VPS fpm + CLI, Docker container)
 **Packages:** Intervention Image 3.11, Spatie Sluggable 3.7, Resend (email), SortableJS, TanStack Vue Query 5.90
 
 ### Critical URLs
 ```
-Backend API:   http://localhost/Portfolio_v2/backend/public/api
-Frontend Dev:  http://localhost:5173 (Vite)
+Backend API:   Docker `portfolio_backend` container (no XAMPP/`localhost/Portfolio_v2`); prod API `https://alisadikinma.com/api`
+Admin SPA Dev: http://localhost:5173 (Vite, `/` redirects to `/admin`)
+Public site:   http://127.0.0.1:4321 (Astro; `/id`, `/en`)
 Production:    https://alisadikinma.com
 Database:      localhost:3306 (user: ali, db: portfolio_v2)
-phpMyAdmin:    http://localhost/phpmyadmin
 ```
 
 ### Key Constraints
 - **DO NOT** use `php artisan serve` — the `portfolio_backend` Docker container serves the API
 - Project path: `/Users/alisadikin/Drive-D/Projects/Portfolio_v2`
-- Backend + MySQL run in Docker Desktop (containers `portfolio_backend` + `portfolio_mysql`); frontend on Vite dev server. **No host php/composer** — run backend commands via `docker exec portfolio_backend php artisan ...`
+- Backend + MySQL run in Docker Desktop (containers `portfolio_backend` + `portfolio_mysql`); admin SPA on Vite dev server, public site via `npm run dev` / built `node dist/server/entry.mjs` in `web/`. **No host php/composer** — run backend commands via `docker exec portfolio_backend php artisan ...`
 
 ## Architecture & Patterns
 
@@ -158,110 +160,51 @@ return response()->json(['success' => false, 'error' => ['code' => '...', 'messa
 5. **SEO:** All content models have HasSeoFields trait (meta_title, meta_description, og_image, schema_markup, canonical_url, seo_score)
 6. **Translations:** Posts and Projects support i18n via translation tables
 
-### Frontend Architecture (Vue 3)
+### Public Site (Astro SSR, `web/`, PF-2)
 
-**Views (13 public + 25 admin + 1 auth = 39 total):**
+Every public page is server-rendered by Astro (`web/src/pages/[lang]/…`, lang = `id`|`en`, localized segments in `web/src/lib/i18n.ts`: `pelatihan-ai`/`ai-training`, `pembicara-ai`/`ai-speaker`, `penghargaan`/`awards`). It reads the Laravel API **server-side only** (`web/src/lib/api.ts`, 4s timeout, falls back to degraded sections instead of failing). Client JS is limited to small islands (`web/src/scripts/`: lightbox, scrollspy, hero cloud, waitlist/newsletter/contact forms). The browser never talks to Astro for data; forms POST to same-origin `/api/*`, which only reaches Laravel behind nginx. On `:4321` alone (local/e2e) an unmocked POST hits Astro 404, so e2e mocks every form POST.
+
+**Routing (nginx, `scripts/nginx/portfolio-8080.conf`):** Laravel = `/api/*`, `/r/{code}`, `/storage/*`, `/uploads/*`; Vue SPA = `/admin*`, `/login`, `/newsletter/unsubscribe`, `/assets/*`, `/sw.js`; Astro (`127.0.0.1:4321`, unit `portfolio-web.service`) = everything else. See the "nginx routing split" section below.
+
+**`web/.env` (see `web/.env.example`):**
+
+| var | purpose |
+|---|---|
+| `API_INTERNAL_URL` | Laravel API base for SSR reads. Prod: loopback listener `http://127.0.0.1:8081/api` (nginx serves `/api/internal/*` there; public :8080 answers 404). Local e2e/gate: `https://alisadikinma.com/api` read-only. `web/src/lib/config.ts` falls back to `http://127.0.0.1:8080/api` when unset: prod MUST set the :8081 loopback, else `/api/internal/*` 404s and AI-crawler hits are silently dropped |
+| `INTERNAL_API_TOKEN` | Required when `NODE_ENV=production` (server throws at boot otherwise). Must equal `backend/.env` `INTERNAL_API_TOKEN`; sent as `X-Internal-Token` on `POST /api/internal/crawler-hit` |
+| `GA4_MEASUREMENT_ID` | GA4 tag; empty = no tag, no network |
+| `SITE_URL` | Canonical origin for canonical/hreflang/sitemap/JSON-LD (`https://alisadikinma.com`) |
+| `IMAGE_DIMS_ORIGIN` | Optional same-host origin used to read inline image width/height (skips Cloudflare; rejects encoded paths) |
+| `HOST` / `PORT` | `127.0.0.1` / `4321` (pinned again in the systemd `ExecStart`) |
+
+**Commands (in `web/`):** `npm run build` then `API_INTERNAL_URL=… SITE_URL=… HOST=127.0.0.1 PORT=4321 node dist/server/entry.mjs`; `npx vitest run` (unit), `npm run check` (astro check), `npm run e2e` (Playwright, needs the shared Chrome below), `node scripts/seo-gate.mjs --routes all [--base URL]` (per-route SEO gate; `scripts/seo-gate.config.mjs` holds route specs).
+
+**e2e rule:** ONE headed Chrome started once with `--remote-debugging-port=9222`; specs attach with `chromium.connectOverCDP` (worker-scoped fixture reuses the window's page; never `newContext()`/`close()`), `workers: 1`, `retries: 0`. Every form POST is mocked with `page.route` using the real controller's response shape; the suite never writes to production. Pages that need `GET /api/awards/slug/{slug}` (not on prod until backend deploy) cannot be mocked (SSR fetch), so award pages are 404 against prod data.
+
+### Frontend Architecture (Vue 3, admin only since PF-2 phase 5B)
+
+**Public pages live in the Astro SSR site `web/`** (home, about, work/awards, projects, blog, FAQ, contact, training, speaker, sitemaps, robots, llms.txt). The Vue SPA in `frontend/` keeps ONLY: the admin panel (`/admin…`), `/login`, `/newsletter/unsubscribe`, and a 404 catch-all. nginx routes those paths to the SPA and everything else to Astro; locally `/` redirects to `/admin`. Removed with 5B: all public views, `components/home|blog (public)|…`, hero 3D/video, i18n (`vue-i18n`), GSAP, Three.js/TresJS, GA4 tag, Font Awesome CDN, static JSON-LD, hero/proof/career images and videos. `src/router/router-public.spec.js` fails if a public route comes back.
+
+**Views:**
 ```
 src/views/
-├── Home.vue              # Hero, stats, projects, blog, testimonials, CTA
-├── About.vue             # Skills, experience, education, social
-├── Work.vue              # Work/portfolio page
-├── Projects.vue          # Grid with filters, pagination
-├── ProjectDetail.vue     # Full project case study
-├── Awards.vue            # Awards cards with gallery modal
-├── Awards-DEBUG.vue      # Debug version (remove in prod)
-├── Blog.vue              # List with search, categories, pagination
-├── BlogDetail.vue        # Post content, share, author, related
-├── BlogCategory.vue      # Posts filtered by category
-├── Gallery.vue           # Image grid with lightbox
-├── Contact.vue           # Form with validation
-├── NotFound.vue          # 404 page
+├── NewsletterUnsubscribe.vue  # token-based public unsubscribe (layout: bare)
+├── NotFound.vue               # 404 catch-all (layout: bare)
 ├── auth/Login.vue
-└── admin/
-    ├── Dashboard.vue
-    ├── PostsList.vue / PostCreate.vue / PostEdit.vue
-    ├── ProjectsList.vue / ProjectCreate.vue / ProjectEdit.vue
-    ├── AwardsList.vue / AwardCreate.vue / AwardEdit.vue
-    ├── GalleriesList.vue
-    ├── TestimonialsList.vue / TestimonialCreate.vue / TestimonialEdit.vue
-    ├── ContactsList.vue
-    ├── AboutSettings.vue / SettingsForm.vue
-    ├── MenuItemsList.vue          # Dynamic menu management
-    ├── PageSectionsManager.vue    # Homepage section editor
-    ├── AutomationTokens.vue       # API token management
-    ├── AutomationLogs.vue         # Automation activity logs
-    ├── AutomationDocs.vue         # API documentation page
-    ├── CarouselDraftsList.vue     # Carousel drafts management
-    ├── CarouselDraftDetail.vue    # Carousel draft review/approve
-    └── ContentEngine.vue          # Content idea pipeline (spreadsheet UI, 4 modals)
+└── admin/                     # Dashboard, Posts*, Projects*, Awards*, Galleries, Testimonials*, Contacts,
+                               # AboutSettings, SettingsForm, MenuItems, PageSectionsManager, Automation*,
+                               # CarouselDrafts*, ContentEngine + ArticlePreview/ImageGeneration/ArticleFinalize,
+                               # SocialStudio, LinkedInDraftDetail, LinkedInPostsCalendar, CrossPost*, Repurpose*,
+                               # VideoFull*, NewsletterSubscribers, TrainingWaitlist, SchedulerSettings
 ```
 
-**Stores (15 Pinia stores):**
-```
-src/stores/
-├── auth.js / auth-fixed.js  # Authentication & token management
-├── automation.js             # Automation API state
-├── awards.js / categories.js / contacts.js / galleries.js
-├── carouselDrafts.js         # Carousel draft state
-├── posts.js / projects.js / settings.js / testimonials.js
-├── theme.js                  # Light/dark theme
-├── ui.js                     # Loading states, modals, toasts
-└── index.js                  # Store exports
-```
+**Layouts:** `AdminLayout` (`meta.layout='admin'`), `AuthLayout` (`'auth'`), none/`'bare'` → plain div. `DefaultLayout` (public nav/footer) is gone.
 
-**Composables (29 composables):**
-```
-src/composables/
-├── useAboutSettings.js    # About page data + prefetch
-├── useActivityFeed.js     # Activity feed data
-├── useApi.js              # Base API wrapper
-├── useAuth.js             # Auth composable
-├── useAutomation.js       # Automation API
-├── useAwards.js           # TanStack Query cached
-├── useCarouselDrafts.js   # Carousel draft management
-├── useCategories.js
-├── useChatbot.js          # AI chatbot interaction
-├── useContact.js
-├── useContentEngine.js    # Content Engine pipeline (15+ API methods)
-├── useCursorSparks.js     # Cursor spark effects
-├── useGallery.js          # TanStack Query cached
-├── useGlobe.js            # 3D globe visualization
-├── useLocalCache.js       # Local storage caching
-├── useMenuItems.js        # Dynamic menu
-├── useMetaTags.js         # Dynamic SEO meta from CMS
-├── useModal.js
-├── useNewsletter.js       # Newsletter subscribe/unsubscribe
-├── usePageSections.js     # Dynamic page sections
-├── usePosts.js            # TanStack Query cached
-├── useProjects.js         # TanStack Query cached
-├── useScrollReveal.js     # Scroll-triggered reveal animations
-├── useSettings.js / useSiteSettings.js
-├── useStageGalleries.js   # Award gallery photos for International Stages cards (parallel, 60min cache)
-├── useTestimonials.js     # TanStack Query cached
-├── useToast.js
-├── useVideoReveal.js      # Video reveal animations
-└── index.js
-```
+**Stores:** `auth`, `automation`, `awards`, `categories`, `contacts`, `galleries`, `carouselDrafts`, `posts`, `projects`, `settings`, `testimonials`, `theme`, `ui`.
 
-**Components:**
-```
-src/components/
-├── admin/
-│   ├── DragDropList.vue     # SortableJS drag-drop
-│   ├── IconDisplay.vue      # Icon renderer
-│   └── IconPicker.vue       # Icon selector
-├── awards/ / blog/ / projects/ / testimonials/
-├── base/ (17 components)
-│   ├── BaseButton / BaseCard / BaseInput / BaseModal / BaseBadge
-│   ├── BaseLoader / BaseToast / BaseLightbox / BaseGalleryModal
-│   ├── BlogSkeleton / ProjectSkeleton / AwardSkeleton / ContentSkeleton
-│   ├── MobileCarousel / ScrollToTop
-│   └── index.js / README.md
-├── CTASection.vue
-├── HeroSectionWOW.vue
-├── TheNavigation.vue
-└── TheFooter.vue
-```
+**Composables:** admin-facing only (`useApi`, `useLinkedInDrafts`, `useContentEngine`, `useCrossPostDrafts`, `useRepurposeJobs`, `useVideoFull`, `useScheduler`, `useSocialCalendar`, `useSocialQueueList`, `useNewsletter` + `useNewsletterAdmin`, `usePageSections`, `useSettings`, `useSiteSettings`, `useCarouselDrafts`, `useCategories`, `useGallery`, `useMenuItems`, `useLocalCache`, `useToast`, `useTrainingWaitlistAdmin`, `useStalePosts`, `useGeminigenCircuit`). The public composables (`usePosts`, `useProjects`, `useAwards`, `useTestimonials`, `useMetaTags`, `useAboutSettings`, `useStageGalleries`, …) and the `composables/index.js` barrel were deleted.
+
+**Components:** `admin/` (DragDropList, IconDisplay/Picker, ImageConfigModal, EntityUploadSlot, PipelineStepBar, SocialPlatformTabs…), `awards/`, `projects/`, `testimonials/`, `blog/` (admin editors only: BlogPostForm, CategorySelect, ImageUploader, RichTextEditor), `base/` (Base* UI kit).
 
 ## Database Schema (48 migrations, 30+ tables)
 
@@ -583,6 +526,8 @@ GET    /api/llms.txt, /api/llms-full.txt
 GET    /api/health
 GET    /api/activity-feed
 POST   /api/contact (throttle: 3/15min)
+POST   /api/training-waitlist (PF-2; dedicated limiter, honeypot `website`, idempotent on `client_key` UUID: 201 new / 200 replay; 422 body `{success:false,error:{code:"VALIDATION",message}}`)
+GET    /api/awards/slug/{slug} (PF-2; Astro award pages; registered before `/awards/{id}`)
 POST   /api/chatbot/ask (throttle: 10/min)
 POST   /api/newsletter/subscribe (throttle: 5/60min)
 DELETE /api/newsletter/unsubscribe
@@ -610,6 +555,13 @@ DELETE /api/newsletter/unsubscribe
 /api/admin/linkedin-drafts/* (see LinkedIn Admin Routes section below)
 /api/admin/linkedin/* (OAuth: connect, callback, account list, test, disconnect)
 /api/admin/settings/linkedin (GET, PUT — operator-facing publishing flags)
+/api/admin/training-waitlist (GET list, GET /export CSV, PATCH /{id} status/notes) — PF-2
+/api/admin/geo/crawler-hits (GET) — AI-bot crawl counts logged via the internal endpoint
+```
+
+### Internal Routes (server-to-server, PF-2)
+```
+POST   /api/internal/crawler-hit   # Astro middleware reports AI-bot crawls; X-Internal-Token (hash_equals vs services.internal.token), throttle internal-crawler 6000/min, 503 when token unset. Public nginx :8080 answers 404; only the loopback :8081 listener reaches it
 ```
 
 ### CV Export Routes (Sanctum bearer + ability:cv:read + throttle:30,1)
@@ -791,7 +743,17 @@ php artisan article:simulate {ideaId}  # Simulate article generation progress (l
 php artisan content-engine:resync-stuck-variations [--dry-run] [--idea=N]  # Backfill drifted UI variation status from authoritative ImageGenerationJob rows
 ```
 
-### Frontend (Vue)
+### Public site (Astro)
+```bash
+cd /Users/alisadikin/Drive-D/Projects/Portfolio_v2/web
+npm run dev           # Astro dev server (127.0.0.1:4321)
+npm run build && node dist/server/entry.mjs   # production-like (see Public Site section for env)
+npx vitest run        # unit tests
+npm run check         # astro check
+npm run e2e           # Playwright over CDP (shared headed Chrome)
+```
+
+### Admin SPA (Vue)
 ```bash
 cd /Users/alisadikin/Drive-D/Projects/Portfolio_v2/frontend
 npm run dev           # Start Vite dev server (port 5173)
@@ -828,12 +790,18 @@ git push origin main   # ← auto-deploys, watch at https://github.com/alisadiki
 
 **Required GitHub secrets** (already configured — see [.github/workflows/README.md](.github/workflows/README.md)): `VPS_SSH_HOST`, `VPS_SSH_USER`, `VPS_SSH_KEY`, `VPS_SSH_PORT`, `VPS_PROJECT_PATH`.
 
+**Astro public site (PF-2, `web/`):** `deploy.sh` also runs `deploy_web` (after the frontend build): `npm ci` + `npm run build` in `web/`, `sudo -n systemctl restart portfolio-web`, then a health check on `http://127.0.0.1:4321/id/faq` (fails the deploy if it never answers). Skip with `DEPLOY_SKIP_WEB=1`. `deploy.sh` also runs `PageSectionSeeder` (idempotent, removes old homepage ghost rows) and keeps `frontend/dist.prev` (previous SPA build). The Vue `frontend/` is now admin/login/unsubscribe only. One-time install + cutover + rollback: [docs/runbooks/pf2-astro-cutover.md](docs/runbooks/pf2-astro-cutover.md). Tests: `bash scripts/tests/{deploy-web-step,web-unit,nginx-routing}.test.sh`.
+
 **Concurrency:** `deploy-production` group with `cancel-in-progress: false` — pushes during an active deploy queue rather than interrupt mid-migration.
 
 **DO NOT:**
 - Manually `ssh` and run `git pull` / `deploy.sh` (creates drift vs. workflow state)
 - `--force` push to `main` (breaks concurrent deploy assumptions)
 - Edit files directly on the VPS (next deploy will `git reset --hard` over them)
+
+## nginx routing split (PF-2) — `scripts/nginx/portfolio-8080.conf`
+
+Snapshot of the live vhost (deploy.sh does NOT touch nginx; sync by hand, `nginx -t && systemctl reload nginx`). Public port 8080: Laravel for `/api/*`, `/r/{code}`, `/storage/*`, `/uploads/*` (`/api/internal/*` = 404); Vue SPA for `/admin*`, `/login`, `/newsletter/unsubscribe`, `/assets/*`, `/sw.js` (kill-switch worker, must stay reachable); **everything else → Astro** `127.0.0.1:4321` (`^~ /_astro/`, `= /_image`, pages, `/robots.txt`, `/sitemap*.xml`, `/llms.txt`, `web/public/*`). There is no extension-regex static block any more (it 404'd Astro assets). Loopback `127.0.0.1:8081` serves `/api/*`, `/storage/*`, `/uploads/*` for Astro → Laravel (`web/.env`: `API_INTERNAL_URL=http://127.0.0.1:8081/api`, `IMAGE_DIMS_ORIGIN=http://127.0.0.1:8081`, `INTERNAL_API_TOKEN` = same value as `backend/.env`, `SITE_URL`, `GA4_MEASUREMENT_ID`). Astro runs as `portfolio-web.service` (same user as the queue unit, `MemoryMax=512M`, env from `web/.env`). Leftover prod env `SEO_SPA_SHELL_PATH` / `SEO_HTML_CACHE_TTL` and `seo_html:*` cache keys are unused and harmless.
 
 ## VPS Background Process Setup (Required for Pipelines)
 
@@ -963,50 +931,26 @@ After updating `.env`, run `php artisan config:cache && systemctl restart portfo
 - Foreign keys: `category_id` (singular + _id)
 - Always include timestamps
 
-## Page Sections Mapping (admin ↔ view)
+## Page Sections Mapping (admin ↔ Astro home)
 
-`/admin/page-sections` rows are keyed by `(page_type, section_type)`. The table below lists which view reads which `section_type` — if a row exists in DB but isn't listed here, toggling it is a **ghost toggle** (no render effect). Always keep this in sync when adding/removing sections from views.
+`/admin/page-sections` rows are keyed by `(page_type, section_type)`. Since PF-2 only the **Astro home** ([web/src/pages/[lang]/index.astro](web/src/pages/[lang]/index.astro)) reads them (`GET /api/page-sections?page=homepage`); a missing row means "on", an `is_active=false` row hides the section, and `hero` can never be hidden (holds the H1 + LCP image). A row that is not listed below is a **ghost toggle** — `PageSectionSeeder` deletes every `homepage` row outside this list on seed (`HOMEPAGE_SECTIONS` constant; covers `what-i-solve`, `selected-work`, `skills-reel`, `featured-projects`, `latest-blog`, `stats-cta`, `skill-*`, and the old snake_case rows). Keep the seeder and `index.astro` in sync when adding/removing a section. Guarded by `PageSectionSeederTest`.
 
-**The Operator redesign (June 8, 2026):** homepage recomposed into a fixed 9-section identity-led spine. All homepage `section_type`s are kebab-case; `PageSectionSeeder` deletes the obsolete snake_case homepage ghosts (`featured_projects`, `latest_blog`, `awards`, `gallery`, `cta`) on seed. `Home.vue::isSectionActive` is **default-on for rows absent from DB** (so the spine renders before the seeder runs), and respects `is_active` for rows that exist.
+| page_type | section_type | Astro component |
+|---|---|---|
+| `homepage` | `hero` | `Hero` (always rendered) |
+| `homepage` | `who-i-am` | `home/WhoIAm` |
+| `homepage` | `receipts` | `home/ProofBand` |
+| `homepage` | `international-stages` | `home/Journey` + `home/Stages` (one toggle, two blocks) |
+| `homepage` | `services` | `home/Services` |
+| `homepage` | `testimonials` | `home/Testimonials` |
+| `homepage` | `latest-writing` | `home/LatestWriting` |
+| `homepage` | `join-the-build` | `NewsletterForm` |
 
-| page_type | section_type | Rendered by | Component |
-|---|---|---|---|
-| `homepage` | `hero` | [Home.vue](frontend/src/views/Home.vue) | `HeroOperator` (cinematic "JARVIS operator" hero video + ALI SADIKIN MA wordmark + manifesto + 3 CTAs + stat triad; **`public/videos/hero-loop.webm` (2.92MB) + `.mp4` (3.40MB) 8s loop** — keyframe via indusia-image-gen (face ref) → VEO image-to-video via indusia-video-gen, Veo watermark stripped w/ ffmpeg `delogo`; central JARVIS arc-reactor HUD orchestrating 3 labeled live screens VIBE CODING · AI AGENT OS · VIDEO GEN, operator in trendy blazer+tee; **`hero-poster.jpg` (keyframe) wired as `posterSrc`** = immediate render + reduced-motion/slow-conn fallback; `sw.js` pre-caches loop+poster (cache v2). Replaced `CinematicHero` June 8.) |
-| `homepage` | `who-i-am` | Home.vue | `WhoIAm` (answer-shaped LLM-quotable about block + real portrait from `settings.about.profile_photo` + identity chips; **live `settings.about.bio` rendered via sanitized `v-html`** — `cleanBio` allowlist `p/strong/em/br`, strips attrs+script — fixed raw-tag leak) |
-| `homepage` | `what-i-solve` | Home.vue | `WhatISolveTabs` (3-discipline tabbed switcher: Vibe Coding · AI Agent OS **MANDOR AI** `Introducing` · Generative Video; right panel renders `active.imageSrc` `<img>` when set — **AI Agent OS tab shows a branded MANDOR kanban-board mockup `public/images/whatisolve/mandor-board.jpg`** (indusia-image-gen), else autoplay muted `videoSrc` per tab; all 3 CTAs scroll to `#join-the-build`) |
-| `homepage` | `receipts` | Home.vue | `ReceiptsBento` (6-tile proof bento, gold lead = #1 Global AI Demo Day 2026; live 56+/17yr from stats, static $318K+/16/≥95%; **each tile has a geminigen background `public/images/proof/*.jpg` + dark legibility overlay** — demoday from face ref) |
-| `homepage` | `international-stages` | Home.vue | `InternationalStages` — **reframed to "Track Record"** (two bands): a **17-year CAREER band** (3 curated chapters from vault `experience.md`: Singapore MNC IT 2008–2015 · Marlin 2016–2019 · Sat Nusapersada 2023–2025, accent gold) ABOVE the **5 STAGE cards** (Bengaluru/Hangzhou-UNCTAD/Silicon Valley/NextDev/Fenox — **IDBYTE dropped**, accent cyan). Stage photos via [`useStageGalleries`](frontend/src/composables/useStageGalleries.js) (`/api/awards/{id}/galleries`); **career photos via new [`useExperienceGalleries`](frontend/src/composables/useExperienceGalleries.js)** (gallery_id based: Singapore→14, Marlin→9-13, Satnusa→16; `/api/galleries/{id}` `file_url`). Shared `BaseGalleryModal` driven by both; text-only fallback per card. Section `id` stays `international-stages` (nav anchor intact) |
-| `homepage` | `selected-work` | Home.vue | `SelectedWork` (live `featured.featured_projects` cards → `/projects/{slug}`; footer "All N projects") |
-| `homepage` | `testimonials` | Home.vue | `TestimonialsCarousel` (LinkedIn-sourced quotes, 8s auto-rotate, pause-on-hover, dots nav, keyboard ←/→) |
-| `homepage` | `latest-writing` | Home.vue | `LatestWriting` (live `featured.latest_articles` feed + Content Engine meta-flex "this blog writes itself") |
-| `homepage` | `join-the-build` | Home.vue | `JoinTheBuild` (follow @alisadikinma IG·TikTok·LI·YT + live newsletter signup name/email/WA E.164 + soft WhatsApp CTA) |
-| ~~`homepage` `skills-reel`~~ | ~~Home.vue~~ | ~~`SkillsReel`~~ | RETIRED June 8 — dropped from The Operator spine |
-| ~~`homepage` `featured-projects`~~ | ~~Home.vue~~ | ~~`ProjectsBento`~~ | RETIRED June 8 — superseded by `selected-work` / `SelectedWork` |
-| ~~`homepage` `latest-blog`~~ | ~~Home.vue~~ | ~~`LatestBlog`~~ | RETIRED June 8 — superseded by `latest-writing` / `LatestWriting` |
-| ~~`homepage` `stats-cta`~~ | ~~Home.vue~~ | ~~`StatsBar`+`CTASection`~~ | RETIRED June 8 — superseded by `receipts` + `join-the-build` |
-| `about` | `cta` | [About.vue](frontend/src/views/About.vue) | `CTASection` (root variant, WhatsApp + social) |
-| `projects` | `cta` | [Projects.vue](frontend/src/views/Projects.vue) | `CTASection` (root variant) |
-| `gallery` | `cta` | [Gallery.vue](frontend/src/views/Gallery.vue) | `CTASection` (root variant) |
-| `blog` | `cta` | [BlogDetail.vue](frontend/src/views/BlogDetail.vue) | `CTASection` (root variant) — **article detail, NOT list** |
-
-**Naming convention:** `section_type` is kebab-case. The retired homepage components (`SkillsReel`, `SkillShowcase`, `ProjectsBento`, `LatestBlog`, `StatsBar`, `CTASection` home-variant, `CinematicHero`) still exist on disk until the Phase J cleanup. Don't revive snake_case; always use kebab-case for new sections and keep `PageSectionSeeder` in sync.
-
-**Home.vue snap-section gotcha:** `.snap-section` wrapper has `min-height: 100dvh` — putting `v-if="isSectionActive(...)"` on the inner component while keeping the wrapper always-rendered leaves a full-viewport blank space when the section is toggled off. Always put the `v-if` on the `<div class="snap-section">` wrapper itself so the whole section collapses.
-
-**Header nav = section anchors (June 8, 2026):** [TheNavigation.vue](frontend/src/components/TheNavigation.vue) no longer renders DB `menu_items` route-links — it renders a static `sectionLinks` set (Who I Am · What I Solve · Receipts · Awards · My Projects · Blogs · Contact) mapped to the homepage section `id`s (`who-i-am`/`what-i-solve`/`receipts`/`international-stages`/`selected-work`/`latest-writing`/`join-the-build`). Each `.snap-section` wrapper in `Home.vue` carries a matching `id` + `scroll-mt-24`. Click → on homepage `scrollIntoView` (reduced-motion aware), off-homepage `router.push({name:'home', hash})` (router `scrollBehavior` resolves the hash). IntersectionObserver drives an active-link highlight (cosmetic, graceful no-op). When adding/removing a homepage section, keep `sectionLinks` ↔ the section `id`s in sync.
+The `about` / `projects` / `blog` `cta` + `featured_projects` + `latest_blog` rows still seeded below are NOT read by Astro (inactive, harmless) — candidates for a later cleanup.
 
 ## Performance & Caching
 
-**TanStack Query Cache Strategy:**
-- Posts: 5min stale time (frequent updates)
-- Projects: 60min stale time
-- Awards: 60min stale time
-- Testimonials: 30min stale time
-- Gallery: 60min + smart invalidation on mutations
-- About Settings: prefetched on router navigation
-- Page Sections: **30s staleTime + `refetchOnMount: 'always'`** — operators toggle visibility in `/admin/page-sections` and expect effect within next navigation, not 10 minutes. Override of global default (`refetchOnMount: false`).
-
-**Results:** 83% faster repeat visits, 70% fewer API calls, all pages < 500ms cached
+Public pages are Astro SSR (no client data layer, no TanStack on the public site). TanStack Query remains in the **admin SPA only** (`frontend/`): lists cached 5-60 min by resource; Page Sections use 30s `staleTime` + `refetchOnMount: 'always'` so operator toggles show on next navigation. Public caching is HTTP-level (Cloudflare edge, ETag/304 via `ApiETag`).
 
 ## CORS Configuration
 ```
@@ -1021,7 +965,7 @@ Supports credentials: true
 - **CORS errors** → Check `backend/config/cors.php` origins
 - **FormData PUT** → Use `POST` with `_method=PUT` field
 - **Migration fail** → `php artisan migrate:fresh --seed`
-- **Gallery bulk-upload silently 422 / "Uploading…" stuck** → check **PHP-FPM `upload_max_filesize`** on VPS (NOT CLI). PHP silently truncates files >limit, validator then sees empty/corrupt `images[]` and returns 422 with no specific message. Production VPS uses `php8.2-fpm` with override at [/etc/php/8.2/fpm/conf.d/99-portfolio.ini](scripts/systemd/) (50M per file / 200M post / 120s execution / 256M memory). Laravel validator capped at 30MB per file (gallery + items + bulk endpoints), frontend hint says "Max 30MB". **Don't trust `php -i` from CLI** — CLI defaults differ from FPM (e.g., CLI showed 2M while FPM was 10M before fix). Always check `/etc/php/8.2/fpm/php.ini` + conf.d overrides.
+- **Gallery bulk-upload silently 422 / "Uploading…" stuck** → check **PHP-FPM `upload_max_filesize`** on VPS (NOT CLI). PHP silently truncates files >limit, validator then sees empty/corrupt `images[]` and returns 422 with no specific message. Production VPS uses `php8.4-fpm` (since PF-2, see [pf2-php84-upgrade.md](docs/runbooks/pf2-php84-upgrade.md)) with override at `/etc/php/8.4/fpm/conf.d/99-portfolio.ini` (50M per file / 200M post / 120s execution / 256M memory). Laravel validator capped at 30MB per file (gallery + items + bulk endpoints), frontend hint says "Max 30MB". **Don't trust `php -i` from CLI** — CLI defaults differ from FPM (e.g., CLI showed 2M while FPM was 10M before fix). Always check `/etc/php/8.4/fpm/php.ini` + conf.d overrides.
 
 ## Multi-Agent System
 
@@ -1081,6 +1025,9 @@ Match the model to the actual cognitive effort of the work. Don't pay Opus rates
 2. Check `PROJECT_STATUS.md` for current state
 3. Review existing patterns before creating new ones
 
+### Repo hygiene (PF-2)
+Never track `vendor/`, `node_modules/`, DB dumps (`*.sql`), `.env`, `*.bak|old|orig|backup-*`, generated reports (`playwright-report/`) or debug pages. Only `backend/`, `frontend/`, `web/` have dependency manifests (none at repo root). Guard: `bash scripts/tests/repo-hygiene.test.sh`. Local data: use `scripts/pf2-local.sh import`, not a committed dump.
+
 ### After Changes (MANDATORY):
 1. Run tests
 2. **Update CLAUDE.md** — every change that touches architecture, routes, schema, composables, page-section mapping, new env vars, or pipeline stages MUST be reflected in the relevant CLAUDE.md section (root / backend / frontend) before commit. Skipping this leaves next session (or next contributor) debugging stale docs. Also update the "Last Updated" line at the bottom of root CLAUDE.md.
@@ -1099,7 +1046,7 @@ Match the model to the actual cognitive effort of the work. Don't pay Opus rates
 
 ### Current State (Fixed April 10, 2026)
 
-**Overall Score: 8.5/10** — All P0-P2 issues resolved. **P0 "SPA without SSR" now FULLY CLOSED** (homepage + all blog surfaces June 9, 2026; **projects detail June 25, 2026** — `SpaPrerenderController::projectDetail` + `SchemaGraphBuilder::creativeWork` + crawlable `seo/project.blade.php` body, 1h cache purged via `Project::boot`) via the Laravel SSR-enrichment layer ([`SpaPrerenderController`](backend/app/Http/Controllers/SpaPrerenderController.php) + [`SeoHtmlComposer`](backend/app/Services/Seo/SeoHtmlComposer.php) + [`SchemaGraphBuilder`](backend/app/Services/Seo/SchemaGraphBuilder.php)) — see the Last Updated changelog + [docs/runbooks/seo-geo-ssr-deploy.md](docs/runbooks/seo-geo-ssr-deploy.md). **GEO 5-Pillar audit (June 25, 2026)** vs Helena Liu's GEO Toolkit closed 3 gaps: projects SSR (Pillar 1), a dedicated `/faq` page (Pillar 2 — `config/faq.php` single source → SSR `FAQPage` + `/api/faq` + Vue `FaqView`), and Pillar 5 measurement (GA4 tag via `VITE_GA4_MEASUREMENT_ID` + AI-bot crawl logger `LogAiCrawler` → `geo_crawler_hits` → `GET /api/admin/geo/crawler-hits`, since GA4 can't see JS-blind crawls). See [docs/plans/2026-06-25-geo-hardening-three-gaps.md](docs/plans/2026-06-25-geo-hardening-three-gaps.md) + [docs/runbooks/geo-ai-traffic-ga4.md](docs/runbooks/geo-ai-traffic-ga4.md).
+**Overall Score: 8.5/10 (state as of Nov 2026; the April 2026 fix list below is historical)** — **PF-2 (Nov 2026): SEO/GEO (JSON-LD, hreflang, sitemaps, llms.txt, crawlable HTML) now lives in the Astro SSR site `web/`.** The old Laravel SSR-enrichment layer (prerender controller, HTML composer, schema-graph builder, `resources/views/seo/*`, 1h `seo_html:*` cache + model purge hooks) was removed in phase 5C; Laravel `web.php` keeps only `/r/{code}` and `/login`. Still on Laravel: `GET /api/faq` (`config/faq.php`, consumed by Astro), `LogAiCrawler` AI-bot logging → `geo_crawler_hits` → `GET /api/admin/geo/crawler-hits`. History of the retired layer: git log + [docs/runbooks/seo-geo-ssr-deploy.md](docs/runbooks/seo-geo-ssr-deploy.md) (obsolete).
 
 ### What's Implemented
 
@@ -1110,40 +1057,25 @@ Match the model to the actual cognitive effort of the work. Don't pay Opus rates
 - `PostResource` / `ProjectResource` → Rich SEO metadata (meta_title, og_image, schema_markup, faq_schema, ai_summary, canonical_url)
 - `robots.txt` (backend) → Crawl rules, AI bot allow-list (GPTBot, ClaudeBot, PerplexityBot), rate limiting
 
-**Frontend SEO Infrastructure:**
-- `useMetaTags.js` → Dynamic meta tags, JSON-LD injection, BreadcrumbList schema, ArticleSchema, ProjectSchema
-- `index.html` → Static OG/Twitter meta tags + `<link rel="alternate" href="/llms.txt">` + `<link rel="sitemap">`
-- `frontend/public/llms.txt` → Static root-level LLM profile (+ link to dynamic API version)
-- `frontend/public/sitemap.xml` → Root sitemap index pointing to API sitemaps
-- `robots.txt` (frontend) → Production URLs, AI crawler allow-list, sitemap references
-- Semantic HTML: `<article>`, `<section>`, `<main>`, `<aside>`, `<header>`, `<footer>`, `<figure>`, `<figcaption>`, `<time>`
-- BreadcrumbList JSON-LD on BlogDetail and ProjectDetail pages
-- BlogPosting JSON-LD on blog posts, CreativeWork JSON-LD on projects
-- Proper H1→H2→H3 hierarchy, alt text on all images, slug-based URLs
+**Public-site SEO infrastructure (Astro `web/`, PF-2):**
+- `web/src/components/SeoHead.astro` + `web/src/lib/schema.ts` → title/description/canonical, hreflang id/en/x-default, OG/Twitter, one JSON-LD `@graph` per page (Person, WebSite, WebPage, BreadcrumbList, BlogPosting, CreativeWork, CollectionPage, Event, Service, FAQPage, ProfilePage)
+- `web/src/pages/robots.txt.ts` (AI crawler allow-list), `sitemap.xml.ts` (index) + `sitemap-{pages,posts,projects}.xml.ts` (proxy Laravel `/api/sitemap*.xml`, 502 when the API fails, never an empty sitemap)
+- `web/public/llms.txt` (static) + Laravel `/api/llms.txt`, `/api/llms-full.txt`
+- `web/scripts/seo-gate.mjs` + `seo-gate.config.mjs` → per-route SEO gate (run against a built Astro server), `parity-diff.mjs` (old vs new SEO), `redirect-map.test.mjs` (every old URL = 200 or one 301)
+- Semantic HTML, H1→H2→H3, alt + width/height on every image, slug-based language-prefixed URLs
 
 ### Remaining Issue
 
 | Priority | Issue | Status |
 |----------|-------|--------|
-| ~~**P0**~~ | ~~**SPA without SSR**~~ — homepage + blog + **projects detail** now server-enriched with head + JSON-LD + crawlable body via Laravel `SpaPrerenderController` (Vue hydrates on top). | ✅ FULLY FIXED — blog June 9 2026, projects June 25 2026 |
+| ~~**P0**~~ | ~~**SPA without SSR**~~ — public pages now rendered by Astro SSR (`web/`); Laravel prerender layer removed (PF-2 5C). | ✅ FIXED (PF-2) |
 | ~~**P2**~~ | ~~**FAQ only on blog**~~ — dedicated `/faq` page now emits `FAQPage` JSON-LD + crawlable `<dl>` (`config/faq.php` single source). | ✅ FIXED June 25, 2026 — per-project/about FAQ deferred |
-| **P5** | **No AI-traffic measurement** — GA4 tag + AI-bot crawl logger now shipped; GA4 "AI Traffic" channel group is a manual dashboard step. | ✅ code shipped June 25, 2026 (operator: set `VITE_GA4_MEASUREMENT_ID` + GA4 channel group) |
+| **P5** | **No AI-traffic measurement** — GA4 tag + AI-bot crawl logger now shipped; GA4 "AI Traffic" channel group is a manual dashboard step. | ✅ code shipped June 25, 2026 (operator: set `GA4_MEASUREMENT_ID` in `web/.env` + GA4 channel group) |
 | **P3** | No `.well-known/ai-plugin.json` | Optional |
 
-### Fixed Issues (April 10, 2026)
+### Fixed Issues
 
-- **robots.txt** — Both frontend/backend now use `https://alisadikinma.com/api/sitemap*.xml`
-- **Root /llms.txt** — Static file in `frontend/public/llms.txt` with profile + API links
-- **Root /sitemap.xml** — Static sitemap index in `frontend/public/sitemap.xml`
-- **sitemap-index.xml** — Fixed `http://` → `https://` via `apiUrl()` helper
-- **Per-page meta tags** — BlogDetail + ProjectDetail inject dynamic OG/Twitter/canonical
-- **`<time datetime>`** — Blog.vue, BlogDetail.vue use semantic `<time>` elements
-- **`<figure>/<figcaption>`** — BlogDetail featured image + ProjectDetail hero image
-- **BreadcrumbList** — JSON-LD on BlogDetail (Home→Blog→Category→Post) and ProjectDetail (Home→Projects→Project)
-- **Article schema** — BlogPosting JSON-LD injected on blog post pages
-- **Project schema** — CreativeWork JSON-LD injected on project detail pages
-- **AI crawler allow-list** — GPTBot, ClaudeBot, PerplexityBot, GoogleOther explicitly allowed in robots.txt
-- **index.html** — Added `<link rel="alternate">` for llms.txt and `<link rel="sitemap">` for sitemap
+The April 2026 SPA-era fixes (per-page meta via `useMetaTags`, static `frontend/public/llms.txt` + `sitemap.xml`, Vue-injected JSON-LD) are obsolete: all of it is replaced by the Astro site (see *Public-site SEO infrastructure* above). `frontend/public/robots.txt` + `sitemap.xml` are removed at cutover.
 
 ### llms.txt Specification
 
@@ -1571,8 +1503,8 @@ CAROUSEL_GEN_REFS_PIPELINE=/home/claudesn/refs-carousel-gen-pipeline.md  # ~169K
 CAROUSEL_GEN_TIMEOUT_SECONDS=900                            # Matches LINKEDIN_GEN_TIMEOUT_SECONDS
 ```
 
-### Service Worker (Media Caching)
-`frontend/public/sw.js` — Caches videos and images via Cache API. Pre-caches hero videos on install, cache-first strategy for all media.
+### Service Worker (retired)
+`frontend/public/sw.js` is a kill-switch worker (PF-2 5B): it clears `media-cache-*` and unregisters itself so browsers that cached the old SPA's media stop intercepting the Astro site's images. nginx must keep serving `/sw.js` from the SPA build root.
 
 ## Newsletter System (May 5, 2026)
 
@@ -1727,8 +1659,10 @@ Idempotent via `firstOrCreate(['signature' => ...], $row)` — re-seeding on exi
 
 > Condensed log — one line per change. Deep detail lives in the linked `docs/plans/` + `docs/runbooks/` docs and git history. Commits are local until the operator authorizes a push.
 
+- **2026-11-08** — **PF-2 5E: release gate.** Playwright e2e in `web/e2e/public.spec.ts` (14 tests: hero fits 4 viewports, scrollspy, lightbox, waitlist/newsletter/contact submit with mocked POSTs, language switch) over ONE headed Chrome via CDP; full SEO gate (`--routes all` + live posts/projects/awards) and Lighthouse (SEO 100 / A11y 100 on home, training, speaker, blog post; home LCP element = hero img) recorded in `.gaspol/progress/PF-2/`. Docs refreshed (Astro `web/`, env vars, new endpoints, PHP 8.4). Not pushed.
+- **2026-11-08** — **PF-2 5B: public Vue SPA code removed (admin stays).** Router now only `/login`, `/newsletter/unsubscribe`, `/admin…`, 404 catch-all, `/`→`/admin`; deleted public views, `components/home|blog (public)`, public composables/utils/data, i18n, hero media, GA4 + SW registration; deps removed: three, @tresjs/core, gsap, vue-i18n, @heroicons/vue, query-sync-storage-persister. `PageSectionSeeder` now deletes every homepage row the Astro home does not read (incl. `what-i-solve`, `selected-work`). `public/sw.js` is a kill-switch. Not pushed. [plan](docs/plans/2026-11-08-PF-2-portfolio-redesign-seo-plan.md)
 - **2026-07-01** — **GeminiGen → indusia client SSOT (submit via CLI bridge, flagged OFF).** Stops the backend hand-rolling GeminiGen/snapgen HTTP submits in two drifted spots — image + video now shell the `indusiagen-api-client` CLI ([geminigen_image.py / geminigen_video.py](https://github.com/alisadikinma/indusiagen-api-client), the SSOT for the wire protocol) via new [`GeminiGenClientBridge`](backend/app/Services/GeminiGenClientBridge.php) (SUBMIT-only: `submit($endpoint,$fields,$refs,$model)` → uuid; `local` driver = Illuminate Process **argv array, no shell**, `ssh` = `escapeshellarg` per token; **API key NEVER on argv** — client reads its own VPS `.env`; gpt-image-2 URL-refs auto-materialized to temp local files). Wave 1 (images): [`ImageGenerationService::queue`](backend/app/Services/ImageGenerationService.php) + [`LinkedInCarouselImageService::dispatchOne`](backend/app/Services/LinkedInCarouselImageService.php) branch to the bridge behind `geminigen.use_indusia_images`; carousel model now operator-set via `linkedin_carousel_image_model` setting (default `nano-banana-pro`; `gpt-image-2` = literal-typography, Premium-plan only, gets `--mode medium`). Wave 2 (video): all 4 [`GeminiGenVideoService`](backend/app/Services/GeminiGenVideoService.php) dispatchers (hook/keyframe/veo/grok) branch behind `geminigen.use_indusia_video` — per-family CLI subcommand (grok `2:3`/`--mode custom`, veo `--mode frame`, keyframe → image CLI). **Both flags default OFF** — old PHP HTTP path is the fallback, deploy = no-op until env flip. Vendor rebrand `api.geminigen.ai → api.snapgen.ai` centralized in new [`config/geminigen.php`](backend/config/geminigen.php) `base_url` (6 seams: 3 services + 3 poll crons off the dead domain). **Poll stays backend GET** (`{base_url}/history/{uuid}` — model-agnostic, no drift; the client's `check` subcommand is a documented stub → bridge is submit-only). Env: `GEMINIGEN_BASE_URL`, `GEMINIGEN_CLIENT_{DRIVER,PATH,REPO,TIMEOUT,SSH_*}`, `GEMINIGEN_USE_INDUSIA_{IMAGES,VIDEO}`. Tests: config 4 + bridge 6 + ImageGenIndusiaSubmit 2 + CarouselIndusiaSubmit 3 + VideoIndusiaSubmit 4 + touched-suite regression (video svc 2, polls 17) all green (11 batched fails are the pre-existing `alias:Setting` Mockery leak, proven identical at base `88479ec7`). **SHIPPED + LIVE (2026-07-01):** pushed, deployed, VPS client installed (read-only deploy key + `~/.config/geminigen/config.json` key — client has no dotenv loader), all step-0 probes green (image / gpt-image-2 Premium / grok+ref 2:3 / veo frame), **both flags flipped ON** — Wave 1 verified prod-green end-to-end (draft 188 slide 0 `failed → done`: service → CLI bridge → job row → poll `GET /history` → downloaded), Wave 2 (video) ON, organic-verify on next hook/veo run. Key rotated to a fresh snapgen key (old one hit `HTTP 402` out-of-credits, which had also broken the live HTTP image path since ~09:30 — rotation fixed both). CLI `--aspect` enum has NO `4:5` (carousel uses `3:4`). → [runbook](docs/runbooks/geminigen-indusia-client-deploy.md). [plan](docs/plans/2026-07-01-geminigen-indusia-client-ssot.md)
-- **2026-06-25** — **GEO hardening vs Helena Liu's 5-Pillar GEO Toolkit — closed the 3 real gaps.** Audit found Pillars 1/3-signal/4 essentially done (9 AI-bot robots allow-list, static+dynamic llms.txt, 10 schema types, blog/home SSR, 7-platform cross-post); gaps were projects-invisible-to-JS-crawlers (P1), FAQ-only-on-blog (P2), zero measurement (P5). **(P1) Projects detail SSR** — [`SpaPrerenderController::projectDetail`](backend/app/Http/Controllers/SpaPrerenderController.php) clones `blogDetail`: `CreativeWork` JSON-LD ([`SchemaGraphBuilder::creativeWork`](backend/app/Services/Seo/SchemaGraphBuilder.php)) + crawlable `<article>` body ([`seo/project.blade.php`](backend/resources/views/seo/project.blade.php)) + breadcrumbs + hreflang, 1h cache purged via `Project::boot` → `purgeForProject`; web.php OG-only closures replaced (no nginx change — `/projects/*` already routes to PHP-FPM). **(P2) Dedicated `/faq`** — single source [`config/faq.php`](backend/config/faq.php) (11 curated answer-first Q&A) feeds SSR `FAQPage`+crawlable `<dl>` ([`SpaPrerenderController::faq`](backend/app/Http/Controllers/SpaPrerenderController.php) + [`seo/faq.blade.php`](backend/resources/views/seo/faq.blade.php)), public `GET /api/faq` ([`FaqController`](backend/app/Http/Controllers/Api/FaqController.php)), and Vue [`FaqView.vue`](frontend/src/views/FaqView.vue) — **needs one-time nginx widening for `/faq`** ([runbook](docs/runbooks/seo-geo-ssr-deploy.md)). **(P5) Measurement** — GA4 gtag in [`main.js`](frontend/src/main.js) gated by `VITE_GA4_MEASUREMENT_ID` (empty → no tag/network) + [`LogAiCrawler`](backend/app/Http/Middleware/LogAiCrawler.php) middleware (atomic `upsert` into `geo_crawler_hits`, fail-open) logging the AI-bot crawls GA4 can't see, read via `GET /api/admin/geo/crawler-hits` ([`GeoCrawlerStatsController`](backend/app/Http/Controllers/Api/Admin/GeoCrawlerStatsController.php)); GA4 "AI Traffic" channel group is a manual dashboard step ([runbook](docs/runbooks/geo-ai-traffic-ga4.md)). Per-project/about FAQ deferred (YAGNI). 5 test files added (LogAiCrawler, ProjectDetailSsr, FaqSsr, FaqApi, SchemaGraphBuilderCreativeWork); code-reviewed (noscript-FAQ + upsert-race + MariaDB-orderBy fixes applied). NOT pushed — operator: run migrate + `php artisan test`, set `VITE_GA4_MEASUREMENT_ID`, widen nginx for `/faq`. [plan](docs/plans/2026-06-25-geo-hardening-three-gaps.md)
+- **2026-06-25** — GEO hardening (3 gaps: projects SSR, `/faq`, measurement). SSR parts since superseded by Astro `web/` (PF-2, Nov 2026) and the Laravel prerender code deleted; surviving pieces: `config/faq.php` + `GET /api/faq`, `LogAiCrawler` + `GET /api/admin/geo/crawler-hits`, GA4 gating. [plan](docs/plans/2026-06-25-geo-hardening-three-gaps.md)
 - **2026-06-22** — **Fix: IG-repurpose BLOG-mode carousel draft invisible in Social Studio (stale `exclude_repurpose` arm #3).** A `source='instagram'` ContentIdea finalized via Content Engine → published → `linkedin:scan-blog` correctly created a `manual_review` carousel draft, but it showed in NEITHER Social Studio column (idea 817 → post 125 → draft 177). IG column (`exclude_settled=1`) hides the blog-mode repurpose job the moment it hands off (`content_idea_id` set); LinkedIn column (`exclude_repurpose=1`) arm #3 in [LinkedInDraftController::index](backend/app/Http/Controllers/Api/Admin/LinkedInDraftController.php) dropped any draft whose `post_id` linked a `ContentIdea{source:'instagram'}`. Arm #3 was added 2026-06-11 to keep sources disjoint, but the 2026-06-13 blog→Content-Engine handoff made blog-mode jobs settle (hidden from IG) immediately — so arm #3 only ever hid blog-handoff drafts that have NO IG-column twin (carousel/video modes never create a `source=instagram` ContentIdea; they're caught by arms #1 `linkedin_post_id` / #2 `anchor_post_id`). **Removed arm #3** → blog-handoff carousel drafts now appear in the Social Studio LinkedIn queue for triage. Test `LinkedInDraftListExcludeRepurposeTest` inverted (now asserts KEEP); unused `ContentIdea` import dropped. 261 LinkedIn/Repurpose tests green. NOT pushed.
 - **2026-06-22** — **Zernio schedule timezone fix (UTC → WIB) + carousel cover headline centered.** (1) Scheduled Zernio posts sent `timezone = config('app.timezone')` = **UTC** ([config/app.php](backend/config/app.php), no `APP_TIMEZONE` override) → Zernio fired/displayed schedules 7h off. New config `social-cross-post.zernio.timezone` (env `ZERNIO_TIMEZONE`, default `Asia/Jakarta`); [PublishViaZernio::applyScheduling](backend/app/Jobs/PublishViaZernio.php) + [PublishRepurposeViaZernio](backend/app/Jobs/PublishRepurposeViaZernio.php) now emit `scheduledFor` in WIB (`+07:00`, same absolute instant via `setTimezone`) + `timezone=Asia/Jakarta` — robust whether Zernio honors the ISO offset or the timezone field. `publishNow` immediate path unchanged (already works when no future schedule). (2) Carousel **cover headline text was dragged to the bottom** — the canonical text-overlay phrase in plugin `/carousel-gen` (`ai-image-carousel-prompt-gen/references/prompt-formulas.md`) read "positioned starting from the vertical center extending **downward**"; rewritten to center the text block on the canvas middle third (7 occurrences = rule def + 6 slide templates, single-source). Recompiled `refs-carousel-gen-pipeline.md` (306KB, gitignored). Tests: PublishViaZernio 11/11 (+1 WIB tz regression assertion), repurpose 8/8 green. **Deploy pending:** Portfolio commit+push (CI auto-deploy) + manual VPS bundle copy to `/home/claudesn/refs-carousel-gen-pipeline.md`. NOT pushed.
 - **2026-06-18** — **IG-repurpose carousel: slide count now follows the SOURCE + founder/figure faces finally REACHABLE (two root causes, `/gaspol-debug`).** Two long-standing prod bugs — every repurpose carousel stuck at 7 slides + founder/public-figure faces never rendering (all sketchnote) — traced to TWO defects, both PROVEN on prod before any fix. **(1) Capture over-grab + under-capture** ([scripts/playwright/ig-capture.cjs](scripts/playwright/ig-capture.cjs)): IG lazy-loads carousel slides behind hover-gated "Next" clicks, but the script did a STATIC whole-page `<img>` scrape and UNIONED JSON-LD+og+DOM → it captured ~2 real slides + a pile of srcset thumbnails + the profile avatar + the "more posts" suggested grid (job 33 = **20 noisy frames** for a 5-slide post; JSON-LD now returns 0 anonymously). Rewritten to TRAVERSE the carousel — hover the media, click "Next" through every slide, collect ONLY `naturalWidth≥600` IG-CDN images (cleanly drops ~150px avatars + ~480px grid cards) until the arrow disappears (loop-back guard). Live-verified on all 4 real source URLs: **5 / 8 / 12 / 7 slides, zero junk** (was 20+). **(2) Enricher read the WRONG disk — the real "no faces" blocker** ([`CarouselPersonPhotoEnricher::resolveSourceSlidePaths`](backend/app/Services/CarouselPersonPhotoEnricher.php)): `Storage::disk('local')` root is `storage/app/private` under Laravel 11/12, but capture writes to `storage/app/repurpose/{id}` → `files()` returned `[]` → the enricher silently no-op'd → **no faces EVER, even with last session's group-crop fix (correct but unreachable — it only ran in my hand-fed test with absolute paths).** Now reads `storage_path('app/'.$relDir)` with a native scan, mirroring `VideoSlideExtractor` (which is why video_rebrand always worked). The People-Spotlight rule + VPS bundle are correctly deployed; `/carousel-gen` flags faces only on posts that warrant a "SIAPA X?" profile slide (news roundups correctly get none). **(3) Slide count follows source**: new [`LinkedInGenerationService::sourceSlideCount()`](backend/app/Services/LinkedInGenerationService.php) + `resolveTargetSlides()` thread the captured count into `/carousel-gen --target-slides` for repurpose drafts (replaces the hard-7 `inferTargetSlides`), clamped to a Sonnet-safe ceiling `config('carousel-gen.max_repurpose_slides', 12)` — a single bilingual envelope truncates past ~9 slides (the reason for the legacy 7-cap; raise w/ `CAROUSEL_GEN_MODEL`→opus). Wired through `applyCarouselGenAdapter`→`dispatchCarouselGenEngine`→`buildCarouselGenPrompt` + the regenerate-button job. Tests: 65 green across 7 suites (+10 new); capture rewrite live-verified (non-deterministic surface). NOT pushed. [eval](docs/evals/repurpose-person-photo.md)
@@ -1799,7 +1733,7 @@ Idempotent via `firstOrCreate(['signature' => ...], $row)` — re-seeding on exi
 - **2026-06-10** — Publer publish path rewritten against live-validated bulk API (`/posts/schedule/publish`, pre-uploaded media, per-platform networks key) + per-platform config gate `PublerPayloadBuilder::isPlatformEnabled()`.
 - **2026-06-10** — Skip `/linkedin-gen` under force-carousel + embed full blog body inline in `/carousel-gen` prompt (`buildForcedCarouselEnvelope`). [plan](docs/plans/2026-06-09-skip-linkedin-gen-force-carousel.md)
 - **2026-06-09** — **Default carousel for all 4 platforms + parallel cross-post fan-out** (`linkedin_force_carousel` default `true`, `portfolio-crosspost@{1..N}` worker pool, early fan-out on all-slides-done). [plan](docs/plans/2026-06-09-default-carousel-all-platforms-parallel.md) · [runbook](docs/runbooks/crosspost-parallel-carousel-deploy.md)
-- **2026-06-09** — **SEO/GEO SSR-enrichment** for homepage + blog (`SpaPrerenderController` + `SeoHtmlComposer` + `SchemaGraphBuilder`): JSON-LD entity graph, crawlable `<article>`, hreflang spliced into the SPA shell; 1h HTML cache w/ purge-on-edit. Closes P0 "SPA without SSR". Requires one-time nginx widening. [runbook](docs/runbooks/seo-geo-ssr-deploy.md)
+- **2026-06-09** — SEO/GEO SSR-enrichment for homepage + blog via Laravel prerender layer — **removed in PF-2 phase 5C (Nov 2026); SEO now in Astro `web/`.**
 - **2026-06-09** — SEO/GEO follow-ups: stale-content freshness loop (`content:flag-stale-posts`), homepage review schema (`aggregateRating`), hard image-completion gate (`segmentsResolvedForAdvance`). [plan](docs/plans/2026-06-09-seo-geo-neilpatel-followups.md)
 - **2026-06-08** — **Homepage redesign "The Operator"** (9-section identity-led spine, kebab-case `section_type`s) + follow-up polish (Track Record, MANDOR board, cinematic JARVIS hero video). See *Page Sections Mapping*. [plan](docs/plans/2026-06-08-homepage-the-operator.md)
 - **2026-05-15** — **GeminiGen circuit breaker** (Hystrix-style, Cache-backed): closed→open→half_open, `geminigen:circuit-probe` cron + Firecrawl status-page accelerator + Telegram alerts + `GET /admin/geminigen/circuit-status`. [plan](docs/plans/2026-05-15-geminigen-circuit-breaker.md)
@@ -1816,10 +1750,11 @@ Idempotent via `firstOrCreate(['signature' => ...], $row)` — re-seeding on exi
 
 ---
 
+**Last Updated:** 2026-11-08 (PF-2 Phase 5E)
 **Maintainer:** Ali Sadikin (ali.sadikincom85@gmail.com)
 **Environment:** macOS + Docker Desktop, /Users/alisadikin/Drive-D/Projects/Portfolio_v2
-**PHP:** 8.2 inside the `portfolio_backend` container — no host php; run `docker exec portfolio_backend php ...` (e.g. `docker exec portfolio_backend php artisan test`)
-**Backend:** Laravel 12 + PHP 8.2 + MySQL 8 + Sanctum 4 + Filament 4.1
+**PHP:** 8.4 everywhere (VPS fpm + CLI, Docker `portfolio_backend` container; runbook: [docs/runbooks/pf2-php84-upgrade.md](docs/runbooks/pf2-php84-upgrade.md)). **Exception: phpMyAdmin (Ubuntu 5.2.1) stays on `php8.2-fpm` until it is upgraded to 5.2.2+ or dropped**, so `php8.2-fpm` stays installed (debt: remove after that + 7 days green). Reload `php8.4-fpm` after deploys (`scripts/deploy.sh` does it) — no host php; run `docker exec portfolio_backend php ...` (e.g. `docker exec portfolio_backend php artisan test`)
+**Backend:** Laravel 12 + PHP 8.4 + MySQL 8 + Sanctum 4 + Filament 4.1
 **Frontend:** Vue 3.5 + Rolldown-Vite 7.1 + Pinia 3 + TanStack Query 5.90 + Tailwind 4
 **Production:** https://alisadikinma.com
 

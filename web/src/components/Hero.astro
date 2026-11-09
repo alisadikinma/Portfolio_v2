@@ -1,0 +1,46 @@
+---
+import type { Lang } from "../lib/i18n";
+import { id } from "../content/copy/id";
+import { en } from "../content/copy/en";
+
+interface Props {
+  lang: Lang;
+  /** wa.me link built from settings site.contact_phone by the page; omit/empty hides the CTA. */
+  wa?: string;
+}
+const { lang, wa = "" } = Astro.props;
+const h = (lang === "id" ? id : en).hero;
+const PHOTO = "/images/ali-sadikin-ma-pakar-ai-indonesia.jpg";
+// "AI Consultant" / "Indonesia": the last word gets its own line (Ali 2026-11-09).
+const cut = h.h1Title.lastIndexOf(" ");
+const h1Head = h.h1Title.slice(0, cut);
+const h1Last = h.h1Title.slice(cut + 1);
+const founderHref = lang === "id" ? "https://indusia.ai/id/" : "https://indusia.ai/";
+---
+<section class="hx" id="tentang" data-hero data-photo={PHOTO} aria-labelledby="hero-h1">
+  <div class="hx-cloud" data-cloud aria-hidden="true"></div>
+  <img class="hx-fallback" src={PHOTO} alt={h.imgAlt} width="1200" height="1200" fetchpriority="high" decoding="async" />
+  <div aria-hidden="true">
+    <span class="det" data-box="0.33,0.12,0.34,0.40"><b>{h.det1}</b></span>
+    {/* Same spot as the logo printed on the portrait (left chest); the cloud is too coarse to show it. */}
+    <span class="hx-logo" data-box="0.565,0.705,0.15,0.045"><img src="/images/indusia-logo-light.png" alt="" aria-hidden="true" width="360" height="60" decoding="async" /></span>
+  </div>
+  <div class="wrap hx-text">
+    <h1 id="hero-h1"><span class="hx-h1-name">{h.h1Name}</span> {h1Head} <span class="hx-h1-l2">{h1Last}</span></h1>
+    <p class="hx-lead" id="hero-lead">{h.leadBefore}<a href={founderHref} target="_blank">{h.leadLinkText}</a>{h.leadAfter}</p>
+    <p class="hx-build">{h.buildLead}<a href={`${founderHref}ai-vision/`} target="_blank">{h.visionLink}</a>, <a href={`${founderHref}ai-fleet-transportation/`} target="_blank">{h.fleetLink}</a>{lang === "id" ? ", dan " : ", and "}<a href={`${founderHref}ai-assistant/`} target="_blank">{h.chatbotLink}</a>{h.buildMid}<a href={founderHref} target="_blank">{h.companyLink}</a>{h.buildEnd}</p>
+    <button type="button" class="hx-more" hidden aria-expanded="false" aria-controls="hero-lead" data-more={h.more} data-less={h.less}>{h.more}</button>
+    <div class="hero-ctas">
+      {wa !== "" && <a class="btn btn-primary" href={wa} target="_blank" rel="noopener">{h.ctaWhatsapp}</a>}
+      <a class="btn btn-ghost" href="#layanan">{h.ctaServices}</a>
+    </div>
+  </div>
+  <div class="hx-hud" aria-hidden="true">
+    <span><span class="live"></span><span data-status data-busy={h.statusBusy} data-done={h.statusDone}>{h.statusDone}</span></span>{" "}
+    <span class="r"><span>{h.hudProducts} <b data-count="59">59</b></span>{" "}<span>{h.hudYears} <b data-count="17">17</b></span></span>
+  </div>
+</section>
+<script>
+  import { initHero } from "../scripts/hero-cloud";
+  initHero();
+</script>
