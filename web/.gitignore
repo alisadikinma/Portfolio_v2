@@ -1,0 +1,9 @@
+# Root .gitignore drops *.jpg/*.png/*.webp (CMS uploads). The Astro site ships its own
+# static images, so they must be tracked or the prod build breaks.
+!public/**/*.jpg
+!public/**/*.jpeg
+!public/**/*.png
+!public/**/*.webp
+!src/assets/**/*.jpg
+!src/assets/**/*.png
+!src/assets/**/*.webp
