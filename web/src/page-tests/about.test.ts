@@ -59,11 +59,14 @@ describe("/{lang}/about", () => {
     expect(pp.dateModified).toBeUndefined();
   });
 
-  it("dated career timeline with time[datetime]; 2019-2021 gap has no text", async () => {
+  it("dated career timeline with time[datetime]; the 2019-2021 gap is a dashed line, never an empty item", async () => {
     const { html } = await load("id");
     for (const dt of ["2008", "2015", "2016", "2019", "2021-01", "2025-12", "2026-01-01"])
       expect(html).toContain(`<time datetime="${dt}"`);
-    expect(html).toMatch(/<li class="gap" aria-hidden="true"><\/li>/);
+    const ol = /<ol class="about-timeline">([\s\S]*?)<\/ol>/.exec(html)![1];
+    expect((ol.match(/<li[ >]/g) ?? []).length).toBe(4);
+    expect(ol).not.toMatch(/<li[^>]*>\s*<\/li>/);
+    expect(ol).toMatch(/<li class="after-gap">[\s\S]*?datetime="2021-01"/);
   });
 
   it("awards list: real titles, attendee wording for award 11, no 'tampil'", async () => {

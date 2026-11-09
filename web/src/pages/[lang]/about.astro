@@ -74,14 +74,14 @@ const modifiedText = modified
 const career = [
   { from: ["2008", "2008"], to: ["2015", "2015"], place: c.placeSingapore, role: j.singaporeRole, org: j.singaporeOrg, note: j.singaporeNote },
   { from: ["2016", "2016"], to: ["2019", "2019"], place: c.placeIndonesia, role: j.marlinRole, org: j.marlinOrg, note: j.marlinNote },
-  { gap: true },
-  { from: ["2021-01", "2021"], to: ["2025-12", "2025"], place: c.placeBatam, role: j.satnusaRole, org: j.satnusaOrg, note: j.satnusaNote },
+  // 2019-2021 has no chapter: the timeline shows a dashed stretch before Satnusa (afterGap), no empty item.
+  { from: ["2021-01", "2021"], afterGap: true, to: ["2025-12", "2025"], place: c.placeBatam, role: j.satnusaRole, org: j.satnusaOrg, note: j.satnusaNote },
   { from: ["2026-01-01", "2026"], to: null, place: c.placeBatam, role: j.indusiaRole, org: j.indusiaOrg, note: c.indusiaTimelineNote },
 ];
 
 const profiles: [string, string][] = SAME_AS.map((u) => {
   const host = new URL(u).hostname.replace(/^www\./, "").split(".")[0];
-  return [u, { instagram: "Instagram", tiktok: "TikTok", linkedin: "LinkedIn", threads: "Threads", youtube: "YouTube", github: "GitHub" }[host] ?? host];
+  return [u, { instagram: "Instagram", tiktok: "TikTok", linkedin: "LinkedIn", threads: "Threads", youtube: "YouTube", github: "GitHub", wikidata: "Wikidata" }[host] ?? host];
 });
 
 const jsonld = graph(
@@ -96,79 +96,112 @@ const jsonld = graph(
 );
 ---
 <BaseLayout title={title} description={c.metaDescription} path={path} lang={lang} jsonld={jsonld}>
-  <main class="wrap about-page">
-    <h1>{c.h1}</h1>
-    {failed ? (
-      <p class="about-unavailable" role="status">{c.unavailable}</p>
-    ) : (
+  <main class="about-page">
+    <section class="page-hero th-hero about-hero">
+      <div class="wrap th-hero-grid">
+        <div>
+          <h1>{c.h1}</h1>
+          {failed ? (
+            <p class="about-unavailable" role="status">{c.unavailable}</p>
+          ) : (
+            <>
+              <p class="lead">{c.lead}</p>
+              {modifiedIso && <p class="about-updated">{c.updated} <time datetime={modifiedIso}>{modifiedText}</time></p>}
+            </>
+          )}
+        </div>
+        <figure class="th-photo about-photo">
+          <div class="th-frame">
+            <img class="about-portrait" src="/images/ali-sadikin-ma-pakar-ai-indonesia.jpg" width="1200" height="1200" alt={c.portraitAlt} loading="eager" fetchpriority="high" decoding="async" />
+            <span class="cnr tl" aria-hidden="true"></span><span class="cnr tr" aria-hidden="true"></span>
+            <span class="cnr bl" aria-hidden="true"></span><span class="cnr br" aria-hidden="true"></span>
+          </div>
+        </figure>
+      </div>
+      {!failed && (
+        <div class="wrap">
+          <dl class="about-facts">
+            <div><dt>{c.fact1Num}</dt><dd>{c.fact1}</dd></div>
+            <div><dt>{c.fact2Num}</dt><dd>{c.fact2}</dd></div>
+            <div><dt>{c.fact3Num}</dt><dd>{c.fact3}</dd></div>
+          </dl>
+        </div>
+      )}
+    </section>
+
+    {!failed && (
       <>
-        <p class="about-lead">{c.lead}</p>
-        <p class="about-disambig">{c.disambig}</p>
-        {modifiedIso && <p class="about-updated">{c.updated} <time datetime={modifiedIso}>{modifiedText}</time></p>}
-        <img class="about-portrait" src="/images/ali-sadikin-ma-pakar-ai-indonesia.jpg" width="400" height="400" alt={c.portraitAlt} loading="eager" decoding="async" />
-
-        <section aria-labelledby="about-story">
-          <h2 id="about-story">{c.storyH2}</h2>
-          <div class="about-bio" set:html={bio} />
+        <section class="sec" aria-labelledby="about-story">
+          <div class="wrap about-split">
+            <div class="sec-head"><h2 id="about-story">{c.storyH2}</h2></div>
+            <div class="about-bio panel" set:html={bio} />
+          </div>
         </section>
 
-        <section aria-labelledby="about-career">
-          <h2 id="about-career">{c.timelineH2}</h2>
-          <ol class="about-timeline">
-            {career.map((e) =>
-              e.gap ? (
-                <li class="gap" aria-hidden="true"></li>
-              ) : (
-                <li>
-                  <p class="when">
-                    <time datetime={e.from![0]}>{e.from![1]}</time>–{e.to ? <time datetime={e.to[0]}>{e.to[1]}</time> : c.now} · {e.place}
-                  </p>
-                  <h3>{e.role}</h3>
-                  <p class="org">{e.org}</p>
-                  <p>{e.note}</p>
-                </li>
+        <section class="sec alt" aria-labelledby="about-career">
+          <div class="wrap">
+            <div class="sec-head"><h2 id="about-career">{c.timelineH2}</h2></div>
+            <ol class="about-timeline">
+              {career.map((e) => (
+                  <li class={e.afterGap ? "after-gap" : undefined}>
+                    <p class="when">
+                      <time datetime={e.from[0]}>{e.from[1]}</time>–{e.to ? <time datetime={e.to[0]}>{e.to[1]}</time> : c.now} · {e.place}
+                    </p>
+                    <h3>{e.role}</h3>
+                    <p class="org">{e.org}</p>
+                    <p class="note">{e.note}</p>
+                  </li>
               ))}
-          </ol>
+            </ol>
+          </div>
         </section>
 
-        <section aria-labelledby="about-awards">
-          <h2 id="about-awards">{c.awardsH2}</h2>
-          <ul class="about-awards">
-            {awards.map((r) => {
-              const href = awardHref(r, lang);
-              const year = yearOf(r.received_at);
-              const res = result(r.id);
-              return (
-                <li>
-                  <strong>{String(r.title)}</strong>
-                  {typeof r.organization === "string" && r.organization !== "" && <span> · {r.organization}</span>}
-                  {year && <span> · {year}</span>}
-                  {res && <span> · {res}</span>}
-                  {href && <> · <a href={href}>{c.awardOpen}</a></>}
-                </li>
-              );
-            })}
-          </ul>
+        <section class="sec" aria-labelledby="about-awards">
+          <div class="wrap">
+            <div class="sec-head"><h2 id="about-awards">{c.awardsH2}</h2></div>
+            <ul class="about-awards">
+              {awards.map((r) => {
+                const href = awardHref(r, lang);
+                const year = yearOf(r.received_at);
+                const res = result(r.id);
+                return (
+                  <li>
+                    <p class="aw-meta">{year && <span class="aw-year">{year}</span>}{res && <span class="aw-res">{res}</span>}</p>
+                    <strong>{String(r.title)}</strong>
+                    {typeof r.organization === "string" && r.organization !== "" && <span class="aw-org">{r.organization}</span>}
+                    {href && <a class="aw-link" href={href}>{c.awardOpen}</a>}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
         </section>
 
-        <section aria-labelledby="about-indusia">
-          <h2 id="about-indusia">{c.indusiaH2}</h2>
-          <p>
-            {c.indusiaLead}<a href={a.hero.href}>{a.hero.anchor}</a>{c.indusiaMid}<a href={a.company.href}>{a.company.anchor}</a>{c.indusiaEnd}
-            {c.indusiaProducts}<a href={a.aboutVision.href}>{a.aboutVision.anchor}</a>, <a href={a.aboutFleet.href}>{a.aboutFleet.anchor}</a>{c.indusiaAnd}<a href={a.aboutChatbot.href}>{a.aboutChatbot.anchor}</a>{c.indusiaEnd}
-          </p>
+        <section class="sec alt" aria-labelledby="about-indusia">
+          <div class="wrap about-split">
+            <div class="sec-head"><p class="about-kicker">{c.indusiaKicker}</p><h2 id="about-indusia">{c.indusiaH2}</h2></div>
+            <div class="panel about-indusia">
+              <p>
+                {c.indusiaLead}<a href={a.hero.href}>{a.hero.anchor}</a>{c.indusiaMid}<a href={a.company.href}>{a.company.anchor}</a>{c.indusiaEnd}
+                {c.indusiaProducts}<a href={a.aboutVision.href}>{a.aboutVision.anchor}</a>, <a href={a.aboutFleet.href}>{a.aboutFleet.anchor}</a>{c.indusiaAnd}<a href={a.aboutChatbot.href}>{a.aboutChatbot.anchor}</a>{c.indusiaEnd}
+              </p>
+            </div>
+          </div>
         </section>
 
-        <p class="about-more">
-          {c.moreLead} <a href={localizedPath(`/${lang}/pelatihan-ai`, lang)}>{copy.nav.training}</a>, <a href={localizedPath(`/${lang}/pembicara-ai`, lang)}>{copy.nav.speaker}</a>, {c.moreOr} <a href={`/${lang}/faq`}>{copy.footer.faq}</a>.
-        </p>
-
-        <section aria-labelledby="about-profiles">
-          <h2 id="about-profiles">{c.profilesH2}</h2>
-          <p>{c.profilesLead}</p>
-          <ul class="about-profiles">
-            {profiles.map(([u, label]) => <li><SocialLink href={u} label={label} rel="me noopener" /></li>)}
-          </ul>
+        <section class="sec" aria-labelledby="about-profiles">
+          <div class="wrap about-close">
+            <div>
+              <h2 id="about-profiles">{c.profilesH2}</h2>
+              <p class="muted">{c.profilesLead}</p>
+              <ul class="about-profiles">
+                {profiles.map(([u, label]) => <li><SocialLink href={u} label={label} rel="me noopener" /></li>)}
+              </ul>
+            </div>
+            <p class="about-more">
+              {c.moreLead} <a href={localizedPath(`/${lang}/pelatihan-ai`, lang)}>{copy.nav.training}</a>, <a href={localizedPath(`/${lang}/pembicara-ai`, lang)}>{copy.nav.speaker}</a>, {c.moreOr} <a href={`/${lang}/faq`}>{copy.footer.faq}</a>.
+            </p>
+          </div>
         </section>
       </>
     )}

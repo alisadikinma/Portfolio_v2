@@ -46,8 +46,7 @@ describe("copy parity id/en", () => {
 
   it("uses the full name and never the bare name or banned claims", () => {
     for (const tree of [id, en]) {
-      // about.disambig names the former governor on purpose (GEO disambiguation, Ali 2026-11-09).
-      const all = strings(tree as Tree).filter(([k]) => !String(k).endsWith("disambig")).map(([, v]) => v).join("\n");
+      const all = strings(tree as Tree).map(([, v]) => v).join("\n");
       expect(all).not.toMatch(/Ali Sadikin(?! Ma)/);
       expect(all).not.toMatch(/terbaik|nomor 1|\bbest\b|number one/i);
       expect(all).not.toMatch(/Rp\s?\d|\$\s?\d/);
