@@ -59,7 +59,8 @@ const yearOf = (v: unknown) => {
 };
 const result = (n: unknown) => (n === STAGE_AWARDS.demoDay ? c.awardWinner : n === STAGE_AWARDS.grind ? c.awardAttended : null);
 
-const bio = typeof about?.bio === "string" ? sanitizeHtml(about.bio) : "";
+const cmsBio = typeof about?.bio === "string" ? about.bio : "";
+const bio = sanitizeHtml(c.bioHtml !== "" ? c.bioHtml : cmsBio);
 
 // "Updated" date = newest edit of the about settings rows (backend sends updated_at).
 // No date from the API means no date on the page: never the render clock.

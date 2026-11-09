@@ -189,6 +189,8 @@ export const en: Copy = {
     updated: "Updated",
     unavailable: "This page cannot be loaded right now. Please try again shortly.",
     storyH2: "Short profile",
+    // Empty = use the CMS bio (settings.about.bio, English).
+    bioHtml: "",
     timelineH2: "Career timeline",
     placeSingapore: "Singapore",
     placeIndonesia: "Indonesia",

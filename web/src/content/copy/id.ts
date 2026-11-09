@@ -187,6 +187,8 @@ export const id = {
     updated: "Diperbarui",
     unavailable: "Halaman ini sedang tidak bisa dimuat. Silakan coba lagi sebentar lagi.",
     storyH2: "Profil singkat",
+    // Indonesian bio (Ali 2026-11-09). The CMS bio is English-only; EN keeps reading the CMS.
+    bioHtml: `<p>17 tahun di dunia enterprise. Lalu AI mengubah hitungan tentang seberapa banyak yang bisa dibangun satu orang.</p><p>Saya menjalankan <strong>INDUSIA.ai</strong> sendirian, dengan dua sistem AI yang sudah berjalan di produksi untuk perusahaan di Batam. Pertama, <strong>AI Visual Inspection</strong> di lini produksi <strong>PT PCI Elektronik Internasional</strong>. Sistem ini mengerjakan inspeksi yang di pasaran biasanya memakai mesin seharga <strong>puluhan ribu dolar AS</strong>, dengan biaya jauh lebih rendah. Kedua, <strong>sistem fleet management</strong>: sensor solar IoT, RFID, HP sebagai GPS, dan asisten AI yang bisa diajak bicara. Sistem ini menjalankan truk sebuah <strong>perusahaan logistik di Batam</strong>.</p><p><strong>Juara 1 Outskill Demo Day</strong> · Vibe Coding · AI Agents · Automation · Video Gen · Batam, bekerja untuk klien global.</p>`,
     timelineH2: "Perjalanan karier",
     placeSingapore: "Singapura",
     placeIndonesia: "Indonesia",

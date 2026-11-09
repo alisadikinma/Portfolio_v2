@@ -80,11 +80,17 @@ describe("/{lang}/about", () => {
     expect(html).toMatch(/Diperbarui <time datetime="2026-10-30">/);
   });
 
-  it("sanitizes bio and renders it in full", async () => {
-    const { html } = await load("id");
+  it("sanitizes the CMS bio and renders it in full (EN)", async () => {
+    const { html } = await load("en");
     expect(html).toContain("Ali bio paragraph one.");
     expect(html).toContain("Paragraph two.");
     expect(html).not.toContain("alert(1)");
+  });
+
+  it("ID renders the Indonesian bio from copy, not the English CMS bio", async () => {
+    const { html } = await load("id");
+    expect(html).toContain("17 tahun di dunia enterprise.");
+    expect(html).not.toContain("Ali bio paragraph one.");
   });
 
   it("INDUSIA anchors are dofollow", async () => {

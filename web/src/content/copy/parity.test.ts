@@ -24,6 +24,8 @@ describe("copy parity id/en", () => {
   it("has no empty strings", () => {
     for (const tree of [id, en]) {
       for (const [k, v] of strings(tree as Tree)) {
+        // en about.bioHtml is empty on purpose: EN renders the CMS bio (settings.about.bio).
+        if (tree === en && k === "bioHtml") continue;
         expect(v.trim(), k).not.toBe("");
       }
     }
