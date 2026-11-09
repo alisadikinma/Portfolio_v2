@@ -33,7 +33,7 @@ const cut = cta.lastIndexOf(" ");
 const ctaLead = cut > 0 ? cta.slice(0, cut + 1) : "";
 const ctaLast = cut > 0 ? cta.slice(cut + 1) : cta;
 ---
-<header class="site-head">
+<header class="site-head" data-same-tab>
   <div class="wrap">
     <a class="brand" href={homePath}>Ali Sadikin Ma <span>/ AI</span></a>
     <nav class="nav" id="site-nav" popover aria-label={c.nav.ariaMain}>

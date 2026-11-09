@@ -43,4 +43,9 @@ describe("newTabLinks (Ali 2026-11-09: every link opens a new tab)", () => {
     const s = '<script type="application/ld+json">{"x":"<a href=\\"/y\\">"}</script><script>el.innerHTML = \'<a href="/z">\';</script>';
     expect(newTabLinks(s)).toBe(s);
   });
+
+  it("leaves links inside a data-same-tab region (site header: menu + logo) in the same tab", () => {
+    const h = '<header class="site-head" data-same-tab><a class="brand" href="/id">Logo</a><nav><a href="/id/pelatihan-ai">P</a></nav></header>';
+    expect(newTabLinks(h + '<a href="/id/faq">F</a>')).toBe(h + '<a href="/id/faq" target="_blank">F</a>');
+  });
 });

@@ -3,8 +3,9 @@
  * (href with "#"), the language switch (hreflang) and non-page links (mailto, tel, download).
  * Applied once to the rendered HTML in middleware, so no component can forget it.
  * <script> blocks (incl. JSON-LD) are skipped: their "<a" text is code, not markup.
+ * A <header data-same-tab> region is skipped too: the site menu and logo stay in the same tab (Ali 2026-11-09).
  */
-const SCRIPT = /<script\b[\s\S]*?<\/script>/gi;
+const SCRIPT = /<script\b[\s\S]*?<\/script>|<header\b[^>]*\sdata-same-tab\b[\s\S]*?<\/header>/gi;
 const A_TAG = /<a(\s[^>]*)>/gi;
 const attr = (attrs: string, name: string): string | null => {
   const m = attrs.match(new RegExp(`\\s${name}(?:\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+)))?(?=[\\s/]|$)`, "i"));
