@@ -23,6 +23,7 @@ export const SAME_AS: string[] = [
   "https://www.threads.com/@alisadikinma",
   "https://www.youtube.com/@alisadikinma",
   "https://github.com/alisadikinma",
+  "https://www.wikidata.org/wiki/Q140135628",
 ];
 
 export function personNode(opts: { sameAs?: string[]; image?: string; award?: string } = {}): Node {

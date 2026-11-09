@@ -42,6 +42,7 @@ Ali Sadikin Ma (pakar AI Indonesia / AI consultant) builds and ships AI products
 - YouTube: https://www.youtube.com/@alisadikinma
 - Threads: https://www.threads.com/@alisadikinma
 - GitHub: https://github.com/alisadikinma
+- Wikidata: https://www.wikidata.org/wiki/Q140135628
 
 ## For the complete AI-readable profile
 - Concise (API): https://alisadikinma.com/api/llms.txt
