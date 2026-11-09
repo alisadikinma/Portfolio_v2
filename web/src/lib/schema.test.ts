@@ -202,6 +202,22 @@ describe("creativeWork creator", () => {
     expect(c.creator).toEqual({ "@id": PERSON_ID });
     expect(c.author).toEqual({ "@id": PERSON_ID });
   });
+  it("carries @id, language, keywords, genre and the site for AI search (GEO)", () => {
+    const c = creativeWork({
+      name: "P", url: "https://alisadikinma.com/id/projects/p", lang: "id",
+      keywords: ["Computer Vision", " ", "IoT"], genre: "AI",
+    }) as any;
+    expect(c["@id"]).toBe("https://alisadikinma.com/id/projects/p#work");
+    expect(c.inLanguage).toBe("id");
+    expect(c.keywords).toBe("Computer Vision, IoT");
+    expect(c.genre).toBe("AI");
+    expect(c.isPartOf).toEqual({ "@id": "https://alisadikinma.com/#website" });
+  });
+  it("omits keywords and genre when empty", () => {
+    const c = creativeWork({ name: "P", url: "https://alisadikinma.com/en/projects/p", keywords: [], genre: "" }) as any;
+    expect(c.keywords).toBeUndefined();
+    expect(c.genre).toBeUndefined();
+  });
 });
 
 describe("graph: INDUSIA.ai organization + nationality", () => {

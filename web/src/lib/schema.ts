@@ -150,10 +150,19 @@ export function blogPosting(p: {
   return n;
 }
 
-export function creativeWork(p: { name: string; url: string; description?: string; image?: string }): Node {
-  const n: Node = { "@type": "CreativeWork", name: p.name, url: p.url, creator: PERSON_REF, author: PERSON_REF };
+export function creativeWork(p: {
+  name: string; url: string; description?: string; image?: string; lang?: string; keywords?: string[]; genre?: string;
+}): Node {
+  const n: Node = {
+    "@type": "CreativeWork", "@id": `${p.url}#work`, name: p.name, url: p.url,
+    creator: PERSON_REF, author: PERSON_REF, isPartOf: { "@id": `${SITE}/#website` },
+  };
   if (p.description) n.description = p.description;
   if (p.image) n.image = p.image;
+  if (p.lang) n.inLanguage = p.lang;
+  const kw = (p.keywords ?? []).map((k) => k.trim()).filter((k) => k !== "");
+  if (kw.length) n.keywords = kw.join(", ");
+  if (p.genre) n.genre = p.genre;
   return n;
 }
 

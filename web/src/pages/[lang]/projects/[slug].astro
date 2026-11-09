@@ -76,7 +76,7 @@ const jsonld = failed
       personNode(),
       websiteNode(),
       webPageNode({ url, lang, name: metaTitle, description: metaDescription }),
-      creativeWork({ name: title, url, description: metaDescription || undefined, image: ogImage }),
+      creativeWork({ name: title, url, description: metaDescription || undefined, image: ogImage, lang, keywords: technologies, genre: category }),
       breadcrumb([
         { name: c.breadcrumbHome, url: `${SITE}/${lang}` },
         { name: c.breadcrumbProjects, url: SITE + idxPath },
