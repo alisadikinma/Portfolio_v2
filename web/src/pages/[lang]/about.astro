@@ -81,7 +81,7 @@ const career = [
 
 const profiles: [string, string][] = SAME_AS.map((u) => {
   const host = new URL(u).hostname.replace(/^www\./, "").split(".")[0];
-  return [u, { instagram: "Instagram", tiktok: "TikTok", linkedin: "LinkedIn", threads: "Threads", youtube: "YouTube", github: "GitHub", wikidata: "Wikidata" }[host] ?? host];
+  return [u, { instagram: "Instagram", tiktok: "TikTok", linkedin: "LinkedIn", threads: "Threads", youtube: "YouTube", github: "GitHub", wikidata: "Wikidata", indusia: "INDUSIA.ai" }[host] ?? host];
 });
 
 const jsonld = graph(

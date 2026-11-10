@@ -322,6 +322,11 @@ export const en: Copy = {
     authorCompanyAnchor: "AI company Indonesia",
     authorAfter:
       " based in Batam. He writes from experience building AI for factories, logistics, and sales teams.",
+    authorServicesLead: "Need ",
+    authorTraining: "AI training",
+    authorServicesBetween: " for your team, or an ",
+    authorSpeaker: "AI speaker",
+    authorServicesAfter: " for your event?",
     authorAboutLead: "Want to know more?",
     authorAbout: "About Ali Sadikin Ma",
     backToBlog: "Back to all articles",

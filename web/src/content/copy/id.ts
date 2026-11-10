@@ -320,6 +320,11 @@ export const id = {
     authorCompanyAnchor: "perusahaan AI Indonesia",
     authorAfter:
       " yang berbasis di Batam. Ia menulis dari pengalaman membangun AI untuk pabrik, logistik, dan tim penjualan.",
+    authorServicesLead: "Butuh ",
+    authorTraining: "pelatihan AI",
+    authorServicesBetween: " untuk tim Anda, atau ",
+    authorSpeaker: "pembicara AI",
+    authorServicesAfter: " untuk acara Anda?",
     authorAboutLead: "Ingin kenal lebih jauh?",
     authorAbout: "Tentang Ali Sadikin Ma",
     backToBlog: "Kembali ke semua artikel",
