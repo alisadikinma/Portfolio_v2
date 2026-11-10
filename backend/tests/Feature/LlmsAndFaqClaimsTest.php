@@ -55,6 +55,15 @@ class LlmsAndFaqClaimsTest extends TestCase
         $this->assertDoesNotMatchRegularExpression(self::FORBIDDEN, $body);
     }
 
+    public function test_llms_full_txt_about_is_plain_text_not_html(): void
+    {
+        Setting::create(['group' => 'about', 'key' => 'bio', 'value' => '<p>17 years in enterprise.</p><p>I run <strong>INDUSIA.ai</strong> &amp; ship AI.</p>']);
+        $body = $this->get('/api/llms-full.txt')->assertStatus(200)->getContent();
+        $this->assertStringContainsString("17 years in enterprise.\n\nI run INDUSIA.ai & ship AI.", $body);
+        $this->assertStringNotContainsString('<p>', $body);
+        $this->assertStringNotContainsString('<strong>', $body);
+    }
+
     public function test_faq_sets_drop_unsupported_claims_and_stay_one_to_one(): void
     {
         $en = config('faq.items');

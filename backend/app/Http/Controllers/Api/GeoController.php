@@ -100,7 +100,7 @@ class GeoController extends Controller
         }
         $sections[] = "";
         $sections[] = "## About";
-        $sections[] = $bio;
+        $sections[] = $this->plainText($bio);
         $sections[] = "";
         $sections = array_merge($sections, $this->identityBlock());
 
@@ -156,6 +156,19 @@ class GeoController extends Controller
      * on post_translations), else the post excerpt. Returns null when neither
      * exists so callers can fall back to a content snippet.
      */
+    /**
+     * The about bio is admin rich text (HTML). llms-full.txt is plain text for LLMs:
+     * paragraphs become blank lines, tags go, entities are decoded.
+     */
+    private function plainText(string $html): string
+    {
+        $text = preg_replace(['#</p\s*>#i', '#<br\s*/?>#i'], ["\n\n", "\n"], $html);
+        $text = html_entity_decode(strip_tags($text), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $lines = array_map(fn ($l) => trim(preg_replace('/[ \t]+/u', ' ', $l)), explode("\n", $text));
+
+        return trim(preg_replace("/\n{3,}/", "\n\n", implode("\n", $lines)));
+    }
+
     private function postSummary(Post $post): ?string
     {
         $translation = $post->relationLoaded('translations')
