@@ -310,3 +310,49 @@ describe("security headers on pages", () => {
     expect(res.headers.get("referrer-policy")).toBe("no-referrer");
   });
 });
+
+describe("canonical host (PF-3)", () => {
+  it("www host -> 301 to apex, path and query kept", async () => {
+    const res = (await onRequest(ctx("/id/pelatihan-ai?utm_source=x", { host: "www.alisadikinma.com" }), ok)) as Response;
+    expect(res.status).toBe(301);
+    expect(res.headers.get("location")).toBe("https://alisadikinma.com/id/pelatihan-ai?utm_source=x");
+  });
+  it("www root -> 301 to apex root (one hop, not the language redirect)", async () => {
+    const res = (await onRequest(ctx("/", { host: "WWW.alisadikinma.com:443" }), ok)) as Response;
+    expect(res.status).toBe(301);
+    expect(res.headers.get("location")).toBe("https://alisadikinma.com/");
+  });
+  it("www static asset also redirects", async () => {
+    const res = (await onRequest(ctx("/_astro/a.js", { host: "www.alisadikinma.com" }), ok)) as Response;
+    expect(res.status).toBe(301);
+  });
+  it("apex host is served, loopback host is served", async () => {
+    const a = (await onRequest(ctx("/id", { host: "alisadikinma.com" }), ok)) as Response;
+    expect(a.status).toBe(200);
+    const b = (await onRequest(ctx("/id", { host: "127.0.0.1:4321" }), ok)) as Response;
+    expect(b.status).toBe(200);
+  });
+});
+
+describe("edge cache headers (PF-3)", () => {
+  const html = () => Promise.resolve(new Response("<html></html>", { status: 200, headers: { "content-type": "text/html" } }));
+  it("public HTML page gets a shared-cache header", async () => {
+    const res = (await onRequest(ctx("/id/pembicara-ai"), html)) as Response;
+    expect(res.headers.get("cache-control")).toBe("public, max-age=0, s-maxage=300, stale-while-revalidate=86400");
+  });
+  it("a page that set its own Cache-Control keeps it", async () => {
+    const own = () => Promise.resolve(new Response("x", { status: 200, headers: { "content-type": "text/html", "Cache-Control": "private, no-store" } }));
+    const res = (await onRequest(ctx("/id/contact"), own)) as Response;
+    expect(res.headers.get("cache-control")).toBe("private, no-store");
+  });
+  it("404 is not shared-cached", async () => {
+    const nf = () => Promise.resolve(new Response("nf", { status: 404, headers: { "content-type": "text/html" } }));
+    const res = (await onRequest(ctx("/id/nope"), nf)) as Response;
+    expect(res.headers.get("cache-control")).toBeNull();
+  });
+  it("non-GET is not shared-cached", async () => {
+    const request = new Request("https://alisadikinma.com/id", { method: "POST" });
+    const res = (await onRequest({ request, url: new URL(request.url) } as unknown as Ctx, html)) as Response;
+    expect(res.headers.get("cache-control")).toBeNull();
+  });
+});

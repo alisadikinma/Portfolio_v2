@@ -27,8 +27,10 @@ describe("awardTitleTag", () => {
     const t = awardTitleTag("1st Place Winner Wild Card Fenox Startup World Cup Competition");
     expect(t.length).toBeLessThanOrEqual(60);
     expect(t.endsWith(" — Ali Sadikin Ma")).toBe(true);
-    expect(t).toContain("…");
+    // A cut title reads as a whole phrase in the SERP: no "…" in the middle of the <title>.
+    expect(t).not.toContain("…");
     expect(t).not.toContain("...");
+    expect(t).toBe("1st Place Winner Wild Card Fenox Startup — Ali Sadikin Ma");
   });
 });
 
