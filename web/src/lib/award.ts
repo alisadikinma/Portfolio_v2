@@ -11,12 +11,14 @@ export function awardShortName(title: string): string {
     .trim();
 }
 
-/** <title>: "{short name} — Ali Sadikin Ma"; only the title part is clipped, the name always stays. */
+/** <title>: "{short name} — Ali Sadikin Ma"; only the title part is cut (whole words, no "…"), the name always stays. */
 export function awardTitleTag(title: string): string {
   const short = awardShortName(title);
   const suffix = ` — ${NAME}`;
   const full = short + suffix;
-  return full.length <= TITLE_MAX ? full : clipWords(short, TITLE_MAX - suffix.length) + suffix;
+  if (full.length <= TITLE_MAX) return full;
+  // Cut on a word boundary without "…": a mid-title ellipsis looks broken in search results.
+  return clipWords(short, TITLE_MAX - suffix.length).replace(/…$/u, "").trimEnd() + suffix;
 }
 
 // Full EN/ID month names plus common abbreviations. A word is accepted only if it is one of

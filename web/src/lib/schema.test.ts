@@ -30,7 +30,7 @@ describe("personNode", () => {
       "Indonesian AI consultant and founder of INDUSIA.ai, based in Batam. Not the former Governor of Jakarta Ali Sadikin.",
     );
     expect(p.worksFor).toEqual(ORG_REF);
-    expect(p.founder).toEqual(ORG_REF);
+    expect(p.worksFor).toEqual(ORG_REF);
     expect(p.award).toBe("1st Place, Global AI Demo Day 2026 (Outskill, Bengaluru)");
     expect(typeof p.image).toBe("string");
     expect(Array.isArray(p.knowsAbout)).toBe(true);
@@ -70,8 +70,8 @@ describe("other nodes", () => {
   });
   it("service has provider, areaServed, no offers", () => {
     const s = serviceNode({ name: "n", url: "u", lang: "id" }) as any;
-    expect(s.provider).toEqual({ "@id": PERSON_ID });
-    expect(s.areaServed).toBe("Indonesia");
+    expect(s.provider).toEqual([{ "@id": PERSON_ID }, ORG_REF]);
+    expect(s.areaServed).toEqual({ "@type": "Country", name: "Indonesia" });
     expect(s.offers).toBeUndefined();
   });
   it("profilePage mainEntity", () => {
@@ -98,8 +98,8 @@ describe("other nodes", () => {
     expect(e.image).toBe("https://alisadikinma.com/i.jpg");
     expect(e.attendee).toEqual({ "@id": PERSON_ID });
   });
-  it("personNode award can be overridden for an award page", () => {
-    expect((personNode({ award: "Top 8 Finalist" }) as any).award).toBe("Top 8 Finalist");
+  it("personNode award is not overridable: one Person @id, one award value on every page", () => {
+    expect((personNode({ award: "Top 8 Finalist" } as any) as any).award).toBe("1st Place, Global AI Demo Day 2026 (Outskill, Bengaluru)");
   });
   it("graph wraps nodes with single @context", () => {
     const g = graph(websiteNode(), breadcrumb([])) as any;
@@ -144,9 +144,9 @@ describe("1D review fixes", () => {
     expect(w.description).toBe("D");
     expect((webPageNode({ url: "u", lang: "en", name: "N" }) as any).description).toBeUndefined();
   });
-  it("person: no alternateName, has spec fields", () => {
+  it("person: no bare-name alias (collides with the former Jakarta governor), has spec fields", () => {
     const p = personNode() as any;
-    expect(p.alternateName).toBeUndefined();
+    expect(p.alternateName).not.toContain("Ali Sadikin");
     expect(typeof p.description).toBe("string");
     expect(p.homeLocation).toEqual({
       "@type": "Place",
@@ -267,5 +267,25 @@ describe("serviceNode / profilePage enrichment", () => {
     expect(p.description).toBe("D");
     expect(p.inLanguage).toBe("id");
     expect(p.isPartOf).toEqual({ "@id": "https://alisadikinma.com/#website" });
+  });
+});
+
+describe("PF-3 entity + service fixes", () => {
+  it("Person has no invalid founder property, has alternateName and the INDUSIA founder page in sameAs", () => {
+    const p = personNode();
+    expect(p).not.toHaveProperty("founder");
+    expect(p.alternateName).toEqual(expect.arrayContaining(["alisadikinma"]));
+    expect(p.sameAs).toContain("https://indusia.ai/id/founder/");
+  });
+  it("Person award is the same everywhere (no per-page override)", () => {
+    expect(personNode().award).toEqual(personNode({ sameAs: [] }).award);
+    expect(personNode().award).toBe("1st Place, Global AI Demo Day 2026 (Outskill, Bengaluru)");
+  });
+  it("Service has serviceType, Person + INDUSIA provider, Country areaServed", () => {
+    const s = serviceNode({ name: "Pelatihan AI", url: "https://alisadikinma.com/id/pelatihan-ai", lang: "id", serviceType: "Pelatihan dan workshop AI untuk perusahaan" });
+    expect(s.serviceType).toBe("Pelatihan dan workshop AI untuk perusahaan");
+    expect(s.provider).toEqual([{ "@id": PERSON_ID }, { "@id": ORG_ID }]);
+    expect(s.areaServed).toEqual({ "@type": "Country", name: "Indonesia" });
+    expect(s).not.toHaveProperty("inLanguage");
   });
 });

@@ -266,11 +266,12 @@ describe("JSON-LD", () => {
     AWARDS[NEXTDEV].award.received_at = "2018";
   });
 
-  it("Person.award is this award only when it was won, never for an attended event", async () => {
+  it("Person is the same node on every award page: award never switches per page (PF-3), never an attended event", async () => {
     const won = nodesOf((await load("id", NEXTDEV)).html).find((n: any) => n["@type"] === "Person") as any;
-    expect(won.award).toBe(AWARDS[NEXTDEV].award.title);
     const grind = nodesOf((await load("id", GRIND)).html).find((n: any) => n["@type"] === "Person") as any;
-    expect(JSON.stringify(grind.award ?? "")).not.toContain("Startup Grind");
+    expect(won.award).toBe("1st Place, Global AI Demo Day 2026 (Outskill, Bengaluru)");
+    expect(grind.award).toBe(won.award);
+    expect(JSON.stringify(grind.award)).not.toContain("Startup Grind");
   });
 
   it("Event: empty organization -> no organizer (never Ali)", async () => {

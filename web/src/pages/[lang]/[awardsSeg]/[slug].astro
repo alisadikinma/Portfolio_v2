@@ -77,8 +77,8 @@ const eventDescription = descriptionText.trim() !== "" ? clipWords(descriptionTe
 const jsonld = failed
   ? graph(personNode(), websiteNode())
   : graph(
-      // Person.award only for awards actually won/earned; an attended event is not an award.
-      kind === "attendee" ? personNode() : personNode({ award: title }),
+      // Person is identical on every page (one @id, one award value); the award itself is the Event below.
+      personNode(),
       websiteNode(),
       webPageNode({ url, lang, name: metaTitle, description: metaDescription }),
       eventNode({

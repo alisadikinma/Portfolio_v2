@@ -1,6 +1,7 @@
 ---
 import type { Lang } from "../lib/i18n";
 import { PORTRAIT_URL } from "../lib/schema";
+import { localizedPath } from "../lib/i18n";
 import { id } from "../content/copy/id";
 import { en } from "../content/copy/en";
 
@@ -17,6 +18,7 @@ const indusia = lang === "id" ? "https://indusia.ai/id/" : "https://indusia.ai/"
     <p>
       {c.authorLeadBefore}<a href={indusia}>{c.authorFounderAnchor}</a>{c.authorBetween}<a href={indusia}>{c.authorCompanyAnchor}</a>{c.authorAfter}
     </p>
+    <p>{c.authorServicesLead}<a href={localizedPath("/id/pelatihan-ai", lang)}>{c.authorTraining}</a>{c.authorServicesBetween}<a href={localizedPath("/id/pembicara-ai", lang)}>{c.authorSpeaker}</a>{c.authorServicesAfter}</p>
     <p>{c.authorAboutLead} <a href={`/${lang}/about`}>{c.authorAbout}</a>.</p>
   </div>
 </aside>

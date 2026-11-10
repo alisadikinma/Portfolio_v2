@@ -42,6 +42,18 @@ export function firstParagraphText(html: string): string {
   return "";
 }
 
+/** Opening <p> texts joined until they reach `min` chars (hook lines like "Ini bukan typo." are too short alone). */
+export function leadParagraphsText(html: string, min: number): string {
+  let out = "";
+  for (const m of (html ?? "").matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)) {
+    const t = htmlToText(m[1]);
+    if (t === "") continue;
+    out = out === "" ? t : `${out} ${t}`;
+    if (out.length >= min) break;
+  }
+  return out;
+}
+
 export const wordCount = (s: string): number => s.split(/\s+/).filter(Boolean).length;
 
 /**
@@ -60,10 +72,10 @@ export function postTitle(title: string, metaTitle?: string | null): string {
   return withName.length <= TITLE_MAX ? withName : clipWords(t, TITLE_MAX);
 }
 
-/** meta_description -> excerpt -> first <p>; a source under 120 chars yields to the next; never empty. */
+/** meta_description -> excerpt -> opening <p>s joined to 120; a source under 120 chars yields to the next; never empty. */
 export function postDescription(o: { meta?: string | null; excerpt?: string | null; content?: string | null; fallback?: string }): string {
   const meta = isCut(o.meta ?? "") ? "" : o.meta ?? "";
-  const sources = [meta, o.excerpt ?? "", firstParagraphText(o.content ?? "")].map((s) => htmlToText(s));
+  const sources = [meta, o.excerpt ?? "", leadParagraphsText(o.content ?? "", DESC_MIN)].map((s) => htmlToText(s));
   const pick = sources.find((s) => s.length >= DESC_MIN) ?? sources.find((s) => s !== "") ?? (o.fallback ?? "").trim();
   return clipWords(pick, DESC_MAX);
 }

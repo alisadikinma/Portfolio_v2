@@ -79,6 +79,15 @@ describe("postDescription", () => {
   });
 });
 
+describe("postDescription: short hook paragraphs (PF-3)", () => {
+  it("joins the opening paragraphs until 120 chars instead of using a 15-char hook line", () => {
+    const content = "<p>Ini bukan typo.</p><p>AI yang pernah nyebut dirinya sendiri MechaHitler kini bisa akses jaringan militer <em>classified</em> Amerika Serikat.</p><p>Paragraf ketiga.</p>";
+    const out = postDescription({ meta: "Ini bukan typo. AI yang pernah nyebut dirinya jaring...", excerpt: null, content, fallback: "Judul" });
+    expect(out).toBe("Ini bukan typo. AI yang pernah nyebut dirinya sendiri MechaHitler kini bisa akses jaringan militer classified Amerika Serikat.");
+    expect(out.length).toBeGreaterThanOrEqual(120);
+  });
+});
+
 describe("pickLede", () => {
   const long = Array.from({ length: 26 }, (_, i) => `kata${i}`).join(" ");
   it("returns the first source with >= 25 words, as plain text", () => {

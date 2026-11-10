@@ -155,6 +155,15 @@ describe("/{lang}/blog/{slug}", () => {
     }
   });
 
+  it("author box links the money pages with keyword anchors (PF-3)", async () => {
+    const id = (await load("id")).html;
+    expect(id).toMatch(/<a href="\/id\/pelatihan-ai"[^>]*>pelatihan AI<\/a>/);
+    expect(id).toMatch(/<a href="\/id\/pembicara-ai"[^>]*>pembicara AI<\/a>/);
+    const en = (await load("en")).html;
+    expect(en).toMatch(/<a href="\/en\/ai-training"[^>]*>AI training<\/a>/);
+    expect(en).toMatch(/<a href="\/en\/ai-speaker"[^>]*>AI speaker<\/a>/);
+  });
+
   it("sanitizes post content: no script, no on* handlers", async () => {
     const { html } = await load("id");
     expect(html).toContain("<h2>Mulai dari masalah</h2>");

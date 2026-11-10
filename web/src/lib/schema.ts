@@ -24,13 +24,19 @@ export const SAME_AS: string[] = [
   "https://www.youtube.com/@alisadikinma",
   "https://github.com/alisadikinma",
   "https://www.wikidata.org/wiki/Q140135628",
+  "https://indusia.ai/id/founder/",
 ];
 
-export function personNode(opts: { sameAs?: string[]; image?: string; award?: string } = {}): Node {
+/** Same on every page: one Person @id must never carry two different award values. */
+const PERSON_AWARD = "1st Place, Global AI Demo Day 2026 (Outskill, Bengaluru)";
+
+export function personNode(opts: { sameAs?: string[]; image?: string } = {}): Node {
   return {
     "@type": "Person",
     "@id": PERSON_ID,
     name: "Ali Sadikin Ma",
+    // Handle used on every social profile; helps separate him from the former Jakarta governor "Ali Sadikin".
+    alternateName: ["alisadikinma", "Ali Sadikin Ma (INDUSIA.ai)"],
     url: SITE,
     jobTitle: "AI Consultant",
     disambiguatingDescription:
@@ -48,9 +54,9 @@ export function personNode(opts: { sameAs?: string[]; image?: string; award?: st
       { "@type": "CollegeOrUniversity", name: "Politeknik Caltex Riau" },
     ],
     image: opts.image ?? PORTRAIT_URL,
+    // Person has no schema.org `founder` property; the link lives on Organization.founder (orgNode).
     worksFor: { "@id": ORG_ID },
-    founder: { "@id": ORG_ID },
-    award: opts.award ?? "1st Place, Global AI Demo Day 2026 (Outskill, Bengaluru)",
+    award: PERSON_AWARD,
     knowsAbout: [
       "AI Agents", "AI Agent Operating Systems", "Vibe Coding", "Generative AI Video",
       "AI Automation", "Computer Vision", "Edge AI", "Large Language Model Applications",
@@ -166,15 +172,16 @@ export function creativeWork(p: {
   return n;
 }
 
-export function serviceNode(s: { name: string; url: string; lang: string; description?: string }): Node {
+export function serviceNode(s: { name: string; url: string; lang: string; description?: string; serviceType?: string }): Node {
   const n: Node = {
     "@type": "Service",
     "@id": `${s.url}#service`,
     name: s.name,
     url: s.url,
-    provider: PERSON_REF,
-    areaServed: "Indonesia",
+    provider: [PERSON_REF, { "@id": ORG_ID }],
+    areaServed: { "@type": "Country", name: "Indonesia" },
   };
+  if (s.serviceType) n.serviceType = s.serviceType;
   if (s.description) n.description = s.description;
   return n;
 }

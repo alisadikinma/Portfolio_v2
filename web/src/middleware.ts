@@ -70,6 +70,29 @@ function withSecurityHeaders(res: Response): Response {
   }
 }
 
+/** Public HTML (GET 200, no own Cache-Control): Cloudflare may keep it 5 min and serve stale up to a day while it refreshes. Slow SSR then hits a crawler at most once per 5 min. */
+const EDGE_CACHE = "public, max-age=0, s-maxage=300, stale-while-revalidate=86400";
+function withEdgeCache(res: Response, method: string): Response {
+  if (method !== "GET" || res.status !== 200 || res.headers.has("cache-control")) return res;
+  if (!(res.headers.get("content-type") ?? "").toLowerCase().includes("text/html")) return res;
+  try {
+    res.headers.set("Cache-Control", EDGE_CACHE);
+    return res;
+  } catch {
+    const headers = new Headers(res.headers);
+    headers.set("Cache-Control", EDGE_CACHE);
+    return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+  }
+}
+
+/** www.<site host> is a duplicate of the whole site; Google indexed it. Send it to the canonical origin in one hop. */
+function wwwRedirect(request: Request, url: URL): Response | null {
+  const site = new URL(getConfig().siteUrl);
+  const host = (request.headers.get("host") ?? url.host).toLowerCase().replace(/:\d+$/, "");
+  if (host !== "www." + site.hostname) return null;
+  return redirect(site.origin + url.pathname + url.search, 301);
+}
+
 /** HTML pages: every link opens a new tab (lib/new-tab.ts). Other bodies pass through untouched. */
 async function withNewTabLinks(res: Response): Promise<Response> {
   if (!(res.headers.get("content-type") ?? "").toLowerCase().includes("text/html") || res.body === null) return res;
@@ -115,6 +138,8 @@ function logCrawlerHit(bot: string): void {
 export async function onRequest(context: Ctx, next: Next): Promise<Response> {
   const url = context.url ?? new URL(context.request.url);
   const path = url.pathname;
+  const toApex = wwwRedirect(context.request, url);
+  if (toApex) return toApex;
   if (isStatic(path)) return next();
 
   const bot = matchAiBot(context.request.headers.get("user-agent"));
@@ -150,7 +175,7 @@ export async function onRequest(context: Ctx, next: Next): Promise<Response> {
     const fixed = prefixed[1].toLowerCase() + norm.slice(prefixed[0].length);
     const target = "/" + fixed + search;
     if (path !== "/" + fixed) return redirect(target, 301);
-    return withSecurityHeaders(await withNewTabLinks(await next()));
+    return withEdgeCache(withSecurityHeaders(await withNewTabLinks(await next())), context.request.method);
   }
 
   const blog = norm.match(/^\/blog\/([^/]+)$/);
